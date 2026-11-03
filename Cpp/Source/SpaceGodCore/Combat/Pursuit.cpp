@@ -115,7 +115,7 @@ namespace SpaceGod::Core
 		return g;
 	}
 
-	cs::List<std::pair<cs::Ref<Pursuer>, PursuitEvent>> Pursuit::Step(const cs::Ref<Ship>& pilot, int body, DVec3 pilotOffset, DVec3 pilotVel, double dt, double jd)
+	cs::List<std::pair<cs::Ref<Pursuer>, PursuitEvent>> Pursuit::Step(const cs::Ref<Ship>& /*pilot*/, int body, DVec3 pilotOffset, DVec3 pilotVel, double dt, double jd)
 	{
 		cs::List<std::pair<cs::Ref<Pursuer>, PursuitEvent>> events;
 		if (dt <= 0) return events;

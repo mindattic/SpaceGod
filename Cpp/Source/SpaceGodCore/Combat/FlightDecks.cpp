@@ -215,7 +215,7 @@ namespace SpaceGod::Core
 
 	// ---------------------------------------------------------------- the pilot's decision
 
-	bool FlightDecks::WantsService(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& u)
+	bool FlightDecks::WantsService(const cs::Ref<Battle>& /*b*/, const cs::Ref<BattleUnit>& u)
 	{
 		auto f = u->Fighter;
 		if (f == nullptr || !AiRearms()->Value || BoardingShuttles::Is(u)) return false;
@@ -292,7 +292,7 @@ namespace SpaceGod::Core
 		return deck->Gate() - c->Forward * HoldAsternKm + (right * cs::Math::Cos(a) + up * cs::Math::Sin(a)) * HoldRadiusKm;
 	}
 
-	bool FlightDecks::TryFinal(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& u, const cs::Ref<FlightDeck>& deck, double dt)
+	bool FlightDecks::TryFinal(const cs::Ref<Battle>& /*b*/, const cs::Ref<BattleUnit>& u, const cs::Ref<FlightDeck>& deck, double dt)
 	{
 		auto v = VisitOf(u);
 		if (v == nullptr || v->Deck != deck || v->Stage != DeckStage::Inbound || deck->Busy(u)) return false;
@@ -360,7 +360,7 @@ namespace SpaceGod::Core
 		return true;
 	}
 
-	void FlightDecks::Touchdown(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& u, const cs::Ref<DeckVisit>& v)
+	void FlightDecks::Touchdown(const cs::Ref<Battle>& /*b*/, const cs::Ref<BattleUnit>& u, const cs::Ref<DeckVisit>& v)
 	{
 		auto deck = v->Deck;
 		if (deck->Final == u) deck->Final = nullptr;

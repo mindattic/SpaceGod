@@ -777,7 +777,7 @@ namespace SpaceGod::Core
 
 	// ---------------------------------------------------------------- flying
 
-	void FighterAI::Steer(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& u, DVec3 goal, double speed, double dt, cs::Nullable<DVec3> match, bool homing)
+	void FighterAI::Steer(const cs::Ref<Battle>& /*b*/, const cs::Ref<BattleUnit>& u, DVec3 goal, double speed, double dt, cs::Nullable<DVec3> match, bool homing)
 	{
 		auto spec = u->Combat->Spec;
 		// Power to the engines (U.SPC-T424) is speed and thrust.

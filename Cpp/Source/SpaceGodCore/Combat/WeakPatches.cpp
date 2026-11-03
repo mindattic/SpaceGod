@@ -274,7 +274,7 @@ namespace SpaceGod::Core
 		roof = PilotFlight::RotateAbout(LevelRoof(f0), axis, a).Normalized();
 	}
 
-	void WeakPatches::Orient(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& u, DVec3 face, const cs::Dictionary<int, double>* bearings,
+	void WeakPatches::Orient(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& u, DVec3 face, const cs::Ref<cs::Dictionary<int, double>>& bearings,
 		cs::Nullable<DVec3> toTarget, cs::Nullable<DVec3> rest, double dt, DVec3& forward, DVec3& roof, cs::Nullable<DVec3> actual)
 	{
 		if (face.LengthSquared() < 1e-18) face = u->Forward;
@@ -291,7 +291,7 @@ namespace SpaceGod::Core
 		if (!valid || cmd->RollReconsider <= 0)
 		{
 			cmd->RollReconsider = ReconsiderSeconds;
-			Choose(b, u, cmd, face, aiming ? bearings : nullptr, aiming ? toTarget : cs::Nullable<DVec3>(), rest, actual);
+			Choose(b, u, cmd, face, aiming ? bearings.get() : nullptr, aiming ? toTarget : cs::Nullable<DVec3>(), rest, actual);
 		}
 		Frame(face, aiming ? toTarget : cs::Nullable<DVec3>(), aiming ? cmd->RollBearing : NoBearing, cmd->RollDeg, forward, roof);
 		// The roof is carried over to the heading the hull actually lies on, to roll it there; the bow is still turned

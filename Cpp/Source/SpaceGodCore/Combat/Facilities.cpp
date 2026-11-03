@@ -151,7 +151,7 @@ namespace SpaceGod::Core
 			auto k = cs::New<FacilityKind>(SpinalPlant, "Spinal power plant", 3, 700, true,
 				BillOf { { Good::Alloys, 220.0 }, { Good::Machinery, 120.0 }, { Good::Electronics, 70.0 }, { Good::HeliumThree, 15.0 } },
 				cs::List<HullCategory> { HullCategory::Battleship }, true, std::nullopt, std::nullopt,
-				[](cs::Ref<CombatSpec> spec, cs::Ref<Loadout> l, int n) { spec->SpinalPlants = cs::Math::Max(0, spec->SpinalPlants + n); });
+				[](cs::Ref<CombatSpec> spec, cs::Ref<Loadout> /*l*/, int n) { spec->SpinalPlants = cs::Math::Max(0, spec->SpinalPlants + n); });
 			k->ClassFilter = [](cs::Nullable<ShipClass> c) { return SpinalMounts::CanCarry(c); };
 			Register(k);
 		}
@@ -182,7 +182,7 @@ namespace SpaceGod::Core
 			/*cargoTonnes:*/ BulkFreighters::PodTonnes, /*holdRows:*/ BulkFreighters::PodRows, /*classes:*/ &BulkFreighters::TrussClasses()));
 		Register(cs::New<FacilityKind>(FuelSphere, "Fuel sphere", 1, BulkFreighters::SphereMassTonnes, false, BillOf { { Good::Alloys, 60.0 }, { Good::Machinery, 4.0 } },
 			/*categories*/ std::nullopt, /*fittable:*/ true, /*compartment*/ std::nullopt, /*module*/ std::nullopt,
-			/*effect:*/ [](cs::Ref<CombatSpec> spec, cs::Ref<Loadout> l, int n) { spec->PropellantTonnes = cs::Math::Max(0.0, spec->PropellantTonnes + n * BulkFreighters::SphereTonnes); },
+			/*effect:*/ [](cs::Ref<CombatSpec> spec, cs::Ref<Loadout> /*l*/, int n) { spec->PropellantTonnes = cs::Math::Max(0.0, spec->PropellantTonnes + n * BulkFreighters::SphereTonnes); },
 			/*berths*/ 0, /*cargoTonnes*/ 0, /*holdRows*/ 0, /*classes:*/ &BulkFreighters::TrussClasses()));
 	}
 

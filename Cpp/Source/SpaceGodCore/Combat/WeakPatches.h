@@ -206,8 +206,8 @@ namespace SpaceGod::Core
 		/// <paramref name="rest"/> (null: level). The choice is weighed every <see cref="ReconsiderSeconds"/> and changed only
 		/// for a better one by <see cref="Hysteresis"/>, so the hull settles instead of hunting.
 		/// </summary>
-		// `bearings` is C#'s nullable IReadOnlyDictionary reference: nullptr stands for null.
-		static void Orient(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& u, DVec3 face, const cs::Dictionary<int, double>* bearings,
+		// `bearings` is C#'s nullable IReadOnlyDictionary reference: nullptr stands for null (Battle's shape, MIGRATION.md ruling 2).
+		static void Orient(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& u, DVec3 face, const cs::Ref<cs::Dictionary<int, double>>& bearings,
 			cs::Nullable<DVec3> toTarget, cs::Nullable<DVec3> rest, double dt, DVec3& forward, DVec3& roof, cs::Nullable<DVec3> actual = std::nullopt);
 
 	private:

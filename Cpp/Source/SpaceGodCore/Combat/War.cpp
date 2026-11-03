@@ -41,9 +41,11 @@
 #include "Economy/Economy.h"
 #include "Economy/Goods.h"
 #include "Economy/Settlement.h"
+#include "Infrastructure/Infrastructure.h"
 #include "Law/Law.h"
 #include "Law/Outlaws.h"
 #include "Sensors/Sensors.h"
+#include "Settings/GameSetting.h"
 #include "Systems/Galaxy.h"
 #include "Systems/InterstellarTraffic.h"
 #include "Systems/JumpGate.h"
@@ -376,9 +378,9 @@ namespace SpaceGod::Core
 			world->Log(jd, cs::Cat("The ", lurker->Faction->Name, " lane picket ", lurker->Name, " interdicts the ", lane->Name, " lane: ", pulled), WorldEventKind::Battle, lane->A);
 		else
 		{
-			double danger = 0;
-			lanes0()->Danger.TryGetValue(lane, danger);
-			lanes0()->SetDanger(lane, danger + 3);
+			double laneDanger = 0; // C#'s local `danger`, renamed: it hides the `danger` field (C4458)
+			lanes0()->Danger.TryGetValue(lane, laneDanger);
+			lanes0()->SetDanger(lane, laneDanger + 3);
 			world->Log(jd, cs::Cat(lurker->Faction->Name, " raiders (", lurker->Name, ") spring an ambush on the ", lane->Name, " lane: ", pulled), WorldEventKind::Battle, lane->A);
 			BumpDanger(lane->A, 1);
 			BumpDanger(lane->B, 1);
@@ -386,7 +388,7 @@ namespace SpaceGod::Core
 		BattleStarted.Invoke(b);
 	}
 
-	bool War::Forewarned(const cs::Ref<Ship>& victim, const cs::Ref<Ship>& lurker, double jd)
+	bool War::Forewarned(const cs::Ref<Ship>& victim, const cs::Ref<Ship>& lurker, double /*jd*/)
 	{
 		auto sensors = world->Sensors;
 		if (sensors == nullptr || victim == nullptr || lurker == nullptr) return false;
@@ -401,7 +403,7 @@ namespace SpaceGod::Core
 		bool forward = rider->LaneLeg.From == lane->A;
 		double now = Core::Fleet::LaneProgress(rider, jd);
 		auto suite = world->Sensors != nullptr ? world->Sensors->GroupSuite(rider) : SensorSuite::Of(rider);
-		double reach = suite->ReachKm(EmitterSignature);
+		double reach = suite.ReachKm(EmitterSignature);
 		cs::Nullable<LaneThreat> best = std::nullopt;
 		for (const auto& lurker : Fleet()->Ships())
 		{
@@ -1385,7 +1387,7 @@ namespace SpaceGod::Core
 		return best;
 	}
 
-	cs::Ref<JumpGate> War::BusiestGate(const cs::Ref<Faction>& clan, double jd)
+	cs::Ref<JumpGate> War::BusiestGate(const cs::Ref<Faction>& /*clan*/, double /*jd*/)
 	{
 		cs::Ref<JumpGate> best = nullptr;
 		double bestScore = 0;
@@ -2355,9 +2357,9 @@ namespace SpaceGod::Core
 				if (keepToPorts) continue;
 				to = far;
 			}
-			double danger = 0;
-			lanes->Danger.TryGetValue(lane, danger);
-			double score = (danger + 0.25) * (0.7 + rng.NextDouble() * 0.6);
+			double laneDanger = 0; // C#'s local `danger`, renamed: it hides the `danger` field (C4458)
+			lanes->Danger.TryGetValue(lane, laneDanger);
+			double score = (laneDanger + 0.25) * (0.7 + rng.NextDouble() * 0.6);
 			if (score > bestScore)
 			{
 				bestScore = score;
@@ -3010,7 +3012,7 @@ namespace SpaceGod::Core
 		}
 	}
 
-	void War::Refit(double jd)
+	void War::Refit(double /*jd*/)
 	{
 		const int alloysI = static_cast<int>(Good::Alloys), electronicsI = static_cast<int>(Good::Electronics);
 		const int munitionsI = static_cast<int>(Good::Munitions), medicalI = static_cast<int>(Good::MedicalSupplies);
@@ -3191,7 +3193,7 @@ namespace SpaceGod::Core
 		return besiegers.TryGetValue(s, f) ? f : nullptr;
 	}
 
-	void War::RebuildPlatforms(double jd)
+	void War::RebuildPlatforms(double /*jd*/)
 	{
 		const int alloysI = static_cast<int>(Good::Alloys), electronicsI = static_cast<int>(Good::Electronics);
 		for (const auto& st : Economy()->Settlements)
