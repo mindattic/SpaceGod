@@ -3,6 +3,7 @@
 
 #include "Cs/Cs.h"
 #include "DVec3.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -204,6 +205,7 @@ namespace SpaceGod::Core
 
 		/// <summary>A sensor satellite: point defence for its own protection and room for a scanner suite.</summary>
 		static const cs::Ref<CombatSpec>& SensorSatellite();
+		SG_SERIALIZABLE(HullFrames); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	/// <summary>Why a construction plan's fitting did or did not go through (<see cref="NoRoom"/>: the facility is bigger

@@ -26,6 +26,9 @@ public class SpaceGodCore : ModuleRules
 		FPSemantics = FPSemanticsMode.Precise;
 		PublicIncludePaths.Add(ModuleDirectory);
 		PublicDependencyModuleNames.Add("Core");
+		// SaveGame's raw DEFLATE (docs/PERSISTENCE.md, section 7): the engine's zlib.
+		AddEngineThirdPartyPrivateStaticDependencies(Target, "zlib");
+		PrivateDefinitions.Add("SPACEGOD_WITH_ZLIB=1");
 
 		if (PortingAllowList != null) RestrictToAllowList();
 	}

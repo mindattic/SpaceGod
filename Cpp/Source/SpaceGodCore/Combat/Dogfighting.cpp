@@ -595,3 +595,13 @@ namespace SpaceGod::Core
 		}
 	}
 }
+
+// ObjectGraph (docs/PERSISTENCE.md, "Statics"): C#'s static FighterCraft.Crafts lives in this file's FighterCraftStatics,
+// so its save declaration is here (the others are in Persistence/Registrations/Statics.cpp). A public accessor first, so
+// the type's statics are set up as C#'s type initialiser sets them.
+#include "Persistence/ObjectGraph.h"
+
+namespace SpaceGod::Core
+{
+	SG_STATIC_OF("Unity.SpaceGod.Core.FighterCraft", "Crafts", (static_cast<void>(FighterCraft::AssaultShuttle()), FighterCraftStatics::Get().Crafts))
+}

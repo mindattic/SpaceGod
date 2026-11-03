@@ -259,6 +259,7 @@ namespace SpaceGod::Core
 
 		/// <summary>The facility that is <paramref name="module"/>, or null if the module goes on a hardpoint.</summary>
 		static cs::Ref<FacilityKind> ForModule(ModuleKind module);
+		SG_SERIALIZABLE(FacilityKinds); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	/// <summary>
