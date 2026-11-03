@@ -5,6 +5,7 @@
 // UStaticMesh*/UProceduralMeshComponent*, UTexture2D*, ULightComponent*) once Rendering backs them.
 
 #include "UnityCompat/UnityMath.h"
+#include "UnityCompat/UnityTexture.h"
 
 namespace SpaceGod::UnityCompat
 {
@@ -26,13 +27,7 @@ namespace SpaceGod::UnityCompat
 		void* Native = nullptr;
 	};
 
-	class Texture2D final
-	{
-	public:
-		cs::String name;
-		int width = 0, height = 0;
-		void* Native = nullptr;
-	};
+	// Texture / Texture2D (pixels made in code, or a wrapped UTexture through Native): UnityTexture.h (US-T31).
 
 	enum class LightType : int { Spot = 0, Directional = 1, Point = 2, Area = 3 };
 
