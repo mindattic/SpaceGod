@@ -83,12 +83,14 @@ namespace Unity.SpaceGod.Bridge
                 component.FieldOfView = HorizontalFov(cam.fieldOfView, aspect);
                 component.ConstrainAspectRatio = false;
             }
-            // Unreal's near plane is global (reversed-Z, infinite far): set it when it has moved by more than 10%.
+            // Unreal's near plane is global (reversed-Z, infinite far): set whenever it moves, as the C++ track does each
+            // frame. Through sg.SetNearClipPlane (the primary module's), not r.SetNearClipPlane, which floors it at one
+            // unit: here one Unity unit is one Unreal unit, and the original's near plane beside Earth is ~0.2 (US-T45).
             float near = (float)(cam.nearClipPlane * UnrealSpace.UnitsPerUnity);
-            if (appliedNear < 0 || Math.Abs(near - appliedNear) > appliedNear * 0.1f)
+            if (near != appliedNear)
             {
                 appliedNear = near;
-                SystemLibrary.ExecuteConsoleCommand("r.SetNearClipPlane " + near.ToString("R", System.Globalization.CultureInfo.InvariantCulture));
+                SystemLibrary.ExecuteConsoleCommand("sg.SetNearClipPlane " + near.ToString("R", System.Globalization.CultureInfo.InvariantCulture));
             }
         }
 

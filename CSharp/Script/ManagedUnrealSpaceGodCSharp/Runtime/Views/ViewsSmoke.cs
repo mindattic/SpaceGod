@@ -165,7 +165,7 @@ namespace Unity.SpaceGod.Views
             // Unreal's near plane is global (reversed-Z, no far plane): a thousandth of the way to Earth.
             int earth = sol.Catalog["Earth"].Index;
             double near = Math.Max(1e-4, (scene[earth] - cameraScene).Length * 1e-3);
-            SystemLibrary.ExecuteConsoleCommand("r.SetNearClipPlane " + near.ToString("R", CultureInfo.InvariantCulture));
+            SystemLibrary.ExecuteConsoleCommand("sg.SetNearClipPlane " + near.ToString("R", CultureInfo.InvariantCulture)); // no 1-unit floor (US-T45)
             ApplyCamera();
         }
 

@@ -8,5 +8,7 @@ public class UnrealSpaceGodCSharp : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 		PublicDependencyModuleNames.AddRange(new[] { "Core", "CoreUObject", "Engine" });
+		// sg.SetNearClipPlane (US-T45): the engine's near-plane setter without r.SetNearClipPlane's 1 cm floor.
+		PrivateDependencyModuleNames.Add("RenderCore");
 	}
 }
