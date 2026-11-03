@@ -1334,6 +1334,10 @@ namespace SpaceGod::Core
 #define SG_ENUM_AS(E, NetFullName, Code) \
 	[[maybe_unused]] static const bool SG_CONCAT(sgEnum_, __LINE__) = (::SpaceGod::Core::Graph::DeclareEnum(typeid(E), NetFullName, ::SpaceGod::Core::Graph::TypeCode::Code), true);
 
+/// SG_STATIC with the value's C++ type taken from `expr` (an lvalue: the accessor's reference or the static member).
+#define SG_STATIC_OF(TypeFullName, FieldName, expr) \
+	[[maybe_unused]] static const bool SG_CONCAT(sgStatic_, __LINE__) = (::SpaceGod::Core::Graph::DeclareStatic(TypeFullName, FieldName, \
+		::SpaceGod::Core::Graph::StaticWalk<std::remove_reference_t<decltype(expr)>>([]() -> std::remove_reference_t<decltype(expr)>& { return expr; })), true);
 /// A static field of a Core type that holds objects (see "Statics"): `expr` is an lvalue of the value it holds.
 /// (A CppValueType with commas needs a `using` alias first.)
 #define SG_STATIC(TypeFullName, FieldName, CppValueType, expr) \
