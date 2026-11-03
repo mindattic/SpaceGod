@@ -65,6 +65,7 @@ namespace Unity.SpaceGod
         /// </summary>
         void EnterPiloting(Target t)
         {
+            if (CoopRefusesHelm()) return; // US-T39: the pilot loop is not lockstepped yet
             var ship = t.Ship;
             Piloted = t;
             // A fresh helm: no drives-down timer left over from the hull flown before (spawned or loaded in the same frame).

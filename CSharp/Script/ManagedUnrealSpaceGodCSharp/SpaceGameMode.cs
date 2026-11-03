@@ -3,6 +3,7 @@ using System.Globalization;
 using Unity.Shared.Core;
 using Unity.SpaceGod;
 using Unity.SpaceGod.Bridge;
+using Unity.SpaceGod.Coop;
 using Unity.SpaceGod.Core;
 using Unity.SpaceGod.Input;
 using UnrealSharp.Attributes;
@@ -50,6 +51,18 @@ public partial class ASpaceGameMode : AGameModeBase
             System.IO.Directory.CreateDirectory(root);
             Profiles.UseRoot(root);
         }
+        // US-T39: a listen server (tools/play.ps1 -Mode host) hosts co-op; standalone stays the original single-player path.
+        if (SystemLibrary.IsServer() && !SystemLibrary.IsStandalone() && !SystemLibrary.IsDedicatedServer())
+        {
+            if (CoopSmoke.Active)
+            {
+                var root = System.IO.Path.Combine(SystemLibrary.ProjectSavedDirectory, "SmokeProfiles", "CoopHost");
+                System.IO.Directory.CreateDirectory(root);
+                Profiles.UseRoot(root);
+            }
+            CoopPeer.StartHost(CoopPeer.NameFromCommandLine(CoopSmoke.Active ? "Host" : null));
+            ASpaceCoopLink.WireHud();
+        }
 
         UnityBridge.Begin(this);
         host = new UnrealHost(this);
@@ -64,6 +77,8 @@ public partial class ASpaceGameMode : AGameModeBase
         if (app != null)
             UnrealLogger.Log(Log, $"UnitySpaceApp up in {started.ElapsedMilliseconds} ms: {app.Galaxy.Systems.Count} systems, " +
                 $"{app.Catalog.Count} bodies in {app.ActiveSystem.Name}, {app.Fleet.Ships.Count} ships (.NET {Environment.Version})");
+
+        if (CoopSmoke.Active && app != null) UnityEngine.Application.targetFrameRate = 60; // US-T39: the co-op smoke's pace
 
         if (smoke)
         {
@@ -120,11 +135,38 @@ public partial class ASpaceGameMode : AGameModeBase
         Step(deltaSeconds);
     }
 
+    // US-T39: each client that logs in gets its link actor (its RPCs), and leaving hands its seat back.
+    readonly System.Collections.Generic.Dictionary<APlayerController, ASpaceCoopLink> coopLinks = new();
+
+    public override void OnPostLogin(APlayerController newPlayer)
+    {
+        base.OnPostLogin(newPlayer);
+        var peer = CoopPeer.Current;
+        if (peer == null || !peer.IsHost || newPlayer == null || newPlayer.IsLocalController()) return;
+        var link = ASpaceCoopLink.SpawnFor(newPlayer);
+        if (link == null) { UnrealLogger.LogError(Log, "SpaceGodCoop: could not spawn a link for a new player"); return; }
+        coopLinks[newPlayer] = link;
+        peer.HostLogin(link);
+        CoopPeer.Log("a player logged in; link spawned");
+    }
+
+    public override void OnLogout(AController exitingController)
+    {
+        if (exitingController is APlayerController pc && coopLinks.TryGetValue(pc, out var link))
+        {
+            coopLinks.Remove(pc);
+            CoopPeer.Current?.HostLogout(link);
+            link.DestroyActor();
+        }
+        base.OnLogout(exitingController);
+    }
+
     public override void EndPlay(EEndPlayReason endPlayReason)
     {
         var app = Bootstrap.App;
         if (app != null) UnityBridge.Invoke(app, "OnApplicationQuit");
         Bootstrap.TearDown();
+        CoopPeer.Stop(); // US-T39
         base.EndPlay(endPlayReason);
     }
 
@@ -133,6 +175,7 @@ public partial class ASpaceGameMode : AGameModeBase
     {
         host!.BeforeUpdate(Bootstrap.App!);
         UnityBridge.Tick(dt);
+        CoopPeer.Current?.HostEndUpdate(Bootstrap.App); // US-T39: the frame to the clients
         host.AfterUpdate();
         UnityBridge.Sync();
         script?.EndFrame();

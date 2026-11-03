@@ -248,6 +248,7 @@ namespace Unity.SpaceGod
                 FocusSystemOverview();
             }
             autosaveDueS = AutosaveIntervalS;
+            CoopLoaded(); // US-T39
         }
 
         /// <summary>Lets go of everything the session held in the old galaxy, without touching it (it is about to be dropped).</summary>
@@ -255,7 +256,7 @@ namespace Unity.SpaceGod
         {
             // A fighter or gun held in the world being left goes back to its AI there (U.SPC-T422); the loaded game starts in command.
             ReleaseSeat();
-            session = LocalSession.Create(seed: 0);
+            session = Coop.CoopPeer.NewSession(); // US-T39: LocalSession.Create(seed: 0) single-player
             commandWarp = -1;
             commandFocus = Target.None;
             Piloted = Target.None;

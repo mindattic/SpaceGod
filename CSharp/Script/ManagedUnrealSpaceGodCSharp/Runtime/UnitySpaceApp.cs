@@ -523,6 +523,7 @@ namespace Unity.SpaceGod
             SpaceCamera.SetPose(SpaceCamera.ScenePosition, SpaceCamera.Rotation);
             // Each system keeps its own sky (U.SPC-T595); the last one stays up until this one has loaded.
             Sky?.Show(system.Name);
+            CoopActivated(system); // US-T39: the host's frame tells its clients
         }
 
         /// <summary>Hides the active system's views (between the stars) or shows them again.</summary>
@@ -536,6 +537,7 @@ namespace Unity.SpaceGod
         public void TravelTo(StarSystem system)
         {
             if (system == null || system == ActiveSystem || Travel.Active) return;
+            if (CoopRefusesTravel()) return; // US-T39: in co-op the host picks the system
             // Already on the way somewhere under the hull's own drive (U.SPC-T417).
             if (InFtlCruise) { ShowToast("Under FTL for " + FtlCruise.ToName + ": the view goes where the hull goes"); return; }
             // The pilot session belongs to this system's ship and world: the gate is the way across while flying.
@@ -679,7 +681,7 @@ namespace Unity.SpaceGod
                 ShowToast("Time warp is held at real time while the helm is in a battle");
             }
 
-            Clock.Advance(dt);
+            CoopAdvance(dt); // US-T39: Clock.Advance(dt), in lockstep with the host in co-op
             Galaxy.Update(Clock.Jd);
             RefreshCharts();
             UpdateSaves(dt);
@@ -693,7 +695,7 @@ namespace Unity.SpaceGod
             ShowLawNotices();
             UpdateShips(dt);
             Structures.Layout();
-            if (!Travel.Active && !InFtlCruise) World.UpdateAdventures(Clock.Jd, PlayerHelioKm());
+            CoopUpdateAdventures(!Travel.Active && !InFtlCruise); // US-T39: was `if (that) World.UpdateAdventures(Clock.Jd, PlayerHelioKm());`, the host's call in co-op
 
             DropLostTargets();
             BattleTime();
