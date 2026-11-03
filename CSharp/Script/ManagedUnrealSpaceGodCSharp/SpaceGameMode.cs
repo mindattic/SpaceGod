@@ -1,55 +1,65 @@
+using System;
 using System.Globalization;
+using Unity.Shared.Core;
+using Unity.SpaceGod;
+using Unity.SpaceGod.Bridge;
+using Unity.SpaceGod.Core;
+using Unity.SpaceGod.Input;
 using UnrealSharp.Attributes;
 using UnrealSharp.Engine;
 using UnrealSharp.Log;
-using Unity.SpaceGod.Core;
+using Time = UnityEngine.Time;
+using UnityBridge = UnityEngine.UnityBridge;
 
 namespace ManagedUnrealSpaceGodCSharp;
 
 /// <summary>
-/// The C# track's game mode: it starts Unity.SpaceGod's own simulation, unchanged, the way UnitySpaceApp.Awake
-/// does (a <see cref="SimClock"/> and <see cref="Galaxy.CreateDefault"/>), and steps it the way
-/// UnitySpaceApp.Update does (<c>Clock.Advance(dt); Galaxy.Update(Clock.Jd)</c>).
-/// The engine-side game (views, HUD, camera, co-op) is later work (MIGRATION.md, order of work 5-6).
+/// The C# track's game mode: the Unity scene's host (US-T26). At BeginPlay it does what Unity did before the first
+/// frame (Unity.SpaceGod's Bootstrap makes the <see cref="UnitySpaceApp"/>, a MonoBehaviour on the shared Unity facade),
+/// and each Tick what Unity's player loop did: the window and input in (<see cref="UnrealHost"/>), every MonoBehaviour's
+/// Update (UnityBridge.Tick: the app's own drives the Core exactly as the original's), then the camera and cursor out
+/// and the scene pushed to Unreal (UnityBridge.Sync).
+///
+/// <c>-SpaceGodSmoke</c> (tools/play.ps1 -Track CSharp -Mode smoke, headless): runs the app loop for a scripted few
+/// seconds — idle frames, a time-warp key, a free-swim camera move (W held, a right-drag look), a number-key focus on
+/// Earth, a save/load round trip through Core/Persistence — logs what each did, and quits.
 /// </summary>
 [UClass]
 public partial class ASpaceGameMode : AGameModeBase
 {
     const string Log = "LogSpaceGod";
+    const float Frame = 1f / 60f;
 
-    /// <summary>The fixed start the C++ track's parity checks use (JD 2461348.0 = 2026-11-03 12:00 UTC), so both tracks log comparable numbers.</summary>
-    public const double StartJd = 2461348.0;
-
-    /// <summary>Ticks stepped at BeginPlay as the smoke proof, at 1/60 s each.</summary>
-    const int SmokeTicks = 5;
-
-    SimClock? clock;
-    Galaxy? galaxy;
-    StarSystem? sol;
-    int earth = -1;
-    double sinceReport;
+    UnrealHost? host;
+    ScriptedInputDevice? script;
 
     public override void BeginPlay()
     {
         base.BeginPlay();
-
-        var started = System.Diagnostics.Stopwatch.StartNew();
-        clock = new SimClock(StartJd);
-        clock.SetWarp(SimClock.DefaultWarpIndex);
-        galaxy = Galaxy.CreateDefault(clock.Jd);
-        sol = galaxy.Find("Sol System") ?? galaxy.Systems[0];
-        earth = sol.Catalog.TryGet("Earth", out var e) ? e.Index : -1;
-        UnrealLogger.Log(Log, $"Unity.SpaceGod Core up in {started.ElapsedMilliseconds} ms: {galaxy.Systems.Count} systems, " +
-            $"{sol.Catalog.Count} bodies in {sol.Name}, {sol.World.TraderCount()} traders (.NET {System.Environment.Version})");
-
-        for (int i = 1; i <= SmokeTicks; i++)
+        bool smoke = Bootstrap.HasCommandLineFlag("-SpaceGodSmoke");
+        if (smoke)
         {
-            Step(1.0 / 60.0);
-            Report($"tick {i}");
+            // The smoke run's profile (and its saves) in a scratch folder, never the player's own.
+            var root = System.IO.Path.Combine(SystemLibrary.ProjectSavedDirectory, "SmokeProfiles");
+            System.IO.Directory.CreateDirectory(root);
+            Profiles.UseRoot(root);
         }
 
-        if (System.Environment.GetCommandLineArgs().Any(a => a.Equals("-SpaceGodSmoke", StringComparison.OrdinalIgnoreCase)))
+        UnityBridge.Begin(this);
+        host = new UnrealHost(this);
+        host.Begin();
+        if (smoke) host.Override = script = new ScriptedInputDevice();
+
+        var started = System.Diagnostics.Stopwatch.StartNew();
+        Bootstrap.EnsureApp();
+        var app = Bootstrap.App;
+        if (app != null)
+            UnrealLogger.Log(Log, $"UnitySpaceApp up in {started.ElapsedMilliseconds} ms: {app.Galaxy.Systems.Count} systems, " +
+                $"{app.Catalog.Count} bodies in {app.ActiveSystem.Name}, {app.Fleet.Ships.Count} ships (.NET {Environment.Version})");
+
+        if (smoke)
         {
+            RunSmoke();
             // Through the engine, not Environment.Exit: the runtime is hosted by Unreal and must shut down with it.
             UnrealLogger.Log(Log, "SpaceGodSmoke: done, quitting");
             SystemLibrary.ExecuteConsoleCommand("quit");
@@ -59,28 +69,103 @@ public partial class ASpaceGameMode : AGameModeBase
     public override void Tick(float deltaSeconds)
     {
         base.Tick(deltaSeconds);
-        if (galaxy == null) return;
+        if (script != null || Bootstrap.App == null) return; // the smoke run steps its own frames
         Step(deltaSeconds);
-        sinceReport += deltaSeconds;
-        if (sinceReport >= 5)
+    }
+
+    public override void EndPlay(EEndPlayReason endPlayReason)
+    {
+        var app = Bootstrap.App;
+        if (app != null) UnityBridge.Invoke(app, "OnApplicationQuit");
+        Bootstrap.TearDown();
+        base.EndPlay(endPlayReason);
+    }
+
+    /// <summary>One frame of Unity's player loop.</summary>
+    void Step(float dt)
+    {
+        host!.BeforeUpdate(Bootstrap.App!);
+        UnityBridge.Tick(dt);
+        host.AfterUpdate();
+        UnityBridge.Sync();
+        script?.EndFrame();
+    }
+
+    void Frames(int n)
+    {
+        for (int i = 0; i < n; i++) Step(Frame);
+    }
+
+    void RunSmoke()
+    {
+        var app = Bootstrap.App;
+        if (app == null || script == null)
         {
-            sinceReport = 0;
-            Report("running");
+            UnrealLogger.LogError(Log, "SpaceGodSmoke: no app");
+            return;
         }
-    }
-
-    void Step(double realSeconds)
-    {
-        clock!.Advance(realSeconds);
-        galaxy!.Update(clock.Jd);
-    }
-
-    void Report(string label)
-    {
-        var p = earth >= 0 ? sol!.Ephemeris.Helio(earth) : DVec3.Zero;
         var inv = CultureInfo.InvariantCulture;
+        var t = System.Diagnostics.Stopwatch.StartNew();
+        Frames(10);
+        Report(app, $"10 frames in {t.ElapsedMilliseconds} ms");
+
+        // Time warp: '.' one step faster.
+        string warpBefore = app.Clock.Warp.Label;
+        script.Tap(Key.Period);
+        Frames(1);
+        UnrealLogger.Log(Log, $"SpaceGodSmoke: '.' warp {warpBefore} -> {app.Clock.Warp.Label}");
+
+        // Free swim: W held for 30 frames, then a right-drag look.
+        var from = app.SpaceCamera.ScenePosition;
+        script.Hold(Key.W);
+        Frames(30);
+        script.Release(Key.W);
+        double moved = (app.SpaceCamera.ScenePosition - from).Length;
+        var rotBefore = app.SpaceCamera.Rotation;
+        script.HoldButton(MouseButton.Right);
+        for (int i = 0; i < 15; i++)
+        {
+            script.MouseDelta = new UnityEngine.Vector2(12f, 0f);
+            Frames(1);
+        }
+        script.ReleaseButton(MouseButton.Right);
+        Frames(1);
+        float turned = UnityEngine.Quaternion.Angle(rotBefore, app.SpaceCamera.Rotation);
+        UnrealLogger.Log(Log, string.Format(inv, "SpaceGodSmoke: camera moved {0:G4} units (W, {1}), turned {2:F1} deg (right-drag)",
+            moved, app.SpaceCamera.Mode, turned));
+
+        // Number key 3 twice: select Earth and focus on it.
+        script.Tap(Key.Digit3);
+        Frames(1);
+        script.Tap(Key.Digit3);
+        Frames(90);
+        UnrealLogger.Log(Log, $"SpaceGodSmoke: '3' x2 selected {Describe(app.Selected)}, camera {app.SpaceCamera.Mode} on {Describe(app.SpaceCamera.FocusTarget)}");
+
+        // Save, run on, load: the clock comes back to the saved moment.
+        double savedJd = app.Clock.Jd;
+        int savedShips = app.Fleet.Ships.Count;
+        bool saved = app.SaveTo("smoke", "US-T26 smoke");
+        Frames(60);
+        double ranOn = app.Clock.Jd;
+        bool loaded = app.LoadFrom("smoke");
+        Frames(2);
         UnrealLogger.Log(Log, string.Format(inv,
-            "[{0}] JD {1:F6} = {2:yyyy-MM-dd HH:mm:ss} UTC, warp {3}; Earth helio km = ({4:F1}, {5:F1}, {6:F1}), |r| = {7:F6} AU",
-            label, clock!.Jd, clock.Utc, clock.Warp.Label, p.X, p.Y, p.Z, p.Length / Astro.AuKm));
+            "SpaceGodSmoke: save {0}, load {1}: JD saved {2:F6}, ran on to {3:F6}, back to {4:F6} (|d| = {5:G3} s); ships {6} -> {7}",
+            saved ? "ok" : "FAILED", loaded ? "ok" : "FAILED", savedJd, ranOn, app.Clock.Jd, Math.Abs(app.Clock.Jd - savedJd) * 86400.0,
+            savedShips, app.Fleet.Ships.Count));
+        Report(app, $"smoke done in {t.ElapsedMilliseconds} ms");
+    }
+
+    static string Describe(Target target) =>
+        target.IsBody ? "body " + Bootstrap.App!.Catalog[target.Body].Name : target.IsShip ? "ship " + target.Ship.Name : target.Kind.ToString();
+
+    void Report(UnitySpaceApp app, string label)
+    {
+        var inv = CultureInfo.InvariantCulture;
+        var cam = app.SpaceCamera.ScenePosition;
+        UnrealLogger.Log(Log, string.Format(inv,
+            "[{0}] {1}: JD {2:F6} = {3:yyyy-MM-dd HH:mm:ss} UTC, warp {4}; camera scene ({5:G6}, {6:G6}, {7:G6}) {8}, fov {9:F1}, near {10:G3}; toast '{11}'; facade {12}",
+            Time.frameCount, label, app.Clock.Jd, app.Clock.Utc, app.Clock.Warp.Label, cam.X, cam.Y, cam.Z, app.SpaceCamera.Mode,
+            app.UnityCamera.fieldOfView, app.UnityCamera.nearClipPlane, app.Toast, UnityBridge.Last));
     }
 }
