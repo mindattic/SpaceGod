@@ -461,8 +461,7 @@ namespace SpaceGod::Core
 		cs::HashSet<cs::String> seededRoutes;
 		cs::List<cs::Ref<DeepSpaceRoute>> routes;
 		cs::List<cs::Ref<DeepSpaceAmbush>> ambushes;
-		// HashSet<string>(StringComparer.OrdinalIgnoreCase): kept upper-cased (Cs.h's HashSet has no comparer of its own).
-		cs::HashSet<cs::String> surveyedStars;
+		cs::HashSet<cs::String, cs::OrdinalIgnoreCaseComparer> surveyedStars;
 
 		/// <summary>Numbers for the life out here, apart from the fights' (so they draw as they did before it).</summary>
 		cs::Random lifeRng{ 9157 };

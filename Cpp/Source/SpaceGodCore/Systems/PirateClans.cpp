@@ -25,19 +25,6 @@
 
 namespace SpaceGod::Core
 {
-	namespace
-	{
-		// C#'s double.CompareTo: NaN sorts below everything, and equals itself.
-		int CompareDoubles(double a, double b)
-		{
-			if (a < b) return -1;
-			if (a > b) return 1;
-			if (a == b) return 0;
-			if (cs::Double::IsNaN(a)) return cs::Double::IsNaN(b) ? 0 : -1;
-			return 1;
-		}
-	}
-
 	double PirateClans::RunnerPrice() { return Economy::HullPrice(ShipClass::Freighter) * 0.5; }
 
 	const cs::List<cs::String>& PirateClans::RunnerNames()
@@ -209,7 +196,7 @@ namespace SpaceGod::Core
 			double margin = BlackMarket::Price(market, g) - GoodInfo::Of(g)->BasePrice * BlackMarket::HavenShare;
 			if (margin > 0 && BlackMarket::Held(haven, g) > 1) goods.Add(GoodMargin{ g, margin });
 		}
-		goods.Sort([](const GoodMargin& a, const GoodMargin& b) { return CompareDoubles(b.margin, a.margin); });
+		goods.Sort([](const GoodMargin& a, const GoodMargin& b) { return cs::CompareTo(b.margin, a.margin); });
 		double room = capacity, gain = 0;
 		for (const auto& [g, _] : goods)
 		{

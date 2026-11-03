@@ -97,7 +97,7 @@ namespace SpaceGod::Core
 	cs::List<cs::Ref<StarEntry>> SystemSources::StarsNear(DVec3 centreLy, double radiusLy, int seed, cs::Func<bool, cs::Ref<SystemSource>> which)
 	{
 		cs::List<cs::Ref<StarEntry>> list;
-		cs::HashSet<cs::NoCase> names;
+		cs::HashSet<cs::String, cs::OrdinalIgnoreCaseComparer> names;
 		auto order = All();
 		for (int i = 0; i < order.Count(); i++)
 		{

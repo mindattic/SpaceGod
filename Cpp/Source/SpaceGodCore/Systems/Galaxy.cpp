@@ -271,7 +271,7 @@ namespace SpaceGod::Core
 		g->Systems.Add(sol);
 		g->Systems.Add(alphaCentauri);
 		for (const auto& spec : NearbySystems::All()) g->Systems.Add(StarSystem::CreateSettled(spec, jd, g->Polities));
-		cs::HashSet<cs::NoCase> simulated;
+		cs::HashSet<cs::String, cs::OrdinalIgnoreCaseComparer> simulated;
 		for (const auto& s : g->Systems)
 			if (s->Spec != nullptr && !s->Spec->NeighbourName.empty()) simulated.Add(s->Spec->NeighbourName);
 		for (const auto& n : Neighbours())

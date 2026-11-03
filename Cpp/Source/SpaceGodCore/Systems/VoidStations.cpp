@@ -17,21 +17,11 @@ namespace SpaceGod::Core
 {
 	namespace
 	{
-		// C#'s double.CompareTo: NaN sorts below everything, and equals itself.
-		int CompareDoubles(double a, double b)
-		{
-			if (a < b) return -1;
-			if (a > b) return 1;
-			if (a == b) return 0;
-			if (cs::Double::IsNaN(a)) return cs::Double::IsNaN(b) ? 0 : -1;
-			return 1;
-		}
-
 		// static List<StarEntry> stations;
 		cs::Ref<cs::List<cs::Ref<StarEntry>>>& stations() { static cs::Ref<cs::List<cs::Ref<StarEntry>>> s; return s; }
-		// static Dictionary<string, (string a, string b)> bridges (StringComparer.OrdinalIgnoreCase: keyed upper-cased here,
-		// as Cs.h's Dictionary has no comparer of its own).
-		cs::Dictionary<cs::String, std::pair<cs::String, cs::String>>& bridges() { static cs::Dictionary<cs::String, std::pair<cs::String, cs::String>> d; return d; }
+		// static Dictionary<string, (string a, string b)> bridges (StringComparer.OrdinalIgnoreCase).
+		using BridgeMap = cs::Dictionary<cs::String, std::pair<cs::String, cs::String>, cs::OrdinalIgnoreCaseComparer>;
+		BridgeMap& bridges() { static BridgeMap d; return d; }
 		// static readonly object gate = new object();
 		std::mutex& gate() { static std::mutex m; return m; }
 	}
@@ -50,12 +40,11 @@ namespace SpaceGod::Core
 			sol->Name = "Sol"; sol->PositionLy = DVec3::Zero; sol->Tag = "sol";
 			list.Add(sol);
 		}
-		// HashSet<string>(StringComparer.OrdinalIgnoreCase): the names upper-cased.
-		cs::HashSet<cs::String> names{ cs::Strings::ToUpperInvariant("Sol"), cs::Strings::ToUpperInvariant("Sol System") };
+		cs::HashSet<cs::String, cs::OrdinalIgnoreCaseComparer> names{ "Sol", "Sol System" };
 		for (const auto& e : HandBuiltSystems::Charted())
-			if (names.Add(cs::Strings::ToUpperInvariant(e->Name))) list.Add(e);
+			if (names.Add(e->Name)) list.Add(e);
 		for (const auto& e : CatalogueStars::Stars())
-			if (names.Add(cs::Strings::ToUpperInvariant(e->Name))) list.Add(e);
+			if (names.Add(e->Name)) list.Add(e);
 		return list;
 	}
 
@@ -70,7 +59,7 @@ namespace SpaceGod::Core
 	{
 		Stations();
 		std::pair<cs::String, cs::String> pair;
-		return bridges().TryGetValue(cs::Strings::ToUpperInvariant(name), pair) ? pair : std::pair<cs::String, cs::String>(cs::String(), cs::String());
+		return bridges().TryGetValue(name, pair) ? pair : std::pair<cs::String, cs::String>(cs::String(), cs::String());
 	}
 
 	void VoidStations::Lay()
@@ -78,8 +67,7 @@ namespace SpaceGod::Core
 		auto at = Destinations();
 		int n = at.Count();
 		// Prim's tree from Sol; ties go to the earlier system, so it is the same tree every run.
-		// bool[]: a List<bool> would be std::vector<bool>, whose operator[] hands back no bool&.
-		auto inTree = cs::NewArray<uint8_t>(n);
+		auto inTree = cs::NewArray<bool>(n);
 		auto best = cs::NewArray<double>(n);
 		auto from = cs::NewArray<int>(n);
 		for (int i = 0; i < n; i++)
@@ -95,7 +83,7 @@ namespace SpaceGod::Core
 			int u = -1;
 			for (int i = 0; i < n; i++)
 				if (!inTree[i] && (u < 0 || best[i] < best[u])) u = i;
-			inTree[u] = 1;
+			inTree[u] = true;
 			if (from[u] >= 0 && best[u] > MaxLegLy)
 				for (const auto& p : GateNetwork::RelayPositions(at[from[u]]->PositionLy, at[u]->PositionLy, MaxLegLy))
 					laid.Add(Laid{ p, at[from[u]]->Name, at[u]->Name });
@@ -112,15 +100,15 @@ namespace SpaceGod::Core
 		}
 		laid.Sort([](const Laid& x, const Laid& y)
 		{
-			int c = CompareDoubles(x.ly.Length(), y.ly.Length());
-			return c != 0 ? c : CompareDoubles(x.ly.X, y.ly.X);
+			int c = cs::CompareTo(x.ly.Length(), y.ly.Length());
+			return c != 0 ? c : cs::CompareTo(x.ly.X, y.ly.X);
 		});
 		stations() = cs::New<cs::List<cs::Ref<StarEntry>>>();
 		bridges().Clear();
 		for (int k = 0; k < laid.Count(); k++)
 		{
 			cs::String name = cs::Cat(Prefix, " ", k + 1);
-			bridges()[cs::Strings::ToUpperInvariant(name)] = std::pair<cs::String, cs::String>(laid[k].a, laid[k].b);
+			bridges()[name] = std::pair<cs::String, cs::String>(laid[k].a, laid[k].b);
 			auto e = cs::New<StarEntry>();
 			e->Name = name; e->PositionLy = laid[k].ly; e->Spectral = "Void station"; e->TeffK = VoidBaseBuilder::TinySunTeffK;
 			e->MassSolar = 0; e->RadiusSolar = 0; e->LuminositySolar = VoidBaseBuilder::TinySuns * 1e-6; e->Source = SourceName; e->Tag = "void station";

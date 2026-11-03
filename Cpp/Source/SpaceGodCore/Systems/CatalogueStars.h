@@ -60,7 +60,7 @@ namespace SpaceGod::Core
 		/// <summary>A value a row does not give (see <see cref="Beyond"/>).</summary>
 		static constexpr double NaN = cs::Double::NaN;
 
-		static cs::Dictionary<cs::NoCase, cs::String>& aliases();
+		static cs::Dictionary<cs::String, cs::String, cs::OrdinalIgnoreCaseComparer>& aliases();
 
 	public:
 		/// <summary>The other name a catalogue star goes by (Wolf 1061's Gliese 628), or null.</summary>

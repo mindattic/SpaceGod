@@ -23,19 +23,6 @@
 
 namespace SpaceGod::Core
 {
-	namespace
-	{
-		// C#'s double.CompareTo: NaN sorts below everything, and equals itself.
-		int CompareDoubles(double a, double b)
-		{
-			if (a < b) return -1;
-			if (a > b) return 1;
-			if (a == b) return 0;
-			if (cs::Double::IsNaN(a)) return cs::Double::IsNaN(b) ? 0 : -1;
-			return 1;
-		}
-	}
-
 	const char* ToString(GateJob v)
 	{
 		switch (v)
@@ -284,7 +271,7 @@ namespace SpaceGod::Core
 		if (tonnes <= 0) return;
 		auto g = Materials()[i];
 		auto sources = Sources(p);
-		sources.Sort([g](const cs::Ref<Settlement>& a, const cs::Ref<Settlement>& b) { return CompareDoubles(b->Stock[static_cast<int>(g)], a->Stock[static_cast<int>(g)]); });
+		sources.Sort([g](const cs::Ref<Settlement>& a, const cs::Ref<Settlement>& b) { return cs::CompareTo(b->Stock[static_cast<int>(g)], a->Stock[static_cast<int>(g)]); });
 		double left = tonnes;
 		for (const auto& s : sources)
 		{

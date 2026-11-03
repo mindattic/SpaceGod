@@ -396,7 +396,7 @@ namespace SpaceGod::Core
 		return cs::Double::PositiveInfinity;
 	}
 
-	bool DeepSpace::SurveyStar(const cs::String& name) { return !name.empty() && surveyedStars.Add(cs::Strings::ToUpperInvariant(name)); }
+	bool DeepSpace::SurveyStar(const cs::String& name) { return !name.empty() && surveyedStars.Add(name); }
 
 	bool DeepSpace::Surveys(cs::Ref<Cruise> c)
 	{

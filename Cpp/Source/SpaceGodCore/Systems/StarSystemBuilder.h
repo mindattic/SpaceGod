@@ -70,8 +70,7 @@ namespace SpaceGod::Core
 		static DVec3 CompanionOffsetKm(const cs::Ref<SystemSpec>& spec, const cs::Ref<CompanionSpec>& c);
 
 	private:
-		// The C# dictionary is keyed StringComparer.OrdinalIgnoreCase; here the key is the lower-cased name.
-		static cs::Ref<StarSpec> StarOf(const cs::Dictionary<cs::String, cs::Ref<StarSpec>>& stars, const cs::String& host, const cs::String& what);
+		static cs::Ref<StarSpec> StarOf(const cs::Dictionary<cs::String, cs::Ref<StarSpec>, cs::OrdinalIgnoreCaseComparer>& stars, const cs::String& host, const cs::String& what);
 
 		// ---------------------------------------------------------------- stars
 

@@ -37,19 +37,6 @@
 
 namespace SpaceGod::Core
 {
-	namespace
-	{
-		// .NET's double.CompareTo: NaN sorts before everything (and equals itself), else the usual order.
-		int CompareTo(double a, double b)
-		{
-			if (a < b) return -1;
-			if (a > b) return 1;
-			if (a == b) return 0;
-			if (cs::Double::IsNaN(a)) return cs::Double::IsNaN(b) ? 0 : -1;
-			return 1;
-		}
-	}
-
 	const char* ToString(VoyagePurpose v)
 	{
 		switch (v)
@@ -147,7 +134,7 @@ namespace SpaceGod::Core
 		// Ships that have reached a gate go in (or wait, or turn for another), in date order.
 		atGates.Sort([](const AtGateEntry& a, const AtGateEntry& b)
 		{
-			return CompareTo(a.ship->Voyage ? a.ship->Voyage->AtGateJd : 0, b.ship->Voyage ? b.ship->Voyage->AtGateJd : 0);
+			return cs::CompareTo(a.ship->Voyage ? a.ship->Voyage->AtGateJd : 0, b.ship->Voyage ? b.ship->Voyage->AtGateJd : 0);
 		});
 		auto snapshot = cs::List<AtGateEntry>(atGates);
 		for (const auto& [system, ship] : snapshot)
@@ -170,7 +157,7 @@ namespace SpaceGod::Core
 			}
 		if (due != nullptr)
 		{
-			due->Sort([](const cs::Ref<Passage>& a, const cs::Ref<Passage>& b) { return CompareTo(a->ExitJd, b->ExitJd); });
+			due->Sort([](const cs::Ref<Passage>& a, const cs::Ref<Passage>& b) { return cs::CompareTo(a->ExitJd, b->ExitJd); });
 			for (const auto& p : *due) Emerge(p);
 		}
 

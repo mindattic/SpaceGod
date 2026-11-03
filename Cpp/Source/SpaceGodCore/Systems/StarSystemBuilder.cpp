@@ -12,9 +12,8 @@ namespace SpaceGod::Core
 	cs::Ref<StarSystemBuilder::Result> StarSystemBuilder::Build(const cs::Ref<SystemSpec>& spec)
 	{
 		auto r = cs::New<Result>();
-		// StringComparer.OrdinalIgnoreCase: keyed by the lower-cased name.
-		cs::Dictionary<cs::String, cs::Ref<StarSpec>> stars;
-		for (const auto& s : spec->Stars()) stars[cs::Strings::ToLowerInvariant(s->Name)] = s;
+		cs::Dictionary<cs::String, cs::Ref<StarSpec>, cs::OrdinalIgnoreCaseComparer> stars;
+		for (const auto& s : spec->Stars()) stars[s->Name] = s;
 
 		bool pairRoot = spec->Primary->IsPair();
 		if (pairRoot)
@@ -51,11 +50,11 @@ namespace SpaceGod::Core
 		return r;
 	}
 
-	cs::Ref<StarSpec> StarSystemBuilder::StarOf(const cs::Dictionary<cs::String, cs::Ref<StarSpec>>& stars, const cs::String& host, const cs::String& what)
+	cs::Ref<StarSpec> StarSystemBuilder::StarOf(const cs::Dictionary<cs::String, cs::Ref<StarSpec>, cs::OrdinalIgnoreCaseComparer>& stars, const cs::String& host, const cs::String& what)
 	{
 		cs::Ref<StarSpec> star;
 		// C#: host == null (a null string is the empty string here).
-		if (host.empty() || !stars.TryGetValue(cs::Strings::ToLowerInvariant(host), star))
+		if (host.empty() || !stars.TryGetValue(host, star))
 			throw cs::InvalidOperationException(cs::Cat(what, ": unknown host star ", host));
 		return star;
 	}

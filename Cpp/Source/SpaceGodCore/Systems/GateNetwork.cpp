@@ -250,7 +250,7 @@ namespace SpaceGod::Core
 			}
 		}
 		auto route = cs::New<cs::List<cs::Ref<JumpGate>>>();
-		for (auto s = to; s != from; s = via[s]->Home) route->Add(via[s]);
+		for (auto s = to; s != from; s = via.At(s)->Home) route->Add(via.At(s));
 		route->Reverse();
 		return route;
 	}

@@ -352,10 +352,10 @@ namespace SpaceGod::Core
 		DVec3 exploredAtLy = DVec3(cs::Double::NaN, cs::Double::NaN, cs::Double::NaN);
 
 		/// <summary>The stars put on the charts by exploring (the rest were there from the start and stay).</summary>
-		cs::HashSet<cs::NoCase> charted;
+		cs::HashSet<cs::String, cs::OrdinalIgnoreCaseComparer> charted;
 
 		/// <summary>The systems built by exploring, and so let go again when left untouched far behind.</summary>
-		cs::HashSet<cs::NoCase> streamed;
+		cs::HashSet<cs::String, cs::OrdinalIgnoreCaseComparer> streamed;
 
 	public:
 		/// <summary>Counts every change to the charts or the systems explored in, so a view of them knows to rebuild.</summary>
@@ -426,7 +426,7 @@ namespace SpaceGod::Core
 		cs::List<NearbyStar> undiscovered;
 
 		/// <summary>The <see cref="Undiscovered"/> by name, for a quick look (the charts ask for every star they see).</summary>
-		cs::HashSet<cs::NoCase> undiscoveredNames;
+		cs::HashSet<cs::String, cs::OrdinalIgnoreCaseComparer> undiscoveredNames;
 
 	public:
 		/// <summary>The stars found since the start, in order (see <see cref="Discover"/>).</summary>

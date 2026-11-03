@@ -13,9 +13,9 @@ namespace SpaceGod::Core
 		return list;
 	}
 
-	cs::Dictionary<cs::NoCase, cs::String>& CatalogueStars::aliases()
+	cs::Dictionary<cs::String, cs::String, cs::OrdinalIgnoreCaseComparer>& CatalogueStars::aliases()
 	{
-		static cs::Dictionary<cs::NoCase, cs::String> map;
+		static cs::Dictionary<cs::String, cs::String, cs::OrdinalIgnoreCaseComparer> map;
 		return map;
 	}
 
@@ -31,8 +31,8 @@ namespace SpaceGod::Core
 			e->LuminositySolar = cs::Double::NaN;
 			list->Add(e);
 		}
-		aliases()[cs::NoCase("Gliese 65")] = "Luyten 726-8, UV and BL Ceti";
-		aliases()[cs::NoCase("Gliese 887")] = "Lacaille 9352";
+		aliases()[cs::String("Gliese 65")] = "Luyten 726-8, UV and BL Ceti";
+		aliases()[cs::String("Gliese 887")] = "Lacaille 9352";
 		list->AddRange(Beyond());
 		list->Sort([](const cs::Ref<StarEntry>& a, const cs::Ref<StarEntry>& b) { return cs::CompareTo(a->PositionLy.Length(), b->PositionLy.Length()); });
 		stars() = list;
@@ -43,7 +43,7 @@ namespace SpaceGod::Core
 		double luminosity, const cs::String& aka)
 	{
 		auto at = DVec3(x, y, z);
-		if (!aka.empty()) aliases()[cs::NoCase(name)] = aka;
+		if (!aka.empty()) aliases()[name] = aka;
 		auto e = cs::New<StarEntry>();
 		e->Name = name; e->PositionLy = at; e->Spectral = type; e->ApparentMagnitude = mag; e->TeffK = teff; e->MassSolar = mass; e->RadiusSolar = radius;
 		e->LuminositySolar = luminosity; e->Source = SourceName;
@@ -55,7 +55,7 @@ namespace SpaceGod::Core
 	{
 		Stars();
 		cs::String aka;
-		return aliases().TryGetValue(cs::NoCase(name), aka) ? aka : cs::String();
+		return aliases().TryGetValue(name, aka) ? aka : cs::String();
 	}
 
 	cs::List<cs::Ref<StarEntry>> CatalogueStars::Beyond()

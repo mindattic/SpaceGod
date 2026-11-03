@@ -51,7 +51,7 @@ namespace SpaceGod::Core
 	cs::List<cs::String> Galaxy::Streamed() const
 	{
 		cs::List<cs::String> r;
-		for (const auto& n : streamed) r.Add(n.Value);
+		for (const auto& n : streamed) r.Add(n);
 		return r;
 	}
 
@@ -68,7 +68,7 @@ namespace SpaceGod::Core
 		{
 			// HashSet.RemoveWhere: each entry tested in enumeration order, the matches removed in that order.
 			for (const auto& name : charted.ToList())
-				if (!NearbyStars.Exists([&](const NearbyStar& n) { return cs::Strings::EqualsOrdinalIgnoreCase(n.Name, name.Value); })) charted.Remove(name);
+				if (!NearbyStars.Exists([&](const NearbyStar& n) { return cs::Strings::EqualsOrdinalIgnoreCase(n.Name, name); })) charted.Remove(name);
 			changed = true;
 		}
 		for (const auto& s : Systems.ToArray())
