@@ -19,14 +19,20 @@
 // Event.current -> Event::current() (a reference). GUIUtility.ExitGUI() throws ExitGUIException, which the host
 // catches as Unity's does.
 //
-// Fonts: Unity's IMGUI font size is the em in pixels; the host draws Roboto (Unreal's Slate font) at the same em, so
-// a fontSize 13 label is 13 px tall here too. Size 0 means the skin's default, 13 (Unity's built-in font in a player).
+// Fonts: Unity's IMGUI font size is the em in pixels; the host draws Arial from the system font folder (Unity's built-in
+// font on Windows, and the C# track's choice, US-T28) at the same em, Slate's Roboto where Arial is missing. Size 0
+// means the skin's default, 13.
 
 #include "UnityCompat/UnityMath.h"
 #include "UnityCompat/UnityTexture.h"
 
 #include <exception>
 #include <functional>
+
+// Windows' rpcndr.h defines `small` as a macro; the UI's styles keep the original's name `small`.
+#ifdef small
+#undef small
+#endif
 
 namespace SpaceGod::UnityCompat
 {
@@ -342,7 +348,7 @@ namespace SpaceGod::UnityCompat
 		/// Runs one OnGUI handler for `e` (the host's event loop calls it per handler per pass): resets the GUI state
 		/// as Unity's BeginGUI does, runs the handler, catches ExitGUIException, closes groups left open.
 		/// `handlerIndex` keeps control ids distinct between handlers.
-		static void RunOnGUI(const std::function<void()>& onGui, const Event& e, int handlerIndex);
+		static void RunOnGUI(const std::function<void()>& onGui, Event& e, int handlerIndex);
 		/// Called by the host at the start of every frame (before its passes): drops the per-frame name map etc.
 		static void BeginFrame();
 	};

@@ -10,7 +10,10 @@
 #include "Engine/GameViewportClient.h"
 #include "Engine/Texture2D.h"
 #include "Engine/World.h"
+#include "Fonts/CompositeFont.h"
 #include "Fonts/FontMeasure.h"
+#include "HAL/PlatformMisc.h"
+#include "Misc/Paths.h"
 #include "Framework/Application/IInputProcessor.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Rendering/DrawElements.h"
@@ -487,6 +490,32 @@ namespace SpaceGod::UnityCompat
 
 		// ---------------------------------------------------------------- fonts
 
+		/// Arial from the system font folder (what Unity's built-in font is on Windows, and what the C# track draws with,
+		/// US-T28), its four faces as one composite font; null where Arial is not installed (then Slate's Roboto).
+		TSharedPtr<const FCompositeFont> Arial()
+		{
+			static TSharedPtr<FStandaloneCompositeFont> font;
+			static bool tried = false;
+			if (tried) return font;
+			tried = true;
+			FString dir = FPlatformMisc::GetEnvironmentVariable(TEXT("WINDIR"));
+			if (dir.IsEmpty()) return font;
+			dir = FPaths::Combine(dir, TEXT("Fonts"));
+			const TCHAR* faces[4] = { TEXT("Regular"), TEXT("Bold"), TEXT("Italic"), TEXT("BoldItalic") };
+			const TCHAR* files[4] = { TEXT("arial.ttf"), TEXT("arialbd.ttf"), TEXT("ariali.ttf"), TEXT("arialbi.ttf") };
+			FString regular = FPaths::Combine(dir, files[0]);
+			if (!FPaths::FileExists(regular)) return font;
+			font = MakeShared<FStandaloneCompositeFont>();
+			for (int i = 0; i < 4; i++)
+			{
+				FString path = FPaths::Combine(dir, files[i]);
+				if (!FPaths::FileExists(path)) path = regular;
+				font->DefaultTypeface.AppendFont(faces[i], path, EFontHinting::Default, EFontLoadingPolicy::LazyLoad);
+			}
+			UE_LOG(LogSpaceGod, Display, TEXT("GUI font: %s"), *regular);
+			return font;
+		}
+
 		FSlateFontInfo FontFor(int fontSize, FontStyle style)
 		{
 			const TCHAR* face = TEXT("Regular");
@@ -498,7 +527,9 @@ namespace SpaceGod::UnityCompat
 				default: break;
 			}
 			// Unity's IMGUI size is the em in pixels; Slate's is points at 96 dpi (em = size * 96 / 72 px).
-			return FCoreStyle::GetDefaultFontStyle(face, static_cast<float>(fontSize) * 0.75f);
+			float size = static_cast<float>(fontSize) * 0.75f;
+			if (TSharedPtr<const FCompositeFont> arial = Arial()) return FSlateFontInfo(arial, size, FName(face));
+			return FCoreStyle::GetDefaultFontStyle(face, size);
 		}
 
 		// ---------------------------------------------------------------- the Slate renderer

@@ -8,8 +8,8 @@
 // The controls below follow Unity's own IMGUI (UnityCsReference GUI.cs / GUIStyle.cs and the native GUIStyle::Draw):
 // the same control-id handshake, the same event handling per control, the same state choice when drawing (a hover /
 // active / focused state counts only when it has a background, the "hover text colour needs a hover background"
-// quirk), the same scroll-view sizing (scrollbars 15 px plus a 1 px margin, a wheel notch is delta 3 scrolled 20 px a
-// unit). Text is laid out here (lines, word wrap, alignment) on the renderer's measurements, so what CalcSize /
+// quirk), the same scroll-view sizing (15 px scrollbars, a wheel notch is delta 3 scrolled 20 px a unit). Where Unity's
+// own numbers are not known (its skin), the values are the C# track's (US-T28, UnityCompat/Imgui), so both look the same. Text is laid out here (lines, word wrap, alignment) on the renderer's measurements, so what CalcSize /
 // CalcHeight report is exactly what Repaint draws.
 
 namespace SpaceGod::UnityCompat
@@ -60,7 +60,6 @@ namespace SpaceGod::UnityCompat
 
 		constexpr int DefaultFontSize = 13;
 		constexpr float ScrollbarSize = 15;
-		constexpr float ScrollbarMargin = 1;
 
 		bool IsRepaint() { return currentEvent->type == EventType::Repaint; }
 
@@ -267,101 +266,127 @@ namespace SpaceGod::UnityCompat
 			return *result;
 		}
 
-		cs::Ref<Texture2D> SolidSkinTexture(Color fill, Color edge)
+		/// A skin swatch: an 8 px square with a rim and cut corners (rounded at 2 px), as the C# track's skin.
+		cs::Ref<Texture2D> Rounded(Color fill, Color edge)
 		{
 			const int n = 8;
 			auto t = cs::New<Texture2D>(n, n, TextureFormat::RGBA32, false);
+			t->name = "Skin";
 			t->hideFlags = HideFlags::DontSave;
-			t->filterMode = FilterMode::Point;
 			for (int y = 0; y < n; y++)
 				for (int x = 0; x < n; x++)
-					t->SetPixel(x, y, x == 0 || y == 0 || x == n - 1 || y == n - 1 ? (edge.a > 0 ? edge : fill) : fill);
+				{
+					bool corner = (x == 0 || x == n - 1) && (y == 0 || y == n - 1);
+					bool rim = x == 0 || y == 0 || x == n - 1 || y == n - 1;
+					t->SetPixel(x, y, corner ? Color::clear() : rim ? edge : fill);
+				}
 			t->Apply();
 			return t;
 		}
 
-		/// Unity's built-in (dark, runtime) skin, near enough: grey boxes and buttons, white text, 15 px scrollbars.
+		/// Unity's dark runtime skin, approximated exactly as the C# track's GUISkin.BuiltIn (US-T28) so both tracks
+		/// look the same: the default font at 13, its padding and margins, and its greys; 15 px scrollbars.
 		GUISkin MakeSkin()
 		{
 			GUISkin s;
-			auto boxTex = SolidSkinTexture(Color(0.1f, 0.1f, 0.1f, 0.6f), Color(0.3f, 0.3f, 0.3f, 0.6f));
-			auto buttonTex = SolidSkinTexture(Color(0.26f, 0.26f, 0.26f, 1.0f), Color(0.14f, 0.14f, 0.14f, 1.0f));
-			auto buttonHoverTex = SolidSkinTexture(Color(0.32f, 0.32f, 0.32f, 1.0f), Color(0.14f, 0.14f, 0.14f, 1.0f));
-			auto buttonActiveTex = SolidSkinTexture(Color(0.18f, 0.18f, 0.18f, 1.0f), Color(0.1f, 0.1f, 0.1f, 1.0f));
-			auto fieldTex = SolidSkinTexture(Color(0.16f, 0.16f, 0.16f, 1.0f), Color(0.08f, 0.08f, 0.08f, 1.0f));
-			auto trackTex = SolidSkinTexture(Color(0.12f, 0.12f, 0.12f, 0.8f), Color(0.2f, 0.2f, 0.2f, 0.8f));
-			auto thumbTex = SolidSkinTexture(Color(0.5f, 0.5f, 0.5f, 1.0f), Color(0.35f, 0.35f, 0.35f, 1.0f));
-			Color text(0.9f, 0.9f, 0.9f, 1.0f);
+			Color light(0.9f, 0.9f, 0.9f);
+			auto boxBg = Rounded(Color(0.1f, 0.1f, 0.1f, 0.5f), Color(0.2f, 0.2f, 0.2f, 0.6f));
+			auto buttonBg = Rounded(Color(0.33f, 0.33f, 0.33f, 1.0f), Color(0.14f, 0.14f, 0.14f, 1.0f));
+			auto buttonHover = Rounded(Color(0.4f, 0.4f, 0.4f, 1.0f), Color(0.14f, 0.14f, 0.14f, 1.0f));
+			auto buttonDown = Rounded(Color(0.2f, 0.2f, 0.2f, 1.0f), Color(0.1f, 0.1f, 0.1f, 1.0f));
+			auto fieldBg = Rounded(Color(0.16f, 0.16f, 0.16f, 1.0f), Color(0.1f, 0.1f, 0.1f, 1.0f));
+			auto track = Rounded(Color(0.12f, 0.12f, 0.12f, 0.6f), Color(0.12f, 0.12f, 0.12f, 0.6f));
+			auto thumb = Rounded(Color(0.5f, 0.5f, 0.5f, 0.95f), Color(0.35f, 0.35f, 0.35f, 0.95f));
+			RectOffset b(2, 2, 2, 2);
 
 			s.box = cs::New<GUIStyle>();
 			s.box->name = "box";
-			s.box->normal.background = boxTex;
-			s.box->normal.textColor = text;
-			s.box->border = RectOffset(2, 2, 2, 2);
+			s.box->normal.background = boxBg;
+			s.box->normal.textColor = Color(0.8f, 0.8f, 0.8f);
+			s.box->border = b;
 			s.box->padding = RectOffset(4, 4, 4, 4);
+			s.box->margin = RectOffset(4, 4, 4, 4);
 			s.box->alignment = TextAnchor::UpperCenter;
-
-			s.label = cs::New<GUIStyle>();
-			s.label->name = "label";
-			s.label->normal.textColor = text;
-			s.label->padding = RectOffset(2, 2, 1, 2);
-			s.label->wordWrap = true;
+			s.box->wordWrap = true;
 
 			s.button = cs::New<GUIStyle>();
 			s.button->name = "button";
-			s.button->normal.background = buttonTex;
-			s.button->hover.background = buttonHoverTex;
-			s.button->active.background = buttonActiveTex;
-			s.button->normal.textColor = s.button->hover.textColor = s.button->active.textColor = text;
-			s.button->border = RectOffset(2, 2, 2, 2);
+			s.button->border = b;
 			s.button->padding = RectOffset(6, 6, 3, 3);
+			s.button->margin = RectOffset(4, 4, 4, 4);
 			s.button->alignment = TextAnchor::MiddleCenter;
+			s.button->normal.background = buttonBg;
+			s.button->normal.textColor = light;
+			s.button->hover.background = buttonHover;
+			s.button->hover.textColor = Color::white();
+			s.button->active.background = buttonDown;
+			s.button->active.textColor = Color::white();
 
-			s.toggle = cs::New<GUIStyle>(*s.button);
-			s.toggle->name = "toggle";
-			s.toggle->onNormal.background = buttonActiveTex;
-			s.toggle->onNormal.textColor = text;
-			s.toggle->alignment = TextAnchor::MiddleLeft;
+			s.label = cs::New<GUIStyle>();
+			s.label->name = "label";
+			s.label->padding = RectOffset(2, 2, 1, 2);
+			s.label->margin = RectOffset(4, 4, 2, 2);
+			s.label->wordWrap = true;
+			s.label->normal.textColor = light;
 
 			s.textField = cs::New<GUIStyle>();
 			s.textField->name = "textfield";
-			s.textField->normal.background = fieldTex;
-			s.textField->focused.background = fieldTex;
-			s.textField->normal.textColor = s.textField->focused.textColor = text;
-			s.textField->border = RectOffset(2, 2, 2, 2);
-			s.textField->padding = RectOffset(3, 3, 1, 2);
-			s.textField->alignment = TextAnchor::MiddleLeft;
+			s.textField->border = b;
+			s.textField->padding = RectOffset(3, 3, 3, 3);
+			s.textField->margin = RectOffset(4, 4, 2, 2);
 			s.textField->clipping = TextClipping::Clip;
+			s.textField->normal.background = fieldBg;
+			s.textField->normal.textColor = Color(0.8f, 0.8f, 0.8f);
+			s.textField->focused.background = fieldBg;
+			s.textField->focused.textColor = Color::white();
 			s.textArea = cs::New<GUIStyle>(*s.textField);
+			s.textArea->name = "textarea";
 			s.textArea->wordWrap = true;
-			s.window = cs::New<GUIStyle>(*s.box);
 
+			s.toggle = cs::New<GUIStyle>(*s.button);
+			s.toggle->name = "toggle";
+			s.toggle->onNormal.background = buttonDown;
+			s.toggle->onNormal.textColor = Color::white();
+			s.toggle->alignment = TextAnchor::MiddleLeft;
+			s.window = cs::New<GUIStyle>(*s.box);
+			s.window->name = "window";
+
+			s.verticalScrollbar = cs::New<GUIStyle>();
+			s.verticalScrollbar->name = "verticalscrollbar";
+			s.verticalScrollbar->normal.background = track;
+			s.verticalScrollbar->border = b;
+			s.verticalScrollbar->fixedWidth = ScrollbarSize;
+			s.verticalScrollbarThumb = cs::New<GUIStyle>();
+			s.verticalScrollbarThumb->name = "verticalscrollbarthumb";
+			s.verticalScrollbarThumb->normal.background = thumb;
+			s.verticalScrollbarThumb->border = b;
+			s.verticalScrollbarThumb->fixedWidth = ScrollbarSize;
+			s.horizontalScrollbar = cs::New<GUIStyle>();
+			s.horizontalScrollbar->name = "horizontalscrollbar";
+			s.horizontalScrollbar->normal.background = track;
+			s.horizontalScrollbar->border = b;
+			s.horizontalScrollbar->fixedHeight = ScrollbarSize;
+			s.horizontalScrollbarThumb = cs::New<GUIStyle>();
+			s.horizontalScrollbarThumb->name = "horizontalscrollbarthumb";
+			s.horizontalScrollbarThumb->normal.background = thumb;
+			s.horizontalScrollbarThumb->border = b;
+			s.horizontalScrollbarThumb->fixedHeight = ScrollbarSize;
 			s.horizontalSlider = cs::New<GUIStyle>();
-			s.horizontalSlider->normal.background = trackTex;
-			s.horizontalSlider->border = RectOffset(2, 2, 2, 2);
-			s.horizontalSlider->fixedHeight = 4;
+			s.horizontalSlider->name = "horizontalslider";
+			s.horizontalSlider->normal.background = track;
+			s.horizontalSlider->border = b;
+			s.horizontalSlider->fixedHeight = 12;
 			s.horizontalSliderThumb = cs::New<GUIStyle>();
-			s.horizontalSliderThumb->normal.background = thumbTex;
-			s.horizontalSliderThumb->border = RectOffset(2, 2, 2, 2);
-			s.horizontalSliderThumb->fixedWidth = 10;
+			s.horizontalSliderThumb->name = "horizontalsliderthumb";
+			s.horizontalSliderThumb->normal.background = thumb;
+			s.horizontalSliderThumb->hover.background = buttonHover;
+			s.horizontalSliderThumb->border = b;
+			s.horizontalSliderThumb->fixedWidth = 12;
 			s.horizontalSliderThumb->fixedHeight = 12;
 			s.verticalSlider = cs::New<GUIStyle>(*s.horizontalSlider);
 			s.verticalSliderThumb = cs::New<GUIStyle>(*s.horizontalSliderThumb);
-
-			s.horizontalScrollbar = cs::New<GUIStyle>();
-			s.horizontalScrollbar->normal.background = trackTex;
-			s.horizontalScrollbar->border = RectOffset(2, 2, 2, 2);
-			s.horizontalScrollbar->fixedHeight = ScrollbarSize;
-			s.horizontalScrollbar->margin = RectOffset(4, 4, 1, 4);
-			s.horizontalScrollbarThumb = cs::New<GUIStyle>();
-			s.horizontalScrollbarThumb->normal.background = thumbTex;
-			s.horizontalScrollbarThumb->border = RectOffset(2, 2, 2, 2);
-			s.verticalScrollbar = cs::New<GUIStyle>(*s.horizontalScrollbar);
-			s.verticalScrollbar->fixedHeight = 0;
-			s.verticalScrollbar->fixedWidth = ScrollbarSize;
-			s.verticalScrollbar->margin = RectOffset(1, 4, 4, 4);
-			s.verticalScrollbarThumb = cs::New<GUIStyle>(*s.horizontalScrollbarThumb);
 			s.scrollView = cs::New<GUIStyle>();
+			s.scrollView->name = "scrollview";
 			return s;
 		}
 
@@ -1061,39 +1086,34 @@ namespace SpaceGod::UnityCompat
 		}
 
 		bool noneH = &horizontalScrollbar == &GUIStyle::none(), noneV = &verticalScrollbar == &GUIStyle::none();
-		float hSize = noneH ? 0 : (horizontalScrollbar.fixedHeight > 0 ? horizontalScrollbar.fixedHeight : ScrollbarSize);
-		float vSize = noneV ? 0 : (verticalScrollbar.fixedWidth > 0 ? verticalScrollbar.fixedWidth : ScrollbarSize);
-		float hMargin = noneH ? 0 : static_cast<float>(horizontalScrollbar.margin.top);
-		float vMargin = noneV ? 0 : static_cast<float>(verticalScrollbar.margin.left);
-
+		float vbarW = verticalScrollbar.fixedWidth > 0 ? verticalScrollbar.fixedWidth : ScrollbarSize;
+		float hbarH = horizontalScrollbar.fixedHeight > 0 ? horizontalScrollbar.fixedHeight : ScrollbarSize;
 		Rect clipRect = position;
-		bool needH = alwaysShowHorizontal || viewRect.width > clipRect.width;
 		bool needV = alwaysShowVertical || viewRect.height > clipRect.height;
-		if (needH) clipRect.height = position.height - hSize - hMargin;
-		if (needV) clipRect.width = position.width - vSize - vMargin;
-		// The bar for one axis can make the other overflow too (Unity's second check).
-		if (!needH && viewRect.width > clipRect.width)
+		if (needV) clipRect.width -= vbarW;
+		bool needH = alwaysShowHorizontal || viewRect.width > clipRect.width;
+		if (needH)
 		{
-			needH = true;
-			clipRect.height = position.height - hSize - hMargin;
+			clipRect.height -= hbarH;
+			// The horizontal bar can make the content overflow vertically too (Unity's second check).
+			if (!needV && viewRect.height > clipRect.height)
+			{
+				needV = true;
+				clipRect.width -= vbarW;
+			}
 		}
-		if (!needV && viewRect.height > clipRect.height)
-		{
-			needV = true;
-			clipRect.width = position.width - vSize - vMargin;
-		}
+		float maxY = Mathf::Max(0.0f, viewRect.height - clipRect.height), maxX = Mathf::Max(0.0f, viewRect.width - clipRect.width);
+		scrollPosition.y = Mathf::Clamp(scrollPosition.y, 0.0f, maxY);
+		scrollPosition.x = Mathf::Clamp(scrollPosition.x, 0.0f, maxX);
 
-		if (needH && !noneH)
-			scrollPosition.x = Scroller(Rect(position.x, position.yMax() - hSize, clipRect.width, hSize), scrollPosition.x,
-				Mathf::Min(clipRect.width, viewRect.width), 0, viewRect.width, horizontalScrollbar, *skin().horizontalScrollbarThumb, true);
-		else if (!noneH) scrollPosition.x = 0;
-		else scrollPosition.x = Mathf::Clamp(scrollPosition.x, 0.0f, Mathf::Max(viewRect.width - position.width, 0.0f));
-
-		if (needV && !noneV)
-			scrollPosition.y = Scroller(Rect(clipRect.xMax() + vMargin, clipRect.y, vSize, clipRect.height), scrollPosition.y,
-				Mathf::Min(clipRect.height, viewRect.height), 0, viewRect.height, verticalScrollbar, *skin().verticalScrollbarThumb, false);
-		else if (!noneV) scrollPosition.y = 0;
-		else scrollPosition.y = Mathf::Clamp(scrollPosition.y, 0.0f, Mathf::Max(viewRect.height - position.height, 0.0f));
+		if (needV)
+			scrollPosition.y = Scroller(Rect(clipRect.xMax(), position.y, vbarW, clipRect.height), scrollPosition.y,
+				Mathf::Min(clipRect.height, viewRect.height), 0, viewRect.height, noneV ? *skin().verticalScrollbar : verticalScrollbar,
+				*skin().verticalScrollbarThumb, false);
+		if (needH)
+			scrollPosition.x = Scroller(Rect(position.x, clipRect.yMax(), clipRect.width, hbarH), scrollPosition.x,
+				Mathf::Min(clipRect.width, viewRect.width), 0, viewRect.width, noneH ? *skin().horizontalScrollbar : horizontalScrollbar,
+				*skin().horizontalScrollbarThumb, true);
 
 		ScrollFrame f;
 		f.id = id;

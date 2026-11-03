@@ -4,6 +4,7 @@
 #include "UnrealSpace.h"
 #include "UnrealSpaceGodLog.h"
 #include "Input/UnrealInputDevice.h"
+#include "UnityCompat/GuiHost.h"
 
 #include "Camera/CameraComponent.h"
 #include "Engine/Engine.h"
@@ -58,6 +59,11 @@ void AUnitySpaceAppActor::BeginPlay()
 
 	App = std::make_shared<UnitySpaceApp>();
 	App->Awake();
+	// OnGUI runs in the GUI host's passes (Layout, each input event, Repaint), as Unity calls it (US-T31).
+	{
+		UnitySpaceApp* AppPtr = App.get();
+		GuiHost::Register(AppPtr, [AppPtr] { if (AppPtr->enabled) AppPtr->OnGUI(); });
+	}
 	ApplyCamera();
 	ApplyCursor();
 	ApplyAudio();
@@ -67,6 +73,7 @@ void AUnitySpaceAppActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	if (App)
 	{
+		GuiHost::Unregister(App.get());
 		if (EndPlayReason == EEndPlayReason::Quit || EndPlayReason == EEndPlayReason::EndPlayInEditor) App->OnApplicationQuit();
 		App->OnDestroy();
 		App.reset();
@@ -97,10 +104,8 @@ void AUnitySpaceAppActor::Tick(float DeltaSeconds)
 
 void AUnitySpaceAppActor::DrawGui(UCanvas* Canvas)
 {
-	if (!App || !App->enabled) return;
-	CurrentCanvas = Canvas;
-	App->OnGUI();
-	CurrentCanvas = nullptr;
+	// OnGUI is the GUI host's (registered in BeginPlay): it draws on its own Slate overlay, with Unity's event passes.
+	(void)Canvas;
 }
 
 void AUnitySpaceAppActor::RefreshUnityStatics(float RealDeltaSeconds)

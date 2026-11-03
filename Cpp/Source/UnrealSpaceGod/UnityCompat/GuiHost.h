@@ -4,7 +4,7 @@
 // OnGUI. A full-screen, hit-test-invisible Slate widget over the game viewport runs, at paint time each frame,
 // Unity's event loop over the registered OnGUI handlers (a Layout pass before every event; one pass per input event
 // that came in since the last frame; then Layout + Repaint) and draws the Repaint pass with Slate: boxes (9-slice
-// for a style's border), textures, text in Roboto at Unity's pixel em, clip zones for groups / scroll views / clipped
+// for a style's border), textures, text in Arial (the system's, as the C# track draws; Roboto without it) at Unity's pixel em, clip zones for groups / scroll views / clipped
 // text, render transforms for GUI.matrix. Input comes from a Slate input pre-processor that never consumes anything
 // (the game reads the same keys and decides with UnitySpaceApp.UiRects whether the pointer is over the UI, as the
 // original does), and that also feeds UI::UiInput.
