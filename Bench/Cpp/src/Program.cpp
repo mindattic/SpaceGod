@@ -38,6 +38,7 @@
 #define NOMINMAX
 #include <windows.h>
 #include <psapi.h>
+#include <dbghelp.h>
 
 // ---------------------------------------------------------------- allocation counter (C#'s GC.GetTotalAllocatedBytes)
 namespace
@@ -479,8 +480,39 @@ namespace Bench
 	}
 }
 
+// ---------------------------------------------------------------- crash report: a native fault prints its stack (pdbs ship beside the exe)
+namespace
+{
+	LONG WINAPI CrashFilter(EXCEPTION_POINTERS* ep)
+	{
+		HANDLE proc = GetCurrentProcess(), thread = GetCurrentThread();
+		std::fprintf(stderr, "Bench.Cpp: native exception 0x%08lX at %p\n", ep->ExceptionRecord->ExceptionCode, ep->ExceptionRecord->ExceptionAddress);
+		SymSetOptions(SYMOPT_LOAD_LINES | SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS);
+		SymInitialize(proc, nullptr, TRUE);
+		CONTEXT ctx = *ep->ContextRecord;
+		STACKFRAME64 f{};
+		f.AddrPC.Offset = ctx.Rip; f.AddrPC.Mode = AddrModeFlat;
+		f.AddrFrame.Offset = ctx.Rbp; f.AddrFrame.Mode = AddrModeFlat;
+		f.AddrStack.Offset = ctx.Rsp; f.AddrStack.Mode = AddrModeFlat;
+		for (int i = 0; i < 48 && StackWalk64(IMAGE_FILE_MACHINE_AMD64, proc, thread, &f, &ctx, nullptr, SymFunctionTableAccess64, SymGetModuleBase64, nullptr); i++)
+		{
+			char buf[sizeof(SYMBOL_INFO) + 512] = {};
+			auto sym = reinterpret_cast<SYMBOL_INFO*>(buf);
+			sym->SizeOfStruct = sizeof(SYMBOL_INFO); sym->MaxNameLen = 511;
+			DWORD64 d = 0; DWORD dl = 0;
+			IMAGEHLP_LINE64 line{}; line.SizeOfStruct = sizeof line;
+			const char* name = SymFromAddr(proc, f.AddrPC.Offset, &d, sym) ? sym->Name : "?";
+			if (SymGetLineFromAddr64(proc, f.AddrPC.Offset, &dl, &line)) std::fprintf(stderr, "  %s  %s(%lu)\n", name, line.FileName, line.LineNumber);
+			else std::fprintf(stderr, "  %s\n", name);
+		}
+		std::fflush(stderr);
+		return EXCEPTION_EXECUTE_HANDLER;
+	}
+}
+
 int main(int argc, char** argv)
 {
+	SetUnhandledExceptionFilter(CrashFilter);
 	try
 	{
 		return Bench::Main(argc, argv);

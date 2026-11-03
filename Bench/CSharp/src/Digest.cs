@@ -129,6 +129,32 @@ namespace Bench.CSharp
             return sb.ToString();
         }
 
+        /// <summary>
+        /// Trace mode: one line for the digest <paramref name="text"/> after tick <paramref name="tick"/>: the FNV-1a of its
+        /// head (everything before the first system) and of each system's block, so the first differing tick and system show
+        /// between the two runners. Bench.Cpp's Digest::TraceLine is the same.
+        /// </summary>
+        public static string TraceLine(int tick, string text)
+        {
+            var sb = new StringBuilder("tick " + I(tick));
+            int start = 0, section = -1;
+            void Emit(int end) => sb.Append(section < 0 ? " head=" : " s" + I(section) + "=").Append(Hex(Fnv1a64(text.Substring(start, end - start))));
+            for (int pos = 0; pos < text.Length;)
+            {
+                int eol = text.IndexOf('\n', pos);
+                if (eol < 0) eol = text.Length;
+                if (string.CompareOrdinal(text, pos, "system ", 0, 7) == 0)
+                {
+                    Emit(pos);
+                    start = pos;
+                    section++;
+                }
+                pos = eol + 1;
+            }
+            Emit(text.Length);
+            return sb.ToString();
+        }
+
         static void WriteBattle(Action<string> L, Battle bt)
         {
             int present = 0;

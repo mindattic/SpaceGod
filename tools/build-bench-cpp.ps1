@@ -63,7 +63,7 @@ foreach ($f in Get-ChildItem -LiteralPath $src -Filter '*.cpp' -File) {
 if ($failed) { exit 1 }
 
 $exe = Join-Path $out 'Bench.Cpp.exe'
-& link.exe /nologo /DEBUG "/OUT:$exe" @objs $lib psapi.lib
+& link.exe /nologo /DEBUG "/OUT:$exe" @objs $lib psapi.lib dbghelp.lib
 if ($LASTEXITCODE -ne 0) { throw 'link.exe failed (Bench.Cpp).' }
 Write-Host "exe     $exe"
 exit 0
