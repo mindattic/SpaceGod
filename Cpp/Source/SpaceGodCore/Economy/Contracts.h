@@ -3,6 +3,7 @@
 
 #include "Cs/Cs.h"
 #include "DVec3.h" // pilotOffset (by value)
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -483,6 +484,9 @@ namespace SpaceGod::Core
 
 	private:
 		static cs::String Cr(double v);
+	private:
+		Contracts() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(Contracts); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	const char* ToString(Contracts::TakeOutcome v);

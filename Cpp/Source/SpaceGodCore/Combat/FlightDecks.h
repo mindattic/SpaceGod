@@ -1,6 +1,7 @@
 #pragma once
 #include "Cs/Cs.h"
 #include "DVec3.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -120,6 +121,9 @@ namespace SpaceGod::Core
 
 		/// <summary>Whether <paramref name="craft"/> has to hold off: another is on the glide path, or every spot is taken.</summary>
 		bool Busy(const cs::Ref<BattleUnit>& craft);
+	private:
+		FlightDeck() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(FlightDeck); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	/// <summary>

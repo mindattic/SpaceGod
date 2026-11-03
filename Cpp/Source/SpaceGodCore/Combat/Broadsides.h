@@ -3,6 +3,7 @@
 
 #include "Cs/Cs.h"
 #include "DVec3.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -151,6 +152,7 @@ namespace SpaceGod::Core
 
 		/// <summary>This step: whether the volley on each hull goes now, worked out the first time one of its guns asks.</summary>
 		cs::Dictionary<cs::Ref<BattleUnit>, bool> Releasing; // internal in C#
+		SG_SERIALIZABLE(BroadsideCommand); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	/// <summary>The broadside game's rules (U.SPC-T425): batteries (the guns whose fire cones bear together, U.SPC-T533), focus

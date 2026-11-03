@@ -6,6 +6,7 @@
 
 #include "Cs/Cs.h"
 #include "DVec3.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -155,5 +156,6 @@ namespace SpaceGod::Core
 
 		/// <summary>Clears away every wreck whose lifetime has run out as of <paramref name="jd"/>.</summary>
 		void AdvanceTo(double jd);
+		SG_SERIALIZABLE(Wrecks); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

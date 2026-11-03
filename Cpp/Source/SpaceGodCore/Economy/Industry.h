@@ -5,6 +5,7 @@
 #include "Economy/Goods.h"
 
 #include <tuple>
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -58,6 +59,9 @@ namespace SpaceGod::Core
 		/// times: both assumed, scaled to how lean the deposits are.
 		/// </summary>
 		static double MineWorkersPerTonneDay(Good ore);
+	private:
+		Recipe() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(Recipe); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	/// <summary>One industry at a settlement. Level scales the recipe; it drifts with profitability.</summary>
@@ -87,5 +91,8 @@ namespace SpaceGod::Core
 		bool LifeSupport() const;
 
 		Facility(cs::Ref<::SpaceGod::Core::Recipe> recipe, double level);
+	private:
+		Facility() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(Facility); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

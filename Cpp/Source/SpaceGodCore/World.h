@@ -13,6 +13,7 @@
 #include "DVec3.h"
 #include "BodyDefinition.h" // Rgb (by value: SolFederationColor)
 #include "Ships.h"          // ShipClass, ShipRole, Faction, Ship
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -687,5 +688,6 @@ namespace SpaceGod::Core
 	public:
 		/// <summary>How much more of every good a settled system makes than it uses: the traders' living, and the slack for the shipyards' and the ships' own wants.</summary>
 		static constexpr double SupplyMargin = 1.15;
+		SG_SERIALIZABLE(World); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

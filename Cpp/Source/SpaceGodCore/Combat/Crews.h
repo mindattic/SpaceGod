@@ -6,6 +6,7 @@
 
 #include "Cs/Cs.h"
 #include "DVec3.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -229,6 +230,7 @@ namespace SpaceGod::Core
 		/// whoever will sign, while a haven stands), up to its reserve; and morale recovering toward its baseline.
 		/// </summary>
 		static void Recruit(const cs::List<cs::Ref<Faction>>& factions, const cs::List<cs::Ref<Settlement>>& settlements, double days);
+		SG_SERIALIZABLE(Crews); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	/// <summary>

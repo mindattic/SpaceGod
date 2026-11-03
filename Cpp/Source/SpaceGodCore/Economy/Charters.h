@@ -2,6 +2,7 @@
 // Port of Unity.SpaceGod Assets/UnitySpace/Core/Economy/Charters.cs (US-T19).
 
 #include "Cs/Cs.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -172,6 +173,9 @@ namespace SpaceGod::Core
 
 	private:
 		void End(const cs::Ref<Charter>& c, double jd, const cs::String& how, bool served);
+	private:
+		Charters() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(Charters); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	const char* ToString(Charters::TakeOutcome v);

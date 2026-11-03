@@ -3,6 +3,7 @@
 
 #include "Cs/Cs.h"
 #include "DVec3.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -159,5 +160,8 @@ namespace SpaceGod::Core
 
 	public:
 		cs::String ToString() const { return Name(); }
+	private:
+		Satellite() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(Satellite); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

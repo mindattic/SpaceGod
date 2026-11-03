@@ -5,6 +5,7 @@
 #include "Economy/Propulsion.h" // TripEstimate (by value in EstimateTrip)
 
 #include <tuple>
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -433,6 +434,9 @@ namespace SpaceGod::Core
 
 		/// <summary>Captures a settlement: the owner changes and production is disrupted for a while.</summary>
 		void Capture(const cs::Ref<Settlement>& s, const cs::Ref<Faction>& newOwner);
+	private:
+		Economy() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(Economy); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	const char* ToString(Economy::TradeOutcome v);

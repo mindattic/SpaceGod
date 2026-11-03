@@ -2,6 +2,7 @@
 // Port of Unity.SpaceGod Assets/UnitySpace/Core/Economy/Colonisation.cs (US-T19).
 
 #include "Cs/Cs.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -439,5 +440,6 @@ namespace SpaceGod::Core
 		/// stands (<see cref="Faction.Capital"/>), rather than simply losing its last settlers (U.SPC-T319).
 		/// </summary>
 		void Abandon(const cs::Ref<Economy>& economy, const cs::Ref<Settlement>& s, double jd);
+		SG_SERIALIZABLE(Colonisation); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

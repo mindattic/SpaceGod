@@ -243,5 +243,7 @@ namespace SpaceGod::Core
 	private:
 		TradeDesk() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 		SG_SERIALIZABLE(TradeDesk); // ObjectGraph registration (Persistence/Registrations)
+	private:
+		TradeDesk() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 	};
 }

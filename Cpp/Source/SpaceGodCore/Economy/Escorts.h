@@ -2,6 +2,7 @@
 // Port of Unity.SpaceGod Assets/UnitySpace/Core/Economy/Escorts.cs (US-T19).
 
 #include "Cs/Cs.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -99,5 +100,8 @@ namespace SpaceGod::Core
 		static double Purse(const cs::Ref<Ship>& s);
 
 		static void Pay(const cs::Ref<Ship>& s, double credits);
+	private:
+		MerchantEscorts() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(MerchantEscorts); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

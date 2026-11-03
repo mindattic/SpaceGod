@@ -2,6 +2,7 @@
 #include "Cs/Cs.h"
 #include "DVec3.h"
 #include <utility>
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -166,5 +167,8 @@ namespace SpaceGod::Core
 
 		/// <summary>Every chase is given up (the pilot has left the frame, the helm, or the system).</summary>
 		void ReleaseAll(double jd);
+	private:
+		Pursuit() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(Pursuit); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

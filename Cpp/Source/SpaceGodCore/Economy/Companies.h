@@ -5,6 +5,7 @@
 #include "BodyDefinition.h" // Rgb (by value in Company::Livery)
 
 #include <tuple>
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -380,5 +381,8 @@ namespace SpaceGod::Core
 
 	public:
 		static cs::String Credits(double c);
+	private:
+		Companies() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(Companies); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

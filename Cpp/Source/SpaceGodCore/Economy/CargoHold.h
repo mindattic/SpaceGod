@@ -3,6 +3,7 @@
 
 #include "Cs/Cs.h"
 #include "Economy/Goods.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -77,6 +78,9 @@ namespace SpaceGod::Core
 		double Tonnes() const;
 		int Width() const;
 		int Height() const;
+	private:
+		CargoItem() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(CargoItem); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	/// <summary>
@@ -127,5 +131,8 @@ namespace SpaceGod::Core
 		/// <summary>Moves an existing crate to a new position/rotation, rejecting overlap or going out of
 		/// bounds; on failure the crate stays exactly where it was.</summary>
 		bool Move(const cs::Ref<CargoItem>& item, int newX, int newY, bool newRotated);
+	private:
+		CargoHold() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(CargoHold); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

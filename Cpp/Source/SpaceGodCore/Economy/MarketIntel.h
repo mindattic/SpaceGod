@@ -5,6 +5,7 @@
 #include "Economy/Goods.h" // GoodInfo::Count (the sheets' lengths), Good (by value in TradeLead)
 
 #include <vector>
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -133,5 +134,8 @@ namespace SpaceGod::Core
 		/// the far end. Runs from a pirate haven (its goods are stolen) are the back door's business, not the desk's.
 		/// </summary>
 		cs::List<cs::Ref<TradeLead>> Leads(double holdTonnes, double jd, int max = 12, cs::Ref<Faction> flag = nullptr, cs::Ref<CargoHold> crateHold = nullptr);
+	private:
+		MarketIntel() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(MarketIntel); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

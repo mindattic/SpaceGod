@@ -655,5 +655,7 @@ namespace SpaceGod::Core
 	private:
 		InterstellarTraffic() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 		SG_SERIALIZABLE(InterstellarTraffic); // ObjectGraph registration (Persistence/Registrations)
+	private:
+		InterstellarTraffic() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 	};
 }

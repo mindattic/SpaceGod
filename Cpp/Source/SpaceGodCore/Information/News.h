@@ -5,6 +5,7 @@
 #include "World.h"
 
 #include <tuple>
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -254,5 +255,8 @@ namespace SpaceGod::Core
 	public:
 		/// <summary>A line for the HUD: how old the news from <paramref name="about"/> is here, and how it came.</summary>
 		cs::String Describe(const cs::Ref<StarSystem>& at, const cs::Ref<StarSystem>& about, double jd) const;
+	private:
+		Newswire() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(Newswire); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

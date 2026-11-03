@@ -5,6 +5,7 @@
 #include "DVec3.h"
 
 #include <tuple>
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -246,6 +247,7 @@ namespace SpaceGod::Core
 		cs::List<cs::Ref<Ship>> Expire(double jd, double holdDays); // internal
 
 		void Clear() { contacts.Clear(); }
+		SG_SERIALIZABLE(ContactBook); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	/// <summary>
@@ -436,5 +438,8 @@ namespace SpaceGod::Core
 
 		/// <summary>How far <paramref name="s"/>'s scanners pick out a hidden haven (<see cref="Signatures.Haven"/>), km.</summary>
 		static double HavenReachKm(const cs::Ref<Ship>& s);
+	private:
+		Sensors() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(Sensors); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

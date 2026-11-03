@@ -3,6 +3,7 @@
 
 #include "Cs/Cs.h"
 #include "Combat/BoardingCommand.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -339,5 +340,6 @@ namespace SpaceGod::Core
 
 		/// <summary>Back at a yard: crew and marines made up to strength. Raw recruits dilute the complement's drill.</summary>
 		void Muster(double crew, double marines);
+		SG_SERIALIZABLE(Interior); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

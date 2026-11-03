@@ -9,6 +9,7 @@
 #include "Economy/LocalTraffic.h" // CivilCraft (by value)
 #include "Systems/Polities.h"    // PolityKind (by value)
 #include "Combat/Wreck.h"        // SalvageStack (by value, in Ship::Salvage)
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -236,6 +237,9 @@ namespace SpaceGod::Core
 
 	public:
 		static cs::Ref<ShipClassSpec> Of(ShipClass c);
+	private:
+		ShipClassSpec() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(ShipClassSpec); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	class SPACEGODCORE_API Faction final
@@ -289,6 +293,9 @@ namespace SpaceGod::Core
 		Faction(cs::String name, cs::String prefix, Rgb color);
 
 		cs::String ToString() const { return Name; }
+	private:
+		Faction() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(Faction); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	/// <summary>A circular parking orbit around a body, in a plane given by an orthonormal pair (U, V).</summary>
@@ -753,6 +760,7 @@ namespace SpaceGod::Core
 		cs::Ref<Ship> Tombstone() const; // internal
 
 		cs::String ToString() const { return Name; }
+		SG_SERIALIZABLE(Ship); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	/// <summary>Kinematic snapshot of a ship at an instant.</summary>

@@ -5,6 +5,7 @@
 #include "Economy/Goods.h" // GoodInfo::Count (array lengths)
 
 #include <tuple>
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -242,5 +243,8 @@ namespace SpaceGod::Core
 		static cs::String Percent(double f);
 		static cs::String Tonnes(double t);
 		static cs::String Days(double d);
+	private:
+		MarketShocks() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(MarketShocks); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

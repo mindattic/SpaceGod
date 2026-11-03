@@ -1,6 +1,7 @@
 #pragma once
 #include "Cs/Cs.h"
 #include "DVec3.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -224,6 +225,7 @@ namespace SpaceGod::Core
 		static double FactorOf(const cs::Ref<BattleUnit>& u, PowerSystem s);
 
 		cs::String ToString() const;
+		SG_SERIALIZABLE(PowerDistribution); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	// ---------------------------------------------------------------- countermeasures

@@ -257,5 +257,7 @@ namespace SpaceGod::Core
 	private:
 		PirateClans() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 		SG_SERIALIZABLE(PirateClans); // ObjectGraph registration (Persistence/Registrations)
+	private:
+		PirateClans() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 	};
 }

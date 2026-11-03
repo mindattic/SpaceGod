@@ -1,6 +1,7 @@
 #pragma once
 #include "Cs/Cs.h"
 #include "DVec3.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -90,6 +91,7 @@ namespace SpaceGod::Core
 			hasLastHull = true;
 			return tookDamage;
 		}
+		SG_SERIALIZABLE(PilotCruiseState); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	/// <summary>

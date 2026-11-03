@@ -2,6 +2,7 @@
 // Port of Unity.SpaceGod Assets/UnitySpace/Core/Economy/Smuggling.cs (US-T19).
 
 #include "Cs/Cs.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -106,6 +107,9 @@ namespace SpaceGod::Core
 		Outcome SellBackDoor(const cs::Ref<Ship>& ship, const cs::Ref<Settlement>& s, Good g, int crates, double jd, int& sold, double& credits, double roll = cs::Double::NaN);
 
 		static cs::String Describe(BackDoorReason r);
+	private:
+		Smuggling() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(Smuggling); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	const char* ToString(Smuggling::Outcome v);

@@ -6,6 +6,7 @@
 
 #include "Cs/Cs.h"
 #include "Combat/Facilities.h" // IPartSpec: ModuleSpec's base
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -225,6 +226,9 @@ namespace SpaceGod::Core
 		cs::String Name() const;
 
 		static cs::String TypeName(MountType t);
+	private:
+		OutfitSlot() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(OutfitSlot); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	enum class OutfitOutcome : int;
@@ -425,6 +429,9 @@ namespace SpaceGod::Core
 
 	private:
 		cs::Ref<Loadout> Self() const { return std::const_pointer_cast<Loadout>(shared_from_this()); }
+	private:
+		Loadout() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(Loadout); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	/// <summary>Why a refit did or did not go through (<see cref="NoRoom"/>: the facility is bigger than the hull's free space;

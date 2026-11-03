@@ -4,6 +4,7 @@
 #include "Cs/Cs.h"
 
 #include <tuple>
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -135,5 +136,8 @@ namespace SpaceGod::Core
 		void PayOut(const cs::Ref<InsurancePolicy>& p, double value, double jd);
 
 		void Close(const cs::Ref<InsurancePolicy>& p, double jd, const cs::String& how);
+	private:
+		TradeInsurance() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(TradeInsurance); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

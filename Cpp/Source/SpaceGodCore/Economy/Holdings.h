@@ -3,6 +3,7 @@
 
 #include "Cs/Cs.h"
 #include "Economy/Goods.h" // GoodInfo::Count (Property::Stock's length)
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -513,5 +514,8 @@ namespace SpaceGod::Core
 		int WhereBound(const cs::Ref<Ship>& c) const;
 
 		int NearestYard(const cs::Ref<Ship>& ship, int here, double jd) const;
+	private:
+		Holdings() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(Holdings); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

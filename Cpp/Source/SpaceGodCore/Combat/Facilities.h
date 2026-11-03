@@ -2,6 +2,7 @@
 // Port of Unity.SpaceGod Assets/UnitySpace/Core/Combat/Facilities.cs (see docs/MIGRATION.md).
 
 #include "Cs/Cs.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -301,6 +302,9 @@ namespace SpaceGod::Core
 
 		/// <summary>The space it takes, sections.</summary>
 		double Size() const;
+	private:
+		FacilitySite() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(FacilitySite); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	/// <summary>

@@ -2,6 +2,7 @@
 // Port of Unity.SpaceGod Core/SimClock.cs (see docs/MIGRATION.md).
 
 #include "Cs/Cs.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -95,5 +96,8 @@ namespace SpaceGod::Core
 
 		/// <summary>Advances by real seconds; returns the simulated days elapsed.</summary>
 		double Advance(double realSeconds);
+	private:
+		SimClock() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(SimClock); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

@@ -7,6 +7,7 @@
 #include "DVec3.h"
 #include "Economy/Industry.h"
 #include "Lagrange.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -100,6 +101,7 @@ namespace SpaceGod::Core
 		double SlipProgress() const;
 
 		cs::String ToString() const { return Name; }
+		SG_SERIALIZABLE(OrbitalStructure); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	/// <summary>
@@ -248,6 +250,9 @@ namespace SpaceGod::Core
 		DVec3 Up(double jd);
 
 		cs::String ToString() const { return Name; }
+	private:
+		DockingRing() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(DockingRing); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	/// <summary>Everything a system has in orbit, and the docking rings over its populous worlds.</summary>
@@ -341,5 +346,8 @@ namespace SpaceGod::Core
 		void AddSolRings(const cs::Ref<Economy>& economy);
 
 		void AddCentauriRings(const cs::Ref<Economy>& economy);
+	private:
+		Infrastructure() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(Infrastructure); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

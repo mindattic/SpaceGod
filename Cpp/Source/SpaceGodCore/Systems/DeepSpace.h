@@ -567,6 +567,8 @@ namespace SpaceGod::Core
 	private:
 		DeepSpace() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 		SG_SERIALIZABLE(DeepSpace); // ObjectGraph registration (Persistence/Registrations)
+	private:
+		DeepSpace() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 	};
 
 	/// <summary>

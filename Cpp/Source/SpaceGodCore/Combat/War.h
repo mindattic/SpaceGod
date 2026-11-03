@@ -3,6 +3,7 @@
 
 #include "Cs/Cs.h"
 #include "DVec3.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -1032,5 +1033,8 @@ namespace SpaceGod::Core
 	public:
 		/// <summary>The ordinal a repeat battle is named with: Second, Third, then 4th, ... 21st, 22nd, 23rd, 111th.</summary>
 		static cs::String Ordinal(int n);
+	private:
+		War() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(War); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

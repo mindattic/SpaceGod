@@ -3,6 +3,7 @@
 
 #include "Cs/Cs.h"
 #include "DVec3.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -19,8 +20,8 @@ namespace SpaceGod::Core
 	class SPACEGODCORE_API Subsystem final
 	{
 	public:
-		const cs::Ref<SubsystemDef> Def;
-		const int Index;
+		cs::Ref<SubsystemDef> Def;
+		int Index = 0;
 		double Hp = 0;
 		double Cooldown = 0;
 		int Ammo = 0;
@@ -52,6 +53,9 @@ namespace SpaceGod::Core
 		/// whose patch then shows no bubble, and for anything that is not a shield emitter.
 		/// </summary>
 		double ShieldFraction() const;
+	private:
+		Subsystem() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(Subsystem); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	/// <summary>
@@ -63,7 +67,7 @@ namespace SpaceGod::Core
 	class SPACEGODCORE_API ShipCombat final : public std::enable_shared_from_this<ShipCombat>
 	{
 	public:
-		const cs::Ref<CombatSpec> Spec;
+		cs::Ref<CombatSpec> Spec;
 		cs::List<cs::Ref<Subsystem>> Subsystems;
 		double Hull = 0;
 
@@ -222,5 +226,8 @@ namespace SpaceGod::Core
 
 		/// <summary>Builds new boarding shuttles for up to <paramref name="count"/> of the empty shuttle berths (U.SPC-T486, U.SPC-T590).</summary>
 		void RestoreShuttles(int count);
+	private:
+		ShipCombat() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(ShipCombat); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

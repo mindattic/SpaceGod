@@ -7,6 +7,7 @@
 
 #include <limits>
 #include <tuple>
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -414,5 +415,8 @@ namespace SpaceGod::Core
 
 		/// <summary>The last hop of the quickest route from <paramref name="fromSystem"/> into every system it reaches.</summary>
 		cs::Ref<RouteTreeMap> RouteTree(int fromSystem, double jd, bool heavyOnly);
+	private:
+		Hyperlanes() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(Hyperlanes); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

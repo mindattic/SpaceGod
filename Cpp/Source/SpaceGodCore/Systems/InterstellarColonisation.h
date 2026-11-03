@@ -52,5 +52,7 @@ namespace SpaceGod::Core
 	private:
 		InterstellarColonisation() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 		SG_SERIALIZABLE(InterstellarColonisation); // ObjectGraph registration (Persistence/Registrations)
+	private:
+		InterstellarColonisation() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 	};
 }

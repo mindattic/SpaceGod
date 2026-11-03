@@ -7,6 +7,7 @@
 #include "Events/Opportunity.h"
 
 #include <tuple>
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -203,5 +204,6 @@ namespace SpaceGod::Core
 		/// <summary>Credits go to the player's purse (their faction's treasury, as the market board shows it),
 		/// cargo into their grid hold as far as it fits, and standing to the patron.</summary>
 		void Pay(const cs::Ref<Opportunity>& op, cs::Ref<Ship> player);
+		SG_SERIALIZABLE(EventDirector); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

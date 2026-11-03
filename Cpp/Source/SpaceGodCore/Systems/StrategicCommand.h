@@ -115,6 +115,8 @@ namespace SpaceGod::Core
 	private:
 		ProductionFocus() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 		SG_SERIALIZABLE(ProductionFocus); // ObjectGraph registration (Persistence/Registrations)
+	private:
+		ProductionFocus() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 	};
 
 	/// <summary>
@@ -184,6 +186,8 @@ namespace SpaceGod::Core
 	private:
 		BuildPlan() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 		SG_SERIALIZABLE(BuildPlan); // ObjectGraph registration (Persistence/Registrations)
+	private:
+		BuildPlan() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 	};
 
 	/// <summary>
@@ -240,6 +244,8 @@ namespace SpaceGod::Core
 	private:
 		ResearchTrack() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 		SG_SERIALIZABLE(ResearchTrack); // ObjectGraph registration (Persistence/Registrations)
+	private:
+		ResearchTrack() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 	};
 
 	/// <summary>One polity's standing directives (U.SPC-T423): its production, build and research priorities and its research so far.</summary>
@@ -264,6 +270,8 @@ namespace SpaceGod::Core
 	private:
 		PolityDirectives() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 		SG_SERIALIZABLE(PolityDirectives); // ObjectGraph registration (Persistence/Registrations)
+	private:
+		PolityDirectives() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 	};
 
 	/// <summary>One fleet group in a polity's command report: where it is, what it is doing and what it was told to do.</summary>
@@ -468,5 +476,7 @@ namespace SpaceGod::Core
 	private:
 		StrategicCommand() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 		SG_SERIALIZABLE(StrategicCommand); // ObjectGraph registration (Persistence/Registrations)
+	private:
+		StrategicCommand() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 	};
 }

@@ -50,6 +50,8 @@ namespace SpaceGod::Core
 	private:
 		GateLink() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 		SG_SERIALIZABLE(GateLink); // ObjectGraph registration (Persistence/Registrations)
+	private:
+		GateLink() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 	};
 
 	/// <summary>

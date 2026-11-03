@@ -307,5 +307,7 @@ namespace SpaceGod::Core
 	private:
 		MilitaryLogistics() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 		SG_SERIALIZABLE(MilitaryLogistics); // ObjectGraph registration (Persistence/Registrations)
+	private:
+		MilitaryLogistics() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 	};
 }

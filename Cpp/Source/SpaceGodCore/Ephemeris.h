@@ -4,6 +4,7 @@
 #include "Cs/Cs.h"
 #include "Astro.h"
 #include "DVec3.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -49,6 +50,7 @@ namespace SpaceGod::Core
 			static FrameBasis FromPole(DVec3 pole);
 
 			DVec3 ToEcliptic(DVec3 v) const { return x * v.X + y * v.Y + z * v.Z; }
+			SG_SERIALIZABLE(FrameBasis); // ObjectGraph registration (Persistence/Registrations)
 		};
 
 		cs::List<DVec3> relative;
@@ -99,5 +101,9 @@ namespace SpaceGod::Core
 
 		/// <summary>Orbital speed relative to the parent (km/s) from vis-viva.</summary>
 		double OrbitalSpeedKmS(int body) const;
+	private:
+		Ephemeris() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(Ephemeris); // ObjectGraph registration (Persistence/Registrations)
+		SG_SERIALIZABLE(FrameBasis); // its registration names this private nested type
 	};
 }

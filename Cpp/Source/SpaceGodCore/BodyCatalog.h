@@ -4,6 +4,7 @@
 #include "Cs/Cs.h"
 #include "Astro.h"
 #include "BodyDefinition.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -103,5 +104,8 @@ namespace SpaceGod::Core
 
 		static cs::Ref<BodyDefinition> Moon(const cs::String& name, const cs::String& parent, double radiusKm, double gm, double aKm, double e, double iDeg,
 			double nodeDeg, double argPeriDeg, double meanAnomalyDeg, double periodDays, double nodeRate, double varpiRate, Rgb color);
+	private:
+		BodyCatalog() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(BodyCatalog); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

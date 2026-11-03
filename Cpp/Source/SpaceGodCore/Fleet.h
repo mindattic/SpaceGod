@@ -17,6 +17,7 @@
 #include "Cs/Cs.h"
 #include "Astro.h"
 #include "DVec3.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -916,5 +917,8 @@ namespace SpaceGod::Core
 		// escorts: params (ShipClass cls, string name)[] -> .first cls, .second name.
 		cs::Ref<Ship> Group(cs::Ref<Faction> faction, double jd, ShipClass leaderClass, cs::String leaderName, cs::List<cs::String> route,
 			cs::List<std::pair<ShipClass, cs::String>> escorts);
+	private:
+		Fleet() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(Fleet); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

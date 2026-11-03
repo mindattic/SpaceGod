@@ -2,6 +2,7 @@
 // Port of Unity.SpaceGod Assets/UnitySpace/Core/Combat/Diplomacy.cs (see docs/MIGRATION.md).
 
 #include "Cs/Cs.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -136,5 +137,6 @@ namespace SpaceGod::Core
 		bool DeclareBlockade(const cs::Ref<Settlement>& port, const cs::Ref<Faction>& by);
 
 		bool LiftBlockade(const cs::Ref<Settlement>& port);
+		SG_SERIALIZABLE(Diplomacy); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

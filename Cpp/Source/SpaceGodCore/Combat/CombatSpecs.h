@@ -5,6 +5,7 @@
 
 #include "Cs/Cs.h"
 #include "DVec3.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -286,6 +287,9 @@ namespace SpaceGod::Core
 
 	public:
 		static cs::String Name(SubsystemKind k);
+	private:
+		SubsystemDef() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(SubsystemDef); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	/// <summary>A hull design's fighting qualities and hardpoint layout (positions match its mesh). Several

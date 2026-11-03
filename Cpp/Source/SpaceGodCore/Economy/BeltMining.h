@@ -7,6 +7,7 @@
 #include "Economy/Goods.h" // GoodInfo::Count (the per-good arrays' length)
 
 #include <tuple>
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -65,6 +66,9 @@ namespace SpaceGod::Core
 
 		/// <summary>One kind, drawn by <see cref="Share"/>.</summary>
 		static cs::Ref<AsteroidClass> Pick(cs::Random& rng);
+	private:
+		AsteroidClass() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(AsteroidClass); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	/// <summary>An asteroid a tug has brought in to a refinery, waiting for (or going through) the grinders.</summary>
@@ -404,6 +408,9 @@ namespace SpaceGod::Core
 		static void Register(const cs::Ref<MegastructureSpec>& spec);
 
 		static cs::Ref<MegastructureSpec> Find(const cs::String& name);
+	private:
+		MegastructureSpec() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(MegastructureSpec); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	/// <summary>One megastructure going up, built from what its builder's warehouses hold.</summary>
@@ -791,5 +798,8 @@ namespace SpaceGod::Core
 		static double Clamp01(double v);
 
 		static cs::String By(const cs::Ref<Faction>& f);
+	private:
+		BeltMining() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(BeltMining); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

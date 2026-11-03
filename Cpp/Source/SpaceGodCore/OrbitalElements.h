@@ -4,6 +4,7 @@
 #include "Cs/Cs.h"
 #include "DVec3.h"
 #include "Kepler.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -79,5 +80,6 @@ namespace SpaceGod::Core
 		}
 
 		KeplerState At(double jd) const;
+		SG_SERIALIZABLE(OrbitalElements); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

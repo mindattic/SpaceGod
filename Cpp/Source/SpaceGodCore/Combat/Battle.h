@@ -7,6 +7,7 @@
 #include "Cs/Cs.h"
 #include "DVec3.h"
 #include "Hyperlanes.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -322,6 +323,7 @@ namespace SpaceGod::Core
 		/// <summary>Yaw angle (degrees) of a battle-local point relative to this hull's own facing:
 		/// 0 = dead ahead, 90 = starboard, 180 = astern, 270 = port.</summary>
 		double YawDegOf(DVec3 point) const;
+		SG_SERIALIZABLE(BattleUnit); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	enum class MissileKind : int
@@ -551,17 +553,17 @@ namespace SpaceGod::Core
 	class Battle final : public std::enable_shared_from_this<Battle>
 	{
 	public:
-		const int Id;
-		const int Body;
-		const cs::String Name;
+		int Id = 0;
+		int Body = 0;
+		cs::String Name;
 
 		/// <summary>Where the fight is: an offset (km, ecliptic) from the body's centre, fixed in its frame.</summary>
-		const DVec3 Anchor;
+		DVec3 Anchor;
 
 		/// <summary>This battle's line-of-approach axis; fixed at creation so late joiners always use the right axis.</summary>
 		DVec3 ApproachAxis = DVec3::UnitX;
 
-		const double StartJd;
+		double StartJd = 0;
 		double Seconds = 0;
 		cs::List<cs::Ref<BattleUnit>> Units;
 		cs::List<cs::Ref<Missile>> Missiles;
@@ -1298,5 +1300,8 @@ namespace SpaceGod::Core
 		/// held), the team stays aboard and the shuttle casts off.
 		/// </summary>
 		void ShuttleLatch(const cs::Ref<BattleUnit>& shuttle, const cs::Ref<BattleUnit>& t);
+	private:
+		Battle() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(Battle); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

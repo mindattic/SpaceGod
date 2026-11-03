@@ -155,5 +155,7 @@ namespace SpaceGod::Core
 	private:
 		JumpGate() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 		SG_SERIALIZABLE(JumpGate); // ObjectGraph registration (Persistence/Registrations)
+	private:
+		JumpGate() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 	};
 }
