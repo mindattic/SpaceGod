@@ -112,8 +112,6 @@ namespace SpaceGod::Smoke
 			FTSTicker::FDelegateHandle ticker;
 			/// A click that loads another scene (New Game): its screen is drawn once that scene is up.
 			cs::String pendingScreen, pendingVia;
-			/// The screenshots: Time::frameCount at the game's first frame (US-T45).
-			int gameStartFrame = -1;
 		};
 		Run run;
 
@@ -418,10 +416,10 @@ namespace SpaceGod::Smoke
 			Log(cs::Cat("UI shots: ", name, " -> ", path));
 		}
 
-		/// The screenshots' start, 2026-11-03 12:00 UTC, seed and game frames before the HUD shot: UiSmoke.Shots' (US-T45).
+		/// The screenshots' start, 2026-11-03 12:00 UTC, seed and the game's clock at the HUD shot: UiSmoke.Shots' (US-T45).
 		constexpr double ShotsStartJd = 2461348.0;
 		constexpr int ShotsSeed = 1;
-		constexpr int ShotsGameFrames = 240;
+		constexpr double ShotsHudSeconds = 4 * 3600; // 240 frames of 1/60 s at the starting 1 hour/s
 
 		/// Logs the moment a shot shows, as UiSmoke.LogShotMoment, so the two tracks' runs can be checked to match.
 		void LogShotMoment(UnitySpaceApp& app, const cs::String& name)
@@ -461,11 +459,10 @@ namespace SpaceGod::Smoke
 					}
 					return;
 				case 2:
-					// The game's own frames from its first (the map load in between counts none): its clock is then the
-					// same on both tracks.
+					// Once the game's own clock is 4 hours in (the map load in between counts for nothing): the same frame
+					// on both tracks.
 					if (!app) { run.waited = 0; return; }
-					if (run.gameStartFrame < 0) run.gameStartFrame = Time::frameCount;
-					if (Time::frameCount - run.gameStartFrame >= ShotsGameFrames)
+					if ((app->Clock->Jd - ShotsStartJd) * 86400.0 >= ShotsHudSeconds - 1)
 					{
 						run.waited = 0;
 						run.phase = 3;

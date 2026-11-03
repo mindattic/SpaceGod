@@ -51,6 +51,15 @@ public partial class ASpaceGameMode : AGameModeBase
             System.IO.Directory.CreateDirectory(root);
             Profiles.UseRoot(root);
         }
+        else if (Bootstrap.HasCommandLineFlag("-SpaceGodUiShots"))
+        {
+            // US-T45: the screenshots' profile in a scratch folder, fresh each run (the C++ track's ShotProfiles), so the
+            // menu reads as a first start ("No saves yet") whatever was played before.
+            var root = System.IO.Path.Combine(SystemLibrary.ProjectSavedDirectory, "ShotProfiles");
+            if (System.IO.Directory.Exists(root)) System.IO.Directory.Delete(root, true);
+            System.IO.Directory.CreateDirectory(root);
+            Profiles.UseRoot(root);
+        }
         // US-T39: a listen server (tools/play.ps1 -Mode host) hosts co-op; standalone stays the original single-player path.
         if (SystemLibrary.IsServer() && !SystemLibrary.IsStandalone() && !SystemLibrary.IsDedicatedServer())
         {

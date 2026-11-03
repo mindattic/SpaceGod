@@ -164,8 +164,8 @@ namespace Unity.SpaceGod.UI
         /// <summary>The screenshots' start, 2026-11-03 12:00 UTC (US-T6's smoke moment), and seed (US-T45).</summary>
         public const double ShotsStartJd = 2461348.0;
         public const int ShotsSeed = 1;
-        /// <summary>The game's frames before the HUD shot (4 s at 1/60 s, 1 hour/s: 4 sim hours).</summary>
-        public const int ShotsGameFrames = 240;
+        /// <summary>The game's clock at the HUD shot: 4 sim hours in (240 frames of 1/60 s at the starting 1 hour/s).</summary>
+        public const double ShotsHudSeconds = 4 * 3600;
 
         /// <summary>Logs the moment a shot shows, so the two tracks' runs can be checked to be at the same one.</summary>
         static void LogShotMoment(UnitySpaceApp app, string name) =>
@@ -239,11 +239,10 @@ namespace Unity.SpaceGod.UI
                 Application.Quit();
                 yield break;
             }
-            // The game's own frames from its first: its clock is then the same on both tracks. From here every step is
+            // The HUD shot once the game's own clock is 4 hours in (the same frame on both tracks). From here every step is
             // a fixed number of frames (the C++ track's ShotsTick schedule), not "until the file appears", so each shot
             // shows the same moment on both tracks; the files are named once they have all been written.
-            int start = Time.frameCount;
-            while (Time.frameCount - start < ShotsGameFrames) yield return null;
+            while ((app.Clock.Jd - ShotsStartJd) * 86400.0 < ShotsHudSeconds - 1) yield return null;
             var pending = new List<(string Name, DateTime Before)>();
             void Take(string name)
             {

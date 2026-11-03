@@ -79,6 +79,15 @@ namespace Unity.SpaceGod.Bridge
             var rotation = UnrealSpace.CameraRotationToUnreal(cam.transform.rotation);
             cameraActor.SetActorTransform(new FTransform(rotation, UnrealSpace.ToUnreal(cam.transform.position)));
             var component = cameraActor.CameraComponent;
+            if (component != null && cam.Unreal == null)
+            {
+                // US-T45: the Unity camera drives this one, so the render backend's look (manual exposure, no tone
+                // curve: the original's LDR, no post-processing) goes on it. Left unbound, Unreal's filmic tone curve
+                // crushed the dark end (the sky's ~14/255 drew as ~2, the menu's stars faded); the C++ track's look is
+                // an unbound post-process volume.
+                cam.Unreal = component;
+                Unity.SpaceGod.Rendering.RenderBackend.Active?.SetupCamera(cam, Unity.SpaceGod.Rendering.CameraRole.Main);
+            }
             if (component != null)
             {
                 // Unity's field of view is vertical, Unreal's horizontal.
