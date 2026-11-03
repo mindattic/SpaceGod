@@ -131,7 +131,7 @@ commit for the benchmark write-up, and an update is a one-line diff. Its build o
 | `CSharp/Source/UnrealSpaceGodCSharp/` | the empty C++ primary game module every UE game target needs; no game code |
 | `CSharp/Core/SpaceGod.Core/` | csproj compiling `../Unity.SpaceGod/Assets/UnitySpace/Core/**/*.cs` **in place** (assembly `Unity.SpaceGod.Core`, netstandard2.1, C# 9), as Unity.SpaceGod's `Tests/UnitySpace.Core` does. `UnitySpaceGodDir` overrides the checkout |
 | `CSharp/Core/Unity.Shared.Core/` | the same for `../Unity.Shared/unity/com.mindattic.unity.shared/Runtime/Core` (`UnitySharedDir`) |
-| `CSharp/Script/ManagedUnrealSpaceGodCSharp/` | the UnrealSharp user project (`Managed<ProjectName>`): the engine side in C#. Class path `/Script/ManagedUnrealSpaceGodCSharp.<Name>` |
+| `CSharp/Script/ManagedUnrealSpaceGodCSharp/` | the UnrealSharp user project (`Managed<ProjectName>`): the engine side in C#. A `[UClass] ASpaceGameMode` is the engine class `/Script/UnrealSharp.SpaceGameMode_C` (one shared package while UnrealSharp's namespace support is off, its default; Blueprint-style `_C` suffix) |
 
 The Core projects live outside `Script/` on purpose: UnrealSharp treats every csproj under `Script/` as a user
 module (glue, load order, hot reload); the Core is a plain dependency that goes into the publish output.
@@ -152,6 +152,25 @@ the submodule:
    `tools/dotnet-sdk.ps1` installs SDK 10.0.403 privately into `CSharp/Intermediate/DotNet` (Microsoft's
    `dotnet-install.ps1`, no admin) and puts it on PATH for the build. Installing SDK ≥ 10.0.300 machine-wide (and
    deleting the empty preview folders) makes this a no-op.
+
+**Proof (2026-11-03).** `tools/play.ps1 -Track CSharp -Mode smoke` (UnrealEditor-Cmd `-game -nullrhi`):
+`ASpaceGameMode` does what `UnitySpaceApp.Awake/Update` do — `new SimClock(jd)`, `Galaxy.CreateDefault(jd)`, then
+`Clock.Advance(dt); Galaxy.Update(Clock.Jd)` — on Unity.SpaceGod's unchanged Core under .NET 10.0.14 in UE 5.8:
+
+```
+LogSpaceGod: Display: Unity.SpaceGod Core up in 9109 ms: 18 systems, 32 bodies in Sol System, 44 traders (.NET 10.0.14)
+LogSpaceGod: Display: [tick 5] JD 2461348.003472 = 2026-11-03 12:04:59 UTC, warp 1 hour/s; Earth helio km = (112499422.4, 96791067.8, -5859.7), |r| = 0.992039 AU
+```
+
+Note for the benchmark: that first `Galaxy.CreateDefault` plus the first ticks (0.3–2 s each) are dominated by JIT
+and the galaxy's first exploration pass; measure warm, and consider ReadyToRun/tiered-PGO settings for both the
+Core and the game assembly before comparing with C++.
+
+**Open risks.** Packaging is a second UAT step today (`PackageProject`) and must be verified with this layout (Core
+outside `Script/`, a netstandard2.1 reference); the packaged exe name and the C++ module stub are set up for it but
+no package has been built yet. Co-op from C# rests on UnrealSharp's replication attributes and RPCs, which are
+less battle-tested than C++'s; the Session layer (host-authoritative commands) keeps the replicated surface small.
+UnrealSharp is pre-1.0 with no tags: updates are by commit, and two of our workarounds depend on its internals.
 
 ## Order of work
 

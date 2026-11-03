@@ -58,6 +58,19 @@ Outside the editor, `tools/play.ps1` starts a game window:
 
 In game, **F9** turns a solo session into a hosted one, and `open <ip>` in the `` ` `` console joins one.
 
+### The C# track (`CSharp/`)
+
+Unity.SpaceGod's own C# Core running inside Unreal through [UnrealSharp](https://github.com/UnrealSharp/UnrealSharp)
+(why, and the build details: [docs/MIGRATION.md](docs/MIGRATION.md#c-track)). Needs Unity.SpaceGod and Unity.Shared
+cloned next to this repo; the Core is compiled from there, not copied.
+
+```powershell
+git submodule update --init                   # the UnrealSharp plugin (build.ps1 does this too)
+./tools/build.ps1 -Track CSharp               # C++ (plugin) + C# glue + Script/ + the Core; installs a private .NET SDK if the machine's can't build UnrealSharp
+./tools/play.ps1 -Track CSharp -Mode smoke    # headless: build the Galaxy, step it, log Earth's position, quit
+./tools/play.ps1 -Track CSharp                # game window (engine side still to come)
+```
+
 ## Controls
 
 | Keys | Action |

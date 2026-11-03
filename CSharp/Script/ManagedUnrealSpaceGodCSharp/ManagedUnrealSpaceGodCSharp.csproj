@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The C# track's game code (UnrealSharp user project, named Managed<ProjectName> as the plugin expects).
+       The simulation is NOT here: it is Unity.SpaceGod's own Core, compiled in place by ../../Core/SpaceGod.Core
+       and referenced as a plain netstandard2.1 library. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>ManagedUnrealSpaceGodCSharp</RootNamespace>
+  </PropertyGroup>
+  <Import Project="../../Plugins/UnrealSharp/UnrealSharp.Shared.props" />
+  <ItemGroup>
+    <ProjectReference Include="../../Core/SpaceGod.Core/SpaceGod.Core.csproj" />
+  </ItemGroup>
+</Project>
