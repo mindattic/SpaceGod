@@ -164,6 +164,8 @@ namespace Unity.SpaceGod.UI
         /// <summary>The screenshots' start, 2026-11-03 12:00 UTC (US-T6's smoke moment), and seed (US-T45).</summary>
         public const double ShotsStartJd = 2461348.0;
         public const int ShotsSeed = 1;
+        /// <summary>The main menu's shot: 1.5 s of the menu's clock (its sky turns 1.5 degrees a second).</summary>
+        public const float ShotsMenuSeconds = 1.5f;
         /// <summary>The game's clock at the HUD shot: 4 sim hours in (240 frames of 1/60 s at the starting 1 hour/s).</summary>
         public const double ShotsHudSeconds = 4 * 3600;
 
@@ -221,7 +223,8 @@ namespace Unity.SpaceGod.UI
             // UnityEngine.Random, and (tools/play.ps1) a fixed 1/60 s frame; the C++ track's SpaceGodSmoke does the same.
             UnitySpaceApp.StartJd = ShotsStartJd;
             Bridge.UnrealHost.NoPlayerInput = true; // wherever the real cursor is, nothing is hovered
-            yield return Frames(90);
+            // The menu's sky turns with Time.unscaledTime: its shot at the same moment on both tracks (90 frames in).
+            while (Time.unscaledTime < ShotsMenuSeconds) yield return null;
             if (MainMenu.Showing)
             {
                 yield return CaptureRunner.Shot("csharp-ui-main-menu");

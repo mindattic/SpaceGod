@@ -419,6 +419,7 @@ namespace SpaceGod::Smoke
 		/// The screenshots' start, 2026-11-03 12:00 UTC, seed and the game's clock at the HUD shot: UiSmoke.Shots' (US-T45).
 		constexpr double ShotsStartJd = 2461348.0;
 		constexpr int ShotsSeed = 1;
+		constexpr float ShotsMenuSeconds = 1.5f; // the main menu's shot: 1.5 s of its clock (its sky turns 1.5 degrees a second)
 		constexpr double ShotsHudSeconds = 4 * 3600; // 240 frames of 1/60 s at the starting 1 hour/s
 
 		/// Logs the moment a shot shows, as UiSmoke.LogShotMoment, so the two tracks' runs can be checked to match.
@@ -434,6 +435,13 @@ namespace SpaceGod::Smoke
 			AUnitySpaceAppActor* a = AUnitySpaceAppActor::Find(world);
 			if (!a || !a->HasActorBegunPlay()) return;
 			UnitySpaceApp* app = a->GetApp();
+			// US-T45: wherever the real cursor is, nothing is hovered (the C# track's UnrealHost.NoPlayerInput): the app,
+			// in each world, reads no device.
+			if (!a->bScriptedInput)
+			{
+				a->bScriptedInput = true;
+				Input::InputDevice::current().Clear();
+			}
 			run.waited++;
 			auto after = [](int frames)
 			{
@@ -449,7 +457,8 @@ namespace SpaceGod::Smoke
 					// seeded UnityEngine.Random and (tools/play.ps1) a fixed 1/60 s frame.
 					UnitySpaceApp::StartJd = ShotsStartJd;
 					if (app) { run.phase = 2; run.waited = 0; return; } // no menu (a flag skipped it)
-					if (UI::MainMenu::Showing() && after(90)) Shot("cpp-ui-main-menu");
+					// The menu's sky turns with Time::unscaledTime: its shot at the same moment on both tracks (UiSmoke.Shots).
+					if (UI::MainMenu::Showing() && Time::unscaledTime >= ShotsMenuSeconds) { run.waited = 0; run.phase = 1; Shot("cpp-ui-main-menu"); }
 					return;
 				case 1:
 					if (after(5))
