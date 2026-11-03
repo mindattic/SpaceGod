@@ -114,13 +114,13 @@ namespace SpaceGod::Core
 		cs::Func<double, cs::Ref<Ship>, double> Dwell;
 
 		/// <summary>Ships that run their own schedule (not escorts, not destroyed, not held by something else).</summary>
-		cs::Func<bool, cs::Ref<Ship>> IsHeld;
+		cs::Func<bool, const cs::Ref<Ship>&> IsHeld; // const& (US-T42): called per ship per step
 
 		/// <summary>Docking rings: ships that <see cref="Lands"/> reach a ringed world through one of its rings.</summary>
 		cs::List<cs::Ref<DockingRing>> Rings = cs::List<cs::Ref<DockingRing>>();
 
 		/// <summary>Which ships go down to the surface at ringed worlds (merchants); null for none.</summary>
-		cs::Func<bool, cs::Ref<Ship>> Lands;
+		cs::Func<bool, const cs::Ref<Ship>&> Lands; // const& (US-T42): called per ship per step
 
 		/// <summary>
 		/// Which ships fly on real propellant (see <see cref="Propulsion"/>): every transit is charged its
@@ -128,7 +128,7 @@ namespace SpaceGod::Core
 		/// propellant, and one that runs dry in flight drifts until a tanker reaches it. Null for none (the
 		/// classic fleet, whose drives never run out).
 		/// </summary>
-		cs::Func<bool, cs::Ref<Ship>> BurnsPropellant;
+		cs::Func<bool, const cs::Ref<Ship>&> BurnsPropellant; // const& (US-T42): called per ship per step
 
 		/// <summary>Whether a ship short of propellant for its next trip can wait at a body for its tanks to be filled (a port that sells it).</summary>
 		cs::Func<bool, cs::Ref<Ship>, int> CanRefuelAt;

@@ -394,7 +394,7 @@ namespace SpaceGod::Core
 		WireColonisation();
 		// Merchants and couriers go down to the surface through the rings; warships and pirates hold orbit, and so does a
 		// bulk freighter, built in space and never landing: it trades from orbit (U.SPC-T482).
-		fleet->Lands = [this](cs::Ref<Ship> s) { return IsTrader(s) && !BulkFreighters::NeverLands(s); };
+		fleet->Lands = [this](const cs::Ref<Ship>& s) { return IsTrader(s) && !BulkFreighters::NeverLands(s); };
 
 		fleet->Lanes = lanes;
 		// The lanes wear, and the tenders their keepers raise keep them up (U.SPC-T481).
@@ -405,7 +405,7 @@ namespace SpaceGod::Core
 		economy->EstimateTravelDays = [fleet](cs::Ref<Ship> ship, int from, int to, double jd) { return fleet->EstimateTravelDays(ship, from, to, jd); };
 		// Civilian hulls fly on real propellant and buy it in port; traders price every run by it.
 		// (Navies' own supply -- tankers and depots -- is a war-logistics matter, left to their stores for now.)
-		fleet->BurnsPropellant = [this](cs::Ref<Ship> s) { return BurnsPropellant(s); };
+		fleet->BurnsPropellant = [this](const cs::Ref<Ship>& s) { return BurnsPropellant(s); };
 		fleet->CanRefuelAt = [economy](cs::Ref<Ship> ship, int body) { return economy->HasPropellantAt(ship, body); };
 		fleet->ForceTopUp = [economy](cs::Ref<Ship> ship, int body, double jd) { economy->Refuel(ship, body, jd, /*force:*/ true); };
 		economy->EstimateTrip = [fleet](cs::Ref<Ship> ship, int from, int to, double jd) { return fleet->EstimateTrip(ship, from, to, jd); };
@@ -475,7 +475,7 @@ namespace SpaceGod::Core
 		economy->CanCrew = [](cs::Ref<Settlement> yard, ShipClass cls) { return Crews::CanCrew(yard->Owner, cls); };
 		fleet->BeforeEvent = [economy](double jd) { economy->AdvanceTo(jd); };
 		// A group running the player down is flown by the chase, not its schedule (U.SPC-T273).
-		fleet->IsHeld = [this](cs::Ref<Ship> ship)
+		fleet->IsHeld = [this](const cs::Ref<Ship>& ship)
 		{
 			return ship->Battle != nullptr || ship->Derelict || ship == PilotedShip || (ship->Voyage != nullptr && ship->Voyage->AtGate) ||
 				(Pursuit != nullptr && Pursuit->Active() && Pursuit->Of(ship) != nullptr);
