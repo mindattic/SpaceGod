@@ -23,7 +23,7 @@ namespace SpaceGod::Core
 	/// weighs it too, <see cref="WeakPatches"/>) takes less while its guns still bear.
 	/// </summary>
 	// [SettingsSource]
-	class ArmourAngling
+	class SPACEGODCORE_API ArmourAngling
 	{
 	public:
 		/// <summary>C# RuntimeHelpers.RunClassConstructor (what SettingsRegistry does for a [SettingsSource] class): creates

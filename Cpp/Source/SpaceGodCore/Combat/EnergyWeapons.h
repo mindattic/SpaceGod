@@ -33,14 +33,14 @@ namespace SpaceGod::Core
 		Sweep,
 	};
 
-	const char* ToString(PhaserTuning v);
+	SPACEGODCORE_API const char* ToString(PhaserTuning v);
 
 	/// <summary>
 	/// The phaser arrays' and plasma cannons' figures, every tunable a declared setting (Settings &gt; Weapons), the beam
 	/// tuning AI captains choose, and the hulls each weapon is fitted to by role.
 	/// </summary>
 	// [SettingsSource]
-	class EnergyWeapons
+	class SPACEGODCORE_API EnergyWeapons
 	{
 		// ------------------------------------------------------------ settings
 

@@ -20,7 +20,7 @@ namespace SpaceGod::Core
 	/// (<see cref="CombatSpec.Squadrons"/>, six craft each), so a carrier can take in only as many strays as its own losses
 	/// have left room for.
 	/// </summary>
-	class StrandedWings
+	class SPACEGODCORE_API StrandedWings
 	{
 	public:
 		/// <summary>How often a stranded craft looks again for somewhere to land, seconds.</summary>
