@@ -17,7 +17,9 @@
 //                          cs::List / Dictionary / HashSet / Queue / Stack, Nullable, tuples, DateTime, Random, ...)
 //   SG_SERIALIZE & co.     the registration macros
 
+#include <array>
 #include <cstdint>
+#include <deque>
 #include <functional>
 #include <istream>
 #include <memory>
@@ -583,7 +585,7 @@ namespace SpaceGod::Core
 			static constexpr int Comparer = 0;
 			static void Content(Writer& w, cs::Queue<T>& c)
 			{
-				std::vector<T> items(c.begin(), c.end());
+				std::deque<T> items(c.begin(), c.end());
 				w.Payload().Var(static_cast<int>(items.size()));
 				for (auto& x : items) Codec<T>::Write(w, x);
 			}
@@ -595,7 +597,7 @@ namespace SpaceGod::Core
 			static void Walk(StaticWalker& s, cs::Queue<T>& c, const cs::String& key, int depth)
 			{
 				int i = 0;
-				std::vector<T> items(c.begin(), c.end());
+				std::deque<T> items(c.begin(), c.end());
 				for (auto& x : items) Codec<T>::Walk(s, x, cs::Cat(key, "[", i++, "]"), depth + 1);
 			}
 		};
@@ -604,7 +606,7 @@ namespace SpaceGod::Core
 			static const NetType* Type() { return Generic("System.Collections.Generic.Stack`1", CollectionsAssembly, { Codec<T>::Type() }, Kind::Stack); }
 			static constexpr int Comparer = 0;
 			// cs::Stack can't be enumerated (Cs.h gap), so a copy is popped: top first, as C# enumerates a Stack.
-			static std::vector<T> Items(const cs::Stack<T>& c) { cs::Stack<T> copy = c; std::vector<T> items; while (copy.Count() > 0) items.push_back(copy.Pop()); return items; }
+			static std::deque<T> Items(const cs::Stack<T>& c) { cs::Stack<T> copy = c; std::deque<T> items; while (copy.Count() > 0) items.push_back(copy.Pop()); return items; }
 			static void Content(Writer& w, cs::Stack<T>& c)
 			{
 				auto items = Items(c);
@@ -614,7 +616,7 @@ namespace SpaceGod::Core
 			static void Fill(Reader& r, const Node& n, cs::Stack<T>& c)
 			{
 				c.Clear();
-				std::vector<T> items;
+				std::deque<T> items;
 				for (const auto& v : n.Items) { T x{}; Codec<T>::Read(r, v, x); items.push_back(x); }
 				for (size_t i = items.size(); i-- > 0;) c.Push(items[i]);
 			}
@@ -633,7 +635,7 @@ namespace SpaceGod::Core
 			{
 				// Compacted as it is written (cleared and refilled in its own order), as the C# writer does, so the
 				// original and the copy keep enumerating in step after later removals.
-				std::vector<T> members;
+				std::deque<T> members;
 				for (const auto& x : c) members.push_back(x);
 				c.Clear();
 				for (auto& x : members) c.Add(x);
@@ -648,7 +650,7 @@ namespace SpaceGod::Core
 			static void Walk(StaticWalker& s, cs::HashSet<T, H, E>& c, const cs::String& key, int depth)
 			{
 				int i = 0;
-				std::vector<T> members;
+				std::deque<T> members;
 				for (const auto& x : c) members.push_back(x);
 				for (auto& x : members) Codec<T>::Walk(s, x, cs::Cat(key, "[", i++, "]"), depth + 1);
 			}
@@ -659,8 +661,8 @@ namespace SpaceGod::Core
 			static constexpr int Comparer = ComparerCode<H>();
 			static void Content(Writer& w, cs::Dictionary<K, V, H, E>& d)
 			{
-				std::vector<K> keys;
-				std::vector<V> values;
+				std::deque<K> keys;
+				std::deque<V> values;
 				for (auto [k, v] : d) { keys.push_back(k); values.push_back(v); }
 				d.Clear();
 				for (size_t i = 0; i < keys.size(); i++) d.Add(keys[i], values[i]);
@@ -686,8 +688,8 @@ namespace SpaceGod::Core
 			static void Walk(StaticWalker& s, cs::Dictionary<K, V, H, E>& d, const cs::String& key, int depth)
 			{
 				int i = 0;
-				std::vector<K> keys;
-				std::vector<V> values;
+				std::deque<K> keys;
+				std::deque<V> values;
 				for (auto [k, v] : d) { keys.push_back(k); values.push_back(v); }
 				for (size_t j = 0; j < keys.size(); j++)
 				{
@@ -834,6 +836,38 @@ namespace SpaceGod::Core
 			static void Walk(StaticWalker& s, cs::Ref<cs::List<T>>& v, const cs::String& key, int depth) { if (v) ArrayCodec<T>::Walk(s, *v, key, depth); }
 		};
 
+		// A C# `T[]` of a length C# never changes, held as std::array<T, N> (Battle's `bool[] Robbed = new bool[2]`).
+		template <class T, size_t N> struct FixedArrayCodec
+		{
+			static const NetType* Type() { return ArrayCodec<T>::Type(); }
+			static void Write(Writer& w, std::array<T, N>& v)
+			{
+				if constexpr (N == 0) w.Payload().Var(w.RefEmptyArray(Type()));
+				else
+				{
+					std::array<T, N>* p = &v;
+					w.Payload().Var(w.RefArray(p, typeid(std::array<T, N>), Type(), static_cast<int>(N), [p](Writer& wr) { for (auto& x : *p) Codec<T>::Write(wr, x); }));
+				}
+			}
+			static void Read(Reader& r, const Value& v, std::array<T, N>& out)
+			{
+				// A saved array of another length loads as far as both reach (C# would keep the saved length).
+				cs::List<T> items;
+				ArrayCodec<T>::Read(r, v, items);
+				for (size_t i = 0; i < N; i++) out[i] = static_cast<int>(i) < items.Count() ? static_cast<T>(items[static_cast<int>(i)]) : T{};
+			}
+			static void Walk(StaticWalker& s, std::array<T, N>& v, const cs::String& key, int depth)
+			{
+				if (depth > StaticWalker::MaxDepth) return;
+				if (!s.Record(&v, typeid(std::array<T, N>), key, nullptr, nullptr)) return;
+				if constexpr (!std::is_arithmetic_v<T>)
+				{
+					int i = 0;
+					for (auto& x : v) Codec<T>::Walk(s, x, cs::Cat(key, "[", i++, "]"), depth + 1);
+				}
+			}
+		};
+
 		// ---- delegates: written as null (see docs/PERSISTENCE.md, "Delegates"); a saved one loads as nothing, and
 		// the class's SG_LOADED hook wires it again.
 		SPACEGODCORE_API const NetType* DelegateType(int argCount, bool func, std::vector<const NetType*> args);
@@ -945,6 +979,79 @@ namespace SpaceGod::Core
 			}
 		};
 
+		/// <summary>
+		/// A named C++ struct standing for a C# value tuple (`(StarSystem, Ship)` ported as `struct AtGateEntry { system;
+		/// ship; }`): written as System.ValueTuple`N of its members, in the order given. SG_TUPLE(T, &T::a, &T::b).
+		/// </summary>
+		template <class T, auto... Members> struct TupleStructCodec
+		{
+			template <auto M> struct MemberOf;
+			template <class C, class V, V C::* M> struct MemberOf<M> { using Type = V; };
+			template <auto M> using MemberType = Bare<typename MemberOf<M>::Type>;
+
+			static const NetType* Type() { return TupleType({ Codec<MemberType<Members>>::Type()... }); }
+			static void Write(Writer& w, T& v) { (Codec<MemberType<Members>>::Write(w, v.*Members), ...); }
+			static void Read(Reader& r, const Value& v, T& out)
+			{
+				if (v.ValueTag != Value::Tag::Struct) return;
+				int i = 0;
+				(ReadItem<Members>(r, v, i++, out), ...);
+			}
+			template <auto M> static void ReadItem(Reader& r, const Value& v, int i, T& out) { if (auto item = TupleItem(v, i)) Codec<MemberType<M>>::Read(r, *item, out.*M); }
+			static void Walk(StaticWalker& s, T& v, const cs::String& key, int depth)
+			{
+				int i = 1;
+				(Codec<MemberType<Members>>::Walk(s, v.*Members, cs::Cat(key, ".Item", i++), depth + 1), ...);
+			}
+		};
+
+		/// <summary>
+		/// A C# `Dictionary&lt;K, V[]&gt;` the port holds as cs::Dictionary&lt;K, cs::List&lt;V&gt;&gt;: the values are arrays
+		/// (Fleet's conicOptions). SG_ARRAYVALUES.
+		/// </summary>
+		template <class D> struct ArrayValuesTraits;
+		template <class K, class E, class H, class EQ> struct ArrayValuesTraits<cs::Dictionary<K, cs::List<E>, H, EQ>>
+		{
+			using D = cs::Dictionary<K, cs::List<E>, H, EQ>;
+			static const NetType* Type() { return Generic("System.Collections.Generic.Dictionary`2", CoreLibAssembly, { Codec<K>::Type(), ArrayCodec<E>::Type() }, Kind::Dictionary); }
+			static void Content(Writer& w, D& d)
+			{
+				std::deque<K> keys;
+				std::deque<cs::List<E>> values;
+				for (auto [k, v] : d) { keys.push_back(k); values.push_back(v); }
+				d.Clear();
+				for (size_t i = 0; i < keys.size(); i++) d.Add(keys[i], values[i]);
+				w.Payload().Var(static_cast<int>(keys.size()));
+				// The writer identifies an array by its address: write the dictionary's own values, not the copies.
+				for (size_t i = 0; i < keys.size(); i++)
+				{
+					Codec<K>::Write(w, keys[i]);
+					ArrayCodec<E>::Write(w, d.At(keys[i]));
+				}
+			}
+			static void Write(Writer& w, D& d)
+			{
+				D* p = &d;
+				w.Payload().Var(w.RefCollection(p, typeid(ArrayValuesTraits), Type(), ComparerCode<H>(), [p](Writer& wr) { Content(wr, *p); }));
+			}
+			static void Read(Reader& r, const Value& v, D& out)
+			{
+				out.Clear();
+				if (v.ValueTag != Value::Tag::Ref) return;
+				const Node& n = r.NodeOf(v.Id);
+				if (n.Entry != EntryKind::Collection || !n.Type || n.Type->TypeKind != Kind::Dictionary) return;
+				for (size_t i = 0; i < n.Keys.size(); i++)
+				{
+					K k{};
+					cs::List<E> x;
+					Codec<K>::Read(r, n.Keys[i], k);
+					ArrayCodec<E>::Read(r, n.Items[i], x);
+					out.Add(k, x);
+				}
+			}
+			static void Walk(StaticWalker&, D&, const cs::String&, int) {}
+		};
+
 		// ---------------------------------------------------------------- registration builders
 
 		/// A field codec that writes the declared .NET type's default and ignores the saved value: for a C# field the
@@ -978,6 +1085,18 @@ namespace SpaceGod::Core
 			/// A C# array (`T[]`) the port holds as cs::List<T> (or cs::Ref<cs::List<T>>).
 			template <class E> ClassBuilder& Array(const cs::String& netName, cs::List<E> T::* member) { return FieldWith<ArrayCodec<E>>(netName, member); }
 			template <class E> ClassBuilder& Array(const cs::String& netName, cs::Ref<cs::List<E>> T::* member) { return FieldWith<SharedArrayCodec<E>>(netName, member); }
+			template <class E, size_t N> ClassBuilder& Array(const cs::String& netName, std::array<E, N> T::* member) { return FieldWith<FixedArrayCodec<E, N>>(netName, member); }
+			/// A C# `Dictionary<K, V[]>` held as cs::Dictionary<K, cs::List<V>>.
+			template <class D> ClassBuilder& ArrayValues(const cs::String& netName, D T::* member) { return FieldWith<ArrayValuesTraits<D>>(netName, member); }
+			/// A field whose declared .NET type the C++ member's type does not name (an `IReadOnlyList<T>` held as a
+			/// cs::List, a delegate whose signature the port changed): written by the member's codec, declared as
+			/// <paramref name="declared"/> in the type table.
+			template <class M> ClassBuilder& Typed(const cs::String& netName, M T::* member, const NetType* (*declared)())
+			{
+				Field(netName, member);
+				info.Own.back().Type = declared;
+				return *this;
+			}
 			/// A string C# never leaves null ("" written as "", not null).
 			ClassBuilder& String(const cs::String& netName, cs::String T::* member) { return FieldWith<StringCodec<false>>(netName, member); }
 			/// A C# field the port has no member for: written as the default of <typeparamref name="M"/>, ignored on load.
@@ -1161,6 +1280,12 @@ namespace SpaceGod::Core
 #define SG_BASE(BaseType) b.template Base<BaseType>()
 /// An interface the type implements (registered with SG_INTERFACE).
 #define SG_IMPLEMENTS(InterfaceType) b.template Interface<InterfaceType>()
+/// A C# `Dictionary<K, V[]>` held as cs::Dictionary<K, cs::List<V>>.
+#define SG_ARRAYVALUES(member) b.ArrayValues(#member, &Self::member)
+/// A named struct the port uses for a C# value tuple: SG_TUPLE(T, &T::a, &T::b) at namespace scope, before any
+/// registration that holds one. (A field declared as a type its member's C++ type does not name: b.Typed(...).)
+#define SG_TUPLE(T, ...) \
+	template <> struct SpaceGod::Core::Graph::Codec<T> : ::SpaceGod::Core::Graph::TupleStructCodec<T, __VA_ARGS__> {};
 /// A hook run on each loaded instance once the whole graph is read.
 #define SG_LOADED(fn) b.Loaded(fn)
 

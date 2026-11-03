@@ -1205,7 +1205,25 @@ namespace SpaceGod::Core
 		const NetType* TupleType(std::vector<const NetType*> args)
 		{
 			int n = static_cast<int>(args.size());
-			if (n < 1 || n > 7) throw cs::NotSupportedException("Cannot save a tuple of more than 7 items");
+			if (n < 1) throw cs::NotSupportedException("Cannot save an empty tuple");
+			// Eight or more items: C#'s ValueTuple`8 {Item1..Item7, Rest}, Rest the tuple of the others (nested as deep as
+			// it takes). Written inline, its bytes are the items in order, so the tuple codec writes them flat.
+			if (n > 7)
+			{
+				std::vector<const NetType*> head(args.begin(), args.begin() + 7);
+				const NetType* rest = TupleType(std::vector<const NetType*>(args.begin() + 7, args.end()));
+				head.push_back(rest);
+				auto copy8 = head;
+				const NetType* t8 = Generic("System.ValueTuple`8", CoreLibAssembly, std::move(head), Kind::Struct);
+				SetShape(t8, [copy8]
+				{
+					std::vector<FieldDecl> list;
+					for (int i = 0; i < 7; i++) list.push_back({ cs::Cat("ValueTuple`8:Item", i + 1), copy8[static_cast<size_t>(i)] });
+					list.push_back({ cs::String("ValueTuple`8:Rest"), copy8[7] });
+					return list;
+				});
+				return t8;
+			}
 			auto copy = args;
 			const NetType* t = Generic(cs::Cat("System.ValueTuple`", n), CoreLibAssembly, std::move(args), Kind::Struct);
 			SetShape(t, [copy, n]
@@ -1223,6 +1241,12 @@ namespace SpaceGod::Core
 			const cs::String& d = v.Type->FullName; // "System.ValueTuple`2"
 			size_t dot = d.find_last_of('.');
 			cs::String name = dot == cs::String::npos ? d : d.substr(dot + 1);
+			if (index >= 7 && name == "ValueTuple`8")
+			{
+				// Item 8 on lives in Rest (ValueTuple`8's eighth field), itself a tuple.
+				int r = v.Type->IndexOfField("ValueTuple`8:Rest");
+				return r >= 0 && static_cast<size_t>(r) < v.Items.size() ? TupleItem(v.Items[static_cast<size_t>(r)], index - 7) : nullptr;
+			}
 			int k = v.Type->IndexOfField(cs::Cat(name, ":Item", index + 1));
 			return k >= 0 && static_cast<size_t>(k) < v.Items.size() ? &v.Items[static_cast<size_t>(k)] : nullptr;
 		}
