@@ -505,6 +505,107 @@ on the CPU with the shader's own maths at ≤ 4 Hz and drawn with `M_Points`, ev
 through a `USceneCaptureComponent2D` without layer isolation; `Light` components are data only (the shaders light
 themselves); one Unreal component per Unity renderer, no instancing of shared meshes.
 
+## Co-op (US-T39, C# track; the C++ track mirrors it)
+
+The one addition to an otherwise faithful port: cooperative multiplayer, built on the original's own Session layer
+(`Core/Session`: `ISession`, `IGameCommand`, `CommandCodec`, `SeatAuthority`, `SessionEvents`, `LocalSession`, `PlayerId`),
+which Unity.SpaceGod wrote "multiplayer-ready" but only ever ran as one local player. Code: `CSharp/Script/.../Runtime/Coop/`
+(`CoopWire`, `CoopPeer`, `SpaceCoopLink`, `CoopSmoke`) and the partial `Runtime/UnitySpaceApp.Coop.cs`; the ported originals
+change only at lines marked `US-T39`, each a no-op in single-player (`CoopPeer.Current == null`, a standalone game).
+
+**Design: lockstep, host-authoritative (option (a)).** The host is a listen server (`tools/play.ps1 -Track CSharp -Mode
+host`, player 1); clients join by address (`-Mode join -Address ...`, players 2-4). Every peer runs the whole original app
+on the same unchanged Core. The Core is deterministic given its state, the clock and the commands (the Bench's five
+byte-identical digests show it across processes and even languages), so only those cross the wire; state replication of
+what clients see (option (b)) would mean replicating thousands of ships, settlements and battle units every frame, and
+re-deriving everything the views read from them. The lockstep is per *frame* of the app's own Update, not on a fixed tick:
+the original steps its flight and seats on real frame time scaled by the warp (the "rule-4 gap" its BIBLE admits), so the
+host's frames are what clients replay.
+
+- **A frame record** (`FrameRecord`, text, doubles as IEEE bits) is written by the host for every Update that reaches the
+  clock: the real seconds of the frame (the host's `Time.unscaledDeltaTime`; the app caps it at 0.1 s itself), the clock's
+  whole state just before it advanced (date, warp, the eased pause's flags and speed) and its date after, whether the
+  host ran the world's adventures this frame and from which player point (`World.UpdateAdventures` places them about the
+  player: the host's point is everyone's), the commands applied at the start of the frame, and post steps (a system made
+  the active one during the frame). Clients run `UnityBridge.Tick(rec.Dt)` per record: same Update, same order.
+- **Commands are the original's.** A seat command is `CommandCodec`'s line, unchanged (`take 1 7`, `release 1`, `host 1`,
+  `control 1 ...`), stamped with the sender's `PlayerId`; the host drops one a client sends for another seat. Every peer
+  holds a `LocalSession.Create(seed: 0, players: 4, local: <its seat>)` and applies each frame's commands to it in order, so
+  the `SeatAuthority`s agree. One wrinkle: a seat's id is handed out the first time the authority names it, so the
+  sender's id means nothing elsewhere; a take is sent as `take <p> 0 @<seat key>` (the key a seat's place in the shared
+  world: `F b u` fighter, `T b u m` gun, `S i` station, `SB b u` station in a fight) and each peer names the seat itself,
+  in the frames' order, which gives it the same id everywhere. Seat controls go out when the stick changes; every
+  player's seat is stepped on every peer (`session.Advance` on the frame's sim seconds).
+- **Clock requests.** The host's clock is everyone's. A client's own changes (its `.`/`,`/Space keys, or its own rules: a
+  seat taken drops to real time) are detected at its next clock step as a difference from the state it was left in, and
+  sent as `warp <i>` / `pause <0|1>`; the host applies them, so they reach everyone in the next frames' clock states.
+- **Selection and presence.** A player's selection goes through the frames (`a <p> select b 3`); where each player is
+  (the seat held, else the camera, as a body of the active system and a true-km offset, so each peer lays it out at its
+  own scale) goes unreliably ten times a second. The co-op HUD (`CoopHud`, an IMGUI MonoBehaviour like the original's)
+  lists the players, what each holds and selected, and draws a `+ P2 name` marker on every other player.
+- **UE plumbing.** No new C++: `ASpaceCoopLink`, a C# `AActor` the game mode spawns in `OnPostLogin` for each remote player,
+  owned by its player controller and relevant only to it, carries everything in four UnrealSharp RPCs (`RunOnServer` /
+  `RunOnClient`, a reliable and an unreliable message each way). A client has no game mode, so the link's `Tick` is also the
+  client's player loop (up to 8 host frames a tick when catching up). `OnLogout` hands the leaver's seat back to its AI.
+
+**Joins, loads and desyncs: the save is the resync.** A join, a load on the host, or a detected desync makes the host
+capture its save (Core/Persistence's `SaveGame` bytes, the original's own format, ~4.5 MB), reload those bytes itself, and
+send them to every client in 16,000-character base64 chunks (four outstanding, acked); each client loads them and replays
+the frames that came after. Every peer starts again from the *same bytes*, so the host's reload makes a load that is not
+perfectly state-exact harmless. Desync detection: every 60 frames each peer hashes a small digest of the shared state
+(Bench/CSharp's idea, cut down: the clock, every system's date, detail level and counts, every faction's treasury, and in the
+active system every ship's position, every settlement's people and stock, every battle unit and who holds which seat;
+FNV-1a), clients send theirs, the host compares and logs `digests match` or `DESYNC`, and a desync resyncs (at most three
+times a player). A client also clamps its clock to the host's date after each frame (`clock corrections`: 0 so far).
+
+**Failure modes.** What the hash catches and the save fixes: anything a peer does to the Core outside the commands. Known
+ones, all left to resync rather than shared yet: the helm's pilot loop (refused in co-op: it flies the hull from this
+machine's keys every frame; fighters, guns and stations are the seats), the cockpit's extra keys (flight assist, locks,
+wing orders, power: off in co-op), HUD actions that write the Core (trade, spawning, hails), a client's own loads, and
+settings the Core reads from each machine's profile. A client's trips to other stars are refused (the host picks the
+system; the host's `Activate` goes out as a post step). A resync drops every seat (a save does not hold the session) and
+costs a hitch on every peer (~0.3 s capture, ~0.3 s load each on this workstation). A client whose pause menu is open
+stops replaying and catches up after; 900 frames behind, it asks for a resync instead. The host's pause menu pauses
+everyone (no frames are made).
+
+**A Core finding on the way.** Core/Persistence names objects reachable from the Core's static fields once per process,
+the first time anything is saved or loaded, and refers to them by name; that walk also takes in what static caches hold
+at that moment (`FlightDecks`' table of live battle units, for one), so two processes that first saved at different
+moments cannot read each other's saves ("a static object this build does not have"). Every co-op peer takes that snapshot
+at start, before any galaxy exists. The same holds for single-player saves across runs of the original whenever the first
+save of a run came during a fight; not fixed here (the Core is unchanged).
+
+**Proof (2026-11-03).** `tools/play.ps1 -Track CSharp -Mode coop-smoke`: two headless instances (`-nullrhi`) on localhost.
+The client joins and loads the host's save, presses `.` (warp up: a request the host grants), `3` (selects Earth: both
+rosters have it), takes Earth's orbital defence platform through the picker (a take with a seat key, granted by the host's
+frame on both `SeatAuthority`s), then tampers with its own Core once (one credit in the Sol Federation's treasury) and says
+bye after 1,200 frames; both log digests every 60 frames, and the script compares them (excerpt):
+
+```
+[host]   SpaceGodCoop: Client joined as player 2
+[client] SpaceGodCoop: loaded sync #1 at frame 1165: save 4581 KB in 328 ms, 128 frames already waiting
+[host]   SpaceGodCoop: Client (player 2) asked: warp 5 (applied at frame 1379)
+[client] SpaceGodCoop: smoke: client's warp 1 hour/s -> 6 hours/s (the host's clock) at frame 1465
+[host]   SpaceGodCoop: Client (player 2) selected 'b 3' at frame 1425
+[host]   SpaceGodCoop: Client (player 2) takes seat 1 (Earth Orbital defence platform 1) at frame 1557
+[client] SpaceGodCoop: Client (player 2) takes seat 1 (Earth Orbital defence platform 1) at frame 1557
+[client] SpaceGodCoop: smoke: client tampers with Sol Federation's treasury at frame 1865 (an injected desync)
+[host]   SpaceGodCoop: DESYNC at frame 1920: host DB65B450D66FC556, Client (player 2) 4427281282847682
+[host]   SpaceGodCoop: Client (player 2) is in sync #2 from frame 1923
+[host]   SpaceGodCoop: frame 2340 digests match: host BD1FA322174C7A06 = Client (player 2) BD1FA322174C7A06
+[host]   SpaceGodCoop: smoke (host) done: the client said bye; frame 2398, 21 digest matches, 1 desyncs, 81 s; quitting
+co-op smoke: 22 frames with both digests, 21 identical (frames 1165..2340)
+co-op smoke: injected desync detected at frame 1920; resynced: True; 8 digests after it, all identical: True
+```
+
+Single-player is unchanged (`-Mode smoke` as before). The host and clients raise Unreal's per-client net rates on the
+command line (`play.ps1`'s `-ini:Engine:...` overrides, no Config change): at the default ~100 KB/s a join's save would
+take most of a minute; on localhost it takes about a second.
+
+**For the C++ track.** The same record and message formats (`CoopWire.cs`), the same hook points in the app (clock step,
+adventures, seats, take/release/move-up, helm and travel gates, `Activate`, loads), a C++ link actor with the same four
+RPCs, and its own digest over the same fields; the C++ Core's saves already round-trip with C#'s (US-T36).
+
 ## Packaging (US-T25)
 
 `tools/package.ps1 -Track Cpp|CSharp [-Configuration Development|Shipping] [-Verify]` builds the editor target (the

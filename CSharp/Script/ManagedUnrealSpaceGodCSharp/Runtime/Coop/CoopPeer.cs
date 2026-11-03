@@ -545,7 +545,7 @@ namespace Unity.SpaceGod.Coop
         public void ClientReceive(string msg)
         {
             if (string.IsNullOrEmpty(msg)) return;
-            int sp = msg.IndexOf(' ');
+            int sp = msg.IndexOfAny(new[] { ' ', '\n' });
             string kind = sp < 0 ? msg : msg.Substring(0, sp);
             try
             {

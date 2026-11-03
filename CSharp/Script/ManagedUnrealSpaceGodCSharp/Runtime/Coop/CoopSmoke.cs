@@ -19,7 +19,7 @@ namespace Unity.SpaceGod.Coop
     {
         public static readonly string Role = Bootstrap.CommandLineValue("-SpaceGodCoopSmoke")?.ToLowerInvariant();
         public static bool Active => Role != null;
-        public const int ClientFrames = 900;
+        public const int ClientFrames = 1200;
         static readonly TimeSpan Timeout = TimeSpan.FromMinutes(6);
         static readonly Stopwatch Since = Stopwatch.StartNew();
 
@@ -70,18 +70,18 @@ namespace Unity.SpaceGod.Coop
                     Script.Tap(Key.Period);
                     CoopPeer.Log("smoke: client presses '.' (time warp up) at frame " + peer.Frame + ", warp " + warpBefore);
                     break;
-                case 150:
+                case 300:
                     CoopPeer.Log("smoke: client's warp " + warpBefore + " -> " + app.Clock.Warp.Label + " (the host's clock) at frame " + peer.Frame);
                     break;
                 case 180:
                     Script.Tap(Key.Digit3);
                     CoopPeer.Log("smoke: client presses '3' (select) at frame " + peer.Frame);
                     break;
-                case 240:
+                case 330:
                     CoopPeer.Log("smoke: client selected " + app.CoopTargetName(app.CoopTargetKey(app.Selected)) + "; the host's roster has it as '" +
                                  peer.Players[peer.LocalSeat]?.Selection + "'");
                     break;
-                case 270:
+                case 360:
                 {
                     var stations = Embodiables.StationsIn(app.World);
                     IEmbodiable seat = stations.Count > 0 ? stations[0] : null;
@@ -98,7 +98,16 @@ namespace Unity.SpaceGod.Coop
                     app.PickSeat(seat);
                     break;
                 }
-                case 480:
+                case 700:
+                {
+                    // A desync on purpose: one credit more in a faction's treasury here only, as a client acting on the Core
+                    // behind the session's back would. The next digest differs; the host resyncs everyone from its save.
+                    var faction = app.World.Fleet.Factions.Count > 0 ? app.World.Fleet.Factions[0] : null;
+                    if (faction != null) faction.Treasury += 1;
+                    CoopPeer.Log("smoke: client tampers with " + faction?.Name + "'s treasury at frame " + peer.Frame + " (an injected desync)");
+                    break;
+                }
+                case 600:
                     CoopPeer.Log("smoke: client holds " + (app.Seat?.Name ?? "nothing") + " at frame " + peer.Frame + ", warp " + app.Clock.Warp.Label);
                     break;
                 case ClientFrames:
