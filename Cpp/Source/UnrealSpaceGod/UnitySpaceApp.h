@@ -88,6 +88,6 @@ namespace SpaceGod
 #include "UnitySpaceApp.Practice.inl"
 #include "UnitySpaceApp.Saves.inl"
 #include "UnitySpaceApp.Streaming.inl"
+#include "UnitySpaceApp.Coop.inl" // US-T44: co-op (the C# track's UnitySpaceApp.Coop.cs)
 	};
 }
-#include "UnitySpaceApp.Coop.inl" // US-T44: co-op (the C# track's UnitySpaceApp.Coop.cs)
