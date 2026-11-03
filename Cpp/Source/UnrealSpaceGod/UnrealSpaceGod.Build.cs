@@ -19,6 +19,8 @@ public class UnrealSpaceGod : ModuleRules
 		{
 			"Core", "CoreUObject", "Engine", "InputCore", "NetCore", "Slate", "SlateCore", "ProceduralMeshComponent", "ImageWrapper",
 			"SpaceGodCore", // the C++ port of Unity.SpaceGod's Core (Cpp/Source/SpaceGodCore)
+			// Views/Rendering (US-T30): meshes drawn as UDynamicMeshComponents, the plugin found for Resources, ShipModels.json.
+			"GeometryCore", "GeometryFramework", "Projects", "Json", "ImageCore",
 		});
 	}
 }
