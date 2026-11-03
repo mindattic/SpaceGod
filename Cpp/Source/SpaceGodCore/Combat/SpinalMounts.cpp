@@ -11,6 +11,7 @@
 #include "Economy/Goods.h"
 #include "Settings/GameSetting.h"
 #include "Ships.h"
+#include "Persistence/ObjectGraph.h"
 
 namespace SpaceGod::Core
 {
@@ -351,5 +352,23 @@ namespace SpaceGod::Core
 		for (const auto& s : c->Subsystems)
 			if (s->Def->Spinal && !s->Destroyed() && s->Def->Weapon != nullptr) reach = cs::Math::Min(reach, s->Def->Weapon->RangeKm);
 		return reach == cs::Double::MaxValue ? 0 : reach;
+	}
+
+	// Save statics (docs/PERSISTENCE.md, "Statics"; US-T41): C#'s ObjectGraph names the spinal parts in SpinalMounts.kinds
+	// ("SpinalMounts::kinds{0}.Part"), so the C++ walk must know the class (never in a save itself: no fields listed). It is
+	// private to SpinalMounts and defined here; an explicit instantiation may name it ([temp.explicit]), and registers it.
+	namespace
+	{
+		template <class T> struct WalkRegistration
+		{
+			static bool Run()
+			{
+				::SpaceGod::Core::Graph::Class<T>("Unity.SpaceGod.Core.SpinalMounts+SpinalPart", nullptr).Abstract();
+				return true;
+			}
+			static const bool Registered;
+		};
+		template <class T> const bool WalkRegistration<T>::Registered = WalkRegistration<T>::Run();
+		template struct WalkRegistration<SpinalMounts::SpinalPart>;
 	}
 }

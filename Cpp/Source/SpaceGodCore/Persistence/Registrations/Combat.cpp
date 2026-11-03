@@ -359,12 +359,15 @@ namespace SpaceGod::Core
 	SG_SERIALIZE(Wrecks, "Unity.SpaceGod.Core.Wrecks",
 		SG_F(DefaultLifetimeDays), SG_F(Items), SG_F(nextId))
 
+	// (US-T41) Bill and Categories: the static walk names each facility's bill and category arrays through them, as C#'s does.
 	SG_SERIALIZE_ABSTRACT(FacilityKind, "Unity.SpaceGod.Core.FacilityKind",
-		SG_F(Effect), SG_IMPLEMENTS(IPartSpec))
+		SG_F(Bill), SG_F(Categories), SG_F(Effect), SG_IMPLEMENTS(IPartSpec))
 
 	SG_SERIALIZE_ABSTRACT(FighterCraft, "Unity.SpaceGod.Core.FighterCraft",
 		SG_F(Spec))
 
+	// (US-T41) Design only: a frame's Facilities is the very FacilityLayouts table C# walked (and named) first, so C#'s walk
+	// names nothing through it; the port holds a copy, which would get names of its own.
 	SG_SERIALIZE_ABSTRACT(HullFrame, "Unity.SpaceGod.Core.HullFrame",
-		SG_F(Design), SG_F(Facilities))
+		SG_F(Design))
 }

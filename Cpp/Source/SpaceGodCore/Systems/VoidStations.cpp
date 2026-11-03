@@ -10,6 +10,7 @@
 #include "Systems/StarSystemSpec.h"
 #include "Systems/SystemSources.h"
 #include "Systems/VoidBaseBuilder.h"
+#include "Persistence/ObjectGraph.h"
 
 #include <mutex>
 
@@ -22,6 +23,11 @@ namespace SpaceGod::Core
 		// static Dictionary<string, (string a, string b)> bridges (StringComparer.OrdinalIgnoreCase).
 		using BridgeMap = cs::Dictionary<cs::String, std::pair<cs::String, cs::String>, cs::OrdinalIgnoreCaseComparer>;
 		BridgeMap& bridges() { static BridgeMap d; return d; }
+
+		// Save statics (docs/PERSISTENCE.md, "Statics"; US-T41): C#'s ObjectGraph walks these two private tables like any
+		// other static, so a save names their entries as C# does (they are file-local here, so declared here).
+		SG_STATIC_OF("Unity.SpaceGod.Core.VoidStations", "bridges", bridges())
+		SG_STATIC_OF("Unity.SpaceGod.Core.VoidStations", "stations", stations())
 		// static readonly object gate = new object();
 		std::mutex& gate() { static std::mutex m; return m; }
 	}

@@ -5,6 +5,7 @@
 #include "ShipLod.h"
 #include "Ships.h"
 #include "Settings/GameSetting.h"
+#include "Persistence/ObjectGraph.h"
 
 #include <tuple>
 
@@ -247,4 +248,17 @@ namespace SpaceGod::Core
 			if (!s->Destroyed) n++;
 		return n;
 	}
+
+	// Save statics (docs/PERSISTENCE.md, "Statics"; US-T41): C#'s ObjectGraph walks RenderLod's private byKey table like
+	// any other static (its classes list is RenderLod::Classes(), declared with the rest in StaticTables.cpp). The table is
+	// file-local here (State), and S() private: an explicit instantiation may name it ([temp.explicit]), and the friend
+	// function it defines hands it on, so RenderLod.h stays as ported.
+	namespace
+	{
+		template <auto Member, class Tag> struct Expose { friend constexpr auto Address(Tag) { return Member; } };
+		struct RenderLodState {};
+		constexpr auto Address(RenderLodState);
+		template struct Expose<&RenderLod::S, RenderLodState>;
+	}
+	SG_STATIC_OF("Unity.SpaceGod.Core.RenderLod", "byKey", Address(RenderLodState{})().byKey)
 }

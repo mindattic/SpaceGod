@@ -2,7 +2,10 @@
 // "Statics"). C#'s ObjectGraph walks every static field of every Core type and writes an object it reaches there by
 // name (an External entry: "Type::field[3].Spec"), so a loaded hull shares its design with every other of its class;
 // here each such static is declared once. Generated from Unity.SpaceGod.Core.dll's metadata (static fields whose
-// type holds a class a save reaches).
+// type holds a class a save reaches). C#'s walk reads each field with FieldInfo.GetValue, which runs the type's static
+// constructor first; HullFrames emulates its own (StaticConstructor), so its tables are read after it, filled, as in C#
+// (US-T41: before, HullFrames::All was walked empty and the station designs got other names than C#'s). The statics the
+// C# walk names anything else through are in StaticTables.cpp.
 
 #include "BodyCatalog.h"
 #include "BodyDefinition.h"
@@ -163,11 +166,11 @@ namespace SpaceGod::Core
 		static decltype(auto) S58() { return (FlightDecks::None()); } // Unity.SpaceGod.Core.FlightDecks::None
 		static decltype(auto) S59() { return (GateConstruction::Materials()); } // Unity.SpaceGod.Core.GateConstruction::Materials
 		static decltype(auto) S60() { return (Holdings::CaptainNames()); } // Unity.SpaceGod.Core.Holdings::CaptainNames
-		static decltype(auto) S61() { return (HullFrames::All()); } // Unity.SpaceGod.Core.HullFrames::All
-		static decltype(auto) S62() { return (HullFrames::ById()); } // Unity.SpaceGod.Core.HullFrames::ById
-		static decltype(auto) S63() { return (HullFrames::OrbitalStation()); } // Unity.SpaceGod.Core.HullFrames::OrbitalStation
-		static decltype(auto) S64() { return (HullFrames::SensorSatellite()); } // Unity.SpaceGod.Core.HullFrames::SensorSatellite
-		static decltype(auto) S65() { return (HullFrames::WeaponsSatellite()); } // Unity.SpaceGod.Core.HullFrames::WeaponsSatellite
+		static decltype(auto) S61() { HullFrames::StaticConstructor(); return (HullFrames::All()); } // Unity.SpaceGod.Core.HullFrames::All
+		static decltype(auto) S62() { HullFrames::StaticConstructor(); return (HullFrames::ById()); } // Unity.SpaceGod.Core.HullFrames::ById
+		static decltype(auto) S63() { HullFrames::StaticConstructor(); return (HullFrames::OrbitalStation()); } // Unity.SpaceGod.Core.HullFrames::OrbitalStation
+		static decltype(auto) S64() { HullFrames::StaticConstructor(); return (HullFrames::SensorSatellite()); } // Unity.SpaceGod.Core.HullFrames::SensorSatellite
+		static decltype(auto) S65() { HullFrames::StaticConstructor(); return (HullFrames::WeaponsSatellite()); } // Unity.SpaceGod.Core.HullFrames::WeaponsSatellite
 		static decltype(auto) S66() { return (LaneUpkeep::Names()); } // Unity.SpaceGod.Core.LaneUpkeep::Names
 		static decltype(auto) S67() { return (LocalTraffic::BusDesign()); } // Unity.SpaceGod.Core.LocalTraffic::BusDesign
 		static decltype(auto) S68() { return (LocalTraffic::RunaboutDesign()); } // Unity.SpaceGod.Core.LocalTraffic::RunaboutDesign
