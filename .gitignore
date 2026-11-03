@@ -10,3 +10,5 @@ DerivedDataCache/
 *.opensdf
 *.sdf
 *.suo
+
+__pycache__/
