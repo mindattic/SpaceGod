@@ -84,6 +84,19 @@ default member initialisers in the same order (C# runs them before the construct
 - A partial class spread over several C# files (e.g. `Battle` extended by `BoardingShuttles.cs`): the file that adds members writes their bodies in its own `.cpp` and lists the exact declarations in a comment at the top of its header; the integration ticket adds them to the main class header.
 - A class that passes `this` as a C# reference (`Foo(this)`) → inherit `std::enable_shared_from_this<T>` and pass `shared_from_this()`.
 - `[SettingsSource]` and other attribute-reflection discovery → explicit registration; list what the integration ticket must call.
+  Settings (US-T21): `SettingsRegistry::DiscoverLoadedDeclarations()` is defined in `Settings/SettingsSources.cpp`, an explicit
+  list touching every Core `[SettingsSource]` class in C#'s discovery order (the folder's own files, then subfolders, alphabetically;
+  declaration order within a file): its `RunClassConstructor()` where the port has one, else each setting accessor in C# field
+  order. A new Core settings source is added to that list; the engine side adds its own with
+  `SettingsRegistry::AddDeclarationSource(touch)`. A setting registers itself from its constructor, as in C#: the registry
+  holds it non-owning until its next read, then adopts the owning `cs::Ref` (`weak_from_this`), so `cs::New<RangeSetting>(…)`
+  in a function-local static stays the way to declare one.
+- An interface's properties (and an implementer's, even auto-properties) → pure virtual / overriding methods `Name()`; an
+  interface event → a virtual accessor returning the implementer's `cs::Event` (`session->EventRaised() += h`). C# structs
+  used through an interface (Session's commands and events) → structs deriving from it, passed as `cs::Ref<IFoo>` (the box).
+- Classes that override `Equals`/`GetHashCode` and are compared through an interface (the `IEmbodiable` seats): virtual
+  `Equals(const cs::Ref<I>&)` / `GetHashCode()` on the interface, plus a key wrapper with `operator==`/`HashCode()` for
+  `cs::Dictionary` and explicit loops for `List.Contains`/`IndexOf` (`Embodiment/Embodiment.h`).
 
 **Evaluation order (parity-critical).** C# evaluates operands and call arguments strictly left to right;
 C++ does not (argument order is unspecified, `a() + b()` may run `b` first). Wherever two or more operands or
