@@ -1,4 +1,5 @@
-// Port of Unity.SpaceGod Core/Persistence/Profiles.cs (US-T20).
+// Port of Unity.SpaceGod Core/Persistence/Profiles.cs (US-T20). Named PersistenceProfiles.cpp, not Profiles.cpp: UBT's
+// non-unity build forbids two sources with one file name in a module, and Shared/Profiles/Profiles.cpp has it (US-T37).
 
 #include "Persistence/Profiles.h"
 
