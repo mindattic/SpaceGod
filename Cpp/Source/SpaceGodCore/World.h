@@ -9,6 +9,7 @@
 #include <utility>
 
 #include "Cs/Cs.h"
+#include "Astro.h"          // Astro::AuKm (TugRaidReachKm)
 #include "DVec3.h"
 #include "BodyDefinition.h" // Rgb (by value: SolFederationColor)
 #include "Ships.h"          // ShipClass, ShipRole, Faction, Ship
@@ -506,7 +507,7 @@ namespace SpaceGod::Core
 
 	public:
 		/// <summary>How near (km) raiders must be to an ore tug, where it actually is, to threaten it.</summary>
-		static constexpr double TugRaidReachKm = 0.2 * 149597870.7; // 0.2 * Astro.AuKm
+		static constexpr double TugRaidReachKm = 0.2 * Astro::AuKm;
 
 		/// <summary>Raider hulls about a tug at which it runs its full risk of being seized.</summary>
 		static constexpr int TugPressureRaiders = 3;
