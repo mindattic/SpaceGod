@@ -5,9 +5,11 @@ The real Sol system in Unreal Engine 5, played co-op: the Unreal counterpart of
 asteroids sit where they really are for today's date, placed from JPL orbital elements, and you and
 your friends fly around them together on one shared clock.
 
+> **Migration in progress (US-T4):** the full game is being ported twice, to C++ (`Cpp/`) and C# (`CSharp/`), co-op, then benchmarked against each other. See [docs/MIGRATION.md](docs/MIGRATION.md).
+
 ## What is ported
 
-The simulation core (`Source/UnrealSpaceGod/Sim/`) is a value-for-value C++ port of Unity.SpaceGod's
+The simulation core (`Cpp/Source/UnrealSpaceGod/Sim/`) is a value-for-value C++ port of Unity.SpaceGod's
 `Assets/UnitySpace/Core/`:
 
 | Unity.SpaceGod | Unreal.SpaceGod | What it does |
@@ -21,7 +23,7 @@ The simulation core (`Source/UnrealSpaceGod/Sim/`) is a value-for-value C++ port
 | `ScaleModel.cs` | `Sim/ScaleModel.*` | The live GAMEPLAY / REALISTIC scale switch |
 | `SimClock.cs` (warp ladder) | `Sim/SimClock.h` | Real time to one year per second |
 
-The NASA/USGS colour maps and their sources are in `SourceArt/Textures/` (see its `SOURCES.md`).
+The NASA/USGS colour maps and their sources are in `Cpp/SourceArt/Textures/` (see its `SOURCES.md`).
 The rest of Unity.SpaceGod (ships, fleets, economy, combat, the other star systems) is not ported yet.
 
 ## Co-op
@@ -39,11 +41,11 @@ you in GAMEPLAY scale still agree on where they are.
 
 Needs Unreal Engine 5.8 with Visual Studio 2022 (the "Game development with C++" workload).
 
-1. Right-click `UnrealSpaceGod.uproject` and pick **Generate Visual Studio project files**, then open
+1. Right-click `Cpp/UnrealSpaceGod.uproject` (or run `tools/build.ps1`) and pick **Generate Visual Studio project files**, then open
    the project. The editor offers to build the module.
-2. On first open, `Content/Python/init_unreal.py` imports the maps into
+2. On first open, `Cpp/Content/Python/init_unreal.py` (or headless: `setup_assets.py`) imports the maps into
    `/Game/UnrealSpaceGod/Textures` and builds the `M_Body` and `M_Ring` materials. Commit what it
-   creates under `Content/UnrealSpaceGod/`. Until it has run, bodies are drawn flat-lit.
+   creates under `Cpp/Content/UnrealSpaceGod/`. Until it has run, bodies are drawn flat-lit.
 3. Press Play. To try co-op in the editor, set **Play > Net Mode** to *Play As Listen Server* with 2
    or more players.
 
@@ -81,8 +83,8 @@ In game, **F9** turns a solo session into a hosted one, and `open <ip>` in the `
 
 ## Layout
 
-- `Source/UnrealSpaceGod/Sim/`: the engine-independent simulation (plain C++ on Unreal's core types).
-- `Source/UnrealSpaceGod/Game/`: `ASolSystem` draws the bodies, rings and orbit trails;
+- `Cpp/Source/UnrealSpaceGod/Sim/`: the engine-independent simulation (plain C++ on Unreal's core types).
+- `Cpp/Source/UnrealSpaceGod/Game/`: `ASolSystem` draws the bodies, rings and orbit trails;
   `ASpaceGameState` holds the shared clock; `ASpacePawn` is a player's camera; `ASpacePlayerController`
   reads input; `ASpaceHUD` draws labels, teammates, marks and the help screen.
 - The game needs no level: it plays on the engine's empty `/Engine/Maps/Entry` and builds everything
