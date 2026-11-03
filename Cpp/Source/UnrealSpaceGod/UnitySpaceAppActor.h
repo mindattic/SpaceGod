@@ -8,7 +8,7 @@
 class UCameraComponent;
 class UCanvas;
 
-namespace SpaceGod { class UnitySpaceApp; }
+namespace SpaceGod { class UnitySpaceApp; class CaptureRunner; }
 
 /**
  * The GameObject "Unity.SpaceGod" that carries UnitySpaceApp: owns the app (a plain C++ class, the MonoBehaviour's
@@ -57,6 +57,14 @@ private:
 	TObjectPtr<UCameraComponent> MainCamera;
 
 	std::shared_ptr<SpaceGod::UnitySpaceApp> App;
+	/// -demo: the scripted tour (Unity: a CaptureRunner component Bootstrap adds to the app's GameObject, US-T31).
+	std::shared_ptr<SpaceGod::CaptureRunner> Capture;
+	bool CaptureStarted = false;
+
+public:
+	/// Bootstrap on -demo: adds the tour runner (once); its Start runs before the app's next Update.
+	void AddCaptureRunner();
+private:
 	double StartSeconds = 0;
 	float LastAppliedVolume = -1;
 };

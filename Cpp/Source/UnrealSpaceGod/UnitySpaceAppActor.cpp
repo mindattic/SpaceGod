@@ -5,6 +5,7 @@
 #include "UnrealSpaceGodLog.h"
 #include "Input/UnrealInputDevice.h"
 #include "UnityCompat/GuiHost.h"
+#include "CaptureRunner.h"
 #include "Views/AsteroidBelt.h"
 
 #include "Camera/CameraComponent.h"
@@ -80,6 +81,11 @@ void AUnitySpaceAppActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	if (App)
 	{
+		if (Capture)
+		{
+			Capture->OnDestroy();
+			Capture.reset();
+		}
 		GuiHost::Unregister(App.get());
 		GuiHost::Unregister(&App->AsteroidBelt);
 		if (EndPlayReason == EEndPlayReason::Quit || EndPlayReason == EEndPlayReason::EndPlayInEditor) App->OnApplicationQuit();
@@ -104,10 +110,24 @@ void AUnitySpaceAppActor::Tick(float DeltaSeconds)
 		Input::UnrealInputDevice::Feed(PC, RealDelta);
 	}
 
+	// A component added this frame starts before the next Updates (Unity: Start before the first Update).
+	if (Capture && !CaptureStarted)
+	{
+		CaptureStarted = true;
+		Capture->Start();
+	}
 	if (App->enabled) App->Update();
+	if (Capture) Capture->Update();
 	ApplyCamera();
 	ApplyCursor();
 	ApplyAudio();
+}
+
+void AUnitySpaceAppActor::AddCaptureRunner()
+{
+	if (Capture || !App) return;
+	Capture = std::make_shared<CaptureRunner>(App.get());
+	CaptureStarted = false;
 }
 
 void AUnitySpaceAppActor::DrawGui(UCanvas* Canvas)
