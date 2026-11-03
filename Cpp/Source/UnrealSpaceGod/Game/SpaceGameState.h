@@ -4,12 +4,12 @@
 #include "GameFramework/GameStateBase.h"
 #include "SpaceGameState.generated.h"
 
-class ASolSystem;
-
 /**
- * The shared simulation clock: an anchor (a Julian date at a server time) plus the warp and pause state. Only the
- * server changes it; every client works the current date out from the replicated anchor and the server's clock, so
- * all players see the planets in the same places without the date streaming every frame.
+ * The host's simulation clock as clients see it: an anchor (a Julian date at a server time) plus the warp index.
+ * Only the host's app changes its clock (SimClock, driven by the app's own input or by commands its Session applies);
+ * the host publishes an anchor whenever the warp or pause changes, or the date jumps, and every client works the
+ * current date out from the anchor and the server's clock, so all players see the planets in the same places without
+ * the date streaming every frame. (Kept from the first Sol-only slice; the co-op ticket networks the Session.)
  */
 USTRUCT()
 struct FSimClockState
@@ -18,23 +18,9 @@ struct FSimClockState
 
 	UPROPERTY() double AnchorJd = 0;
 	UPROPERTY() double AnchorServerSeconds = 0;
-	UPROPERTY() int32 WarpIndex = 4;
+	UPROPERTY() int32 WarpIndex = 0;
+	UPROPERTY() double SimSecondsPerSecond = 1;
 	UPROPERTY() bool bPaused = false;
-};
-
-/** A line in the co-op log: who changed the time, who marked what. */
-struct FCoopAnnouncement
-{
-	FString Text;
-	double RealSeconds = 0;
-};
-
-/** A body a player marked for everyone, shown with a ping ring for a few seconds. */
-struct FCoopPing
-{
-	int32 Body = INDEX_NONE;
-	FString Player;
-	double RealSeconds = 0;
 };
 
 UCLASS()
@@ -45,38 +31,26 @@ class ASpaceGameState : public AGameStateBase
 public:
 	ASpaceGameState();
 
-	virtual void BeginPlay() override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void Tick(float DeltaSeconds) override;
 
-	double CurrentJd() const;
-	int32 GetWarpIndex() const { return Clock.WarpIndex; }
-	bool IsPaused() const { return Clock.bPaused; }
-	ASolSystem* GetSolSystem() const { return SolSystem; }
+	/// The host's date now, as a client reckons it (0 before the first anchor arrives).
+	double HostJd() const;
+	const FSimClockState& GetClock() const { return Clock; }
 
-	// Server only: the controllers' RPCs land here.
-	void ChangeWarp(int32 Delta, const FString& Who);
-	void TogglePause(const FString& Who);
-	void ResetToNow(const FString& Who);
-	void Ping(int32 Body, const FString& Who);
-
-	UFUNCTION(NetMulticast, Reliable)
-	void MulticastAnnounce(const FString& Text);
-
-	UFUNCTION(NetMulticast, Reliable)
-	void MulticastPing(int32 Body, const FString& Who);
-
-	const TArray<FCoopAnnouncement>& GetAnnouncements() const { return Announcements; }
-	const TArray<FCoopPing>& GetPings() const { return Pings; }
+	/// Host: which Unity scene this session is in (GameLaunch); replicated so clients equip the same.
+	void SetScene(const FString& InScene) { Scene = InScene; }
 
 private:
-	void Reanchor();
+	UFUNCTION()
+	void OnRep_Scene();
+
+	/// Host: re-anchors from its app's clock when the warp or pause changed or the date left the extrapolation.
+	void PublishHostClock();
 
 	UPROPERTY(Replicated)
 	FSimClockState Clock;
 
-	UPROPERTY()
-	TObjectPtr<ASolSystem> SolSystem;
-
-	TArray<FCoopAnnouncement> Announcements;
-	TArray<FCoopPing> Pings;
+	UPROPERTY(ReplicatedUsing = OnRep_Scene)
+	FString Scene;
 };

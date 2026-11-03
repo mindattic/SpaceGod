@@ -1,94 +1,63 @@
 #include "Game/SpaceGameState.h"
-#include "Game/SolSystem.h"
-#include "Sim/Astro.h"
-#include "Sim/SimClock.h"
+#include "UnitySpaceAppActor.h"
+#include "UnitySpaceApp.h"
+#include "Bootstrap.h"
+#include "GameLaunch.h"
+#include "UnrealSpace.h"
+#include "SimClock.h"
+#include "Astro.h"
+
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
 
 ASpaceGameState::ASpaceGameState()
 {
-	Clock.WarpIndex = SimClock::DefaultWarpIndex;
-}
-
-void ASpaceGameState::BeginPlay()
-{
-	Super::BeginPlay();
-
-	if (HasAuthority())
-	{
-		Clock.AnchorJd = Astro::JulianDate(FDateTime::UtcNow());
-		Clock.AnchorServerSeconds = GetServerWorldTimeSeconds();
-	}
-
-	// Every machine that draws builds its own copy of the system; only the clock above is shared.
-	if (GetNetMode() != NM_DedicatedServer)
-	{
-		FActorSpawnParameters Params;
-		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		SolSystem = GetWorld()->SpawnActor<ASolSystem>(ASolSystem::StaticClass(), FTransform::Identity, Params);
-	}
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bTickEvenWhenPaused = true;
 }
 
 void ASpaceGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(ASpaceGameState, Clock);
+	DOREPLIFETIME(ASpaceGameState, Scene);
 }
 
-double ASpaceGameState::CurrentJd() const
+void ASpaceGameState::OnRep_Scene()
 {
-	// A client that has not received the clock yet shows the present.
-	if (Clock.AnchorJd == 0) return Astro::JulianDate(FDateTime::UtcNow());
+	// A client joining the host's game scene equips its own app (the menu stays the host's).
+	if (HasAuthority() || Scene != UTF8_TO_TCHAR(SpaceGod::GameLaunch::GameScene)) return;
+	SpaceGod::Bootstrap::EnsureApp(GetWorld(), SpaceGod::UnrealSpace::FromFString(Scene));
+}
+
+void ASpaceGameState::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	if (HasAuthority() && GetNetMode() != NM_Standalone) PublishHostClock();
+}
+
+double ASpaceGameState::HostJd() const
+{
+	if (Clock.AnchorJd == 0) return 0;
 	if (Clock.bPaused) return Clock.AnchorJd;
 	const double Elapsed = GetServerWorldTimeSeconds() - Clock.AnchorServerSeconds;
-	const double Rate = SimClock::Levels[FMath::Clamp(Clock.WarpIndex, 0, SimClock::NumLevels - 1)].SimSecondsPerSecond;
-	return Clock.AnchorJd + Elapsed * Rate / Astro::SecondsPerDay;
+	return Clock.AnchorJd + Elapsed * Clock.SimSecondsPerSecond / SpaceGod::Core::Astro::SecondsPerDay;
 }
 
-void ASpaceGameState::Reanchor()
+void ASpaceGameState::PublishHostClock()
 {
-	Clock.AnchorJd = CurrentJd();
+	AUnitySpaceAppActor* Host = AUnitySpaceAppActor::Find(GetWorld());
+	SpaceGod::UnitySpaceApp* App = Host ? Host->GetApp() : nullptr;
+	if (!App || !App->Clock) return;
+	const auto& SimClock = *App->Clock;
+	const bool bPaused = SimClock.PauseHeld();
+	const double Rate = SpaceGod::Core::SimClock::Levels()[SimClock.WarpIndex].SimSecondsPerSecond * SimClock.Speed;
+	// Re-anchor on any change of rate, or once the extrapolated date drifts more than a second (sim) from the host's.
+	const bool bDrifted = FMath::Abs(HostJd() - SimClock.Jd) * SpaceGod::Core::Astro::SecondsPerDay > FMath::Max(1.0, Rate * 0.05);
+	if (Clock.AnchorJd != 0 && Clock.WarpIndex == SimClock.WarpIndex && Clock.bPaused == bPaused && !bDrifted) return;
+	Clock.AnchorJd = SimClock.Jd;
 	Clock.AnchorServerSeconds = GetServerWorldTimeSeconds();
-}
-
-void ASpaceGameState::ChangeWarp(int32 Delta, const FString& Who)
-{
-	const int32 Next = FMath::Clamp(Clock.WarpIndex + Delta, 0, SimClock::NumLevels - 1);
-	if (Next == Clock.WarpIndex) return;
-	Reanchor();
-	Clock.WarpIndex = Next;
-	MulticastAnnounce(FString::Printf(TEXT("%s set time warp to %s"), *Who, SimClock::Levels[Next].Label));
-}
-
-void ASpaceGameState::TogglePause(const FString& Who)
-{
-	Reanchor();
-	Clock.bPaused = !Clock.bPaused;
-	MulticastAnnounce(FString::Printf(TEXT("%s %s time"), *Who, Clock.bPaused ? TEXT("paused") : TEXT("resumed")));
-}
-
-void ASpaceGameState::ResetToNow(const FString& Who)
-{
-	Clock.AnchorJd = Astro::JulianDate(FDateTime::UtcNow());
-	Clock.AnchorServerSeconds = GetServerWorldTimeSeconds();
-	MulticastAnnounce(FString::Printf(TEXT("%s brought time back to now"), *Who));
-}
-
-void ASpaceGameState::Ping(int32 Body, const FString& Who)
-{
-	MulticastPing(Body, Who);
-}
-
-void ASpaceGameState::MulticastAnnounce_Implementation(const FString& Text)
-{
-	Announcements.Add({ Text, FPlatformTime::Seconds() });
-	if (Announcements.Num() > 8) Announcements.RemoveAt(0);
-}
-
-void ASpaceGameState::MulticastPing_Implementation(int32 Body, const FString& Who)
-{
-	Pings.Add({ Body, Who, FPlatformTime::Seconds() });
-	if (Pings.Num() > 16) Pings.RemoveAt(0);
-	if (const ASolSystem* Sol = SolSystem.Get(); Sol && Body >= 0 && Body < Sol->NumBodies())
-		MulticastAnnounce_Implementation(FString::Printf(TEXT("%s marked %s"), *Who, *Sol->GetCatalog()[Body].Name));
+	Clock.WarpIndex = SimClock.WarpIndex;
+	Clock.SimSecondsPerSecond = Rate;
+	Clock.bPaused = bPaused;
 }
