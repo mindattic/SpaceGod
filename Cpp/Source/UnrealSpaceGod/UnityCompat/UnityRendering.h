@@ -220,6 +220,8 @@ namespace SpaceGod::UnityCompat
 		Vector4 GetVector(const cs::String& name) const;
 		cs::Ref<Texture> GetTexture(const cs::String& name) const;
 		bool IsEmpty() const { return values.empty(); }
+		/// The same properties with the same values (a block set again unchanged need not reach Unreal again).
+		bool SameAs(const MaterialProperties& other) const;
 
 		const std::vector<std::pair<cs::String, MaterialValue>>& All() const { return values; }
 		/// Bumped by every change.

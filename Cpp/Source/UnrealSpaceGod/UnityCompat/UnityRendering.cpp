@@ -254,8 +254,24 @@ namespace SpaceGod::UnityCompat
 		return c;
 	}
 
+	bool MaterialProperties::SameAs(const MaterialProperties& other) const
+	{
+		if (values.size() != other.values.size()) return false;
+		for (size_t i = 0; i < values.size(); i++)
+		{
+			const auto& [n, a] = values[i];
+			const auto& [m, b] = other.values[i];
+			if (n != m || a.kind != b.kind || a.f != b.f || a.v.x != b.v.x || a.v.y != b.v.y || a.v.z != b.v.z || a.v.w != b.v.w
+				|| a.texture != b.texture || a.array != b.array)
+				return false;
+		}
+		return true;
+	}
+
 	void Renderer::SetPropertyBlock(const MaterialPropertyBlock& b)
 	{
+		// Unity copies the block each call; reaching Unreal again only matters when something changed.
+		if (hasBlock && block.SameAs(b)) return;
 		block = b;
 		hasBlock = true;
 		++BlockVersion;
