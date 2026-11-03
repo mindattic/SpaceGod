@@ -36,6 +36,12 @@ public partial class ASpaceGameMode : AGameModeBase
     public override void BeginPlay()
     {
         base.BeginPlay();
+        // The views on their own (US-T27, tools/play.ps1 -Mode views / shot): Sol's views built without the app.
+        if (Bootstrap.HasCommandLineFlag("-SpaceGodViews") || ShotPath() != null)
+        {
+            RunViews();
+            return;
+        }
         bool smoke = Bootstrap.HasCommandLineFlag("-SpaceGodSmoke");
         if (smoke)
         {
@@ -66,9 +72,47 @@ public partial class ASpaceGameMode : AGameModeBase
         }
     }
 
+    Unity.SpaceGod.Views.ViewsSmoke? views;
+    int viewFrames;
+
+    static string? ShotPath()
+    {
+        foreach (var a in Environment.GetCommandLineArgs())
+            if (a.StartsWith("-SpaceGodShot=", StringComparison.OrdinalIgnoreCase)) return a.Substring("-SpaceGodShot=".Length).Trim('"');
+        return null;
+    }
+
+    /// <summary>US-T27's views check: Sol's views for a frame, logged; headless it quits, windowed (-SpaceGodShot=file)
+    /// it keeps them on screen, saves a screenshot after 90 frames and quits after 150.</summary>
+    void RunViews()
+    {
+        try
+        {
+            // The C# track's fixed start (2026-11-03 12:00 UTC), as US-T6's smoke used.
+            var clock = new SimClock(2461348.0);
+            var galaxy = Galaxy.CreateDefault(clock.Jd);
+            views = new Unity.SpaceGod.Views.ViewsSmoke(galaxy);
+            UnrealLogger.Log(Log, "SpaceGodViews: " + views.Build(this, clock.Jd, ShotPath() != null));
+        }
+        catch (Exception e)
+        {
+            UnrealLogger.LogError(Log, "SpaceGodViews failed: " + e);
+        }
+        if (ShotPath() == null) SystemLibrary.ExecuteConsoleCommand("quit");
+    }
+
     public override void Tick(float deltaSeconds)
     {
         base.Tick(deltaSeconds);
+        if (views != null)
+        {
+            views.Frame(deltaSeconds);
+            var shot = ShotPath();
+            viewFrames++;
+            if (shot != null && viewFrames == 90) SystemLibrary.ExecuteConsoleCommand("HighResShot 1600x900 filename=\"" + shot.Replace('\\', '/') + "\"");
+            if (shot != null && viewFrames == 150) SystemLibrary.ExecuteConsoleCommand("quit");
+            return;
+        }
         if (script != null || Bootstrap.App == null) return; // the smoke run steps its own frames
         Step(deltaSeconds);
     }

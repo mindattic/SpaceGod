@@ -1,0 +1,729 @@
+using System.Collections.Generic;
+using Unity.SpaceGod.Core;
+using Unity.SpaceGod.Rendering;
+using UnityEngine;
+using Subsystem = Unity.SpaceGod.Core.Subsystem;
+
+namespace Unity.SpaceGod.Views
+{
+    /// <summary>
+    /// The 3D model of one ship. Warships carry their hardpoints as separate parts: turrets traverse
+    /// and elevate onto whatever they are shooting, a hardpoint that is shot away leaves a blackened
+    /// stub and a fire, engines glow while they work, the hull shows more breaches as its hit points
+    /// fall, and a destroyed ship breaks into bow and stern that tumble apart and burn out.
+    /// </summary>
+    public sealed class ShipView
+    {
+        public readonly Ship Ship;
+        public readonly GameObject Root;
+
+        /// <summary>The combat state the hardpoints were built from: a yard refit (U.SPC-T65) gives the ship a new one, and the view is rebuilt.</summary>
+        public readonly ShipCombat BuiltFor;
+        readonly List<Renderer> renderers = new List<Renderer>();
+        readonly MeshRenderer plume;
+        readonly ParticleSystem exhaust;
+        bool exhaustPlaying;
+        readonly MaterialPropertyBlock block = new MaterialPropertyBlock();
+        readonly Transform stern, bow;
+        readonly Part[] parts;
+        readonly List<Glow> glows = new List<Glow>();
+        readonly Glow[] breaches;
+        bool visible = true;
+
+        /// <summary>A truss freighter's hull (U.SPC-T482), whose mesh is swapped as its load changes the pods clamped on
+        /// it, and what that mesh shows now; null for any other hull.</summary>
+        readonly MeshFilter truss;
+        (int pods, int loaded, int spheres) trussShown;
+
+        /// <summary>What an ore tug has latched on (U.SPC-T498), drawn ahead of its push plate, and the load it shows now; null until it first carries one.</summary>
+        MeshRenderer towRenderer;
+        MeshFilter towFilter;
+        CapturedRock towShown;
+
+        /// <summary>Whether the full model is drawn (U.SPC-T415): false draws the hull alone, without hardpoints, scars, glows, shields or exhaust.</summary>
+        bool detailed = true;
+        float wreckSpin;
+
+        // Shield fields: one disc per shield emitter over the patch of hull it covers (U.SPC-T501), built once
+        // (geometry is fixed) and recoloured each frame from that emitter's own field. Built for every ship, not
+        // just warships, so a freighter's shields show too.
+        readonly List<Subsystem> shieldGenerators = new List<Subsystem>();
+        MeshRenderer shieldRingRenderer;
+        Mesh shieldRingMesh;
+        int[] shieldWedgeStart, shieldWedgeCount;
+        Color[] shieldVertexColors;
+
+        static Mesh plumeMesh, quadMesh;
+        static Material plumeMaterial, fireMaterial, engineMaterial, shieldRingMaterial;
+
+        static readonly int EngineGlowId = Shader.PropertyToID("_EngineGlow");
+        static readonly int HighlightId = Shader.PropertyToID("_Highlight");
+        static readonly int ColorId = Shader.PropertyToID("_Tint");
+
+        /// <summary>Breaches open as the hull falls below these fractions.</summary>
+        static readonly float[] BreachAt = { 0.85f, 0.7f, 0.55f, 0.4f, 0.28f, 0.16f };
+
+        sealed class Part
+        {
+            public Subsystem Sub;
+            public Transform Mount, Barrels;
+            public Renderer[] Renderers;
+            public GameObject Scar;
+            public Glow Fire;
+            public bool ShownDestroyed;
+            public bool Turret;
+            public Quaternion Rest;
+        }
+
+        sealed class Glow
+        {
+            public Transform T;
+            public Renderer R;
+            public float Size, Phase;
+            public Part Owner;
+            public bool Engine;
+        }
+
+        public ShipView(Ship ship, Transform parent)
+        {
+            Ship = ship;
+            BuiltFor = ship.Combat;
+            Root = new GameObject(ship.Name);
+            Root.transform.SetParent(parent, false);
+            ShipModels.Build(ship, Root.transform, renderers, out stern, out bow);
+            if (bow == null && stern.name == ShipModels.TrussSection)
+            {
+                truss = stern.GetComponent<MeshFilter>();
+                trussShown = ShipModels.TrussLoad(ship);
+            }
+            EnsureStatics();
+
+            var plumeGo = new GameObject("Plume");
+            plumeGo.transform.SetParent(Root.transform, false);
+            plumeGo.transform.localPosition = new Vector3(0, 0, -0.5f);
+            plumeGo.transform.localScale = new Vector3(0.12f, 0.12f, 0.6f);
+            plumeGo.AddComponent<MeshFilter>().sharedMesh = plumeMesh;
+            plume = plumeGo.AddComponent<MeshRenderer>();
+            plume.sharedMaterial = plumeMaterial;
+            plume.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+
+            exhaust = BuildExhaust(Root.transform);
+
+            BuildShieldRing();
+
+            if (bow == null)
+            {
+                parts = new Part[0];
+                breaches = new Glow[0];
+                return;
+            }
+
+            var subs = ship.Combat.Subsystems;
+            parts = new Part[subs.Count];
+            for (int i = 0; i < subs.Count; i++) parts[i] = BuildPart(subs[i]);
+
+            // Breach points along the upper hull, fixed per ship so the damage reads consistently.
+            var rng = new System.Random(ship.Id * 7919 + 13);
+            breaches = new Glow[BreachAt.Length];
+            for (int i = 0; i < breaches.Length; i++)
+            {
+                float z = (float)(rng.NextDouble() * 0.8 - 0.42);
+                float x = (float)(rng.NextDouble() - 0.5) * 0.09f;
+                float y = (float)(rng.NextDouble() * 0.5 - 0.1) * 0.06f;
+                breaches[i] = NewGlow(SectionFor(z), new Vector3(x, y, z), 0.035f, fireMaterial, null);
+            }
+        }
+
+        static void EnsureStatics()
+        {
+            plumeMesh ??= MeshFactory.Plume();
+            quadMesh ??= MeshFactory.Quad();
+            if (plumeMaterial != null) return;
+            plumeMaterial = GlowMaterial("Plume", new Color(0.45f, 0.75f, 1f), 1.4f, 1.6f);
+            fireMaterial = GlowMaterial("Fire", new Color(1f, 0.5f, 0.18f), 1.6f, 1.8f);
+            engineMaterial = GlowMaterial("EngineGlow", new Color(0.5f, 0.8f, 1f), 1.5f, 2.2f);
+            shieldRingMaterial = Materials.MarkShared(Materials.Create(Materials.Fx, "ShieldRing"));
+        }
+
+        static Material GlowMaterial(string name, Color c, float intensity, float falloff)
+        {
+            var m = Materials.MarkShared(Materials.Create(Materials.Glow, name));
+            m.SetColor("_Color", c);
+            m.SetFloat("_Intensity", intensity);
+            m.SetFloat("_Falloff", falloff);
+            return m;
+        }
+
+        /// <summary>
+        /// A stream of small glowing embers trailing from the engine nozzle, alongside (not instead
+        /// of) the existing teardrop plume mesh -- the plume reads as the steady glow of the drive
+        /// itself, this is the turbulent exhaust it throws off. Sized and simulated in the ship's own
+        /// local space with hierarchy scaling, so it shrinks and grows correctly as the ship's own
+        /// root transform is rescaled frame to frame (everything in this sim is drawn at whatever
+        /// scale the camera's current distance calls for, never a fixed real-world size).
+        /// </summary>
+        static ParticleSystem BuildExhaust(Transform parent)
+        {
+            var go = new GameObject("Exhaust");
+            go.transform.SetParent(parent, false);
+            // Cone shape emits along local +Z by default; the hull's nose is +Z (see ShipModels'
+            // doc comment), so the whole emitter is turned to face aft instead of flipping the shape.
+            go.transform.localPosition = new Vector3(0, 0, -0.5f);
+            go.transform.localRotation = Quaternion.Euler(0, 180, 0);
+
+            var ps = go.AddComponent<ParticleSystem>();
+            var main = ps.main;
+            main.loop = true;
+            main.playOnAwake = false;
+            main.simulationSpace = ParticleSystemSimulationSpace.Local;
+            main.scalingMode = ParticleSystemScalingMode.Hierarchy;
+            main.startLifetime = 0.3f;
+            main.startSpeed = 1.1f;
+            main.startSize = new ParticleSystem.MinMaxCurve(0.03f, 0.06f);
+            main.startColor = new Color(0.75f, 0.88f, 1f, 1f);
+            main.maxParticles = 150;
+
+            var emission = ps.emission;
+            emission.rateOverTime = 70f;
+
+            var shape = ps.shape;
+            shape.shapeType = ParticleSystemShapeType.Cone;
+            shape.angle = 7f;
+            shape.radius = 0.015f;
+
+            var colorOverLifetime = ps.colorOverLifetime;
+            colorOverLifetime.enabled = true;
+            var fade = new Gradient();
+            fade.SetKeys(
+                new[] { new GradientColorKey(new Color(0.9f, 0.95f, 1f), 0f), new GradientColorKey(new Color(0.4f, 0.7f, 1f), 1f) },
+                new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0f, 1f) });
+            colorOverLifetime.color = fade;
+
+            var sizeOverLifetime = ps.sizeOverLifetime;
+            sizeOverLifetime.enabled = true;
+            sizeOverLifetime.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0, 1, 1, 0.2f));
+
+            var r = go.GetComponent<ParticleSystemRenderer>();
+            r.sharedMaterial = plumeMaterial;
+            r.renderMode = ParticleSystemRenderMode.Billboard;
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            r.receiveShadows = false;
+            r.alignment = ParticleSystemRenderSpace.View;
+
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            return ps;
+        }
+
+        /// <summary>
+        /// Builds the shield fields' geometry once (U.SPC-T501): one glowing disc per shield emitter, over the patch of hull
+        /// its field covers, in the hull's own normalized (nose +Z, up +Y) space. Each disc sits just off the hull over its
+        /// emitter, facing out from the keel, as wide as half the way to the nearest other emitter (the patch's own reach,
+        /// see <see cref="ShipCombat.PatchAt"/>). Every vertex shares one UV so the Fx shader's radial shape term comes out
+        /// a constant multiplier everywhere; the shader just makes it glow additively from the vertex colour, which is
+        /// where each emitter's own field gets shown (recoloured every frame in <see cref="UpdateShieldRing"/>, never
+        /// rebuilt), so a patch shot away shows as a dark hole in the hull's shields.
+        /// </summary>
+        void BuildShieldRing()
+        {
+            foreach (var s in Ship.Combat.Subsystems)
+                if (s.Kind == SubsystemKind.ShieldGenerator) shieldGenerators.Add(s);
+            if (shieldGenerators.Count == 0) return;
+
+            const int segs = 16;
+            const float lift = 0.03f;
+            var verts = new List<Vector3>();
+            var uvs = new List<Vector3>();
+            var cols = new List<Color>();
+            var tris = new List<int>();
+            shieldWedgeStart = new int[shieldGenerators.Count];
+            shieldWedgeCount = new int[shieldGenerators.Count];
+
+            for (int gi = 0; gi < shieldGenerators.Count; gi++)
+            {
+                var def = shieldGenerators[gi].Def;
+                var at = new Vector3((float)def.X, (float)def.Y, (float)def.Z);
+                // The patch reaches halfway to the nearest other emitter; a lone emitter covers the whole hull.
+                float nearest = float.MaxValue;
+                foreach (var o in shieldGenerators)
+                {
+                    if (o == shieldGenerators[gi]) continue;
+                    nearest = Mathf.Min(nearest, Vector3.Distance(at, new Vector3((float)o.Def.X, (float)o.Def.Y, (float)o.Def.Z)));
+                }
+                float radius = nearest == float.MaxValue ? 0.5f : Mathf.Clamp(nearest * 0.5f, 0.05f, 0.5f);
+                // Out from the keel line at the emitter's station; one sitting on the keel faces up.
+                var normal = new Vector3(at.x, at.y, 0);
+                normal = normal.sqrMagnitude > 1e-6f ? normal.normalized : Vector3.up;
+                var u = Vector3.Cross(normal, Vector3.forward);
+                if (u.sqrMagnitude < 1e-6f) u = Vector3.right;
+                u.Normalize();
+                var v = Vector3.Cross(normal, u).normalized;
+                var centre = at + normal * lift;
+
+                shieldWedgeStart[gi] = verts.Count;
+                int hub = verts.Count;
+                verts.Add(centre);
+                uvs.Add(new Vector3(0.5f, 0.5f, 0f));
+                cols.Add(Color.clear);
+                for (int k = 0; k < segs; k++)
+                {
+                    float t = k * Mathf.PI * 2 / segs;
+                    verts.Add(centre + (u * Mathf.Cos(t) + v * Mathf.Sin(t)) * radius);
+                    uvs.Add(new Vector3(0.5f, 0.5f, 0f));
+                    cols.Add(Color.clear);
+                }
+                for (int k = 0; k < segs; k++)
+                {
+                    int a = hub + 1 + k, b = hub + 1 + (k + 1) % segs;
+                    // Both windings, so the field reads whichever side the camera is on.
+                    tris.Add(hub); tris.Add(a); tris.Add(b);
+                    tris.Add(hub); tris.Add(b); tris.Add(a);
+                }
+                shieldWedgeCount[gi] = verts.Count - shieldWedgeStart[gi];
+            }
+
+            shieldRingMesh = Materials.Own(new Mesh { name = "ShieldFields" });
+            shieldRingMesh.SetVertices(verts);
+            shieldRingMesh.SetUVs(0, uvs);
+            shieldRingMesh.SetColors(cols);
+            shieldRingMesh.SetTriangles(tris, 0);
+            shieldRingMesh.RecalculateBounds();
+
+            var go = new GameObject("ShieldFields");
+            go.transform.SetParent(Root.transform, false);
+            go.AddComponent<MeshFilter>().sharedMesh = shieldRingMesh;
+            shieldRingRenderer = go.AddComponent<MeshRenderer>();
+            shieldRingRenderer.sharedMaterial = shieldRingMaterial;
+            shieldRingRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            shieldRingRenderer.enabled = false;
+            shieldVertexColors = cols.ToArray();
+        }
+
+        /// <summary>
+        /// A shield generator's colour at <paramref name="charge"/> (0 to 1 of its cap): dim and translucent when
+        /// nearly drained, bright when full. Its patch's disc and the bubble a hit raises on that patch
+        /// (<see cref="BattleFx"/>, U.SPC-T40) share it, so a bubble reads as the patch that took the hit.
+        /// </summary>
+        public static Color ShieldColor(float charge) =>
+            Color.Lerp(new Color(0.1f, 0.25f, 0.5f, 0.22f), new Color(0.4f, 0.75f, 1f, 1f), Mathf.Clamp01(charge));
+
+        /// <summary>Recolours each patch's disc from its own emitter's live field (none for one shot away); only shown while fighting.</summary>
+        void UpdateShieldRing(bool fighting)
+        {
+            if (shieldRingRenderer == null) return;
+            shieldRingRenderer.enabled = fighting && visible;
+            if (!fighting || !visible) return;
+            for (int gi = 0; gi < shieldGenerators.Count; gi++)
+            {
+                var gen = shieldGenerators[gi];
+                var c = gen.Destroyed ? Color.clear : ShieldColor((float)gen.ShieldFraction);
+                int start = shieldWedgeStart[gi], count = shieldWedgeCount[gi];
+                for (int v = 0; v < count; v++) shieldVertexColors[start + v] = c;
+            }
+            shieldRingMesh.SetColors(shieldVertexColors);
+        }
+
+        Transform SectionFor(float z) => bow != null && z >= ShipMeshFactory.SplitZ ? bow : stern;
+
+        Part BuildPart(Subsystem sub)
+        {
+            var d = sub.Def;
+            var part = new Part { Sub = sub };
+            var section = SectionFor((float)d.Z);
+            var pos = new Vector3((float)d.X, (float)d.Y, (float)d.Z);
+            // Mounts under the keel hang upside down.
+            bool under = d.Y < -0.005;
+            part.Rest = Quaternion.Euler(0, d.FacesAft ? 180 : 0, under ? 180 : 0);
+
+            if (sub.Kind == SubsystemKind.Engine)
+            {
+                var g = NewGlow(section, pos + new Vector3(0, 0, -0.035f), 0.06f, engineMaterial, part);
+                g.Engine = true;
+                part.Renderers = new Renderer[0];
+            }
+            // The reactor, and a bridge buried at the centre of the hull with no viewports (U.SPC-T492), show nothing outside.
+            else if (sub.Kind == SubsystemKind.Reactor || d.Buried)
+            {
+                part.Renderers = new Renderer[0];
+            }
+            else
+            {
+                var mount = new GameObject(SubsystemDef.Name(sub.Kind)).transform;
+                mount.SetParent(section, false);
+                mount.localPosition = pos;
+                mount.localRotation = part.Rest;
+                part.Mount = mount;
+                // A spinal mount is a gun the length of the hull laid down the keel from its muzzle (U.SPC-T490).
+                var list = new List<Renderer> { ShipModels.Part(mount, d.Spinal ? ShipMeshFactory.GetSpinal(sub.Kind, Ship.Faction) : ShipMeshFactory.GetPart(sub.Kind, Ship.Faction, false), "Base") };
+                part.Turret = !d.Spinal && (sub.Kind == SubsystemKind.HeavyLaser || sub.Kind == SubsystemKind.LaserTurret || sub.Kind == SubsystemKind.PointDefense ||
+                              sub.Kind == SubsystemKind.PlasmaCannon || sub.Kind == SubsystemKind.FlakCannon);
+                if (part.Turret)
+                {
+                    var barrels = new GameObject("Barrels").transform;
+                    barrels.SetParent(mount, false);
+                    barrels.localPosition = new Vector3(0, sub.Kind == SubsystemKind.HeavyLaser || sub.Kind == SubsystemKind.PlasmaCannon ? 0.014f : sub.Kind == SubsystemKind.LaserTurret ? 0.009f
+                        : sub.Kind == SubsystemKind.FlakCannon ? 0.011f : 0.008f, 0);
+                    part.Barrels = barrels;
+                    list.Add(ShipModels.Part(barrels, ShipMeshFactory.GetPart(sub.Kind, Ship.Faction, true), "Barrels"));
+                }
+                part.Renderers = list.ToArray();
+            }
+
+            var scar = ShipModels.Part(section, ShipMeshFactory.GetScar(), "Scar");
+            scar.transform.localPosition = pos;
+            scar.transform.localRotation = part.Rest;
+            scar.enabled = false;
+            part.Scar = scar.gameObject;
+            part.Fire = NewGlow(section, pos + new Vector3(0, under ? -0.012f : 0.012f, 0), 0.05f, fireMaterial, part);
+            part.Fire.R.enabled = false;
+            return part;
+        }
+
+        Glow NewGlow(Transform parent, Vector3 localPos, float size, Material material, Part owner)
+        {
+            var go = new GameObject("Glow");
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = localPos;
+            go.AddComponent<MeshFilter>().sharedMesh = quadMesh;
+            var mr = go.AddComponent<MeshRenderer>();
+            mr.sharedMaterial = material;
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            var g = new Glow { T = go.transform, R = mr, Size = size, Phase = Random.value * 10, Owner = owner };
+            mr.enabled = false;
+            glows.Add(g);
+            return g;
+        }
+
+        // ---------------------------------------------------------------- per frame
+
+        public void Apply(Vector3 relative, Quaternion rotation, float length, bool burning, bool highlighted)
+        {
+            var t = Root.transform;
+            t.localPosition = relative;
+            t.localRotation = rotation;
+            t.localScale = Vector3.one * length;
+            stern.localPosition = Vector3.zero;
+            stern.localRotation = Quaternion.identity;
+            if (bow != null)
+            {
+                bow.localPosition = Vector3.zero;
+                bow.localRotation = Quaternion.identity;
+            }
+            if (truss != null)
+            {
+                // The pods clamped on show its load: loaded in port, dropped off where it sells.
+                var load = ShipModels.TrussLoad(Ship);
+                if (load != trussShown)
+                {
+                    trussShown = load;
+                    truss.sharedMesh = ShipMeshFactory.GetTruss(Ship.Faction, load.pods, load.loaded, load.spheres);
+                }
+            }
+
+            UpdateTow();
+
+            block.SetFloat(EngineGlowId, burning ? 2.2f : 0.35f);
+            block.SetFloat(HighlightId, highlighted ? 1f : 0f);
+            block.SetColor(ColorId, Color.white);
+            SetBlock();
+            if (towRenderer != null) towRenderer.SetPropertyBlock(block);
+            plume.enabled = visible && burning;
+            SetExhaust(visible && detailed && burning);
+        }
+
+        /// <summary>
+        /// An ore tug's load (U.SPC-T498): the rock or block of ice in its claws, drawn just ahead of its push plate at its
+        /// true size against the hull (the root is scaled to the hull's length, so a unit here is one hull length), and gone
+        /// when it lets go.
+        /// </summary>
+        void UpdateTow()
+        {
+            var load = Ship.Tow;
+            if (load == null)
+            {
+                if (towRenderer != null) towRenderer.enabled = false;
+                towShown = null;
+                return;
+            }
+            if (towRenderer == null)
+            {
+                var go = new GameObject("Tow");
+                go.transform.SetParent(Root.transform, false);
+                towFilter = go.AddComponent<MeshFilter>();
+                towRenderer = go.AddComponent<MeshRenderer>();
+                towRenderer.sharedMaterial = ShipModels.ProceduralMaterial;
+                towRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                towRenderer.receiveShadows = false;
+            }
+            if (towShown != load)
+            {
+                towShown = load;
+                towFilter.sharedMesh = ShipMeshFactory.GetTowLoad(load.Class == AsteroidClass.CometIce);
+                float across = Ship.LengthKm > 0 ? (float)(load.DiameterM / 1000 / Ship.LengthKm) : 1f;
+                var t = towFilter.transform;
+                t.localScale = Vector3.one * across;
+                // Resting against the push plate, its near side in the claws' grip.
+                t.localPosition = new Vector3(0, 0, 0.38f + across * 0.45f);
+                // A fixed tumble per load, so each block reads as its own lump of rock.
+                int seed = 0;
+                foreach (char ch in load.Designation ?? "") seed = seed * 31 + ch;
+                t.localRotation = Quaternion.Euler((seed & 0x7fff) % 360, 37f + (seed >> 15 & 0xff), 11f);
+            }
+            towRenderer.enabled = visible;
+        }
+
+        /// <summary>Starts/stops the exhaust emitter only on an actual state change -- <see cref="ParticleSystem.Stop"/>
+        /// defaults to letting already-spawned embers finish fading out rather than clearing them instantly,
+        /// which reads as the drive spooling down rather than snapping off.</summary>
+        void SetExhaust(bool want)
+        {
+            if (want == exhaustPlaying) return;
+            exhaustPlaying = want;
+            if (want) exhaust.Play();
+            else exhaust.Stop();
+        }
+
+        /// <summary>
+        /// Shows the hull's combat state: turrets on their targets (or at rest), lost hardpoints as
+        /// scars and fires, engines that still work glowing, breaches by hull damage.
+        /// </summary>
+        public void ApplyCombat(ShipCombat combat, bool fighting, bool thrusting, float now, float dt)
+        {
+            if (!visible || !detailed) return;
+            UpdateShieldRing(fighting);
+            if (bow == null) return;
+            var inverse = Quaternion.Inverse(Root.transform.rotation);
+            foreach (var p in parts)
+            {
+                var sub = p.Sub;
+                if (sub.Destroyed != p.ShownDestroyed)
+                {
+                    p.ShownDestroyed = sub.Destroyed;
+                    foreach (var r in p.Renderers) r.enabled = !sub.Destroyed;
+                    p.Scar.GetComponent<Renderer>().enabled = sub.Destroyed && p.Mount != null;
+                    p.Fire.R.enabled = sub.Destroyed;
+                }
+                if (p.Turret && !sub.Destroyed) Aim(p, sub, fighting, inverse, dt);
+            }
+            float hull = (float)combat.HullFraction;
+            for (int i = 0; i < breaches.Length; i++) breaches[i].R.enabled = hull < BreachAt[i];
+            foreach (var g in glows)
+            {
+                if (!g.Engine) continue;
+                bool alive = !g.Owner.Sub.Destroyed;
+                g.R.enabled = alive;
+                g.Size = thrusting ? 0.075f : 0.045f;
+            }
+            Billboard(now);
+        }
+
+        /// <summary>Traverses the mount about its own up axis and elevates the barrels, both rate-limited.</summary>
+        void Aim(Part p, Subsystem sub, bool fighting, Quaternion inverseShip, float dt)
+        {
+            Quaternion goalMount = p.Rest, goalBarrels = Quaternion.identity;
+            if (fighting && sub.Aim.LengthSquared > 1e-9)
+            {
+                var a = sub.Aim.SwapYZ;
+                var world = new Vector3((float)a.X, (float)a.Y, (float)a.Z);
+                // Into the section's frame (sections stay aligned with the root unless wrecked).
+                var local = inverseShip * world;
+                var mountLocal = Quaternion.Inverse(Quaternion.Euler(0, 0, p.Rest.eulerAngles.z)) * local;
+                var flat = new Vector3(mountLocal.x, 0, mountLocal.z);
+                if (flat.sqrMagnitude > 1e-8f)
+                {
+                    goalMount = Quaternion.Euler(0, 0, p.Rest.eulerAngles.z) * Quaternion.LookRotation(flat.normalized, Vector3.up);
+                    float elevation = Mathf.Atan2(mountLocal.y, flat.magnitude) * Mathf.Rad2Deg;
+                    goalBarrels = Quaternion.Euler(-Mathf.Clamp(elevation, -8f, 80f), 0, 0);
+                }
+            }
+            float traverse = (sub.Kind == SubsystemKind.PointDefense ? 360f : sub.Kind == SubsystemKind.FlakCannon ? 240f : sub.Kind == SubsystemKind.HeavyLaser || sub.Kind == SubsystemKind.PlasmaCannon ? 50f : 90f) * dt;
+            p.Mount.localRotation = Quaternion.RotateTowards(p.Mount.localRotation, goalMount, traverse);
+            p.Barrels.localRotation = Quaternion.RotateTowards(p.Barrels.localRotation, goalBarrels, traverse);
+        }
+
+        void Billboard(float now)
+        {
+            var cam = Camera.main;
+            if (cam == null) return;
+            var camPos = cam.transform.position;
+            foreach (var g in glows)
+            {
+                if (!g.R.enabled) continue;
+                var p = g.T.position;
+                g.T.rotation = Quaternion.LookRotation(p - camPos, cam.transform.up);
+                float flicker = g.Engine ? 1f : 0.75f + 0.25f * Mathf.Sin(now * 13f + g.Phase) * Mathf.Sin(now * 7.3f + g.Phase * 2f);
+                g.T.localScale = Vector3.one * (g.Size * flicker);
+            }
+        }
+
+        /// <summary>
+        /// A destroyed ship: bow and stern drift apart and tumble, the hull blackens, fires burn at
+        /// the break and on the wreck, then the pieces burn out and vanish.
+        /// </summary>
+        /// <returns>False once the wreck has burnt out.</returns>
+        public bool Wreck(Vector3 relative, Quaternion rotation, float length, float age, float now)
+        {
+            const float Life = WreckBurnS;
+            if (age > Life)
+            {
+                SetVisible(false);
+                return false;
+            }
+            SetVisible(true);
+            if (shieldRingRenderer != null) shieldRingRenderer.enabled = false;
+            var t = Root.transform;
+            t.localPosition = relative;
+            t.localRotation = rotation;
+            t.localScale = Vector3.one * length;
+            if (wreckSpin == 0) wreckSpin = 6f + (Ship.Id % 5) * 3f;
+            if (bow != null)
+            {
+                PlaceBrokenHalves(age);
+                foreach (var p in parts)
+                {
+                    foreach (var r in p.Renderers) r.enabled = false;
+                    p.Scar.GetComponent<Renderer>().enabled = p.Mount != null;
+                    p.Fire.R.enabled = age < Life * 0.7f && (p.Sub.Index % 2 == 0);
+                }
+                foreach (var g in breaches) g.R.enabled = age < Life * 0.8f;
+                foreach (var g in glows) if (g.Engine) g.R.enabled = false;
+                Billboard(now);
+            }
+            else
+            {
+                stern.localRotation = Quaternion.Euler(age * 9f, age * 5f, age * 14f);
+            }
+            float burnt = Mathf.Clamp01(age / 1.5f);
+            block.SetFloat(EngineGlowId, 0f);
+            block.SetFloat(HighlightId, 0f);
+            block.SetColor(ColorId, Color.Lerp(Color.white, new Color(0.22f, 0.2f, 0.19f), burnt));
+            SetBlock();
+            plume.enabled = false;
+            HardStopExhaust();
+            return true;
+        }
+
+        /// <summary>How long a destroyed ship burns (see <see cref="Wreck"/>) before it lingers as a cold hulk (see <see cref="BurntOut"/>), real seconds.</summary>
+        public const float WreckBurnS = 28f;
+
+        /// <summary>A warship's bow and stern drifting apart and tumbling, <paramref name="age"/> real seconds after it broke.</summary>
+        void PlaceBrokenHalves(float age)
+        {
+            if (wreckSpin == 0) wreckSpin = 6f + (Ship.Id % 5) * 3f;
+            float drift = Mathf.Sqrt(age) * 0.07f;
+            bow.localPosition = new Vector3(0.01f * age, 0.015f * age, drift);
+            bow.localRotation = Quaternion.Euler(age * wreckSpin * 0.6f, age * wreckSpin * 0.3f, age * wreckSpin);
+            stern.localPosition = new Vector3(-0.01f * age, -0.01f * age, -drift);
+            stern.localRotation = Quaternion.Euler(-age * wreckSpin * 0.4f, 0, -age * wreckSpin * 0.7f);
+        }
+
+        /// <summary>
+        /// A destroyed ship once its fires are out, for as long as its wreck lasts: a cold hulk tumbling like a
+        /// derelict, but still broken in two where it died, with its guns and masts gone and their scars left.
+        /// </summary>
+        public void BurntOut(Vector3 relative, Quaternion rotation, float length, float now)
+        {
+            Derelict(relative, rotation, length, now);
+            if (bow == null) return;
+            PlaceBrokenHalves(WreckBurnS);
+            foreach (var p in parts)
+            {
+                foreach (var r in p.Renderers) r.enabled = false;
+                p.Scar.GetComponent<Renderer>().enabled = p.Mount != null;
+                p.Fire.R.enabled = false;
+            }
+            foreach (var g in breaches) g.R.enabled = false;
+        }
+
+        /// <summary>A boarded hulk left adrift: dark, cold, slowly tumbling, never burning out.</summary>
+        public void Derelict(Vector3 relative, Quaternion rotation, float length, float now)
+        {
+            SetVisible(true);
+            if (shieldRingRenderer != null) shieldRingRenderer.enabled = false;
+            var t = Root.transform;
+            t.localPosition = relative;
+            t.localRotation = rotation * Quaternion.Euler(now * 1.3f, now * 0.7f, now * 2.1f);
+            t.localScale = Vector3.one * length;
+            stern.localPosition = Vector3.zero;
+            stern.localRotation = Quaternion.identity;
+            if (bow != null)
+            {
+                bow.localPosition = Vector3.zero;
+                bow.localRotation = Quaternion.identity;
+            }
+            foreach (var g in glows) g.R.enabled = false;
+            block.SetFloat(EngineGlowId, 0f);
+            block.SetFloat(HighlightId, 0f);
+            block.SetColor(ColorId, new Color(0.35f, 0.33f, 0.32f));
+            SetBlock();
+            plume.enabled = false;
+            HardStopExhaust();
+        }
+
+        /// <summary>A wrecked or derelict hull cuts its exhaust immediately rather than letting it fade
+        /// (see <see cref="SetExhaust"/>) -- the drive is gone, not just throttled down.</summary>
+        void HardStopExhaust()
+        {
+            exhaustPlaying = false;
+            exhaust.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        }
+
+        void SetBlock()
+        {
+            foreach (var r in renderers) r.SetPropertyBlock(block);
+            foreach (var p in parts)
+                foreach (var r in p.Renderers) r.SetPropertyBlock(block);
+        }
+
+        /// <summary>
+        /// Full model or simplified (U.SPC-T415, <see cref="RenderLod"/>): a ship too small on screen for its hardpoints to
+        /// read draws its hull alone, its turrets, scars, fires, breaches, glows, shield ring and exhaust put away, and
+        /// stops aiming and billboarding them. Back to full detail, every hardpoint is shown as it now stands.
+        /// </summary>
+        public void SetDetail(bool full)
+        {
+            if (detailed == full) return;
+            detailed = full;
+            if (!visible) return;
+            foreach (var p in parts)
+            {
+                foreach (var r in p.Renderers) r.enabled = full && !p.Sub.Destroyed;
+                p.Scar.GetComponent<Renderer>().enabled = full && p.Sub.Destroyed && p.Mount != null;
+                p.Fire.R.enabled = full && p.Sub.Destroyed;
+                // Re-read by ApplyCombat on the next detailed frame.
+                p.ShownDestroyed = p.Sub.Destroyed;
+            }
+            if (!full)
+            {
+                HardStopExhaust();
+                foreach (var g in glows) g.R.enabled = false;
+                foreach (var g in breaches) g.R.enabled = false;
+                if (shieldRingRenderer != null) shieldRingRenderer.enabled = false;
+            }
+        }
+
+        public void SetVisible(bool value)
+        {
+            if (visible == value) return;
+            visible = value;
+            foreach (var r in renderers) r.enabled = value;
+            if (towRenderer != null) towRenderer.enabled = value && Ship.Tow != null;
+            foreach (var p in parts)
+            {
+                foreach (var r in p.Renderers) r.enabled = value && detailed && !p.Sub.Destroyed;
+                p.Scar.GetComponent<Renderer>().enabled = value && detailed && p.Sub.Destroyed && p.Mount != null;
+                p.Fire.R.enabled = value && detailed && p.Sub.Destroyed;
+            }
+            if (!value)
+            {
+                plume.enabled = false;
+                HardStopExhaust();
+                foreach (var g in glows) g.R.enabled = false;
+                if (shieldRingRenderer != null) shieldRingRenderer.enabled = false;
+            }
+            else
+            {
+                foreach (var p in parts) p.ShownDestroyed = !p.Sub.Destroyed;
+            }
+        }
+    }
+}
