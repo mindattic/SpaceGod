@@ -48,7 +48,7 @@ if (-not ($env:VCToolsInstallDir -and (Get-Command cl.exe -ErrorAction SilentlyC
 
 $flags = @('/nologo', '/c', '/std:c++20', '/EHsc', '/GR', '/W4', '/permissive-', '/utf-8', '/fp:precise',
   '/Zc:__cplusplus', '/Zc:preprocessor', '/bigobj', '/DSPACEGOD_STANDALONE', '/D_CRT_SECURE_NO_WARNINGS', "/I`"$core`"", "/I`"$src`"")
-if ($Configuration -eq 'Release') { $flags += @('/O2', '/GL', '/Gw', '/MD', '/DNDEBUG', '/Zi') } else { $flags += @('/Od', '/MDd', '/Zi', '/RTC1') }
+if ($Configuration -eq 'Release') { $flags += @('/O2', '/GL', '/Gw', '/arch:AVX', '/MD', '/DNDEBUG', '/Zi') } else { $flags += @('/Od', '/MDd', '/Zi', '/RTC1') }
 
 $objDir = Join-Path $out 'benchobj'
 New-Item -ItemType Directory -Force $objDir | Out-Null

@@ -95,7 +95,11 @@ namespace cs
 	// ---------------------------------------------------------------- hashing -----------------------------------
 	// Only lookup uses hashes; enumeration order never depends on them (see Dictionary), so any good hash will do.
 	template <class T, class = void> struct Hash { size_t operator()(const T& v) const { return std::hash<T>{}(v); } };
-	template <class T> struct Hash<Ref<T>> { size_t operator()(const Ref<T>& p) const { return std::hash<const void*>{}(p.get()); } };
+	template <class T> struct Hash<Ref<T>> { size_t operator()(const Ref<T>& p) const { return reinterpret_cast<size_t>(p.get()) >> 4; } };
+	// Integers and doubles hash to their own value (MSVC's std::hash runs FNV-1a over the bytes); Dictionary mixes it.
+	// A double's -0.0 hashes as 0.0, since the two compare equal.
+	template <class T> struct Hash<T, std::enable_if_t<std::is_integral_v<T>>> { size_t operator()(T v) const { return static_cast<size_t>(v); } };
+	template <> struct Hash<double> { size_t operator()(double v) const { return v == 0 ? 0 : std::bit_cast<size_t>(v); } };
 	// A struct or record key gives itself `size_t HashCode() const` and `operator==`.
 	template <class T> struct Hash<T, std::void_t<decltype(std::declval<const T&>().HashCode())>>
 	{
@@ -325,7 +329,7 @@ namespace cs
 		static constexpr size_t NoBucket = static_cast<size_t>(-1);
 		// The comparer's hash, mixed (Fibonacci) so identity-like hashes still spread over the table's low bits.
 		static size_t HashOf(const K& k) { return static_cast<size_t>(H{}(k)) * 0x9E3779B97F4A7C15ull; }
-		size_t Home(size_t h) const { return (h >> 32 ^ h) & (buckets.size() - 1); }
+		size_t Home(size_t h) const { return h >> shift; } // the product's top bits: Fibonacci hashing
 		// The bucket holding k, or NoBucket.
 		size_t BucketOf(const K& k, size_t h) const
 		{
@@ -359,6 +363,7 @@ namespace cs
 			size_t n = 8;
 			while (n < used * 2) n *= 2;
 			buckets.assign(n, Empty);
+			shift = 64 - static_cast<int>(std::countr_zero(n));
 			tombstones = 0;
 			for (size_t i = 0; i < entries.size(); ++i)
 				if (entries[i].Used) Place(static_cast<int>(i), entries[i].HashCode);
@@ -378,6 +383,7 @@ namespace cs
 		}
 		std::vector<Entry> entries;
 		std::vector<int> buckets;
+		int shift = 64;
 		size_t tombstones = 0;
 		int freeList = -1;
 		int count = 0;

@@ -75,8 +75,9 @@ $headerTime = (Get-ChildItem -LiteralPath $core -Recurse -File -Include '*.h', '
 $common = @('/nologo', '/c', '/std:c++20', '/EHsc', '/GR', '/W4', '/permissive-', '/utf-8', '/fp:precise',
   '/Zc:__cplusplus', '/Zc:preprocessor', '/bigobj', '/DSPACEGOD_STANDALONE', '/D_CRT_SECURE_NO_WARNINGS', "/I`"$core`"")
 # Release: whole-program optimisation (/GL here, /LTCG on lib and link: Core's small inline-looking members such as DVec3
-# operators live in .cpp files, so only link-time code generation can inline them across files). /fp:precise stays (bit parity).
-if ($Configuration -eq 'Release') { $common += @('/O2', '/GL', '/Gw', '/MD', '/DNDEBUG', '/Zi') } else { $common += @('/Od', '/MDd', '/Zi', '/RTC1') }
+# operators live in .cpp files, so only link-time code generation can inline them across files). /arch:AVX: VEX-encoded SSE, as RyuJIT
+# emits on this hardware (AVX has no FMA, so nothing can be contracted). /fp:precise stays (bit parity).
+if ($Configuration -eq 'Release') { $common += @('/O2', '/GL', '/Gw', '/arch:AVX', '/MD', '/DNDEBUG', '/Zi') } else { $common += @('/Od', '/MDd', '/Zi', '/RTC1') }
 
 # SaveGame's raw DEFLATE (docs/PERSISTENCE.md, section 7): the engine's own zlib 1.3 when UE 5.8 is installed (its
 # headers, and its prebuilt /MD zlibstatic.lib merged into SpaceGodCore.lib, so whatever links the lib has it). Release
