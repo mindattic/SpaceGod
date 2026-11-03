@@ -26,6 +26,7 @@ namespace SpaceGod::UnityCompat
 	{
 		TWeakObjectPtr<AActor> HostActor;
 		uint64_t PushedGlobals = 0;
+		int64_t Frame = 0;
 
 		/// A mesh converted to Unreal's frame and layouts, shared by every renderer drawing it.
 		struct MeshHandle final : NativeHandle
@@ -352,6 +353,7 @@ namespace SpaceGod::UnityCompat
 		bool Shown(const Renderer& r, const cs::Ref<Mesh>& mesh)
 		{
 			if (!r.enabled || !mesh || mesh->destroyed) return false;
+			if (r.OnlyFrame >= 0 && r.OnlyFrame != Frame) return false;
 			auto go = r.gameObject();
 			if (!go || !go->activeInHierarchy()) return false;
 			auto m = r.sharedMaterial();
@@ -475,6 +477,8 @@ namespace SpaceGod::UnityCompat
 		HostActor.Reset();
 	}
 
+	int64_t UnityScene::CurrentFrame() { return Frame; }
+
 	AActor* UnityScene::Host() { return HostActor.Get(); }
 
 	UWorld* UnityScene::World() { return HostActor.IsValid() ? HostActor->GetWorld() : nullptr; }
@@ -490,6 +494,12 @@ namespace SpaceGod::UnityCompat
 	}
 
 	void UnityScene::Sync()
+	{
+		SyncNow();
+		Frame++;
+	}
+
+	void UnityScene::SyncNow()
 	{
 		AActor* host = HostActor.Get();
 		if (!host) return;

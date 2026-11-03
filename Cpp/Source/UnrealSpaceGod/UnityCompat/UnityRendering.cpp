@@ -513,7 +513,7 @@ namespace SpaceGod::UnityCompat
 	}
 
 	/// BGRA8 levels from level 0 down to 1x1 (a 2x2 box filter, as Unity's default mip filter).
-	static std::vector<std::vector<uint8_t>> MipChain(const uint8_t* bgra, int width, int height)
+	std::vector<std::vector<uint8_t>> TextureFactory::MipChain(const uint8_t* bgra, int width, int height)
 	{
 		std::vector<std::vector<uint8_t>> levels;
 		levels.emplace_back(bgra, bgra + static_cast<size_t>(width) * height * 4);
@@ -544,19 +544,11 @@ namespace SpaceGod::UnityCompat
 		return levels;
 	}
 
-	/// A decoded image file as BGRA8 mips (worker thread safe).
-	struct DecodedImage
-	{
-		int Width = 0, Height = 0;
-		std::vector<std::vector<uint8_t>> Levels;
-		bool Ok() const { return Width > 0 && !Levels.empty(); }
-	};
-
-	static DecodedImage Decode(const FString& file)
+	TextureFactory::DecodedImage TextureFactory::Decode(const cs::String& file)
 	{
 		DecodedImage out;
 		FImage image;
-		if (!FImageUtils::LoadImage(*file, image)) return out;
+		if (!FImageUtils::LoadImage(*ToF(file), image)) return out;
 		image.ChangeFormat(ERawImageFormat::BGRA8, EGammaSpace::sRGB);
 		out.Width = image.SizeX;
 		out.Height = image.SizeY;
@@ -575,6 +567,14 @@ namespace SpaceGod::UnityCompat
 		return t;
 	}
 
+	cs::Ref<Texture2D> TextureFactory::Wrap(UTexture* texture, int width, int height, const cs::String& name)
+	{
+		if (!texture) return nullptr;
+		cs::Ref<Texture2D> t = cs::New<HeldTexture2D>(texture, width, height);
+		t->name = name;
+		return t;
+	}
+
 	static bool IsLinearMap(const FString& file)
 	{
 		// Unity imports the relief maps as normal maps (linear); every colour map is sRGB.
@@ -583,7 +583,7 @@ namespace SpaceGod::UnityCompat
 
 	cs::Ref<Texture2D> TextureFactory::FromImageFile(const cs::String& file, bool linear)
 	{
-		auto decoded = Decode(ToF(file));
+		auto decoded = Decode(file);
 		if (!decoded.Ok()) return nullptr;
 		return FromMips(FromF(FPaths::GetBaseFilename(ToF(file))), decoded.Width, decoded.Height, decoded.Levels,
 			TextureWrapMode::Repeat, TextureWrapMode::Repeat, linear);
@@ -604,7 +604,7 @@ namespace SpaceGod::UnityCompat
 				bgra[o + 2] = p.r;
 				bgra[o + 3] = p.a;
 			}
-		auto levels = texture.mipChain ? MipChain(bgra.data(), texture.width, texture.height) : std::vector<std::vector<uint8_t>>{ bgra };
+		auto levels = texture.mipChain ? TextureFactory::MipChain(bgra.data(), texture.width, texture.height) : std::vector<std::vector<uint8_t>>{ bgra };
 		UTexture2D* tex = MakeTexture(ToF(texture.name.empty() ? cs::String("Texture2D") : texture.name), texture.width, texture.height, levels,
 			texture.wrapMode, texture.wrapMode, texture.linear);
 		if (texture.filterMode == FilterMode::Point) tex->Filter = TF_Nearest;

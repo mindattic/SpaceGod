@@ -25,6 +25,8 @@
 #include <variant>
 #include <vector>
 
+class UTexture;
+
 namespace SpaceGod::UnityCompat
 {
 	enum class MeshTopology : int { Triangles = 0, Quads = 2, Lines = 3, LineStrip = 4, Points = 5 };
@@ -297,6 +299,8 @@ namespace SpaceGod::UnityCompat
 	{
 	public:
 		bool enabled = true;
+		/// Graphics.RenderPrimitives: drawn only on the frame UnityScene numbers this (-1: every frame, as a renderer is).
+		int64_t OnlyFrame = -1;
 		ShadowCastingMode shadowCastingMode = ShadowCastingMode::On;
 		bool receiveShadows = true;
 
@@ -508,11 +512,24 @@ namespace SpaceGod::UnityCompat
 	/// A texture made from a decoded image (or from raw RGBA8 mip levels), wrapped as a Unity Texture2D.
 	struct TextureFactory
 	{
+		/// An image file decoded to BGRA8 levels, top row first (level 0 down to 1x1).
+		struct DecodedImage
+		{
+			int Width = 0, Height = 0;
+			std::vector<std::vector<uint8_t>> Levels;
+			bool Ok() const { return Width > 0 && !Levels.empty(); }
+		};
+		/// Decodes a .jpg/.png on any thread (no Unreal object is made).
+		static DecodedImage Decode(const cs::String& file);
+		/// BGRA8 level 0 (top row first) to a full mip chain.
+		static std::vector<std::vector<uint8_t>> MipChain(const uint8_t* bgra, int width, int height);
 		/// sRGB colour (the game's maps), Unity's Repeat wrap; linear for data (normal maps: Unity imports them linear).
 		static cs::Ref<Texture2D> FromImageFile(const cs::String& file, bool linear);
 		/// RGBA8 levels (level 0 first), width x height at level 0.
 		static cs::Ref<Texture2D> FromMips(const cs::String& name, int width, int height, const std::vector<std::vector<uint8_t>>& levels,
 			TextureWrapMode wrapU, TextureWrapMode wrapV, bool linear);
+		/// Wraps an Unreal texture made elsewhere (kept from the garbage collector while the Texture2D lives).
+		static cs::Ref<Texture2D> Wrap(UTexture* texture, int width, int height, const cs::String& name);
 		/// Uploads a Texture2D made from pixels (new Texture2D + SetPixel + Apply) if it has no Unreal texture yet.
 		static void EnsureNative(Texture2D& texture);
 	};

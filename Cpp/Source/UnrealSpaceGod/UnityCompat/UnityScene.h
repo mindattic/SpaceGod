@@ -34,6 +34,12 @@ namespace SpaceGod::UnityCompat
 		/// End of a frame: every renderer to its Unreal component, the shader globals to MPC_SpaceGod.
 		static void Sync();
 
+		/// Sync without ending the frame: brings Unreal up to date now (a scene capture about to render, ShipThumbnails).
+		static void SyncNow();
+
+		/// The number of the frame being built (Renderer::OnlyFrame), counted by Sync.
+		static int64_t CurrentFrame();
+
 		/// The Unreal components drawing the renderers under root (a scene capture's show-only list).
 		static TArray<UPrimitiveComponent*> ComponentsUnder(const cs::Ref<Transform>& root);
 	};
