@@ -28,12 +28,19 @@ namespace SpaceGod::UI::DisplayBackend
 		int width = 0;
 		int height = 0;
 		double refreshRateHz = 0;
+		/// refreshRateRatio itself (US-T56): the rate exactly as the display reports it (0/0 when unknown).
+		unsigned int refreshNumerator = 0, refreshDenominator = 0;
 	};
 
-	/// Screen.SetResolution(width, height, mode[, refreshRate]): `refreshHz` 0 = the default for that size.
+	/// Screen.SetResolution(width, height, mode[, refreshRate]): `refreshHz` 0 = the default for that size. In exclusive
+	/// fullscreen the monitor is switched to the size's mode nearest that rate once the window is fullscreen (US-T56).
 	void SetResolution(int width, int height, FullScreenMode mode, double refreshHz = 0);
 
-	/// Screen.resolutions: every mode the screen offers.
+	/// The mode (and exact rate) the last exclusive-fullscreen SetResolution asked for; refreshRateHz 0 when the last
+	/// call asked for none (the audit's display.exclusive-rate, US-T56).
+	Resolution RequestedRefresh();
+
+	/// Screen.resolutions: every mode the screen offers, each at each of its real refresh rates (US-T56).
 	cs::List<Resolution> Resolutions();
 
 	/// Screen.currentResolution: the screen's own (desktop) mode.

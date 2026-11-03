@@ -25,5 +25,8 @@ public class UnrealSpaceGod : ModuleRules
 			// Views/Rendering (US-T30): meshes drawn as UDynamicMeshComponents, the plugin found for Resources, ShipModels.json.
 			"GeometryCore", "GeometryFramework", "Projects", "Json", "ImageCore",
 		});
+		// UI/DisplayBackend (US-T56): the monitor's modes with their refresh rates (SpaceGodRender's SpaceGodDisplayModes.h)
+		// and the rate set on the game's swap chain.
+		PrivateDependencyModuleNames.AddRange(new[] { "SpaceGodRender", "RHI", "RenderCore", "ApplicationCore" });
 	}
 }
