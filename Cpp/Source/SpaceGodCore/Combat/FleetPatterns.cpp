@@ -216,7 +216,8 @@ namespace SpaceGod::Core
 	double FleetPatterns::Worth(const cs::Ref<IPartSpec>& part, double scale)
 	{
 		double v = 0;
-		for (int i = 0; i < part->Bill().Count(); i++) v += part->Tonnes(i, scale) * GoodInfo::Of(part->Bill()[i].good)->BasePrice;
+		// IPartSpec.Bill is PartBill() in C++, its (good, tonnes) lines std::pairs (see Combat/Facilities.h).
+		for (int i = 0; i < part->PartBill().Count(); i++) v += part->Tonnes(i, scale) * GoodInfo::Of(part->PartBill()[i].first)->BasePrice;
 		return v;
 	}
 
