@@ -201,7 +201,7 @@ namespace SpaceGod::Core
 		cs::Ref<HullModule> ModuleOf(int subsystem) const;
 
 		/// <summary>Whether the module is still held to the root through unbroken joints.</summary>
-		bool Attached(int module) const { return Reachable()[static_cast<size_t>(module)]; }
+		bool Attached(int module) const { return Reachable()[module]; }
 
 		/// <summary>
 		/// A hit of <paramref name="damage"/> (what got through shields and armour) at a point on the hull, ship lengths,
@@ -238,11 +238,10 @@ namespace SpaceGod::Core
 		bool Intact() const;
 
 	private:
-		// bool[] is a std::vector<bool> here: cs::List<bool> cannot hand out a bool& (vector<bool> packs its bits).
-		std::vector<bool> Reachable() const;
+		cs::List<bool> Reachable() const;
 
 		/// <summary>The modules joined to <paramref name="start"/> through unbroken joints, as one piece.</summary>
-		cs::Ref<HullFragment> Gather(int start, std::vector<bool>& seen, bool includeDetached) const;
+		cs::Ref<HullFragment> Gather(int start, cs::List<bool>& seen, bool includeDetached) const;
 
 	public:
 		static uint32_t Hash(uint32_t x); // internal

@@ -2901,7 +2901,7 @@ namespace SpaceGod::Core
 		auto polities = world->Polities;
 		Core::Crews::Recruit(polities->KeptBy(world, Fleet()->Factions()), polities->Worlds().Count() > 1 ? polities->Settlements() : Economy()->Settlements, 1);
 		if (Fleet()->Lanes != nullptr)
-			for (const auto& lane : Fleet()->Lanes->Danger.Keys()) Fleet()->Lanes->SetDanger(lane, Fleet()->Lanes->Danger[lane] * 0.85);
+			for (const auto& lane : Fleet()->Lanes->Danger.Keys()) Fleet()->Lanes->SetDanger(lane, Fleet()->Lanes->Danger.At(lane) * 0.85);
 		MergeGroups(jd);
 		PayUpkeep();
 		DrillMarines();

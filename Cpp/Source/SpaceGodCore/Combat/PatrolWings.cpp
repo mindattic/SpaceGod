@@ -14,19 +14,6 @@
 
 namespace SpaceGod::Core
 {
-	namespace
-	{
-		// double.CompareTo: NaN sorts below every number.
-		int CompareDouble(double a, double b)
-		{
-			if (a < b) return -1;
-			if (a > b) return 1;
-			if (a == b) return 0;
-			if (cs::Double::IsNaN(a)) return cs::Double::IsNaN(b) ? 0 : -1;
-			return 1;
-		}
-	}
-
 	const cs::List<cs::List<ShipClass>>& PatrolWings::Compositions()
 	{
 		static const cs::List<cs::List<ShipClass>> compositions =
@@ -112,7 +99,7 @@ namespace SpaceGod::Core
 		cs::List<cs::Ref<Settlement>> list;
 		for (const auto& s : w->Economy->Settlements)
 			if (s->Owner == f && !s->Fallen && s->Kind != SettlementKind::Haven) list.Add(s);
-		list.Sort([](const cs::Ref<Settlement>& a, const cs::Ref<Settlement>& b) { return CompareDouble(b->Population, a->Population); });
+		list.Sort([](const cs::Ref<Settlement>& a, const cs::Ref<Settlement>& b) { return cs::CompareTo(b->Population, a->Population); });
 		cs::List<int> bodies;
 		for (const auto& s : list)
 			if (!bodies.Contains(s->Body)) bodies.Add(s->Body);

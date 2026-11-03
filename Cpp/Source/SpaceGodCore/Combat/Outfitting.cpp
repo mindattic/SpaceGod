@@ -878,20 +878,17 @@ namespace SpaceGod::Core
 	{
 		cs::List<AiWish> wishes;
 		// The facilities it wants that it has not got yet, in order, so far as each still fits.
-		// StringComparer.OrdinalIgnoreCase: keyed by the id upper-cased (only looked up, never enumerated).
-		cs::Dictionary<cs::String, int> have;
+		cs::Dictionary<cs::String, int, cs::OrdinalIgnoreCaseComparer> have;
 		for (const auto& f : l->AddedFacilities())
 		{
-			auto key = cs::Strings::ToUpperInvariant(f->Kind);
 			int n = 0;
-			have.TryGetValue(key, n);
-			have[key] = n + 1;
+			have.TryGetValue(f->Kind, n);
+			have[f->Kind] = n + 1;
 		}
 		for (const auto& id : ship->Faction->IsPirate ? RaiderFacilities() : NavyFacilities())
 		{
-			auto key = cs::Strings::ToUpperInvariant(id);
 			int n = 0;
-			if (have.TryGetValue(key, n) && n > 0) { have[key] = n - 1; continue; }
+			if (have.TryGetValue(id, n) && n > 0) { have[id] = n - 1; continue; }
 			auto kind = FacilityKinds::Of(id);
 			// A Breacher bay is only worth its space where the habitats can fill a whole team (U.SPC-T521).
 			if (kind == BreacherBays::Kind() && (BreacherBays::Count(ship) > 0 || !BreacherBays::CanMan(l))) continue;

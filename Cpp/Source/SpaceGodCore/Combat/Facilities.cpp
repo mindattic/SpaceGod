@@ -28,9 +28,6 @@ namespace SpaceGod::Core
 		{
 			return cs::New<FacilitySite>(kind, name, z, y, link, berths);
 		}
-
-		// The key an OrdinalIgnoreCase dictionary or set files a facility id under.
-		cs::String Key(const cs::String& id) { return cs::Strings::ToLowerInvariant(id); }
 	}
 
 	// ---------------------------------------------------------------- FacilityKind
@@ -193,10 +190,10 @@ namespace SpaceGod::Core
 		return value;
 	}
 
-	cs::Dictionary<cs::String, cs::Ref<FacilityKind>>& FacilityKinds::ById()
+	cs::Dictionary<cs::String, cs::Ref<FacilityKind>, cs::OrdinalIgnoreCaseComparer>& FacilityKinds::ById()
 	{
 		RunClassConstructor();
-		static cs::Dictionary<cs::String, cs::Ref<FacilityKind>> value;
+		static cs::Dictionary<cs::String, cs::Ref<FacilityKind>, cs::OrdinalIgnoreCaseComparer> value;
 		return value;
 	}
 
@@ -236,8 +233,8 @@ namespace SpaceGod::Core
 	{
 		if (kind == nullptr) throw cs::ArgumentNullException("kind");
 		cs::Ref<FacilityKind> old;
-		if (ById().TryGetValue(Key(kind->Id), old)) All().Remove(old);
-		ById()[Key(kind->Id)] = kind;
+		if (ById().TryGetValue(kind->Id, old)) All().Remove(old);
+		ById()[kind->Id] = kind;
 		All().Add(kind);
 	}
 
@@ -247,9 +244,9 @@ namespace SpaceGod::Core
 	{
 		if (id.empty()) return nullptr; // C# null (and "", which no kind has)
 		cs::Ref<FacilityKind> k;
-		if (ById().TryGetValue(Key(id), k)) return k;
+		if (ById().TryGetValue(id, k)) return k;
 		// A hull saved before the Assault Bay became the Breacher bay (U.SPC-T521) still names it by its old id.
-		return cs::Strings::EqualsOrdinalIgnoreCase(id, OldBreacherBayId) && ById().TryGetValue(Key(BreacherBay), k) ? k : nullptr;
+		return cs::Strings::EqualsOrdinalIgnoreCase(id, OldBreacherBayId) && ById().TryGetValue(BreacherBay, k) ? k : nullptr;
 	}
 
 	cs::Ref<FacilityKind> FacilityKinds::ForModule(ModuleKind module)
@@ -504,13 +501,13 @@ namespace SpaceGod::Core
 
 	void FacilityLayouts::Register(ShipClass c, const cs::List<cs::Ref<FacilitySite>>& layout) { ByClass()[c] = layout; }
 
-	cs::Dictionary<ShipClass, cs::HashSet<cs::String>>& FacilityLayouts::Barred()
+	cs::Dictionary<ShipClass, cs::HashSet<cs::String, cs::OrdinalIgnoreCaseComparer>>& FacilityLayouts::Barred()
 	{
-		static cs::Dictionary<ShipClass, cs::HashSet<cs::String>> value = []
+		static cs::Dictionary<ShipClass, cs::HashSet<cs::String, cs::OrdinalIgnoreCaseComparer>> value = []
 		{
-			cs::Dictionary<ShipClass, cs::HashSet<cs::String>> d;
+			cs::Dictionary<ShipClass, cs::HashSet<cs::String, cs::OrdinalIgnoreCaseComparer>> d;
 			// Every kilogram of a truss freighter goes to cargo: no plate, and no racks, since its pods are its hold (U.SPC-T482).
-			d[ShipClass::Freighter] = cs::HashSet<cs::String> { Key(FacilityKinds::ArmourPlating), Key(FacilityKinds::CargoRacks) };
+			d[ShipClass::Freighter] = cs::HashSet<cs::String, cs::OrdinalIgnoreCaseComparer> { FacilityKinds::ArmourPlating, FacilityKinds::CargoRacks };
 			return d;
 		}();
 		return value;
@@ -519,16 +516,16 @@ namespace SpaceGod::Core
 	void FacilityLayouts::Bar(ShipClass c, const cs::String& kind, bool barred)
 	{
 		auto& all = Barred();
-		if (!all.ContainsKey(c)) all[c] = cs::HashSet<cs::String>();
+		if (!all.ContainsKey(c)) all[c] = cs::HashSet<cs::String, cs::OrdinalIgnoreCaseComparer>();
 		auto& set = all.At(c);
-		if (barred) set.Add(Key(kind));
-		else set.Remove(Key(kind));
+		if (barred) set.Add(kind);
+		else set.Remove(kind);
 	}
 
 	bool FacilityLayouts::Bars(ShipClass c, const cs::String& kind)
 	{
 		auto& all = Barred();
-		return !kind.empty() && all.ContainsKey(c) && all.At(c).Contains(Key(kind));
+		return !kind.empty() && all.ContainsKey(c) && all.At(c).Contains(kind);
 	}
 
 	double FacilityLayouts::SpareSpace(ShipClass c)

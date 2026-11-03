@@ -15,11 +15,6 @@ namespace SpaceGod::Core
 	using cs::Math::Max;
 	using cs::Math::Min;
 
-	namespace
-	{
-		int CompareInt(int a, int b) { return a < b ? -1 : (a > b ? 1 : 0); }
-	}
-
 	const char* ToString(FighterRole v)
 	{
 		switch (v)
@@ -464,8 +459,8 @@ namespace SpaceGod::Core
 			if (!s->Destroyed() && SpecOf(s->Kind()) != nullptr) list.Add(s);
 		list.Sort([](const cs::Ref<Subsystem>& a, const cs::Ref<Subsystem>& b)
 		{
-			int p = CompareInt(SpecOf(b->Kind())->Priority, SpecOf(a->Kind())->Priority);
-			return p != 0 ? p : CompareInt(a->Index, b->Index);
+			int p = cs::CompareTo(SpecOf(b->Kind())->Priority, SpecOf(a->Kind())->Priority);
+			return p != 0 ? p : cs::CompareTo(a->Index, b->Index);
 		});
 		return list;
 	}

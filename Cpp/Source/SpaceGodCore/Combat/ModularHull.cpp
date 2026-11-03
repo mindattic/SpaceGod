@@ -220,10 +220,10 @@ namespace SpaceGod::Core
 	{
 		auto reach = Reachable();
 		cs::List<cs::Ref<HullFragment>> pieces;
-		std::vector<bool> seen(static_cast<size_t>(Modules.Count()));
+		cs::List<bool> seen(std::vector<bool>(static_cast<size_t>(Modules.Count()))); // new bool[Modules.Count]
 		for (const auto& m : Modules)
 		{
-			if (reach[static_cast<size_t>(m->Id)] || m->Detached || seen[static_cast<size_t>(m->Id)]) continue;
+			if (reach[m->Id] || m->Detached || seen[m->Id]) continue;
 			auto piece = Gather(m->Id, seen, /*includeDetached:*/ false);
 			for (int id : piece->Modules) Modules[id]->Detached = true;
 			pieces.Add(piece);
@@ -253,12 +253,12 @@ namespace SpaceGod::Core
 		Separate();
 
 		cs::List<cs::Ref<HullFragment>> pieces;
-		std::vector<bool> seen(static_cast<size_t>(Modules.Count()));
+		cs::List<bool> seen(std::vector<bool>(static_cast<size_t>(Modules.Count()))); // new bool[Modules.Count]
 		auto hulk = Gather(Root, seen, /*includeDetached:*/ true);
 		hulk->Hulk = true;
 		pieces.Add(hulk);
 		for (const auto& m : Modules)
-			if (!seen[static_cast<size_t>(m->Id)]) pieces.Add(Gather(m->Id, seen, /*includeDetached:*/ true));
+			if (!seen[m->Id]) pieces.Add(Gather(m->Id, seen, /*includeDetached:*/ true));
 		return pieces;
 	}
 
@@ -277,11 +277,11 @@ namespace SpaceGod::Core
 		return true;
 	}
 
-	std::vector<bool> ModularHull::Reachable() const
+	cs::List<bool> ModularHull::Reachable() const
 	{
-		std::vector<bool> reach(static_cast<size_t>(Modules.Count()));
+		cs::List<bool> reach(std::vector<bool>(static_cast<size_t>(Modules.Count()))); // new bool[Modules.Count]
 		cs::Queue<int> queue;
-		reach[static_cast<size_t>(Root)] = true;
+		reach[Root] = true;
 		queue.Enqueue(Root);
 		while (queue.Count() > 0)
 		{
@@ -291,20 +291,20 @@ namespace SpaceGod::Core
 			{
 				if (j->Broken() || !j->Joins(at)) continue;
 				int next = j->Other(at);
-				if (reach[static_cast<size_t>(next)]) continue;
-				reach[static_cast<size_t>(next)] = true;
+				if (reach[next]) continue;
+				reach[next] = true;
 				queue.Enqueue(next);
 			}
 		}
 		return reach;
 	}
 
-	cs::Ref<HullFragment> ModularHull::Gather(int start, std::vector<bool>& seen, bool includeDetached) const
+	cs::Ref<HullFragment> ModularHull::Gather(int start, cs::List<bool>& seen, bool includeDetached) const
 	{
 		auto f = cs::New<HullFragment>();
 		f->Shattered = true;
 		cs::Queue<int> queue;
-		seen[static_cast<size_t>(start)] = true;
+		seen[start] = true;
 		queue.Enqueue(start);
 		DVec3 weighted = DVec3::Zero;
 		while (queue.Count() > 0)
@@ -322,8 +322,8 @@ namespace SpaceGod::Core
 			{
 				if (j->Broken() || !j->Joins(at)) continue;
 				int next = j->Other(at);
-				if (seen[static_cast<size_t>(next)] || (!includeDetached && Modules[next]->Detached)) continue;
-				seen[static_cast<size_t>(next)] = true;
+				if (seen[next] || (!includeDetached && Modules[next]->Detached)) continue;
+				seen[next] = true;
 				queue.Enqueue(next);
 			}
 		}

@@ -15,22 +15,6 @@
 
 namespace SpaceGod::Core
 {
-	namespace
-	{
-		// C#'s double.CompareTo: NaN sorts below everything (and equal to itself). Cs.h has no CompareTo.
-		int CompareTo(double a, double b)
-		{
-			if (a < b) return -1;
-			if (a > b) return 1;
-			if (a == b) return 0;
-			if (cs::Double::IsNaN(a)) return cs::Double::IsNaN(b) ? 0 : -1;
-			return 1;
-		}
-
-		// C#'s int.CompareTo.
-		int CompareTo(int a, int b) { return a < b ? -1 : (a > b ? 1 : 0); }
-	}
-
 	const char* ToString(BatteryOrder v)
 	{
 		switch (v)
@@ -503,8 +487,8 @@ namespace SpaceGod::Core
 		}
 		list.Sort([](const cs::Ref<BattleUnit>& a, const cs::Ref<BattleUnit>& c)
 		{
-			int h = CompareTo(c->Combat->Spec->Hull, a->Combat->Spec->Hull);
-			return h != 0 ? h : CompareTo(a->Id, c->Id);
+			int h = cs::CompareTo(c->Combat->Spec->Hull, a->Combat->Spec->Hull);
+			return h != 0 ? h : cs::CompareTo(a->Id, c->Id);
 		});
 		return list;
 	}

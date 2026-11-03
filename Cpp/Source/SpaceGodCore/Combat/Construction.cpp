@@ -151,9 +151,9 @@ namespace SpaceGod::Core
 		return all;
 	}
 
-	cs::Dictionary<cs::String, cs::Ref<HullFrame>>& HullFrames::ById()
+	cs::Dictionary<cs::String, cs::Ref<HullFrame>, cs::OrdinalIgnoreCaseComparer>& HullFrames::ById()
 	{
-		static cs::Dictionary<cs::String, cs::Ref<HullFrame>> byId;
+		static cs::Dictionary<cs::String, cs::Ref<HullFrame>, cs::OrdinalIgnoreCaseComparer> byId;
 		return byId;
 	}
 
@@ -189,10 +189,9 @@ namespace SpaceGod::Core
 	{
 		StaticConstructor();
 		if (frame == nullptr) throw cs::ArgumentNullException("frame");
-		auto key = cs::Strings::ToUpperInvariant(frame->Id);
 		cs::Ref<HullFrame> old;
-		if (ById().TryGetValue(key, old)) All().Remove(old);
-		ById()[key] = frame;
+		if (ById().TryGetValue(frame->Id, old)) All().Remove(old);
+		ById()[frame->Id] = frame;
 		All().Add(frame);
 	}
 
@@ -206,7 +205,7 @@ namespace SpaceGod::Core
 	{
 		StaticConstructor();
 		cs::Ref<HullFrame> f;
-		return ById().TryGetValue(cs::Strings::ToUpperInvariant(id), f) ? f : nullptr;
+		return ById().TryGetValue(id, f) ? f : nullptr;
 	}
 
 	cs::List<cs::Ref<HullFrame>> HullFrames::InCategory(HullCategory c)
@@ -448,7 +447,7 @@ namespace SpaceGod::Core
 				bill[g] = t + sign * part->Tonnes(i, scale);
 			}
 		auto goods = bill.Keys();
-		for (auto g : goods) if (bill[g] < 0) bill[g] = 0;
+		for (auto g : goods) if (bill.At(g) < 0) bill[g] = 0;
 		return bill;
 	}
 

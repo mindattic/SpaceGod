@@ -167,8 +167,8 @@ namespace SpaceGod::Core
 	class HullFrames final
 	{
 		static cs::List<cs::Ref<HullFrame>>& All();
-		// StringComparer.OrdinalIgnoreCase: keyed by the id upper-cased (cs::Dictionary takes no comparer), never enumerated.
-		static cs::Dictionary<cs::String, cs::Ref<HullFrame>>& ById();
+		// new Dictionary<string, HullFrame>(StringComparer.OrdinalIgnoreCase)
+		static cs::Dictionary<cs::String, cs::Ref<HullFrame>, cs::OrdinalIgnoreCaseComparer>& ById();
 
 		/// The C# static constructor: run once, before any static member is used (each entry point calls it).
 		static void StaticConstructor();

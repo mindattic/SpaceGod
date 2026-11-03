@@ -164,9 +164,8 @@ namespace SpaceGod::Core
 	{
 		static cs::List<cs::Ref<FacilityKind>>& All();
 
-		/// <remarks>C#'s Dictionary(StringComparer.OrdinalIgnoreCase): cs::Dictionary takes no comparer, so keys are stored
-		/// and looked up lower-cased (Strings::ToLowerInvariant), which is the same for these ASCII ids.</remarks>
-		static cs::Dictionary<cs::String, cs::Ref<FacilityKind>>& ById();
+		/// <remarks>C#'s Dictionary(StringComparer.OrdinalIgnoreCase).</remarks>
+		static cs::Dictionary<cs::String, cs::Ref<FacilityKind>, cs::OrdinalIgnoreCaseComparer>& ById();
 
 	public:
 		/// <summary>C# runs the static constructor before the first use of any static member: every static field accessor
@@ -347,8 +346,8 @@ namespace SpaceGod::Core
 		static void Register(ShipClass c, const cs::List<cs::Ref<FacilitySite>>& layout);
 
 	private:
-		/// <remarks>C#'s HashSet(StringComparer.OrdinalIgnoreCase): kinds are stored and looked up lower-cased.</remarks>
-		static cs::Dictionary<ShipClass, cs::HashSet<cs::String>>& Barred();
+		/// <remarks>C#'s HashSet(StringComparer.OrdinalIgnoreCase).</remarks>
+		static cs::Dictionary<ShipClass, cs::HashSet<cs::String, cs::OrdinalIgnoreCaseComparer>>& Barred();
 
 	public:
 		/// <summary>Bars (or, with <paramref name="barred"/> false, allows again) a facility kind on every hull of a class.</summary>
