@@ -85,6 +85,12 @@ default member initialisers in the same order (C# runs them before the construct
 - A class that passes `this` as a C# reference (`Foo(this)`) → inherit `std::enable_shared_from_this<T>` and pass `shared_from_this()`.
 - `[SettingsSource]` and other attribute-reflection discovery → explicit registration; list what the integration ticket must call.
 
+**Evaluation order (parity-critical).** C# evaluates operands and call arguments strictly left to right;
+C++ does not (argument order is unspecified, `a() + b()` may run `b` first). Wherever two or more operands or
+arguments of one expression have side effects — above all `rng.Next…()` draws, but also counters, queue
+pops, list adds — hoist them into locals in C#'s left-to-right order first:
+`double x = rng.NextDouble(); double y = rng.NextDouble(); DVec3(x, y, …)`.
+
 **Don't compile in the porting waves** (memory is shared by many agents): write the files faithfully, then
 the integration ticket compiles all of SpaceGodCore and fixes the seams. If a referenced C# member's shape is
 ambiguous, read its declaration in Unity.SpaceGod and apply the table above; if still unclear, note it on
