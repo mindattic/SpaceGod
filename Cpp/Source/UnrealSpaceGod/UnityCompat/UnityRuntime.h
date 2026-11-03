@@ -19,6 +19,8 @@ namespace SpaceGod::UnityCompat
 		static inline float time = 0;
 		static inline double realtimeSinceStartupAsDouble = 0;
 		static inline int frameCount = 0;
+		/// Time.timeScale: the pause menu sets 0 and puts it back (US-T31); deltaTime should scale by it.
+		static inline float timeScale = 1;
 	};
 
 	/// UnityEngine.Screen: the viewport size in pixels, written by the host actor.
