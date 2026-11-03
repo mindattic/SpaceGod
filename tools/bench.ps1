@@ -13,6 +13,8 @@
 param(
     [string[]] $Scenario,
     [ValidateSet('CSharp', 'Cpp', 'Both')] [string] $Track = 'CSharp',
+    # Bench.CSharp's runtime: net10.0 is what the C# game track runs (UnrealSharp, UE 5.8); net8.0 for comparison.
+    [ValidateSet('net10.0', 'net8.0')] [string] $DotNet = 'net10.0',
     [int] $Ticks = 0,
     [switch] $NoBuild,
     # Only compare the results already on disk (both tracks), running nothing.
@@ -44,7 +46,7 @@ if ($Track -in 'CSharp', 'Both' -and -not $Compare) {
         & dotnet build $proj -c Release -nologo -v q
         if ($LASTEXITCODE -ne 0) { throw "Bench.CSharp build failed" }
     }
-    Invoke-Runner (Join-Path $bench 'CSharp\bin\Release\net8.0\Bench.CSharp.exe') 'C#'
+    Invoke-Runner (Join-Path $bench "CSharp\bin\Release\$DotNet\Bench.CSharp.exe") 'C#'
 }
 
 # ---------------------------------------------------------------- C++ side (Bench.Cpp over Cpp/Source/SpaceGodCore)

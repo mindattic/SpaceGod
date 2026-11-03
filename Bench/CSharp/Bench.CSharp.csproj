@@ -3,7 +3,8 @@
        the Unity.SpaceGod checkout in place through Lib/; nothing of it is copied into this repo. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <!-- net10.0 is what the C# game track runs (UnrealSharp on UE 5.8); net8.0 kept for comparison (tools/bench.ps1 -DotNet). -->
+    <TargetFrameworks>net10.0;net8.0</TargetFrameworks>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
