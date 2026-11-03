@@ -7,21 +7,6 @@
 
 namespace SpaceGod::Core
 {
-	namespace
-	{
-		// .NET double.CompareTo: NaN sorts below everything, equal to itself (Cs.h has no CompareTo).
-		int CompareTo(double a, double b)
-		{
-			if (a < b) return -1;
-			if (a > b) return 1;
-			if (a == b) return 0;
-			if (cs::Double::IsNaN(a)) return cs::Double::IsNaN(b) ? 0 : -1;
-			return 1;
-		}
-
-		int CompareTo(int a, int b) { return a < b ? -1 : (a > b ? 1 : 0); }
-	}
-
 	bool PrizeSettlement::SoldToBreakers() const { return Keeper == nullptr; }
 
 	cs::Ref<PrizeClaim> PrizeSettlement::Of(const cs::Ref<Faction>& f) const
@@ -68,8 +53,8 @@ namespace SpaceGod::Core
 		// The hull is offered largest claim first; the first aboard breaks a tie.
 		order.Sort([&](const cs::Ref<BoardingParty>& a, const cs::Ref<BoardingParty>& b)
 		{
-			int byStrength = CompareTo(deal->Of(b->Faction)->Share, deal->Of(a->Faction)->Share);
-			return byStrength != 0 ? byStrength : CompareTo(a->Order, b->Order);
+			int byStrength = cs::Compare(deal->Of(b->Faction)->Share, deal->Of(a->Faction)->Share);
+			return byStrength != 0 ? byStrength : cs::Compare(a->Order, b->Order);
 		});
 		if (parties.Count() == 1)
 		{

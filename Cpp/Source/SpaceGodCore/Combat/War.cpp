@@ -53,19 +53,6 @@
 
 namespace SpaceGod::Core
 {
-	namespace
-	{
-		// .NET double.CompareTo: NaN sorts below everything, equal to itself (Cs.h has no CompareTo).
-		int CompareTo(double a, double b)
-		{
-			if (a < b) return -1;
-			if (a > b) return 1;
-			if (a == b) return 0;
-			if (cs::Double::IsNaN(a)) return cs::Double::IsNaN(b) ? 0 : -1;
-			return 1;
-		}
-	}
-
 	const char* ToString(OrderKind v)
 	{
 		switch (v)
@@ -1861,5 +1848,1720 @@ namespace SpaceGod::Core
 		Orders.Remove(dead);
 		PriorOrders.Remove(dead);
 		if (!keepHunter && world->Outlaws != nullptr) world->Outlaws->OnSuccession(dead, heir);
+	}
+
+	// ---------------------------------------------------------------- orders
+
+	namespace
+	{
+		// C#'s `new GroupOrder { Kind = k, Body = body }`.
+		cs::Ref<GroupOrder> Order(OrderKind kind, int body)
+		{
+			auto o = cs::New<GroupOrder>();
+			o->Kind = kind;
+			o->Body = body;
+			return o;
+		}
+	}
+
+	int War::ChooseNext(const cs::Ref<Ship>& leader, int here, double jd)
+	{
+		// Bounty hunters go where their contracts take them (U.SPC-T62).
+		if (Hunter(leader)) return world->Outlaws->ChooseNext(leader, here, jd);
+		// A navy's supply convoy is led by a freighter but takes its orders from the navy (U.SPC-T375).
+		if (!leader->Spec->IsMilitary && !leader->Faction->IsPirate && !leader->Convoy) return -1;
+		auto order = Decide(leader, here, jd);
+		cs::Ref<GroupOrder> current;
+		if (!Orders.TryGetValue(leader, current) || current->Kind != order->Kind || current->Body != order->Body)
+		{
+			if (current != nullptr) PriorOrders[leader] = current;
+			order->SinceJd = jd;
+			Orders[leader] = order;
+		}
+		return order->Body;
+	}
+
+	double War::Dwell(const cs::Ref<Ship>& ship, double normal)
+	{
+		double until = 0;
+		if (retreating.TryGetValue(ship, until) && lastJd < until) return 0.05;
+		cs::Ref<GroupOrder> o;
+		if (!Orders.TryGetValue(ship, o)) return normal;
+		switch (o->Kind)
+		{
+		case OrderKind::Repair:
+		case OrderKind::Siege:
+		case OrderKind::Assault:
+		case OrderKind::Defend: return 1.0;
+		case OrderKind::Raid: return 1.5 + rng.NextDouble();
+		case OrderKind::GateWatch:
+		case OrderKind::HoldGate: return 0.5;
+		case OrderKind::Blockade: return 1.0;
+		case OrderKind::Escort: return 0.1;
+		case OrderKind::Explore: return 0.3;
+		default: return normal;
+		}
+	}
+
+	cs::Ref<GroupOrder> War::Decide(const cs::Ref<Ship>& leader, int here, double jd)
+	{
+		auto f = leader->Faction;
+		double until = 0;
+		bool withdrawing = retreating.TryGetValue(leader, until) && jd < until;
+		if (f->IsPirate) return DecidePirate(leader, here, jd, withdrawing);
+		// A fresh plan: a lane picket planned earlier and not yet reached no longer stands (U.SPC-T479).
+		leader->LurkLane = nullptr;
+		if (leader->PicketGate != nullptr) return DecidePicket(leader, here, jd, withdrawing);
+		if (Corvettes::Stationed(leader)) return DecideCorvette(leader, here, jd, withdrawing);
+		if (leader->PatrolWing) return DecideWing(leader, here, jd, withdrawing);
+		// A fresh plan: a gate it was holding is held again only if it is still the order (U.SPC-T374).
+		auto held = leader->StakeoutKm;
+		leader->StakeoutKm = std::nullopt;
+
+		if (withdrawing || GroupDamage(leader) > 0.22 || MissilesLow(leader) || !leader->Combat->Armed() || HangarsLow(leader) || MarinesLow(leader))
+		{
+			int yard = NearestYard(f, here, jd);
+			if (yard >= 0) return Order(OrderKind::Repair, yard);
+		}
+
+		// Its polity's command has given it an objective (U.SPC-T423): that comes before its own plans.
+		if (auto directed = Directed(leader, here, jd)) return directed;
+
+		// Defend: an own port with enemies at it.
+		int threatened = -1;
+		double bestDays = cs::Double::MaxValue;
+		for (const auto& s : Economy()->Settlements)
+		{
+			if (s->Owner != f) continue;
+			if (!EnemiesAt(s->Body, f)) continue;
+			double days = s->Body == here ? 0 : Fleet()->EstimateTravelDays(leader, here, s->Body, jd);
+			if (days < bestDays && days < 40)
+			{
+				bestDays = days;
+				threatened = s->Body;
+			}
+		}
+		if (threatened >= 0) return Order(OrderKind::Defend, threatened);
+
+		// A gate picket has warned of hostiles come in at one of its own gates (U.SPC-T480): command sends a group
+		// strong enough to meet them there while they are still at the gate, before they are loose in the system.
+		if (!IsHomeGuard(leader) && GateWarned(leader, here, jd, held) != nullptr)
+			return Order(OrderKind::HoldGate, Catalog()->Root()->Index);
+
+		// At a haven it found, with the garrison broken: stay and finish the job.
+		for (const auto& s : Economy()->At(here))
+			if (Assailable(s, f) && s->Platforms.Count() == 0)
+				return Order(OrderKind::Assault, here);
+
+		// Besieging: stay until the port falls or defenders show up.
+		for (const auto& s : Economy()->At(here))
+			if (Diplomacy()->Hostile(f, s->Owner) && !s->Owner->IsPirate && s->Platforms.Count() == 0 && s->DaysSinceCapture > CaptureGraceDays && AtWar(f))
+				return Order(OrderKind::Siege, here);
+
+		bool atWar = AtWar(f);
+		// Cut the enemy's lanes (U.SPC-T481): fall on a lane tender of a power it is at war with, if one is in reach.
+		if (atWar && !IsHomeGuard(leader) && world->LaneUpkeep != nullptr)
+		{
+			int tender = world->LaneUpkeep->HuntTarget(leader, here, jd);
+			if (tender >= 0) return Order(OrderKind::Hunt, tender);
+		}
+		if (atWar && !IsHomeGuard(leader))
+		{
+			double strength = GroupStrength(leader);
+			int target = -1;
+			double best = 0;
+			for (const auto& s : Economy()->Settlements)
+			{
+				if (!Diplomacy()->Hostile(f, s->Owner) || s->Owner->IsPirate) continue;
+				double defence = DefenceAt(s->Body, f);
+				if (strength < defence * 1.25) continue;
+				double days = Fleet()->EstimateTravelDays(leader, here, s->Body, jd);
+				double value = (s->Population / 1e5 + 2) * (s->HasShipyard() ? 2 : 1) / (defence + 200) / (days + 5);
+				if (value > best)
+				{
+					best = value;
+					target = s->Body;
+				}
+			}
+			if (target >= 0) return Order(OrderKind::Attack, target);
+		}
+
+		// Hunt pirates working an own port -- that its ships or stations have seen there (U.SPC-T66).
+		auto at = world->Sensors != nullptr ? world->Sensors->HelioOf(leader, jd) : DVec3();
+		for (const auto& s : Economy()->Settlements)
+			if (s->Owner == f && s->Body != here && PiratesSeenAt(s->Body, f, at, jd))
+				return Order(OrderKind::Hunt, s->Body);
+
+		// Hold one of its own jump gates that raiders are known to be lying off (U.SPC-T374): command sends a group
+		// strong enough to clear them, which takes station on the gate's approach and fights them there.
+		if (!IsHomeGuard(leader) && GateToHold(leader, here, at, jd, held) != nullptr)
+			return Order(OrderKind::HoldGate, Catalog()->Root()->Index);
+
+		// Strike a hidden haven this navy has found, if the group can take its garrison.
+		if (!IsHomeGuard(leader))
+			if (auto mark = AssaultTarget(leader, here, jd))
+				return Order(OrderKind::Assault, mark->Body);
+
+		// A group with a field projector fitted to one of its hulls may hold a picket on a troubled lane out of the system (U.SPC-T479, U.SPC-T507).
+		if (!IsHomeGuard(leader))
+			if (auto picket = LanePicket(leader, here, PatrolWings::Ports(world, f), false)) return picket;
+
+		return Order(OrderKind::Patrol, NextPatrol(leader, here));
+	}
+
+	cs::Ref<GroupOrder> War::Directed(const cs::Ref<Ship>& leader, int here, double jd)
+	{
+		auto command = world->Polities != nullptr ? world->Polities->Command : nullptr;
+		auto o = command != nullptr ? command->ObjectiveOf(leader) : nullptr;
+		if (o == nullptr) return nullptr;
+		auto f = leader->Faction;
+		if (o->Where != world) return Order(OrderKind::Patrol, here);
+		switch (o->Kind)
+		{
+		case ObjectiveKind::Take:
+		{
+			cs::Ref<Settlement> target = nullptr;
+			double bestDays = cs::Double::MaxValue;
+			for (const auto& s : Economy()->Settlements)
+			{
+				if (!command->Enemy(f, s) || (o->Body >= 0 ? s->Body != o->Body : s->Kind == SettlementKind::Haven)) continue;
+				double days = s->Body == here ? 0 : Fleet()->EstimateTravelDays(leader, here, s->Body, jd);
+				if (days < bestDays)
+				{
+					bestDays = days;
+					target = s;
+				}
+			}
+			if (target == nullptr)
+			{
+				// Nothing left there held by an enemy: taken (or the war is over and it was given back); it holds the place.
+				int held = o->Body;
+				if (held < 0)
+					for (const auto& s : Economy()->Settlements)
+						if (s->Owner == f && !s->Fallen && (held < 0 || s->Population > PopulationAt(held, f))) held = s->Body;
+				if (held < 0 || !OwnsAt(held, f))
+				{
+					// Not taken by it: the war that made it an enemy's is over.
+					command->Complete(leader, world, jd, cs::Cat("The ", leader->Name, "'s group stands down: nothing there is an enemy's to take now"));
+					return nullptr;
+				}
+				command->Taken(leader, world, held, jd);
+				return Order(OrderKind::Defend, command->ObjectiveOf(leader)->Body);
+			}
+			if (target->Kind == SettlementKind::Haven) return Order(OrderKind::Assault, target->Body);
+			if (target->Body == here && target->Platforms.Count() == 0 && target->DaysSinceCapture > CaptureGraceDays)
+				return Order(OrderKind::Siege, here);
+			return Order(OrderKind::Attack, target->Body);
+		}
+		case ObjectiveKind::Hold:
+			return Order(OrderKind::Defend, o->Body >= 0 ? o->Body : here);
+		case ObjectiveKind::Blockade:
+		{
+			for (const auto& s : Economy()->At(o->Body))
+				if (command->Blockadable(f, s)) return Order(OrderKind::Blockade, o->Body);
+			command->Complete(leader, world, jd, cs::Cat("The ", leader->Name, "'s group lifts its blockade of ", (*Catalog())[o->Body]->Name, ": the port is no enemy's now"));
+			return nullptr;
+		}
+		case ObjectiveKind::Escort:
+		{
+			auto charge = o->Charge != nullptr ? o->Charge->Controller() : nullptr;
+			if (charge == nullptr || charge->Destroyed || !Fleet()->IsPresent(charge)) return Order(OrderKind::Patrol, here);
+			int bound = BoundFor(charge);
+			return Order(OrderKind::Escort, bound >= 0 ? bound : here);
+		}
+		case ObjectiveKind::Explore:
+		{
+			auto worlds = cs::List<int>();
+			if (o->Body >= 0) worlds.Add(o->Body);
+			else
+			{
+				for (int b : world->FreeShipPorts())
+					if (!worlds.Contains(b)) worlds.Add(b);
+				for (const auto& s : Economy()->Settlements)
+					if (!worlds.Contains(s->Body)) worlds.Add(s->Body);
+			}
+			if (worlds.Contains(here) && !o->Visited.Contains(here)) o->Visited.Add(here);
+			int next = -1;
+			double nearest = cs::Double::MaxValue;
+			auto from = world->Ephemeris->HelioAt(here, jd);
+			for (int b : worlds)
+			{
+				if (o->Visited.Contains(b)) continue;
+				double d = (world->Ephemeris->HelioAt(b, jd) - from).Length();
+				if (d < nearest)
+				{
+					nearest = d;
+					next = b;
+				}
+			}
+			if (next < 0)
+			{
+				command->Complete(leader, world, jd, cs::Cat("The ", leader->Name, "'s group has explored every world it was sent to (", o->Visited.Count(), ") and stands down"));
+				return nullptr;
+			}
+			return Order(OrderKind::Explore, next);
+		}
+		}
+		return nullptr;
+	}
+
+	bool War::OwnsAt(int body, const cs::Ref<Faction>& f)
+	{
+		for (const auto& s : Economy()->At(body))
+			if (s->Owner == f && !s->Fallen) return true;
+		return false;
+	}
+
+	double War::PopulationAt(int body, const cs::Ref<Faction>& f)
+	{
+		double p = 0;
+		for (const auto& s : Economy()->At(body))
+			if (s->Owner == f && !s->Fallen) p += s->Population;
+		return p;
+	}
+
+	int War::BoundFor(const cs::Ref<Ship>& c)
+	{
+		if (c->Battle != nullptr) return c->Battle->Body;
+		if (c->Phase == ShipPhase::Transit || c->Phase == ShipPhase::Lane || c->Phase == ShipPhase::Lurk || c->Phase == ShipPhase::Adrift)
+			// (C#'s `c.Journey != null`: a C++ journey is never null, so an empty one counts as none.)
+			return c->FinalBody >= 0 && c->Journey.Count() > 0 ? c->FinalBody : c->DestinationBody;
+		if ((c->Phase == ShipPhase::Queued || c->Planetside()) && c->Ring != nullptr) return c->Ring->Body;
+		return c->Orbit != nullptr ? c->Orbit->Body : -1;
+	}
+
+	cs::Ref<JumpGate> War::GateToHold(const cs::Ref<Ship>& leader, int here, DVec3 at, double jd, cs::Nullable<DVec3> held)
+	{
+		auto f = leader->Faction;
+		int root = Catalog()->Root()->Index;
+		if (held.has_value() && jd < leader->StakeoutUntilJd)
+		{
+			auto spot = *held;
+			auto holding = GateNear(spot);
+			if (holding != nullptr && holding->Owner == f)
+			{
+				leader->StakeoutKm = spot;
+				return holding;
+			}
+		}
+		if (world->Gates.Count() == 0) return nullptr;
+		double strength = GroupStrength(leader);
+		cs::Ref<JumpGate> best = nullptr;
+		double bestBand = 0;
+		for (const auto& g : world->Gates)
+		{
+			if (g->Owner != f) continue;
+			double band = RaidersOffGate(g, f, at, jd);
+			if (band <= 0 || strength < band * 1.25) continue;
+			if (band > bestBand)
+			{
+				bestBand = band;
+				best = g;
+			}
+		}
+		if (best == nullptr) return nullptr;
+		double days = here == root ? 0 : Fleet()->EstimateTravelDays(leader, here, root, jd);
+		if (days > 30) return nullptr;
+		StakeOut(leader, best, jd + days + HoldGateDays);
+		return best;
+	}
+
+	double War::WarnedOffGate(const cs::Ref<JumpGate>& gate, const cs::Ref<Faction>& f, double jd)
+	{
+		int root = Catalog()->Root()->Index;
+		double total = 0;
+		auto counted = cs::HashSet<cs::Ref<Ship>>();
+		for (const auto& w : PicketWarnings)
+		{
+			if (w->Gate != gate || w->Owner != f || jd - w->Jd > GatePickets::WarningDays || jd < w->Jd) continue;
+			auto s = w->Intruder != nullptr ? w->Intruder->Controller() : nullptr;
+			if (s == nullptr || s->Destroyed || !Fleet()->IsPresent(s) || !counted.Add(s) || !Diplomacy()->Hostile(f, s->Faction)) continue;
+			if (!Core::Fleet::IsAt(s, root) || s->Orbit == nullptr || (s->Orbit->OffsetAt(jd) - gate->PositionKm).Length() > GateFightRangeKm) continue;
+			if (s->Faction->IsPirate && s->StakeoutKm.has_value() && GateNear(*s->StakeoutKm) == gate) continue;
+			total += GroupStrength(s);
+		}
+		return total;
+	}
+
+	cs::Ref<JumpGate> War::GateWarned(const cs::Ref<Ship>& leader, int here, double jd, cs::Nullable<DVec3> held)
+	{
+		auto f = leader->Faction;
+		if (world->Gates.Count() == 0 || PicketWarnings.Count() == 0) return nullptr;
+		double strength = GroupStrength(leader);
+		cs::Ref<JumpGate> best = nullptr;
+		double bestThreat = 0;
+		for (const auto& g : world->Gates)
+		{
+			if (g->Owner != f) continue;
+			double threat = WarnedOffGate(g, f, jd);
+			if (threat <= 0) continue;
+			double forts = 0;
+			for (const auto& fort : g->Forts) forts += fort->Strength();
+			if (strength + forts < threat * 1.25) continue;
+			if (threat > bestThreat)
+			{
+				bestThreat = threat;
+				best = g;
+			}
+		}
+		if (best == nullptr) return nullptr;
+		int root = Catalog()->Root()->Index;
+		if (held.has_value() && GateNear(*held) == best)
+		{
+			leader->StakeoutKm = *held;
+			leader->StakeoutUntilJd = cs::Math::Max(leader->StakeoutUntilJd, jd + HoldGateDays);
+			return best;
+		}
+		double days = here == root ? 0 : Fleet()->EstimateTravelDays(leader, here, root, jd);
+		if (days > 30) return nullptr;
+		StakeOut(leader, best, jd + days + HoldGateDays);
+		return best;
+	}
+
+	cs::Ref<GroupOrder> War::DecidePicket(const cs::Ref<Ship>& leader, int here, double jd, bool withdrawing)
+	{
+		if (withdrawing || GroupDamage(leader) > GatePickets::RepairDamage)
+		{
+			int yard = NearestYard(leader->Faction, here, jd);
+			if (yard >= 0) return Order(OrderKind::Repair, yard);
+		}
+		return Order(OrderKind::Patrol, Catalog()->Root()->Index);
+	}
+
+	cs::Ref<GroupOrder> War::DecideCorvette(const cs::Ref<Ship>& leader, int here, double jd, bool withdrawing)
+	{
+		auto f = leader->Faction;
+		if (withdrawing || GroupDamage(leader) > Corvettes::RepairDamage || MissilesLow(leader) || !leader->Combat->Armed())
+		{
+			int yard = NearestYard(f, here, jd);
+			if (yard >= 0) return Order(OrderKind::Repair, yard);
+		}
+		// (C#'s `leader.Route ?? new[] { ... }`: a C++ route is never null, so an empty one counts as none.)
+		auto beat = leader->Route.Count() > 0 ? leader->Route : cs::List<int>{ leader->CorvetteStation };
+		int threatened = -1;
+		double bestDays = cs::Double::MaxValue;
+		for (int body : beat)
+		{
+			if (!EnemiesAt(body, f)) continue;
+			double days = body == here ? 0 : Fleet()->EstimateTravelDays(leader, here, body, jd);
+			if (days < bestDays)
+			{
+				bestDays = days;
+				threatened = body;
+			}
+		}
+		if (threatened >= 0) return Order(OrderKind::Defend, threatened);
+		// The pirates and smugglers working its ground, as its navy's picture has them: the nearest first.
+		auto at = world->Sensors != nullptr ? world->Sensors->HelioOf(leader, jd) : DVec3();
+		auto ground = cs::List<int>(beat);
+		for (const auto& s : Economy()->Settlements)
+			if (!ground.Contains(s->Body) && Corvettes::Polices(world, leader, s->Body)) ground.Add(s->Body);
+		int mark = -1;
+		bestDays = cs::Double::MaxValue;
+		for (int body : ground)
+		{
+			if (body == here || !PiratesSeenAt(body, f, at, jd)) continue;
+			double days = Fleet()->EstimateTravelDays(leader, here, body, jd);
+			if (days < bestDays)
+			{
+				bestDays = days;
+				mark = body;
+			}
+		}
+		if (mark >= 0) return Order(OrderKind::Hunt, mark);
+		return Order(OrderKind::Patrol, Corvettes::NextOnBeat(leader, here));
+	}
+
+	double War::RaidersOffGate(const cs::Ref<JumpGate>& gate, const cs::Ref<Faction>& f, DVec3 at, double jd)
+	{
+		int root = Catalog()->Root()->Index;
+		auto sensors = world->Sensors;
+		double total = 0;
+		for (const auto& s : Fleet()->Ships())
+		{
+			if (s->Destroyed || s->IsEscort() || s->Faction == nullptr || !s->Faction->IsPirate || s->Runner || !s->StakeoutKm.has_value()) continue;
+			if (!Diplomacy()->Hostile(f, s->Faction) || GateNear(*s->StakeoutKm) != gate) continue;
+			if (sensors != nullptr)
+			{
+				auto seen = sensors->KnownAt(f, s, at, jd);
+				if (!(seen.has_value() && seen->Body == root && seen->Level >= ContactLevel::Class)) continue;
+			}
+			total += GroupStrength(s);
+		}
+		return total;
+	}
+
+	cs::Ref<GroupOrder> War::DecideWing(const cs::Ref<Ship>& leader, int here, double jd, bool withdrawing)
+	{
+		auto f = leader->Faction;
+		// A supply convoy (U.SPC-T375) goes on round its run, to a yard when hurt: its stores, not the fighting, are its business.
+		if (leader->Convoy)
+		{
+			if (withdrawing || GroupDamage(leader) > 0.22)
+			{
+				int dock = NearestYard(f, here, jd);
+				if (dock >= 0) return Order(OrderKind::Repair, dock);
+			}
+			return Order(OrderKind::Patrol, PatrolWings::NextOnBeat(leader, here));
+		}
+		if (withdrawing || GroupDamage(leader) > 0.22 || MissilesLow(leader) || !leader->Combat->Armed())
+		{
+			int yard = NearestYard(f, here, jd);
+			if (yard >= 0) return Order(OrderKind::Repair, yard);
+		}
+		// A wing too can be given an objective by its polity's command, off its beat (U.SPC-T423).
+		if (auto directed = Directed(leader, here, jd)) return directed;
+		auto beat = leader->Route; // (C#'s `?? new int[0]`: a C++ route is never null.)
+		int threatened = -1;
+		double bestDays = cs::Double::MaxValue;
+		for (int body : beat)
+		{
+			if (!EnemiesAt(body, f)) continue;
+			double days = body == here ? 0 : Fleet()->EstimateTravelDays(leader, here, body, jd);
+			if (days < bestDays)
+			{
+				bestDays = days;
+				threatened = body;
+			}
+		}
+		if (threatened >= 0) return Order(OrderKind::Defend, threatened);
+		auto at = world->Sensors != nullptr ? world->Sensors->HelioOf(leader, jd) : DVec3();
+		for (int body : beat)
+			if (body != here && PiratesSeenAt(body, f, at, jd))
+				return Order(OrderKind::Hunt, body);
+		// A lane picket wing (U.SPC-T479) lies in wait now and then on a lane between the ports of its beat.
+		if (auto picket = LanePicket(leader, here, beat, true)) return picket;
+		return Order(OrderKind::Patrol, PatrolWings::NextOnBeat(leader, here));
+	}
+
+	cs::Ref<GroupOrder> War::LanePicket(const cs::Ref<Ship>& leader, int here, const cs::List<int>& ports, bool keepToPorts)
+	{
+		auto lanes = Fleet()->Lanes;
+		if (lanes == nullptr || !LaneInterdictors::Fielded(leader, Fleet()->Ships())) return nullptr;
+		if (rng.NextDouble() >= LaneInterdictors::PicketChance()->Value) return nullptr;
+		int system = lanes->SystemOf(here);
+		cs::Ref<Lane> best = nullptr;
+		int bound = -1;
+		double bestScore = 0;
+		for (const auto& lane : lanes->Lanes)
+		{
+			if (lane->A != system && lane->B != system) continue;
+			int far = lane->Other(system), to = -1;
+			// (C#'s `ports != null`: the list is passed by reference.)
+			for (int p : ports)
+				if (lanes->SystemOf(p) == far) { to = p; break; }
+			if (to < 0)
+			{
+				if (keepToPorts) continue;
+				to = far;
+			}
+			double danger = 0;
+			lanes->Danger.TryGetValue(lane, danger);
+			double score = (danger + 0.25) * (0.7 + rng.NextDouble() * 0.6);
+			if (score > bestScore)
+			{
+				bestScore = score;
+				best = lane;
+				bound = to;
+			}
+		}
+		if (best == nullptr) return nullptr;
+		leader->LurkLane = best;
+		leader->LurkAt = 0.3 + rng.NextDouble() * 0.4;
+		leader->LurkDays = 2 + rng.NextDouble() * 2;
+		return Order(OrderKind::Ambush, bound);
+	}
+
+	bool War::Commanded(const cs::Ref<Ship>& ship, int body)
+	{
+		if (ship == nullptr) return false;
+		auto leader = ship->Controller();
+		if (Hunter(leader)) return true;
+		// A band staked out off a gate is there to fall on what comes through (see GateAmbushes).
+		if (leader->StakeoutKm.has_value() && body == Catalog()->Root()->Index) return true;
+		for (const auto& st : Economy()->At(body))
+			if (st->Owner == leader->Faction && !st->Fallen) return true;
+		cs::Ref<GroupOrder> o;
+		bool ordered = Orders.TryGetValue(leader, o);
+		cs::Ref<GroupOrder> prior;
+		PriorOrders.TryGetValue(leader, prior);
+		// Never ordered anywhere yet: the old rule, for all but a wing.
+		if (!ordered) return !leader->PatrolWing || PatrolWings::OnBeat(leader, body);
+		if (Objective(o, body) || Objective(prior, body)) return true;
+		// On its beat a group patrols, and fights for it, unless it was sent away on other business (a wing always).
+		return PatrolWings::OnBeat(leader, body) && (leader->PatrolWing || o->Kind == OrderKind::Patrol || prior == nullptr || prior->Kind == OrderKind::Patrol);
+	}
+
+	bool War::Objective(const cs::Ref<GroupOrder>& o, int body)
+	{
+		return o != nullptr && o->Body == body && o->Kind != OrderKind::Patrol && o->Kind != OrderKind::Repair;
+	}
+
+	cs::Ref<GroupOrder> War::DecidePirate(const cs::Ref<Ship>& leader, int here, double jd, bool withdrawing)
+	{
+		// A fresh plan: an ambush planned earlier and not yet reached no longer stands.
+		leader->LurkLane = nullptr;
+		auto watch = leader->StakeoutKm;
+		leader->StakeoutKm = std::nullopt;
+		auto home = HomeHaven(leader);
+		// A group whose haven has been taken or destroyed is out of the game: it lies low where it is,
+		// no raids and no ambushes, until the haven is rebuilt.
+		if (home != nullptr && home->Fallen) return Order(OrderKind::Patrol, here);
+		if (!home)
+		{
+			home = LiveHavenOf(leader->Faction);
+			if (!home) home = FirstLiveHaven();
+		}
+		int haven = home != nullptr ? home->Body : -1;
+		if (withdrawing || GroupDamage(leader) > 0.3 || MissilesLow(leader) || !leader->Combat->Armed())
+			return Order(OrderKind::Repair, haven >= 0 ? haven : here);
+
+		// Home is under attack: back to defend it.
+		if (haven >= 0 && EnemiesAt(haven, leader->Faction) && (haven == here || Fleet()->EstimateTravelDays(leader, here, haven, jd) < 30))
+			return Order(OrderKind::Defend, haven);
+
+		// A hold full of plunder goes home to the haven's stores first (U.SPC-T94).
+		if (leader->PlunderTonnes() > 0 && home != nullptr && home->Owner == leader->Faction)
+		{
+			if (haven == here) UnloadPlunder(leader, here);
+			else return Order(OrderKind::Repair, haven);
+		}
+
+		// Lying in wait off a jump gate (U.SPC-T94): hold there till the watch is up; or, now and then, go and lie off
+		// the busiest gate, where traffic bunches up going in and coming out.
+		int root = Catalog()->Root()->Index;
+		if (watch.has_value() && jd < leader->StakeoutUntilJd)
+		{
+			leader->StakeoutKm = *watch;
+			return Order(OrderKind::GateWatch, root);
+		}
+		if (here != root && world->Gates.Count() > 0 && rng.NextDouble() < GateWatchChance)
+			if (auto gate = BusiestGate(leader->Faction, jd))
+			{
+				double days = Fleet()->EstimateTravelDays(leader, here, root, jd);
+				if (days < 30)
+				{
+					StakeOut(leader, gate, jd + days + 2 + rng.NextDouble() * 2);
+					return Order(OrderKind::GateWatch, root);
+				}
+			}
+
+		// Go after a lane tender in reach (U.SPC-T481): worth a fat purse to whoever wants the lanes cut.
+		if (world->LaneUpkeep != nullptr && world->LaneUpkeep->RaidersHunt())
+		{
+			int tender = world->LaneUpkeep->HuntTarget(leader, here, jd);
+			if (tender >= 0) return Order(OrderKind::Raid, tender);
+		}
+
+		// Lie in wait beside a busy hyperlane: only with an interdictor in the band to pull its marks out (U.SPC-T479).
+		auto lanes = Fleet()->Lanes;
+		if (lanes != nullptr && LaneInterdictors::Fielded(leader, Fleet()->Ships()) && rng.NextDouble() < 0.55)
+		{
+			int system = lanes->SystemOf(here);
+			auto lane = BusiestLane(system);
+			if (lane != nullptr)
+			{
+				if (lane->A == system || lane->B == system)
+				{
+					leader->LurkLane = lane;
+					leader->LurkAt = 0.3 + rng.NextDouble() * 0.4;
+					leader->LurkDays = 2.5 + rng.NextDouble() * 2;
+					return Order(OrderKind::Ambush, lane->Other(system));
+				}
+				double toA = (world->Ephemeris->HelioAt(lane->A, jd) - world->Ephemeris->HelioAt(here, jd)).Length();
+				double toB = (world->Ephemeris->HelioAt(lane->B, jd) - world->Ephemeris->HelioAt(here, jd)).Length();
+				return Order(OrderKind::Ambush, toA < toB ? lane->A : lane->B);
+			}
+		}
+
+		// Stay on a hunting ground a while if it has traffic and no warships.
+		cs::Ref<GroupOrder> o;
+		if (Orders.TryGetValue(leader, o) && o->Kind == OrderKind::Raid && o->Body == here && jd - o->SinceJd < 4 && DefenceAt(here, leader->Faction) < GroupStrength(leader))
+			return Order(OrderKind::Raid, here);
+
+		int target = -1;
+		double best = 0;
+		for (const auto& s : Economy()->Settlements)
+		{
+			if (s->Kind == SettlementKind::Haven || s->Body == here) continue;
+			double traffic = 1;
+			for (const auto& t : Fleet()->Ships())
+				if (!t->Destroyed && world->IsTrader(t) && (t->DestinationBody == s->Body || (t->Orbit != nullptr && t->Orbit->Body == s->Body))) traffic++;
+			double defence = DefenceAt(s->Body, leader->Faction);
+			// Raiders take chances against a port's guns, but prefer the soft ones.
+			if (defence > GroupStrength(leader) * 1.6) continue;
+			double days = Fleet()->EstimateTravelDays(leader, here, s->Body, jd);
+			double value = traffic / (defence + GroupStrength(leader) * 0.3 + 100) / (days + 3) * (0.7 + rng.NextDouble() * 0.6);
+			if (value > best)
+			{
+				best = value;
+				target = s->Body;
+			}
+		}
+		if (target < 0) target = haven >= 0 && haven != here ? haven : NextPatrol(leader, here);
+		return Order(OrderKind::Raid, target);
+	}
+
+	bool War::Hunter(const cs::Ref<Ship>& ship) { return world->Outlaws != nullptr && world->Outlaws->IsHunter(ship); }
+
+	bool War::IsHomeGuard(const cs::Ref<Ship>& leader)
+	{
+		// Each navy keeps its oldest surviving group at home: one it still commands (not the hull the player
+		// is flying, nor a derelict), or every other group would be free to leave. A patrol wing is never it: it keeps
+		// its beat whatever (U.SPC-T371).
+		for (const auto& s : Fleet()->Ships())
+			if (!s->Destroyed && !s->IsEscort() && !s->Derelict && !s->PatrolWing && s != world->PilotedShip && s->Faction == leader->Faction && s->Spec->IsMilitary)
+				return s == leader;
+		return false;
+	}
+
+	int War::NextPatrol(const cs::Ref<Ship>& leader, int here)
+	{
+		auto own = cs::List<int>();
+		for (const auto& s : Economy()->Settlements)
+			if (s->Owner == leader->Faction && !own.Contains(s->Body)) own.Add(s->Body);
+		if (own.Count() == 0) own.AddRange(leader->Route); // (C#'s `leader.Route != null`: an empty route adds nothing.)
+		own.Remove(here);
+		if (own.Count() == 0) return here;
+		return own[rng.Next(own.Count())];
+	}
+
+	int War::NearestYard(const cs::Ref<Faction>& f, int here, double jd)
+	{
+		int best = -1;
+		double bestDist = cs::Double::MaxValue;
+		for (const auto& s : Economy()->Settlements)
+		{
+			if (s->Owner != f || (!s->HasShipyard() && s->Kind != SettlementKind::Haven)) continue;
+			double d = s->Body == here ? 0 : (world->Ephemeris->HelioAt(s->Body, jd) - world->Ephemeris->HelioAt(here, jd)).Length();
+			if (d < bestDist)
+			{
+				bestDist = d;
+				best = s->Body;
+			}
+		}
+		return best;
+	}
+
+	int War::HavenBody(const cs::Ref<Faction>& clan)
+	{
+		auto h = LiveHavenOf(clan);
+		return h != nullptr ? h->Body : -1;
+	}
+
+	cs::String War::HavenName(const cs::Ref<Faction>& clan)
+	{
+		auto h = clan != nullptr ? LiveHavenOf(clan) : nullptr;
+		if (h != nullptr) return h->Name;
+		auto first = FirstLiveHaven();
+		return first != nullptr ? first->Name : cs::String("a pirate haven");
+	}
+
+	cs::Ref<Settlement> War::FirstLiveHaven()
+	{
+		for (const auto& s : Economy()->Settlements)
+			if (s->Kind == SettlementKind::Haven && !s->Fallen) return s;
+		return nullptr;
+	}
+
+	cs::Ref<Settlement> War::HomeHaven(const cs::Ref<Ship>& ship)
+	{
+		if (ship == nullptr) return nullptr;
+		// (C#'s `route == null`: a C++ route is never null, so an empty one counts as none.)
+		const auto route = ship->Controller()->Route;
+		if (route.Count() == 0) return nullptr;
+		for (const auto& s : Economy()->At(route[0]))
+			if (s->Kind == SettlementKind::Haven) return s;
+		return nullptr;
+	}
+
+	// ---------------------------------------------------------------- hidden havens
+
+	bool War::Discover(const cs::Ref<Settlement>& st, const cs::Ref<Faction>& by, double jd, const cs::String& how)
+	{
+		if (st == nullptr || !st->Hidden || by == nullptr || by->IsPirate || st->KnownTo.Contains(by)) return false;
+		bool first = st->KnownTo.Count() == 0;
+		st->KnownTo.Add(by);
+		cs::String text = first
+			? cs::Cat("The ", by->Name, " find a hidden ", st->Owner->Name, " haven, ", st->Name, ", on ", (*Catalog())[st->Body]->Name, ": ", how)
+			: cs::Cat("The ", by->Name, " learn where ", st->Name, " (", (*Catalog())[st->Body]->Name, ") lies: ", how);
+		world->Log(jd, text, WorldEventKind::Info, st->Body);
+		return true;
+	}
+
+	cs::List<cs::Ref<Settlement>> War::ScanFrom(const cs::Ref<Faction>& by, DVec3 helioKm, double jd, const cs::String& who, double rangeKm)
+	{
+		auto found = cs::List<cs::Ref<Settlement>>();
+		if (by == nullptr || by->IsPirate) return found;
+		for (const auto& st : Economy()->Settlements)
+		{
+			if (!st->Hidden || st->KnownTo.Contains(by)) continue;
+			if ((world->Ephemeris->HelioAt(st->Body, jd) - helioKm).Length() > rangeKm) continue;
+			// (C#'s `who != null`: no name is an empty one here.)
+			if (Discover(st, by, jd, cs::Cat((!who.empty() ? cs::Cat("the ", who, "'s") : cs::String("a ship's")), " scanners pick it out"))) found.Add(st);
+		}
+		return found;
+	}
+
+	bool War::TrailHome(const cs::Ref<Ship>& raider, const cs::Ref<Faction>& tracker, double jd)
+	{
+		auto home = HomeHaven(raider);
+		if (home == nullptr || tracker == nullptr || tracker->IsPirate) return false;
+		return Discover(home, tracker, jd, cs::Cat(tracker->Name, " ships follow the beaten ", raider->Name, " home"));
+	}
+
+	void War::Scans(double jd)
+	{
+		bool anyHidden = false;
+		for (const auto& st : Economy()->Settlements) anyHidden |= st->Hidden;
+		if (!anyHidden) return;
+		// A group sweeps as far as the best scanners in it reach.
+		auto reach = cs::Dictionary<cs::Ref<Ship>, double>();
+		for (const auto& e : Fleet()->Ships())
+			if (e->IsEscort() && !e->Destroyed && e->Loadout != nullptr)
+			{
+				double r = 0;
+				reach.TryGetValue(e->Leader, r);
+				reach[e->Leader] = cs::Math::Max(r, Outfitting::ScanRangeKm(e));
+			}
+		for (const auto& s : Fleet()->Ships())
+		{
+			if (s->Destroyed || s->IsEscort() || s->Derelict || s == world->PilotedShip || !s->Spec->IsMilitary || s->Faction->IsPirate) continue;
+			double escorts = 0;
+			reach.TryGetValue(s, escorts);
+			ScanFrom(s->Faction, Fleet()->StateOf(s, jd).HelioKm, jd, s->Name, cs::Math::Max(escorts, Outfitting::ScanRangeKm(s)));
+		}
+	}
+
+	bool War::Assailable(const cs::Ref<Settlement>& s, const cs::Ref<Faction>& f)
+	{
+		return s->Kind == SettlementKind::Haven && !s->Fallen && s->Hidden && s->KnownTo.Contains(f) && Diplomacy()->Hostile(f, s->Owner);
+	}
+
+	cs::Ref<Settlement> War::AssaultTarget(const cs::Ref<Ship>& leader, int here, double jd)
+	{
+		auto f = leader->Faction;
+		double strength = GroupStrength(leader);
+		cs::Ref<Settlement> best = nullptr;
+		double bestDays = 40;
+		for (const auto& s : Economy()->Settlements)
+		{
+			if (!Assailable(s, f) || strength < DefenceAt(s->Body, f) * 1.5) continue;
+			double days = s->Body == here ? 0 : Fleet()->EstimateTravelDays(leader, here, s->Body, jd);
+			if (days < bestDays)
+			{
+				bestDays = days;
+				best = s;
+			}
+		}
+		return best;
+	}
+
+	bool War::HasMarines(const cs::Ref<Ship>& ship)
+	{
+		auto leader = ship->Controller();
+		if (!leader->Destroyed && leader->Combat->MarinesAvailable() > 0) return true;
+		for (const auto& e : Fleet()->Ships())
+			if (e->Leader == leader && !e->Destroyed && e->Combat->MarinesAvailable() > 0) return true;
+		return false;
+	}
+
+	bool War::CanAssault(const cs::Ref<Settlement>& st, const cs::Ref<Ship>& ship)
+	{
+		return st != nullptr && ship != nullptr && !ship->Destroyed && st->Kind == SettlementKind::Haven && !st->Fallen && st->Platforms.Count() == 0 &&
+			BattleAt(st->Body) == nullptr && !PiratesAt(st->Body) && Diplomacy()->Hostile(ship->Faction, st->Owner);
+	}
+
+	bool War::AssaultHaven(const cs::Ref<Settlement>& st, const cs::Ref<Ship>& ship, bool capture, double jd)
+	{
+		if (!CanAssault(st, ship)) return false;
+		if (capture ? !HasMarines(ship) : !ship->Controller()->Combat->Armed() && !HasMarines(ship)) return false;
+		FallHaven(st, ship->Faction, capture, jd);
+		return true;
+	}
+
+	void War::FallHaven(const cs::Ref<Settlement>& st, const cs::Ref<Faction>& by, bool capture, double jd)
+	{
+		double value = 0;
+		for (int i = 0; i < GoodInfo::Count; i++)
+		{
+			value += cs::Math::Max(0.0, st->Stock[i]) * GoodInfo::Of(static_cast<Good>(i))->BasePrice;
+			st->Stock[i] = 0;
+		}
+		if (capture) by->Treasury += value * 0.6;
+		st->Platforms.Clear();
+		st->Population = 0;
+		st->Fallen = true;
+		st->RebuildJd = jd + HavenRebuildDays;
+		if (st->Hidden) st->KnownTo.Add(by);
+		assaultDays.Remove(st);
+		cs::String where = cs::Cat(st->Name, " (", (*Catalog())[st->Body]->Name, ")");
+		world->Log(jd, capture
+			? cs::Cat("The ", by->Name, " board and take ", where, ", seizing ", cs::Fmt(value / 1e6, "N0"), " M of stolen goods; its raiders scatter")
+			: cs::Cat("The ", by->Name, " destroy ", where, "; its raiders scatter"), WorldEventKind::Capture, st->Body);
+		BumpDanger(st->Body, 1);
+	}
+
+	void War::HavenAssaults(double jd)
+	{
+		for (const auto& st : Economy()->Settlements)
+		{
+			if (st->Kind != SettlementKind::Haven) continue;
+			if (st->Fallen)
+			{
+				if (jd >= st->RebuildJd) RebuildHaven(st, jd);
+				continue;
+			}
+			cs::Ref<Ship> assailant = nullptr;
+			if (st->Platforms.Count() == 0 && BattleAt(st->Body) == nullptr && !PiratesAt(st->Body))
+				for (const auto& s : Fleet()->Ships())
+				{
+					if (s->Destroyed || s->IsEscort() || !s->Spec->IsMilitary || s->Faction->IsPirate || s == world->PilotedShip) continue;
+					auto c = s->Controller();
+					if (c->Phase != ShipPhase::Parked || c->Orbit->Body != st->Body || !Diplomacy()->Hostile(s->Faction, st->Owner)) continue;
+					cs::Ref<GroupOrder> o;
+					if (!Orders.TryGetValue(s, o) || o->Kind != OrderKind::Assault) continue;
+					if (assailant == nullptr || GroupStrength(s) > GroupStrength(assailant)) assailant = s;
+				}
+			if (assailant == nullptr)
+			{
+				assaultDays.Remove(st);
+				continue;
+			}
+			double days = 0;
+			assaultDays.TryGetValue(st, days);
+			days += 1;
+			assaultDays[st] = days;
+			if (days >= HavenAssaultDays) FallHaven(st, assailant->Faction, HasMarines(assailant), jd);
+		}
+	}
+
+	void War::RebuildHaven(const cs::Ref<Settlement>& st, double jd)
+	{
+		st->Fallen = false;
+		st->Population = st->InitialPopulation;
+		while (st->Platforms.Count() < st->MaxPlatforms) st->Platforms.Add(cs::New<ShipCombat>(CombatSpec::Platform()));
+		world->Log(jd, cs::Cat("The ", st->Owner->Name, " have rebuilt ", st->Name, " (", (*Catalog())[st->Body]->Name, ")"), WorldEventKind::Info, st->Body);
+	}
+
+	double War::AssaultDays(const cs::Ref<Settlement>& s) const
+	{
+		double d = 0;
+		return assaultDays.TryGetValue(s, d) ? d : 0;
+	}
+
+	bool War::AtWar(const cs::Ref<Faction>& f)
+	{
+		for (const auto& g : Fleet()->Factions())
+			if (g != f && !g->IsPirate && Diplomacy()->Get(f, g) == Relation::War) return true;
+		return false;
+	}
+
+	bool War::EnemiesAt(int body, const cs::Ref<Faction>& f)
+	{
+		if (auto b = BattleAt(body))
+			if (b->SideLeaders[0] == f || b->SideLeaders[1] == f) return true;
+		for (const auto& s : Fleet()->Ships())
+		{
+			if (s->Destroyed || s->IsEscort() || !(s->Spec->IsMilitary || s->Faction->IsPirate)) continue;
+			if (!Diplomacy()->Hostile(f, s->Faction)) continue;
+			auto c = s->Controller();
+			if (c->Phase == ShipPhase::Parked && c->Orbit->Body == body) return true;
+		}
+		return false;
+	}
+
+	bool War::EnemyNavyAt(int body, const cs::Ref<Faction>& f)
+	{
+		for (const auto& s : Fleet()->Ships())
+		{
+			if (s->Destroyed || s->IsEscort() || !s->Spec->IsMilitary || s->Faction->IsPirate || !Diplomacy()->Hostile(f, s->Faction)) continue;
+			auto c = s->Controller();
+			if (c->Phase == ShipPhase::Parked && c->Orbit != nullptr && c->Orbit->Body == body) return true;
+		}
+		return false;
+	}
+
+	bool War::PiratesAt(int body)
+	{
+		for (const auto& s : Fleet()->Ships())
+			if (!s->Destroyed && !s->IsEscort() && s->Faction->IsPirate && !s->Runner && s->Phase == ShipPhase::Parked && s->Orbit->Body == body) return true;
+		return false;
+	}
+
+	bool War::PiratesSeenAt(int body, const cs::Ref<Faction>& f, DVec3 where, double jd)
+	{
+		auto sensors = world->Sensors;
+		if (sensors == nullptr)
+		{
+			for (const auto& s : Fleet()->Ships())
+				if (!s->Destroyed && !s->IsEscort() && s->Faction->IsPirate && s->Phase == ShipPhase::Parked && s->Orbit->Body == body) return true;
+			return false;
+		}
+		for (const auto& c : sensors->PictureOf(f)->Contacts())
+		{
+			auto s = c->Ship;
+			if (s->Destroyed || s->IsEscort() || s->Faction == nullptr || !s->Faction->IsPirate) continue;
+			auto seen = sensors->KnownAt(f, s, where, jd);
+			if (seen.has_value() && seen->Body == body && seen->Level >= ContactLevel::Class) return true;
+		}
+		return false;
+	}
+
+	bool War::KnowsOfRaidersAt(int body, const cs::Ref<Faction>& f, DVec3 where, double jd) { return PiratesSeenAt(body, f, where, jd); }
+
+	double War::DefenceAt(int body, const cs::Ref<Faction>& attacker)
+	{
+		double total = 0;
+		for (const auto& st : Economy()->At(body))
+			if (Diplomacy()->Hostile(attacker, st->Owner))
+				for (const auto& p : st->Platforms) total += p->Strength();
+		for (const auto& s : Fleet()->Ships())
+		{
+			if (s->Destroyed || !(s->Spec->IsMilitary || s->Faction->IsPirate) || !Diplomacy()->Hostile(attacker, s->Faction)) continue;
+			auto c = s->Controller();
+			if (c->Phase == ShipPhase::Parked && c->Orbit->Body == body) total += s->Combat->Strength();
+		}
+		return total;
+	}
+
+	double War::GroupStrength(const cs::Ref<Ship>& leader)
+	{
+		double total = leader->Combat->Strength();
+		for (const auto& s : Fleet()->Ships())
+			if (s->Leader == leader && !s->Destroyed) total += s->Combat->Strength();
+		return total;
+	}
+
+	double War::GroupDamage(const cs::Ref<Ship>& leader)
+	{
+		double sum = leader->Combat->HullDamage();
+		int n = 1;
+		for (const auto& s : Fleet()->Ships())
+			if (s->Leader == leader && !s->Destroyed)
+			{
+				sum += s->Combat->HullDamage();
+				n++;
+			}
+		return sum / n;
+	}
+
+	bool War::HangarsLow(const cs::Ref<Ship>& leader)
+	{
+		int have = 0, full = 0;
+		for (const auto& s : Fleet()->Ships())
+		{
+			if (s->Destroyed || (s != leader && s->Leader != leader)) continue;
+			have += s->Combat->Fighters();
+			full += s->Combat->Spec->HangarCraft();
+		}
+		return full > 0 && have < full * 0.5;
+	}
+
+	bool War::MarinesLow(const cs::Ref<Ship>& leader)
+	{
+		double have = 0, full = 0;
+		for (const auto& s : Fleet()->Ships())
+		{
+			if (s->Destroyed || (s != leader && s->Leader != leader)) continue;
+			have += s->Combat->Interior->Marines();
+			full += s->Combat->Spec->Marines;
+		}
+		return full > 0 && have < full * 0.35;
+	}
+
+	bool War::MissilesLow(const cs::Ref<Ship>& leader)
+	{
+		int have = 0, full = 0;
+		for (const auto& sub : leader->Combat->Subsystems)
+			if (sub->Def->Weapon != nullptr && sub->Def->Weapon->Missile && !sub->Destroyed())
+			{
+				have += sub->Ammo;
+				full += sub->Def->Weapon->Ammo;
+			}
+		return full > 0 && have < full * 0.3;
+	}
+
+	// ---------------------------------------------------------------- daily
+
+	void War::Daily(double jd)
+	{
+		for (const auto& key : danger.Keys()) danger[key] *= cs::Math::Exp(-1.0 / 20);
+		for (const auto& s : Economy()->Settlements)
+			for (int i = 0; i < s->ExtraDemand.Count(); i++) s->ExtraDemand[i] = 0; // Array.Clear
+		PruneTracking(jd);
+
+		for (const auto& s : Fleet()->Ships())
+			if (s->Derelict && !s->Destroyed && jd - s->DerelictSinceJd > 25) s->Destroyed = true;
+		Wrecks->AdvanceTo(jd);
+		Crews->Daily(Diplomacy(), jd);
+		// A polity recruits once a day from every settlement it holds in any system, by the world that keeps its books.
+		auto polities = world->Polities;
+		Core::Crews::Recruit(polities->KeptBy(world, Fleet()->Factions()), polities->Worlds().Count() > 1 ? polities->Settlements() : Economy()->Settlements, 1);
+		if (Fleet()->Lanes != nullptr)
+			for (const auto& lane : Fleet()->Lanes->Danger.Keys()) Fleet()->Lanes->SetDanger(lane, Fleet()->Lanes->Danger[lane] * 0.85);
+		MergeGroups(jd);
+		PayUpkeep();
+		DrillMarines();
+		Refit(jd);
+		Sieges(jd);
+		Scans(jd);
+		HavenAssaults(jd);
+		RebuildPlatforms(jd);
+		// The navies' corvettes: reposted when their ports change hands, and replaced when lost (U.SPC-T476).
+		Corvettes::Upkeep(world, CorvettesShortSince, jd);
+		PirateRecruiting(jd);
+		DiplomacyCycle(jd);
+
+		// Groups that met at a body without a fight (a war resumed, say) fight now, if they are fit to.
+		for (const auto& s : Fleet()->Ships())
+		{
+			// Not the player's ship: its fights start only where the player engages (TryStartPlayerBattle).
+			if (s->Destroyed || s->IsEscort() || s->Battle != nullptr || s->Phase != ShipPhase::Parked || s == world->PilotedShip) continue;
+			if (!(s->Spec->IsMilitary || s->Faction->IsPirate) || s->Runner || !Willing(s, jd)) continue;
+			int body = s->Orbit->Body;
+			double ended = 0;
+			if (lastBattleEndJd.TryGetValue(body, ended) && jd - ended < 0.5) continue;
+			if (BattleAt(body) == nullptr) TryStartBattle(body, s->Faction, jd, body == Catalog()->Root()->Index ? cs::Nullable<DVec3>(s->Orbit->OffsetAt(jd)) : cs::Nullable<DVec3>());
+		}
+	}
+
+	void War::MergeGroups(double jd)
+	{
+		int root = Catalog()->Root()->Index;
+		auto groups = cs::List<cs::Ref<Ship>>();
+		for (const auto& s : Fleet()->Ships())
+			// The player's ship is flown by the player: never handed to an AI flagship, nor one itself.
+			// Nor a group on an interstellar voyage: it keeps to its own business.
+			// Nor bounty hunters: each works its own contract.
+			// Nor a pirate clan's smugglers: they carry loot, not guns, and never raid (see Ship.Runner).
+			// Nor a patrol wing: it keeps to its own beat (U.SPC-T371).
+			if (!s->Destroyed && !s->IsEscort() && s->Battle == nullptr && s != world->PilotedShip && (s->Spec->IsMilitary || s->Faction->IsPirate) && !s->Runner && !s->PatrolWing && s->Phase == ShipPhase::Parked && s->Voyage == nullptr && !Hunter(s))
+				groups.Add(s);
+		groups.Sort([this](const cs::Ref<Ship>& a, const cs::Ref<Ship>& b) { return cs::Compare(GroupStrength(b), GroupStrength(a)); });
+		for (int i = 0; i < groups.Count(); i++)
+		{
+			auto big = groups[i];
+			if (big->Destroyed || big->IsEscort() || IsHomeGuard(big)) continue;
+			for (int j = i + 1; j < groups.Count(); j++)
+			{
+				auto small = groups[j];
+				if (small->IsEscort() || small->Faction != big->Faction || small->Orbit->Body != big->Orbit->Body || IsHomeGuard(small)) continue;
+				if (big->Orbit->Body == root && (big->Orbit->OffsetAt(jd) - small->Orbit->OffsetAt(jd)).Length() > GateFightRangeKm) continue;
+				int size = 1, joining = 1;
+				for (const auto& e : Fleet()->Ships())
+				{
+					if (e->Destroyed) continue;
+					if (e->Leader == big) size++;
+					if (e->Leader == small) joining++;
+				}
+				if (size + joining > 8) continue;
+				auto members = cs::List<cs::Ref<Ship>>{ small };
+				for (const auto& e : Fleet()->Ships())
+					if (e->Leader == small && !e->Destroyed) members.Add(e);
+				// The joining band's own plunder comes along into the flagship it now follows (U.SPC-T308).
+				MovePlunder(small, big);
+				for (const auto& m : members)
+				{
+					Fleet()->AddEscort(big, m, Core::Fleet::SlotFor(FreeSlot(big)));
+					size++;
+				}
+				Orders.Remove(small);
+				PriorOrders.Remove(small);
+				retreating.Remove(small);
+			}
+		}
+	}
+
+	int War::FreeSlot(const cs::Ref<Ship>& leader)
+	{
+		for (int k = 0; ; k++)
+		{
+			auto at = Core::Fleet::SlotFor(k);
+			bool taken = false;
+			for (const auto& e : Fleet()->Ships())
+				if (!e->Destroyed && e->Leader == leader && (e->FormationSlot - at).LengthSquared() < 1e-9)
+				{
+					taken = true;
+					break;
+				}
+			if (!taken) return k;
+		}
+	}
+
+	void War::PayUpkeep()
+	{
+		constexpr double perDay = Core::Economy::UpkeepPerYear / 365.25;
+		for (const auto& s : Fleet()->Ships())
+		{
+			if (s->Destroyed || s->Derelict || !s->Spec->IsMilitary || s->Faction->IsPirate) continue;
+			s->Faction->Treasury -= Core::Economy::HullPrice(s->Spec->Class) * perDay;
+		}
+		for (const auto& st : Economy()->Settlements)
+			if (!st->Owner->IsPirate && st->Platforms.Count() > 0) st->Owner->Treasury -= st->Platforms.Count() * PlatformPrice * perDay;
+	}
+
+	void War::DrillMarines()
+	{
+		for (const auto& s : Fleet()->Ships())
+		{
+			if (s->Destroyed || s->Derelict || s->Battle != nullptr || s->Combat == nullptr) continue;
+			s->Combat->Interior->Drill(1);
+		}
+	}
+
+	void War::Refit(double jd)
+	{
+		const int alloysI = static_cast<int>(Good::Alloys), electronicsI = static_cast<int>(Good::Electronics);
+		const int munitionsI = static_cast<int>(Good::Munitions), medicalI = static_cast<int>(Good::MedicalSupplies);
+		for (const auto& s : Fleet()->Ships())
+		{
+			if (s->Destroyed || s->Battle != nullptr || !(s->Spec->IsMilitary || s->Faction->IsPirate)) continue;
+			auto c = s->Controller();
+			if (c->Phase != ShipPhase::Parked) continue;
+			cs::Ref<Settlement> yard = nullptr, port = nullptr;
+			for (const auto& st : Economy()->At(c->Orbit->Body))
+			{
+				if (st->Owner != s->Faction || st->Fallen) continue;
+				port = st;
+				if (st->HasShipyard() || st->Kind == SettlementKind::Haven) yard = st;
+			}
+			// Strays that set down here with no hangar to take them rejoin their carrier now it has called (U.SPC-T591).
+			for (const auto& st : Economy()->At(c->Orbit->Body))
+				if (st->Strays.Count() > 0 && !st->Fallen && s->Combat->Hangar != nullptr) CarrierWings::Rejoin(st, s);
+			// Prisoners in the brig go ashore at any port of the owner's, for their bounty or ransom (U.SPC-T65).
+			if (port != nullptr && s->Prisoners > 0 && s != world->PilotedShip) Outfitting::HandOverPrisoners(Economy(), s, port);
+			// In a port of its own a hull is in supply again: tanks, magazines and stores (U.SPC-T93).
+			if (port != nullptr && (s->Voyage == nullptr || s->Voyage->Campaign == nullptr)) s->Combat->Readiness = 1;
+			if (s->Faction->Treasury <= 0) continue;
+			if (yard == nullptr) continue;
+
+			double scale = s->LengthKm();
+			double damage = s->Combat->Damage();
+			if (damage > 0.001)
+			{
+				double share = cs::Math::Min(0.15, damage);
+				double alloys = 900 * scale * share / 0.15, electronics = 60 * scale * share / 0.15;
+				double have = cs::Math::Min(1.0, cs::Math::Min(yard->Stock[alloysI] / cs::Math::Max(alloys, 1e-9), yard->Stock[electronicsI] / cs::Math::Max(electronics, 1e-9)));
+				yard->ExtraDemand[alloysI] += alloys;
+				yard->ExtraDemand[electronicsI] += electronics;
+				if (yard->Kind == SettlementKind::Haven) have = 0.5;
+				yard->Stock[alloysI] -= cs::Math::Min(yard->Stock[alloysI], alloys * have);
+				yard->Stock[electronicsI] -= cs::Math::Min(yard->Stock[electronicsI], electronics * have);
+				s->Faction->Treasury -= (alloys * yard->Price[alloysI] + electronics * yard->Price[electronicsI]) * have;
+				if (have > 0) s->Combat->Repair(share * have);
+			}
+			int missing = 0;
+			for (const auto& sub : s->Combat->Subsystems)
+				if (sub->Def->Weapon != nullptr && sub->Def->Weapon->Missile) missing += sub->Def->Weapon->Ammo - sub->Ammo;
+			if (missing > 0)
+			{
+				double tonnes = missing * 1.5;
+				yard->ExtraDemand[munitionsI] += tonnes;
+				if (yard->Stock[munitionsI] >= tonnes || yard->Kind == SettlementKind::Haven)
+				{
+					yard->Stock[munitionsI] = cs::Math::Max(0.0, yard->Stock[munitionsI] - tonnes);
+					s->Faction->Treasury -= tonnes * yard->Price[munitionsI];
+					for (const auto& sub : s->Combat->Subsystems)
+						if (sub->Def->Weapon != nullptr && sub->Def->Weapon->Missile) sub->Ammo = sub->Def->Weapon->Ammo;
+				}
+			}
+			// Marines lost boarding (and crew lost to breaches) are replaced from the faction's trained
+			// reserve, as far as it goes; the wounded go to the yard's hospitals.
+			auto inside = s->Combat->Interior;
+			double marinesShort = s->Combat->Spec->Marines - inside->Marines();
+			double crewShort = cs::Math::Max(0.0, s->Combat->Spec->Crew - inside->Crew());
+			if ((marinesShort > s->Combat->Spec->Marines * 0.1 || crewShort > s->Combat->Spec->Crew * 0.1) && !inside->UnderBoarding())
+			{
+				double marines = Core::Crews::Draft(s->Faction, cs::Math::Max(0.0, marinesShort));
+				double crew = Core::Crews::Draft(s->Faction, crewShort);
+				double medical = marines * 0.05;
+				yard->ExtraDemand[medicalI] += medical;
+				yard->Stock[medicalI] = cs::Math::Max(0.0, yard->Stock[medicalI] - medical);
+				s->Faction->Treasury -= marines * 40000;
+				if (marines + crew > 0) inside->Muster(inside->Crew() + crew, inside->Marines() + marines);
+			}
+			int fighters = s->Combat->Spec->HangarCraft() - s->Combat->Fighters();
+			if (fighters > 0 && yard->Stock[electronicsI] > 30)
+			{
+				int add = cs::Math::Min(fighters, 4);
+				yard->Stock[electronicsI] -= 6 * add;
+				yard->Stock[alloysI] = cs::Math::Max(0.0, yard->Stock[alloysI] - 40 * add);
+				s->Faction->Treasury -= add * 2.5e6;
+				s->Combat->RestoreFighters(add);
+			}
+			// The craft that came back hurt are mended whole in the yard's shops (U.SPC-T526): each is its own hull.
+			int hurt = CarrierWings::Damaged(s->Combat);
+			if (hurt > 0 && yard->Stock[alloysI] > 10 * hurt)
+			{
+				yard->Stock[alloysI] -= 10 * hurt;
+				yard->Stock[electronicsI] = cs::Math::Max(0.0, yard->Stock[electronicsI] - 2 * hurt);
+				s->Faction->Treasury -= hurt * 4e5;
+				CarrierWings::MendAboard(s->Combat);
+			}
+			// Boarding shuttles lost are built anew (U.SPC-T486).
+			int shuttles = s->Combat->Spec->Shuttles - s->Combat->Shuttles();
+			if (shuttles > 0 && yard->Stock[electronicsI] > 30)
+			{
+				yard->Stock[electronicsI] -= 4 * shuttles;
+				yard->Stock[alloysI] = cs::Math::Max(0.0, yard->Stock[alloysI] - 60 * shuttles);
+				s->Faction->Treasury -= shuttles * 3e6;
+				s->Combat->RestoreShuttles(shuttles);
+			}
+			// A sound, rearmed hull of a flush owner takes an upgrade now and then (U.SPC-T65); the player fits their own.
+			if (s != world->PilotedShip && s->Combat->Damage() <= 0.001 && missing == 0 && rng.NextDouble() < AiOutfitChance)
+			{
+				auto command = world->Polities != nullptr ? world->Polities->Command : nullptr;
+				Outfitting::AiRefit(Economy(), s, yard, command != nullptr ? command->BuildPlanOf(s->Faction) : nullptr);
+			}
+		}
+	}
+
+	double War::SiegeNeeded(const cs::Ref<Settlement>& s) { return cs::Math::Min(20.0, 4 + s->Population / 2e5); }
+
+	void War::Sieges(double jd)
+	{
+		for (const auto& st : Economy()->Settlements)
+		{
+			if (st->Kind == SettlementKind::Haven) continue;
+			cs::Ref<Faction> besieger = nullptr, blockader = nullptr;
+			bool defended = st->Platforms.Count() > 0 || BattleAt(st->Body) != nullptr || st->DaysSinceCapture < CaptureGraceDays, guarded = false;
+			for (const auto& s : Fleet()->Ships())
+			{
+				if (s->Destroyed || s->IsEscort() || !s->Spec->IsMilitary || s->Faction->IsPirate) continue;
+				auto c = s->Controller();
+				if (c->Phase != ShipPhase::Parked || c->Orbit->Body != st->Body) continue;
+				cs::Ref<GroupOrder> o, b;
+				if (Diplomacy()->Hostile(s->Faction, st->Owner) && Orders.TryGetValue(s, o) && o->Kind == OrderKind::Siege) besieger = s->Faction;
+				// A group sent to blockade it holds the space over it as a siege does, but lands nobody (U.SPC-T423).
+				else if (Diplomacy()->Hostile(s->Faction, st->Owner) && Orders.TryGetValue(s, b) && b->Kind == OrderKind::Blockade) blockader = s->Faction;
+				else if (s->Faction == st->Owner) defended = guarded = true;
+			}
+			auto holder = besieger ? besieger : blockader;
+			if (holder != nullptr && !guarded) besiegers[st] = holder;
+			else besiegers.Remove(st);
+			if (besieger == nullptr || defended)
+			{
+				siegeDays.Remove(st);
+				continue;
+			}
+			double days = 0;
+			siegeDays.TryGetValue(st, days);
+			days += 1;
+			siegeDays[st] = days;
+			if (days >= SiegeNeeded(st))
+			{
+				auto old = st->Owner;
+				Economy()->Capture(st, besieger);
+				// Taken back by the power it was occupied from: liberated, no longer occupied (U.SPC-T297).
+				// Taken from anyone else: occupied from them, the same bookkeeping a campaign's marines leave
+				// (see InterstellarWars.Occupy) -- without it the war's peace never counts this port's system
+				// as ceded, and its people never rise to retake it (U.SPC-T362).
+				if (st->OccupiedFrom == besieger) st->OccupiedFrom = nullptr;
+				else if (!st->OccupiedFrom) st->OccupiedFrom = old;
+				siegeDays.Remove(st);
+				besiegers.Remove(st);
+				RevokeBookings();
+				world->Log(jd, cs::Cat(st->Name, " (", (*Catalog())[st->Body]->Name, ") falls to the ", besieger->Name, ", taken from the ", old->Name), WorldEventKind::Capture, st->Body);
+				BumpDanger(st->Body, 1);
+			}
+		}
+	}
+
+	void War::RevokeBookings()
+	{
+		for (const auto& t : Fleet()->Ships())
+		{
+			if (t->Destroyed || t->CargoDestination == nullptr || Economy()->CanTrade(t, t->CargoDestination)) continue;
+			Economy()->Release(t);
+			t->CargoDestination = nullptr;
+			t->Cargo = Core::Economy::CargoText(t);
+		}
+	}
+
+	double War::SiegeDays(const cs::Ref<Settlement>& s) const
+	{
+		double d = 0;
+		return siegeDays.TryGetValue(s, d) ? d : 0;
+	}
+
+	cs::Ref<Faction> War::Besieger(const cs::Ref<Settlement>& s) const
+	{
+		cs::Ref<Faction> f;
+		return besiegers.TryGetValue(s, f) ? f : nullptr;
+	}
+
+	void War::RebuildPlatforms(double jd)
+	{
+		const int alloysI = static_cast<int>(Good::Alloys), electronicsI = static_cast<int>(Good::Electronics);
+		for (const auto& st : Economy()->Settlements)
+		{
+			if (st->Fallen) continue;
+			// Not mid-fight: a daily refit would refill shields and ammunition (and end a boarding) in battle.
+			if (BattleAt(st->Body) != nullptr) continue;
+			// Nor with an enemy navy holding the space overhead (U.SPC-T92): nothing goes up past its guns.
+			if (EnemyNavyAt(st->Body, st->Owner)) continue;
+			for (const auto& p : st->Platforms)
+				if (p->Damage() > 0) { p->Repair(0.05); p->FreeResupply(); }
+			if (st->Platforms.Count() >= st->MaxPlatforms) continue;
+			// A new platform every couple of weeks while the port can afford the steel.
+			if (rng.NextDouble() > 0.07) continue;
+			constexpr double alloys = 3000, electronics = 200;
+			st->ExtraDemand[alloysI] += alloys / 14;
+			st->ExtraDemand[electronicsI] += electronics / 14;
+			if (st->Stock[alloysI] < alloys || st->Stock[electronicsI] < electronics) continue;
+			// ... and the owner can pay for it: a broke owner leaves its ports bare.
+			if (st->Owner->Treasury < PlatformPrice) continue;
+			st->Stock[alloysI] -= alloys;
+			st->Stock[electronicsI] -= electronics;
+			st->Owner->Treasury -= PlatformPrice;
+			st->Platforms.Add(cs::New<ShipCombat>(CombatSpec::Platform()));
+		}
+	}
+
+	const cs::List<cs::String>& War::RaiderNames()
+	{
+		static const cs::List<cs::String> names =
+		{
+			"Gallows Bird", "Red Meridian", "Widow's Due", "Cutthroat Margin", "No Quarter", "Bad Debt", "Scavenger", "Hollow Crown",
+			"Ill Wind", "Knife Edge", "Grudge", "Salvage Rights", "Last Laugh", "Black Ledger",
+		};
+		return names;
+	}
+
+	void War::RaisePirateGroup(double jd, int body)
+	{
+		auto pirates = world->Pirates;
+		// (C#'s `world.RaiderNames ?? RaiderNames`: no names is an empty list here.)
+		const auto& names = world->RaiderNames.Count() > 0 ? world->RaiderNames : RaiderNames();
+		auto Name = [&]() -> cs::String
+		{
+			int n = raidersRaised++;
+			return names[n % names.Count()] + (n >= names.Count() ? cs::Cat(" ", (n / names.Count() + 1)) : cs::String(""));
+		};
+		auto leader = Fleet()->AddShip(Name(), raidersRaised % 3 == 0 ? ShipClass::Cruiser : ShipClass::Destroyer, pirates, ShipRole::Patrol);
+		// Raiders fit phaser arrays as their taste and their plunder allow, from their haven's slips (U.SPC-T505).
+		auto slips = LiveHavenOf(pirates);
+		FleetPatterns::Commission(leader, slips, nullptr);
+		leader->Route = cs::List<int>{ body };
+		// Every raider band takes its prizes with Breacher rounds fired from its leader's Breacher bay (U.SPC-T466, U.SPC-T521),
+		// a destroyer fitting a second habitat to supply the teams.
+		BreacherBays::Equip(leader);
+		int escorts = 1 + rng.Next(2);
+		for (int i = 0; i < escorts; i++)
+		{
+			auto e = Fleet()->AddShip(Name(), ShipClass::Destroyer, pirates, ShipRole::Escort);
+			FleetPatterns::Commission(e, slips, nullptr);
+			Fleet()->AddEscort(leader, e, Core::Fleet::SlotFor(i));
+		}
+		// Every raider band keeps a lane interdictor to pull its marks out of the hyperlanes (U.SPC-T479): a destroyer with
+		// a field projector fitted into its free space (U.SPC-T507). No pulse without one.
+		auto interdictor = Fleet()->AddShip(Name(), ShipClass::Destroyer, pirates, ShipRole::Escort);
+		LaneInterdictors::Fit(interdictor);
+		Fleet()->AddEscort(leader, interdictor, Core::Fleet::SlotFor(escorts));
+		Fleet()->Station(leader, body, jd);
+		double hands = Core::Crews::Complement(leader->Spec->Class) + (escorts + 1) * Core::Crews::Complement(ShipClass::Destroyer);
+		Core::Crews::Draft(pirates, hands);
+		world->NotifyAdded(leader);
+	}
+
+	double War::BandComplement() { return Core::Crews::Complement(ShipClass::Cruiser) + 3 * Core::Crews::Complement(ShipClass::Destroyer); }
+
+	void War::PirateRecruiting(double jd)
+	{
+		if (LiveHavenOf(world->Pirates) == nullptr) return;
+		int groups = 0;
+		auto based = cs::Dictionary<cs::Ref<Settlement>, int>();
+		for (const auto& s : Fleet()->Ships())
+			if (!s->Destroyed && !s->IsEscort() && s->Faction->IsPirate && !s->Runner)
+			{
+				groups++;
+				if (auto h = HomeHaven(s))
+				{
+					int n = 0;
+					based[h] = (based.TryGetValue(h, n) ? n : 0) + 1;
+				}
+			}
+		// Smuggling and protection rackets keep the Banner afloat between prizes.
+		world->Pirates->Treasury += world->PirateIncomePerDay;
+		if (groups >= world->PirateGroupCap || world->Pirates->Treasury < 5e7 || rng.NextDouble() > 0.08) return;
+		// A new band needs hands: hostages pressed into service, and whoever else signs on.
+		if (world->Pirates->Manpower < BandComplement()) return;
+		// The new band sails from the standing haven with the fewest of its own.
+		cs::Ref<Settlement> from = nullptr;
+		int fewest = cs::Int::MaxValue;
+		for (const auto& st : Economy()->Settlements)
+		{
+			if (st->Kind != SettlementKind::Haven || st->Fallen || st->Owner != world->Pirates) continue;
+			int k = 0;
+			int n = based.TryGetValue(st, k) ? k : 0;
+			if (n < fewest)
+			{
+				fewest = n;
+				from = st;
+			}
+		}
+		world->Pirates->Treasury -= 4e7;
+		RaisePirateGroup(jd, from->Body);
+		world->Log(jd, cs::Cat("A new ", world->Pirates->Name, " raider group sails from ", (from->Discovered() ? from->Name : cs::String("somewhere in the dark"))), WorldEventKind::Info, from->Discovered() ? from->Body : -1);
+	}
+
+	int War::Warships(const cs::Ref<Faction>& f)
+	{
+		int n = 0;
+		for (const auto& s : Fleet()->Ships())
+			if (!s->Destroyed && s->Faction == f && s->Spec->IsMilitary) n++;
+		return n;
+	}
+
+	bool War::Beaten(const cs::Ref<Faction>& f, const cs::Ref<Faction>& enemy)
+	{
+		int own = Warships(f), them = Warships(enemy);
+		if (own >= them) return false;
+		// Its yards all under the enemy's guns: beaten however few hulls it has lost since the war last flared up
+		// (the count starts again then, and a siege needs only days to take a yard).
+		int free = 0;
+		bool besieged = false;
+		for (const auto& st : Economy()->Settlements)
+		{
+			if (st->Owner != f || !st->HasShipyard()) continue;
+			cs::Ref<Faction> by;
+			if (besiegers.TryGetValue(st, by) && by == enemy) besieged = true;
+			else free++;
+		}
+		if (besieged && free == 0) return true;
+		return Losses(f) > 2 && own <= BeatenNavyShips && own * 3 < them;
+	}
+
+	void War::DiplomacyCycle(double jd)
+	{
+		auto a = world->RivalA;
+		auto b = world->RivalB;
+		if (a == nullptr || b == nullptr) return;
+		auto r = Diplomacy()->Get(a, b);
+		if (r == Relation::War)
+		{
+			// A navy that has been beaten sues for peace rather than fight on to the last hull and the last yard.
+			auto loser = Beaten(a, b) ? a : Beaten(b, a) ? b : nullptr;
+			if (loser != nullptr)
+			{
+				auto winner = loser == a ? b : a;
+				Diplomacy()->Set(a, b, Relation::Ceasefire);
+				ceasefireUntilJd = jd + 120 + rng.NextDouble() * 120;
+				world->Log(jd, cs::Cat("The ", loser->Name, ", its navy broken, sues for peace: ceasefire with the ", winner->Name), WorldEventKind::Diplomacy);
+			}
+			else if (jd - warStartJd > 240 && Losses(a) > 2 && Losses(b) > 2 && rng.NextDouble() < 0.012)
+			{
+				Diplomacy()->Set(a, b, Relation::Ceasefire);
+				ceasefireUntilJd = jd + 90 + rng.NextDouble() * 120;
+				world->Log(jd, cs::Cat("Ceasefire between the ", a->Name, " and the ", b->Name), WorldEventKind::Diplomacy);
+			}
+		}
+		else if (r == Relation::Ceasefire && jd > ceasefireUntilJd)
+		{
+			// Neither side goes back to war while one of them is still too weak to fight: it rebuilds first.
+			if (Beaten(a, b) || Beaten(b, a))
+			{
+				ceasefireUntilJd = jd + 30;
+				return;
+			}
+			Diplomacy()->Set(a, b, Relation::War);
+			RevokeBookings();
+			warStartJd = jd;
+			losses[a] = 0;
+			losses[b] = 0;
+			world->Log(jd, cs::Cat("The ceasefire collapses: the ", a->Name, " and the ", b->Name, " are at war again"), WorldEventKind::Diplomacy);
+		}
+	}
+
+	// ---------------------------------------------------------------- shipbuilding
+
+	cs::Nullable<ShipClass> War::ChooseWarship(const cs::Ref<Settlement>& yard)
+	{
+		auto f = yard->Owner;
+		if (!f->IsMilitary) return std::nullopt;
+		// The patrol wings are a standing force of their own, not counted against the battle fleet's cap (U.SPC-T371).
+		int count = 0;
+		for (const auto& s : Fleet()->Ships())
+			if (!s->Destroyed && s->Faction == f && s->Spec->IsMilitary && !s->PatrolWing) count++;
+		// What it lays down, and how big a navy it keeps, are its polity's build plan (U.SPC-T423; the balanced fleet unless told otherwise).
+		auto command = world->Polities != nullptr ? world->Polities->Command : nullptr;
+		auto plan = command != nullptr ? command->BuildPlanOf(f) : nullptr;
+		if (!plan) plan = BuildPlan::Balanced();
+		if (plan->Cycle.Count() == 0) return std::nullopt;
+		int cap = AtWar(f) ? world->NavyCapAtWar : world->NavyCap;
+		double share = command != nullptr ? command->NavyShare(f) : 1;
+		if (share != 1) cap = cs::ToInt(cs::Math::Round(cap * share));
+		if (count >= cap) return std::nullopt;
+		// At war, a gate breaker to take the enemy's gates (U.SPC-T478), when the yard has its keel's worth to hand.
+		auto breaker = ShipClass::GateBreaker;
+		if (yard->BuildPoints >= Core::Economy::HullCost(breaker) && f->Treasury >= Core::Economy::HullPrice(breaker) && Core::Crews::CanCrew(f, breaker))
+		{
+			int breakers = 0;
+			for (const auto& s : Fleet()->Ships())
+				if (!s->Destroyed && s->Faction == f && GateBreakers::IsClass(s->Spec->Class)) breakers++;
+			if (GateBreakers::Wanted(f, AtWar(f), breakers)) return breaker;
+		}
+		return plan->Cycle[(builtWarships + yard->Id) % plan->Cycle.Count()];
+	}
+
+	const cs::List<cs::String>& War::HullNames()
+	{
+		static const cs::List<cs::String> names =
+		{
+			"Valiant", "Bastion", "Sentinel", "Corvus", "Tenacity", "Ardent", "Harrier", "Rampart", "Vigil", "Onslaught",
+			"Meridian", "Paladin", "Warden", "Sabre", "Gauntlet", "Thunderer", "Steadfast", "Lodestar", "Zenith", "Implacable",
+		};
+		return names;
+	}
+
+	cs::Ref<Ship> War::LaunchWarship(const cs::Ref<Settlement>& yard, ShipClass cls, double jd)
+	{
+		builtWarships++;
+		cs::String name = HullNames()[builtWarships % HullNames().Count()] + (builtWarships >= HullNames().Count() ? cs::Cat(" ", (builtWarships / HullNames().Count() + 1)) : cs::String(""));
+		// Reinforce an under-strength group refitting here, or form a new one.
+		cs::Ref<Ship> group = nullptr;
+		for (const auto& s : Fleet()->Ships())
+		{
+			// Never the player's ship: escorts would follow a schedule the player isn't flying.
+			if (s->Destroyed || s->IsEscort() || s->Faction != yard->Owner || !s->Spec->IsMilitary || s->Battle != nullptr || s == world->PilotedShip || s->PatrolWing) continue;
+			if (s->Phase != ShipPhase::Parked || s->Orbit->Body != yard->Body) continue;
+			int escorts = 0;
+			for (const auto& e : Fleet()->Ships())
+				if (e->Leader == s && !e->Destroyed) escorts++;
+			if (escorts < 5 && s->Combat->Spec->Hull >= CombatSpec::Of(cls)->Hull) group = s;
+		}
+		// A new command ship (U.SPC-T477) goes to lead a group here that has none, whatever its flagship's size.
+		bool command = FleetCoordination::IsCommandClass(cls);
+		if (command)
+		{
+			cs::Ref<Ship> led = nullptr;
+			for (const auto& s : Fleet()->Ships())
+			{
+				if (s->Destroyed || s->IsEscort() || s->Faction != yard->Owner || !s->Spec->IsMilitary || s->Battle != nullptr || s == world->PilotedShip || s->PatrolWing) continue;
+				if (s->Phase != ShipPhase::Parked || s->Orbit->Body != yard->Body || GroupHasCommandShip(s)) continue;
+				if (led == nullptr || s->Combat->Spec->Hull > led->Combat->Spec->Hull) led = s;
+			}
+			if (led != nullptr) group = led;
+		}
+		cs::Ref<Ship> ship;
+		// The new hull is built to its navy's patterns, by its doctrine, its wealth and what this yard can build (U.SPC-T505).
+		auto strategic = world->Polities != nullptr ? world->Polities->Command : nullptr;
+		auto plan = strategic != nullptr ? strategic->BuildPlanOf(yard->Owner) : nullptr;
+		if (group != nullptr)
+		{
+			ship = Fleet()->AddShip(name, cls, yard->Owner, ShipRole::Escort);
+			FleetPatterns::Commission(ship, yard, plan);
+			Fleet()->AddEscort(group, ship, Core::Fleet::SlotFor(FreeSlot(group)));
+			if (command && !GroupHasCommandShip(group, ship)) TakeCommand(group, ship);
+		}
+		else
+		{
+			ship = Fleet()->AddShip(name, cls, yard->Owner, ShipRole::Patrol);
+			FleetPatterns::Commission(ship, yard, plan);
+			auto own = cs::List<int>();
+			for (const auto& s : Economy()->Settlements)
+				if (s->Owner == yard->Owner && !own.Contains(s->Body)) own.Add(s->Body);
+			ship->Route = own.ToArray();
+			world->Launch(ship, yard, jd);
+		}
+		// The heavy equipment its polity's build plan wants in every group, fitted to this hull if its group carries none
+		// yet and it can take it (U.SPC-T507: lane security's field projector makes it the group's lane interdictor).
+		auto groupPlan = strategic != nullptr ? strategic->BuildPlanOf(yard->Owner) : nullptr;
+		FitGroupEquipment(ship, group ? group : ship, groupPlan ? groupPlan : BuildPlan::Balanced());
+		cs::String joins = group == nullptr ? cs::String("") : ship->IsEscort() ? cs::Cat(", joining ", group->Name) : cs::Cat(", taking command of ", group->Name, "'s group");
+		world->Log(jd, cs::Cat(yard->Name, " commissions the ", cs::Strings::ToLowerInvariant(ShipClassSpec::Of(cls)->DisplayName), " ", ship->Name) + joins, WorldEventKind::Launch, yard->Body);
+		return ship;
+	}
+
+	void War::FitGroupEquipment(const cs::Ref<Ship>& ship, const cs::Ref<Ship>& leader, const cs::Ref<BuildPlan>& plan)
+	{
+		// (C#'s `plan?.GroupFittings == null`: no fittings is an empty list here.)
+		if (plan == nullptr || plan->GroupFittings.Count() == 0) return;
+		for (const auto& id : plan->GroupFittings)
+		{
+			auto kind = FacilityKinds::Of(id);
+			if (kind == nullptr || GroupCarries(leader, id)) continue;
+			Outfitting::Install(ship, kind);
+		}
+	}
+
+	bool War::GroupCarries(const cs::Ref<Ship>& leader, const cs::String& id)
+	{
+		if (FleetCoordination::Count(leader, id) > 0) return true;
+		for (const auto& s : Fleet()->Ships())
+			if (s->Leader == leader && !s->Destroyed && FleetCoordination::Count(s, id) > 0) return true;
+		return false;
+	}
+
+	bool War::GroupHasCommandShip(const cs::Ref<Ship>& leader, const cs::Ref<Ship>& except)
+	{
+		if (leader != except && FleetCoordination::IsCommandShip(leader)) return true;
+		for (const auto& e : Fleet()->Ships())
+			if (e->Leader == leader && e != except && !e->Destroyed && FleetCoordination::IsCommandShip(e)) return true;
+		return false;
+	}
+
+	void War::TakeCommand(const cs::Ref<Ship>& leader, const cs::Ref<Ship>& flag)
+	{
+		if (leader == nullptr || flag == nullptr || flag->Leader != leader || leader->IsEscort() || leader->Destroyed || flag->Destroyed) return;
+		auto station = flag->FormationSlot;
+		Succession(leader, true, flag);
+		if (flag->Leader != nullptr) return;
+		Fleet()->AddEscort(flag, leader, station);
+		leader->Route.Clear(); // (C#'s `leader.Route = null`.)
+	}
+
+	// ---------------------------------------------------------------- helpers
+
+	void War::BumpDanger(int body, double amount)
+	{
+		double d = 0;
+		danger.TryGetValue(body, d);
+		danger[body] = d + amount;
+	}
+
+	cs::String War::Describe(const cs::Ref<Battle>& b, int side)
+	{
+		auto f = b->SideLeaders[side];
+		if (f == nullptr) return "nobody";
+		cs::Ref<Ship> flag = nullptr;
+		int count = 0;
+		for (const auto& u : b->Units)
+		{
+			if (u->Side != side || u->Kind == UnitKind::Fighter) continue;
+			count++;
+			if (u->Ship != nullptr && (flag == nullptr || u->Ship->Combat->Spec->Hull > flag->Combat->Spec->Hull)) flag = u->Ship;
+		}
+		auto owner = flag != nullptr && flag->Faction != nullptr ? flag->Faction : f;
+		cs::String who = owner->IsPirate ? cs::Cat(owner->Name, " raiders") : owner->Name;
+		return flag != nullptr ? cs::Cat(who, " (", flag->Name, ", ", count, " ships)") : cs::Cat(who, " defences");
+	}
+
+	cs::String War::Short(const cs::Ref<Battle>& b, int side)
+	{
+		auto f = b->SideLeaders[side];
+		if (f != nullptr && f->IsPirate) return "pirates";
+		// (C#'s `f?.Prefix is string p`: a C++ prefix is never null.)
+		if (f != nullptr && f->Prefix.size() > 0) return f->Prefix;
+		return side == 0 ? "attackers" : "defenders";
+	}
+
+	cs::String War::Ordinal(int n)
+	{
+		if (n == 2) return "Second";
+		if (n == 3) return "Third";
+		int tens = n % 100;
+		cs::String suffix;
+		if (tens >= 11 && tens <= 13) suffix = "th";
+		else
+			switch (n % 10)
+			{
+			case 1: suffix = "st"; break;
+			case 2: suffix = "nd"; break;
+			case 3: suffix = "rd"; break;
+			default: suffix = "th"; break;
+			}
+		return cs::Cat(n, suffix);
 	}
 }
