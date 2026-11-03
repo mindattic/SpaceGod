@@ -17,11 +17,31 @@
 #include "UnityCompat/UnityGui.h"
 
 #include <functional>
+#include <utility>
+#include <vector>
 
 namespace SpaceGod::UnityCompat
 {
+	/// A scripted frame's keyboard and mouse (the C# track's GuiInput): the pointer in GUI pixels (origin top-left),
+	/// buttons held / pressed / released this frame (left, right, middle), wheel notches (positive away from the
+	/// player), keys that went down with the character each types.
+	struct ScriptedGuiInput
+	{
+		Vector2 mouse = Vector2(-1000, -1000);
+		bool held[3] = {}, pressed[3] = {}, released[3] = {};
+		float wheelNotches = 0;
+		std::vector<std::pair<KeyCode, char32_t>> keysDown;
+		/// This frame's edges cleared (after the frame ran); held buttons and the pointer stay.
+		void Clear();
+	};
+
 	struct GuiHost
 	{
+		/// One GUI frame over the registered handlers from scripted input, outside Slate's paint (the headless smoke):
+		/// Unity's event passes then Layout + Repaint, measured but not drawn. GUI::Stats() and GUI::DrawnButtons() then
+		/// describe it.
+		static void ScriptedFrame(ScriptedGuiInput& input, float time);
+
 		/// Adds an OnGUI handler; lower `order` runs first in each pass (Unity: GUI.depth / script order). Re-registering
 		/// an owner replaces its handler.
 		static void Register(const void* owner, std::function<void()> onGui, int order = 0);

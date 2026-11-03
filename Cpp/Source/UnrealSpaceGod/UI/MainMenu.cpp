@@ -74,6 +74,8 @@ namespace SpaceGod::UI
 		});
 	}
 
+	bool MainMenu::Showing() { return sceneMenu != nullptr && sceneWorldAlive.IsValid(); }
+
 	void MainMenu::DrawGui(UWorld* world, UCanvas* /*canvas*/)
 	{
 		if (!sceneMenu) return;

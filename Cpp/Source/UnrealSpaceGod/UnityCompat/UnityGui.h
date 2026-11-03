@@ -28,6 +28,7 @@
 
 #include <exception>
 #include <functional>
+#include <unordered_map>
 
 // Windows' rpcndr.h defines `small` as a macro; the UI's styles keep the original's name `small`.
 #ifdef small
@@ -351,6 +352,19 @@ namespace SpaceGod::UnityCompat
 		static void RunOnGUI(const std::function<void()>& onGui, Event& e, int handlerIndex);
 		/// Called by the host at the start of every frame (before its passes): drops the per-frame name map etc.
 		static void BeginFrame();
+
+		/// What a frame drew and what its controls did (the smoke run logs it, as the C# track's ImguiHost.Stats):
+		/// labels, boxes and buttons drawn in Repaint, texture quads and text runs handed to the renderer, clicks
+		/// buttons took, OnGUI calls (one per handler per pass). The host resets it at the start of each frame.
+		struct FrameStats
+		{
+			int Labels = 0, Boxes = 0, Buttons = 0, Textures = 0, Texts = 0, Clicks = 0, Passes = 0;
+			cs::String ToString() const;
+		};
+		static FrameStats& Stats();
+		/// Where each enabled button with text was drawn in the last Repaint (screen pixels, cut to its clip), by its
+		/// label (the first of a label wins), so a scripted run can click it.
+		static std::unordered_map<cs::String, Rect>& DrawnButtons();
 	};
 }
 

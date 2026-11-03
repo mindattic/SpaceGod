@@ -45,6 +45,9 @@ namespace SpaceGod::UI
 		/// used: GuiHost draws the menu's OnGUI on its own overlay.
 		static void DrawGui(UWorld* world, UCanvas* canvas);
 
+		/// Whether the menu scene's menu is up (the C# track's MainMenu.Showing; the smoke run asks).
+		static bool Showing();
+
 		/// Stands in for the GameObject's transform (the sky is parented to it).
 		cs::Ref<Transform> transform = cs::New<Transform>();
 

@@ -54,6 +54,18 @@ namespace SpaceGod
 		{
 			if (!GameLaunch::SkipsMenu())
 			{
+				// MainMenu.unity's camera and starfield need the scene host (no app): spawned first, then the menu.
+				FActorSpawnParameters params;
+				params.Name = TEXT("MainMenu");
+				params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+				params.bDeferConstruction = true;
+				if (auto* host = world->SpawnActor<AUnitySpaceAppActor>(AUnitySpaceAppActor::StaticClass(), FTransform::Identity, params))
+				{
+					host->bSceneHost = true;
+					TWeakObjectPtr<UWorld> menuWorld = world;
+					host->SceneUpdate = [menuWorld] { if (menuWorld.IsValid()) UI::MainMenu::DrawGui(menuWorld.Get(), nullptr); };
+					host->FinishSpawning(FTransform::Identity);
+				}
 				UI::MainMenu::Create(world); // the scene's MainMenu (UI ticket)
 				return;
 			}

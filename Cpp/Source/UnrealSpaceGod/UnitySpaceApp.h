@@ -67,6 +67,9 @@ namespace SpaceGod
 		/// MonoBehaviour.enabled: false stops Update (the host checks it).
 		bool enabled = true;
 
+		/// The smoke run (Smoke/SpaceGodSmoke.cpp) reads private members, as the C# track's smoke does by reflection.
+		friend struct SmokeAccess;
+
 #include "UnitySpaceApp.Main.inl"
 #include "UnitySpaceApp.Main2.inl"
 #include "UnitySpaceApp.Boarding.inl"

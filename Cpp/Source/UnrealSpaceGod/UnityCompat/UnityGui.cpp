@@ -678,6 +678,24 @@ namespace SpaceGod::UnityCompat
 	void GUI::SetRenderer(IGuiRenderer* r) { renderer = r; }
 	IGuiRenderer* GUI::Renderer() { return renderer; }
 
+	GUI::FrameStats& GUI::Stats()
+	{
+		static FrameStats stats;
+		return stats;
+	}
+
+	std::unordered_map<cs::String, Rect>& GUI::DrawnButtons()
+	{
+		static std::unordered_map<cs::String, Rect> buttons;
+		return buttons;
+	}
+
+	cs::String GUI::FrameStats::ToString() const
+	{
+		return cs::Cat(Labels, " labels, ", Boxes, " boxes, ", Buttons, " buttons, ", Textures, " texture quads, ", Texts, " text runs (",
+			Passes, " OnGUI passes)");
+	}
+
 	void GUI::BeginFrame()
 	{
 		// Names map control ids of the frame they were drawn in.
@@ -736,7 +754,9 @@ namespace SpaceGod::UnityCompat
 
 	void GUI::Label(const Rect& position, const GUIContent& content, const GUIStyle& style)
 	{
-		if (IsRepaint()) style.Draw(position, content, false, false, false, false);
+		if (!IsRepaint()) return;
+		style.Draw(position, content, false, false, false, false);
+		Stats().Labels++;
 	}
 
 	void GUI::Box(const Rect& position, const cs::String& text) { Box(position, GUIContent(text), *skin().box); }
@@ -745,7 +765,9 @@ namespace SpaceGod::UnityCompat
 	{
 		int id = GUIUtility::GetControlID(FocusType::Passive);
 		(void)id;
-		if (IsRepaint()) style.Draw(position, content, false, false, false, false);
+		if (!IsRepaint()) return;
+		style.Draw(position, content, false, false, false, false);
+		Stats().Boxes++;
 	}
 
 	bool GUI::Button(const Rect& position, const cs::String& text) { return Button(position, GUIContent(text), *skin().button); }
@@ -772,6 +794,7 @@ namespace SpaceGod::UnityCompat
 					if (position.Contains(e.mousePosition))
 					{
 						changed = true;
+						Stats().Clicks++;
 						return true;
 					}
 				}
@@ -781,6 +804,12 @@ namespace SpaceGod::UnityCompat
 				return false;
 			case EventType::Repaint:
 				style.Draw(position, content, id, false);
+				Stats().Buttons++;
+				if (enabled && !content.text.empty() && !clips.empty())
+				{
+					Rect screen = Intersect(ToScreen(position), clips.back().clip);
+					if (screen.width > 0 && screen.height > 0) DrawnButtons().emplace(content.text, screen);
+				}
 				return false;
 			default:
 				return false;

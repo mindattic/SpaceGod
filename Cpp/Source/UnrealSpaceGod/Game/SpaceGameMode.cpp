@@ -5,6 +5,7 @@
 #include "Bootstrap.h"
 #include "GameLaunch.h"
 #include "UnrealSpace.h"
+#include "Smoke/SpaceGodSmoke.h"
 
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
@@ -43,6 +44,8 @@ void ASpaceGameMode::StartPlay()
 	// The host (or a standalone game) decides the scene; the GameState carries it to clients, which equip their own
 	// app for it when it arrives (ASpaceGameState::OnRep_Scene).
 	if (ASpaceGameState* State = GetGameState<ASpaceGameState>()) State->SetScene(Scene);
+	// -SpaceGodSmoke / -SpaceGodUiShots / -SpaceGodViews (tools/play.ps1, US-T38): the views check builds its own scene.
+	if (SpaceGod::Smoke::BeginScene(GetWorld())) return;
 	SpaceGod::Bootstrap::EnsureApp(GetWorld(), SpaceGod::UnrealSpace::FromFString(Scene));
 }
 

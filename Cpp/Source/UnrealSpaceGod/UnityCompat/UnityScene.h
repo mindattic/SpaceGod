@@ -21,6 +21,17 @@ namespace SpaceGod::UnityCompat
 	class UnityScene
 	{
 	public:
+		/// What the last Sync pushed (the smoke logs it, as the C# track's UnityBridge.Last): the scene's renderers, the
+		/// Unreal primitives backing them, those drawn this frame and their triangles, meshes uploaded this frame,
+		/// material instances made so far.
+		struct Stats
+		{
+			int Renderers = 0, Primitives = 0, Visible = 0, MeshUploads = 0, MaterialInstances = 0;
+			int64_t Triangles = 0;
+			cs::String ToString() const;
+		};
+		static const Stats& Last();
+
 		/// The actor whose components draw the scene (and whose world it is in).
 		static void Attach(AActor* host);
 		/// Lets go of every Unreal component and material instance (the game scene is going).

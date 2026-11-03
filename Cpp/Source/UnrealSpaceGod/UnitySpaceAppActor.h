@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include <functional>
 #include <memory>
 #include "UnitySpaceAppActor.generated.h"
 
@@ -42,6 +43,14 @@ public:
 	/// Tick runs it with the real delta; a scripted run (the smoke) sets bExternallyStepped and calls it itself.
 	void Step(float RealDelta);
 	bool bExternallyStepped = false;
+	/// The scripted run writes Input::InputDevice::current() itself (the C# track's ScriptedInputDevice): no Feed.
+	bool bScriptedInput = false;
+
+	/// A scene without the app (set before BeginPlay): the main menu scene (Bootstrap), the views check. Each frame
+	/// runs Unity's loop for that scene instead -- Time, SceneUpdate (the menu's Update; the views placed), the scene's
+	/// renderers to Unreal, the camera.
+	bool bSceneHost = false;
+	std::function<void()> SceneUpdate;
 
 	/// Called by ASpaceHUD::DrawHUD: Unity's OnGUI pass, drawn on that canvas.
 	void DrawGui(UCanvas* Canvas);

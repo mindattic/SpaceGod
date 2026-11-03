@@ -62,6 +62,13 @@ void AUnitySpaceAppActor::BeginPlay()
 
 	// The Unity scene's renderers draw as components of this actor (US-T30); attached before Awake builds the views.
 	UnityScene::Attach(this);
+	if (bSceneHost)
+	{
+		// A scene without the app (MainMenu.unity: its camera and starfield; the menu itself is Bootstrap's).
+		ApplyCamera();
+		ApplyCursor();
+		return;
+	}
 	App = std::make_shared<UnitySpaceApp>();
 	App->Awake();
 	// OnGUI runs in the GUI host's passes (Layout, each input event, Repaint), as Unity calls it (US-T31).
@@ -94,22 +101,22 @@ void AUnitySpaceAppActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		if (EndPlayReason == EEndPlayReason::Quit || EndPlayReason == EEndPlayReason::EndPlayInEditor) App->OnApplicationQuit();
 		App->OnDestroy();
 		App.reset();
-		UnityScene::Detach();
 	}
+	UnityScene::Detach();
 	Super::EndPlay(EndPlayReason);
 }
 
 void AUnitySpaceAppActor::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	if (!App || bExternallyStepped) return;
+	if ((!App && !bSceneHost) || bExternallyStepped) return;
 	// Unity's unscaled delta: real seconds, not dilated (the app clamps it to 0.1 s itself).
 	Step(static_cast<float>(FApp::GetDeltaTime()));
 }
 
 void AUnitySpaceAppActor::Step(float RealDelta)
 {
-	if (!App) return;
+	if (!App && !bSceneHost) return;
 	RefreshUnityStatics(RealDelta);
 	// Unity's player loop: finished loads and particles first (UnityScene's BeginFrame), then every Update.
 	UnityScene::BeginFrame(Time::deltaTime);
@@ -117,7 +124,17 @@ void AUnitySpaceAppActor::Step(float RealDelta)
 	if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
 	{
 		if (PC->GetViewTarget() != this) PC->SetViewTarget(this);
-		Input::UnrealInputDevice::Feed(PC, RealDelta);
+		if (!bScriptedInput) Input::UnrealInputDevice::Feed(PC, RealDelta);
+	}
+	if (!App)
+	{
+		// A scene without the app: its own Update (the main menu's; its OnGUI runs in the GUI host's passes).
+		if (SceneUpdate) SceneUpdate();
+		UnityScene::Sync();
+		ApplyCamera();
+		ApplyCursor();
+		ApplyAudio();
+		return;
 	}
 
 	// A component added this frame starts before the next Updates (Unity: Start before the first Update).

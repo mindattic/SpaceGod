@@ -7,6 +7,7 @@
 #include "Components/DynamicMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
+#include "StaticMeshResources.h"
 #include "DynamicMesh/DynamicMesh3.h"
 #include "DynamicMesh/DynamicMeshAttributeSet.h"
 #include "Engine/World.h"
@@ -25,6 +26,8 @@ namespace SpaceGod::UnityCompat
 	namespace
 	{
 		TWeakObjectPtr<AActor> HostActor;
+		UnityScene::Stats LastStats, Building;
+		int MaterialInstancesMade = 0;
 		uint64_t PushedGlobals = 0;
 		int64_t Frame = 0;
 
@@ -292,6 +295,7 @@ namespace SpaceGod::UnityCompat
 				m.Engine = std::make_unique<MaterialHandle>();
 				h = static_cast<MaterialHandle*>(m.Engine.get());
 				h->Mid.Reset(UMaterialInstanceDynamic::Create(ShaderBinding::Parent(m.shader.get()), GetTransientPackage()));
+				MaterialInstancesMade++;
 			}
 			if (h->Pushed != m.Properties.Version)
 			{
@@ -399,10 +403,13 @@ namespace SpaceGod::UnityCompat
 				if (h->Drawn != mesh.get())
 				{
 					sm->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, UTF8_TO_TCHAR(mesh->ImportedAsset.c_str())));
+					Building.MeshUploads++;
 					h->Drawn = mesh.get();
 					h->DrawnVersion = mesh->Version;
 				}
 				sections = FMath::Max(1, sm->GetNumMaterials());
+				if (UStaticMesh* drawn = sm->GetStaticMesh(); drawn && drawn->GetRenderData() && drawn->GetRenderData()->LODResources.Num() > 0)
+					Building.Triangles += drawn->GetRenderData()->LODResources[0].GetNumTriangles();
 			}
 			else
 			{
@@ -412,10 +419,12 @@ namespace SpaceGod::UnityCompat
 				{
 					FDynamicMesh3 copy = converted->Mesh;
 					dm->SetMesh(MoveTemp(copy));
+					Building.MeshUploads++;
 					h->Drawn = mesh.get();
 					h->DrawnVersion = mesh->Version;
 				}
 				sections = converted->Sections;
+				Building.Triangles += converted->Mesh.TriangleCount();
 				if (dm->GetNumMaterials() != sections) dm->SetNumMaterials(sections);
 			}
 
@@ -438,7 +447,11 @@ namespace SpaceGod::UnityCompat
 				{
 					auto& mid = h->BlockMids[i];
 					UMaterialInterface* parent = ShaderBinding::Parent(m->shader.get());
-					if (!mid.IsValid() || mid->Parent != parent) mid.Reset(UMaterialInstanceDynamic::Create(parent, GetTransientPackage()));
+					if (!mid.IsValid() || mid->Parent != parent)
+					{
+						mid.Reset(UMaterialInstanceDynamic::Create(parent, GetTransientPackage()));
+						MaterialInstancesMade++;
+					}
 					auto& pushed = h->BlockPushed[i];
 					if (pushed.first != m.get() || pushed.second != m->Properties.Version || h->BlockPushedVersion != r.BlockVersion)
 					{
@@ -466,6 +479,7 @@ namespace SpaceGod::UnityCompat
 			}
 			if (!h->Visible) c->SetVisibility(true);
 			h->Visible = true;
+			Building.Visible++;
 		}
 	}
 
@@ -478,6 +492,14 @@ namespace SpaceGod::UnityCompat
 	}
 
 	int64_t UnityScene::CurrentFrame() { return Frame; }
+
+	const UnityScene::Stats& UnityScene::Last() { return LastStats; }
+
+	cs::String UnityScene::Stats::ToString() const
+	{
+		return cs::Cat(Renderers, " renderers, ", Primitives, " Unreal primitives (", Visible, " visible, ", Triangles, " triangles), ",
+			MeshUploads, " mesh uploads, ", MaterialInstances, " material instances");
+	}
 
 	AActor* UnityScene::Host() { return HostActor.Get(); }
 
@@ -505,7 +527,15 @@ namespace SpaceGod::UnityCompat
 		if (!host) return;
 		// What was destroyed since the last frame leaves the screen now (its component goes with its handle).
 		SceneRegistry::Get().Purge([](Renderer& r) { r.Engine.reset(); });
-		SceneRegistry::Get().ForEachRenderer([host](const cs::Ref<Renderer>& r) { SyncRenderer(host, *r); });
+		Building = UnityScene::Stats();
+		SceneRegistry::Get().ForEachRenderer([host](const cs::Ref<Renderer>& r)
+		{
+			SyncRenderer(host, *r);
+			Building.Renderers++;
+			if (auto* h = static_cast<RendererHandle*>(r->Engine.get()); h && h->Component.IsValid()) Building.Primitives++;
+		});
+		Building.MaterialInstances = MaterialInstancesMade;
+		LastStats = Building;
 		const auto& globals = Shader::Globals();
 		if (globals.Version != PushedGlobals)
 		{

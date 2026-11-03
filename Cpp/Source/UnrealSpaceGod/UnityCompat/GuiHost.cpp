@@ -571,7 +571,9 @@ namespace SpaceGod::UnityCompat
 
 			void DrawTexture(const Rect& screen, const Texture* texture, const Rect& uv, Color tint, const RectOffset& border, const GuiMatrix& matrix) override
 			{
-				if (!elements || !pixels || screen.width <= 0 || screen.height <= 0) return;
+				if (texture == nullptr || tint.a <= 0 || screen.width <= 0 || screen.height <= 0) return;
+				GUI::Stats().Textures++;
+				if (!elements || !pixels) return;
 				const FSlateBrush* source = BrushFor(texture);
 				if (!source) return;
 				// A per-draw copy: the UV region and the 9-slice margin differ between draws of one texture.
@@ -595,7 +597,9 @@ namespace SpaceGod::UnityCompat
 
 			void DrawText(Vector2 topLeft, const cs::String& text, int fontSize, FontStyle style, Color color, const GuiMatrix& matrix) override
 			{
-				if (!elements || !pixels || text.empty()) return;
+				if (text.empty()) return;
+				GUI::Stats().Texts++;
+				if (!elements || !pixels) return;
 				Vector2 size = MeasureLine(text, fontSize, style);
 				Next(&textKey);
 				FSlateDrawElement::MakeText(*elements, layer, Paint(Rect(topLeft.x, topLeft.y, size.x + 2, size.y), matrix), ToF(text),
@@ -698,6 +702,7 @@ namespace SpaceGod::UnityCompat
 					// Unity logs an exception in OnGUI and carries on with the next frame.
 					UE_LOG(LogSpaceGod, Error, TEXT("OnGUI threw: %s"), UTF8_TO_TCHAR(ex.what()));
 				}
+				GUI::Stats().Passes++;
 			}
 		}
 
@@ -722,6 +727,7 @@ namespace SpaceGod::UnityCompat
 			FGeometry px = allotted.MakeChild(FVector2f(static_cast<float>(pw), static_cast<float>(ph)), FSlateLayoutTransform(1.0f / scale));
 			GUI::SetRenderer(&slateRenderer);
 			GUI::BeginFrame();
+			GUI::Stats() = GUI::FrameStats();
 
 			std::vector<PendingEvent> events;
 			events.swap(input.queue);
@@ -745,6 +751,7 @@ namespace SpaceGod::UnityCompat
 			layout.mousePosition = mouse;
 			RunPass(layout);
 
+			GUI::DrawnButtons().clear();
 			slateRenderer.Begin(out, px, layerId);
 			Event repaint;
 			repaint.type = repaint.rawType = EventType::Repaint;
@@ -838,6 +845,97 @@ namespace SpaceGod::UnityCompat
 	void GuiHost::Unregister(const void* owner)
 	{
 		handlers.erase(std::remove_if(handlers.begin(), handlers.end(), [owner](const Handler& h) { return h.owner == owner; }), handlers.end());
+	}
+
+	void ScriptedGuiInput::Clear()
+	{
+		for (int i = 0; i < 3; i++) pressed[i] = released[i] = false;
+		wheelNotches = 0;
+		keysDown.clear();
+	}
+
+	void GuiHost::ScriptedFrame(ScriptedGuiInput& in, float time)
+	{
+		// The C# track's ImguiHost.Frame with its GuiInput: this frame's input as IMGUI events -- a move or drag, the
+		// presses and releases (Unity's click count), the wheel, the keys -- each a Layout pass then its own; then
+		// Layout and Repaint. Nothing is drawn (no element list): the renderer only measures and counts.
+		if (inFrame) return;
+		inFrame = true;
+		static Vector2 lastMouse(NAN, NAN);
+		static float lastClickTime = -10;
+		static Vector2 lastClickAt;
+		static int clickCount = 0;
+
+		GUI::SetRenderer(&slateRenderer);
+		GUI::BeginFrame();
+		GUI::Stats() = GUI::FrameStats();
+		input.present = true;
+		auto make = [&in](EventType type)
+		{
+			Event e;
+			e.type = e.rawType = type;
+			e.mousePosition = in.mouse;
+			return e;
+		};
+		std::vector<Event> events;
+		bool anyHeld = in.held[0] || in.held[1] || in.held[2];
+		if (!FMath::IsNaN(lastMouse.x) && (in.mouse.x != lastMouse.x || in.mouse.y != lastMouse.y))
+		{
+			Event move = make(anyHeld ? EventType::MouseDrag : EventType::MouseMove);
+			move.delta = Vector2(in.mouse.x - lastMouse.x, in.mouse.y - lastMouse.y);
+			move.button = in.held[0] ? 0 : in.held[1] ? 1 : in.held[2] ? 2 : 0;
+			events.push_back(move);
+		}
+		lastMouse = in.mouse;
+		for (int b = 0; b < 3; b++)
+		{
+			if (in.pressed[b])
+			{
+				float dx = in.mouse.x - lastClickAt.x, dy = in.mouse.y - lastClickAt.y;
+				clickCount = time - lastClickTime < 0.5f && FMath::Sqrt(dx * dx + dy * dy) < 5 ? clickCount + 1 : 1;
+				lastClickTime = time;
+				lastClickAt = in.mouse;
+				Event down = make(EventType::MouseDown);
+				down.button = b;
+				down.clickCount = clickCount;
+				events.push_back(down);
+			}
+			if (in.released[b])
+			{
+				Event up = make(EventType::MouseUp);
+				up.button = b;
+				up.clickCount = clickCount;
+				events.push_back(up);
+			}
+		}
+		if (in.wheelNotches != 0)
+		{
+			Event wheel = make(EventType::ScrollWheel);
+			wheel.delta = Vector2(0, -in.wheelNotches * 3.0f);
+			events.push_back(wheel);
+		}
+		for (const auto& k : in.keysDown)
+		{
+			Event key = make(EventType::KeyDown);
+			key.keyCode = k.first;
+			key.character = k.second;
+			events.push_back(key);
+		}
+
+		for (Event& e : events)
+		{
+			Event layout = make(EventType::Layout);
+			RunPass(layout);
+			EventType raw = e.type;
+			RunPass(e);
+			if (raw == EventType::MouseUp) GUIUtility::hotControl = 0;
+		}
+		Event layout = make(EventType::Layout);
+		RunPass(layout);
+		GUI::DrawnButtons().clear();
+		Event repaint = make(EventType::Repaint);
+		RunPass(repaint);
+		inFrame = false;
 	}
 
 	void GuiHost::ReleaseNativeTexture(void* native)
