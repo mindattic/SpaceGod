@@ -88,7 +88,7 @@ namespace SpaceGod::Core
 		return FireCones::Clamp(aim, axis, d->HalfDeg());
 	}
 
-	EmbodimentPose MountedTurret::PoseAt(double jd)
+	EmbodimentPose MountedTurret::PoseAt(double /*jd*/)
 	{
 		auto aim = Mount->Aim.LengthSquared() > 1e-12 ? Mount->Aim.Normalized() : RestAim(Unit, Mount->Def);
 		DVec3 unusedRight, up;
@@ -105,7 +105,7 @@ namespace SpaceGod::Core
 		Battle->Manned[Mount] = control;
 	}
 
-	void MountedTurret::Control(const EmbodimentInput& input, double dt)
+	void MountedTurret::Control(const EmbodimentInput& input, double /*dt*/)
 	{
 		cs::Ref<MountControl> m;
 		if (!Battle->Manned.TryGetValue(Mount, m)) return;

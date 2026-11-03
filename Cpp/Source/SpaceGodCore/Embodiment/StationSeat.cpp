@@ -126,7 +126,7 @@ namespace SpaceGod::Core
 		return { body, round * r, round };
 	}
 
-	EmbodimentPose StationSeat::PoseAt(double jd)
+	EmbodimentPose StationSeat::PoseAt(double /*jd*/)
 	{
 		cs::Ref<Battle> b;
 		auto u = Unit(b);

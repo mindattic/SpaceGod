@@ -138,7 +138,7 @@ namespace SpaceGod::Core
 		return sat;
 	}
 
-	void Constellation::Step(const cs::Ref<BodyDefinition>& body, double jd)
+	void Constellation::Step(const cs::Ref<BodyDefinition>& /*body*/, double jd)
 	{
 		if (Flying.Count() == 0) return;
 		cs::Ref<cs::List<int>> settled = nullptr;

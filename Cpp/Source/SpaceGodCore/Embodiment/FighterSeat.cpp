@@ -49,7 +49,7 @@ namespace SpaceGod::Core
 		return cs::String();
 	}
 
-	EmbodimentPose FighterSeat::PoseAt(double jd)
+	EmbodimentPose FighterSeat::PoseAt(double /*jd*/)
 	{
 		cs::Ref<FighterControl> stick;
 		auto up = Battle->Flown.TryGetValue(Unit, stick) && stick->Up.LengthSquared() > 1e-12 ? stick->Up : UpOf(Unit);

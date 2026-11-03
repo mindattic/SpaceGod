@@ -232,7 +232,7 @@ namespace SpaceGod::Core
 		return op;
 	}
 
-	cs::Ref<Opportunity> EventDirector::DistressAdrift(const cs::Ref<Ship>& s, double jd, const cs::Ref<EventSources>& src)
+	cs::Ref<Opportunity> EventDirector::DistressAdrift(const cs::Ref<Ship>& s, double jd, const cs::Ref<EventSources>& /*src*/)
 	{
 		cs::String lane = s->LaneLeg.Lane != nullptr ? cs::Cat(" off the ", s->LaneLeg.Lane->Name, " lane") : cs::String("");
 		auto op = cs::New<Opportunity>();
@@ -368,7 +368,7 @@ namespace SpaceGod::Core
 		return op;
 	}
 
-	cs::Ref<Opportunity> EventDirector::Escort(const cs::Ref<Ship>& s, const cs::Ref<Lane>& lane, double jd, const cs::Ref<EventSources>& src)
+	cs::Ref<Opportunity> EventDirector::Escort(const cs::Ref<Ship>& s, const cs::Ref<Lane>& lane, double /*jd*/, const cs::Ref<EventSources>& /*src*/)
 	{
 		auto op = cs::New<Opportunity>();
 		op->Kind = OpportunityKind::ConvoyEscort;

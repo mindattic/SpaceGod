@@ -88,7 +88,7 @@ namespace SpaceGod::Core
 		return r;
 	}
 
-	void SystemReport::TakeSituation(const cs::Ref<SystemReport>& r, const cs::Ref<StarSystem>& s, double jd)
+	void SystemReport::TakeSituation(const cs::Ref<SystemReport>& r, const cs::Ref<StarSystem>& s, double /*jd*/)
 	{
 		auto world = s->World;
 		r->Holder = world->Holder();

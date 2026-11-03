@@ -6,6 +6,7 @@
 #include "BodyCatalog.h"
 #include "BodyDefinition.h"
 #include "Combat/Battle.h"
+#include "Combat/CombatState.h"
 #include "Combat/Diplomacy.h"
 #include "Combat/Morale.h"
 #include "Combat/War.h"

@@ -93,7 +93,7 @@ namespace SpaceGod::Core
 		s->Command = SatelliteCommand{};
 	}
 
-	void SatelliteSeat::Control(const EmbodimentInput& input, double dt)
+	void SatelliteSeat::Control(const EmbodimentInput& input, double /*dt*/)
 	{
 		auto s = Satellite();
 		if (s == nullptr || !s->Held()) return;
