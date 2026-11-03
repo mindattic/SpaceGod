@@ -246,13 +246,16 @@ namespace SpaceGod::Core
 	// [SettingsSource]
 	class SPACEGODCORE_API InterstellarTraffic final
 	{
+	public: // (the save registration names it: Persistence/Registrations/Registrations.h)
 		/// <summary>C#'s (StarSystem system, Ship ship).</summary>
 		struct AtGateEntry
 		{
 			cs::Ref<StarSystem> system;
 			cs::Ref<Ship> ship;
 		};
+	private:
 
+	public: // (the save registration names it: Persistence/Registrations/Registrations.h)
 		/// <summary>C#'s (StarSystem from, StarSystem to, Faction quarry, double jd).</summary>
 		struct ExpeditionWanted
 		{
@@ -261,6 +264,7 @@ namespace SpaceGod::Core
 			cs::Ref<::SpaceGod::Core::Faction> quarry;
 			double jd = 0;
 		};
+	private:
 
 		cs::Ref<::SpaceGod::Core::Galaxy> galaxy;
 		cs::Random rng;

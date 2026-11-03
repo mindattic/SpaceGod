@@ -100,12 +100,14 @@ namespace SpaceGod::Core
 	/// </summary>
 	class War final
 	{
+	public: // (the save registration names it: Persistence/Registrations/Registrations.h)
 		// C#'s value tuple (Lane lane, double at): where a lane rider was last seen, as a fraction of the lane from its A end.
 		struct LanePass
 		{
 			cs::Ref<Lane> lane;
 			double at = 0;
 		};
+	private:
 
 		cs::Ref<World> world;
 
