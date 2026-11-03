@@ -45,12 +45,18 @@ namespace UnityEngine
     /// </summary>
     public sealed class HudCanvas : IGuiCanvas
     {
-        const int FontBaseSize = 16; // the UFonts' LegacyFontSize (points); every size is drawn as a scale of it
+        // Canvas rasterises a runtime font's glyphs at its LegacyFontSize and scales the quads (FCanvasTextItem), so
+        // one 16 pt font drawn at every size blurred big text (the menu's 40 px title read as a soft glow) and thinned
+        // small text. Each face is kept per point size instead, drawn at a scale near 1 (US-T45), as the C++ track's
+        // Slate text is at its exact size.
+        const int FallbackBaseSize = 16; // Roboto's LegacyFontSize (the engine asset's): every size a scale of it
 
         readonly AHUD hud;
         readonly Action<UObject> keep;
         readonly HashSet<UTexture> kept = new HashSet<UTexture>();
         readonly UFont[] fonts = new UFont[4];
+        readonly string?[] faceFiles = new string?[4];
+        readonly Dictionary<(int, int), UFont> sized = new Dictionary<(int, int), UFont>();
         readonly Dictionary<(string, int, int), float> widths = new Dictionary<(string, int, int), float>();
         readonly Dictionary<(int, int), float> lineHeights = new Dictionary<(int, int), float>();
 
@@ -69,7 +75,8 @@ namespace UnityEngine
                 string path = string.IsNullOrEmpty(fontsDir) ? "" : System.IO.Path.Combine(fontsDir, files[i]);
                 if (System.IO.File.Exists(path))
                 {
-                    fonts[i] = FromFile(path, hud);
+                    faceFiles[i] = path;
+                    fonts[i] = FromFile(path, hud, FallbackBaseSize);
                     keep(fonts[i]);
                     if (i == 0) FontSource = path;
                 }
@@ -83,11 +90,11 @@ namespace UnityEngine
         }
 
         /// <summary>A runtime-cached UFont with one typeface read from a font file.</summary>
-        static UFont FromFile(string path, UObject outer)
+        static UFont FromFile(string path, UObject outer, int points)
         {
             var font = UObject.NewObject<UFont>(outer);
             font.FontCacheType = EFontCacheType.Runtime;
-            font.LegacyFontSize = FontBaseSize;
+            font.LegacyFontSize = points;
             var data = new FFontData(path.Replace('\\', '/'), EFontHinting.Default, EFontLoadingPolicy.LazyLoad, 0, null!, null!, new List<byte>());
             var composite = font.CompositeFont;
             composite.DefaultTypeface = new FTypeface(new List<FTypefaceEntry> { new FTypefaceEntry(new UnrealSharp.Core.FName("Regular"), data) });
@@ -95,16 +102,37 @@ namespace UnityEngine
             return font;
         }
 
-        UFont FontFor(FontStyle style) => fonts[(int)style] ?? fonts[0];
+        /// <summary>Unity sizes are pixels; Slate's points are 96 DPI.</summary>
+        static float Points(int size) => size * 0.75f;
 
-        static float Scale(int size) => size * 0.75f / FontBaseSize; // Unity sizes are pixels; Slate's points are 96 DPI
+        /// <summary>The whole point size a face is rasterised at for a Unity pixel size.</summary>
+        static int BasePoints(int size) => Math.Max(1, (int)MathF.Round(Points(size)));
+
+        int Face(FontStyle style) => faceFiles[(int)style] != null ? (int)style : 0;
+
+        UFont FontFor(FontStyle style, int size)
+        {
+            int face = Face(style);
+            string? file = faceFiles[face];
+            if (file == null) return fonts[(int)style] ?? fonts[0]; // Roboto: one size, scaled
+            var key = (face, BasePoints(size));
+            if (!sized.TryGetValue(key, out var font))
+            {
+                font = FromFile(file, hud, key.Item2);
+                keep(font);
+                sized[key] = font;
+            }
+            return font;
+        }
+
+        float Scale(int size, FontStyle style) => Points(size) / (faceFiles[Face(style)] != null ? BasePoints(size) : FallbackBaseSize);
 
         public float Measure(string text, int size, FontStyle style)
         {
             if (string.IsNullOrEmpty(text)) return 0;
             var key = (text, size, (int)style);
             if (widths.TryGetValue(key, out float w)) return w;
-            hud.GetTextSize(text, out w, out float h, FontFor(style), Scale(size));
+            hud.GetTextSize(text, out w, out float h, FontFor(style, size), Scale(size, style));
             if (widths.Count > 20000) widths.Clear();
             widths[key] = w;
             return w;
@@ -114,7 +142,7 @@ namespace UnityEngine
         {
             var key = (size, (int)style);
             if (lineHeights.TryGetValue(key, out float h)) return h;
-            hud.GetTextSize("Hg", out _, out h, FontFor(style), Scale(size));
+            hud.GetTextSize("Hg", out _, out h, FontFor(style, size), Scale(size, style));
             if (h <= 0) h = MathF.Ceiling(size * 1.15f);
             lineHeights[key] = h;
             return h;
@@ -135,6 +163,6 @@ namespace UnityEngine
         }
 
         public void DrawText(string text, Vector2 screen, int size, FontStyle style, Color tint) =>
-            hud.DrawText(text, ToLinear(tint), screen.x, screen.y, FontFor(style), Scale(size), false);
+            hud.DrawText(text, ToLinear(tint), screen.x, screen.y, FontFor(style, size), Scale(size, style), false);
     }
 }
