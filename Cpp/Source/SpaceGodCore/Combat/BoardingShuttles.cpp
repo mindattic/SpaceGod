@@ -167,8 +167,11 @@ namespace SpaceGod::Core
 	/// and no damage to the hull. If the hull is no longer theirs to take (boarded by another faction, or already
 	/// held), the team stays aboard and the shuttle casts off.
 	/// </summary>
-	void Battle::ShuttleLatch(const cs::Ref<BattleUnit>& shuttle, const cs::Ref<BattleUnit>& t)
+	void Battle::ShuttleLatch(const cs::Ref<BattleUnit>& shuttle, const cs::Ref<BattleUnit>& target)
 	{
+		// A copy: C# passes the reference by value, and the caller (FighterAI::Dock) hands in shuttle->BoardTarget
+		// itself, which the next lines clear -- through a const& that would null `t` (US-T37).
+		cs::Ref<BattleUnit> t = target;
 		shuttle->Latched = t;
 		shuttle->LatchLocal = t->ToLocal(shuttle->Pos);
 		shuttle->BoardTarget = nullptr;
