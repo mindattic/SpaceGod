@@ -32,6 +32,25 @@ namespace SpaceGod::Core
 	/// C# int.CompareTo.
 	inline int CompareTo(int a, int b) { return a < b ? -1 : (a > b ? 1 : 0); }
 
+	/// C# `foreach (char c in s)`: visits the UTF-16 code units of the (UTF-8) string, as .NET's char does.
+	template <class F> void ForEachUtf16(const cs::String& s, F visit)
+	{
+		size_t i = 0, n = s.size();
+		while (i < n)
+		{
+			uint32_t c = static_cast<unsigned char>(s[i]);
+			uint32_t cp; size_t len;
+			if (c < 0x80) { cp = c; len = 1; }
+			else if ((c >> 5) == 0x6) { cp = c & 0x1F; len = 2; }
+			else if ((c >> 4) == 0xE) { cp = c & 0x0F; len = 3; }
+			else { cp = c & 0x07; len = 4; }
+			for (size_t k = 1; k < len && i + k < n; ++k) cp = (cp << 6) | (static_cast<unsigned char>(s[i + k]) & 0x3F);
+			i += len;
+			if (cp >= 0x10000) { cp -= 0x10000; visit(static_cast<uint32_t>(0xD800 + (cp >> 10))); visit(static_cast<uint32_t>(0xDC00 + (cp & 0x3FF))); }
+			else visit(cp);
+		}
+	}
+
 	/// string.Equals(a, b, StringComparison.OrdinalIgnoreCase).
 	inline bool EqualsNoCase(const cs::String& a, const cs::String& b) { return cs::Strings::EqualsOrdinalIgnoreCase(a, b); }
 }
