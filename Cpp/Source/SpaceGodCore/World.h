@@ -689,5 +689,7 @@ namespace SpaceGod::Core
 		/// <summary>How much more of every good a settled system makes than it uses: the traders' living, and the slack for the shipyards' and the ships' own wants.</summary>
 		static constexpr double SupplyMargin = 1.15;
 		SG_SERIALIZABLE(World); // ObjectGraph registration (Persistence/Registrations)
+		/// A loaded world wires its delegates again (Persistence/Registrations/Wiring.cpp, which repeats Construct and Wire's wiring).
+		void RewireAfterLoad();
 	};
 }
