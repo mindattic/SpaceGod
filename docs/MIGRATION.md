@@ -391,7 +391,8 @@ Core/Persistence, same `LocalSession` command path for seats (the co-op seam).
 - **Camera**: `SpaceCamera`/`StarTravel` run unchanged in Unity axes and double scene units; `Camera.main` stays at the
   origin (floating origin: every view is placed at scene − camera). `UnrealHost` copies it onto an `ACameraActor` that is
   the player's view target, through the one axis helper `UnityEngine.UnrealSpace` (Unity left-handed Y-up → Unreal
-  left-handed Z-up: UE(X, Y, Z) = Unity(z, x, y), a proper rotation, quaternions permuted the same way; one unit a unit,
+  left-handed Z-up: UE(X, Y, Z) = Unity(x, −z, y), SpaceGodRender's convention, a proper rotation, quaternions mapped
+  the same way, cameras through `UnrealSpace.CameraRotationToUnreal` (Unity looks +Z, Unreal +X); one unit a unit,
   scene units not being metres). Unity's vertical FOV becomes Unreal's horizontal for the viewport aspect; the dynamic
   near plane (nearest surface × 0.25) is `r.SetNearClipPlane` when it moves by over 10% (Unreal's far plane is infinite).
 - **Seams** for the later ports: stand-ins marked `Seam (US-T26)` with the originals' signatures and inert bodies, at the
@@ -404,6 +405,41 @@ Core/Persistence, same `LocalSession` command path for seats (the co-op seam).
   the game mode steps the real app loop at 1/60 s with a scripted device — idle frames, `.` (time warp), W held (free
   swim), a right-drag look, `3` twice (select and focus Earth), then `SaveTo`/`LoadFrom` through Core/Persistence — and
   logs each.
+
+### C# Runtime: views and rendering (US-T27)
+
+`Runtime/Views/*.cs` (all 17) and `Runtime/Rendering/{AssetStreamer, Materials, MeshFactory, ShipMeshFactory, ShipModels,
+ShipThumbnails}.cs` are the **original source**, byte for byte, except `AssetStreamer.cs` (its local `Object` alias is
+global in this port, `UnityCompat/GlobalUsings.cs`). `Rendering/RenderBackend.cs` keeps the original's interface and types;
+URP/HDRP (`Pipeline/`) become one `UnrealRenderBackend`: the game's LDR, no-post-process look as camera post-process
+settings (manual exposure 0 EV, ToneCurveAmount 0, ExpandGamut 0, no bloom/motion blur; FXAA, which keeps 1-px lines).
+The facade does the engine work (`UnityCompat/`):
+
+- **Renderers → primitives.** `UnityBridge.Sync` gives every enabled, active `MeshRenderer` a `UProceduralMeshComponent`
+  (an imported model: `UStaticMeshComponent`) on one scene actor at the origin, and re-pushes only what changed (transform
+  version, mesh version, materials, property block). Meshes are converted per SpaceGodRender's README: axes, re-winding
+  (Unity's front face is clockwise, Unreal's counter-clockwise), uv `(u, 1 − v)`, raw vertex colours, `MeshTopology.Points`
+  as 4-vertex quads (TexCoord0 = corner), `Lines/LineStrip` as ribbons (other end in TexCoord1.xy + TexCoord2.x, side in
+  TexCoord2.y). Same meshes and LODs: `MeshFactory`/`ShipMeshFactory` build them, `RenderLod`/`ShipLod` (Core) choose them.
+- **Materials → `ShaderBinding`** (the one lookup): Unity shader → `/SpaceGodRender/Materials/M_<Shader>` as a
+  `UMaterialInstanceDynamic`, Unity property names kept, `SetColor` through sRGB → linear, `_Drift[k]` → `_Drift_{k/4}`,
+  spatial vectors in Unreal axes, globals to `MPC_SpaceGod`, Unity's queue as `TranslucencySortPriority`.
+  `MaterialPropertyBlock` = a per-primitive MID parented to the shared one.
+- **Resources** (`UnityResources.cs`): `Textures/…`, `Skyboxes/…` → `/SpaceGodRender/Resources/…` (shared by both tracks,
+  imported headless by `Shared/Plugins/SpaceGodRender/Content/Python/spacegod_import_resources.py` with Unity's per-file
+  max size and sRGB); `Ships/*` → the Kenney craft as one static mesh per glTF node, rebuilt as Unity's prefab hierarchy
+  from `CSharp/Content/SpaceGod/Data/ShipModels.json` (glTF material names/colours, the import's axis/scale correction);
+  `Data/asteroids.bytes` read as a file (staged non-UFS). Loads are async, completed on the game thread in `UnityBridge.Tick`.
+- **ParticleSystem** (ShipView's exhaust): a CPU emitter with the modules the original sets, drawn as camera-facing quads.
+- **Check**: `tools/play.ps1 -Track CSharp -Mode views` builds Sol's views without the app (`ViewsSmoke`) and logs them;
+  `-Mode viewshot` keeps them on screen and saves `docs/images/csharp-views-sol.png`. The app smoke (`-Mode smoke`) logs
+  the facade's counts each report (`UnityBridge.Last`).
+
+Not exact yet: the asteroid belt (Asteroids.shader reads a StructuredBuffer per vertex; a material cannot, and
+`UProceduralMeshComponent` keeps UVs at half precision, so `M_Asteroids`' index-in-TexCoord0 cannot be fed) is propagated
+on the CPU with the shader's own maths at ≤ 4 Hz and drawn with `M_Points`, every asteroid 1 px; `ShipThumbnails` renders
+through a `USceneCaptureComponent2D` without layer isolation; `Light` components are data only (the shaders light
+themselves); one Unreal component per Unity renderer, no instancing of shared meshes.
 
 ## Packaging (US-T25)
 

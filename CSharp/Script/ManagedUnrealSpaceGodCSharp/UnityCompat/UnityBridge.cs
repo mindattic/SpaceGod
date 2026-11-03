@@ -46,9 +46,13 @@ namespace UnityEngine
         /// <summary>Hangs the scene's Unreal primitives on <paramref name="actor"/> (it gets a root at the origin if it has none).</summary>
         public static void Begin(AActor actor)
         {
-            host = actor;
-            if (actor.RootComponent == null)
-                actor.AddComponentByClass<USceneComponent>(false, new FTransform());
+            // Not on the given actor itself: a game mode (an AInfo) is hidden in game, and so would be everything on it.
+            // The scene gets its own plain actor at the origin, owned by it.
+            var scene = UObject.SpawnActor<AActor>(new UnrealSharp.TSubclassOf<AActor>(), new FTransform(),
+                ESpawnActorCollisionHandlingMethod.AlwaysSpawn, null, actor);
+            host = scene ?? actor;
+            if (host.RootComponent == null)
+                host.AddComponentByClass<USceneComponent>(false, new FTransform());
         }
 
         public static void Log(string message, int severity)
@@ -245,7 +249,7 @@ namespace UnityEngine
             UStaticMeshComponent? staticMesh;
             Mesh? shownMesh;
             int shownMeshVersion = -1, shownTransform = -1, shownMaterials = -1, shownBlock = -1, sections;
-            readonly List<UMaterialInstanceDynamic?> blockInstances = new List<UMaterialInstanceDynamic?>();
+            readonly List<(UMaterialInstanceDynamic? Mid, UMaterialInstanceDynamic? Parent)> blockInstances = new List<(UMaterialInstanceDynamic?, UMaterialInstanceDynamic?)>();
             bool visible;
             public int Triangles;
 
@@ -364,12 +368,13 @@ namespace UnityEngine
                             component!.SetMaterial(i, parent);
                             continue;
                         }
-                        while (blockInstances.Count <= i) blockInstances.Add(null);
-                        var mid = blockInstances[i];
-                        if (mid == null || !ReferenceEquals(mid.Parent, parent))
+                        while (blockInstances.Count <= i) blockInstances.Add((null, null));
+                        // Our own record of the parent: the glue hands back a fresh wrapper for mid.Parent each time.
+                        var (mid, ofParent) = blockInstances[i];
+                        if (mid == null || !ReferenceEquals(ofParent, parent))
                         {
                             mid = MaterialLibrary.CreateDynamicMaterialInstance(parent, new FName("Block"));
-                            blockInstances[i] = mid;
+                            blockInstances[i] = (mid, parent);
                             materialInstances++;
                         }
                         ShaderBinding.Push(r.Block, mid);

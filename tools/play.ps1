@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-  [ValidateSet('solo', 'host', 'join', 'smoke', 'shots')][string]$Mode = 'solo',
+  [ValidateSet('solo', 'host', 'join', 'smoke', 'shots', 'views', 'viewshot')][string]$Mode = 'solo',
   [string]$Address = '127.0.0.1',
   [ValidateSet('Cpp', 'CSharp')][string]$Track = 'Cpp',
   [string]$EngineVersion = '5.8'
@@ -19,6 +19,8 @@ under LogSpaceGod and quits; the log is CSharp/Saved/Logs/UnrealSpaceGodCSharp.l
   ./tools/play.ps1 -Track CSharp
   ./tools/play.ps1 -Track CSharp -Mode smoke
   ./tools/play.ps1 -Track CSharp -Mode shots   # windowed: the UI's screenshots into docs/images
+  ./tools/play.ps1 -Track CSharp -Mode views   # headless: Sol's views (US-T27) built for a frame, counts logged
+  ./tools/play.ps1 -Track CSharp -Mode viewshot # windowed: those views on screen, docs/images/csharp-views-sol.png
 #>
 
 $ErrorActionPreference = 'Stop'
@@ -46,6 +48,25 @@ if ($Mode -eq 'shots') {
   $p = Start-Process -FilePath $editor -PassThru -Wait -ArgumentList @("`"$($project.FullName)`"", '/Engine/Maps/Entry', '-game',
     '-windowed', '-ResX=1600', '-ResY=900', '-nosound', '-unattended', '-log', '-SpaceGodUiShots', "`"-capturedir=$images`"")
   Get-ChildItem -LiteralPath $images -Filter 'csharp-ui-*.png' -ErrorAction SilentlyContinue | ForEach-Object FullName
+  exit $p.ExitCode
+}
+
+if ($Mode -eq 'views' -or $Mode -eq 'viewshot') {
+  # US-T27: the ported views without the app (ASpaceGameMode.RunViews / ViewsSmoke): Sol's bodies, sky, starfield,
+  # interstellar stars, every ship's model, an orbit line; one frame headless (-Mode views) or a window that saves a
+  # screenshot (-Mode viewshot).
+  if ($Track -ne 'CSharp') { throw "-Mode $Mode is the C# track's views check: use -Track CSharp." }
+  if ($Mode -eq 'views') {
+    $cmd = Join-Path $engine 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
+    & $cmd $project.FullName '/Engine/Maps/Entry' -game -nullrhi -nosound -unattended -nosplash -stdout -FullStdOutLogOutput -SpaceGodViews |
+      Select-String -Pattern 'LogSpaceGod|Error:|Fatal' | ForEach-Object Line
+    exit $LASTEXITCODE
+  }
+  $editor = Join-Path $engine 'Engine\Binaries\Win64\UnrealEditor.exe'
+  $shot = Join-Path $repo 'docs\images\csharp-views-sol.png'
+  $p = Start-Process -FilePath $editor -PassThru -Wait -ArgumentList @("`"$($project.FullName)`"", '/Engine/Maps/Entry', '-game',
+    '-windowed', '-ResX=1600', '-ResY=900', '-nosound', '-unattended', '-log', "`"-SpaceGodShot=$shot`"")
+  if (Test-Path -LiteralPath $shot) { $shot }
   exit $p.ExitCode
 }
 
