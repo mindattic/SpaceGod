@@ -253,6 +253,7 @@ namespace Unity.SpaceGod
                 ShowToast("Nobody to hail: lock or select a ship of another polity first (F12 hails it)");
                 return;
             }
+            if (UI.GalaxyMapScreen.CoopSendsHail(this, from, to)) return; // US-T47: the hail at its frame on every peer, the envoy opened here
             ShowToast(statecraft.Hail(from, to, Clock.Jd));
             if (!Statecraft.Party(to)) return;
             EnvoyTo = to;

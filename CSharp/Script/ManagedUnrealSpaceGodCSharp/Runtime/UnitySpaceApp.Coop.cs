@@ -678,7 +678,43 @@ namespace Unity.SpaceGod
                   .Append(' ').Append(Wire.D(ps.Propellant)).Append(' ').Append(ps.Cargo ?? "-").Append(' ').Append(Wire.D(ps.Credits)).Append(pilotFlightAssistOff ? " fa-off" : " fa-on");
             }
             sb.Append(' ').Append(Course?.Destination?.Name ?? "-").Append(' ').Append(PlottedCourse != null ? "ftl" : "-").Append(InFtlCruise ? " cruise" : "").Append('\n');
+            CoopDigestStatecraft(sb); // US-T47
             return Wire.Hex(Wire.Fnv1a64(sb.ToString()));
+        }
+
+        /// <summary>US-T47: the strategy layer and statecraft, as the galaxy map's screens write them: the polity the party
+        /// speaks for, every polity's directives, the objectives, pacts, proposals waiting and the record, and between every
+        /// two states how they stand and what each thinks of the other.</summary>
+        void CoopDigestStatecraft(StringBuilder sb)
+        {
+            var polities = Galaxy.Polities;
+            var command = polities.Command;
+            var statecraft = polities.Statecraft;
+            var factions = polities.Factions;
+            int player = -1;
+            for (int i = 0; i < factions.Count; i++)
+                if (factions[i] == command.Player) player = i;
+            sb.Append("polities ").Append(player).Append(' ').Append(command.ObjectiveCount).Append(' ').Append(statecraft.Pacts.Count)
+              .Append(' ').Append(statecraft.Inbox.Count).Append(' ').Append(statecraft.Record.Count).Append('\n');
+            for (int i = 0; i < factions.Count; i++)
+            {
+                var d = command.Find(factions[i]);
+                if (d == null) continue;
+                sb.Append("directives ").Append(i).Append(' ').Append(d.Production.Name).Append(" / ").Append(d.Build.Name).Append(" / ")
+                  .Append(d.Research?.Name ?? "-").Append(' ').Append(Wire.D(d.ResearchPoints));
+                foreach (var t in ResearchTrack.All) sb.Append(' ').Append(d.Level(t));
+                sb.Append('\n');
+            }
+            for (int i = 0; i < factions.Count; i++)
+            {
+                if (!Statecraft.Party(factions[i])) continue;
+                for (int j = i + 1; j < factions.Count; j++)
+                {
+                    if (!Statecraft.Party(factions[j])) continue;
+                    sb.Append("states ").Append(i).Append(' ').Append(j).Append(' ').Append((int)polities.Diplomacy.Get(factions[i], factions[j]))
+                      .Append(' ').Append(Wire.D(statecraft.Opinion(factions[i], factions[j]))).Append(' ').Append(Wire.D(statecraft.Opinion(factions[j], factions[i]))).Append('\n');
+                }
+            }
         }
 
         /// <summary>Where this machine's player is, for the others' markers: the seat held, else the camera, as a body of the
@@ -1154,7 +1190,8 @@ namespace Unity.SpaceGod
                         finally { CoopNow = null; }
                         break;
                     default:
-                        if (!hud.CoopExecute(verb, a)) CoopPeer.Warn("unknown action '" + verb + "' from player " + (seat + 1));
+                        if (!hud.CoopExecute(verb, a) && !UI.GalaxyMapScreen.CoopExecute(this, verb, a)) // US-T47: the galaxy map's screens and the hail
+                            CoopPeer.Warn("unknown action '" + verb + "' from player " + (seat + 1));
                         break;
                 }
                 CoopActions++;

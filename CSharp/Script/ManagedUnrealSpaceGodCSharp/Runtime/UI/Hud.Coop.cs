@@ -46,6 +46,9 @@ namespace Unity.SpaceGod.UI
             return null;
         }
 
+        /// <summary>US-T47: the galaxy map's screen (made if it was never opened), for the smoke run's clicks.</summary>
+        internal GalaxyMapScreen CoopMap => galaxyMap ??= new GalaxyMapScreen(app);
+
         long observedFrame = -1;
         Settlement observedAt;
 

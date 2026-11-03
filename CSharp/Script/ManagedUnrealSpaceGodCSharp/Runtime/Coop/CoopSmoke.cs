@@ -38,6 +38,11 @@ namespace Unity.SpaceGod.Coop
         static string warpBefore;
         static long fighterFrom = -1, travelFrom = -1, loadFrom = -1;
         static FighterSeat fighter;
+        static Faction speaker; // US-T47
+        static Ship hailed;
+        static string productionBefore;
+        static int objectivesBefore, recordBefore;
+        static double treasuryBefore;
 
         static void Finish(string why, CoopPeer peer, UnitySpaceApp app)
         {
@@ -194,6 +199,62 @@ namespace Unity.SpaceGod.Coop
                     CoopPeer.Log("smoke: client asks for the party's trip to " + to?.Name + " at frame " + peer.Frame + " (from " + app.ActiveSystem.Name + ")");
                     if (to != null) app.TravelTo(to);
                     travelFrom = n;
+                    break;
+                }
+                // US-T47: the galaxy map's strategy and envoy screens and a hail (F12), from the client.
+                case 2050:
+                {
+                    var factions = app.Galaxy.Polities.Factions;
+                    Ship other = null;
+                    foreach (var s in app.World.Fleet.Ships)
+                        if (!s.Destroyed && Statecraft.Party(s.Faction)) { other = s; break; }
+                    speaker = null;
+                    foreach (var f in factions)
+                        if (Statecraft.Party(f) && f != other?.Faction) { speaker = f; break; }
+                    hailed = other;
+                    var map = app.CoopHud.CoopMap;
+                    CoopPeer.Log("smoke: client speaks for the " + speaker?.Name + " (the COMMAND panel's arrows) at frame " + peer.Frame);
+                    if (speaker != null) map.CoopSmokeSpeak(speaker);
+                    break;
+                }
+                case 2080:
+                    if (speaker == null) break;
+                    productionBefore = app.Galaxy.Polities.Command.Find(speaker)?.Production.Name ?? ProductionFocus.Balanced.Name;
+                    CoopPeer.Log("smoke: client clicks Production (" + productionBefore + ") at frame " + peer.Frame);
+                    app.CoopHud.CoopMap.CoopSmokeProduction();
+                    break;
+                case 2110:
+                    if (speaker == null) break;
+                    objectivesBefore = app.Galaxy.Polities.Command.ObjectiveCount;
+                    CoopPeer.Log("smoke: client orders the " + speaker.Name + "'s navy to EXPLORE " + app.ActiveSystem.Name + " at frame " + peer.Frame);
+                    app.CoopHud.CoopMap.CoopSmokeExplore(app.ActiveSystem);
+                    break;
+                case 2160:
+                    if (hailed == null) { CoopPeer.Warn("smoke: no ship of a state to hail in " + app.ActiveSystem.Name); break; }
+                    app.Select(Target.OfShip(hailed));
+                    break;
+                case 2170:
+                    if (hailed == null) break;
+                    CoopPeer.Log("smoke: client selects " + hailed.Name + " (" + hailed.Faction.Name + ") and presses F12 (hail) at frame " + peer.Frame);
+                    Script.Tap(Key.F12);
+                    break;
+                case 2240:
+                    if (hailed == null || speaker == null) break;
+                    recordBefore = app.Galaxy.Polities.Statecraft.Record.Count;
+                    treasuryBefore = hailed.Faction.Treasury;
+                    CoopPeer.Log("smoke: client sends the " + hailed.Faction.Name + " a gift (the envoy screen's button) at frame " + peer.Frame + "; envoy open: " + app.ShowGalaxyMap);
+                    app.CoopHud.CoopMap.CoopSmokeGift(hailed.Faction);
+                    break;
+                case 2320:
+                {
+                    if (speaker == null || hailed == null) break;
+                    var command = app.Galaxy.Polities.Command;
+                    string production = command.Find(speaker)?.Production.Name ?? "-";
+                    bool ok = command.Player == speaker && production != productionBefore && app.Galaxy.Polities.Statecraft.Record.Count > recordBefore;
+                    CoopPeer.Log("smoke: statecraft at frame " + peer.Frame + ": speaker " + command.Player?.Name + ", production " + productionBefore + " -> " + production +
+                                 ", objectives " + objectivesBefore + " -> " + command.ObjectiveCount + ", record " + recordBefore + " -> " + app.Galaxy.Polities.Statecraft.Record.Count +
+                                 ", the " + hailed.Faction.Name + "'s treasury " + treasuryBefore.ToString("N0") + " -> " + hailed.Faction.Treasury.ToString("N0") + "; carried out: " + ok);
+                    app.ShowGalaxyMap = false;
                     break;
                 }
                 case 2500:
