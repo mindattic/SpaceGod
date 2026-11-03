@@ -142,6 +142,15 @@ namespace UnityEngine
         {
             var key = (size, (int)style);
             if (lineHeights.TryGetValue(key, out float h)) return h;
+            if (faceFiles[Face(style)] != null)
+            {
+                // US-T45: Arial's line as Slate (the C++ track) and Unity's hinted font give it: the ascender and the
+                // descender (1854 and 434 of 2048 units) each rounded up to whole pixels (13 px: 12 + 3 = 15). The
+                // Canvas measure of a scaled whole-point font gave 14, so wrapped text drew a pixel tighter a line.
+                h = MathF.Ceiling(1854f * size / 2048f) + MathF.Ceiling(434f * size / 2048f);
+                lineHeights[key] = h;
+                return h;
+            }
             hud.GetTextSize("Hg", out _, out h, FontFor(style, size), Scale(size, style));
             if (h <= 0) h = MathF.Ceiling(size * 1.15f);
             lineHeights[key] = h;

@@ -30,6 +30,10 @@ namespace Unity.SpaceGod.Bridge
         /// <summary>The device the app reads; null headless (no local player).</summary>
         public UnrealInputDevice Device => device;
 
+        /// <summary>US-T45: the screenshots ignore the real keyboard and mouse (wherever the cursor happens to be, it
+        /// would hover a button or a label on one track's shot and not the other's), in the game and the GUI alike.</summary>
+        public static bool NoPlayerInput { get; set; }
+
         /// <summary>A script stands in for the keyboard and mouse (the smoke run).</summary>
         public IInputDevice Override { get; set; }
 
@@ -53,7 +57,7 @@ namespace Unity.SpaceGod.Bridge
                 Screen.SetSize(w, h);
             }
             device?.BeginFrame();
-            if (app != null) app.Input.Device = Override ?? (IInputDevice)device ?? NoInputDevice.Instance;
+            if (app != null) app.Input.Device = Override ?? (NoPlayerInput ? null : (IInputDevice)device) ?? NoInputDevice.Instance;
         }
 
         /// <summary>After the app's Update: camera, cursor, frame cap.</summary>

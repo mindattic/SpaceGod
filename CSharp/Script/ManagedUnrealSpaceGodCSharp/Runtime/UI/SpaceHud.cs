@@ -82,7 +82,7 @@ namespace Unity.SpaceGod.UI
         void RunFrame(IGuiCanvas target)
         {
             if (device == null && PlayerOwner != null) device = new UnrealInputDevice(PlayerOwner);
-            IInputDevice d = device != null ? device : NoInputDevice.Instance;
+            IInputDevice d = device != null && !Bridge.UnrealHost.NoPlayerInput ? device : NoInputDevice.Instance; // US-T45: not in the screenshots
             device?.BeginFrame();
             InputSystemDevices.Source = d;
             Fill(input, d);

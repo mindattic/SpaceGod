@@ -220,6 +220,7 @@ namespace Unity.SpaceGod.UI
             // US-T45: the same game on both tracks, pixel for pixel: a fixed start (ShotsStartJd, not now), a seeded
             // UnityEngine.Random, and (tools/play.ps1) a fixed 1/60 s frame; the C++ track's SpaceGodSmoke does the same.
             UnitySpaceApp.StartJd = ShotsStartJd;
+            Bridge.UnrealHost.NoPlayerInput = true; // wherever the real cursor is, nothing is hovered
             yield return Frames(90);
             if (MainMenu.Showing)
             {
