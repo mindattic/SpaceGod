@@ -5,14 +5,15 @@ Headless runners over the two simulation Cores, driven by the same scenarios wit
 
 | Runner | Status | Core |
 |---|---|---|
-| `Bench/CSharp/` (`Bench.CSharp.exe`, .NET 8) | done (US-T23) | `../Unity.SpaceGod/Assets/UnitySpace/Core/**/*.cs` + `../Unity.Shared/.../Runtime/Core`, linked **in place** by `CSharp/Lib/*.csproj` (netstandard2.1, C# 9, as Unity.SpaceGod's `Tests/UnitySpace.Core` does). Nothing is copied. `UnitySpaceGodDir` / `UnitySharedDir` override the checkouts. |
+| `Bench/CSharp/` (`Bench.CSharp.exe`, .NET 10 and .NET 8) | done (US-T23; net10.0, the C# game track's runtime, added in US-T42) | `../Unity.SpaceGod/Assets/UnitySpace/Core/**/*.cs` + `../Unity.Shared/.../Runtime/Core`, linked **in place** by `CSharp/Lib/*.csproj` (netstandard2.1, C# 9, as Unity.SpaceGod's `Tests/UnitySpace.Core` does). Nothing is copied. `UnitySpaceGodDir` / `UnitySharedDir` override the checkouts. |
 | `Bench/Cpp/` (`Bench.Cpp.exe`) | done (US-T37) | `Cpp/Source/SpaceGodCore` (the standalone `SpaceGodCore.lib` from `tools/build-core.ps1`); `src/` is a line-for-line port of `CSharp/src` (Program, Simulation, Digest), built by `tools/build-bench-cpp.ps1` into `Cpp/Intermediate/CoreStandalone/Release/Bench.Cpp.exe` |
 
 ```powershell
 tools/bench.ps1                         # dotnet build -c Release, then every scenario, one process each (~2 min)
 tools/bench.ps1 -Scenario battle -NoBuild
-Bench/CSharp/bin/Release/net8.0/Bench.CSharp.exe --list
-Bench/CSharp/bin/Release/net8.0/Bench.CSharp.exe --scenario sol-idle [--ticks N] [--scenarios path] [--out dir]
+tools/bench.ps1 -DotNet net8.0          # Bench.CSharp on .NET 8 (default net10.0, what UnrealSharp runs)
+Bench/CSharp/bin/Release/net10.0/Bench.CSharp.exe --list
+Bench/CSharp/bin/Release/net10.0/Bench.CSharp.exe --scenario sol-idle [--ticks N] [--scenarios path] [--out dir]
 ```
 
 Output, per scenario (gitignored): `Bench/results/csharp-<scenario>.json` (hashes, timings, memory) and
@@ -185,3 +186,25 @@ is outside the timings. The root causes found so far are in docs/MIGRATION.md, "
 so treat differences under ~20% as noise.) The C++ Core is 2–2.5× slower per simulation tick on the heavy scenarios
 and about even on building the galaxy; see docs/MIGRATION.md for the likely causes. Peak working set: C++ 38–81 MB,
 C# 85–146 MB.
+
+## C++ performance (US-T42)
+
+The C++ Core after tuning (whole-program optimisation, `/arch:AVX`, inline IEEE tests, an open-addressing
+`cs::Dictionary` index with cheap hashes, `const cs::Ref&` where accessors and delegates copied: docs/MIGRATION.md,
+"C++ performance"), raced **interleaved** against the untuned build and both .NET runtimes. Each scenario ran its four
+runners back to back, three rounds; the table gives medians of each run's tick mean / p50 in ms. All 60 runs were
+digest-identical to C#. The machine was shared with other builds and an UnrealEditor, which is why the C# figures sit
+above the 2026-11-03 sample table. Compare within a row.
+
+| Scenario | C++ before | C++ after | C# .NET 10 | C# .NET 8 | Build (C++ after / .NET 10) |
+|---|---|---|---|---|---|
+| high-warp | 1532 / 1470 | 1379 / 1282 | 1436 / 1371 | 1289 / 1209 | 4.5 / 7.8 s |
+| economy-year | 138.6 / 129.6 | 127.6 / 112.8 | 161.9 / 109.3 | 136.5 / 109.1 | 4.3 / 7.3 s |
+| galaxy-ftl | 8.88 / 3.31 | 7.41 / 2.90 | 8.09 / 2.43 | 7.46 / 2.45 | 4.0 / 6.3 s |
+| sol-idle | 2.26 / 1.10 | 1.94 / 0.99 | 1.85 / 0.60 | 1.72 / 0.60 | 4.0 / 6.0 s |
+| battle | 2.06 / 1.33 | 1.81 / 1.23 | 1.98 / 0.63 | 1.69 / 0.59 | 4.1 / 6.6 s |
+
+The heavy scenarios are now level (within noise) with .NET 10, and the galaxy builds in ~0.6× the time. .NET keeps the
+lighter median frame (sol-idle, battle). Interleaving matters: run back to back, the untuned C++ was 1.1–1.9× behind,
+not the 2–2.5× of the first table above, where the two tracks were timed at different moments of a shared machine.
+Concurrent GC (`DOTNET_gcConcurrent=1`, UnrealSharp's host default) measured within noise of the Bench's setting.

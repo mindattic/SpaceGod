@@ -60,7 +60,46 @@ namespace UnityEngine
                 data.Sections.Add(s);
                 data.TriangleCount += s.TriangleCount;
             }
+            data.FitLinesToHalfPrecision();
             return data;
+        }
+
+        /// <summary>
+        /// US-T45: the factor the component is scaled by (and the vertices divided by) so a line mesh's other ends fit
+        /// UProceduralMeshComponent's half-precision UVs (largest finite 65504). An orbit or lane end millions of units
+        /// out became infinite, the ribbon's side NaN, and the segment vanished (the C# lines drew dashed or not at all
+        /// where the C++ track's full-precision UVs drew them whole). M_Line takes the other end through
+        /// TransformLocalVectorToWorld, so a scaled component draws the same ribbon. 1 for any other mesh.
+        /// </summary>
+        public double LineScale { get; private set; } = 1;
+
+        const double HalfRoom = 16384; // well inside a half's range, so sums near the largest coordinate stay finite
+
+        void FitLinesToHalfPrecision()
+        {
+            double max = 0;
+            foreach (var s in Sections)
+            {
+                if (s.Vertices.Count == 0) continue;
+                if (s.Topology != MeshTopology.Lines && s.Topology != MeshTopology.LineStrip) return;
+                foreach (var p in s.Vertices) max = Math.Max(max, Math.Max(Math.Abs(p.X), Math.Max(Math.Abs(p.Y), Math.Abs(p.Z))));
+            }
+            double k = 1;
+            while (max / k > HalfRoom) k *= 2;
+            if (k == 1) return;
+            LineScale = k;
+            foreach (var s in Sections)
+            {
+                for (int i = 0; i < s.Vertices.Count; i++)
+                {
+                    var p = s.Vertices[i];
+                    s.Vertices[i] = new FVector(p.X / k, p.Y / k, p.Z / k);
+                    var a = s.Uv1[i];
+                    s.Uv1[i] = new FVector2D(a.X / k, a.Y / k);
+                    var b = s.Uv2[i];
+                    s.Uv2[i] = new FVector2D(b.X / k, b.Y);
+                }
+            }
         }
 
         static FLinearColor Col(Color[]? c, int i) => c != null && i < c.Length ? new FLinearColor(c[i].r, c[i].g, c[i].b, c[i].a) : new FLinearColor(1, 1, 1, 1);

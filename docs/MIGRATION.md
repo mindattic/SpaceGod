@@ -276,7 +276,83 @@ the galaxy at about the same speed. Nothing has been tuned yet; the likely costs
 than the language: `cs::Ref` (shared_ptr) passed and copied by value through hot paths (atomic reference counts where
 .NET copies a pointer), `std::function` for every C# delegate and LINQ-style callback, `cs::Dictionary`'s .NET-order
 bookkeeping, and per-object heap allocations the GC would have bump-allocated. A profiler pass on high-warp is the
-first optimisation step; anything changed must keep the five digests identical.
+first optimisation step; anything changed must keep the five digests identical. *(Done in US-T42: next section. Most of
+that 2–2.5× was the two runners timed at different times on a shared machine; interleaved, the untuned Core was
+1.1–1.9× behind, and it is now level with .NET 10.)*
+
+## C++ performance (US-T42)
+
+**Goal:** the C++ Core as fast as a competent port can be, bit-identical to C# (all five digests and CsParity checked
+after every step; nothing reorders floating-point arithmetic, RNG draws or enumeration; `/fp:precise` stays).
+
+**Build configuration.** Before: `/O2 /MD /DNDEBUG` (so `/Ob2`, `/Oi`, `_ITERATOR_DEBUG_LEVEL=0`, release CRT, no `/RTC`
+already), no whole-program optimisation. After (`tools/build-core.ps1`, `tools/build-bench-cpp.ps1`, Release): `/O2 /GL
+/Gw /arch:AVX /MD`, `lib /LTCG`, `link /LTCG /OPT:REF /OPT:ICF /CGTHREADS:n`. `/GL`+`/LTCG` matter because Core's small
+members (DVec3 operators, accessors) are defined in .cpp files. `/arch:AVX` gives VEX-encoded SSE, as RyuJIT emits
+on this hardware; AVX has no FMA, so nothing can be contracted. MSVC 2022 doesn't contract under `/fp:precise` anyway.
+The UE module's flags are unchanged (UBT's).
+
+**How it was profiled.** No admin rights, so no ETW/xperf kernel sampling. Instead, a small external sampler (suspend
+the main thread every ~1 ms, `StackWalk64`, symbols from the PDB and Microsoft's symbol server for ucrtbase) was run
+over Bench.Cpp and over Bench.CSharp. That separates time in the CRT math library from time in Core code.
+
+**What the profile showed (high-warp / economy-year, untuned):**
+- **~30% in the CRT's libm** (`sin`, `cos`, `pow`, `sinh`, `_remainder_piby2`: Kepler, the lunar theory, Lambert/
+  Stumpff, Propagate). That is the same ucrtbase code .NET calls: a micro-benchmark gives identical per-call times from
+  C++ and .NET 8, and Bench.CSharp spends ~48% of its time there. This part cannot be won back without changing results.
+- **~5% in `_dclass`/`_dtest`**: MSVC's `std::isnan`/`isinf`/`isfinite`/`signbit` are out-of-line UCRT calls, and
+  `cs::Math::Max`/`Min` (NaN-propagating, as .NET's) call two per use.
+- **~3% in `std::unordered_map`** behind `cs::Dictionary` (node allocation per key, MSVC's byte-wise FNV-1a hashes for
+  `int`/`double`/pointers, `clear()` freeing nodes one by one), worst on Fleet's `helioCache` (cleared every 8192 entries).
+- **~6% heap** (`RtlAllocateHeap`/`RtlFreeHeap`), and shared_ptr reference counting (inline `lock xadd`, spread over
+  callers) wherever a `cs::Ref` is copied: `auto b = (*Catalog)[i]`, accessors returning a Ref by value
+  (`Ship::Design`, `CombatSpec::Of`, `GoodInfo::Of`), `std::function<bool(cs::Ref<Ship>)>` delegates called per ship.
+
+**Steps (each its own commit, digests identical after each):**
+1. Whole-program optimisation (`/GL`, `/LTCG`) + inline IEEE tests in Cs.h (`IsNaNFast` = `v != v`, bit tests for inf/
+   finite/sign) behind `cs::Math::Max/Min/Sign`, `cs::Double::Is*`, `cs::Compare`. high-warp ~1590 → ~1390 ms on a
+   back-to-back run. LTCG alone was within noise.
+2. `cs::Dictionary`'s index is an open-addressing table (linear probing, power-of-two, ≤ half full, per-entry hash,
+   tombstones on Remove) instead of `std::unordered_map<K, int>`; enumeration still walks the .NET-ordered entries array,
+   so order is untouched. `CombatSpec::Of`, `GoodInfo::Of` and `Ship::Design` return `const cs::Ref&` into immutable
+   tables (every caller dereferences at once); `Ephemeris::HelioAt` and `ShipCombat::Strength` bind by `const&`.
+3. `cs::Hash`: integers and doubles hash to their value (`-0.0` as `0.0`), a Ref to its pointer; the Dictionary takes a
+   bucket from the top bits of the Fibonacci product. `/arch:AVX` (about −7% on economy-year, at the edge of noise).
+4. Fleet's per-ship delegates (`IsHeld`, `Lands`, `BurnsPropellant`) take `const cs::Ref<Ship>&`.
+
+**Tried and dropped:** a size-class allocator in Bench.Cpp (per-class reserved ranges, thread-local free lists, like
+UE's binned allocator) was *slower* than Windows' low-fragmentation heap in every scenario (economy-year 184 vs 114 ms
+back to back). Bench.Cpp keeps the CRT heap. `/arch:AVX` was kept; `/arch:AVX2` was not tried, because it would allow
+FMA instructions under a flag change.
+
+**Results**, interleaved (each scenario: C++ after, .NET 10, C++ before, .NET 8, back to back, three rounds; medians of
+the per-run tick mean and p50, ms; same workstation shared with other agents' builds and an UnrealEditor, so treat
+differences under ~10% as noise; all 60 runs digest-identical to C#):
+
+| Scenario | C++ before | C++ after | C# .NET 10 | C# .NET 8 | after vs before | after vs .NET 10 |
+|---|---|---|---|---|---|---|
+| high-warp (mean / p50) | 1532 / 1470 | 1379 / 1282 | 1436 / 1371 | 1289 / 1209 | −10% / −13% | 0.96× / 0.94× |
+| economy-year | 138.6 / 129.6 | 127.6 / 112.8 | 161.9 / 109.3 | 136.5 / 109.1 | −8% / −13% | 0.79× / 1.03× |
+| galaxy-ftl | 8.88 / 3.31 | 7.41 / 2.90 | 8.09 / 2.43 | 7.46 / 2.45 | −17% / −12% | 0.92× / 1.19× |
+| sol-idle | 2.26 / 1.10 | 1.94 / 0.99 | 1.85 / 0.60 | 1.72 / 0.60 | −14% / −10% | 1.05× / 1.65× |
+| battle | 2.06 / 1.33 | 1.81 / 1.23 | 1.98 / 0.63 | 1.69 / 0.59 | −12% / −7% | 0.92× / 1.95× |
+| build (galaxy creation) | 5.2–6.2 s | 4.0–4.5 s | 6.0–7.8 s | 6.0–6.5 s | about −25% | about 0.6× |
+
+Reading it: per heavy tick the C++ Core is now **level with .NET 10** (high-warp, economy-year, galaxy-ftl within
+noise) and builds the galaxy in ~0.6× the time. .NET still wins the *median* light frame (sol-idle, battle: 0.6 ms vs
+1.0–1.2 ms). Those frames are dominated by small per-object work (dictionary/list traffic, Ref copies, short-lived
+allocations), where a JIT with a bump allocator and no reference counting is cheaper. Its mean is held back by GC
+pauses and tier-up. .NET 10 against .NET 8 on this machine: no consistent gain (economy-year and high-warp p50 equal or
+slightly slower, more variance). Concurrent GC (`DOTNET_gcConcurrent=1`, the default UnrealSharp's host gets, single
+runs): within noise of the Bench's non-concurrent setting. TieredPGO is on in both runtimes' defaults and in the Bench.
+UnrealSharp ships the game assemblies JIT-compiled (no ReadyToRun), so the Bench's JIT setup is the shipped one.
+
+**Where the rest is.** The remaining non-libm C++ cost is spread thin: shared_ptr counting on every Ref copy still
+left in by-value parameters (`cs::Ref<Ship> ship` across Fleet, Economy, War), `std::function` delegates, list bounds
+checks. The next steps, in order of expected payoff: (a) `const cs::Ref<T>&` parameters through Fleet/Economy/War's
+call graph (mechanical, but each needs the aliasing check from Parity finding 2); (b) by-value `cs::List` returns
+from accessors that callers only read (`Values()`, `ChildrenOf`); (c) an intrusive, non-atomic `cs::Ref` for the
+single-threaded simulation, which is a large change and would need care for the UE side's threads.
 
 ## C++ Runtime: first compile and smoke (US-T38)
 

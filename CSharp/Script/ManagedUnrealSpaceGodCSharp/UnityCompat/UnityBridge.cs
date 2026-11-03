@@ -395,6 +395,7 @@ namespace UnityEngine
             UStaticMeshComponent? staticMesh;
             Mesh? shownMesh;
             int shownMeshVersion = -1, shownTransform = -1, shownMaterials = -1, shownBlock = -1, sections;
+            double shownLineScale = 1; // US-T45: UnrealMeshData.LineScale the transform was pushed with
             readonly List<(UMaterialInstanceDynamic? Mid, Material? Of, int Version)> blockInstances = new List<(UMaterialInstanceDynamic?, Material?, int)>();
             bool visible;
             public int Triangles;
@@ -473,11 +474,13 @@ namespace UnityEngine
 
                 // Transform: Unity world -> Unreal world (identity for geometry already in world space).
                 int tv = r.WorldSpaceGeometry ? 0 : r.transform.version;
-                if (tv != shownTransform)
+                double lineScale = isStatic ? 1 : mesh.Unreal.LineScale;
+                if (tv != shownTransform || lineScale != shownLineScale)
                 {
                     shownTransform = tv;
+                    shownLineScale = lineScale;
                     FTransform t;
-                    if (r.WorldSpaceGeometry) t = new FTransform();
+                    if (r.WorldSpaceGeometry) t = lineScale == 1 ? new FTransform() : UnrealSpace.ToUnreal(Vector3.zero, Quaternion.identity, Vector3.one * (float)lineScale);
                     else
                     {
                         var rot = r.transform.rotation;
@@ -487,6 +490,7 @@ namespace UnityEngine
                             rot = rot * c.Rotation;
                             scale = Vector3.Scale(scale, c.Scale);
                         }
+                        if (lineScale != 1) scale *= (float)lineScale; // the line mesh was divided by it (UnrealMeshData.LineScale)
                         t = UnrealSpace.ToUnreal(r.transform.position, rot, scale);
                     }
                     component!.SetWorldTransform(t, false, out _, true);
