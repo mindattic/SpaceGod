@@ -230,9 +230,8 @@ All in `Persistence/Registrations/` (new files, so the folders' own `.cpp` files
 New codecs for shapes the port uses: `std::array<T, N>` as a C# array (`SG_ARRAY`), `SG_ARRAYVALUES` for a
 `Dictionary<K, V[]>` held with `cs::List` values, tuples of 8+ items (`ValueTuple`8` + `Rest`).
 
-Limits that remain: a C++ save loaded in C# has null delegates (section 5); the static walk declares only statics whose
-type holds a saved class directly, so an object reachable first through another static (a type the save never holds)
-could be named differently from C#'s walk; and a World saved without its Galaxy is not rewired (saves are SaveData).
+Limits that remain (US-T36): a C++ save loaded in C# had null delegates, the static walk declared only part of C#'s, and a
+World saved without its Galaxy is not rewired (saves are SaveData). The first two are closed in section 11.
 
 ## 10. Integration checklist
 
@@ -248,3 +247,57 @@ could be named differently from C#'s walk; and a World saved without its Galaxy 
    `enum class ContactLevel : int` and `Outlaws.cpp`/`Law.cpp` include `Sensors/Sensors.h` (`Sensors::Resolve`,
    `Sensors::FindWitness(helio, jd, signature, exclude)`, `PilotBurning()`, `PilotSignature()`, `SignatureOf`,
    `Signatures::Battle/Of/Transponder`).
+
+## 11. Cross-track saves (US-T41)
+
+Proved by scratch probes over Bench's Simulation and digest (sol-idle at warp 4, saved at the first tick past 600 with a
+battle running, then 1,200 ticks; and warp 8): **C# save -> C++ load -> step** and **C++ save -> C# load -> step** give the
+same digest as the unsaved run in either Core and as the same save loaded and stepped in its own Core. A C# graph diff of
+a C# save against the C++ re-save of it (loaded in C#) finds no field differing; with rewiring, every delegate slot is
+filled as in the C# load but those of battles already over (`War.Ended`: never stepped again, not rewired in either track).
+
+**Statics at parity.** C#'s walk (section 4) goes through *every* static of every Core type, and the first path that
+reaches an object names it, so a table walked early can name a saved object first: the orbital station's and satellites'
+designs are `HullFrames::All[23].Design` in C#, because `FieldInfo.GetValue` runs HullFrames' static constructor and fills
+`All`; the C++ walk read `All` empty and named them `HullFrames::OrbitalStation`, so a C# save with stations did not load.
+Now `Persistence/Registrations/StaticTables.cpp` (generated from the C# walk, like Statics.cpp) declares the other 94
+statics C# names anything through, with walk registrations for the 24 classes it names there (only the fields it goes on
+through: they are never saved), private tables reached by explicit instantiation (no ported header changes); VoidStations'
+and RenderLod's file-local tables and SpinalMounts' SpinalPart are declared in their own .cpp; HullFrames' static
+constructor runs before its tables are walked. Every name of C#'s walk is C++'s, in walk order (checked fresh, after
+`Galaxy.CreateDefault` and after 3,600 ticks), except on purpose: settings (their names follow the order the process
+registered them in; no save holds one), compiler closure caches (`+<>c::<>9`, bound to nothing), ObjectGraph's own tables
+and locks, and LunarTheory's coefficient tables (constexpr in C++). C++ has ~20 names more: by-value copies of arrays C#
+shares (`Array.Empty` bills, shared category and control-group arrays), which no save holds.
+
+**C# null arrays.** The port holds a C# null array or list as the empty one. Fields C# leaves null until set (Ship.Plunder,
+Route, Ports, Path, PathCumulative, Journey; Voyage.HomeRoute; MiningOperation.TugReadyJd; World.RaiderNames) are now
+written as null when empty (`SG_NULLARRAY` / `SG_NULLLIST` in their registrations): written as `Array.Empty` they loaded
+in C# as empty arrays where the C# tests for null (`War.UnloadPlunder` indexed an empty Plunder). Faction.Prefix is
+written as a never-null string, Loadout.StockFacilities as the array C# holds there.
+
+**Delegates on the C# track.** `CSharp/Core/SaveCompat/SaveWiring.cs` (`RewireIfNeeded(SaveData)`, called by the C# track's
+`ApplyLoaded`; compiles into any net8+ project, so Bench/CSharp can include it) wires a save that carries no delegates as
+construction did, mirroring `Registrations/Wiring.cpp` statement for statement: method groups bound to the same Core
+methods (so a later C# save writes them as the original's would), the original's own pure wiring methods called as they
+are (War.Hook, World.WireColonyHulls, InterstellarTraffic.Register, InterstellarColonisation.Wire), the rest the
+original lambdas' bodies. It replaces every slot it wires (handlers from outside Core are kept, after Core's), so a C#
+save of a rewired game (whose glue lambdas ObjectGraph does not save) is rewired again on load without doubling. **A
+change to World's wiring must be repeated in Wiring.cpp and SaveWiring.cs.** C++ writes `System.Random` in .NET 10's layout,
+so a C++ save loads on the C# track (.NET 10), not on Bench.CSharp's .NET 8.
+
+**The original's weak-table bug (genuine; fixed in both tracks).** Two of the statics C#'s walk enumerates are
+`ConditionalWeakTable` caches keyed by live simulation objects: `FlightDecks.decks` (carriers' battle units) and
+`ArmourAngling.Tables` (combat specs). A ConditionalWeakTable is a generic IEnumerable, so the walk names everything they
+reach: after `Galaxy.CreateDefault` ~400 live objects (ships, factions, worlds: `FlightDecks::decks[0].key.Faction`),
+and combat specs under `ArmourAngling::Tables` instead of their own table. A save writes those as bare names, and any
+process whose caches differ (a fresh one; one whose GC dropped entries; another co-op peer) cannot load it. Probe: the
+unchanged original, saving 1,441 ticks into sol-idle, names 97 objects through `FlightDecks::decks` and 137 through
+`ArmourAngling::Tables`; neither a fresh C# process nor C++ loads it ("a static object this build does not have:
+...FlightDecks::decks[0].value[0].Aboard[0].Fighter.Lead.Target.Faction"). The fix: the walk does not look into those
+caches. C++ never declared them. The C# track, whose Core stays unchanged, builds ObjectGraph's private table with the
+original's own Walk minus those two (`CSharp/Core/SaveCompat/SaveStatics.cs`, `EnsureFixed`) at start (`InitSaves`, and the
+co-op peers' start, US-T39's finding of the same cause), before any galaxy exists; the table then differs from one built
+later only in settings and the lazily filled star lists, which no save holds, so every process (single-player across runs,
+co-op peers, C++) names the same objects. Saves the unfixed original made once those caches held anything stay unloadable.
+
