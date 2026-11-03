@@ -12,3 +12,8 @@ DerivedDataCache/
 *.suo
 
 __pycache__/
+
+# Packaged games (tools/package.ps1).
+Builds/
+# Written by the cooker on every package.
+**/Build/Windows/FileOpenOrder/

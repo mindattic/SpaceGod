@@ -284,11 +284,45 @@ Note for the benchmark: that first `Galaxy.CreateDefault` plus the first ticks (
 and the galaxy's first exploration pass; measure warm, and consider ReadyToRun/tiered-PGO settings for both the
 Core and the game assembly before comparing with C++.
 
-**Open risks.** Packaging is a second UAT step today (`PackageProject`) and must be verified with this layout (Core
-outside `Script/`, a netstandard2.1 reference); the packaged exe name and the C++ module stub are set up for it but
-no package has been built yet. Co-op from C# rests on UnrealSharp's replication attributes and RPCs, which are
+**Open risks.** Co-op from C# rests on UnrealSharp's replication attributes and RPCs, which are
 less battle-tested than C++'s; the Session layer (host-authoritative commands) keeps the replicated surface small.
 UnrealSharp is pre-1.0 with no tags: updates are by commit, and two of our workarounds depend on its internals.
+
+## Packaging (US-T25)
+
+`tools/package.ps1 -Track Cpp|CSharp [-Configuration Development|Shipping] [-Verify]` builds the editor target (the
+cooker needs it), runs `RunUAT BuildCookRun -platform=Win64 -build -cook -stage -pak -archive` into
+`Builds/<Track>/Windows/` (gitignored; UBT with `-WaitMutex -MaxParallelActions=4`), and for CSharp then runs
+UnrealSharp's `PackageProject` UAT command, which publishes UnrealSharp's bindings, the glue, `Script/` and the
+Core self-contained (with the .NET 10 runtime) into `<archive>/UnrealSpaceGodCSharp/Binaries/Managed/net10.0`, the
+folder the packaged plugin loads from (`ProjectDir/Binaries/Managed/net10.0`). `-Verify` (or `-VerifyOnly` on an
+existing package) boots the packaged exe with `-nullrhi -unattended` (+ `-SpaceGodSmoke` for CSharp) and prints its log.
+
+**Exe names.** A UE target name is a C# class name, so it cannot be `Unreal.SpaceGod.Cpp`. UAT archives a small
+bootstrap launcher `<Target>.exe` next to `<Target>/Binaries/Win64/<Target>.exe` (the real game). The launcher reads
+the real exe's relative path from an embedded resource, not from its own name, and the real exe finds its content
+from its own folder and its compiled-in project name, so the script **renames the launcher** to
+`Unreal.SpaceGod.Cpp.exe` / `Unreal.SpaceGod.CSharp.exe` and leaves the inner exe and the targets alone. Proven by
+booting the renamed launchers (2026-11-03, Development):
+
+```
+Cpp:    LogLoad: Game class is 'SpaceGameMode'   (Unreal.SpaceGod.Cpp.exe, LoadMap /Engine/Maps/Entry)
+CSharp: LogSpaceGod: Display: Unity.SpaceGod Core up in 11456 ms: 18 systems, 32 bodies in Sol System, 44 traders (.NET 10.0.14)
+        LogSpaceGod: Display: [tick 5] JD 2461348.003472 = 2026-11-03 12:04:59 UTC, warp 1 hour/s; Earth helio km = (112499422.4, 96791067.8, -5859.7), |r| = 0.992039 AU
+        LogSpaceGod: Display: SpaceGodSmoke: done, quitting
+```
+
+Sizes (Development, pdbs included): Cpp 940 MB staged (game exe 317 MB); CSharp 1,056 MB staged (game exe 317 MB,
+managed folder 148 MB of which most is the self-contained .NET runtime, content 131 MB, engine content 74 MB).
+
+**UnrealSharp packaging caveats.**
+- UnrealSharp's editor module runs `RunUAT BuildUserSolution` on every startup, the cook commandlet included, and
+  that nested UAT fails ("A conflicting instance of AutomationTool is already running") under BuildCookRun's UAT
+  mutex. The script sets `uebp_UATMutexNoWait=1` for the CSharp BuildCookRun, as UAT does for its own child UATs.
+- The managed publish compiles every csproj under `Script/` as it is on disk. While a Runtime port is mid-flight there
+  (uncompilable files), pass `-ManagedBuildArgs '-p:DefaultItemExcludesInProjectFolder=*/**'` to publish only each
+  project's top-level `.cs` files (the boot proof above was made that way, with `SpaceGameMode.cs`).
+- Shipping builds write no log file, so `-Verify` can only check that a Shipping package starts and exits.
 
 ## Order of work
 
