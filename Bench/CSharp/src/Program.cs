@@ -162,6 +162,7 @@ namespace Bench.CSharp
                     ["tickMeanMs"] = Round(sorted.Length > 0 ? sum / sorted.Length : 0),
                     ["tickP50Ms"] = Round(Percentile(sorted, 0.50)),
                     ["tickP95Ms"] = Round(Percentile(sorted, 0.95)),
+                    ["tickP99Ms"] = Round(Percentile(sorted, 0.99)),
                     ["tickMaxMs"] = Round(sorted.Length > 0 ? sorted[sorted.Length - 1] : 0),
                     ["ticksTotalMs"] = Round(sum),
                     ["totalMs"] = Round(total.Elapsed.TotalMilliseconds),

@@ -395,6 +395,7 @@ namespace Bench
 		j.Num("tickMeanMs", Round4(tickMean));
 		j.Num("tickP50Ms", Round4(Percentile(sorted, 0.50)));
 		j.Num("tickP95Ms", Round4(Percentile(sorted, 0.95)));
+		j.Num("tickP99Ms", Round4(Percentile(sorted, 0.99)));
 		j.Num("tickMaxMs", Round4(tickMax));
 		j.Num("ticksTotalMs", Round4(sum));
 		j.Num("totalMs", Round4(totalMs));

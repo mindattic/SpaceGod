@@ -49,7 +49,8 @@ namespace Unity.SpaceGod.UI
 
         /// <summary>-SpaceGodUiShots: the windowed screenshot tour (<see cref="UiSmoke.Shots"/>), stepped once a frame.</summary>
         static CaptureRunner.Coroutine shots = Bootstrap.HasCommandLineFlag("-SpaceGodUiShots") ? new CaptureRunner.Coroutine(UiSmoke.Shots())
-            : Bootstrap.HasCommandLineFlag("-SpaceGodFidelityShots") ? new CaptureRunner.Coroutine(FidelityShots.Run()) : null; // US-T40
+            : Bootstrap.HasCommandLineFlag("-SpaceGodFidelityShots") ? new CaptureRunner.Coroutine(FidelityShots.Run()) // US-T40
+            : Race.RaceProbe.On ? new CaptureRunner.Coroutine(Race.RaceRun.Run()) : null; // US-T46: the race (docs/RACE.md)
 
         /// <summary>Milliseconds the last GUI frame (every OnGUI pass) took, averaged (US-T40's frame-time log).</summary>
         public static float GuiMs;
@@ -89,6 +90,7 @@ namespace Unity.SpaceGod.UI
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             ImguiHost.Frame(target, input, Handlers(), Time.unscaledTime);
             GuiMs = GuiMs * 0.9f + (float)System.Diagnostics.Stopwatch.GetElapsedTime(t0).TotalMilliseconds * 0.1f;
+            Race.RaceProbe.GuiMs = System.Diagnostics.Stopwatch.GetElapsedTime(t0).TotalMilliseconds; // US-T46
             AfterFrame?.Invoke(this);
             shots?.Step();
         }

@@ -16,6 +16,7 @@
 #include "UI/GalaxyMapScreen.h" // US-T47
 #include "UI/PauseMenu.h"
 #include "UI/UiInput.h"
+#include "Smoke/SpaceGodRace.h"
 #include "UnityCompat/UnityGui.h"
 #include "Views/AsteroidBelt.h"
 #include "Views/BattleFx.h"
@@ -450,8 +451,10 @@ namespace SpaceGod
 			ShowToast("Time warp is held at real time while the helm is in a battle");
 		}
 
+		double raceSim = Race::Probe::Now(); // US-T46: the race's simulation time (docs/RACE.md)
 		CoopAdvance(dt); // US-T44: Clock->Advance(dt), in lockstep with the host in co-op
 		Galaxy->Update(Clock->Jd);
+		Race::Probe::SimMs += Race::Probe::Now() - raceSim; // US-T46
 		RefreshCharts();
 		UpdateSaves(dt);
 		SyncShipViews();
@@ -464,7 +467,9 @@ namespace SpaceGod
 		ShowLawNotices();
 		UpdateShips(dt);
 		Structures->Layout();
+		raceSim = Race::Probe::Now(); // US-T46
 		CoopUpdateAdventures(!Travel->Active && !InFtlCruise()); // US-T44: was `if (that) World()->UpdateAdventures(Clock->Jd, PlayerHelioKm());`, the host's call in co-op
+		Race::Probe::SimMs += Race::Probe::Now() - raceSim; // US-T46
 
 		CoopShared([this] { DropLostTargets(); }); // US-T44 (US-T43): DropLostTargets(); a helm lost is lost on every peer
 		BattleTime();

@@ -9,6 +9,7 @@
 #include "CaptureRunner.h"
 #include "Views/AsteroidBelt.h"
 #include "Coop/CoopPeer.h"
+#include "Smoke/SpaceGodRace.h"
 
 #include "Camera/CameraComponent.h"
 #include "Engine/Engine.h"
@@ -123,6 +124,7 @@ void AUnitySpaceAppActor::Tick(float DeltaSeconds)
 void AUnitySpaceAppActor::Step(float RealDelta)
 {
 	if (!App && !bSceneHost) return;
+	const double raceT0 = Race::Probe::Now(); // US-T46: the whole Unity frame, for the race (docs/RACE.md)
 	RefreshUnityStatics(RealDelta);
 	// Unity's player loop: finished loads and particles first (UnityScene's BeginFrame), then every Update.
 	UnityScene::BeginFrame(Time::deltaTime);
@@ -158,6 +160,7 @@ void AUnitySpaceAppActor::Step(float RealDelta)
 	ApplyCamera();
 	ApplyCursor();
 	ApplyAudio();
+	Race::Probe::AppMs = Race::Probe::Now() - raceT0; // US-T46
 }
 
 void AUnitySpaceAppActor::AddCaptureRunner()

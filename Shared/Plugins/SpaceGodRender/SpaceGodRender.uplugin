@@ -14,6 +14,11 @@
 			"Name": "SpaceGodRender",
 			"Type": "Runtime",
 			"LoadingPhase": "PostConfigInit"
+		},
+		{
+			"Name": "SpaceGodRace",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
 		}
 	]
 }

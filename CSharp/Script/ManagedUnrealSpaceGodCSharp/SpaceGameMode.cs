@@ -51,7 +51,7 @@ public partial class ASpaceGameMode : AGameModeBase
             System.IO.Directory.CreateDirectory(root);
             Profiles.UseRoot(root);
         }
-        else if (Bootstrap.HasCommandLineFlag("-SpaceGodUiShots"))
+        else if (Bootstrap.HasCommandLineFlag("-SpaceGodUiShots") || Unity.SpaceGod.Race.RaceProbe.On)
         {
             // US-T45: the screenshots' profile in a scratch folder, fresh each run (the C++ track's ShotProfiles), so the
             // menu reads as a first start ("No saves yet") whatever was played before.
@@ -182,12 +182,14 @@ public partial class ASpaceGameMode : AGameModeBase
     /// <summary>One frame of Unity's player loop.</summary>
     void Step(float dt)
     {
+        long raceT0 = Unity.SpaceGod.Race.RaceProbe.Now(); // US-T46: the whole Unity frame, for the race
         host!.BeforeUpdate(Bootstrap.App!);
         UnityBridge.Tick(dt);
         CoopPeer.Current?.HostEndUpdate(Bootstrap.App); // US-T39: the frame to the clients
         host.AfterUpdate();
         UnityBridge.Sync();
         script?.EndFrame();
+        Unity.SpaceGod.Race.RaceProbe.AppMs = Unity.SpaceGod.Race.RaceProbe.Since(raceT0); // US-T46
     }
 
     void Frames(int n)

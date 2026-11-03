@@ -2,6 +2,7 @@
 
 #include "UnityCompat/UnityRuntime.h"
 #include "UI/UiInput.h"
+#include "Smoke/SpaceGodRace.h"
 #include "UnrealSpaceGodLog.h"
 
 #include "CoreMinimal.h"
@@ -712,6 +713,7 @@ namespace SpaceGod::UnityCompat
 		{
 			if (inFrame) return layerId; // a nested paint (should not happen) draws nothing
 			inFrame = true;
+			const double raceT0 = Race::Probe::Now(); // US-T46: the IMGUI pass, for the race (docs/RACE.md)
 			float scale = allotted.Scale > 0 ? allotted.Scale : 1.0f;
 			FVector2f localSize = allotted.GetLocalSize();
 			int pw = FMath::RoundToInt(localSize.X * scale), ph = FMath::RoundToInt(localSize.Y * scale);
@@ -761,6 +763,7 @@ namespace SpaceGod::UnityCompat
 			RunPass(repaint);
 			int32 last = slateRenderer.End();
 			inFrame = false;
+			Race::Probe::GuiMs = Race::Probe::Now() - raceT0; // US-T46
 			return last;
 		}
 

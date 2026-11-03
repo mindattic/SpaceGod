@@ -11,6 +11,7 @@
 #include "UnitySpaceAppActor.h"
 #include "UnrealSpace.h"
 #include "UnrealSpaceGodLog.h"
+#include "Smoke/SpaceGodRace.h"
 #include "Smoke/SpaceGodSmoke.h"
 
 #include "BodyCatalog.h"
@@ -73,6 +74,7 @@ void ASpaceGameMode::StartPlay()
 	if (ASpaceGameState* State = GetGameState<ASpaceGameState>()) State->SetScene(Scene);
 	// -SpaceGodSmoke / -SpaceGodUiShots / -SpaceGodViews (tools/play.ps1, US-T38): the views check builds its own scene.
 	if (SpaceGod::Smoke::BeginScene(GetWorld())) return;
+	SpaceGod::Race::BeginScene(GetWorld()); // -SpaceGodRace (US-T46, docs/RACE.md)
 
 	// US-T44: a listen server (tools/play.ps1 -Mode host) hosts co-op in the game scene; standalone stays the original
 	// single-player path. (The C# track's ASpaceGameMode.BeginPlay.)
