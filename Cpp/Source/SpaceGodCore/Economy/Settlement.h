@@ -23,14 +23,14 @@ namespace SpaceGod::Core
 		MiningOutpost,
 		Haven,
 	};
-	const char* ToString(SettlementKind v);
+	SPACEGODCORE_API const char* ToString(SettlementKind v);
 
 	/// <summary>
 	/// A populated place with a market: a colony on a world, a station in orbit, a mining outpost or a
 	/// pirate haven. It produces through its facilities, consumes through its people and industry,
 	/// and prices every good from how its stock compares with what it uses.
 	/// </summary>
-	class Settlement final
+	class SPACEGODCORE_API Settlement final
 	{
 	public:
 		int Id = 0;

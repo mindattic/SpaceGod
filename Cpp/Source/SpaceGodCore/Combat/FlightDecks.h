@@ -31,7 +31,7 @@ namespace SpaceGod::Core
 		/// <summary>Thrown down the deck and out of the bow mouth, back into the fight.</summary>
 		Launching,
 	};
-	const char* ToString(DeckStage v);
+	SPACEGODCORE_API const char* ToString(DeckStage v);
 
 	/// <summary>A craft's visit to one flight deck: which, how far along it is, and how far its service has got.</summary>
 	class DeckVisit final
@@ -70,7 +70,7 @@ namespace SpaceGod::Core
 	/// run fore and aft through one of its hangars (<see cref="SubsystemKind.Hangar"/>). Craft come in through the stern mouth,
 	/// put down on the deck amidships and go out through the bow mouth. Positions are battle-local km, moving with the hull.
 	/// </summary>
-	class FlightDeck final
+	class SPACEGODCORE_API FlightDeck final
 	{
 	public:
 		cs::Ref<BattleUnit> Carrier;
@@ -141,7 +141,7 @@ namespace SpaceGod::Core
 	/// launches (<see cref="TakeOff"/>).
 	/// </summary>
 	// [SettingsSource]
-	class FlightDecks
+	class SPACEGODCORE_API FlightDecks
 	{
 	public:
 		static const cs::Ref<RangeSetting>& ServiceSeconds();

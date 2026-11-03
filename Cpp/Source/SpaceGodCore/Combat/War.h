@@ -63,7 +63,7 @@ namespace SpaceGod::Core
 		/// <summary>Visit every world of a system in turn, on its polity's orders (U.SPC-T423).</summary>
 		Explore,
 	};
-	const char* ToString(OrderKind v);
+	SPACEGODCORE_API const char* ToString(OrderKind v);
 
 	/// <summary>
 	/// An armed interdictor a lane rider's scanners have picked up ahead (see <see cref="War.ThreatAhead"/>): who, how many
@@ -98,7 +98,7 @@ namespace SpaceGod::Core
 	/// electronics, munitions), a port held without defenders for three days changes hands, and
 	/// traders steer clear of where the fighting has been.
 	/// </summary>
-	class War final
+	class SPACEGODCORE_API War final
 	{
 	public: // (the save registration names it: Persistence/Registrations/Registrations.h)
 		// C#'s value tuple (Lane lane, double at): where a lane rider was last seen, as a fraction of the lane from its A end.

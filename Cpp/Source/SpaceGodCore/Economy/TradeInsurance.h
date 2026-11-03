@@ -14,7 +14,7 @@ namespace SpaceGod::Core
 	class Holdings;
 
 	/// <summary>An insurance policy on one of the house's hulls (and its cargo) or warehouses (and its stock).</summary>
-	class InsurancePolicy final
+	class SPACEGODCORE_API InsurancePolicy final
 	{
 	public:
 		int Id = 0;
@@ -51,7 +51,7 @@ namespace SpaceGod::Core
 	/// seized or lost with its port, is paid out at <see cref="TradeRules.InsuranceCover"/> of what it was worth. A policy
 	/// whose premium the account cannot pay lapses.
 	/// </summary>
-	class TradeInsurance final
+	class SPACEGODCORE_API TradeInsurance final
 	{
 		cs::Ref<TradeDesk> desk;
 

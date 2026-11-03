@@ -53,7 +53,7 @@ namespace SpaceGod::Core
 		/// one of a carrier's squadrons: a carrier sends one out when there is a prize to take.</summary>
 		AssaultShuttle,
 	};
-	const char* ToString(FighterRole v);
+	SPACEGODCORE_API const char* ToString(FighterRole v);
 
 	/// <summary>
 	/// One class of launched small craft (U.SPC-T424): the <see cref="ShipClass"/> it is a hull of (U.SPC-T484), its
@@ -62,7 +62,7 @@ namespace SpaceGod::Core
 	/// handling numbers flight assist works to, and how its pilots pick their fights. A new class is a new entry here
 	/// (<see cref="Register"/>) and a place in <see cref="SquadronMix"/>.
 	/// </summary>
-	class FighterCraft final
+	class SPACEGODCORE_API FighterCraft final
 	{
 	public:
 		FighterRole Role;
@@ -156,10 +156,10 @@ namespace SpaceGod::Core
 		Missiles,
 		Torpedoes,
 	};
-	const char* ToString(WeaponGroup v);
+	SPACEGODCORE_API const char* ToString(WeaponGroup v);
 
 	/// <summary>Which group each kind of mount fires in: a table, so a new mount joins a group by an entry here.</summary>
-	class WeaponGroups
+	class SPACEGODCORE_API WeaponGroups
 	{
 		static cs::Dictionary<SubsystemKind, WeaponGroup>& ByKind();
 
@@ -187,7 +187,7 @@ namespace SpaceGod::Core
 		Shields,
 		Engines,
 	};
-	const char* ToString(PowerSystem v);
+	SPACEGODCORE_API const char* ToString(PowerSystem v);
 
 	/// <summary>
 	/// How a small craft shares its reactor (U.SPC-T424): <see cref="TotalPips"/> pips across weapons, shields and
@@ -195,7 +195,7 @@ namespace SpaceGod::Core
 	/// quarter faster (guns reloading and cooling, shields recharging, top speed and thrust), every pip less a quarter
 	/// slower. A unit with no distribution runs everything as designed.
 	/// </summary>
-	class PowerDistribution final
+	class SPACEGODCORE_API PowerDistribution final
 	{
 	public:
 		static constexpr int TotalPips = 6; static constexpr int MaxPips = 4; static constexpr int EvenPips = 2;
@@ -245,7 +245,7 @@ namespace SpaceGod::Core
 	};
 
 	// [SettingsSource]
-	class Countermeasures
+	class SPACEGODCORE_API Countermeasures
 	{
 	public:
 		/// <summary>How long a cloud burns, and how far off a homing round must be to be drawn onto it, km.</summary>
@@ -271,7 +271,7 @@ namespace SpaceGod::Core
 	/// <see cref="LocalAxis"/>, in ship-length axes: right, up, forward) does <see cref="Multiplier"/> times the damage
 	/// that gets through the shields.
 	/// </summary>
-	class WeakPointSpec final
+	class SPACEGODCORE_API WeakPointSpec final
 	{
 	public:
 		SubsystemKind Kind;
@@ -286,7 +286,7 @@ namespace SpaceGod::Core
 	};
 
 	// [SettingsSource]
-	class WeakPoints
+	class SPACEGODCORE_API WeakPoints
 	{
 		static cs::Dictionary<SubsystemKind, cs::Ref<WeakPointSpec>>& Specs();
 
@@ -349,7 +349,7 @@ namespace SpaceGod::Core
 	/// damage. Small craft only (a capital's own torpedo tubes are not strike torpedoes), and only on a capital.
 	/// </summary>
 	// [SettingsSource]
-	class StrikeTorpedoes
+	class SPACEGODCORE_API StrikeTorpedoes
 	{
 	public:
 		static const cs::Ref<RangeSetting>& BareHullDamage();
@@ -383,10 +383,10 @@ namespace SpaceGod::Core
 		/// <summary>Each picks and fights its own target.</summary>
 		EngageAtWill,
 	};
-	const char* ToString(WingOrder v);
+	SPACEGODCORE_API const char* ToString(WingOrder v);
 
 	/// <summary>A squadron's wingmen and the orders its lead gives them (U.SPC-T424).</summary>
-	class Wing
+	class SPACEGODCORE_API Wing
 	{
 	public:
 		/// <summary>How near the lead a hostile must be for a wingman covering it to go after it, km.</summary>

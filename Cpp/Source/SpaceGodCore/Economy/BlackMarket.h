@@ -21,7 +21,7 @@ namespace SpaceGod::Core
 	/// as much as it can move in <see cref="AppetiteDays"/>, and on down to a quarter of that when glutted. So a clan's
 	/// smugglers carry loot from havens that are full of it to stations that are short.
 	/// </summary>
-	class BlackMarket
+	class SPACEGODCORE_API BlackMarket
 	{
 	public:
 		/// <summary>What a haven's fences pay for loot, as a share of the base price, when they hold a normal amount.</summary>

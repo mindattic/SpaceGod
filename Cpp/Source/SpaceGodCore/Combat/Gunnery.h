@@ -14,7 +14,7 @@ namespace SpaceGod::Core
 	/// segment, and either hits only what it really passes through, so a crosshair laid on target hits
 	/// and a hull jinking across a gunner's sights makes him miss.
 	/// </summary>
-	class Gunnery
+	class SPACEGODCORE_API Gunnery
 	{
 	public:
 		/// <summary>How far off the nose a player's gun swings to meet the crosshair, deg; the railgun's

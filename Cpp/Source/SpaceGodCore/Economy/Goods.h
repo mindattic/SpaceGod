@@ -25,7 +25,7 @@ namespace SpaceGod::Core
 		Machinery,
 		Munitions,
 	};
-	const char* ToString(Good v);
+	SPACEGODCORE_API const char* ToString(Good v);
 
 	enum class GoodCategory : int
 	{
@@ -35,9 +35,9 @@ namespace SpaceGod::Core
 		Industrial,
 		Military,
 	};
-	const char* ToString(GoodCategory v);
+	SPACEGODCORE_API const char* ToString(GoodCategory v);
 
-	class GoodInfo final
+	class SPACEGODCORE_API GoodInfo final
 	{
 	public:
 		::SpaceGod::Core::Good Good = static_cast<::SpaceGod::Core::Good>(0);

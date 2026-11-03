@@ -38,7 +38,7 @@ namespace SpaceGod::Core
 		/// <summary>Nobody came before the air ran out.</summary>
 		Lost,
 	};
-	const char* ToString(PodState v);
+	SPACEGODCORE_API const char* ToString(PodState v);
 
 	/// <summary>How a hull's last moments came, which decides how many of its people reach the pods.</summary>
 	enum class AbandonCause : int
@@ -52,7 +52,7 @@ namespace SpaceGod::Core
 		/// <summary>Scuttled or cast adrift deliberately: the crew are put off in the pods in good order.</summary>
 		Scuttled,
 	};
-	const char* ToString(AbandonCause v);
+	SPACEGODCORE_API const char* ToString(AbandonCause v);
 
 	/// <summary>
 	/// Crew survival and the manpower behind every hull. Every crewed hull carries escape pods, one per
@@ -66,7 +66,7 @@ namespace SpaceGod::Core
 	/// <see cref="Faction.Manpower"/> for good; new hulls and refits draw their crews from that pool, which
 	/// recruiting from the owners' settlements tops up.
 	/// </summary>
-	class Crews final
+	class SPACEGODCORE_API Crews final
 	{
 	public:
 		/// <summary>People per escape pod (a lifeboat-sized capsule).</summary>
@@ -240,7 +240,7 @@ namespace SpaceGod::Core
 	/// battle's anchor in <see cref="Body"/>'s frame (or beside a lane, <see cref="Site"/>), and
 	/// <see cref="LocalAt"/> the cluster's battle-local position, drifting slowly away from the hull.
 	/// </summary>
-	class EscapePod final
+	class SPACEGODCORE_API EscapePod final
 	{
 	public:
 		int Id = 0;

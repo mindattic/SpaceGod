@@ -26,7 +26,7 @@ namespace SpaceGod::Core
 	/// not listed is slag. New kinds plug in through <see cref="Register"/>; nothing that runs the pipeline needs
 	/// to change.
 	/// </summary>
-	class AsteroidClass final
+	class SPACEGODCORE_API AsteroidClass final
 	{
 	public:
 		cs::String Name;
@@ -91,7 +91,7 @@ namespace SpaceGod::Core
 	/// guarded. Raided now and then (see <see cref="BeltMining.WarehouseRaidPerDay"/>), but far less often than the
 	/// convoys that fill it are robbed on the way.
 	/// </summary>
-	class MaterialWarehouse final
+	class SPACEGODCORE_API MaterialWarehouse final
 	{
 	public:
 		cs::String Name;
@@ -119,10 +119,10 @@ namespace SpaceGod::Core
 		/// <summary>Lost on the way with nobody the richer: an ore tug blown apart with its load in a fight (U.SPC-T498).</summary>
 		Lost,
 	};
-	const char* ToString(ConvoyState v);
+	SPACEGODCORE_API const char* ToString(ConvoyState v);
 
 	/// <summary>A raw-material convoy: one load of separated elements from a refinery to a warehouse.</summary>
-	class MaterialConvoy final
+	class SPACEGODCORE_API MaterialConvoy final
 	{
 	public:
 		cs::String Name;
@@ -236,7 +236,7 @@ namespace SpaceGod::Core
 	/// One faction's belt works: capture tugs bringing asteroids in to a refinery, grinders reducing them to dust,
 	/// separators splitting the dust into elements, and convoys hauling the elements to a warehouse.
 	/// </summary>
-	class MiningOperation final
+	class SPACEGODCORE_API MiningOperation final
 	{
 	public:
 		cs::String Name;
@@ -366,7 +366,7 @@ namespace SpaceGod::Core
 	/// A kind of megastructure, and its bill of separated elements (U.SPC-T330). New kinds plug in through
 	/// <see cref="Register"/>; what one does once finished is its <see cref="Completed"/> handler.
 	/// </summary>
-	class MegastructureSpec final
+	class SPACEGODCORE_API MegastructureSpec final
 	{
 	public:
 		cs::String Name;
@@ -414,7 +414,7 @@ namespace SpaceGod::Core
 	};
 
 	/// <summary>One megastructure going up, built from what its builder's warehouses hold.</summary>
-	class MegastructureProject final
+	class SPACEGODCORE_API MegastructureProject final
 	{
 	public:
 		cs::Ref<MegastructureSpec> Spec;
@@ -466,7 +466,7 @@ namespace SpaceGod::Core
 	/// raiders who can take it are those about it where it actually is (<see cref="TugThreat"/>) or the fight that boards it.
 	/// </summary>
 	/// (BeltMining has a method named Ship, so inside it the type is always written ::SpaceGod::Core::Ship.)
-	class BeltMining final : public std::enable_shared_from_this<BeltMining>
+	class SPACEGODCORE_API BeltMining final : public std::enable_shared_from_this<BeltMining>
 	{
 		cs::Random rng;
 		double nextDayJd = cs::Double::NaN;

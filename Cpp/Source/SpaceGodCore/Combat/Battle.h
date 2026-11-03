@@ -40,7 +40,7 @@ namespace SpaceGod::Core
 		Platform,
 		Fighter,
 	};
-	const char* ToString(UnitKind v);
+	SPACEGODCORE_API const char* ToString(UnitKind v);
 
 	/// <summary>What a dogfighting small craft is doing (U.SPC-T274).</summary>
 	enum class DogfightManeuver : int
@@ -54,10 +54,10 @@ namespace SpaceGod::Core
 		/// <summary>A hard turn away from a hostile on its tail.</summary>
 		Break,
 	};
-	const char* ToString(DogfightManeuver v);
+	SPACEGODCORE_API const char* ToString(DogfightManeuver v);
 
 	/// <summary>One combatant in a battle. Positions are km from the battle's anchor, ecliptic axes.</summary>
-	class BattleUnit final
+	class SPACEGODCORE_API BattleUnit final
 	{
 	public:
 		int Id = 0;
@@ -345,7 +345,7 @@ namespace SpaceGod::Core
 		/// slight course correction until it strikes a hull and drills in (<see cref="BreacherBays"/>).</summary>
 		Breacher,
 	};
-	const char* ToString(MissileKind v);
+	SPACEGODCORE_API const char* ToString(MissileKind v);
 
 	/// <summary>
 	/// A proximity mine (U.SPC-T271): it sits where it was laid, arms after a moment, and blows when a hull hostile to
@@ -520,7 +520,7 @@ namespace SpaceGod::Core
 		/// <summary>A flak shell (U.SPC-T489): its tracer from the cannon (A) to its burst (B), Size the burst, km.</summary>
 		FlakBurst,
 	};
-	const char* ToString(FxKind v);
+	SPACEGODCORE_API const char* ToString(FxKind v);
 
 	/// <summary>Something to draw: a beam, a hit, an explosion. A and B are battle-local km.</summary>
 	struct CombatFx
@@ -550,7 +550,7 @@ namespace SpaceGod::Core
 	/// </summary>
 	/// <remarks>C# passes the battle itself (`this`) to hooks and helpers; here that is shared_from_this(), so a
 	/// Battle must be made with cs::New.</remarks>
-	class Battle final : public std::enable_shared_from_this<Battle>
+	class SPACEGODCORE_API Battle final : public std::enable_shared_from_this<Battle>
 	{
 	public:
 		int Id = 0;

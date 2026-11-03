@@ -20,10 +20,10 @@ namespace SpaceGod::Core
 		MunitionsPlant,
 		Shipyard,
 	};
-	const char* ToString(IndustryKind v);
+	SPACEGODCORE_API const char* ToString(IndustryKind v);
 
 	/// <summary>A production recipe: tonnes per day at level 1. Mines take their output from the site.</summary>
-	class Recipe final
+	class SPACEGODCORE_API Recipe final
 	{
 	public:
 		IndustryKind Kind = static_cast<IndustryKind>(0);
@@ -65,7 +65,7 @@ namespace SpaceGod::Core
 	};
 
 	/// <summary>One industry at a settlement. Level scales the recipe; it drifts with profitability.</summary>
-	class Facility final
+	class SPACEGODCORE_API Facility final
 	{
 	public:
 		cs::Ref<::SpaceGod::Core::Recipe> Recipe;

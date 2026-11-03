@@ -11,7 +11,7 @@ namespace SpaceGod::Core
 	class Faction;
 
 	/// <summary>One hostile group running the player's ship down (see <see cref="Pursuit"/>).</summary>
-	class Pursuer final
+	class SPACEGODCORE_API Pursuer final
 	{
 	public:
 		cs::Ref<Ship> Leader;
@@ -53,7 +53,7 @@ namespace SpaceGod::Core
 		/// <summary>The group has given the chase up and gone back to its business.</summary>
 		GaveUp,
 	};
-	const char* ToString(PursuitEvent v);
+	SPACEGODCORE_API const char* ToString(PursuitEvent v);
 
 	/// <summary>
 	/// Hostiles that see the player's ship and run it down (U.SPC-T273). Every armed hostile group in the system whose
@@ -64,7 +64,7 @@ namespace SpaceGod::Core
 	/// with the player still in reach, and within <see cref="EngageKm"/> the fight begins where the player is, anywhere
 	/// in open space. A chase that runs too long or too far is given up and the group goes back to its schedule.
 	/// </summary>
-	class Pursuit final
+	class SPACEGODCORE_API Pursuit final
 	{
 	public:
 		/// <summary>How far off a chasing group shows up, km, and how far off it gives up.</summary>

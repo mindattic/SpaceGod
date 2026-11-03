@@ -41,7 +41,7 @@ namespace SpaceGod::Core
 		/// <summary>Kill or take a wanted captain (the board's copy of a bounty, see <see cref="Outlaws"/>).</summary>
 		Bounty,
 	};
-	const char* ToString(ContractKind v);
+	SPACEGODCORE_API const char* ToString(ContractKind v);
 
 	enum class ContractState : int
 	{
@@ -62,10 +62,10 @@ namespace SpaceGod::Core
 		/// <summary>Never taken: the offer lapsed, or the need it was posted for went away.</summary>
 		Expired,
 	};
-	const char* ToString(ContractState v);
+	SPACEGODCORE_API const char* ToString(ContractState v);
 
 	/// <summary>One job on a contracts board: what, for whom, where, what it pays, and who has taken it.</summary>
-	class Contract final
+	class SPACEGODCORE_API Contract final
 	{
 	public:
 		int Id = 0;
@@ -150,7 +150,7 @@ namespace SpaceGod::Core
 	/// the patron falls; below <see cref="Law.ContractMinStanding"/> the patron offers no more). An offer nobody
 	/// takes lapses, and one whose need has gone (the shortage filled, the client arrived) is taken down.
 	/// </summary>
-	class Contracts final
+	class SPACEGODCORE_API Contracts final
 	{
 		cs::Ref<World> world;
 		cs::Random rng;
@@ -489,5 +489,5 @@ namespace SpaceGod::Core
 		SG_SERIALIZABLE(Contracts); // ObjectGraph registration (Persistence/Registrations)
 	};
 
-	const char* ToString(Contracts::TakeOutcome v);
+	SPACEGODCORE_API const char* ToString(Contracts::TakeOutcome v);
 }

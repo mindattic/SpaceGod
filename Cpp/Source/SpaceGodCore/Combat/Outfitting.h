@@ -91,7 +91,7 @@ namespace SpaceGod::Core
 		/// <summary>A spinal coilgun (U.SPC-T490, see <see cref="SpinalMounts"/>): only a spinal mount takes one.</summary>
 		Coilgun,
 	};
-	const char* ToString(ModuleKind v);
+	SPACEGODCORE_API const char* ToString(ModuleKind v);
 
 	/// <summary>
 	/// What kind of part a hull's hardpoint is reserved for, MechWarrior style (U.SPC-T508). A weapon hardpoint is
@@ -106,13 +106,13 @@ namespace SpaceGod::Core
 	/// built to its length (<see cref="SpinalMounts"/>).
 	/// </summary>
 	enum class MountType : int { Ballistic, Missile, Energy, Shield, Engine, Spinal };
-	const char* ToString(MountType v);
+	SPACEGODCORE_API const char* ToString(MountType v);
 
 	class OutfitSlot;
 
 	/// <summary>One module: what it is called, what a yard builds it from (tonnes of alloys, electronics,
 	/// machinery and munitions, scaled with the hull for plate, drives, generators and racks) and its mass.</summary>
-	class ModuleSpec final : public IPartSpec
+	class SPACEGODCORE_API ModuleSpec final : public IPartSpec
 	{
 	public:
 		ModuleKind Kind{};
@@ -193,7 +193,7 @@ namespace SpaceGod::Core
 
 	/// <summary>One hardpoint of a hull: its type and size (U.SPC-T508), which hardpoint of the layout it is and what the
 	/// design put there.</summary>
-	class OutfitSlot final
+	class SPACEGODCORE_API OutfitSlot final
 	{
 	public:
 		/// <summary>The kind of part the hardpoint is reserved for.</summary>
@@ -245,7 +245,7 @@ namespace SpaceGod::Core
 	/// <see cref="CombatSpec"/>: its hardpoints, shield, hull, armour, drive and mass.
 	/// </summary>
 	// enable_shared_from_this: members hand `this` on as a cs::Ref<Loadout> (Outfitting.RackTonnes, FacilityKind.Effect).
-	class Loadout final : public std::enable_shared_from_this<Loadout>
+	class SPACEGODCORE_API Loadout final : public std::enable_shared_from_this<Loadout>
 	{
 	public:
 		cs::Ref<CombatSpec> Base;
@@ -437,7 +437,7 @@ namespace SpaceGod::Core
 	/// <summary>Why a refit did or did not go through (<see cref="NoRoom"/>: the facility is bigger than the hull's free space;
 	/// <see cref="NoPower"/>, <see cref="NoCrew"/>: the hull has not the reactor power or the hands to spare for it, U.SPC-T521).</summary>
 	enum class OutfitOutcome : int { Ok, NotAYard, CannotDock, Busy, NoSuchSlot, WontFit, AlreadyFitted, NoStock, CantAfford, HoldTooFull, BrigOccupied, YardCannotBuild, NoRoom, NoPower, NoCrew };
-	const char* ToString(OutfitOutcome v);
+	SPACEGODCORE_API const char* ToString(OutfitOutcome v);
 
 	/// <summary>What a refit costs at a yard: the new module's materials bought from its market, the yard's labour,
 	/// and what the part taken out fetches sold back into it.</summary>
@@ -478,7 +478,7 @@ namespace SpaceGod::Core
 	/// does this at the helm; navies and raiders upgrade their warships while they refit at their own yards
 	/// (<see cref="AiRefit"/>).
 	/// </summary>
-	class Outfitting final
+	class SPACEGODCORE_API Outfitting final
 	{
 	public:
 		/// <summary>The yard's labour, as a share of the materials' base worth.</summary>

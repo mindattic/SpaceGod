@@ -682,10 +682,16 @@ namespace SpaceGod::Core
 	cs::String Companies::TagOf(const cs::String& name)
 	{
 		cs::String tag = "";
+		// `tag += char.ToUpperInvariant(w[0])` adds one UTF-16 unit, so C#'s `tag.Length > 4 ? tag.Substring(0, 4) : tag`
+		// keeps the first four letters added.
+		int units = 0;
 		for (const auto& w : cs::Strings::Split(name, ' '))
-			// char.IsLetter / char.ToUpperInvariant on ASCII (company names are built from settlement names).
-			if (static_cast<int>(w.size()) > 0 && std::isalpha(static_cast<unsigned char>(w[0]))) tag += static_cast<char>(std::toupper(static_cast<unsigned char>(w[0])));
-		return static_cast<int>(tag.size()) > 4 ? cs::Strings::Substring(tag, 0, 4) : tag;
+			if (static_cast<int>(w.size()) > 0 && cs::Char::IsLetter(cs::Char::At(w, 0)))
+			{
+				if (units < 4) cs::Char::Append(tag, cs::Char::ToUpperInvariant(cs::Char::At(w, 0)));
+				units++;
+			}
+		return tag;
 	}
 
 	Rgb Companies::LiveryFor(int n)

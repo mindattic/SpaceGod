@@ -41,7 +41,7 @@ namespace SpaceGod::Core
 		/// <summary>A navy closes its ports to a neutral's ships for supplying its enemy, through <see cref="Diplomacy"/>.</summary>
 		Embargo,
 	};
-	const char* ToString(ShockKind v);
+	SPACEGODCORE_API const char* ToString(ShockKind v);
 
 	/// <summary>One economic event in force (or just over), with what it did and where.</summary>
 	class EconomicShock final
@@ -82,7 +82,7 @@ namespace SpaceGod::Core
 	/// stock and prices through the ordinary markets, so traders (and the player) react. The news (the
 	/// world's event log) reports each one, and every price spike, as it happens.
 	/// </summary>
-	class MarketShocks final
+	class SPACEGODCORE_API MarketShocks final
 	{
 		cs::Ref<World> world;
 		cs::Random rng;

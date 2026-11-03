@@ -32,7 +32,7 @@ namespace SpaceGod::Core
 		/// <summary>The port's owner has closed its ports to the ship's flag.</summary>
 		Embargo,
 	};
-	const char* ToString(BackDoorReason v);
+	SPACEGODCORE_API const char* ToString(BackDoorReason v);
 
 	/// <summary>
 	/// Smuggling (U.SPC-T426): every lawful port has a back door. What its open market will not take from the player's
@@ -44,7 +44,7 @@ namespace SpaceGod::Core
 	/// price on their head): caught, the crates are seized and the law charges smuggling, with a witness, against the
 	/// port's owner (or the blockader).
 	/// </summary>
-	class Smuggling final
+	class SPACEGODCORE_API Smuggling final
 	{
 		cs::Ref<TradeDesk> desk;
 		cs::Random rng;
@@ -112,5 +112,5 @@ namespace SpaceGod::Core
 		SG_SERIALIZABLE(Smuggling); // ObjectGraph registration (Persistence/Registrations)
 	};
 
-	const char* ToString(Smuggling::Outcome v);
+	SPACEGODCORE_API const char* ToString(Smuggling::Outcome v);
 }

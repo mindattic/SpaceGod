@@ -42,7 +42,7 @@ namespace SpaceGod::Core
 	/// Every figure is in the settings menu's Broadsides group.
 	/// </summary>
 	// [SettingsSource]
-	class BoardingShuttles
+	class SPACEGODCORE_API BoardingShuttles
 	{
 		static cs::String Seconds(double v);
 

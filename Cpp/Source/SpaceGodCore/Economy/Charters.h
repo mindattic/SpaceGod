@@ -16,7 +16,7 @@ namespace SpaceGod::Core
 	enum class ShipClass : int;
 
 	/// <summary>A trading company's offer to charter a hull: the class it wants, for how long, at what hire a day.</summary>
-	class CharterOffer final
+	class SPACEGODCORE_API CharterOffer final
 	{
 	public:
 		int Id = 0;
@@ -40,7 +40,7 @@ namespace SpaceGod::Core
 	};
 
 	/// <summary>One of the house's hulls out on a time charter: whose, for how long, and what it has paid and made.</summary>
-	class Charter final
+	class SPACEGODCORE_API Charter final
 	{
 	public:
 		cs::Ref<OwnedShip> Ship;
@@ -79,7 +79,7 @@ namespace SpaceGod::Core
 	/// early for <see cref="RecallPenaltyDays"/> days' hire; a charterer that cannot pay (or goes under) ends the charter
 	/// itself, and a hull lost on charter is the house's loss (see <see cref="TradeInsurance"/>).
 	/// </summary>
-	class Charters final
+	class SPACEGODCORE_API Charters final
 	{
 		cs::Ref<TradeDesk> desk;
 		cs::Random rng;
@@ -178,5 +178,5 @@ namespace SpaceGod::Core
 		SG_SERIALIZABLE(Charters); // ObjectGraph registration (Persistence/Registrations)
 	};
 
-	const char* ToString(Charters::TakeOutcome v);
+	SPACEGODCORE_API const char* ToString(Charters::TakeOutcome v);
 }

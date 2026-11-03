@@ -33,7 +33,7 @@ namespace SpaceGod::Core
 		/// <summary>A six-seat personal tourer.</summary>
 		Tourer,
 	};
-	const char* ToString(CivilCraft v);
+	SPACEGODCORE_API const char* ToString(CivilCraft v);
 
 	/// <summary>
 	/// Ordinary civilian traffic (U.SPC-T375), so a system reads as lived-in rather than as a combat arena: every
@@ -43,7 +43,7 @@ namespace SpaceGod::Core
 	/// rides a hyperlane), as <see cref="ShipRole.Commuter"/> traffic. It is unarmed and no combatant (a fight never sweeps
 	/// it in, and it steers clear of one), carries no trade, and runs on its operators' own fuel rather than the markets'.
 	/// </summary>
-	class LocalTraffic
+	class SPACEGODCORE_API LocalTraffic
 	{
 	public:
 		/// <summary>The most local craft one system raises, the busiest ports first, so a crowded system stays cheap to fly.</summary>

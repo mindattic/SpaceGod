@@ -39,12 +39,12 @@ namespace SpaceGod::Core
 		/// (U.SPC-T426; a hull out on charter works this way for its charterer).</summary>
 		FreeTrade,
 	};
-	const char* ToString(StandingOrderKind v);
+	SPACEGODCORE_API const char* ToString(StandingOrderKind v);
 
 	class Property;
 
 	/// <summary>A captain's standing orders: what to do, and where (the stops of a route or patrol, a claim, a charge).</summary>
-	class StandingOrder final
+	class SPACEGODCORE_API StandingOrder final
 	{
 	public:
 		StandingOrderKind Kind = StandingOrderKind::Hold;
@@ -96,7 +96,7 @@ namespace SpaceGod::Core
 	};
 
 	/// <summary>One of the player's ships: the hull, who commands it, their orders and the ship's books.</summary>
-	class OwnedShip final
+	class SPACEGODCORE_API OwnedShip final
 	{
 	public:
 		cs::Ref<::SpaceGod::Core::Ship> Ship;
@@ -143,10 +143,10 @@ namespace SpaceGod::Core
 		/// <summary>The right to cut one ore on one world: the player's ore haulers mine it under standing orders.</summary>
 		MiningClaim,
 	};
-	const char* ToString(PropertyKind v);
+	SPACEGODCORE_API const char* ToString(PropertyKind v);
 
 	/// <summary>Something the player owns that is not a ship.</summary>
-	class Property final
+	class SPACEGODCORE_API Property final
 	{
 	public:
 		PropertyKind Kind = PropertyKind::Warehouse;
@@ -188,7 +188,7 @@ namespace SpaceGod::Core
 	};
 
 	/// <summary>A line in the player's books: when, what, and the credits in (+) or out (-).</summary>
-	class LedgerEntry final
+	class SPACEGODCORE_API LedgerEntry final
 	{
 	public:
 		double Jd = 0;
@@ -211,7 +211,7 @@ namespace SpaceGod::Core
 	/// (the house's treasury); every captain and crew is paid from it daily, and a captain unpaid for
 	/// <see cref="QuitDays"/> walks off. A ship lost is a loss on the books at what it was worth.
 	/// </summary>
-	class Holdings final
+	class SPACEGODCORE_API Holdings final
 	{
 		cs::Ref<World> world;
 		cs::Random rng;

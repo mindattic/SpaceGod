@@ -1196,4 +1196,96 @@ namespace cs
 		}
 		bool EqualsOrdinalIgnoreCase(const String& a, const String& b) { return EqualsIgnoreCase(a, b); }
 	}
+
+	namespace Char
+	{
+		uint32_t At(const String& s, int utf16Index)
+		{
+			if (utf16Index < 0) throw IndexOutOfRangeException("index");
+			int i = 0;
+			uint32_t found = 0;
+			bool got = false;
+			ForEachUtf16(s, [&](uint32_t c) { if (!got && i++ == utf16Index) { found = c; got = true; } });
+			if (!got) throw IndexOutOfRangeException("index");
+			return found;
+		}
+
+		bool IsLetter(uint32_t c)
+		{
+			if (c < 0x80) return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+			if (c == 0xAA || c == 0xB5 || c == 0xBA) return true;
+			if (c >= 0xC0 && c <= 0x2C1) return c != 0xD7 && c != 0xF7;
+			if (c >= 0x370 && c <= 0x373) return true;
+			if (c == 0x376 || c == 0x377 || (c >= 0x37B && c <= 0x37D) || c == 0x37F || c == 0x386 || (c >= 0x388 && c <= 0x38A) || c == 0x38C) return true;
+			if (c >= 0x38E && c <= 0x3A1) return true;
+			if (c >= 0x3A3 && c <= 0x3F5) return true;
+			if (c >= 0x3F7 && c <= 0x481) return true;
+			if (c >= 0x48A && c <= 0x52F) return true;
+			return false;
+		}
+
+		namespace
+		{
+			// A run of case pairs [first, last] where the upper case of each pair sits on the even (evenUpper) or odd code point.
+			bool InPairs(uint32_t c, uint32_t first, uint32_t last) { return c >= first && c <= last; }
+			uint32_t PairUpper(uint32_t c, bool evenUpper) { bool even = (c & 1) == 0; return even == evenUpper ? c : c - 1; }
+			uint32_t PairLower(uint32_t c, bool evenUpper) { bool even = (c & 1) == 0; return even == evenUpper ? c + 1 : c; }
+
+			// The pair ranges of Latin Extended-A/B and Cyrillic: (first, last, upper on the even code point).
+			struct PairRun { uint32_t First, Last; bool EvenUpper; };
+			const PairRun Runs[] = {
+				{ 0x100, 0x12F, true }, { 0x132, 0x137, true }, { 0x139, 0x148, false }, { 0x14A, 0x177, true }, { 0x179, 0x17E, false },
+				{ 0x1CD, 0x1DC, false }, { 0x1DE, 0x1EF, true }, { 0x1F8, 0x21F, true }, { 0x222, 0x233, true }, { 0x246, 0x24F, true },
+				{ 0x460, 0x481, true }, { 0x48A, 0x4BF, true }, { 0x4C1, 0x4CE, false }, { 0x4D0, 0x52F, true },
+			};
+		}
+
+		uint32_t ToUpperInvariant(uint32_t c)
+		{
+			if (c < 0x80) return c >= 'a' && c <= 'z' ? c - 32 : c;
+			if (c >= 0xE0 && c <= 0xFE && c != 0xF7) return c - 0x20;
+			if (c == 0xFF) return 0x178;
+			if (c == 0xB5) return 0x39C;
+			if (c == 0x131) return 'I';
+			if (c == 0x17F) return 'S';
+			for (const auto& r : Runs) if (InPairs(c, r.First, r.Last)) return PairUpper(c, r.EvenUpper);
+			if ((c >= 0x3B1 && c <= 0x3C1) || (c >= 0x3C3 && c <= 0x3CB)) return c - 0x20;
+			if (c == 0x3C2) return 0x3A3;
+			if (c == 0x3AC) return 0x386;
+			if (c >= 0x3AD && c <= 0x3AF) return c - 0x25;
+			if (c == 0x3CC) return 0x38C;
+			if (c == 0x3CD || c == 0x3CE) return c - 0x3F;
+			if (c >= 0x430 && c <= 0x44F) return c - 0x20;
+			if (c >= 0x450 && c <= 0x45F) return c - 0x50;
+			if (c == 0x4CF) return 0x4C0;
+			return c;
+		}
+
+		uint32_t ToLowerInvariant(uint32_t c)
+		{
+			if (c < 0x80) return c >= 'A' && c <= 'Z' ? c + 32 : c;
+			if (c >= 0xC0 && c <= 0xDE && c != 0xD7) return c + 0x20;
+			if (c == 0x178) return 0xFF;
+			if (c == 0x130) return 'i';
+			for (const auto& r : Runs) if (InPairs(c, r.First, r.Last)) return PairLower(c, r.EvenUpper);
+			if ((c >= 0x391 && c <= 0x3A1) || (c >= 0x3A3 && c <= 0x3AB)) return c + 0x20;
+			if (c == 0x386) return 0x3AC;
+			if (c >= 0x388 && c <= 0x38A) return c + 0x25;
+			if (c == 0x38C) return 0x3CC;
+			if (c == 0x38E || c == 0x38F) return c + 0x3F;
+			if (c >= 0x410 && c <= 0x42F) return c + 0x20;
+			if (c >= 0x400 && c <= 0x40F) return c + 0x50;
+			if (c == 0x4C0) return 0x4CF;
+			return c;
+		}
+
+		void Append(String& s, uint32_t c)
+		{
+			// A lone surrogate unit cannot be UTF-8; .NET's UTF-8 encoder writes U+FFFD for it.
+			if (c >= 0xD800 && c <= 0xDFFF) c = 0xFFFD;
+			if (c < 0x80) s += static_cast<char>(c);
+			else if (c < 0x800) { s += static_cast<char>(0xC0 | (c >> 6)); s += static_cast<char>(0x80 | (c & 0x3F)); }
+			else { s += static_cast<char>(0xE0 | (c >> 12)); s += static_cast<char>(0x80 | ((c >> 6) & 0x3F)); s += static_cast<char>(0x80 | (c & 0x3F)); }
+		}
+	}
 }

@@ -29,7 +29,7 @@ namespace SpaceGod::Core
 	/// goods flow from surplus to shortage on their own. Ships' profits go to their faction, ports tax
 	/// the trade they host, and shipyards turn alloys, electronics and machinery into new hulls.
 	/// </summary>
-	class Economy final : public std::enable_shared_from_this<Economy>
+	class SPACEGODCORE_API Economy final : public std::enable_shared_from_this<Economy>
 	{
 	public:
 		cs::List<cs::Ref<Settlement>> Settlements = cs::List<cs::Ref<Settlement>>();
@@ -439,5 +439,5 @@ namespace SpaceGod::Core
 		SG_SERIALIZABLE(Economy); // ObjectGraph registration (Persistence/Registrations)
 	};
 
-	const char* ToString(Economy::TradeOutcome v);
+	SPACEGODCORE_API const char* ToString(Economy::TradeOutcome v);
 }

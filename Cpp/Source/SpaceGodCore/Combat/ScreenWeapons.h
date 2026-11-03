@@ -23,7 +23,7 @@ namespace SpaceGod::Core
 	/// worth, how a screen picks what to shoot and where a screening hull keeps station. Tunables are declared settings.
 	/// </summary>
 	// [SettingsSource]
-	class ScreenWeapons
+	class SPACEGODCORE_API ScreenWeapons
 	{
 	public:
 		/// <summary>C# RuntimeHelpers.RunClassConstructor (what SettingsRegistry does for a [SettingsSource] class): creates

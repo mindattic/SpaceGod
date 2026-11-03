@@ -16,7 +16,7 @@ namespace SpaceGod::Core
 	/// by <see cref="ShipClass"/> the same way <see cref="PilotTuning"/> keys arcade flight feel: how
 	/// many crates physically fit is a hull-wide call, not a per-design balance knob.
 	/// </summary>
-	struct CargoHoldSpec
+	struct SPACEGODCORE_API CargoHoldSpec
 	{
 		int Width = 0, Height = 0;
 
@@ -40,7 +40,7 @@ namespace SpaceGod::Core
 	/// supplies, electronics, platinum) pack into a single cell, roughly tracking each good's
 	/// <see cref="GoodInfo.BasePrice"/>.
 	/// </summary>
-	struct CargoFootprint
+	struct SPACEGODCORE_API CargoFootprint
 	{
 		int Width = 0, Height = 0;
 		double Tonnes = 0;
@@ -62,7 +62,7 @@ namespace SpaceGod::Core
 
 	/// <summary>One crate placed in a hold: a good occupying a rectangle of cells with its top-left
 	/// corner at (X, Y), optionally rotated 90 degrees (swapping its footprint's width and height).</summary>
-	class CargoItem final
+	class SPACEGODCORE_API CargoItem final
 	{
 	public:
 		::SpaceGod::Core::Good Good = static_cast<::SpaceGod::Core::Good>(0);
@@ -90,7 +90,7 @@ namespace SpaceGod::Core
 	/// fields every AI trader reads and writes in Economy.cs -- this hold exists only for the one
 	/// ship a human is flying and never touches those fields.
 	/// </summary>
-	class CargoHold final
+	class SPACEGODCORE_API CargoHold final
 	{
 	public:
 		int Width = 0, Height = 0;

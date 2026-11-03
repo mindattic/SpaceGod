@@ -37,7 +37,7 @@ namespace SpaceGod::Core
 	/// burn that takes <see cref="HeliumThreePerTonne"/> of helium-3 with every tonne. Hyperlane rides cost
 	/// no propellant (the lane carries the ship) but are tolled.
 	/// </summary>
-	class Propulsion
+	class SPACEGODCORE_API Propulsion
 	{
 	public:
 		/// <summary>Helium-3 the fusion burn takes per tonne of reaction mass thrown out (0.5 kg).</summary>

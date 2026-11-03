@@ -17,7 +17,7 @@ namespace SpaceGod::Core
 	class RangeSetting;
 
 	/// <summary>One shield emitter's patch of hull as its captain reads it (U.SPC-T502, see <see cref="WeakPatches"/>).</summary>
-	struct HullPatch
+	struct SPACEGODCORE_API HullPatch
 	{
 		/// <summary>The emitter whose field covers the patch (shot away when the patch is holed).</summary>
 		cs::Ref<Subsystem> Emitter;
@@ -82,7 +82,7 @@ namespace SpaceGod::Core
 	/// (<see cref="BroadsideCommand.RollWeakPatches"/>), steering the nose themselves. Every figure is a setting in Broadsides.
 	/// </summary>
 	// [SettingsSource]
-	class WeakPatches final
+	class SPACEGODCORE_API WeakPatches final
 	{
 	public:
 		// ------------------------------------------------------------ settings

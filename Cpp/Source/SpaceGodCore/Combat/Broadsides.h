@@ -39,7 +39,7 @@ namespace SpaceGod::Core
 		Volley,
 	};
 
-	const char* ToString(BatteryOrder v);
+	SPACEGODCORE_API const char* ToString(BatteryOrder v);
 
 	/// <summary>Where a capital ship's damage control teams work first (U.SPC-T425).</summary>
 	enum class DamageControlFocus : int
@@ -55,7 +55,7 @@ namespace SpaceGod::Core
 		Engines,
 	};
 
-	const char* ToString(DamageControlFocus v);
+	SPACEGODCORE_API const char* ToString(DamageControlFocus v);
 
 	/// <summary>The formations a flagship orders its line into (U.SPC-T425).</summary>
 	enum class FleetFormation : int
@@ -79,7 +79,7 @@ namespace SpaceGod::Core
 		EngageAtWill,
 	};
 
-	const char* ToString(FleetFormation v);
+	SPACEGODCORE_API const char* ToString(FleetFormation v);
 
 	/// <summary>
 	/// A capital ship's standing orders and state in the broadside game (U.SPC-T425), on its <see cref="BattleUnit"/>: the
@@ -87,7 +87,7 @@ namespace SpaceGod::Core
 	/// crews go for a weakened patch of the enemy's shields, its crew's brace, where damage control works, the formation it
 	/// has ordered its line into, and the broadside it is building (its telegraph).
 	/// </summary>
-	class BroadsideCommand final
+	class SPACEGODCORE_API BroadsideCommand final
 	{
 		cs::List<BatteryOrder> orders;
 
@@ -158,7 +158,7 @@ namespace SpaceGod::Core
 	/// <summary>The broadside game's rules (U.SPC-T425): batteries (the guns whose fire cones bear together, U.SPC-T533), focus
 	/// fire on a weakened shield patch, the brace, damage control, formations and turning circles. Tunables are declared settings.</summary>
 	// [SettingsSource]
-	class Broadsides
+	class SPACEGODCORE_API Broadsides
 	{
 	public:
 		/// <summary>C# RuntimeHelpers.RunClassConstructor (what SettingsRegistry does for a [SettingsSource] class): creates

@@ -18,7 +18,7 @@ namespace SpaceGod::Core
 	/// which facility, what they earn and pay in tax, and where they move to. Every figure is listed,
 	/// with its source or the reason it is assumed, in Economy/SOURCES.md.
 	/// </summary>
-	class People
+	class SPACEGODCORE_API People
 	{
 	public:
 		// ---------------------------------------------------------------- needs

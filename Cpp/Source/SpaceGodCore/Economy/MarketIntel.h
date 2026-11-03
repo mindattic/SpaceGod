@@ -16,7 +16,7 @@ namespace SpaceGod::Core
 	class CargoHold;
 
 	/// <summary>One market's prices as the player last knew them: when, from whom, and what it sold and wanted then.</summary>
-	class PriceSheet final
+	class SPACEGODCORE_API PriceSheet final
 	{
 	public:
 		cs::Ref<Settlement> Market;
@@ -39,7 +39,7 @@ namespace SpaceGod::Core
 	};
 
 	/// <summary>A run the player's intelligence says pays: buy here, sell there, what it should make and how far to trust it.</summary>
-	class TradeLead final
+	class SPACEGODCORE_API TradeLead final
 	{
 	public:
 		cs::Ref<Settlement> From, To;
@@ -73,7 +73,7 @@ namespace SpaceGod::Core
 	/// (<see cref="Leads"/>): buy where a good is cheap and to spare, sell where it is dear and wanted, weighed by how
 	/// fresh the prices are and the risk at the far end.
 	/// </summary>
-	class MarketIntel final
+	class SPACEGODCORE_API MarketIntel final
 	{
 		cs::Ref<TradeDesk> desk;
 		cs::Dictionary<cs::Ref<Settlement>, cs::Ref<PriceSheet>> sheets = cs::Dictionary<cs::Ref<Settlement>, cs::Ref<PriceSheet>>();

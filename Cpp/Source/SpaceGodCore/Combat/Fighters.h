@@ -24,7 +24,7 @@ namespace SpaceGod::Core
 		/// <summary>Flying home to land on the carrier.</summary>
 		Return,
 	};
-	const char* ToString(FighterPhase v);
+	SPACEGODCORE_API const char* ToString(FighterPhase v);
 
 	/// <summary>A fighter's pilot and squadron: who leads, where it flies in the formation, how it flies.</summary>
 	class FighterState final
@@ -113,7 +113,7 @@ namespace SpaceGod::Core
 	/// by its senior wingman. Pilots share their reactor as the fight needs (<see cref="PowerDistribution"/>) and throw
 	/// flares at missiles closing on them.
 	/// </summary>
-	class FighterAI
+	class SPACEGODCORE_API FighterAI
 	{
 	public:
 		static constexpr double FighterLengthKm = 0.016; static constexpr double BomberLengthKm = 0.024;

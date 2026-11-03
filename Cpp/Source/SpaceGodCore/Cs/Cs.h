@@ -720,6 +720,20 @@ namespace cs
 		}
 	}
 
+	// System.Char over the UTF-8 strings: a C# `char` is one UTF-16 code unit, here a uint32_t holding it.
+	// `s[i]` for a char -> `cs::Char::At(s, i)` (the i-th UTF-16 unit); IsLetter / ToUpperInvariant / ToLowerInvariant
+	// follow .NET's tables (simple case mapping, invariant culture) for Latin (Basic, Latin-1, Extended-A/B), Greek and
+	// Cyrillic; other scripts (none in the Core's text) are not letters and map to themselves. `tag += c` ->
+	// `cs::Char::Append(tag, c)` (UTF-8). Surrogate units are not letters, as in .NET.
+	namespace Char
+	{
+		SPACEGODCORE_API uint32_t At(const String& s, int utf16Index);
+		SPACEGODCORE_API bool IsLetter(uint32_t c);
+		SPACEGODCORE_API uint32_t ToUpperInvariant(uint32_t c);
+		SPACEGODCORE_API uint32_t ToLowerInvariant(uint32_t c);
+		SPACEGODCORE_API void Append(String& s, uint32_t c);
+	}
+
 	// A mutable string builder (System.Text.StringBuilder).
 	class StringBuilder
 	{

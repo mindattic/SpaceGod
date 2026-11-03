@@ -19,7 +19,7 @@ namespace SpaceGod::Core
 
 	/// <summary>The trading game's tunables (U.SPC-T426), in Settings > Economy.</summary>
 	// [SettingsSource]: the integration ticket registers TradeRules (RunClassConstructor) with the settings registry.
-	class TradeRules
+	class SPACEGODCORE_API TradeRules
 	{
 		static cs::String Percent(double v);
 
@@ -46,7 +46,7 @@ namespace SpaceGod::Core
 	};
 
 	/// <summary>What a trader faces at a port: raiders, a blockade or an embargo closing it, and the place falling apart.</summary>
-	struct PortRisk
+	struct SPACEGODCORE_API PortRisk
 	{
 		/// <summary>The war's tally of fights and raids at its body, 0..1 (<see cref="Contracts.DangerAt"/>).</summary>
 		double Piracy = 0;
@@ -86,7 +86,7 @@ namespace SpaceGod::Core
 		Magnate,
 		MerchantPrince,
 	};
-	const char* ToString(TraderRank v);
+	SPACEGODCORE_API const char* ToString(TraderRank v);
 
 	/// <summary>One piece of trade news for the desk: where, what, and why it matters to a trader.</summary>
 	class TradeTip final
@@ -116,7 +116,7 @@ namespace SpaceGod::Core
 	/// </summary>
 	// TradeDesk hands itself to its parts (new MarketIntel(this), ...), hence enable_shared_from_this; its C# constructor
 	// body runs as Construct() right after the Ref is made: create it with `TradeDesk::Make(world, seed)` (ruling 6).
-	class TradeDesk final : public std::enable_shared_from_this<TradeDesk>
+	class SPACEGODCORE_API TradeDesk final : public std::enable_shared_from_this<TradeDesk>
 	{
 		cs::Ref<::SpaceGod::Core::World> world;
 

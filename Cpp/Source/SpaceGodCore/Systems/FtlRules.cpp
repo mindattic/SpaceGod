@@ -90,9 +90,8 @@ namespace SpaceGod::Core
 	double FtlRules::SolarMasses(const cs::String& spectralType)
 	{
 		if (cs::Strings::IsNullOrEmpty(spectralType)) return 1;
-		char c = cs::Strings::TrimStart(spectralType).at(0);
-		if (c >= 'a' && c <= 'z') c = static_cast<char>(c - 'a' + 'A'); // char.ToUpperInvariant (ASCII; a non-ASCII lead falls to default)
-		switch (c)
+		// char.ToUpperInvariant(spectralType.TrimStart()[0]): the first UTF-16 unit (an all-blank type throws, as C#'s indexer).
+		switch (cs::Char::ToUpperInvariant(cs::Char::At(cs::Strings::TrimStart(spectralType), 0)))
 		{
 		case 'O': return 30;
 		case 'B': return 6;

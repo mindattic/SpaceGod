@@ -52,7 +52,7 @@ namespace SpaceGod::Core
 	/// does to the hull's fighting spec (<see cref="Effect"/>). A new facility (a marine habitat, a Breacher bay, a
 	/// radiator, a drive room) is a new registered kind, never an edit to the code that fits the first.
 	/// </summary>
-	class FacilityKind final : public IPartSpec
+	class SPACEGODCORE_API FacilityKind final : public IPartSpec
 	{
 	public:
 		/// <summary>A stable name for saves and bindings ("armour-plating", "hangar").</summary>
@@ -161,7 +161,7 @@ namespace SpaceGod::Core
 	/// here, with the marine habitat (U.SPC-T465, <see cref="MarineHabitats"/>) and the Breacher bay that fires Breacher
 	/// rounds (U.SPC-T466, U.SPC-T521, <see cref="BreacherBays"/>); new kinds plug in with <see cref="Register"/>.
 	/// </summary>
-	class FacilityKinds
+	class SPACEGODCORE_API FacilityKinds
 	{
 		static cs::List<cs::Ref<FacilityKind>>& All();
 
@@ -268,7 +268,7 @@ namespace SpaceGod::Core
 	/// one a yard fitted later, off midships (<see cref="Amidships"/>). It has no firing arc: only a hardpoint
 	/// (<see cref="Hardpoint"/>) has one.
 	/// </summary>
-	class FacilitySite final
+	class SPACEGODCORE_API FacilitySite final
 	{
 	public:
 		cs::String Kind;
@@ -313,7 +313,7 @@ namespace SpaceGod::Core
 	/// facilities beyond them. A new frame can bring its own layout (<see cref="HullFrame"/>); a new class registers one
 	/// with <see cref="Register"/>.
 	/// </summary>
-	class FacilityLayouts
+	class SPACEGODCORE_API FacilityLayouts
 	{
 		/// <summary>A warship's bridge (U.SPC-T492): buried at the centre of the hull behind its full thickness, with no
 		/// viewports (the crew sees out through its sensors and holo displays), opening only off the space it links to.</summary>

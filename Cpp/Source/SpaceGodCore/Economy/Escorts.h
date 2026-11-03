@@ -18,7 +18,7 @@ namespace SpaceGod::Core
 	/// them, out of the company's cash (or its flag's treasury for a hull no company owns), and a wing is only taken on
 	/// that the owners can well afford. The escorts fly with the freighter from then on, as any escort does.
 	/// </summary>
-	class MerchantEscorts final
+	class SPACEGODCORE_API MerchantEscorts final
 	{
 	public:
 		/// <summary>Days between looks over the merchants in port.</summary>

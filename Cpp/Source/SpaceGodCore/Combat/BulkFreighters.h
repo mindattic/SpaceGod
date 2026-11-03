@@ -32,7 +32,7 @@ namespace SpaceGod::Core
 	/// Another class is made a truss with <see cref="RegisterTruss"/>.
 	/// </summary>
 	// [SettingsSource]
-	class BulkFreighters
+	class SPACEGODCORE_API BulkFreighters
 	{
 	public:
 		/// <summary>Trade cargo one pod carries, tonnes: the stock design's pods carry what a freighter's holds did.</summary>

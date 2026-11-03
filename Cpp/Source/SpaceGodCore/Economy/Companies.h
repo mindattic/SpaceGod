@@ -28,13 +28,13 @@ namespace SpaceGod::Core
 		/// <summary>Ran out of money: its hulls were sold off or broken up and it was wound up.</summary>
 		Bankrupt,
 	};
-	const char* ToString(CompanyFate v);
+	SPACEGODCORE_API const char* ToString(CompanyFate v);
 
 	/// <summary>
 	/// A run a company's ships have worked: loaded at one port, sold at another, and what it earned. The
 	/// company learns which runs pay from these and points its fleet at the best of them.
 	/// </summary>
-	class TradeRoute final
+	class SPACEGODCORE_API TradeRoute final
 	{
 	public:
 		cs::Ref<Settlement> From, To;
@@ -60,7 +60,7 @@ namespace SpaceGod::Core
 	/// (or is bought out) when it cannot pay its way. Its ships sail under its flag faction's colours for docking
 	/// and the law; the company is who profits.
 	/// </summary>
-	class Company final
+	class SPACEGODCORE_API Company final
 	{
 	public:
 		cs::String Name;
@@ -150,7 +150,7 @@ namespace SpaceGod::Core
 	/// are founded at busy ports when the trade pays. So the merchant fleet's size and where it trades come out of
 	/// what trade earns, rather than a fixed number of spawns.
 	/// </summary>
-	class Companies final
+	class SPACEGODCORE_API Companies final
 	{
 		cs::Ref<World> world;
 		cs::Random rng;

@@ -31,14 +31,14 @@ namespace SpaceGod::Core
 		/// <summary>A founded settlement that failed: its last people have gone, its facilities stand empty.</summary>
 		Ruin,
 	};
-	const char* ToString(ColonyStage v);
+	SPACEGODCORE_API const char* ToString(ColonyStage v);
 
 	/// <summary>
 	/// A world a faction could settle: where it sits against its star's habitable zone, what can be dug there
 	/// and how many people it could hold. Surveyed from the catalogue (<see cref="Survey"/>); the resources and
 	/// capacity are game-layer judgements from the body's kind, size and sunlight, set out there.
 	/// </summary>
-	class ColonySite final
+	class SPACEGODCORE_API ColonySite final
 	{
 	public:
 		int Body = 0;
@@ -84,7 +84,7 @@ namespace SpaceGod::Core
 	};
 
 	/// <summary>A colony ship under way: the colonists it carries, its starter goods, and where it is bound.</summary>
-	class ColonyShip final
+	class SPACEGODCORE_API ColonyShip final
 	{
 	public:
 		ColonyShip();
@@ -156,7 +156,7 @@ namespace SpaceGod::Core
 		/// <summary>Home again with the colonists it could not land: they rejoin their port, and the hull goes back to trading.</summary>
 		Returned,
 	};
-	const char* ToString(ColonyLanding v);
+	SPACEGODCORE_API const char* ToString(ColonyLanding v);
 
 	/// <summary>A free site in another system that a colony ship could reach through the gates, and how long it would take (U.SPC-T293).</summary>
 	class ForeignSite final
@@ -197,7 +197,7 @@ namespace SpaceGod::Core
 	/// it is a <see cref="ColonyStage.Ruin"/>, and after <see cref="RuinYears"/> its site is free again.
 	/// </summary>
 	// Passes itself as a Ref (ship.Of = this, `v.Into ?? this`), hence enable_shared_from_this.
-	class Colonisation final : public std::enable_shared_from_this<Colonisation>
+	class SPACEGODCORE_API Colonisation final : public std::enable_shared_from_this<Colonisation>
 	{
 	public:
 		/// <summary>Every site in the system, occupied or not (whether one is free is checked when it is wanted).</summary>

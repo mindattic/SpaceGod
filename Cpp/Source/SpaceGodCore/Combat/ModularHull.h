@@ -37,14 +37,14 @@ namespace SpaceGod::Core
 		/// (a cruiser's broadside launchers, a fighter's wing guns). The first thing to be shot off.</summary>
 		Sponson,
 	};
-	const char* ToString(HullModuleKind v);
+	SPACEGODCORE_API const char* ToString(HullModuleKind v);
 
 	/// <summary>
 	/// One structural piece of a hull (U.SPC-T596): a section of the keel or a sponson off one, with its own structure
 	/// points and the hardpoints mounted on it. Positions are in ship lengths, hull frame (right, up, forward), the same
 	/// frame as <see cref="SubsystemDef"/>'s X, Y, Z.
 	/// </summary>
-	class HullModule final
+	class SPACEGODCORE_API HullModule final
 	{
 	public:
 		int Id = 0;
@@ -142,7 +142,7 @@ namespace SpaceGod::Core
 	/// the <see cref="Root"/>: whatever is still joined to it is the ship, anything else has broken away. The design and
 	/// what builds on it next are in docs/MODULAR_SHIPS.md.
 	/// </summary>
-	class ModularHull final
+	class SPACEGODCORE_API ModularHull final
 	{
 	public:
 		/// <summary>Hull length, km, per keel section beyond the first two: a destroyer has three, a cruiser five and a
@@ -248,7 +248,7 @@ namespace SpaceGod::Core
 	};
 
 	/// <summary>What a hull that has lost a piece loses with it (U.SPC-T596).</summary>
-	class ModularHulls final
+	class SPACEGODCORE_API ModularHulls final
 	{
 	public:
 		/// <summary>The share of a lost piece's mass the hull's points lose with it: the rest of the damage that cut it
@@ -270,7 +270,7 @@ namespace SpaceGod::Core
 	/// (<see cref="ModuleSpec.Bill"/>), as much of it as the part's health leaves; a part no yard fits (a bridge, a reactor, a
 	/// hangar) as the one good it is mostly made of (<see cref="SalvageSession.ScrapOf"/>).
 	/// </summary>
-	class HullSalvage final
+	class SPACEGODCORE_API HullSalvage final
 	{
 	public:
 		/// <summary>The share of a structure's dry mass that is recovered as alloys: the rest is holed, buckled or gone.</summary>
@@ -311,7 +311,7 @@ namespace SpaceGod::Core
 	/// heading as the field spreads (<see cref="Wreck.DebrisRadiusKm"/>), so the pieces of a wreck scatter but stay
 	/// within its field.
 	/// </summary>
-	class WreckPiece final
+	class SPACEGODCORE_API WreckPiece final
 	{
 	public:
 		int Index = 0;
