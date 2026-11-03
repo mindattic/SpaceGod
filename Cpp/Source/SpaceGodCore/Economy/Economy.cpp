@@ -18,16 +18,6 @@ namespace SpaceGod::Core
 {
 	namespace
 	{
-		// C#'s double.CompareTo (NaN sorts first). Not in Cs.h.
-		int CompareTo(double a, double b)
-		{
-			if (a < b) return -1;
-			if (a > b) return 1;
-			if (a == b) return 0;
-			if (cs::Double::IsNaN(a)) return cs::Double::IsNaN(b) ? 0 : -1;
-			return 1;
-		}
-
 		void FillList(cs::List<double>& list, double v)
 		{
 			for (auto& x : list) x = v;
@@ -805,7 +795,7 @@ namespace SpaceGod::Core
 
 	Economy::Option Economy::Choose(cs::List<Option>& options)
 	{
-		options.Sort([](const Option& a, const Option& b) { return CompareTo(b.Score, a.Score); });
+		options.Sort([](const Option& a, const Option& b) { return cs::CompareTo(b.Score, a.Score); });
 		int n = cs::Math::Min(4, options.Count());
 		double top = cs::Math::Max(options[0].Score, 1e-9);
 		double total = 0;
@@ -866,7 +856,7 @@ namespace SpaceGod::Core
 		auto markets = cs::List<cs::Ref<Settlement>>();
 		for (const auto& s : At(body))
 			if (HasPropellant(ship, s)) markets.Add(s);
-		markets.Sort([](const cs::Ref<Settlement>& a, const cs::Ref<Settlement>& b) { return CompareTo(PropellantPrice(a), PropellantPrice(b)); });
+		markets.Sort([](const cs::Ref<Settlement>& a, const cs::Ref<Settlement>& b) { return cs::CompareTo(PropellantPrice(a), PropellantPrice(b)); });
 		double taken = 0;
 		for (const auto& s : markets)
 		{
@@ -894,7 +884,7 @@ namespace SpaceGod::Core
 		cost = 0;
 		double got = 0;
 		auto order = cs::List<Good>(Propulsion::ReactionMass());
-		order.Sort([&s](Good a, Good b) { return CompareTo(s->Price[static_cast<int>(a)], s->Price[static_cast<int>(b)]); });
+		order.Sort([&s](Good a, Good b) { return cs::CompareTo(s->Price[static_cast<int>(a)], s->Price[static_cast<int>(b)]); });
 		auto payer = ship->Faction;
 		for (auto g : order)
 		{

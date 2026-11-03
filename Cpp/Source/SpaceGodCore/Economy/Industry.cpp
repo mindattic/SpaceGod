@@ -29,8 +29,8 @@ namespace SpaceGod::Core
 		Outputs = outputs;
 		double total = 0;
 		for (const auto& [_, rate] : inputs) total += rate;
-		Limiting = std::vector<bool>(static_cast<size_t>(inputs.Count()));
-		for (int i = 0; i < inputs.Count(); i++) Limiting[static_cast<size_t>(i)] = kind != IndustryKind::Mine && std::get<1>(inputs[i]) >= total * 0.02;
+		Limiting = cs::NewArray<bool>(inputs.Count());
+		for (int i = 0; i < inputs.Count(); i++) Limiting[i] =kind != IndustryKind::Mine && std::get<1>(inputs[i]) >= total * 0.02;
 	}
 
 	const cs::Dictionary<IndustryKind, cs::Ref<Recipe>>& Recipe::Fixed()

@@ -272,7 +272,7 @@ namespace SpaceGod::Core
 		const auto& inputs = f->Recipe->Inputs;
 		for (int k = 0; k < inputs.Count(); k++)
 		{
-			if (f->Recipe->Limiting[static_cast<size_t>(k)]) continue;
+			if (f->Recipe->Limiting[k]) continue;
 			Good inputGood = std::get<0>(inputs[k]);
 			bool local = false;
 			for (const auto& other : s->Facilities)

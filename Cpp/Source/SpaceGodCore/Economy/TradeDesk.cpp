@@ -395,7 +395,7 @@ namespace SpaceGod::Core
 			if (sheet->Market->Fallen) continue;
 			for (int g = 0; g < GoodInfo::Count; g++)
 			{
-				if (!sheet->Buys[static_cast<size_t>(g)]) continue;
+				if (!sheet->Buys[g]) continue;
 				double ratio = sheet->Price[g] / GoodInfo::Of(static_cast<Good>(g))->BasePrice;
 				if (ratio < 2) continue;
 				double age = sheet->AgeDays(jd);

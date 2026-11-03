@@ -27,19 +27,6 @@
 
 namespace SpaceGod::Core
 {
-	namespace
-	{
-		// C#'s double.CompareTo (NaN sorts first). Not in Cs.h.
-		int CompareTo(double a, double b)
-		{
-			if (a < b) return -1;
-			if (a > b) return 1;
-			if (a == b) return 0;
-			if (cs::Double::IsNaN(a)) return cs::Double::IsNaN(b) ? 0 : -1;
-			return 1;
-		}
-	}
-
 	const char* ToString(ContractKind v)
 	{
 		switch (v)
@@ -139,7 +126,7 @@ namespace SpaceGod::Core
 		if (!Lawful(port)) return list;
 		for (const auto& c : All)
 			if (c->IsOpen() && c->Board == port) list.Add(c);
-		list.Sort([](const cs::Ref<Contract>& a, const cs::Ref<Contract>& b) { return CompareTo(b->Pay, a->Pay); });
+		list.Sort([](const cs::Ref<Contract>& a, const cs::Ref<Contract>& b) { return cs::CompareTo(b->Pay, a->Pay); });
 		return list;
 	}
 
@@ -452,7 +439,7 @@ namespace SpaceGod::Core
 				if (world->Fleet->Lanes != nullptr && world->Fleet->Lanes->SystemOf(b->Index) < 0) continue;
 				candidates.Add(std::tuple<int, double>(b->Index, Km(board->Body, b->Index, jd)));
 			}
-			candidates.Sort([](const std::tuple<int, double>& a, const std::tuple<int, double>& b) { return CompareTo(std::get<1>(a), std::get<1>(b)); });
+			candidates.Sort([](const std::tuple<int, double>& a, const std::tuple<int, double>& b) { return cs::CompareTo(std::get<1>(a), std::get<1>(b)); });
 			for (int i = 0; i < candidates.Count() && open < 2; i++, open++)
 			{
 				auto [body, km] = candidates[i];

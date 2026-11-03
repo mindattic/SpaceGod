@@ -54,7 +54,7 @@ namespace SpaceGod::Core
 			sheet->Price[g] = s->Price[g];
 			sheet->Available[g] = s->Fallen ? 0 : s->Available(good);
 			sheet->Wants[g] = s->Fallen ? 0 : s->Absorb(good);
-			sheet->Buys[static_cast<size_t>(g)] = !s->Fallen && s->Demand[g] > 0;
+			sheet->Buys[g] = !s->Fallen && s->Demand[g] > 0;
 		}
 		return sheet;
 	}
@@ -151,7 +151,7 @@ namespace SpaceGod::Core
 				double cb = Confidence(b, jd);
 				for (int g = 0; g < GoodInfo::Count; g++)
 				{
-					if (!b->Buys[static_cast<size_t>(g)] || a->Available[g] < 1) continue;
+					if (!b->Buys[g] || a->Available[g] < 1) continue;
 					double buy = a->Price[g], sell = b->Price[g];
 					double margin = sell * 0.97 * (1 - Economy::PortTax) - buy * 1.03 * (1 + Economy::PortTax);
 					if (margin <= 0) continue;

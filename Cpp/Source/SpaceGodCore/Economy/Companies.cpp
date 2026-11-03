@@ -691,7 +691,7 @@ namespace SpaceGod::Core
 	Rgb Companies::LiveryFor(int n)
 	{
 		// C# `%` on doubles is fmod (truncated remainder), not IEEERemainder.
-		double h = std::fmod(n * 0.618033988749895 + 0.11, 1.0);
+		double h = cs::Mod(n * 0.618033988749895 + 0.11, 1.0);
 		return Hsv(h, 0.55, 0.95);
 	}
 
@@ -703,7 +703,7 @@ namespace SpaceGod::Core
 
 	double Companies::Channel(double n, double h, double s, double v)
 	{
-		double k = std::fmod(n + h * 6, 6.0);
+		double k = cs::Mod(n + h * 6, 6.0);
 		return v - v * s * cs::Math::Max(0.0, cs::Math::Min(cs::Math::Min(k, 4 - k), 1.0));
 	}
 

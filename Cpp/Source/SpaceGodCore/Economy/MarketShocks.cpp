@@ -34,13 +34,7 @@ namespace SpaceGod::Core
 	MarketShocks::MarketShocks(cs::Ref<World> world, int seed)
 		: world(world), rng(seed)
 	{
-		// C# `world.Economy.Sold += OnSold;` on a plain delegate field: combine, the earlier handler first.
-		auto previous = world->Economy->Sold;
-		world->Economy->Sold = [previous, this](cs::Ref<Ship> ship, cs::Ref<Settlement> port, Good good, double tonnes)
-		{
-			if (previous) previous(ship, port, good, tonnes);
-			OnSold(ship, port, good, tonnes);
-		};
+		world->Economy->Sold += [this](cs::Ref<Ship> ship, cs::Ref<Settlement> port, Good good, double tonnes) { OnSold(ship, port, good, tonnes); };
 	}
 
 	cs::Ref<::SpaceGod::Core::Economy> MarketShocks::Economy() const { return world->Economy; }

@@ -30,8 +30,7 @@ namespace SpaceGod::Core
 		cs::List<double> Wants = cs::NewArray<double>(GoodInfo::Count);
 
 		/// <summary>By good: whether anybody there uses it (a market that only makes a good does not buy it).</summary>
-		// bool[]: std::vector<bool> (a cs::List<bool> cannot hand out a bool&).
-		std::vector<bool> Buys = std::vector<bool>(static_cast<size_t>(GoodInfo::Count));
+		cs::List<bool> Buys = cs::NewArray<bool>(GoodInfo::Count);
 
 		double AgeDays(double jd) const { return cs::Math::Max(0.0, jd - Jd); }
 

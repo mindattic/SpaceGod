@@ -34,8 +34,7 @@ namespace SpaceGod::Core
 		/// Per input: true if it is a bulk feedstock that caps output outright; false for a consumable
 		/// (fuel, spares) whose shortage only cuts efficiency, down to <see cref="MinorFloor"/>.
 		/// </summary>
-		// bool[]: a std::vector<bool>, since cs::List<bool> cannot hand out a bool& (as other ports do).
-		std::vector<bool> Limiting;
+		cs::List<bool> Limiting;
 
 		static constexpr double MinorFloor = 0.55;
 

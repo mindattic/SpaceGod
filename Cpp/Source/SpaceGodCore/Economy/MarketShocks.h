@@ -128,8 +128,7 @@ namespace SpaceGod::Core
 		cs::Dictionary<cs::Ref<Settlement>, double> lastStrikeEndJd = cs::Dictionary<cs::Ref<Settlement>, double>();
 		cs::HashSet<std::tuple<cs::Ref<Settlement>, int>> spiking = cs::HashSet<std::tuple<cs::Ref<Settlement>, int>>();
 		cs::Dictionary<std::tuple<cs::Ref<Settlement>, int>, double> spikeClearedJd = cs::Dictionary<std::tuple<cs::Ref<Settlement>, int>, double>();
-		// C# bool[]: held as bytes, since cs::List<bool> (std::vector<bool>) cannot hand out a bool& from operator[].
-		cs::List<uint8_t> systemSpiking = cs::NewArray<uint8_t>(GoodInfo::Count);
+		cs::List<bool> systemSpiking = cs::NewArray<bool>(GoodInfo::Count);
 		cs::List<double> systemIndex = cs::NewArray<double>(GoodInfo::Count);
 		cs::Dictionary<std::tuple<cs::Ref<Settlement>, int>, double> smoothed = cs::Dictionary<std::tuple<cs::Ref<Settlement>, int>, double>();
 		cs::Dictionary<cs::Ref<Settlement>, int> besiegerAbsentDays = cs::Dictionary<cs::Ref<Settlement>, int>();

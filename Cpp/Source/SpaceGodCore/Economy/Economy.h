@@ -66,7 +66,8 @@ namespace SpaceGod::Core
 		cs::Action<cs::Ref<Settlement>, ShipClass, double> ShipBuilt;
 
 		/// <summary>Raised when a trader sells a load at a port (ship, port, good, tonnes): who supplies whom, for the news and for embargoes.</summary>
-		cs::Action<cs::Ref<Ship>, cs::Ref<Settlement>, Good, double> Sold;
+		/// (A plain Action field that World and MarketShocks chain with `+=`: a cs::Delegate.)
+		cs::Delegate<cs::Ref<Ship>, cs::Ref<Settlement>, Good, double> Sold;
 
 		/// <summary>Whether a yard's owner has the hands to crew a hull of this class (see <see cref="Crews"/>); null for always.</summary>
 		cs::Func<bool, cs::Ref<Settlement>, ShipClass> CanCrew;
@@ -76,7 +77,8 @@ namespace SpaceGod::Core
 		cs::Func<bool, cs::Ref<Settlement>, ShipClass, double> PaidFor;
 
 		/// <summary>Raised when a ship loads a cargo for sale (the ship and the settlement it bought at).</summary>
-		cs::Action<cs::Ref<Ship>, cs::Ref<Settlement>> Loaded;
+		/// (A plain Action field that World chains with `+=`: a cs::Delegate.)
+		cs::Delegate<cs::Ref<Ship>, cs::Ref<Settlement>> Loaded;
 
 		/// <summary>
 		/// How a ship's owners weigh a run from one settlement (null: the cargo already aboard) to another: multiplies a

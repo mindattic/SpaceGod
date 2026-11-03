@@ -440,21 +440,10 @@ namespace SpaceGod::Core
 		Companies = cs::New<CompaniesT>(shared_from_this(), seed + 29);
 		{
 			auto companies = Companies;
-			// economy.Loaded / economy.Sold are multicast delegate fields in C#: `+=` keeps whoever subscribed first
-			// (MarketShocks, in the constructor, subscribes to Sold) and calls them in order. Plain cs::Action fields, so
-			// chained by hand (Cs.h gap: no multicast Action).
-			auto loadedBefore = economy->Loaded;
-			economy->Loaded = [loadedBefore, companies](cs::Ref<Ship> ship, cs::Ref<Settlement> from)
-			{
-				if (loadedBefore) loadedBefore(ship, from);
-				companies->OnLoaded(ship, from);
-			};
-			auto soldBefore = economy->Sold;
-			economy->Sold = [soldBefore, companies](cs::Ref<Ship> ship, cs::Ref<Settlement> to, Good good, double tonnes)
-			{
-				if (soldBefore) soldBefore(ship, to, good, tonnes);
-				companies->OnSold(ship, to, good, tonnes);
-			};
+			// economy.Loaded / economy.Sold are multicast delegate fields in C# (cs::Delegate): `+=` keeps whoever
+			// subscribed first (MarketShocks, in the constructor, subscribes to Sold) and calls them in order.
+			economy->Loaded += [companies](cs::Ref<Ship> ship, cs::Ref<Settlement> from) { companies->OnLoaded(ship, from); };
+			economy->Sold += [companies](cs::Ref<Ship> ship, cs::Ref<Settlement> to, Good good, double tonnes) { companies->OnSold(ship, to, good, tonnes); };
 			economy->RouteFactor = [](cs::Ref<Ship> ship, cs::Ref<Settlement> from, cs::Ref<Settlement> to) { return CompaniesT::RouteFactor(ship, from, to); };
 			economy->PaidFor = [companies](cs::Ref<Settlement> yard, ShipClass cls, double price) { return companies->PaidFor(yard, cls, price); };
 			ShipAdded += [companies](cs::Ref<Ship> ship) { companies->OnShipAdded(ship); };
