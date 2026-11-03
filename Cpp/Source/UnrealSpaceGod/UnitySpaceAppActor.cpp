@@ -130,7 +130,11 @@ void AUnitySpaceAppActor::ApplyCamera()
 	if (!Cam || !MainCamera) return;
 	// The app keeps the camera at the origin and rotates it (floating origin); everything else is placed at
 	// scene - camera, so the camera component only ever turns. Unity's fov is vertical, Unreal's horizontal.
-	MainCamera->SetWorldLocationAndRotation(UnrealSpace::ToUnreal(Cam->transform->position()), UnrealSpace::ToUnreal(Cam->transform->rotation()));
+	// A Unity camera looks down its +Z, which UnrealSpace maps to Unreal's -Y; an Unreal camera looks down +X. So the
+	// camera's Unreal rotation is the converted one after a quarter turn (yaw -90) taking +X onto -Y, roof +Z on +Z.
+	static const FQuat LookAlongUnityForward(FVector::UpVector, FMath::DegreesToRadians(-90.0));
+	MainCamera->SetWorldLocationAndRotation(UnrealSpace::ToUnreal(Cam->transform->position()),
+		UnrealSpace::ToUnreal(Cam->transform->rotation()) * LookAlongUnityForward);
 	MainCamera->SetFieldOfView(UnrealSpace::HorizontalFov(Cam->fieldOfView, Cam->aspect()));
 	// Unreal draws with an infinite reverse-Z far plane: Unity's farClipPlane has nothing to set. The near plane is
 	// global (GNearClippingPlane, cm).

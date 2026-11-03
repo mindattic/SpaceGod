@@ -1,13 +1,13 @@
-#pragma once
+﻿#pragma once
 
 // The one conversion between Unity.SpaceGod's space and Unreal's, used everywhere a value crosses into the engine
 // (camera pose, view placement, lights, the mouse).
 //
 // Unity (and the Runtime's scene space, and Core's DVec3::SwapYZ() of the ecliptic) is left-handed, Y up, Z forward,
-// X right, in scene units of one metre. Unreal is left-handed too, Z up, X forward, Y right, in centimetres. Both
-// being left-handed, the change of axes is a proper rotation (a cyclic permutation: UE.X = U.z, UE.Y = U.x,
-// UE.Z = U.y), so rotations carry over with the same permutation of the quaternion's vector part and nothing is
-// mirrored.
+// X right, in scene units of one metre. Unreal is left-handed too, Z up, in centimetres. The tracks share the SpaceGodRender
+// plugin's convention (Shared/Plugins/SpaceGodRender/Shaders/SpaceGodCommon.ush, and the C# track's UnrealSpace):
+// Unity (x, y, z) == Unreal (x, -z, y), a proper rotation (a quarter turn about X), so rotations carry over with the
+// same rotation of the quaternion's vector part and nothing is mirrored; the shared materials rely on it.
 //
 // Positions stay camera-relative as the original keeps them (floating origin: the camera sits at the origin and
 // everything is drawn at scene - camera, in Core doubles until this point), and become Unreal's Large World
@@ -28,27 +28,27 @@ namespace SpaceGod::UnrealSpace
 	inline constexpr double CmPerUnit = 100.0;
 
 	/// A Unity-axes point or direction (scene units) as Unreal's (cm).
-	inline FVector ToUnreal(Vector3 v) { return FVector(v.z * CmPerUnit, v.x * CmPerUnit, v.y * CmPerUnit); }
+	inline FVector ToUnreal(Vector3 v) { return FVector(v.x * CmPerUnit, -v.z * CmPerUnit, v.y * CmPerUnit); }
 
 	/// A double-precision Unity-axes scene point (camera-relative) as Unreal's (cm, LWC doubles).
-	inline FVector ToUnreal(const Core::DVec3& v) { return FVector(v.Z * CmPerUnit, v.X * CmPerUnit, v.Y * CmPerUnit); }
+	inline FVector ToUnreal(const Core::DVec3& v) { return FVector(v.X * CmPerUnit, -v.Z * CmPerUnit, v.Y * CmPerUnit); }
 
 	/// A Unity-axes direction as Unreal's, unscaled.
-	inline FVector DirectionToUnreal(Vector3 v) { return FVector(v.z, v.x, v.y); }
+	inline FVector DirectionToUnreal(Vector3 v) { return FVector(v.x, -v.z, v.y); }
 
 	/// Back from Unreal (cm) to Unity axes (scene units).
-	inline Core::DVec3 FromUnreal(const FVector& v) { return Core::DVec3(v.Y / CmPerUnit, v.Z / CmPerUnit, v.X / CmPerUnit); }
+	inline Core::DVec3 FromUnreal(const FVector& v) { return Core::DVec3(v.X / CmPerUnit, v.Z / CmPerUnit, -v.Y / CmPerUnit); }
 
-	/// A Unity rotation as Unreal's: the vector part permuted as the axes are (w unchanged).
-	inline FQuat ToUnreal(Quaternion q) { return FQuat(q.z, q.x, q.y, q.w); }
+	/// A Unity rotation as Unreal's: the vector part turned as the axes are (w unchanged).
+	inline FQuat ToUnreal(Quaternion q) { return FQuat(q.x, -q.z, q.y, q.w); }
 
 	inline Quaternion FromUnreal(const FQuat& q)
 	{
-		return Quaternion(static_cast<float>(q.Y), static_cast<float>(q.Z), static_cast<float>(q.X), static_cast<float>(q.W));
+		return Quaternion(static_cast<float>(q.X), static_cast<float>(q.Z), static_cast<float>(-q.Y), static_cast<float>(q.W));
 	}
 
 	/// A Unity scale (x, y, z along its axes) as Unreal's (along X, Y, Z).
-	inline FVector ScaleToUnreal(Vector3 s) { return FVector(s.z, s.x, s.y); }
+	inline FVector ScaleToUnreal(Vector3 s) { return FVector(s.x, s.z, s.y); }
 
 	/// Unity's camera field of view is vertical, Unreal's horizontal: the horizontal one for an aspect (w/h).
 	inline float HorizontalFov(float verticalDeg, float aspect)
