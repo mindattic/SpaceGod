@@ -14,6 +14,13 @@
 
 namespace SpaceGod::UnityCompat
 {
+	/// Unity's HideFlags: kept so the ported code reads the same; nothing here is saved anyway.
+	enum class HideFlags : int
+	{
+		None = 0, HideInHierarchy = 1, HideInInspector = 2, DontSaveInEditor = 4, NotEditable = 8,
+		DontSaveInBuild = 16, DontUnloadUnusedAsset = 32, DontSave = 52, HideAndDontSave = 61,
+	};
+
 	struct Mathf
 	{
 		static constexpr float PI = 3.14159274f;

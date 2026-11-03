@@ -35,6 +35,12 @@ namespace SpaceGod
 		/// SceneManager.LoadScene(name): the host travels to the map with this scene (set by ASpaceGameMode's world).
 		static void LoadScene(const cs::String& scene);
 
+		/// Unity's SceneUtility.GetBuildIndexByScenePath(scenePath) >= 0, for the main menu's Asset Library page: a
+		/// candidate package's demo scene is "in the build" only in Unity (Asset Store packages). Unreal has none, so
+		/// none is installed (the C# track's SceneUtility answers -1 the same way); the game's own two scenes go
+		/// through LoadScene.
+		static bool SceneInBuild(const cs::String& scenePath);
+
 		/// Set by the game mode: how a scene load reaches Unreal (ServerTravel / OpenLevel on the current map).
 		static inline cs::Action<cs::String> SceneLoader;
 

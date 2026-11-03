@@ -21,10 +21,10 @@ namespace SpaceGod::UI
 		static bool IsMousePressed(int button);
 		static bool WasMousePressedThisFrame(int button);
 		/// `mouse.delta.ReadValue()`: pixels this frame, y up (Unity's screen space).
-		static Vector2 MouseDelta();
+		static UnityCompat::Vector2 MouseDelta();
 		/// `mouse.scroll.ReadValue().y`: Unity's raw units, 120 a notch, positive away from the player.
 		static float ScrollY();
 		/// `mouse.position.ReadValue()`: pixels, origin bottom-left (Unity's screen space).
-		static Vector2 MousePosition();
+		static UnityCompat::Vector2 MousePosition();
 	};
 }

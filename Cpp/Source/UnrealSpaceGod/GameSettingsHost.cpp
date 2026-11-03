@@ -3,6 +3,8 @@
 #include "EngineSettings.h"
 #include "UnitySpaceApp.h"
 #include "Camera/SpaceCamera.h"
+#include "Rendering/Pipeline/RenderBackend.h"
+#include "Views/BattleFx.h"
 #include "UnityCompat/UnityTypes.h"
 #include "Settings/SettingsRegistry.h"
 #include "Settings/GameSetting.h"
@@ -16,11 +18,27 @@ namespace SpaceGod
 
 	void GameSettingsHost::RegisterRuntimeSources()
 	{
-		// The Runtime assembly's [SettingsSource] classes in this ticket's scope. Rendering's RenderPipelineSettings and
-		// UrpPostProcessSettings and Views' BattleFx (EffectsBudget) register theirs the same way from their tickets.
+		// The Runtime assembly's [SettingsSource] classes, each accessor touched in C# field order.
 		SettingsRegistry::AddDeclarationSource([] { EngineSettings::FrameRateCap(); EngineSettings::Msaa(); EngineSettings::MasterVolume(); });
 		SettingsRegistry::AddDeclarationSource([] { UnitySpaceApp::AutoReorientSetting(); });
 		SettingsRegistry::AddDeclarationSource([] { Cameras::SpaceCamera::LookSensitivitySetting(); Cameras::SpaceCamera::InvertLook(); });
+		SettingsRegistry::AddDeclarationSource([]
+		{
+			using Rendering::RenderPipelineSettings;
+			RenderPipelineSettings::Pipeline(); RenderPipelineSettings::PhysicalSky(); RenderPipelineSettings::Volumetrics();
+			RenderPipelineSettings::Exposure(); RenderPipelineSettings::ExposureCompensation(); RenderPipelineSettings::SunBrightness();
+			RenderPipelineSettings::RayTracing();
+		});
+		SettingsRegistry::AddDeclarationSource([]
+		{
+			using Rendering::UrpPostProcessSettings;
+			UrpPostProcessSettings::Enabled(); UrpPostProcessSettings::Metering(); UrpPostProcessSettings::Compensation();
+			UrpPostProcessSettings::Iso(); UrpPostProcessSettings::Shutter(); UrpPostProcessSettings::Aperture();
+			UrpPostProcessSettings::Bloom(); UrpPostProcessSettings::BloomThreshold(); UrpPostProcessSettings::SunBrightness();
+			UrpPostProcessSettings::Tonemapping(); UrpPostProcessSettings::Contrast(); UrpPostProcessSettings::Saturation();
+			UrpPostProcessSettings::Temperature();
+		});
+		SettingsRegistry::AddDeclarationSource([] { Views::BattleFx::EffectsBudget(); });
 	}
 
 	void GameSettingsHost::Bind()

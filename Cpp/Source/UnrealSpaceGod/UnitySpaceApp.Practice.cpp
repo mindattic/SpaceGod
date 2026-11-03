@@ -5,6 +5,7 @@
 #include "BodyCatalog.h"
 #include "BodyDefinition.h"
 #include "Camera/SpaceCamera.h"
+#include "Camera/StarTravel.h"
 #include "Combat/Battle.h"
 #include "Combat/CombatSpecs.h"
 #include "Combat/CombatState.h"

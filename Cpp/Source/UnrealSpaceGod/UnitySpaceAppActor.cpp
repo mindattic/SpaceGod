@@ -5,6 +5,7 @@
 #include "UnrealSpaceGodLog.h"
 #include "Input/UnrealInputDevice.h"
 #include "UnityCompat/GuiHost.h"
+#include "UnityCompat/UnityScene.h"
 #include "CaptureRunner.h"
 #include "Views/AsteroidBelt.h"
 
@@ -59,6 +60,8 @@ void AUnitySpaceAppActor::BeginPlay()
 		AddTickPrerequisiteActor(PC);
 	}
 
+	// The Unity scene's renderers draw as components of this actor (US-T30); attached before Awake builds the views.
+	UnityScene::Attach(this);
 	App = std::make_shared<UnitySpaceApp>();
 	App->Awake();
 	// OnGUI runs in the GUI host's passes (Layout, each input event, Repaint), as Unity calls it (US-T31).
@@ -91,6 +94,7 @@ void AUnitySpaceAppActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		if (EndPlayReason == EEndPlayReason::Quit || EndPlayReason == EEndPlayReason::EndPlayInEditor) App->OnApplicationQuit();
 		App->OnDestroy();
 		App.reset();
+		UnityScene::Detach();
 	}
 	Super::EndPlay(EndPlayReason);
 }
@@ -98,11 +102,17 @@ void AUnitySpaceAppActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void AUnitySpaceAppActor::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	if (!App) return;
-
+	if (!App || bExternallyStepped) return;
 	// Unity's unscaled delta: real seconds, not dilated (the app clamps it to 0.1 s itself).
-	const float RealDelta = static_cast<float>(FApp::GetDeltaTime());
+	Step(static_cast<float>(FApp::GetDeltaTime()));
+}
+
+void AUnitySpaceAppActor::Step(float RealDelta)
+{
+	if (!App) return;
 	RefreshUnityStatics(RealDelta);
+	// Unity's player loop: finished loads and particles first (UnityScene's BeginFrame), then every Update.
+	UnityScene::BeginFrame(Time::deltaTime);
 
 	if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
 	{
@@ -118,6 +128,8 @@ void AUnitySpaceAppActor::Tick(float DeltaSeconds)
 	}
 	if (App->enabled) App->Update();
 	if (Capture) Capture->Update();
+	// End of the frame (Unity's render): every renderer the views placed to its Unreal component.
+	UnityScene::Sync();
 	ApplyCamera();
 	ApplyCursor();
 	ApplyAudio();
@@ -138,12 +150,14 @@ void AUnitySpaceAppActor::DrawGui(UCanvas* Canvas)
 
 void AUnitySpaceAppActor::RefreshUnityStatics(float RealDeltaSeconds)
 {
+	// As the C# track's UnityBridge.Tick: the unscaled clock is real time, Time.deltaTime and Time.time are scaled by
+	// Time.timeScale (the pause menu sets it to 0), and every app frame counts one.
 	Time::unscaledDeltaTime = RealDeltaSeconds;
-	Time::deltaTime = RealDeltaSeconds;
+	Time::unscaledTime += RealDeltaSeconds;
+	Time::deltaTime = RealDeltaSeconds * Time::timeScale;
+	Time::time += Time::deltaTime;
 	Time::realtimeSinceStartupAsDouble = FPlatformTime::Seconds() - StartSeconds;
-	Time::unscaledTime = static_cast<float>(Time::realtimeSinceStartupAsDouble);
-	Time::time = Time::unscaledTime;
-	Time::frameCount = static_cast<int>(GFrameCounter);
+	if (RealDeltaSeconds > 0) Time::frameCount++;
 
 	if (GEngine && GEngine->GameViewport)
 	{

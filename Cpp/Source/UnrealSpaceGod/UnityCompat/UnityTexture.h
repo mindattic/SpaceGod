@@ -34,13 +34,6 @@ namespace SpaceGod::UnityCompat
 	enum class FilterMode : int { Point = 0, Bilinear = 1, Trilinear = 2 };
 	enum class TextureWrapMode : int { Repeat = 0, Clamp = 1, Mirror = 2, MirrorOnce = 3 };
 
-	/// Unity's HideFlags: kept so the ported code reads the same; nothing here is saved anyway.
-	enum class HideFlags : int
-	{
-		None = 0, HideInHierarchy = 1, HideInInspector = 2, DontSaveInEditor = 4, NotEditable = 8,
-		DontSaveInBuild = 16, DontUnloadUnusedAsset = 32, DontSave = 52, HideAndDontSave = 61,
-	};
-
 	/// UnityEngine.Texture: anything GUI.DrawTexture draws.
 	class Texture
 	{

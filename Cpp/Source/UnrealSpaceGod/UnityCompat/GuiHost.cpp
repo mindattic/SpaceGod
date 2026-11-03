@@ -874,18 +874,18 @@ namespace SpaceGod::UI
 	bool UiInput::IsMousePressed(int button) { return button >= 0 && button < 5 && UnityCompat::input.buttons[button]; }
 	bool UiInput::WasMousePressedThisFrame(int button) { return button >= 0 && button < 5 && UnityCompat::input.mousePressedFrame[button]; }
 
-	Vector2 UiInput::MouseDelta()
+	UnityCompat::Vector2 UiInput::MouseDelta()
 	{
 		const auto& in = UnityCompat::input;
-		return Vector2(in.deltaFrame.X * in.absToPixel, -in.deltaFrame.Y * in.absToPixel);
+		return UnityCompat::Vector2(in.deltaFrame.X * in.absToPixel, -in.deltaFrame.Y * in.absToPixel);
 	}
 
 	float UiInput::ScrollY() { return UnityCompat::input.wheelFrame * 120.0f; }
 
-	Vector2 UiInput::MousePosition()
+	UnityCompat::Vector2 UiInput::MousePosition()
 	{
 		const auto& in = UnityCompat::input;
 		FVector2f p = (in.absMouse - in.overlayAbsTopLeft) * in.absToPixel;
-		return Vector2(p.X, static_cast<float>(Screen::height) - p.Y);
+		return UnityCompat::Vector2(p.X, static_cast<float>(UnityCompat::Screen::height) - p.Y);
 	}
 }

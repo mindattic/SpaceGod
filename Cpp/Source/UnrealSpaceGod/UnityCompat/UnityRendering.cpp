@@ -740,7 +740,7 @@ namespace SpaceGod::UnityCompat
 								part.BaseColor = FLinearColor((*c)[0]->AsNumber(), (*c)[1]->AsNumber(), (*c)[2]->AsNumber(), (*c)[3]->AsNumber());
 							spec.Parts.push_back(part);
 						}
-					out[FromF(kv.Key)] = spec;
+					out[FromF(FString(kv.Key))] = spec;
 				}
 				return out;
 			}();

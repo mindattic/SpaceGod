@@ -11,6 +11,9 @@
 namespace SpaceGod::Core
 {
 	class RenderPipelineProfile;
+	class ChoiceSetting;
+	class RangeSetting;
+	class ToggleSetting;
 }
 
 class APostProcessVolume;

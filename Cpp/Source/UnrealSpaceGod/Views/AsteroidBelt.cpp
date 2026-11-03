@@ -4,6 +4,8 @@
 #include "UnityCompat/UnityGui.h"
 #include "UnityCompat/UnityScene.h"
 #include "UnitySpaceApp.h"
+#include "Camera/StarTravel.h"
+#include "SimClock.h"
 #include "ModelViewer.h"
 
 #include "Astro.h"
@@ -48,7 +50,7 @@ namespace SpaceGod::Views
 			data->Mips.Add(mip);
 			mip->BulkData.Lock(LOCK_READ_WRITE);
 			int64 bytes = static_cast<int64>(width) * height * 16;
-			auto* dst = static_cast<float*>(mip->BulkData.Realloc(bytes));
+			auto* dst = reinterpret_cast<float*>(mip->BulkData.Realloc(bytes));
 			FMemory::Memzero(dst, bytes);
 			FMemory::Memcpy(dst, packed.Raw().data(), static_cast<size_t>(packed.Count()) * sizeof(float));
 			mip->BulkData.Unlock();

@@ -101,6 +101,8 @@ namespace SpaceGod::UnityCompat
 		cs::String name;
 		cs::String tag;
 		bool activeSelf = true;
+		/// Unity's hideFlags: kept so the ported code reads the same; nothing here is saved or shown in an editor.
+		HideFlags hideFlags = HideFlags::None;
 		bool destroyed = false;
 		cs::Ref<Transform> transform;
 

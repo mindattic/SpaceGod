@@ -38,6 +38,11 @@ public:
 	/// The app, once awake (null before BeginPlay and after EndPlay).
 	SpaceGod::UnitySpaceApp* GetApp() const { return App.get(); }
 
+	/// One frame of Unity's player loop for the app (Time, input, Update, the scene to Unreal, camera/cursor/audio out).
+	/// Tick runs it with the real delta; a scripted run (the smoke) sets bExternallyStepped and calls it itself.
+	void Step(float RealDelta);
+	bool bExternallyStepped = false;
+
 	/// Called by ASpaceHUD::DrawHUD: Unity's OnGUI pass, drawn on that canvas.
 	void DrawGui(UCanvas* Canvas);
 

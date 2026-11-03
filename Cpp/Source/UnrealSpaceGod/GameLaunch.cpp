@@ -26,6 +26,12 @@ namespace SpaceGod
 		return slot;
 	}
 
+	bool GameLaunch::SceneInBuild(const cs::String& scenePath)
+	{
+		(void)scenePath;
+		return false;
+	}
+
 	void GameLaunch::ToMainMenu() { LoadScene(MenuScene); }
 
 	void GameLaunch::LoadScene(const cs::String& scene)

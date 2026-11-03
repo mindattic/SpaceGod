@@ -14,6 +14,9 @@ public class UnrealSpaceGod : ModuleRules
 		CppStandard = CppStandardVersion.Cpp20;
 		bEnableExceptions = true;
 		bUseRTTI = true;
+		// Each ported file keeps its own file-local helpers (static ToF, anonymous-namespace caches) as the C# files
+		// keep their private members: a unity build would merge them into one translation unit and collide.
+		bUseUnity = false;
 
 		PublicDependencyModuleNames.AddRange(new[]
 		{
