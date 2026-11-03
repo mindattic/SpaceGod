@@ -3241,7 +3241,9 @@ namespace SpaceGod::Core
 			int n = raidersRaised++;
 			return names[n % names.Count()] + (n >= names.Count() ? cs::Cat(" ", (n / names.Count() + 1)) : cs::String(""));
 		};
-		auto leader = Fleet()->AddShip(Name(), raidersRaised % 3 == 0 ? ShipClass::Cruiser : ShipClass::Destroyer, pirates, ShipRole::Patrol);
+		// C# evaluates the arguments left to right: Name() bumps raidersRaised before the class is chosen from it.
+		cs::String leaderName = Name();
+		auto leader = Fleet()->AddShip(leaderName, raidersRaised % 3 == 0 ? ShipClass::Cruiser : ShipClass::Destroyer, pirates, ShipRole::Patrol);
 		// Raiders fit phaser arrays as their taste and their plunder allow, from their haven's slips (U.SPC-T505).
 		auto slips = LiveHavenOf(pirates);
 		FleetPatterns::Commission(leader, slips, nullptr);
