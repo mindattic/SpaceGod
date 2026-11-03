@@ -381,7 +381,7 @@ namespace SpaceGod::Core
 			{
 				const auto& ms = ModuleSpec::Of(*module);
 				double scale = cs::Math::Max(0.1, spec->LengthKm / 0.45);
-				for (int i = 0; i < ms->Bill.Count(); i++) tonnes[static_cast<int>(ms->Bill[i].good)] += ms->Tonnes(i, scale) * PartRecovery * health;
+				for (int i = 0; i < ms->Bill.Count(); i++) tonnes[static_cast<int>(ms->Bill[i].first)] += ms->Tonnes(i, scale) * PartRecovery * health;
 			}
 			else tonnes[static_cast<int>(SalvageSession::ScrapOf(def->Kind))] += def->MaxHp * TonnesPerHp * health;
 		}
@@ -404,7 +404,7 @@ namespace SpaceGod::Core
 		if (!module.has_value() || health <= 0) return 0;
 		const auto& ms = ModuleSpec::Of(*module);
 		double scale = cs::Math::Max(0.1, lengthKm / 0.45), total = 0;
-		for (int i = 0; i < ms->Bill.Count(); i++) total += ms->Tonnes(i, scale) * PriceOf(ms->Bill[i].good, port);
+		for (int i = 0; i < ms->Bill.Count(); i++) total += ms->Tonnes(i, scale) * PriceOf(ms->Bill[i].first, port);
 		return total * SecondhandShare * cs::Math::Min(1.0, health);
 	}
 
