@@ -55,6 +55,8 @@ public partial class ASpaceGameMode : AGameModeBase
         host = new UnrealHost(this);
         host.Begin();
         if (smoke) host.Override = script = new ScriptedInputDevice();
+        // US-T28: the local player's HUD is the UI's (Unity's IMGUI on the Canvas: every MonoBehaviour's OnGUI).
+        UGameplayStatics.GetPlayerController(0)?.ClientSetHUD(typeof(Unity.SpaceGod.UI.ASpaceHud));
 
         var started = System.Diagnostics.Stopwatch.StartNew();
         Bootstrap.EnsureApp();
@@ -113,7 +115,8 @@ public partial class ASpaceGameMode : AGameModeBase
             if (shot != null && viewFrames == 150) SystemLibrary.ExecuteConsoleCommand("quit");
             return;
         }
-        if (script != null || Bootstrap.App == null) return; // the smoke run steps its own frames
+        if (script != null) return; // the smoke run steps its own frames
+        if (Bootstrap.App == null && !Unity.SpaceGod.UI.MainMenu.Showing) return; // US-T28: the menu's own Update runs too
         Step(deltaSeconds);
     }
 
@@ -142,6 +145,8 @@ public partial class ASpaceGameMode : AGameModeBase
 
     void RunSmoke()
     {
+        // US-T28: the UI first -- the main menu's pages, New Game (which makes the app), then every screen and panel.
+        Unity.SpaceGod.UI.UiSmoke.Run(Frames);
         var app = Bootstrap.App;
         if (app == null || script == null)
         {

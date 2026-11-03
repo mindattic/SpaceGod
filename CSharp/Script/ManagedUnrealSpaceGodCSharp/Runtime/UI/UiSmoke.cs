@@ -71,7 +71,7 @@ namespace Unity.SpaceGod.UI
             Toggle(v => app.ShowOutfit = v, "outfitting");
             Toggle(v => app.ShowSaves = v, "saves");
             Toggle(v => app.ShowSpawn = v, "spawn & pilot (V)");
-            Toggle(v => app.ScreenCleared = v, "clear screen (F11)");
+            Toggle(v => app.ScreenCleared = v, "clear screen (F11): only the reticle, none while not piloting", allowEmpty: true);
 
             var pause = typeof(UnitySpaceApp).GetField("pauseMenu", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(app) as PauseMenu;
             if (pause == null) Fail("no pause menu on the app");
@@ -81,7 +81,7 @@ namespace Unity.SpaceGod.UI
                 Draw("pause menu (Esc)");
                 Click("Settings", "pause menu > settings");
                 Click("Display", "pause menu > settings > display");
-                Click("Back", "pause menu > settings");
+                Click("Cancel", "pause menu > settings");
                 Click("Back", "pause menu");
                 Click("Help", "help from the pause menu");
                 if (app.ShowHelp) app.ShowHelp = false;
@@ -100,13 +100,13 @@ namespace Unity.SpaceGod.UI
         }
 
         /// <summary>One frame of the app, then one IMGUI frame; logs what was drawn.</summary>
-        static void Draw(string screen)
+        static void Draw(string screen, bool allowEmpty = false, string via = null)
         {
             frames(1);
             Frame();
             var s = ImguiHost.Stats;
-            if (s.Labels + s.Boxes + s.Buttons + s.Textures == 0) Fail(screen + ": drew nothing");
-            else UnrealLogger.Log(Log, $"UI smoke [{screen}]: {s}");
+            if (s.Labels + s.Boxes + s.Buttons + s.Textures == 0 && !allowEmpty) Fail(screen + ": drew nothing");
+            else UnrealLogger.Log(Log, $"UI smoke [{screen}]{(via != null ? " (clicked '" + via + "')" : "")}: {s}");
         }
 
         static void Frame()
@@ -133,8 +133,12 @@ namespace Unity.SpaceGod.UI
             Frame();
             int clicks = ImguiHost.Stats.Clicks;
             Input.Mouse = new Vector2(-1000, -1000);
-            if (clicks == 0) Fail($"'{label}' did not take the click");
-            Draw(next);
+            if (clicks == 0)
+            {
+                Fail($"'{label}' did not take the click");
+                Draw(next);
+            }
+            else Draw(next, via: label);
         }
 
         static void Key(KeyCode code, string next)
@@ -144,10 +148,10 @@ namespace Unity.SpaceGod.UI
             Draw(next);
         }
 
-        static void Toggle(Action<bool> set, string screen, Action inside = null)
+        static void Toggle(Action<bool> set, string screen, Action inside = null, bool allowEmpty = false)
         {
             set(true);
-            Draw(screen);
+            Draw(screen, allowEmpty);
             inside?.Invoke();
             set(false);
         }
