@@ -34,6 +34,11 @@
 #endif
 // UBT defines SPACEGODCORE_API as DLLEXPORT / DLLIMPORT, which Unreal's own headers define; SpaceGodCore's files
 // include none, so define them here exactly as WindowsPlatform.h does (an identical redefinition is legal).
+// Exported classes hold standard-library members (std::string, shared_ptr, cs::List); both sides of the DLL
+// boundary are built with the same compiler and CRT, so MSVC's "needs to have dll-interface" warnings are noise.
+#ifdef _MSC_VER
+#pragma warning(disable : 4251 4275)
+#endif
 #if defined(_WIN32) && !defined(DLLEXPORT)
 #define DLLEXPORT __declspec(dllexport)
 #define DLLIMPORT __declspec(dllimport)
