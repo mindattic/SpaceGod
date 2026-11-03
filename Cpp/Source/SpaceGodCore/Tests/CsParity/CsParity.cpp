@@ -206,6 +206,68 @@ namespace
 			bool ok = cs::Double::TryParse(s, v);
 			P(cs::Cat("T ", Bits(d), " ", ok, " ", Bits(v)));
 		}
+
+		// --- DateTime / TimeSpan
+		{
+			using cs::DateTime; using cs::TimeSpan; using cs::DateTimeKind;
+			DateTime j2000(2000, 1, 1, 12, 0, 0, DateTimeKind::Utc);
+			P(cs::Cat("DT limits ", Bits((DateTime::MaxValue - j2000).TotalDays()), " ", Bits((DateTime::MinValue - j2000).TotalDays()), " ", j2000.ToBinary(), " ", j2000.Ticks()));
+			cs::List<double> days{ 0, 0.5, -0.5, 1.0 / 3, 365.25, -36525.123456789, 2461348.0 - 2451545.0, 1e-9, 12345.678901234, -730000.5, 2900000.25, 0.1, 0.000011574074074074073 };
+			for (int k = 0; k < 60; k++) days.Add((static_cast<double>(Lcg() >> 11) * (1.0 / 9007199254740992.0) - 0.5) * 1400000.0);
+			const char* dfs[] = { "", "o", "s", "u", "R", "G", "d", "D", "f", "t", "T", "M", "y", "yyyyMMdd'T'HHmmss'Z'", "yyyy-MM-dd  HH:mm", "MMM d HH:mm", "yyyy-MM-dd HH:mm:ss.fffffff", "h:mm tt F FF FFF", "dddd ddd dd d yy y" };
+			for (double d : days)
+			{
+				String r;
+				try
+				{
+					DateTime t = j2000.AddDays(d);
+					r += cs::Cat(t.Ticks(), " ", t.ToBinary(), " ", t.Year(), " ", t.DayOfYear(), " ", static_cast<int>(t.DayOfWeek()), " ");
+					r += cs::Cat(Bits((t - j2000).TotalDays()), " ", TimeSpan::FromDays(d).Ticks(), " ", TimeSpan::FromDays(d).ToString(), " ");
+					r += cs::Cat(t.AddHours(d).Ticks(), " ");
+					r += cs::Cat(t.AddSeconds(d * 1000).Ticks(), " ");
+					r += cs::Cat(t.AddMonths(7).Ticks(), " ");
+					DateTime u = DateTime::SpecifyKind(t, DateTimeKind::Unspecified);
+					for (const char* f : dfs) r += cs::Cat("|", *f ? u.ToString(f) : u.ToString());
+				}
+				catch (const cs::ArgumentOutOfRangeException&) { r += "<throw>"; }
+				String sb = r;
+				P(cs::Cat("DT ", Bits(d), " ", sb));
+			}
+		}
+	}
+
+	// Checks of the layer's own C++ mechanics (no .NET counterpart needed): List<bool>, Delegate, comparers.
+	int SelfChecks()
+	{
+		int bad = 0;
+		auto expect = [&](bool ok, const char* what) { if (!ok) { std::printf("self-check failed: %s\n", what); bad++; } };
+		cs::List<bool> flags = cs::NewArray<bool>(3);
+		flags[1] = true;
+		bool& ref = flags[2]; ref = true;
+		int n = 0; for (bool b : flags) n += b ? 1 : 0;
+		for (bool& b : flags) b = !b;
+		expect(n == 2 && flags[0] && !flags[1] && !flags[2] && flags.IndexOf(true) == 0, "List<bool>");
+		int calls = 0;
+		cs::Delegate<int> del;
+		expect(!del, "Delegate empty");
+		del += [&](int x) { calls += x; };
+		del += [&](int x) { calls += 10 * x; };
+		del(2);
+		del = [&](int x) { calls += 100 * x; };
+		del.Invoke(1);
+		expect(calls == 122 && static_cast<bool>(del), "Delegate");
+		cs::Dictionary<String, int, cs::OrdinalIgnoreCaseComparer> ci;
+		ci["Alpha"] = 1; ci["ALPHA"] = 2;
+		cs::HashSet<String, cs::OrdinalIgnoreCaseComparer> hs{ "a", "A", "b" };
+		expect(ci.Count() == 1 && ci["alpha"] == 2 && hs.Count() == 2, "OrdinalIgnoreCase");
+		cs::Dictionary<std::tuple<int, String>, int> tk; tk[{ 1, "x" }] = 5;
+		expect(tk.ContainsKey({ 1, "x" }) && !tk.ContainsKey({ 2, "x" }), "tuple keys");
+		expect(cs::CompareTo(cs::Double::NaN, 0.0) == -1 && cs::CompareTo(cs::Double::NaN, cs::Double::NaN) == 0 && cs::CompareTo(1.0, cs::Double::NaN) == 1, "CompareTo");
+		expect(cs::Math::Max(0, 2.5) == 2.5 && cs::Math::Min(3, 2.5) == 2.5 && cs::Mod(-7.5, 2.0) == -1.5, "Math mixed");
+		cs::List<int> li{ 1, 2, 3, 4, 5 };
+		expect(li.GetRange(1, 3).Count() == 3 && li.GetRange(1, 3)[0] == 2, "GetRange");
+		expect(cs::Format("{0:0.###} {1,4}|{2,-3}|{{x}}", 1.23456, 7, "ab") == "1.235    7|ab |{x}", "Format");
+		return bad;
 	}
 
 	std::vector<String> Lines(const String& text)
@@ -256,8 +318,9 @@ int main(int argc, char** argv)
 			bad++;
 		}
 	}
-	std::printf("CsParity: %zu lines, %d mismatch%s\n", n, bad, bad == 1 ? "" : "es");
-	return bad == 0 ? 0 : 1;
+	int selfBad = SelfChecks();
+	std::printf("CsParity: %zu lines, %d mismatch%s; %d self-check failure%s\n", n, bad, bad == 1 ? "" : "es", selfBad, selfBad == 1 ? "" : "s");
+	return bad == 0 && selfBad == 0 ? 0 : 1;
 }
 
 #endif

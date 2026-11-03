@@ -120,14 +120,62 @@ namespace cs
 	template <class A, class B, std::enable_if_t<!std::is_same_v<A, B> && std::is_arithmetic_v<A> && std::is_arithmetic_v<B>, int> = 0>
 	int Compare(const A& a, const B& b) { using C = std::common_type_t<A, B>; return Compare<C>(static_cast<C>(a), static_cast<C>(b)); }
 
+	// ---------------------------------------------------------------- equality comparers -------------------------
+	// C# `new Dictionary<K, V>(comparer)` / `new HashSet<T>(comparer)`: pass a comparer *type* as the H parameter,
+	// `cs::Dictionary<String, int, cs::OrdinalIgnoreCaseComparer>`. A comparer is a struct with both
+	// `size_t operator()(const K&) const` (GetHashCode) and `bool operator()(const K&, const K&) const` (Equals);
+	// a plain hasher (like the default Hash<K>) pairs with operator==. StringComparer.Ordinal is the default.
+	template <class H, class K, class = void> struct EqualFor { using type = std::equal_to<K>; };
+	template <class H, class K> struct EqualFor<H, K, std::enable_if_t<std::is_invocable_r_v<bool, const H&, const K&, const K&>>> { using type = H; };
+	template <class H, class K> using EqualFor_t = typename EqualFor<H, K>::type;
+
+	// StringComparer.OrdinalIgnoreCase (ASCII case folding; Core's keys are ASCII).
+	struct OrdinalIgnoreCaseComparer
+	{
+		static char Fold(char c) { return c >= 'a' && c <= 'z' ? static_cast<char>(c - 32) : c; }
+		size_t operator()(const std::string& s) const
+		{
+			size_t h = 1469598103934665603ull;
+			for (char c : s) { h ^= static_cast<unsigned char>(Fold(c)); h *= 1099511628211ull; }
+			return h;
+		}
+		bool operator()(const std::string& a, const std::string& b) const
+		{
+			if (a.size() != b.size()) return false;
+			for (size_t i = 0; i < a.size(); i++) if (Fold(a[i]) != Fold(b[i])) return false;
+			return true;
+		}
+	};
+	using OrdinalComparer = Hash<std::string>; // StringComparer.Ordinal
+
 	// ---------------------------------------------------------------- List<T> -----------------------------------
+	// List<bool> must hand out a real bool& (std::vector<bool> packs bits), so it stores one of these per item.
+	// It converts to bool& / const bool&, so `for (bool b : flags)`, `for (bool& b : flags)` and `flags[i] = true`
+	// all work as for any other List.
+	struct BoolSlot
+	{
+		bool Value = false;
+		BoolSlot() = default;
+		BoolSlot(bool v) : Value(v) {}
+		operator bool&() { return Value; }
+		operator const bool&() const { return Value; }
+		BoolSlot& operator=(bool v) { Value = v; return *this; }
+	};
+	template <class T> struct ListSlot { using type = T; };
+	template <> struct ListSlot<bool> { using type = BoolSlot; };
+
 	template <class T> class List
 	{
 	public:
 		using value_type = T;
+		using Slot = typename ListSlot<T>::type; // T itself, except BoolSlot for bool
 		List() = default;
-		List(std::initializer_list<T> init) : items(init) {}
-		explicit List(std::vector<T> v) : items(std::move(v)) {}
+		List(std::initializer_list<T> init) : items(init.begin(), init.end()) {}
+		explicit List(std::vector<T> v)
+		{
+			if constexpr (std::is_same_v<T, Slot>) items = std::move(v);
+			else items.assign(v.begin(), v.end());
+		}
 		template <class It> List(It first, It last) : items(first, last) {}
 
 		int Count() const { return static_cast<int>(items.size()); }
@@ -153,12 +201,19 @@ namespace cs
 		bool Contains(const T& v) const { return IndexOf(v) >= 0; }
 		template <class P> int FindIndex(P pred) const { for (size_t i = 0; i < items.size(); ++i) if (pred(items[i])) return static_cast<int>(i); return -1; }
 		// C# Find returns default(T) when nothing matches: nullptr for a Ref, a zeroed struct otherwise.
-		template <class P> T Find(P pred) const { int i = FindIndex(pred); return i >= 0 ? items[static_cast<size_t>(i)] : T{}; }
+		template <class P> T Find(P pred) const { int i = FindIndex(pred); return i >= 0 ? static_cast<const T&>(items[static_cast<size_t>(i)]) : T{}; }
 		template <class P> bool Exists(P pred) const { return FindIndex(pred) >= 0; }
 		template <class P> bool TrueForAll(P pred) const { for (const auto& v : items) if (!pred(v)) return false; return true; }
 		void Reverse() { std::reverse(items.begin(), items.end()); }
 		List<T> ToList() const { return *this; }
 		List<T> ToArray() const { return *this; } // arrays are Lists too (see docs/MIGRATION.md)
+		// GetRange(index, count): a shallow copy of count items from index.
+		List<T> GetRange(int index, int count) const
+		{
+			if (index < 0 || count < 0) throw ArgumentOutOfRangeException(index < 0 ? "index" : "count");
+			if (Count() - index < count) throw ArgumentException("Offset and length were out of bounds for the array or count is greater than the number of elements from index to the end of the source collection.");
+			return List<T>(items.begin() + index, items.begin() + index + count);
+		}
 
 		// .NET's List.Sort: unstable introsort, ported exactly (Cs.cpp), so equal keys land where .NET puts them.
 		template <class Cmp> void Sort(Cmp compare); // compare(a, b) -> int, as Comparison<T>
@@ -168,13 +223,13 @@ namespace cs
 		auto end() { return items.end(); }
 		auto begin() const { return items.begin(); }
 		auto end() const { return items.end(); }
-		std::vector<T>& Raw() { return items; }
-		const std::vector<T>& Raw() const { return items; }
+		std::vector<Slot>& Raw() { return items; }
+		const std::vector<Slot>& Raw() const { return items; }
 		bool operator==(const List& o) const { return this == &o; } // reference semantics, as a C# List
 
 	private:
 		void Check(int i) const { if (i < 0 || static_cast<size_t>(i) >= items.size()) throw ArgumentOutOfRangeException("index"); }
-		std::vector<T> items;
+		std::vector<Slot> items;
 	};
 
 	// A C# `T[]` of fixed length.
@@ -184,7 +239,7 @@ namespace cs
 	// Reproduces .NET's Dictionary layout: entries live in an array in insertion order, a Remove frees its slot
 	// onto a free list, and the next Add fills the most recently freed slot first. Enumeration walks the array,
 	// so it comes out in exactly .NET's order, including after removals.
-	template <class K, class V, class H = Hash<K>> class Dictionary
+	template <class K, class V, class H = Hash<K>, class Eq = EqualFor_t<H, K>> class Dictionary
 	{
 	public:
 		struct Entry { K Key; V Value; bool Used = false; int NextFree = -1; };
@@ -249,14 +304,14 @@ namespace cs
 			return e.Value;
 		}
 		std::vector<Entry> entries;
-		std::unordered_map<K, int, H> index;
+		std::unordered_map<K, int, H, Eq> index;
 		int freeList = -1;
 		int count = 0;
 	};
 
 	// ---------------------------------------------------------------- HashSet<T> --------------------------------
 	// Same slot layout as Dictionary, so enumeration order matches .NET's HashSet.
-	template <class T, class H = Hash<T>> class HashSet
+	template <class T, class H = Hash<T>, class Eq = EqualFor_t<H, T>> class HashSet
 	{
 	public:
 		HashSet() = default;
@@ -272,17 +327,17 @@ namespace cs
 		class Iterator
 		{
 		public:
-			explicit Iterator(typename Dictionary<T, bool, H>::Iterator it) : it(it) {}
+			explicit Iterator(typename Dictionary<T, bool, H, Eq>::Iterator it) : it(it) {}
 			const T& operator*() const { return (*it).first; }
 			Iterator& operator++() { ++it; return *this; }
 			bool operator!=(const Iterator& o) const { return it != o.it; }
 		private:
-			typename Dictionary<T, bool, H>::Iterator it;
+			typename Dictionary<T, bool, H, Eq>::Iterator it;
 		};
 		Iterator begin() const { return Iterator(map.begin()); }
 		Iterator end() const { return Iterator(map.end()); }
 	private:
-		Dictionary<T, bool, H> map;
+		Dictionary<T, bool, H, Eq> map;
 	};
 
 	// ---------------------------------------------------------------- Queue / Stack -----------------------------
@@ -333,6 +388,29 @@ namespace cs
 	private:
 		std::vector<std::pair<int, Action<A...>>> handlers;
 		int next = 0;
+	};
+
+	// A C# delegate *field* (not an event) of type Action<...> that code chains with `+=`: multicast, in order.
+	// `d += h` appends, `d = h` replaces (`d = nullptr` clears), `d(args)` / `d.Invoke(args)` runs every handler
+	// on a snapshot, `if (d)` is C#'s null check. (`-=` needs delegate equality, which std::function lacks.)
+	template <class... A> class Delegate
+	{
+	public:
+		Delegate() = default;
+		Delegate(std::nullptr_t) {}
+		template <class F, std::enable_if_t<std::is_invocable_v<F&, A...> && !std::is_same_v<std::decay_t<F>, Delegate>, int> = 0>
+		explicit Delegate(F f) { handlers.emplace_back(std::move(f)); }
+		Delegate& operator=(std::nullptr_t) { handlers.clear(); return *this; }
+		template <class F, std::enable_if_t<std::is_invocable_v<F&, A...> && !std::is_same_v<std::decay_t<F>, Delegate>, int> = 0>
+		Delegate& operator=(F f) { handlers.clear(); handlers.emplace_back(std::move(f)); return *this; }
+		Delegate& operator+=(Action<A...> h) { if (h) handlers.push_back(std::move(h)); return *this; }
+		Delegate& operator+=(const Delegate& d) { handlers.insert(handlers.end(), d.handlers.begin(), d.handlers.end()); return *this; }
+		void Invoke(A... args) const { auto snapshot = handlers; for (auto& h : snapshot) h(args...); }
+		void operator()(A... args) const { Invoke(args...); }
+		explicit operator bool() const { return !handlers.empty(); }
+		bool operator==(std::nullptr_t) const { return handlers.empty(); }
+	private:
+		std::vector<Action<A...>> handlers;
 	};
 
 	// ---------------------------------------------------------------- System.Random -----------------------------
@@ -471,6 +549,23 @@ namespace cs
 		inline bool IsInfinity(float v) { return std::isinf(v); }
 		inline bool IsFinite(float v) { return std::isfinite(v); }
 	}
+	namespace Long
+	{
+		constexpr long long MaxValue = std::numeric_limits<long long>::max();
+		constexpr long long MinValue = std::numeric_limits<long long>::min();
+	}
+	// double.CompareTo / float.CompareTo / int.CompareTo: -1, 0 or 1, with NaN equal to NaN and below every number.
+	inline int CompareTo(double a, double b)
+	{
+		if (a < b) return -1;
+		if (a > b) return 1;
+		if (a == b) return 0;
+		if (std::isnan(a)) return std::isnan(b) ? 0 : -1;
+		return 1;
+	}
+	inline int CompareTo(float a, float b) { return CompareTo(static_cast<double>(a), static_cast<double>(b)); }
+	inline int CompareTo(int a, int b) { return a < b ? -1 : (a > b ? 1 : 0); }
+	inline int CompareTo(long long a, long long b) { return a < b ? -1 : (a > b ? 1 : 0); }
 	namespace Int
 	{
 		constexpr int MaxValue = std::numeric_limits<int>::max();
@@ -478,6 +573,10 @@ namespace cs
 		SPACEGODCORE_API bool TryParse(std::string_view s, int& out);
 		SPACEGODCORE_API int Parse(std::string_view s);
 	}
+
+	// C# `a % b` on doubles is fmod (truncated, sign of a), which C++ spells std::fmod: write cs::Mod(a, b).
+	inline double Mod(double a, double b) { return std::fmod(a, b); }
+	inline float Mod(float a, float b) { return std::fmod(a, b); }
 
 	// ---------------------------------------------------------------- conversions -------------------------------
 	// C# `(int)d`: truncates toward zero; NaN and out-of-range give int.MinValue (x64 cvttsd2si, as .NET 8 and
@@ -637,3 +736,4 @@ namespace cs
 }
 
 #include "Cs/CsSort.inl"
+#include "Cs/CsDateTime.h"

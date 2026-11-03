@@ -163,7 +163,7 @@ namespace cs
 		{
 			for (size_t i = 0; i < items.size(); i++)
 			{
-				if (std::isnan(items[i]))
+				if (std::isnan(static_cast<double>(items[i])))
 				{
 					std::swap(items[start], items[i]);
 					start++;
@@ -171,7 +171,7 @@ namespace cs
 			}
 		}
 		auto cmp = [](const T& a, const T& b) { return Compare(a, b); };
-		SortDetail::Introsort<T, decltype(cmp)> s{ items.data() + start, cmp };
+		SortDetail::Introsort<Slot, decltype(cmp)> s{ items.data() + start, cmp };
 		s.Run(static_cast<int>(items.size() - start));
 	}
 }

@@ -166,6 +166,32 @@ static class Program
             P($"T {Bits(d)} {ok} {Bits(v)}");
         }
 
+        // --- DateTime / TimeSpan (UTC and unspecified only: local time depends on the machine's zone)
+        {
+            var j2000 = new DateTime(2000, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+            P($"DT limits {Bits((DateTime.MaxValue - j2000).TotalDays)} {Bits((DateTime.MinValue - j2000).TotalDays)} {j2000.ToBinary()} {j2000.Ticks}");
+            var days = new List<double> { 0, 0.5, -0.5, 1.0 / 3, 365.25, -36525.123456789, 2461348.0 - 2451545.0, 1e-9, 12345.678901234, -730000.5, 2900000.25, 0.1, 0.000011574074074074073 };
+            for (int k = 0; k < 60; k++) days.Add(((Lcg() >> 11) * (1.0 / 9007199254740992.0) - 0.5) * 1400000.0);
+            string[] dfs = { "", "o", "s", "u", "R", "G", "d", "D", "f", "t", "T", "M", "y", "yyyyMMdd'T'HHmmss'Z'", "yyyy-MM-dd  HH:mm", "MMM d HH:mm", "yyyy-MM-dd HH:mm:ss.fffffff", "h:mm tt F FF FFF", "dddd ddd dd d yy y" };
+            foreach (double d in days)
+            {
+                var sb = new StringBuilder();
+                try
+                {
+                var t = j2000.AddDays(d);
+                sb.Append(t.Ticks).Append(' ').Append(t.ToBinary()).Append(' ').Append(t.Year).Append(' ').Append(t.DayOfYear).Append(' ').Append((int)t.DayOfWeek).Append(' ');
+                sb.Append(Bits((t - j2000).TotalDays)).Append(' ').Append(TimeSpan.FromDays(d).Ticks).Append(' ').Append(TimeSpan.FromDays(d).ToString()).Append(' ');
+                sb.Append(t.AddHours(d).Ticks).Append(' ');
+                sb.Append(t.AddSeconds(d * 1000).Ticks).Append(' ');
+                sb.Append(t.AddMonths(7).Ticks).Append(' ');
+                var u = DateTime.SpecifyKind(t, DateTimeKind.Unspecified);
+                foreach (string f in dfs) sb.Append('|').Append(f.Length == 0 ? u.ToString(Inv) : u.ToString(f, Inv));
+                }
+                catch (ArgumentOutOfRangeException) { sb.Append("<throw>"); }
+                P($"DT {Bits(d)} {sb}");
+            }
+        }
+
         var o = Console.OpenStandardOutput();
         var bytesOut = new UTF8Encoding(false).GetBytes(Out.ToString());
         o.Write(bytesOut, 0, bytesOut.Length);
