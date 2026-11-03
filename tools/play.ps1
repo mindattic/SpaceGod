@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-  [ValidateSet('solo', 'host', 'join', 'smoke')][string]$Mode = 'solo',
+  [ValidateSet('solo', 'host', 'join', 'smoke', 'shots')][string]$Mode = 'solo',
   [string]$Address = '127.0.0.1',
   [ValidateSet('Cpp', 'CSharp')][string]$Track = 'Cpp',
   [string]$EngineVersion = '5.8'
@@ -18,6 +18,7 @@ under LogSpaceGod and quits; the log is CSharp/Saved/Logs/UnrealSpaceGodCSharp.l
   ./tools/play.ps1 -Mode join -Address 192.168.1.20
   ./tools/play.ps1 -Track CSharp
   ./tools/play.ps1 -Track CSharp -Mode smoke
+  ./tools/play.ps1 -Track CSharp -Mode shots   # windowed: the UI's screenshots into docs/images
 #>
 
 $ErrorActionPreference = 'Stop'
@@ -34,6 +35,18 @@ if ($Track -eq 'CSharp') {
   # The editor binaries rebuild stale C# through UnrealSharp's UAT commands, which need a usable .NET SDK.
   . "$PSScriptRoot/dotnet-sdk.ps1"
   Use-UnrealSharpDotNet -PrivateRoot (Join-Path $project.DirectoryName 'Intermediate\DotNet')
+}
+
+if ($Mode -eq 'shots') {
+  # -Mode shots (CSharp): a window and the UI's screenshot tour (UiSmoke.Shots: main menu, HUD, Help, galaxy map,
+  # market + cargo, pause menu), each saved as docs/images/csharp-ui-*.png; the game quits when done.
+  if ($Track -ne 'CSharp') { throw '-Mode shots is the C# track''s UI screenshot tour: use -Track CSharp.' }
+  $editor = Join-Path $engine 'Engine\Binaries\Win64\UnrealEditor.exe'
+  $images = Join-Path $repo 'docs\images'
+  $p = Start-Process -FilePath $editor -PassThru -Wait -ArgumentList @("`"$($project.FullName)`"", '/Engine/Maps/Entry', '-game',
+    '-windowed', '-ResX=1600', '-ResY=900', '-nosound', '-unattended', '-log', '-SpaceGodUiShots', "`"-capturedir=$images`"")
+  Get-ChildItem -LiteralPath $images -Filter 'csharp-ui-*.png' -ErrorAction SilentlyContinue | ForEach-Object FullName
+  exit $p.ExitCode
 }
 
 if ($Mode -eq 'smoke') {
