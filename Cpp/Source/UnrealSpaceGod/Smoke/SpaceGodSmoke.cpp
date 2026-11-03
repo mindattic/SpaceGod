@@ -43,6 +43,7 @@
 #include "HAL/FileManager.h"
 #include "HAL/PlatformTime.h"
 #include "Misc/CommandLine.h"
+#include "Misc/CoreDelegates.h"
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
 
@@ -707,6 +708,9 @@ namespace SpaceGod::Smoke
 			h->bScriptedInput = true;
 			h->SceneUpdate = [] { if (views) views->Frame(Time::deltaTime); };
 			h->FinishSpawning(FTransform::Identity);
+			// The views hold material instances and textures (strong UObject references): let go of them while the
+			// object system is still up, not in static destruction after it.
+			FCoreDelegates::OnEnginePreExit.AddLambda([] { views = nullptr; });
 			try
 			{
 				// The C# track's fixed start (2026-11-03 12:00 UTC), as US-T6's smoke used.

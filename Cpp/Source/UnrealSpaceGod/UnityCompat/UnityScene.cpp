@@ -357,6 +357,9 @@ namespace SpaceGod::UnityCompat
 		bool Shown(const Renderer& r, const cs::Ref<Mesh>& mesh)
 		{
 			if (!r.enabled || !mesh || mesh->destroyed) return false;
+			// Nothing to draw (an idle particle system's mesh, a line not yet given points): as the C# track's
+			// UnityBridge.Sync, which wants vertexCount + (imported ? 1 : 0) > 0.
+			if (mesh->vertexCount() == 0 && mesh->ImportedAsset.empty()) return false;
 			if (r.OnlyFrame >= 0 && r.OnlyFrame != Frame) return false;
 			auto go = r.gameObject();
 			if (!go || !go->activeInHierarchy()) return false;
