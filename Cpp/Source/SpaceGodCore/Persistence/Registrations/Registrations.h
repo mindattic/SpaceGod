@@ -4,6 +4,7 @@
 // the few fields whose C# declared type the C++ member's type does not name.
 
 #include "Persistence/ObjectGraph.h"
+#include "Persistence/Registrations/Wiring.h"
 
 #include "Combat/War.h"
 #include "Systems/InterstellarTraffic.h"
