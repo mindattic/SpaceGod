@@ -284,6 +284,78 @@ Note for the benchmark: that first `Galaxy.CreateDefault` plus the first ticks (
 and the galaxy's first exploration pass; measure warm, and consider ReadyToRun/tiered-PGO settings for both the
 Core and the game assembly before comparing with C++.
 
+**UI (US-T28): Unity's IMGUI on an AHUD Canvas.** Unity.SpaceGod's whole UI — `Hud` (+ `Hud.Trade`), `MainMenu`,
+`PauseMenu`, `HelpScreen`, `GalaxyMapScreen`, `DisplayOptions`, `Icons`, `ModelViewer`, and the `SceneTour` /
+`CaptureRunner` tour — is **immediate-mode IMGUI** (`OnGUI`, `GUI.Label/Box/Button/DrawTexture/TextField/
+HorizontalSlider`, `BeginScrollView`, `BeginGroup/Clip`, `GUI.matrix` rotations for lines and arrows), laid out in
+absolute pixel rects recomputed every frame, with its own `GUIStyle`s over 8×8 bordered swatch textures made in code
+and procedurally rasterised icon sprites; no uGUI, no UI Toolkit, no font assets (every style uses Unity's built-in
+font: Arial, at the style's `fontSize`, regular/bold/italic). So the port keeps it immediate-mode:
+
+- **Approach: AHUD + Canvas, not UMG/Slate.** UnrealSharp exposes AHUD's whole Canvas API (`ReceiveDrawHUD`,
+  `DrawTexture` with UVs, tint, blend and rotation, `DrawText` with a UFont and scale, `GetTextSize`), which is exactly
+  what IMGUI needs; UMG would mean rebuilding every screen as retained widgets and syncing state into them, which is
+  where a faithful port would drift. The UI files are the originals **copied verbatim** (`using UnityEngine;` and all);
+  only `CaptureRunner` (MindAttic.Capture → Unreal's `shot showui`; coroutine stepped from `Update`) and a
+  `MainMenu.Scene.cs` partial (the Unity scene → one GameObject the scene loader shows/hides) are new.
+- **The IMGUI facade** (`Script/.../UnityCompat/Imgui/`, namespace `UnityEngine`, on US-T27's facade): `GUI`,
+  `GUIUtility`, `GUIStyle`/`GUIStyleState`/`GUIContent`/`GUISkin`/`RectOffset`, `Event`/`EventType`/`KeyCode`, the
+  text enums, `Screen`'s display modes (through GameUserSettings) and `QualitySettings.vSyncCount`, `Keyboard/Mouse
+  .current`, `SceneUtility`. It reproduces Unity's semantics where the UI depends on them: one OnGUI pass per event
+  (Layout before each; mouse/scroll/key events; Layout + Repaint last; only Repaint draws); `GUI.Button` true on
+  mouse-up over the hot control (any button, as Unity's); a style state (hover/active/focused) is used only when it
+  has a background, else `normal` — text colour included; a new state's text colour is black; disabled = half alpha;
+  `GUI.color × backgroundColor` tints backgrounds and textures, `GUI.color × contentColor × textColor` tints text;
+  backgrounds nine-sliced by `border`; padding, the nine alignments, word wrap, `TextClipping.Clip`; scroll views with
+  15 px bars, wheel = 20 px × `delta` (3 a notch, as Unity on Windows), state kept per control so the wheel applies
+  next pass; mouse positions local to groups and far away outside the clip; `GUIUtility.ExitGUI`; click counts.
+- **Fonts.** The original's font is Unity's built-in Arial. The HUD canvas builds runtime UFonts straight from the
+  system's `arial.ttf / arialbd.ttf / ariali.ttf / arialbi.ttf` (`FFontData` by file name, `EFontCacheType.Runtime`),
+  so text has Arial's exact metrics without shipping Microsoft's font; Unity's pixel `fontSize` is drawn at
+  `0.75 ×` in Slate points (96 DPI). Where Arial is not installed it falls back to the engine's Roboto (wider/narrower
+  in places). No font or icon assets are imported, so nothing is needed in `SpaceGodRender`: the C++ track can load the
+  same system faces the same way (`FFontData(TEXT(".../arial.ttf"), ...)` in a transient `UFont`).
+- **Colour.** Unity's colours are gamma; Canvas takes linear, so every tint is converted sRGB→linear (textures are
+  sRGB already).
+- **Wiring.** `Runtime/UI/SpaceHud.cs`: `ASpaceHud : AHUD`; each `ReceiveDrawHUD` sets `Screen` from the canvas size,
+  polls the player controller (US-T26's `UnrealInputDevice`) into IMGUI events and runs every live MonoBehaviour's
+  `OnGUI` (`UnityBridge.GuiHandlers()`: the app's HUD + pause menu, the main menu, the model viewer, AsteroidBelt's
+  labels). Headless (`-nullrhi`, no DrawHUD) the same cycle runs from its Tick on a measuring canvas (Arial's
+  advance widths), so the UI's own logic (UiRects, hover, galaxy-map model rebuilds) still runs.
+- **Smoke** (`-SpaceGodSmoke`): `UiSmoke.Run` goes through every screen as a player would — main menu pages,
+  New Game, HUD, Help, galaxy map (Diplomacy, Command), every HUD panel, the pause menu and its Settings/Display
+  pages — one IMGUI frame each, moving between them by **clicking the real buttons by label** (mouse down/up over the
+  rect where the last Repaint drew that button), and logs `UI smoke [screen]: N labels, … buttons, … text runs`.
+- **Screenshots** (`tools/play.ps1 -Track CSharp -Mode shots`, a 1600×900 window): `UiSmoke.Shots` saves the main
+  menu, the HUD, Help, the galaxy map, the market board and the pause menu as `docs/images/csharp-ui-*.png`.
+
+**Proof (2026-11-03).** Smoke, all 36 steps (excerpt):
+
+```
+LogSpaceGod: Display: UI smoke [main menu]: 3 labels, 1 boxes, 8 buttons, 81 texture quads, 11 text runs (2 OnGUI passes)
+LogSpaceGod: Display: UI smoke [main menu > help, next chapter (Next)] (clicked 'Next'): 75 labels, 1 boxes, 18 buttons, 183 texture quads, 63 text runs (4 OnGUI passes)
+LogSpaceGod: Display: UI smoke [new game] (clicked 'New Game'): 245 labels, 8 boxes, 9 buttons, 250 texture quads, 160 text runs (8 OnGUI passes)
+LogSpaceGod: Display: UI smoke [galaxy map > command] (clicked 'COMMAND'): 161 labels, 3 boxes, 44 buttons, 637 texture quads, 180 text runs (8 OnGUI passes)
+LogSpaceGod: Display: UI smoke [pause menu > settings > display] (clicked 'Display'): 255 labels, 10 boxes, 27 buttons, 398 texture quads, 184 text runs (8 OnGUI passes)
+LogSpaceGod: Display: UI smoke: every screen drew
+```
+
+In the window the colours come out as the original's arithmetic gives them (e.g. the menu panel, 0.03/0.05/0.08 at
+0.88 over black, reads (7, 11, 17); a button 0.12/0.18/0.24 at 0.95 reads (30, 44, 59)), Arial in all four faces.
+
+![HUD](images/csharp-ui-hud.png)
+
+**Not faithful yet (UI).** Canvas cannot cut a glyph, so text at a clip edge (scroll views, `TextClipping.Clip`) is
+dropped character by character horizontally and line by line vertically (a line less than half inside is not
+drawn), where Unity cuts through the glyphs; rotated quads (`GUI.matrix`: lines, arrows) are not clipped to scroll
+views. Unity's default-skin look (only `ModelViewer` and AsteroidBelt's labels use `GUI.skin`) is approximated with
+generated greys. Icons are drawn from one 64 px texture without the original's mip chain (no trilinear minification).
+The text field has no caret movement or selection (type and backspace only, as the game's two fields are used).
+Unreal reports no refresh rates, so every display mode lists as 60 Hz. Slate's Arial advances at fractional sizes
+can differ by a pixel from Unity's hinted ones, so a line that just fitted in Unity can wrap here (seen once, on the
+Opportunities card). Cargo, outfitting and the other piloting panels draw only once a hull is flown; the smoke opens
+them without one, so it proves they run, not their full content.
+
 **Open risks.** Co-op from C# rests on UnrealSharp's replication attributes and RPCs, which are
 less battle-tested than C++'s; the Session layer (host-authoritative commands) keeps the replicated surface small.
 UnrealSharp is pre-1.0 with no tags: updates are by commit, and two of our workarounds depend on its internals.

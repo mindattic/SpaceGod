@@ -38,7 +38,7 @@ namespace UnityEngine
             public int Labels, Boxes, Buttons, Textures, Texts, Clicks, Passes;
 
             public override string ToString() =>
-                $"{Labels} labels, {Boxes} boxes, {Buttons} buttons, {Textures} texture quads, {Texts} text runs, ({Passes} OnGUI passes)";
+                $"{Labels} labels, {Boxes} boxes, {Buttons} buttons, {Textures} texture quads, {Texts} text runs ({Passes} OnGUI passes)";
         }
 
         public static DrawStats Stats;
