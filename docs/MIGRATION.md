@@ -214,6 +214,23 @@ agents apply them across all folders (full list of reported seams: notes on US-T
     BodyDefinition.h); members named like their type are declared with `::SpaceGod::Core::T`; locals named after
     Windows macros (`near`, `far`, `small`, `min`, `max`) are renamed.
 
+## Whole-Core integration in UE (US-T37)
+
+`PortingAllowList` is null: UE compiles all of SpaceGodCore, and `UnrealEditor-SpaceGodCore.dll` links with 0 warnings
+(standalone: `tools/build-core.ps1 -Rebuild`, 0 warnings, CsParity 0 mismatches). What the DLL needed beyond ruling 8:
+- **No two sources may share a file name** in a module (UBT's non-unity build refuses): `Persistence/PersistenceProfiles.cpp`
+  (beside `Shared/Profiles/Profiles.cpp`) and `Persistence/Registrations/<Folder>Registrations.cpp` where a folder has
+  its own `<Folder>.cpp`. The standalone build does not catch this; keep new file names unique across SpaceGodCore.
+- **One static per declaration** in an exported class (`static constexpr double A = 1, B = 2;` is C2487).
+- **Friend declarations** of exported free functions carry `SPACEGODCORE_API` too (C2375 otherwise).
+- **Value types with inline static constants** (`inline const DVec3 DVec3::Zero = ...` in the header) cannot be exported
+  whole (C2491, a dllimport static may not be defined); they export their out-of-line members one by one (DVec3,
+  GalacticPosition, the flight handlings, SensorSuite). Each module then has its own copy of those constants.
+- **Unreal's legacy `PI` macro** rewrote `cs::Math::PI` in modules that include Unreal's headers first. `Cs/Cs.h`
+  undefines it (Unreal code uses `UE_PI`); `UE_DEFINE_LEGACY_MATH_CONSTANT_MACRO_NAMES=0` per module does not work,
+  because the engine's shared PCH already defines the macros. A Runtime file that includes a Unreal header *after* the
+  first Core header gets `PI` back for the rest of that file.
+
 ## Parity findings (US-T37)
 
 The first C++ vs C# comparison (`tools/bench.ps1 -Track Both`, Bench/README.md): Bench.Cpp runs the same startup
