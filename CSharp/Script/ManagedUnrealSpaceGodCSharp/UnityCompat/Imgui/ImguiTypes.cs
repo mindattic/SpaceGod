@@ -337,6 +337,67 @@ namespace UnityEngine
                     GUI.DrawCaret(new Vector2(Mathf.Round(x) + w + 1, y), lh, tint);
             }
         }
+
+        /// <summary>Unity's TextEditor selection colour (the default skin's settings.selectionColor).</summary>
+        internal static readonly Color SelectionColor = new Color(61 / 255f, 128 / 255f, 223 / 255f, 166 / 255f);
+
+        /// <summary>Where a single-line field's text starts (x, y) inside <paramref name="position"/>, before scrolling.</summary>
+        Vector2 FieldOrigin(Rect position)
+        {
+            var area = padding.Remove(position);
+            area.x += contentOffset.x;
+            area.y += contentOffset.y;
+            float lh = lineHeight;
+            int v = (int)alignment / 3;
+            float y = v == 1 ? area.y + (area.height - lh) * 0.5f : v == 2 ? area.yMax - lh : area.y;
+            return new Vector2(area.x, Mathf.Round(y));
+        }
+
+        /// <summary>The character boundary nearest <paramref name="mouseX"/> (local) in a single-line field.</summary>
+        internal int TextFieldIndexAt(Rect position, string text, float scroll, float mouseX)
+        {
+            float x = mouseX - (FieldOrigin(position).x - scroll);
+            int best = 0;
+            float prev = 0;
+            for (int i = 1; i <= text.Length; i++)
+            {
+                float w = GUI.Canvas.Measure(text.Substring(0, i), EffectiveSize, fontStyle);
+                if (x < (prev + w) * 0.5f) return i - 1;
+                prev = w;
+                best = i;
+            }
+            return best;
+        }
+
+        /// <summary>A focused single-line field as Unity's TextEditor draws it: the text scrolled so the cursor stays in
+        /// view and clipped to the padded area, the selection highlighted behind it, the cursor a 1-px line.</summary>
+        internal void DrawTextFieldContent(Rect position, string text, Color textColor, GUI.TextEditing ed)
+        {
+            var area = padding.Remove(position);
+            var origin = FieldOrigin(position);
+            float lh = lineHeight;
+            int size = EffectiveSize;
+            float cursorX = GUI.Canvas.Measure(text.Substring(0, ed.Cursor), size, fontStyle);
+            // TextEditor.UpdateScrollOffset: keep the cursor inside the visible width.
+            float view = Math.Max(1, area.xMax - origin.x);
+            if (cursorX - ed.Scroll > view - 1) ed.Scroll = cursorX - view + 1;
+            if (cursorX - ed.Scroll < 0) ed.Scroll = cursorX;
+            float full = GUI.Canvas.Measure(text, size, fontStyle);
+            if (full - ed.Scroll < view - 1) ed.Scroll = Math.Max(0, full - view + 1);
+            float x0 = Mathf.Round(origin.x - ed.Scroll);
+            GUI.BeginClip(area);
+            var local = new Vector2(x0 - area.x, origin.y - area.y);
+            if (ed.HasSelection)
+            {
+                int a = Math.Min(ed.Cursor, ed.Select), b = Math.Max(ed.Cursor, ed.Select);
+                float sx = GUI.Canvas.Measure(text.Substring(0, a), size, fontStyle);
+                float ex = GUI.Canvas.Measure(text.Substring(0, b), size, fontStyle);
+                GUI.DrawTextureTinted(new Rect(local.x + sx, local.y, ex - sx, lh), Texture2D.whiteTexture, SelectionColor);
+            }
+            GUI.DrawTextLine(text, local, size, fontStyle, GUI.ContentTint(textColor), null, lh);
+            GUI.DrawCaret(new Vector2(local.x + cursorX, local.y), lh, new Color(1, 1, 1, GUI.color.a)); // settings.cursorColor
+            GUI.EndClip();
+        }
     }
 
     /// <summary>Unity's built-in game skin: box, button, label, text field, scrollbars, slider.</summary>

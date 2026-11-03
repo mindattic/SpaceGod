@@ -48,7 +48,11 @@ namespace Unity.SpaceGod.UI
         static readonly bool Headless = Bootstrap.HasCommandLineFlag("-nullrhi");
 
         /// <summary>-SpaceGodUiShots: the windowed screenshot tour (<see cref="UiSmoke.Shots"/>), stepped once a frame.</summary>
-        static CaptureRunner.Coroutine shots = Bootstrap.HasCommandLineFlag("-SpaceGodUiShots") ? new CaptureRunner.Coroutine(UiSmoke.Shots()) : null;
+        static CaptureRunner.Coroutine shots = Bootstrap.HasCommandLineFlag("-SpaceGodUiShots") ? new CaptureRunner.Coroutine(UiSmoke.Shots())
+            : Bootstrap.HasCommandLineFlag("-SpaceGodFidelityShots") ? new CaptureRunner.Coroutine(FidelityShots.Run()) : null; // US-T40
+
+        /// <summary>Milliseconds the last GUI frame (every OnGUI pass) took, averaged (US-T40's frame-time log).</summary>
+        public static float GuiMs;
 
         HudCanvas canvas;
         MeasuringCanvas measuring;
@@ -82,7 +86,9 @@ namespace Unity.SpaceGod.UI
             device?.BeginFrame();
             InputSystemDevices.Source = d;
             Fill(input, d);
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             ImguiHost.Frame(target, input, Handlers(), Time.unscaledTime);
+            GuiMs = GuiMs * 0.9f + (float)System.Diagnostics.Stopwatch.GetElapsedTime(t0).TotalMilliseconds * 0.1f;
             AfterFrame?.Invoke(this);
             shots?.Step();
         }
@@ -111,9 +117,30 @@ namespace Unity.SpaceGod.UI
             if (d.IsPressed(Key.LeftCtrl) || d.IsPressed(Key.RightCtrl)) m |= EventModifiers.Control;
             if (d.IsPressed(Key.LeftAlt) || d.IsPressed(Key.RightAlt)) m |= EventModifiers.Alt;
             input.Modifiers = m;
+            float now = Time.unscaledTime;
             foreach (var (key, code, lower, upper) in KeyTable)
-                if (d.WasPressedThisFrame(key)) input.KeysDown.Add((code, shift ? upper : lower));
+            {
+                char ch = shift ? upper : lower;
+                if (d.WasPressedThisFrame(key))
+                {
+                    input.KeysDown.Add((code, ch));
+                    repeatKey = key;
+                    repeatAt = now + RepeatDelay;
+                }
+                // Unity's KeyDown events come from the OS, which repeats a held key (Windows' defaults: after 0.5 s, ~30 a
+                // second): held Backspace or an arrow in a text field keeps going. The last key pressed repeats.
+                else if (key == repeatKey && d.IsPressed(key) && now >= repeatAt)
+                {
+                    input.KeysDown.Add((code, ch));
+                    repeatAt = Math.Max(repeatAt + RepeatInterval, now - RepeatInterval);
+                }
+            }
+            if (repeatKey.HasValue && !d.IsPressed(repeatKey.Value)) repeatKey = null;
         }
+
+        const float RepeatDelay = 0.5f, RepeatInterval = 1f / 30f;
+        static Key? repeatKey;
+        static float repeatAt;
 
         static (Key, KeyCode, char, char)[] BuildKeys()
         {

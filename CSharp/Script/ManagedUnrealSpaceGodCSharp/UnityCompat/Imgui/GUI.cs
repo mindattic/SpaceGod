@@ -201,6 +201,18 @@ namespace UnityEngine
             if (!matrix.isIdentity)
             {
                 var centre = matrix.MultiplyPoint(screen.center);
+                // Clipped to the scroll view / group as Unity's clip does: the quad is cut along its own length where its
+                // centre line leaves the clip (exact for the 1-2 px lines and arrows the UI rotates; a thick quad's
+                // corners can overhang the clip by up to half its thickness).
+                var along = matrix.MultiplyPoint(screen.center + new Vector2(1, 0)) - centre;
+                float half = screen.width * 0.5f, t0 = -half, t1 = half;
+                if (clips.Count > 0 && !ClipLine(centre, along, Top.Clip, ref t0, ref t1)) return;
+                if (t0 > -half || t1 < half)
+                {
+                    centre += along * ((t0 + t1) * 0.5f);
+                    uv = new Rect(uv.x + (t0 + half) / screen.width * uv.width, uv.y, (t1 - t0) / screen.width * uv.width, uv.height);
+                    screen.width = t1 - t0;
+                }
                 var r = new Rect(centre.x - screen.width * 0.5f, centre.y - screen.height * 0.5f, screen.width, screen.height);
                 Canvas.DrawTexture(tex, r, uv, tint, matrix.AngleDegrees);
                 ImguiHost.Stats.Textures++;
@@ -218,6 +230,21 @@ namespace UnityEngine
             }
             Canvas.DrawTexture(tex, screen, uv, tint, 0);
             ImguiHost.Stats.Textures++;
+        }
+
+        /// <summary>Liang-Barsky: narrows [t0, t1] of the line p + d t to the part inside <paramref name="clip"/>.</summary>
+        static bool ClipLine(Vector2 p, Vector2 d, Rect clip, ref float t0, ref float t1)
+        {
+            bool Edge(float q, float r, ref float a, ref float b)
+            {
+                if (Math.Abs(q) < 1e-6f) return r >= 0;
+                float t = r / q;
+                if (q < 0) { if (t > b) return false; if (t > a) a = t; }
+                else { if (t < a) return false; if (t < b) b = t; }
+                return true;
+            }
+            return Edge(-d.x, p.x - clip.xMin, ref t0, ref t1) && Edge(d.x, clip.xMax - p.x, ref t0, ref t1)
+                && Edge(-d.y, p.y - clip.yMin, ref t0, ref t1) && Edge(d.y, clip.yMax - p.y, ref t0, ref t1) && t1 > t0;
         }
 
         /// <summary>A style's background: the texture nine-sliced by <paramref name="border"/> (in texture pixels) over the rect.</summary>
@@ -481,7 +508,9 @@ namespace UnityEngine
                 nextControlName = null;
             }
             var e = Event.current;
+            style ??= GUIStyle.none;
             bool focused = GUIUtility.keyboardControl == id;
+            var ed = TextEditing.For(id, text, focused);
             switch (e.GetTypeForControl(id))
             {
                 case EventType.MouseDown:
@@ -490,6 +519,23 @@ namespace UnityEngine
                         GUIUtility.hotControl = id;
                         GUIUtility.keyboardControl = id;
                         ImguiHost.FocusTaken = true;
+                        // Unity's TextEditor: the click puts the cursor at the nearest character boundary; a double click
+                        // selects the word, a triple click the whole line; shift-click extends the selection.
+                        int at = style.TextFieldIndexAt(position, text, ed.Scroll, e.mousePosition.x);
+                        if (e.clickCount == 2) ed.SelectWord(text, at);
+                        else if (e.clickCount >= 3) ed.SelectAll(text);
+                        else if (e.shift) ed.Cursor = at;
+                        else ed.Cursor = ed.Select = at;
+                        ed.DragWords = e.clickCount == 2;
+                        e.Use();
+                    }
+                    break;
+                case EventType.MouseDrag:
+                    if (GUIUtility.hotControl == id)
+                    {
+                        int at = style.TextFieldIndexAt(position, text, ed.Scroll, e.mousePosition.x);
+                        if (ed.DragWords) ed.ExtendToWord(text, at);
+                        else ed.Cursor = at;
                         e.Use();
                     }
                     break;
@@ -502,32 +548,230 @@ namespace UnityEngine
                     break;
                 case EventType.KeyDown:
                     if (!focused) break;
-                    if (e.keyCode == KeyCode.Backspace)
+                    if (ed.HandleKey(e, ref text, maxLength))
                     {
-                        if (text.Length > 0) text = text.Substring(0, text.Length - 1);
-                        changed = true;
                         e.Use();
+                        if (ed.Changed) changed = true;
                     }
-                    else if (e.character >= ' ' && e.character != '\u007f')
-                    {
-                        if (maxLength < 0 || text.Length < maxLength) text += e.character;
-                        changed = true;
-                        e.Use();
-                    }
-                    else if (e.keyCode == KeyCode.LeftArrow || e.keyCode == KeyCode.RightArrow || e.keyCode == KeyCode.Home || e.keyCode == KeyCode.End
-                             || e.keyCode == KeyCode.Delete)
-                        e.Use();
                     break;
                 case EventType.Repaint:
                 {
-                    style ??= GUIStyle.none;
                     var state = style.StateFor(Hover(position, id), GUIUtility.hotControl == id, false, focused);
                     if (state.background != null) DrawSliced(style.overflow.Add(position), state.background, style.border, BackgroundTint());
-                    style.DrawContent(position, GUIContent.Temp(text), state.textColor, focused ? text.Length : -1);
+                    if (focused) style.DrawTextFieldContent(position, text, state.textColor, ed);
+                    else style.DrawContent(position, GUIContent.Temp(text), state.textColor);
                     break;
                 }
             }
             return text;
+        }
+
+        /// <summary>Unity's clipboard (GUIUtility.systemCopyBuffer): the Windows clipboard, else a process-local one.</summary>
+        internal static class Clipboard
+        {
+            static string local = "";
+
+            [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool OpenClipboard(IntPtr owner);
+            [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool CloseClipboard();
+            [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool EmptyClipboard();
+            [System.Runtime.InteropServices.DllImport("user32.dll")] static extern IntPtr GetClipboardData(uint format);
+            [System.Runtime.InteropServices.DllImport("user32.dll")] static extern IntPtr SetClipboardData(uint format, IntPtr mem);
+            [System.Runtime.InteropServices.DllImport("kernel32.dll")] static extern IntPtr GlobalAlloc(uint flags, UIntPtr bytes);
+            [System.Runtime.InteropServices.DllImport("kernel32.dll")] static extern IntPtr GlobalLock(IntPtr mem);
+            [System.Runtime.InteropServices.DllImport("kernel32.dll")] static extern bool GlobalUnlock(IntPtr mem);
+            const uint UnicodeText = 13;
+
+            public static string Text
+            {
+                get
+                {
+                    if (!OperatingSystem.IsWindows()) return local;
+                    try
+                    {
+                        if (!OpenClipboard(IntPtr.Zero)) return local;
+                        try
+                        {
+                            var h = GetClipboardData(UnicodeText);
+                            if (h == IntPtr.Zero) return "";
+                            var p = GlobalLock(h);
+                            try { return System.Runtime.InteropServices.Marshal.PtrToStringUni(p) ?? ""; }
+                            finally { GlobalUnlock(h); }
+                        }
+                        finally { CloseClipboard(); }
+                    }
+                    catch { return local; }
+                }
+                set
+                {
+                    local = value ?? "";
+                    if (!OperatingSystem.IsWindows()) return;
+                    try
+                    {
+                        if (!OpenClipboard(IntPtr.Zero)) return;
+                        try
+                        {
+                            EmptyClipboard();
+                            var bytes = (local.Length + 1) * 2;
+                            var h = GlobalAlloc(0x0002 /* GMEM_MOVEABLE */, (UIntPtr)bytes);
+                            var p = GlobalLock(h);
+                            System.Runtime.InteropServices.Marshal.Copy((local + "\0").ToCharArray(), 0, p, local.Length + 1);
+                            GlobalUnlock(h);
+                            SetClipboardData(UnicodeText, h);
+                        }
+                        finally { CloseClipboard(); }
+                    }
+                    catch { }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Unity's TextEditor for the single-line GUI.TextField: a cursor and a selection anchor (select) per focused
+        /// control, scroll offset keeping the cursor in view, and its Windows key map: Left/Right (Ctrl: by word),
+        /// Home/End (Up/Down in one line likewise), Shift extends the selection, Backspace/Delete (Ctrl: a word),
+        /// Ctrl+A/C/X/V; typing replaces the selection; a field gaining focus from the keyboard selects all.
+        /// </summary>
+        internal sealed class TextEditing
+        {
+            static TextEditing current;
+            public int Id, Cursor, Select;
+            public float Scroll;
+            public bool DragWords, Changed;
+
+            public static TextEditing For(int id, string text, bool focused)
+            {
+                if (current == null || current.Id != id)
+                {
+                    if (!focused) return Scratch;
+                    current = new TextEditing { Id = id };
+                    current.SelectAll(text); // TextEditor.OnFocus (single line): select all
+                }
+                current.Cursor = Math.Clamp(current.Cursor, 0, text.Length);
+                current.Select = Math.Clamp(current.Select, 0, text.Length);
+                return current;
+            }
+
+            static readonly TextEditing Scratch = new TextEditing { Id = -1 };
+
+            public bool HasSelection => Cursor != Select;
+            int Min => Math.Min(Cursor, Select);
+            int Max => Math.Max(Cursor, Select);
+
+            public void SelectAll(string text) { Select = 0; Cursor = text.Length; }
+
+            static bool IsWord(char c) => char.IsLetterOrDigit(c) || c == '_';
+
+            static int WordStart(string t, int i)
+            {
+                while (i > 0 && !IsWord(t[i - 1])) i--;
+                while (i > 0 && IsWord(t[i - 1])) i--;
+                return i;
+            }
+
+            static int WordEnd(string t, int i)
+            {
+                while (i < t.Length && !IsWord(t[i])) i++;
+                while (i < t.Length && IsWord(t[i])) i++;
+                return i;
+            }
+
+            public void SelectWord(string t, int at)
+            {
+                int s = at, e = at;
+                if (at < t.Length && IsWord(t[at]) || at > 0 && IsWord(t[at - 1]))
+                {
+                    while (s > 0 && IsWord(t[s - 1])) s--;
+                    while (e < t.Length && IsWord(t[e])) e++;
+                }
+                else if (at < t.Length) e = at + 1;
+                Select = s;
+                Cursor = e;
+            }
+
+            public void ExtendToWord(string t, int at)
+            {
+                int anchor = Select;
+                if (at >= anchor) { Cursor = at < t.Length && IsWord(t[Math.Max(0, at - 1)]) ? WordEnd(t, at) : at; }
+                else Cursor = WordStart(t, at);
+            }
+
+            string Delete(string t, int from, int to)
+            {
+                Changed = true;
+                Cursor = Select = from;
+                return t.Remove(from, to - from);
+            }
+
+            string Insert(string t, string s, int maxLength)
+            {
+                if (HasSelection) t = Delete(t, Min, Max);
+                if (maxLength >= 0 && t.Length + s.Length > maxLength) s = s.Substring(0, Math.Max(0, maxLength - t.Length));
+                if (s.Length == 0) return t;
+                Changed = true;
+                t = t.Insert(Cursor, s);
+                Cursor = Select = Cursor + s.Length;
+                return t;
+            }
+
+            /// <returns>Whether the key was the field's (the event is then used).</returns>
+            public bool HandleKey(Event e, ref string text, int maxLength)
+            {
+                Changed = false;
+                bool shift = e.shift, ctrl = e.control || e.command;
+                void Move(int to) { Cursor = to; if (!shift) Select = to; }
+                switch (e.keyCode)
+                {
+                    case KeyCode.LeftArrow:
+                        if (!shift && !ctrl && HasSelection) Move(Min);
+                        else Move(ctrl ? WordStart(text, Cursor) : Math.Max(0, Cursor - 1));
+                        return true;
+                    case KeyCode.RightArrow:
+                        if (!shift && !ctrl && HasSelection) Move(Max);
+                        else Move(ctrl ? WordEnd(text, Cursor) : Math.Min(text.Length, Cursor + 1));
+                        return true;
+                    case KeyCode.Home:
+                    case KeyCode.UpArrow:
+                        Move(0);
+                        return true;
+                    case KeyCode.End:
+                    case KeyCode.DownArrow:
+                        Move(text.Length);
+                        return true;
+                    case KeyCode.Backspace:
+                        if (HasSelection) text = Delete(text, Min, Max);
+                        else if (Cursor > 0) text = Delete(text, ctrl ? WordStart(text, Cursor) : Cursor - 1, Cursor);
+                        return true;
+                    case KeyCode.Delete:
+                        if (HasSelection) text = Delete(text, Min, Max);
+                        else if (Cursor < text.Length) text = Delete(text, Cursor, ctrl ? WordEnd(text, Cursor) : Cursor + 1);
+                        return true;
+                }
+                if (ctrl)
+                {
+                    switch (e.keyCode)
+                    {
+                        case KeyCode.A: SelectAll(text); return true;
+                        case KeyCode.C: if (HasSelection) Clipboard.Text = text.Substring(Min, Max - Min); return true;
+                        case KeyCode.X:
+                            if (HasSelection) { Clipboard.Text = text.Substring(Min, Max - Min); text = Delete(text, Min, Max); }
+                            return true;
+                        case KeyCode.V:
+                        {
+                            var paste = Clipboard.Text.Replace("\r", "").Replace("\n", "");
+                            text = Insert(text, paste, maxLength);
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+                // Single line: Return and Tab are not typed (the game sees them).
+                if (e.character >= ' ' && e.character != '\u007f')
+                {
+                    text = Insert(text, e.character.ToString(), maxLength);
+                    return true;
+                }
+                return false;
+            }
         }
 
         // ---------------------------------------------------------------- HorizontalSlider
