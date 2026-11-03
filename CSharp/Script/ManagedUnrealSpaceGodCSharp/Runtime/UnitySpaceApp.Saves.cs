@@ -32,6 +32,9 @@ namespace Unity.SpaceGod
 
         void InitSaves()
         {
+            // US-T41: the saves' static-object names built now, before any galaxy, without the original's weak-table caches
+            // (CSharp/Core/SaveCompat/SaveStatics.cs), so every process names the same objects and reads every other's saves.
+            UnrealSpaceGod.SaveCompat.SaveStatics.EnsureFixed();
             Saves = new SaveSlots(ActiveProfile.Current.SavesFolder);
             autosaveEnabled = !Bootstrap.HasCommandLineFlag("-demo") && !Bootstrap.HasCommandLineFlag("-capture");
             // Started from the main menu: the save it picked (or, for a new game, none).
@@ -211,6 +214,8 @@ namespace Unity.SpaceGod
         /// </summary>
         void ApplyLoaded(SaveData data)
         {
+            // US-T41: a save from the C++ Core carries no delegates: wire them as construction did (CSharp/Core/SaveCompat/SaveWiring.cs).
+            UnrealSpaceGod.SaveCompat.SaveWiring.RewireIfNeeded(data);
             DropSession();
             Clock = data.Clock;
             Galaxy = data.Galaxy;

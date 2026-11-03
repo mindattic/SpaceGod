@@ -12,6 +12,8 @@
   </PropertyGroup>
   <Import Project="../../Plugins/UnrealSharp/UnrealSharp.Shared.props" />
   <ItemGroup>
+    <!-- US-T41: cross-track saves (the static-name fix and the post-load delegate wiring), shared with Bench/CSharp. -->
+    <Compile Include="../../Core/SaveCompat/*.cs" LinkBase="SaveCompat" />
     <ProjectReference Include="../../Core/SpaceGod.Core/SpaceGod.Core.csproj" />
   </ItemGroup>
 </Project>

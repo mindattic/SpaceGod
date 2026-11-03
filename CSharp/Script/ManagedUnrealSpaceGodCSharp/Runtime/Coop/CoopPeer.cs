@@ -99,13 +99,9 @@ namespace Unity.SpaceGod.Coop
         /// </summary>
         static void PrimeSaveStatics()
         {
-            try
-            {
-                var statics = typeof(ObjectGraph).GetNestedType("Statics", System.Reflection.BindingFlags.NonPublic);
-                var ensure = statics?.GetMethod("Ensure", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
-                if (ensure == null) { Warn("Core/Persistence's statics snapshot not found: saves may not cross between processes"); return; }
-                ensure.Invoke(null, null);
-            }
+            // US-T41: the same root cause as the original's weak-table bug (FlightDecks.decks, ArmourAngling.Tables), fixed for
+            // every process in CSharp/Core/SaveCompat/SaveStatics.cs; InitSaves builds it at start too, so this is a no-op there.
+            try { UnrealSpaceGod.SaveCompat.SaveStatics.EnsureFixed(); }
             catch (Exception e) { Warn("could not prime the save statics: " + e.Message); }
         }
 
