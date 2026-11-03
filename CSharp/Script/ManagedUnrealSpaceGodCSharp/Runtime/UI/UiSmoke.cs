@@ -1,7 +1,10 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
 using UnityEngine;
+using UnrealSharp.Engine;
 using UnrealSharp.Log;
 
 namespace Unity.SpaceGod.UI
@@ -158,6 +161,51 @@ namespace Unity.SpaceGod.UI
 
         // ---------------------------------------------------------------- windowed screenshots
 
+        /// <summary>The screenshots' start, 2026-11-03 12:00 UTC (US-T6's smoke moment), and seed (US-T45).</summary>
+        public const double ShotsStartJd = 2461348.0;
+        public const int ShotsSeed = 1;
+        /// <summary>The game's frames before the HUD shot (4 s at 1/60 s, 1 hour/s: 4 sim hours).</summary>
+        public const int ShotsGameFrames = 240;
+
+        /// <summary>Logs the moment a shot shows, so the two tracks' runs can be checked to be at the same one.</summary>
+        static void LogShotMoment(UnitySpaceApp app, string name) =>
+            UnrealLogger.Log(Log, $"UI shots: {name} at frame {Time.frameCount}, JD {app.Clock.Jd.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, {app.Fleet.Ships.Count} ships");
+
+        /// <summary>
+        /// Waits for every <c>shot showui</c> taken since the first of <paramref name="pending"/> (Unreal numbers them in
+        /// the order taken) and moves them, in that order, to their names under CaptureRunner's folder.
+        /// </summary>
+        static IEnumerator NameShots(List<(string Name, DateTime Before)> pending)
+        {
+            if (pending.Count == 0) yield break;
+            string dir = Path.Combine(Paths.ProjectSavedDir(), "Screenshots");
+            string tour = Path.DirectorySeparatorChar + "Tour" + Path.DirectorySeparatorChar;
+            var since = pending[0].Before;
+            float deadline = Time.unscaledTime + 20f;
+            var found = new List<string>();
+            while (Time.unscaledTime < deadline)
+            {
+                yield return null;
+                if (!Directory.Exists(dir)) continue;
+                found.Clear();
+                foreach (var f in Directory.GetFiles(dir, "*.png", SearchOption.AllDirectories))
+                    if (File.GetLastWriteTimeUtc(f) >= since && !f.Contains(tour)) found.Add(f);
+                if (found.Count >= pending.Count) break;
+            }
+            yield return null; // let the last writer finish
+            found.Sort(StringComparer.OrdinalIgnoreCase);
+            if (found.Count != pending.Count)
+                UnrealLogger.LogError(Log, $"UI shots: {pending.Count} taken, {found.Count} files under {dir}");
+            Directory.CreateDirectory(CaptureRunner.ShotFolder);
+            for (int i = 0; i < Math.Min(found.Count, pending.Count); i++)
+            {
+                var target = Path.Combine(CaptureRunner.ShotFolder, pending[i].Name + ".png");
+                File.Copy(found[i], target, true);
+                File.Delete(found[i]);
+                UnrealLogger.Log(Log, "UI shots: " + pending[i].Name + " -> " + target);
+            }
+        }
+
         /// <summary>
         /// <c>-SpaceGodUiShots</c> (tools/play.ps1 -Track CSharp -Mode shots): in a real window, a screenshot of each main
         /// screen with the HUD drawn (Unreal's <c>shot showui</c>, saved under <c>-capturedir=</c> as CaptureRunner's are):
@@ -169,33 +217,57 @@ namespace Unity.SpaceGod.UI
             {
                 for (int i = 0; i < n; i++) yield return null;
             }
+            // US-T45: the same game on both tracks, pixel for pixel: a fixed start (ShotsStartJd, not now), a seeded
+            // UnityEngine.Random, and (tools/play.ps1) a fixed 1/60 s frame; the C++ track's SpaceGodSmoke does the same.
+            UnitySpaceApp.StartJd = ShotsStartJd;
             yield return Frames(90);
             if (MainMenu.Showing)
             {
                 yield return CaptureRunner.Shot("csharp-ui-main-menu");
+                UnityEngine.Random.InitState(ShotsSeed);
                 GameLaunch.NewGame();
             }
-            yield return Frames(240);
             var app = Bootstrap.App;
+            for (int i = 0; i < 600 && app == null; i++)
+            {
+                yield return null;
+                app = Bootstrap.App;
+            }
             if (app == null)
             {
                 UnrealLogger.LogError(Log, "UI shots: no game");
                 Application.Quit();
                 yield break;
             }
-            yield return CaptureRunner.Shot("csharp-ui-hud");
+            // The game's own frames from its first: its clock is then the same on both tracks. From here every step is
+            // a fixed number of frames (the C++ track's ShotsTick schedule), not "until the file appears", so each shot
+            // shows the same moment on both tracks; the files are named once they have all been written.
+            int start = Time.frameCount;
+            while (Time.frameCount - start < ShotsGameFrames) yield return null;
+            var pending = new List<(string Name, DateTime Before)>();
+            void Take(string name)
+            {
+                LogShotMoment(app, name);
+                pending.Add((name, DateTime.UtcNow));
+                SystemLibrary.ExecuteConsoleCommand("shot showui");
+            }
+            Take("csharp-ui-hud");
+            yield return Frames(5);
             app.ShowHelp = true;
             yield return Frames(10);
-            yield return CaptureRunner.Shot("csharp-ui-help");
+            Take("csharp-ui-help");
+            yield return Frames(5);
             app.ShowHelp = false;
             app.ShowGalaxyMap = true;
             yield return Frames(30);
-            yield return CaptureRunner.Shot("csharp-ui-galaxy-map");
+            Take("csharp-ui-galaxy-map");
+            yield return Frames(5);
             app.ShowGalaxyMap = false;
             app.ShowMarket = true;
             app.ShowCargo = true;
             yield return Frames(10);
-            yield return CaptureRunner.Shot("csharp-ui-market-cargo");
+            Take("csharp-ui-market-cargo");
+            yield return Frames(5);
             app.ShowMarket = false;
             app.ShowCargo = false;
             var pause = typeof(UnitySpaceApp).GetField("pauseMenu", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(app) as PauseMenu;
@@ -203,10 +275,11 @@ namespace Unity.SpaceGod.UI
             {
                 pause.Open();
                 yield return Frames(10);
-                yield return CaptureRunner.Shot("csharp-ui-pause-menu");
+                Take("csharp-ui-pause-menu");
+                yield return Frames(10);
                 pause.Close();
             }
-            UnrealLogger.Log(Log, "UI shots: done, in " + CaptureRunner.ShotFolder);
+            yield return NameShots(pending);            UnrealLogger.Log(Log, "UI shots: done, in " + CaptureRunner.ShotFolder);
             Application.Quit();
         }
     }

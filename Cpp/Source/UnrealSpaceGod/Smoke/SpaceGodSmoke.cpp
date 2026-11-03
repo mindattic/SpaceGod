@@ -112,6 +112,8 @@ namespace SpaceGod::Smoke
 			FTSTicker::FDelegateHandle ticker;
 			/// A click that loads another scene (New Game): its screen is drawn once that scene is up.
 			cs::String pendingScreen, pendingVia;
+			/// The screenshots: Time::frameCount at the game's first frame (US-T45).
+			int gameStartFrame = -1;
 		};
 		Run run;
 
@@ -416,6 +418,18 @@ namespace SpaceGod::Smoke
 			Log(cs::Cat("UI shots: ", name, " -> ", path));
 		}
 
+		/// The screenshots' start, 2026-11-03 12:00 UTC, seed and game frames before the HUD shot: UiSmoke.Shots' (US-T45).
+		constexpr double ShotsStartJd = 2461348.0;
+		constexpr int ShotsSeed = 1;
+		constexpr int ShotsGameFrames = 240;
+
+		/// Logs the moment a shot shows, as UiSmoke.LogShotMoment, so the two tracks' runs can be checked to match.
+		void LogShotMoment(UnitySpaceApp& app, const cs::String& name)
+		{
+			Log(cs::Cat("UI shots: ", name, " at frame ", Time::frameCount, ", JD ", cs::Fmt(app.Clock->Jd, "F6"), ", ",
+				app.Fleet()->Ships().Count(), " ships"));
+		}
+
 		/// Each step waits its frames, then acts; a shot is written at the end of its frame, so the next step waits.
 		void ShotsTick(UWorld* world)
 		{
@@ -433,33 +447,49 @@ namespace SpaceGod::Smoke
 			switch (run.phase)
 			{
 				case 0:
+					// US-T45: the same game on both tracks, pixel for pixel (UiSmoke.Shots): a fixed start, not now, a
+					// seeded UnityEngine.Random and (tools/play.ps1) a fixed 1/60 s frame.
+					UnitySpaceApp::StartJd = ShotsStartJd;
 					if (app) { run.phase = 2; run.waited = 0; return; } // no menu (a flag skipped it)
 					if (UI::MainMenu::Showing() && after(90)) Shot("cpp-ui-main-menu");
 					return;
 				case 1:
-					if (after(5)) GameLaunch::NewGame();
+					if (after(5))
+					{
+						UnityRandom::InitState(ShotsSeed);
+						GameLaunch::NewGame();
+					}
 					return;
 				case 2:
+					// The game's own frames from its first (the map load in between counts none): its clock is then the
+					// same on both tracks.
 					if (!app) { run.waited = 0; return; }
-					if (after(240)) Shot("cpp-ui-hud");
+					if (run.gameStartFrame < 0) run.gameStartFrame = Time::frameCount;
+					if (Time::frameCount - run.gameStartFrame >= ShotsGameFrames)
+					{
+						run.waited = 0;
+						run.phase = 3;
+						LogShotMoment(*app, "cpp-ui-hud");
+						Shot("cpp-ui-hud");
+					}
 					return;
 				case 3:
 					if (after(5)) app->ShowHelp = true;
 					return;
 				case 4:
-					if (after(10)) Shot("cpp-ui-help");
+					if (after(10)) { LogShotMoment(*app, "cpp-ui-help"); Shot("cpp-ui-help"); }
 					return;
 				case 5:
 					if (after(5)) { app->ShowHelp = false; app->ShowGalaxyMap = true; }
 					return;
 				case 6:
-					if (after(30)) Shot("cpp-ui-galaxy-map");
+					if (after(30)) { LogShotMoment(*app, "cpp-ui-galaxy-map"); Shot("cpp-ui-galaxy-map"); }
 					return;
 				case 7:
 					if (after(5)) { app->ShowGalaxyMap = false; app->ShowMarket = true; app->ShowCargo = true; }
 					return;
 				case 8:
-					if (after(10)) Shot("cpp-ui-market-cargo");
+					if (after(10)) { LogShotMoment(*app, "cpp-ui-market-cargo"); Shot("cpp-ui-market-cargo"); }
 					return;
 				case 9:
 					if (after(5))
@@ -470,7 +500,7 @@ namespace SpaceGod::Smoke
 					}
 					return;
 				case 10:
-					if (after(10)) Shot("cpp-ui-pause-menu");
+					if (after(10)) { LogShotMoment(*app, "cpp-ui-pause-menu"); Shot("cpp-ui-pause-menu"); }
 					return;
 				case 11:
 					if (after(10))

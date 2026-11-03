@@ -186,7 +186,7 @@ namespace SpaceGod
 		pauseMenu->ShowHelp = [this] { ShowHelp = true; };
 		pauseMenu->ToMainMenu = [this] { pendingMainMenu = true; };
 
-		Clock = SimClock::StartingNow();
+		Clock = std::isnan(StartJd) ? SimClock::StartingNow() : cs::New<SimClock>(StartJd); // US-T45: was SimClock::StartingNow()
 		Clock->SetWarp(SimClock::StartingWarp()->Index);
 		scaleModel = cs::New<ScaleModel>();
 		scaleModel->SetBlend(1);

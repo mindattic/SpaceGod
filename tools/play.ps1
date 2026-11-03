@@ -53,10 +53,13 @@ if ($Track -eq 'CSharp') {
 if ($Mode -eq 'shots') {
   # -Mode shots: a window and the UI's screenshot tour (main menu, HUD, Help, galaxy map, market + cargo, pause menu),
   # each saved as docs/images/<track>-ui-*.png; the game quits when done.
+  # US-T45: deterministic, so the two tracks' shots can be diffed (tools/imgdiff.py): both start the game at the same
+  # fixed moment with a seeded UnityEngine.Random, and every frame is 1/60 s of game time (-UseFixedTimeStep -FPS=60),
+  # however long it took to draw.
   $editor = Join-Path $engine 'Engine\Binaries\Win64\UnrealEditor.exe'
   $images = Join-Path $repo 'docs\images'
   $p = Start-Process -FilePath $editor -PassThru -Wait -ArgumentList @("`"$($project.FullName)`"", '/Engine/Maps/Entry', '-game',
-    '-windowed', '-ResX=1600', '-ResY=900', '-nosound', '-unattended', '-log', '-SpaceGodUiShots', "`"-capturedir=$images`"")
+    '-windowed', '-ResX=1600', '-ResY=900', '-nosound', '-unattended', '-log', '-UseFixedTimeStep', '-FPS=60', '-SpaceGodUiShots', "`"-capturedir=$images`"")
   Get-ChildItem -LiteralPath $images -Filter "$prefix-ui-*.png" -ErrorAction SilentlyContinue | ForEach-Object FullName
   exit $p.ExitCode
 }

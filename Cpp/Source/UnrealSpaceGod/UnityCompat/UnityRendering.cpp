@@ -459,15 +459,18 @@ namespace SpaceGod::UnityCompat
 
 	// ---------------------------------------------------------------- Random
 
-	static std::mt19937& Rng()
+	// The C# facade's generator, draw for draw (US-T45): .NET's System.Random (cs::Random is bit-exact with it), clock
+	// seeded until InitState, so a seeded run (-Mode shots) gives both tracks the same flares, glow phases and spins.
+	static cs::Random& Rng()
 	{
-		static std::mt19937 rng(std::random_device{}());
+		static cs::Random rng;
 		return rng;
 	}
 
-	float Random::value() { return std::uniform_real_distribution<float>(0.0f, 1.0f)(Rng()); }
-	float Random::Range(float a, float b) { return a + (b - a) * value(); }
-	int Random::Range(int a, int b) { return b <= a ? a : a + static_cast<int>(Rng()() % static_cast<uint32_t>(b - a)); }
+	void Random::InitState(int seed) { Rng() = cs::Random(seed); }
+	float Random::value() { return static_cast<float>(Rng().NextDouble()); }
+	float Random::Range(float a, float b) { return a + static_cast<float>(Rng().NextDouble()) * (b - a); }
+	int Random::Range(int a, int b) { return b <= a ? a : Rng().Next(a, b); }
 
 	// ---------------------------------------------------------------- textures
 

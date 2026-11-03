@@ -449,10 +449,11 @@ namespace SpaceGod::UnityCompat
 	/// Object.Instantiate(original, parent, false): a copy of the hierarchy (sharing meshes and materials).
 	cs::Ref<GameObject> Instantiate(const cs::Ref<GameObject>& original, const cs::Ref<Transform>& parent, bool worldPositionStays = false);
 
-	/// UnityEngine.Random's static generator (Random.value, Random.Range): not seeded by the game, so any good
-	/// uniform source reproduces it.
+	/// UnityEngine.Random's static generator (Random.value, Random.Range): not seeded by the game; the C# facade's
+	/// (System.Random) draw for draw, so a run seeded with InitState (the screenshots) matches the C# track's.
 	struct Random
 	{
+		static void InitState(int seed);
 		static float value();
 		static float Range(float minInclusive, float maxInclusive);
 		static int Range(int minInclusive, int maxExclusive);

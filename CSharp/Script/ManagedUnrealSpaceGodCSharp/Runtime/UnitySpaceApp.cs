@@ -394,6 +394,10 @@ namespace Unity.SpaceGod
         /// <summary>The scene root everything of the game is drawn under (the Rendering port backs it in Unreal).</summary>
         public Transform WorldRoot => worldRoot;
 
+        /// <summary>US-T45: a fixed start for the next game's clock (the screenshot runs, so both tracks show the same
+        /// moment); null starts at now, as the original.</summary>
+        public static double? StartJd { get; set; }
+
         /// <summary>Whether Awake has run (Bootstrap runs it on AddComponent, as Unity does, unless the facade already has).</summary>
         internal bool Awoken { get; private set; }
 
@@ -409,7 +413,7 @@ namespace Unity.SpaceGod
             pauseMenu.ShowHelp = () => ShowHelp = true;
             pauseMenu.ToMainMenu = () => pendingMainMenu = true;
 
-            Clock = SimClock.StartingNow();
+            Clock = StartJd is double startJd ? new SimClock(startJd) : SimClock.StartingNow(); // US-T45: was SimClock.StartingNow()
             Clock.SetWarp(SimClock.StartingWarp.Index);
             Scale = new ScaleModel { Blend = 1 };
             Galaxy = Galaxy.CreateDefault(Clock.Jd);
