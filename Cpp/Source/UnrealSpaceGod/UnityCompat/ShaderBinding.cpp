@@ -34,7 +34,8 @@ namespace SpaceGod::UnityCompat
 
 		std::unordered_map<cs::String, ParentEntry>& Parents()
 		{
-			static std::unordered_map<cs::String, ParentEntry> parents;
+			// Never destroyed: UObject references must not be released in static destruction, after the object system.
+			static auto& parents = *new std::unordered_map<cs::String, ParentEntry>();
 			return parents;
 		}
 
@@ -176,7 +177,7 @@ namespace SpaceGod::UnityCompat
 
 	UMaterialParameterCollection* ShaderBinding::Globals()
 	{
-		static TStrongObjectPtr<UMaterialParameterCollection> mpc;
+		static auto& mpc = *new TStrongObjectPtr<UMaterialParameterCollection>(); // never destroyed, as the parents
 		static bool tried = false;
 		if (!tried)
 		{

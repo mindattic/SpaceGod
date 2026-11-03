@@ -475,7 +475,7 @@ namespace SpaceGod::UnityCompat
 	class HeldTexture2D final : public Texture2D
 	{
 	public:
-		HeldTexture2D(UTexture* texture, int w, int h) : hold(texture)
+		HeldTexture2D(UTexture* texture, int w, int h) : hold(new TStrongObjectPtr<UTexture>(texture))
 		{
 			Native = texture;
 			width = w;
@@ -483,8 +483,15 @@ namespace SpaceGod::UnityCompat
 			OwnsNative = false;
 		}
 
+		~HeldTexture2D() override
+		{
+			// A static texture (a sky, a swatch) is destroyed at exit, after the object system has gone: the reference
+			// is left as it is then (releasing it would touch freed engine state).
+			if (UObjectInitialized() && !GExitPurge) delete hold;
+		}
+
 	private:
-		TStrongObjectPtr<UTexture> hold;
+		TStrongObjectPtr<UTexture>* hold;
 	};
 
 	static TextureAddress ToAddress(TextureWrapMode w)

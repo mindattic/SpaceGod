@@ -31,6 +31,28 @@ namespace SpaceGod::UnityCompat
 		uint64_t PushedGlobals = 0;
 		int64_t Frame = 0;
 
+		/// A strong UObject reference that is left alone when it is destroyed after the object system (a static
+		/// material's instance at exit): releasing it then touches freed engine state.
+		template <class T>
+		struct ExitSafeStrong
+		{
+			TStrongObjectPtr<T>* p = new TStrongObjectPtr<T>();
+			ExitSafeStrong() = default;
+			ExitSafeStrong(const ExitSafeStrong&) = delete;
+			ExitSafeStrong& operator=(const ExitSafeStrong&) = delete;
+			ExitSafeStrong(ExitSafeStrong&& o) noexcept : p(o.p) { o.p = nullptr; }
+			ExitSafeStrong& operator=(ExitSafeStrong&& o) noexcept { std::swap(p, o.p); return *this; }
+			~ExitSafeStrong() { if (p && UObjectInitialized() && !GExitPurge) delete p; }
+			T* Get() const { return p ? p->Get() : nullptr; }
+			T* operator->() const { return Get(); }
+			bool IsValid() const { return p && p->IsValid(); }
+			void Reset(T* v = nullptr)
+			{
+				if (!p) p = new TStrongObjectPtr<T>();
+				p->Reset(v);
+			}
+		};
+
 		/// A mesh converted to Unreal's frame and layouts, shared by every renderer drawing it.
 		struct MeshHandle final : NativeHandle
 		{
@@ -41,7 +63,7 @@ namespace SpaceGod::UnityCompat
 		/// A material's instance of its SpaceGodRender material.
 		struct MaterialHandle final : NativeHandle
 		{
-			TStrongObjectPtr<UMaterialInstanceDynamic> Mid;
+			ExitSafeStrong<UMaterialInstanceDynamic> Mid;
 			uint64_t Pushed = 0;
 		};
 
@@ -54,7 +76,7 @@ namespace SpaceGod::UnityCompat
 			const Mesh* Drawn = nullptr;
 			uint64_t DrawnVersion = 0;
 			bool Visible = false;
-			std::vector<TStrongObjectPtr<UMaterialInstanceDynamic>> BlockMids;
+			std::vector<ExitSafeStrong<UMaterialInstanceDynamic>> BlockMids;
 			std::vector<std::pair<const Material*, uint64_t>> BlockPushed;
 			uint64_t BlockPushedVersion = 0;
 			std::vector<UMaterialInterface*> Bound;

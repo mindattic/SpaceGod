@@ -360,9 +360,11 @@ namespace SpaceGod::UnityCompat
 			UTexture2D* texture = nullptr;
 			TSharedPtr<FSlateBrush> brush;
 		};
-		std::unordered_map<void*, NativeEntry> natives;
+		// Never destroyed: static Texture2Ds (icons, the screens' styles) release into these from their own static
+		// destructors at exit, which may run after this file's statics would have been (that crashed the windowed run).
+		std::unordered_map<void*, NativeEntry>& natives = *new std::unordered_map<void*, NativeEntry>();
 		/// Brushes for textures wrapped from elsewhere (not owned), by UTexture.
-		std::unordered_map<void*, TSharedPtr<FSlateBrush>> wrappedBrushes;
+		std::unordered_map<void*, TSharedPtr<FSlateBrush>>& wrappedBrushes = *new std::unordered_map<void*, TSharedPtr<FSlateBrush>>();
 
 		void Upload(Texture2D& t)
 		{
