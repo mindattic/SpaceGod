@@ -1,7 +1,7 @@
 // Port of Assets/UnitySpace/Core/Systems/SystemSources.cs (US-T17).
 
 #include "Systems/SystemSources.h"
-#include "Systems/CsGaps.h"
+#include "Cs/Cs.h"
 #include "Systems/StarSystemSpec.h"
 #include "Systems/Galaxy.h"
 #include "Systems/AlphaCentauri.h"
@@ -72,7 +72,7 @@ namespace SpaceGod::Core
 		if (source == nullptr) throw cs::ArgumentNullException("source");
 		std::lock_guard<std::recursive_mutex> lock(gate());
 		auto& list = sources();
-		list.RemoveAll([&](const cs::Ref<SystemSource>& s) { return EqualsNoCase(s->Name(), source->Name()); });
+		list.RemoveAll([&](const cs::Ref<SystemSource>& s) { return cs::Strings::EqualsOrdinalIgnoreCase(s->Name(), source->Name()); });
 		int at = 0;
 		while (at < list.Count() && list[at]->Order() <= source->Order()) at++;
 		list.Insert(at, source);
@@ -81,7 +81,7 @@ namespace SpaceGod::Core
 	bool SystemSources::Unregister(const cs::String& name)
 	{
 		std::lock_guard<std::recursive_mutex> lock(gate());
-		return sources().RemoveAll([&](const cs::Ref<SystemSource>& s) { return EqualsNoCase(s->Name(), name); }) > 0;
+		return sources().RemoveAll([&](const cs::Ref<SystemSource>& s) { return cs::Strings::EqualsOrdinalIgnoreCase(s->Name(), name); }) > 0;
 	}
 
 	cs::Ref<SystemSource> SystemSources::Find(const cs::String& name)
@@ -89,7 +89,7 @@ namespace SpaceGod::Core
 		{
 			std::lock_guard<std::recursive_mutex> lock(gate());
 			for (const auto& s : sources())
-				if (EqualsNoCase(s->Name(), name)) return s;
+				if (cs::Strings::EqualsOrdinalIgnoreCase(s->Name(), name)) return s;
 		}
 		return nullptr;
 	}
@@ -97,7 +97,7 @@ namespace SpaceGod::Core
 	cs::List<cs::Ref<StarEntry>> SystemSources::StarsNear(DVec3 centreLy, double radiusLy, int seed, cs::Func<bool, cs::Ref<SystemSource>> which)
 	{
 		cs::List<cs::Ref<StarEntry>> list;
-		cs::HashSet<NoCase> names;
+		cs::HashSet<cs::NoCase> names;
 		auto order = All();
 		for (int i = 0; i < order.Count(); i++)
 		{
@@ -115,7 +115,7 @@ namespace SpaceGod::Core
 		}
 		list.Sort([&](const cs::Ref<StarEntry>& a, const cs::Ref<StarEntry>& b)
 		{
-			int c = CompareTo((a->PositionLy - centreLy).Length(), (b->PositionLy - centreLy).Length());
+			int c = cs::CompareTo((a->PositionLy - centreLy).Length(), (b->PositionLy - centreLy).Length());
 			return c != 0 ? c : cs::Strings::CompareOrdinal(a->Name, b->Name);
 		});
 		return list;
@@ -124,7 +124,7 @@ namespace SpaceGod::Core
 	cs::Ref<StarEntry> SystemSources::Entry(const cs::String& name, DVec3 nearLy, int seed)
 	{
 		for (const auto& e : StarsNear(nearLy, 1, seed))
-			if (EqualsNoCase(e->Name, name)) return e;
+			if (cs::Strings::EqualsOrdinalIgnoreCase(e->Name, name)) return e;
 		return nullptr;
 	}
 
@@ -241,7 +241,7 @@ namespace SpaceGod::Core
 	{
 		(void)seed;
 		for (const auto& [tag, spec] : Specs())
-			if (EqualsNoCase(!spec->NeighbourName.empty() ? spec->NeighbourName : spec->Name, star->Name)) return spec;
+			if (cs::Strings::EqualsOrdinalIgnoreCase(!spec->NeighbourName.empty() ? spec->NeighbourName : spec->Name, star->Name)) return spec;
 		return nullptr;
 	}
 

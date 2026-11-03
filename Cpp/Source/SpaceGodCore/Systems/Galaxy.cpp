@@ -157,7 +157,7 @@ namespace SpaceGod::Core
 		if (name == "Alpha Centauri") return 4243;
 		int h = 17;
 		// unchecked int arithmetic over the name's UTF-16 chars, as C#.
-		ForEachUtf16(name, [&](uint32_t c) { h = cs::WrapAdd(cs::WrapMul(h, 31), static_cast<int>(c)); });
+		cs::ForEachUtf16(name, [&](uint32_t c) { h = cs::WrapAdd(cs::WrapMul(h, 31), static_cast<int>(c)); });
 		return h & 0x7fffffff;
 	}
 
@@ -236,7 +236,7 @@ namespace SpaceGod::Core
 		if (system == nullptr || Systems.Contains(system)) return;
 		Systems.Add(system);
 		cs::String shown = system->Spec != nullptr && !system->Spec->NeighbourName.empty() ? system->Spec->NeighbourName : system->Name;
-		NearbyStars.RemoveAll([&](const NearbyStar& n) { return EqualsNoCase(n.Name, shown); });
+		NearbyStars.RemoveAll([&](const NearbyStar& n) { return cs::Strings::EqualsOrdinalIgnoreCase(n.Name, shown); });
 		// A system that runs is known (U.SPC-T456): one still undiscovered is found by being reached.
 		Unhide(shown);
 		system->World->SetCoarse(!AtFullDetail(system));
@@ -255,7 +255,7 @@ namespace SpaceGod::Core
 	cs::Ref<StarSystem> Galaxy::Find(const cs::String& name) const
 	{
 		for (const auto& s : Systems)
-			if (EqualsNoCase(s->Name, name)) return s;
+			if (cs::Strings::EqualsOrdinalIgnoreCase(s->Name, name)) return s;
 		return nullptr;
 	}
 
@@ -271,7 +271,7 @@ namespace SpaceGod::Core
 		g->Systems.Add(sol);
 		g->Systems.Add(alphaCentauri);
 		for (const auto& spec : NearbySystems::All()) g->Systems.Add(StarSystem::CreateSettled(spec, jd, g->Polities));
-		cs::HashSet<NoCase> simulated;
+		cs::HashSet<cs::NoCase> simulated;
 		for (const auto& s : g->Systems)
 			if (s->Spec != nullptr && !s->Spec->NeighbourName.empty()) simulated.Add(s->Spec->NeighbourName);
 		for (const auto& n : Neighbours())

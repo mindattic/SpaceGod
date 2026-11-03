@@ -1,7 +1,7 @@
 // Port of Assets/UnitySpace/Core/Systems/GateNetwork.cs (US-T17).
 
 #include "Systems/GateNetwork.h"
-#include "Systems/CsGaps.h"
+#include "Cs/Cs.h"
 #include "Systems/Galaxy.h"
 #include "Systems/JumpGate.h"
 #include "Systems/GateConstruction.h"
@@ -76,8 +76,8 @@ namespace SpaceGod::Core
 			int me = i;
 			order.Sort([&](int a, int b)
 			{
-				int c = CompareTo(Galaxy::DistanceLy(systems[me], systems[a]), Galaxy::DistanceLy(systems[me], systems[b]));
-				return c != 0 ? c : CompareTo(a, b);
+				int c = cs::CompareTo(Galaxy::DistanceLy(systems[me], systems[a]), Galaxy::DistanceLy(systems[me], systems[b]));
+				return c != 0 ? c : cs::CompareTo(a, b);
 			});
 			int joined = 0;
 			for (int k = 0; k < order.Count() && joined < neighbours; k++)
@@ -104,7 +104,7 @@ namespace SpaceGod::Core
 		for (int i = 0; i < n; i++)
 			for (int j = i + 1; j < n; j++)
 				pairs.Add({ Galaxy::DistanceLy(systems[i], systems[j]), i, j });
-		pairs.Sort([](const PairLy& a, const PairLy& b) { return a.ly != b.ly ? CompareTo(a.ly, b.ly) : a.i != b.i ? CompareTo(a.i, b.i) : CompareTo(a.j, b.j); });
+		pairs.Sort([](const PairLy& a, const PairLy& b) { return a.ly != b.ly ? cs::CompareTo(a.ly, b.ly) : a.i != b.i ? cs::CompareTo(a.i, b.i) : cs::CompareTo(a.j, b.j); });
 		int nextVoidBase = 1;
 		for (const auto& s : systems) if (s->IsVoidBase) nextVoidBase++;
 		for (const auto& [ly, i, j] : pairs)

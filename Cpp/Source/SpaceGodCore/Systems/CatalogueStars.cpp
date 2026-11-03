@@ -13,9 +13,9 @@ namespace SpaceGod::Core
 		return list;
 	}
 
-	cs::Dictionary<NoCase, cs::String>& CatalogueStars::aliases()
+	cs::Dictionary<cs::NoCase, cs::String>& CatalogueStars::aliases()
 	{
-		static cs::Dictionary<NoCase, cs::String> map;
+		static cs::Dictionary<cs::NoCase, cs::String> map;
 		return map;
 	}
 
@@ -31,10 +31,10 @@ namespace SpaceGod::Core
 			e->LuminositySolar = cs::Double::NaN;
 			list->Add(e);
 		}
-		aliases()[NoCase("Gliese 65")] = "Luyten 726-8, UV and BL Ceti";
-		aliases()[NoCase("Gliese 887")] = "Lacaille 9352";
+		aliases()[cs::NoCase("Gliese 65")] = "Luyten 726-8, UV and BL Ceti";
+		aliases()[cs::NoCase("Gliese 887")] = "Lacaille 9352";
 		list->AddRange(Beyond());
-		list->Sort([](const cs::Ref<StarEntry>& a, const cs::Ref<StarEntry>& b) { return CompareTo(a->PositionLy.Length(), b->PositionLy.Length()); });
+		list->Sort([](const cs::Ref<StarEntry>& a, const cs::Ref<StarEntry>& b) { return cs::CompareTo(a->PositionLy.Length(), b->PositionLy.Length()); });
 		stars() = list;
 		return *list;
 	}
@@ -43,7 +43,7 @@ namespace SpaceGod::Core
 		double luminosity, const cs::String& aka)
 	{
 		auto at = DVec3(x, y, z);
-		if (!aka.empty()) aliases()[NoCase(name)] = aka;
+		if (!aka.empty()) aliases()[cs::NoCase(name)] = aka;
 		auto e = cs::New<StarEntry>();
 		e->Name = name; e->PositionLy = at; e->Spectral = type; e->ApparentMagnitude = mag; e->TeffK = teff; e->MassSolar = mass; e->RadiusSolar = radius;
 		e->LuminositySolar = luminosity; e->Source = SourceName;
@@ -55,7 +55,7 @@ namespace SpaceGod::Core
 	{
 		Stars();
 		cs::String aka;
-		return aliases().TryGetValue(NoCase(name), aka) ? aka : cs::String();
+		return aliases().TryGetValue(cs::NoCase(name), aka) ? aka : cs::String();
 	}
 
 	cs::List<cs::Ref<StarEntry>> CatalogueStars::Beyond()
@@ -198,7 +198,7 @@ namespace SpaceGod::Core
 		(void)seed;
 		cs::Ref<StarEntry> row = nullptr;
 		for (const auto& s : Stars())
-			if (EqualsNoCase(s->Name, star->Name)) row = s;
+			if (cs::Strings::EqualsOrdinalIgnoreCase(s->Name, star->Name)) row = s;
 		if (row == nullptr) return nullptr;
 		bool estimated = cs::Double::IsNaN(row->MassSolar);
 		double mass = estimated ? SystemSources::MainSequenceMass(row->TeffK) : row->MassSolar;

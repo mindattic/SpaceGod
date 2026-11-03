@@ -12,7 +12,7 @@
 #include "Hyperlanes.h"
 #include "Law/Law.h"
 #include "Ships.h"
-#include "Systems/CsGaps.h"
+#include "Cs/Cs.h"
 #include "World.h"
 
 namespace SpaceGod::Core
@@ -115,7 +115,7 @@ namespace SpaceGod::Core
 		// A ship always has a name, so no ship reaches that branch.
 		// unchecked: h * 31 + c wraps, over the string's UTF-16 code units as C#'s foreach (char c in s).
 		int h = 23;
-		ForEachUtf16(s, [&](uint32_t c) { h = cs::WrapAdd(cs::WrapMul(h, 31), static_cast<int>(c)); });
+		cs::ForEachUtf16(s, [&](uint32_t c) { h = cs::WrapAdd(cs::WrapMul(h, 31), static_cast<int>(c)); });
 		return h;
 	}
 

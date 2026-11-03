@@ -6,7 +6,7 @@
 #include "DVec3.h"
 #include "GalacticPosition.h"
 #include "BodyDefinition.h"
-#include "Systems/CsGaps.h"
+#include "Cs/Cs.h"
 #include "Systems/StarDiscovery.h"
 
 namespace SpaceGod::Core
@@ -352,10 +352,10 @@ namespace SpaceGod::Core
 		DVec3 exploredAtLy = DVec3(cs::Double::NaN, cs::Double::NaN, cs::Double::NaN);
 
 		/// <summary>The stars put on the charts by exploring (the rest were there from the start and stay).</summary>
-		cs::HashSet<NoCase> charted;
+		cs::HashSet<cs::NoCase> charted;
 
 		/// <summary>The systems built by exploring, and so let go again when left untouched far behind.</summary>
-		cs::HashSet<NoCase> streamed;
+		cs::HashSet<cs::NoCase> streamed;
 
 	public:
 		/// <summary>Counts every change to the charts or the systems explored in, so a view of them knows to rebuild.</summary>
@@ -426,7 +426,7 @@ namespace SpaceGod::Core
 		cs::List<NearbyStar> undiscovered;
 
 		/// <summary>The <see cref="Undiscovered"/> by name, for a quick look (the charts ask for every star they see).</summary>
-		cs::HashSet<NoCase> undiscoveredNames;
+		cs::HashSet<cs::NoCase> undiscoveredNames;
 
 	public:
 		/// <summary>The stars found since the start, in order (see <see cref="Discover"/>).</summary>

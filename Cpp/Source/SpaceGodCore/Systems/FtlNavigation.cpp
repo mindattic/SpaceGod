@@ -1,7 +1,7 @@
 // Port of Assets/UnitySpace/Core/Systems/FtlNavigation.cs (US-T17).
 
 #include "Systems/FtlNavigation.h"
-#include "Systems/CsGaps.h"
+#include "Cs/Cs.h"
 #include "Systems/FtlRules.h"
 #include "Systems/Galaxy.h"
 #include "Systems/HelmFtl.h"
@@ -318,7 +318,7 @@ namespace SpaceGod::Core
 		cs::Dictionary<cs::Ref<FtlTarget>, double> dist;
 		for (const auto& t : list) dist[t] = t->Origin.DistanceKm(at);
 		const auto& d = dist;
-		list.Sort([&](const cs::Ref<FtlTarget>& a, const cs::Ref<FtlTarget>& b) { return CompareTo(d[a], d[b]); });
+		list.Sort([&](const cs::Ref<FtlTarget>& a, const cs::Ref<FtlTarget>& b) { return cs::CompareTo(d[a], d[b]); });
 		return list;
 	}
 
@@ -342,7 +342,7 @@ namespace SpaceGod::Core
 	{
 		if (a == nullptr || b == nullptr) return a == b;
 		if (a->System != nullptr || b->System != nullptr) return a->System == b->System;
-		return EqualsNoCase(a->Name, b->Name);
+		return cs::Strings::EqualsOrdinalIgnoreCase(a->Name, b->Name);
 	}
 
 	cs::String FtlNavigation::Describe(double days)

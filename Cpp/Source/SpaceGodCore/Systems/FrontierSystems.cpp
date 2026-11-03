@@ -1,7 +1,7 @@
 // Port of Assets/UnitySpace/Core/Systems/FrontierSystems.cs (US-T17).
 
 #include "Systems/FrontierSystems.h"
-#include "Systems/CsGaps.h"
+#include "Cs/Cs.h"
 #include "Systems/StarSystemSpec.h"
 #include "Systems/StarSystemBuilder.h"
 #include "Systems/NearbySystems.h"
@@ -28,7 +28,7 @@ namespace SpaceGod::Core
 	cs::Ref<SystemSpec> FrontierSystems::Find(const cs::String& name)
 	{
 		for (const auto& s : All())
-			if (EqualsNoCase(s->Name, name)) return s;
+			if (cs::Strings::EqualsOrdinalIgnoreCase(s->Name, name)) return s;
 		return nullptr;
 	}
 

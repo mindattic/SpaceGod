@@ -1,7 +1,7 @@
 // Port of Assets/UnitySpace/Core/Systems/CruiseDrive.cs (US-T17).
 
 #include "Systems/CruiseDrive.h"
-#include "Systems/CsGaps.h"
+#include "Cs/Cs.h"
 #include "Systems/FtlRules.h"
 #include "Systems/Galaxy.h"
 #include "Systems/JumpGate.h"
@@ -139,7 +139,7 @@ namespace SpaceGod::Core
 		if (ship == nullptr || ship->Spec == nullptr) return false;
 		if (ship->Loadout != nullptr) return ship->Loadout->CountFacility(FacilityKinds::FtlDrive) > 0;
 		for (const auto& f : FacilityLayouts::For(ship->Spec->Class))
-			if (EqualsNoCase(f->Kind, FacilityKinds::FtlDrive)) return true;
+			if (cs::Strings::EqualsOrdinalIgnoreCase(f->Kind, FacilityKinds::FtlDrive)) return true;
 		return false;
 	}
 

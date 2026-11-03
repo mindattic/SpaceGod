@@ -82,7 +82,7 @@ namespace SpaceGod::Core
 	bool Galaxy::Discover(const cs::String& name, double jd, const cs::String& by)
 	{
 		if (!IsUndiscovered(name)) return false;
-		int i = undiscovered.FindIndex([&](const NearbyStar& n) { return EqualsNoCase(n.Name, name); });
+		int i = undiscovered.FindIndex([&](const NearbyStar& n) { return cs::Strings::EqualsOrdinalIgnoreCase(n.Name, name); });
 		auto star = undiscovered[i];
 		undiscovered.RemoveAt(i);
 		undiscoveredNames.Remove(star.Name);
@@ -126,7 +126,7 @@ namespace SpaceGod::Core
 	bool Galaxy::Unhide(const cs::String& name)
 	{
 		if (!undiscoveredNames.Remove(name)) return false;
-		undiscovered.RemoveAll([&](const NearbyStar& n) { return EqualsNoCase(n.Name, name); });
+		undiscovered.RemoveAll([&](const NearbyStar& n) { return cs::Strings::EqualsOrdinalIgnoreCase(n.Name, name); });
 		ChartVersion++;
 		return true;
 	}

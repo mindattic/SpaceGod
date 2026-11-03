@@ -68,7 +68,7 @@ namespace SpaceGod::Core
 		{
 			// HashSet.RemoveWhere: each entry tested in enumeration order, the matches removed in that order.
 			for (const auto& name : charted.ToList())
-				if (!NearbyStars.Exists([&](const NearbyStar& n) { return EqualsNoCase(n.Name, name.Value); })) charted.Remove(name);
+				if (!NearbyStars.Exists([&](const NearbyStar& n) { return cs::Strings::EqualsOrdinalIgnoreCase(n.Name, name.Value); })) charted.Remove(name);
 			changed = true;
 		}
 		for (const auto& s : Systems.ToArray())
@@ -112,7 +112,7 @@ namespace SpaceGod::Core
 	bool Galaxy::ChartedStar(const cs::String& name) const
 	{
 		for (const auto& n : NearbyStars)
-			if (EqualsNoCase(n.Name, name)) return true;
+			if (cs::Strings::EqualsOrdinalIgnoreCase(n.Name, name)) return true;
 		return false;
 	}
 
@@ -122,8 +122,8 @@ namespace SpaceGod::Core
 		{
 			// C#: string.Equals(s.Spec?.NeighbourName, e.Name, OrdinalIgnoreCase); a null string is the empty string here.
 			cs::String neighbour = s->Spec != nullptr ? s->Spec->NeighbourName : cs::String();
-			if (EqualsNoCase(s->Name, e->Name)
-				|| EqualsNoCase(neighbour, e->Name)
+			if (cs::Strings::EqualsOrdinalIgnoreCase(s->Name, e->Name)
+				|| cs::Strings::EqualsOrdinalIgnoreCase(neighbour, e->Name)
 				|| (s->PositionLy - e->PositionLy).Length() < 0.01) return s;
 		}
 		return nullptr;
@@ -134,7 +134,7 @@ namespace SpaceGod::Core
 		auto existing = Find(name);
 		if (existing != nullptr) return existing;
 		for (const auto& n : NearbyStars)
-			if (EqualsNoCase(n.Name, name))
+			if (cs::Strings::EqualsOrdinalIgnoreCase(n.Name, name))
 			{
 				auto e = SystemSources::Entry(n.Name, n.PositionLy, Seed);
 				return e == nullptr ? nullptr : Realize(e, jd);
@@ -178,10 +178,10 @@ namespace SpaceGod::Core
 	bool Galaxy::Held(const cs::String& name) const
 	{
 		for (const auto& c : DeepSpace->Cruises())
-			if (EqualsNoCase(c->ToName, name)) return true;
+			if (cs::Strings::EqualsOrdinalIgnoreCase(c->ToName, name)) return true;
 		for (const auto& s : Systems)
 			for (const auto& ship : s->World->Fleet->Ships())
-				if (ship->Voyage != nullptr && EqualsNoCase(ship->Voyage->StarName, name)) return true;
+				if (ship->Voyage != nullptr && cs::Strings::EqualsOrdinalIgnoreCase(ship->Voyage->StarName, name)) return true;
 		return false;
 	}
 }
