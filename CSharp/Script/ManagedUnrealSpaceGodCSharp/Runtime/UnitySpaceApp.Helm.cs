@@ -65,7 +65,7 @@ namespace Unity.SpaceGod
         /// </summary>
         void EnterPiloting(Target t)
         {
-            if (CoopRefusesHelm()) return; // US-T39: the pilot loop is not lockstepped yet
+            if (CoopRoutesHelmTake(t)) return; // US-T39/US-T43: in co-op a take goes into the frames, and every peer takes it there
             var ship = t.Ship;
             Piloted = t;
             // A fresh helm: no drives-down timer left over from the hull flown before (spawned or loaded in the same frame).
@@ -117,8 +117,8 @@ namespace Unity.SpaceGod
             laneRejoinable = false;
             if (!riding && (ship.Battle == null || ship.Orbit == null)) PinWherePiloted(ship);
 
-            Select(t);
-            SpaceCamera.EnterPilotChase(t, 6);
+            if (CoopHelmMine) Select(t); // US-T43: the holder's view (every peer flies the helm, one watches from it)
+            if (CoopHelmMine) SpaceCamera.EnterPilotChase(t, 6); // US-T43
             Clock.SetWarp(0);
             ShowToast("Piloting " + ship.Name + ", " + Clock.Warp.Label + "  (" + HelmControls.Of(ship).Hint + "; P to release, . to speed up, Left-click to fire, T to lock a target, Z/X to roll, F flight assist, hold J to cruise)");
             if (riding)
@@ -147,6 +147,7 @@ namespace Unity.SpaceGod
             var offsetKm = Scale.InverseLocalOffset(Catalog[frame], SpaceCamera.ScenePosition - BodyScene(frame));
             var forwardUnity = SpaceCamera.Rotation * Vector3.forward;
             var forward = new DVec3(forwardUnity.x, forwardUnity.y, forwardUnity.z).SwapYZ;
+            if (CoopSpawns("spawn", (int)cls + " " + (hostile ? 1 : 0), frame, offsetKm, forward)) return; // US-T43: the rest on every peer (CoopSpawnShip)
 
             var faction = hostile ? World.Pirates : World.Sol;
             string name = "Sandbox " + cls + " " + (++spawnedCount);
@@ -187,7 +188,7 @@ namespace Unity.SpaceGod
         void SeedPilot(DVec3 offsetKm, DVec3 velocityKmS, DVec3 facing)
         {
             pilot = PilotState.At(offsetKm, velocityKmS, facing);
-            var upUnity = SpaceCamera.UpFrame * Vector3.up;
+            var upUnity = (CoopUpFrame ?? SpaceCamera.UpFrame) * Vector3.up; // US-T43: the helm holder's frame in co-op
             var upReference = new DVec3(upUnity.x, upUnity.y, upUnity.z).SwapYZ;
             var level = upReference - pilot.Forward * DVec3.Dot(upReference, pilot.Forward);
             if (level.LengthSquared > 1e-6) pilot.Up = level.Normalized;
@@ -215,13 +216,14 @@ namespace Unity.SpaceGod
             pilotCruise = default;
             // A trigger held as the helm was taken is not still held by the next hull flown.
             helmTriggerWas = false;
-            SpaceCamera.PilotLockTarget = Target.None;
-            SpaceCamera.ExitFocus();
+            if (CoopHelmMine) SpaceCamera.PilotLockTarget = Target.None; // US-T43: the holder's view only
+            if (CoopHelmMine) SpaceCamera.ExitFocus(); // US-T43
             ShowToast("The " + ship.Name + " has been boarded and taken");
         }
 
         void ExitPiloting()
         {
+            if (CoopRoutesHelmRelease()) return; // US-T43: a release the player asks for goes into the frames in co-op
             // A charge stops where it is (U.SPC-T417): the crew does not jump on its own.
             StopFtl();
             EndSalvage(null);
@@ -241,7 +243,7 @@ namespace Unity.SpaceGod
             pilotLockUnit = null;
             pilotBoosting = false;
             pilotCruise = default;
-            SpaceCamera.PilotLockTarget = Target.None;
+            if (CoopHelmMine) SpaceCamera.PilotLockTarget = Target.None; // US-T43: the holder's view only
             bool rode = ship != null && !ship.Destroyed && ship.Battle == null && ship.Phase == ShipPhase.Lane;
             EndRide();
             // Mid-ride the crew rides it on: the fleet brings it off at the far ramp and on into that system.
@@ -262,7 +264,7 @@ namespace Unity.SpaceGod
                     Fleet.ScheduleNext(ship, Clock.Jd);
                 }
             }
-            SpaceCamera.ExitFocus();
+            if (CoopHelmMine) SpaceCamera.ExitFocus(); // US-T43: the holder's view only
             // A trigger held as the helm was let go is not still held by the next hull taken.
             helmTriggerWas = false;
             // A hull shot to pieces under the helm ends the session as a loss, not as a release the player chose.
@@ -629,6 +631,7 @@ namespace Unity.SpaceGod
         /// <summary>Calls an emergency tanker out to the piloted ship (dearer than a port: a call-out fee and three times the going rate).</summary>
         public void CallTanker()
         {
+            if (CoopSends("tanker")) return; // US-T43: into the frames (the tanker's timer is the shared helm's)
             if (!IsPiloting || TankerDueS >= 0) return;
             var ship = Piloted.Ship;
             if (ship == null || Propulsion.TankerLoad(ship) < 1) { ShowToast("Tanks are full"); return; }
@@ -690,7 +693,7 @@ namespace Unity.SpaceGod
             TankerDueS = -1;
 
             Select(Piloted);
-            SpaceCamera.EnterPilotChase(Piloted, 6);
+            if (CoopHelmMine) SpaceCamera.EnterPilotChase(Piloted, 6); // US-T43: the holder's view only
             ShowToast("Jumped to " + destination.Name.ToUpperInvariant() + " through the gate");
             return true;
         }

@@ -102,6 +102,7 @@ namespace Unity.SpaceGod.Coop
             if (HasAuthority()) return;
             var peer = CoopPeer.Current;
             if (peer == null || !peer.IsClient) return;
+            CoopPeer.EngineTick++; // US-T43: the device's edges belong to the tick, however many host frames it replays
             CoopSmoke.ClientTick(peer);
             if (!started)
             {
@@ -157,6 +158,7 @@ namespace Unity.SpaceGod.Coop
             host = new UnrealHost(this);
             host.Begin();
             if (CoopSmoke.Active) host.Override = CoopSmoke.Script = new ScriptedInputDevice();
+            if (CoopSmoke.Active) CoopPeer.EdgesPerTick = false; // US-T43: the script clears its edges after every Update
             UGameplayStatics.GetPlayerController(0)?.ClientSetHUD(typeof(UI.ASpaceHud));
             WireHud();
             Bootstrap.EnsureApp();

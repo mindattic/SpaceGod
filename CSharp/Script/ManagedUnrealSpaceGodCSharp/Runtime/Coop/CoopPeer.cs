@@ -108,6 +108,7 @@ namespace Unity.SpaceGod.Coop
         public static CoopPeer StartHost(string name)
         {
             PrimeSaveStatics();
+            CoopSettings.Hook(); // US-T43
             Current = new CoopPeer(true, name) { HostReloads = !Bootstrap.HasCommandLineFlag("-CoopNoHostReload") };
             Log("hosting as " + Current.Players[0].Name + " (player 1), up to " + MaxPlayers + " players; host reloads its sync saves: " + Current.HostReloads);
             return Current;
@@ -116,6 +117,7 @@ namespace Unity.SpaceGod.Coop
         public static CoopPeer StartClient(ICoopLink host, string name)
         {
             PrimeSaveStatics();
+            CoopSettings.Hook(); // US-T43
             Current = new CoopPeer(false, name) { hostLink = host };
             return Current;
         }
@@ -153,6 +155,98 @@ namespace Unity.SpaceGod.Coop
         {
             if (IsClient) hostLink?.Send(request);
         }
+
+        // ---------------------------------------------------------------- US-T43: requests, the helm's hands, sync state
+
+        /// <summary>The host's next frame carries <paramref name="entry"/> (a shared setting changed here, an app entry).</summary>
+        public void QueueEntry(string entry)
+        {
+            if (IsHost) pending.Add(entry);
+        }
+
+        /// <summary>A client asks the host to set a shared setting (<see cref="CoopSettings"/>).</summary>
+        public void RequestSetting(string key, string value)
+        {
+            if (IsClient) hostLink?.Send("setreq " + key + " " + value);
+        }
+
+        /// <summary>A client asks the host to take the party to another star (the host's view makes the trip).</summary>
+        public void RequestTravel(string system)
+        {
+            if (IsClient) hostLink?.Send("travel " + system);
+        }
+
+        /// <summary>A client asks the host to load one of the host's save slots (every peer then loads the host's save).</summary>
+        public void RequestLoad(string slot)
+        {
+            if (IsClient) hostLink?.Send("load " + slot);
+        }
+
+        /// <summary>A client asks for a resync now (the smoke run's deliberate one; a slow client's is "resync &lt;frames&gt;").</summary>
+        public void RequestResync(string why)
+        {
+            if (IsClient) hostLink?.Send("resync " + why);
+        }
+
+        /// <summary>The engine tick a client is in (several host frames can replay in one): edges are sent once a tick.</summary>
+        public static long EngineTick;
+
+        /// <summary>Whether a second Update in one engine tick sees the same edges again (Unreal's player controller: yes; the
+        /// smoke run's scripted device clears them after every Update, so no).</summary>
+        public static bool EdgesPerTick = true;
+
+        /// <summary>Whether the edges this Update read are new ones (false for a repeat within the tick, see <see cref="EdgesPerTick"/>).</summary>
+        public static bool FreshEdges(ref long lastTick)
+        {
+            if (!EdgesPerTick) return true;
+            bool fresh = lastTick != EngineTick;
+            lastTick = EngineTick;
+            return fresh;
+        }
+
+        long pilotSentTick = -1;
+
+        /// <summary>The helm holder (a client) sends its hands for the frame it just replayed; a second send in the same engine
+        /// tick carries only what is held (the device's edges and mouse delta belong to the tick, not to each Update).</summary>
+        public void SendPilot(PilotFrame frame)
+        {
+            if (!IsClient) return;
+            if (!FreshEdges(ref pilotSentTick)) frame = frame.HeldOnly();
+            hostLink?.Send("pin " + frame.Write());
+            PilotSent++;
+        }
+
+        public int PilotSent { get; private set; }
+
+        readonly Dictionary<int, List<PilotFrame>> pilotIn = new Dictionary<int, List<PilotFrame>>();
+        readonly Dictionary<int, PilotFrame> pilotLast = new Dictionary<int, PilotFrame>();
+
+        /// <summary>The host's frame for a client's helm: what came from it since the last frame (<see cref="PilotFrame.Compose"/>).</summary>
+        public PilotFrame HostPilotFor(int seat)
+        {
+            pilotIn.TryGetValue(seat, out var since);
+            pilotLast.TryGetValue(seat, out var last);
+            var frame = PilotFrame.Compose(last, since ?? new List<PilotFrame>());
+            if (since != null && since.Count > 0) pilotLast[seat] = since[since.Count - 1];
+            since?.Clear();
+            return frame;
+        }
+
+        /// <summary>Forgets a seat's hands (the helm changed hands): the next holder starts from idle.</summary>
+        public void ForgetPilot(int seat)
+        {
+            pilotIn.Remove(seat);
+            pilotLast.Remove(seat);
+        }
+
+        /// <summary>The state a sync's save does not hold, sent with it: who flies the helm, each player's seat (by key, to be
+        /// taken again after the load, in seat order), and the host's shared settings.</summary>
+        public string PendingSyncState { get; private set; }
+
+        /// <summary>The sync state that came with the client's current sync (null until it has).</summary>
+        public string ClientSyncState { get; private set; }
+
+        public int Retakes { get; set; }
 
         /// <summary>This machine's player selected something: everyone sees it (applied with the frames, as commands are).</summary>
         public void Selected(string key)
@@ -283,6 +377,16 @@ namespace Unity.SpaceGod.Coop
         }
 
         /// <summary>A save for every client at the next frame boundary (a join, a load on the host, a desync).</summary>
+        /// <summary>US-T43: the sync wanted is for a load (every view starts again, as a load does); else a resync, which leaves
+        /// each player's view as it was.</summary>
+        bool syncLoad;
+
+        public void RequestSync(string reason, bool load)
+        {
+            syncLoad |= load;
+            RequestSync(reason);
+        }
+
         public void RequestSync(string reason)
         {
             if (!IsHost) return;
@@ -297,12 +401,17 @@ namespace Unity.SpaceGod.Coop
             if (blocked != null) return; // tried again next frame
             syncWanted = false;
             var watch = Stopwatch.StartNew();
+            // US-T43: what the save does not hold (who flies the helm, every player's seat, the shared settings), taken
+            // before it, so every peer (this one too) takes the seats again after loading the same bytes.
+            string state = app.CoopSyncState(!syncLoad) + "\n" + CoopSettings.Snapshot();
+            syncLoad = false;
+            PendingSyncState = state;
             byte[] save = app.CoopCaptureSave();
             long captured = watch.ElapsedMilliseconds;
             if (HostReloads)
             {
                 Applying = true;
-                try { app.CoopApplySave(save); }
+                try { app.CoopApplySave(save, state); }
                 finally { Applying = false; }
             }
             long reloaded = watch.ElapsedMilliseconds;
@@ -320,6 +429,7 @@ namespace Unity.SpaceGod.Coop
                 r.NextChunk = 0;
                 r.Acked = -1;
                 r.Link.Send("sync " + syncId + " " + syncFrame + " " + syncChunks.Count);
+                r.Link.Send("syncstate " + syncId + "\n" + state); // US-T43
                 sent++;
             }
             Log("sync #" + syncId + " at frame " + syncFrame + " (" + syncReason + "): save " + save.Length / 1024 + " KB in " + syncChunks.Count + " chunks to " + sent + " player(s); captured in " + captured + " ms" +
@@ -355,7 +465,9 @@ namespace Unity.SpaceGod.Coop
             if (r.Seat > 0)
             {
                 pending.Add("s " + CommandCodec.Write(new ReleaseSeatCommand(new PlayerId(r.Seat))));
+                pending.Add("h " + r.Seat + " release"); // US-T43: a helm they flew goes back to its crew too
                 pending.Add("l " + r.Seat);
+                ForgetPilot(r.Seat);
                 Log(NameOf(r.Seat) + " (player " + (r.Seat + 1) + ") left");
             }
         }
@@ -405,7 +517,28 @@ namespace Unity.SpaceGod.Coop
                         }
                         break;
                     }
-                    case "resync": RequestSync(NameOf(r.Seat) + " fell " + rest + " frames behind"); break;
+                    case "resync":
+                        RequestSync(rest.Length > 0 && char.IsDigit(rest[0]) ? NameOf(r.Seat) + " fell " + rest + " frames behind" : NameOf(r.Seat) + " asked: " + rest);
+                        break;
+                    // US-T43: the helm's hands, and what a client asks of the host.
+                    case "pin":
+                    {
+                        if (r.Seat < 0) break;
+                        if (!pilotIn.TryGetValue(r.Seat, out var list)) pilotIn[r.Seat] = list = new List<PilotFrame>();
+                        list.Add(PilotFrame.Read(rest));
+                        break;
+                    }
+                    case "setreq":
+                    {
+                        int sp2 = rest.IndexOf(' ');
+                        string key = sp2 > 0 ? rest.Substring(0, sp2) : rest;
+                        if (sp2 < 0 || !CoopSettings.IsSharedKey(key)) { Warn("player " + (r.Seat + 1) + " asked to set '" + key + "', not a shared setting"); break; }
+                        pending.Add("a " + r.Seat + " set " + rest);
+                        pending.Add("set " + rest);
+                        break;
+                    }
+                    case "travel": pending.Add("t " + r.Seat + " " + rest); break;
+                    case "load": pending.Add("a " + r.Seat + " load " + rest); break;
                     case "bye":
                         r.Bye = true;
                         Log(NameOf(r.Seat) + " (player " + (r.Seat + 1) + ") says bye");
@@ -449,6 +582,15 @@ namespace Unity.SpaceGod.Coop
 
         void Command(Remote r, string entry)
         {
+            // US-T43: the app's own entries ("h" the helm, "k" a cockpit key, "x" an action that writes the Core), each
+            // "<kind> <seat> ...": a client speaks only for its own seat.
+            if (entry.Length > 2 && (entry[0] == 'h' || entry[0] == 'k' || entry[0] == 'x') && entry[1] == ' ')
+            {
+                var f = entry.Split(new[] { ' ' }, 3);
+                if (f.Length < 3 || !int.TryParse(f[1], out int seat) || seat != r.Seat) { Warn("player " + (r.Seat + 1) + " sent '" + entry + "' for another seat: dropped"); return; }
+                pending.Add(entry);
+                return;
+            }
             if (!entry.StartsWith("s ", StringComparison.Ordinal)) { Warn("unknown command entry '" + entry + "'"); return; }
             string codec = entry.Substring(2);
             int at = codec.IndexOf(" @", StringComparison.Ordinal);
@@ -577,9 +719,17 @@ namespace Unity.SpaceGod.Coop
                         clientSyncFrame = Wire.ParseL(f[2]);
                         chunks = new string[Wire.ParseI(f[3])];
                         chunksGot = 0;
+                        ClientSyncState = null;
                         Running = false;
                         // Everything queued is from before the save; what comes now is after it.
                         queue.Clear();
+                        break;
+                    }
+                    case "syncstate":
+                    {
+                        // US-T43: "syncstate <id>\n<the state>", sent just after its "sync".
+                        int nl = msg.IndexOf('\n');
+                        if (nl > 0 && Wire.ParseI(msg.Substring(10, nl - 10)) == clientSyncId) ClientSyncState = msg.Substring(nl + 1);
                         break;
                     }
                     case "chunk":
@@ -619,12 +769,12 @@ namespace Unity.SpaceGod.Coop
         /// <summary>Once every chunk of a sync is in: the save is loaded, and the frames after it replay.</summary>
         public bool ClientTryLoad(UnitySpaceApp app)
         {
-            if (chunks == null || chunksGot < chunks.Length || app == null) return false;
+            if (chunks == null || chunksGot < chunks.Length || app == null || ClientSyncState == null) return false;
             var watch = Stopwatch.StartNew();
             byte[] save = Wire.Unpack(chunks);
             chunks = null;
             Applying = true;
-            try { app.CoopApplySave(save); }
+            try { app.CoopApplySave(save, ClientSyncState); }
             catch (Exception e)
             {
                 Warn("could not load the host's save (sync #" + clientSyncId + "): " + e.Message);

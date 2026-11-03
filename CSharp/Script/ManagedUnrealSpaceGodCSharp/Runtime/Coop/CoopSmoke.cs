@@ -1,4 +1,6 @@
-// US-T39: the headless two-instance co-op proof (new file; tools/play.ps1 -Track CSharp -Mode coop-smoke).
+// US-T39: the headless two-instance co-op proof (new file; tools/play.ps1 -Track CSharp -Mode coop-smoke). US-T43: the
+// client now also keeps a seat through a resync, flies a helm, trades, uses a cockpit's keys, takes the party to another
+// star and has the host load a save.
 using System;
 using System.Diagnostics;
 using Unity.SpaceGod.Core;
@@ -9,18 +11,21 @@ namespace Unity.SpaceGod.Coop
 {
     /// <summary>
     /// <c>-SpaceGodCoopSmoke=host|client</c>: a listen server and a client on localhost (-nullrhi). The client joins (the
-    /// host's save comes over and both load it), then plays a few things as a player would, by the keys and the picker: '.'
-    /// (time warp up: a request the host grants for everyone), '3' (select Earth: every peer sees it), and a station's seat
-    /// through the picker (a take command the host's frame grants, through SeatAuthority on every peer). Both log a digest
-    /// of the shared state every <see cref="CoopPeer.DigestEvery"/> frames; the host compares them and logs each match or
-    /// desync. After <see cref="ClientFrames"/> replayed frames the client says bye and both quit.
+    /// host's save comes over and both load it), then plays as a player would, by the keys, the picker and the HUD's own
+    /// handlers: '.' (time warp up: a request the host grants for everyone), '3' (select Earth: every peer sees it), a
+    /// station's seat through the picker (a take the host's frame grants, through SeatAuthority on every peer), a
+    /// deliberate resync (the seat is kept through it), a freighter spawned and flown (its helm on every peer, on the
+    /// client's input stream), a trade at Earth's market, a pirate carrier flown into a fight and a fighter's cockpit taken
+    /// there (its keys as commands), a trip to another star (the party's), and a load of the host's quicksave. Both log a
+    /// digest of the shared state every <see cref="CoopPeer.DigestEvery"/> frames; the host compares them. After
+    /// <see cref="ClientFrames"/> replayed frames the client says bye and both quit.
     /// </summary>
     public static class CoopSmoke
     {
         public static readonly string Role = Bootstrap.CommandLineValue("-SpaceGodCoopSmoke")?.ToLowerInvariant();
         public static bool Active => Role != null;
-        public const int ClientFrames = 1200;
-        static readonly TimeSpan Timeout = TimeSpan.FromMinutes(6);
+        public const int ClientFrames = 3000;
+        static readonly TimeSpan Timeout = TimeSpan.FromMinutes(9);
         static readonly Stopwatch Since = Stopwatch.StartNew();
 
         /// <summary>The client's scripted keyboard and mouse (the link puts it in front of the real device).</summary>
@@ -29,15 +34,19 @@ namespace Unity.SpaceGod.Coop
         static long byeAt = -1;
         static long replayed;
         static int quitIn = -1;
-        static bool finished;
+        static bool finished, hostSaved;
         static string warpBefore;
+        static long fighterFrom = -1, travelFrom = -1, loadFrom = -1;
+        static FighterSeat fighter;
 
-        static void Finish(string why, CoopPeer peer)
+        static void Finish(string why, CoopPeer peer, UnitySpaceApp app)
         {
             if (finished) return;
             finished = true;
             CoopPeer.Log("smoke (" + Role + ") done: " + why + "; frame " + peer.Frame + ", " +
                          (peer.IsHost ? peer.DigestMatches + " digest matches, " + peer.Desyncs + " desyncs" : peer.ClockCorrections + " clock corrections") +
+                         (app != null ? ", " + app.CoopPilotFrames + " helm frames made here, " + peer.PilotSent + " helm inputs sent, " + app.CoopCockpitKeys + " cockpit keys, " +
+                                        app.CoopActions + " actions, " + peer.Retakes + " seats kept through syncs, " + CoopSettings.Applied + " settings taken" : "") +
                          ", " + Since.Elapsed.TotalSeconds.ToString("F0") + " s; quitting");
             SystemLibrary.ExecuteConsoleCommand("quit");
         }
@@ -45,17 +54,24 @@ namespace Unity.SpaceGod.Coop
         public static void HostFrame(CoopPeer peer, UnitySpaceApp app, FrameRecord rec)
         {
             if (Role != "host" || finished) return;
+            // The host's quicksave, early (the client asks for it to be loaded near the end).
+            if (!hostSaved && app != null && peer.DigestMatches >= 2)
+            {
+                hostSaved = true;
+                bool saved = app.SaveTo(SaveSlots.Quick, "Quicksave");
+                CoopPeer.Log("smoke: host quicksaves at frame " + rec.Frame + ": " + saved);
+            }
             if (peer.AnyBye && byeAt < 0) byeAt = rec.Frame;
-            if (byeAt >= 0 && rec.Frame >= byeAt + 30) Finish("the client said bye", peer);
-            else if (Since.Elapsed > Timeout) Finish("TIMEOUT", peer);
+            if (byeAt >= 0 && rec.Frame >= byeAt + 30) Finish("the client said bye", peer, app);
+            else if (Since.Elapsed > Timeout) Finish("TIMEOUT", peer, app);
         }
 
         /// <summary>Each engine tick on the client, before its frames: the countdown to quitting and the timeout.</summary>
         public static void ClientTick(CoopPeer peer)
         {
             if (Role != "client" || finished) return;
-            if (quitIn > 0 && --quitIn == 0) Finish("said bye", peer);
-            else if (Since.Elapsed > Timeout) Finish("TIMEOUT", peer);
+            if (quitIn > 0 && --quitIn == 0) Finish("said bye", peer, Bootstrap.App);
+            else if (Since.Elapsed > Timeout) Finish("TIMEOUT", peer, Bootstrap.App);
         }
 
         /// <summary>After each replayed host frame on the client: the scripted player.</summary>
@@ -63,6 +79,8 @@ namespace Unity.SpaceGod.Coop
         {
             if (Role != "client" || finished || Script == null) return;
             long n = ++replayed;
+            // The stick at the helm: throttle up, the mouse swinging the nose, a roll.
+            if (n >= 740 && n < 800) Script.MouseDelta = new UnityEngine.Vector2(4f, 2f);
             switch (n)
             {
                 case 30:
@@ -70,12 +88,15 @@ namespace Unity.SpaceGod.Coop
                     Script.Tap(Key.Period);
                     CoopPeer.Log("smoke: client presses '.' (time warp up) at frame " + peer.Frame + ", warp " + warpBefore);
                     break;
-                case 300:
-                    CoopPeer.Log("smoke: client's warp " + warpBefore + " -> " + app.Clock.Warp.Label + " (the host's clock) at frame " + peer.Frame);
-                    break;
                 case 180:
                     Script.Tap(Key.Digit3);
                     CoopPeer.Log("smoke: client presses '3' (select) at frame " + peer.Frame);
+                    break;
+                case 200:
+                    app.FocusSelected();
+                    break;
+                case 300:
+                    CoopPeer.Log("smoke: client's warp " + warpBefore + " -> " + app.Clock.Warp.Label + " (the host's clock) at frame " + peer.Frame);
                     break;
                 case 330:
                     CoopPeer.Log("smoke: client selected " + app.CoopTargetName(app.CoopTargetKey(app.Selected)) + "; the host's roster has it as '" +
@@ -88,8 +109,7 @@ namespace Unity.SpaceGod.Coop
                     if (seat == null)
                         foreach (var b in app.World.War.Battles)
                         {
-                            var seats = Embodiables.SeatsIn(app.World, b);
-                            foreach (var s in seats)
+                            foreach (var s in Embodiables.SeatsIn(app.World, b))
                                 if (!(s is ShipHelm)) { seat = s; break; }
                             if (seat != null) break;
                         }
@@ -98,23 +118,120 @@ namespace Unity.SpaceGod.Coop
                     app.PickSeat(seat);
                     break;
                 }
+                case 480:
+                    CoopPeer.Log("smoke: client holds " + (app.Seat?.Name ?? "nothing") + " and asks for a resync at frame " + peer.Frame + " (a deliberate one: the seat must be kept)");
+                    peer.RequestResync("a deliberate resync (smoke)");
+                    break;
+                case 600:
+                    CoopPeer.Log("smoke: after the resync the client holds " + (app.Seat?.Name ?? "nothing") + " at frame " + peer.Frame + ", warp " + app.Clock.Warp.Label);
+                    break;
+                case 640:
+                    Script.Tap(Key.P); // back to command: the seat goes back to its AI (a release command)
+                    break;
+                case 670:
+                    Script.Tap(Key.Digit3); // Earth again, and the camera on it (the spawns below are at the camera)
+                    break;
+                case 680:
+                    app.FocusSelected();
+                    break;
                 case 700:
+                    CoopPeer.Log("smoke: client spawns a freighter at its camera (the spawn grid's call) at frame " + peer.Frame);
+                    app.SpawnShip(ShipClass.Freighter, false);
+                    break;
+                case 730:
+                    CoopPeer.Log("smoke: client at the helm of " + (app.Piloted.Ship?.Name ?? "nothing") + " (helm seat " + app.CoopHelmSeat + ") at frame " + peer.Frame + "; flies it");
+                    Script.Hold(Key.W);
+                    break;
+                case 760: Script.Hold(Key.X); break;
+                case 780: Script.Release(Key.X); break;
+                case 820:
+                    Script.Tap(Key.F); // flight assist off, in the pilot loop on every peer
+                    break;
+                case 900:
+                    Script.Release(Key.W);
+                    CoopPeer.Log("smoke: client's helm at frame " + peer.Frame + ": " + app.PilotSpeedKmS.ToString("0.000") + " km/s, flight assist " + (app.PilotFlightAssist ? "on" : "off"));
+                    break;
+                case 920:
                 {
-                    // A desync on purpose: one credit more in a faction's treasury here only, as a client acting on the Core
-                    // behind the session's back would. The next digest differs; the host resyncs everyone from its save.
-                    var faction = app.World.Fleet.Factions.Count > 0 ? app.World.Fleet.Factions[0] : null;
-                    if (faction != null) faction.Treasury += 1;
-                    CoopPeer.Log("smoke: client tampers with " + faction?.Name + "'s treasury at frame " + peer.Frame + " (an injected desync)");
+                    Settlement market = null;
+                    foreach (var s in app.Economy.Settlements)
+                        if (s.Discovered && app.CanTradeNow(s)) { market = s; break; }
+                    if (market == null) { CoopPeer.Warn("smoke: no market in reach of the helm at frame " + peer.Frame); break; }
+                    Good good = Good.Water;
+                    for (int g = 0; g < GoodInfo.Count; g++)
+                        if (market.Stock[g] > 50) { good = (Good)g; break; }
+                    CoopPeer.Log("smoke: client buys 1 crate of " + GoodInfo.Of(good).Name + " at " + market.Name + " (the market board's Buy) at frame " + peer.Frame);
+                    app.CoopHud.CoopSmokeBuy(market, good);
                     break;
                 }
-                case 600:
-                    CoopPeer.Log("smoke: client holds " + (app.Seat?.Name ?? "nothing") + " at frame " + peer.Frame + ", warp " + app.Clock.Warp.Label);
+                case 1000:
+                    CoopPeer.Log("smoke: client's hold: " + (app.Piloted.Ship?.Cargo ?? "?") + "; releases the helm at frame " + peer.Frame);
+                    Script.Tap(Key.P);
+                    break;
+                case 1040:
+                    CoopPeer.Log("smoke: client spawns a pirate carrier at its camera to start a fight at frame " + peer.Frame);
+                    app.SpawnShip(ShipClass.Carrier, true);
+                    break;
+                case 1340:
+                {
+                    // Its crew takes it back (a carrier's AI launches its squadrons in a fight); the cockpits are then there to take.
+                    var carrier = app.Piloted.Ship;
+                    CoopPeer.Log("smoke: client's carrier " + (carrier?.Name ?? "?") + " is " + (carrier?.Battle != null ? "in " + carrier.Battle.Name : "in no fight") +
+                                 "; " + app.World.War.Battles.Count + " battles in " + app.ActiveSystem.Name + "; hands the helm to its crew at frame " + peer.Frame);
+                    Script.Tap(Key.P);
+                    fighterFrom = n + 20;
+                    break;
+                }
+                case 1700:
+                    if (fighter == null) CoopPeer.Warn("smoke: no fighter aloft to take by frame " + peer.Frame);
+                    Script.Tap(Key.P);
+                    break;
+                case 1760:
+                {
+                    StarSystem to = null;
+                    foreach (var s in app.Galaxy.Systems)
+                        if (s != app.ActiveSystem && !s.IsVoidBase) { to = s; break; }
+                    CoopPeer.Log("smoke: client asks for the party's trip to " + to?.Name + " at frame " + peer.Frame + " (from " + app.ActiveSystem.Name + ")");
+                    if (to != null) app.TravelTo(to);
+                    travelFrom = n;
+                    break;
+                }
+                case 2500:
+                    CoopPeer.Log("smoke: client is in " + app.ActiveSystem.Name + " at frame " + peer.Frame + "; asks the host to load its quicksave");
+                    app.LoadFrom(SaveSlots.Quick);
+                    loadFrom = n;
+                    break;
+                case 2800:
+                    CoopPeer.Log("smoke: after the load the client is in " + app.ActiveSystem.Name + " at frame " + peer.Frame);
                     break;
                 case ClientFrames:
                     peer.SayBye();
                     quitIn = 30;
                     break;
             }
+            // The fight: once a fighter is aloft, take its cockpit, then its keys (power to weapons, flight assist, a flare).
+            if (fighterFrom >= 0 && n >= fighterFrom && fighter == null && n % 20 == 0)
+            {
+                foreach (var b in app.World.War.Battles)
+                {
+                    foreach (var s in Embodiables.SeatsIn(app.World, b))
+                        if (s is FighterSeat f) { fighter = f; break; }
+                    if (fighter != null) break;
+                }
+                if (fighter != null)
+                {
+                    CoopPeer.Log("smoke: client takes the cockpit of " + fighter.Name + " (key " + app.CoopSeatKey(fighter) + ") at frame " + peer.Frame);
+                    app.PickSeat(fighter); // hands the carrier's helm back first (a release), then the take
+                    fighterFrom = n;
+                }
+            }
+            else if (fighter != null && n == fighterFrom + 60)
+            {
+                CoopPeer.Log("smoke: client in " + (app.Seat?.Name ?? "nothing") + " presses 7 (power to weapons) at frame " + peer.Frame);
+                Script.Tap(Key.Digit7);
+            }
+            else if (fighter != null && n == fighterFrom + 80) Script.Tap(Key.F);
+            else if (fighter != null && n == fighterFrom + 100) Script.Tap(Key.LeftCtrl);
         }
     }
 }
