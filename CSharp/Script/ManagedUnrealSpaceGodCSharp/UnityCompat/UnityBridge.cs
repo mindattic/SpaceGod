@@ -250,7 +250,7 @@ namespace UnityEngine
             static GameObject? go;
             static MeshRenderer? renderer;
             static Material? material;
-            static Color shown = new Color(-1, -1, -1, -1);
+            static (Color, bool) shown = (new Color(-1, -1, -1, -1), false);
 
             public static bool Is(Renderer r) => ReferenceEquals(r, renderer);
 
@@ -276,14 +276,17 @@ namespace UnityEngine
                     renderer.sharedMaterial = material;
                 }
                 go.transform.position = cam!.transform.position;
-                if (c != shown)
+                if (shown != (c, captureCamera != null))
                 {
-                    shown = c;
+                    shown = (c, captureCamera != null);
                     var t = new Texture2D(1, 1) { name = "Backdrop" };
-                    // Measured (US-T40): M_Sky's sRGB texel reaches the screen decoded but not re-encoded (a 13/15/23
-                    // texel showed as 1/1/2), so the texel is the colour encoded once more; on screen it is then
-                    // Unity's clear colour exactly as Unity shows it (its gamma value).
-                    t.SetPixel(0, 0, new Color(Encode(c.r), Encode(c.g), Encode(c.b), 1));
+                    // Measured (US-T40): M_Sky's texel does not reach the screen as Unity's clear colour does (a 13/15/23
+                    // texel showed as 1/1/2 on screen and 1/1/1 in a capture; 63 as 37 and 22): the screen value is
+                    // close to a * decoded^g. The texel is chosen so the screen shows Unity's value (its gamma colour).
+                    bool capture = captureCamera != null;
+                    float a = capture ? 3.36f : 10.57f, g = capture ? 1.224f : 1.432f;
+                    float Texel(float v) => Encode(Mathf.Pow(Mathf.Max(v, 0f) / a, 1f / g));
+                    t.SetPixel(0, 0, new Color(Texel(c.r), Texel(c.g), Texel(c.b), 1));
                     t.Apply();
                     material!.SetTexture("_MainTex", t);
                 }
