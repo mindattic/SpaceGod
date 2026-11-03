@@ -631,7 +631,8 @@ namespace SpaceGod::Core
 			{
 				// Compacted as it is written (cleared and refilled in its own order), as the C# writer does, so the
 				// original and the copy keep enumerating in step after later removals.
-				std::vector<T> members(c.begin(), c.end());
+				std::vector<T> members;
+				for (const auto& x : c) members.push_back(x);
 				c.Clear();
 				for (auto& x : members) c.Add(x);
 				w.Payload().Var(static_cast<int>(members.size()));
@@ -645,7 +646,8 @@ namespace SpaceGod::Core
 			static void Walk(StaticWalker& s, cs::HashSet<T, H, E>& c, const cs::String& key, int depth)
 			{
 				int i = 0;
-				std::vector<T> members(c.begin(), c.end());
+				std::vector<T> members;
+				for (const auto& x : c) members.push_back(x);
 				for (auto& x : members) Codec<T>::Walk(s, x, cs::Cat(key, "[", i++, "]"), depth + 1);
 			}
 		};
@@ -1049,7 +1051,7 @@ namespace SpaceGod::Core
 		/// A static field's walk (SG_STATIC).
 		template <class V> std::function<void(StaticWalker&, const cs::String&)> StaticWalk(std::function<V&()> get)
 		{
-			return [get](StaticWalker& s, const cs::String& key) { Codec<Bare<V>>::Walk(s, get(), key, 0); };
+			return [get](StaticWalker& s, const cs::String& key) { Codec<Bare<V>>::Walk(s, const_cast<Bare<V>&>(get()), key, 0); };
 		}
 	}
 
@@ -1206,6 +1208,7 @@ namespace SpaceGod::Core
 	[[maybe_unused]] static const bool SG_CONCAT(sgEnum_, __LINE__) = (::SpaceGod::Core::Graph::DeclareEnum(typeid(E), NetFullName, ::SpaceGod::Core::Graph::TypeCode::Code), true);
 
 /// A static field of a Core type that holds objects (see "Statics"): `expr` is an lvalue of the value it holds.
+/// (A CppValueType with commas needs a `using` alias first.)
 #define SG_STATIC(TypeFullName, FieldName, CppValueType, expr) \
 	[[maybe_unused]] static const bool SG_CONCAT(sgStatic_, __LINE__) = (::SpaceGod::Core::Graph::DeclareStatic(TypeFullName, FieldName, \
 		::SpaceGod::Core::Graph::StaticWalk<CppValueType>([]() -> CppValueType& { return const_cast<CppValueType&>(expr); })), true);
