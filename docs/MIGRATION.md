@@ -304,9 +304,29 @@ ships unchanged; after the load 1650 renderers (C# 1644). Every UI screen draws 
 C#) and text runs higher (one per line). The views check logs the same line as C#'s (5083 renderers, 36 primitives, 543,314
 triangles). Images: `docs/images/cpp-ui-*.png`, `cpp-views-sol.png` beside the `csharp-*` ones.
 
-Not identical yet: the in-game scene shows more long straight line strips than the C# track's (what the app's view update
-places, not the line facade: the views check's orbit line is identical); the C# track's HUD shot does not draw Earth at the
-reticle where the C++ one does (a C# near-plane question, not this port's); the main menu title has no soft halo in C++.
+**Visual parity between the tracks (US-T45).** `tools/play.ps1 -Mode shots` is deterministic on both tracks: the game
+starts at a fixed moment (`UnitySpaceApp.StartJd` = 2026-11-03 12:00 UTC, not now), `UnityEngine.Random` is seeded before
+New Game (the C++ facade's is now .NET's `System.Random`, `cs::Random`, draw for draw the C# facade's), every frame is 1/60 s
+of game time (`-UseFixedTimeStep -FPS=60`), the real keyboard and mouse are ignored (no hover from wherever the cursor is),
+the profile is a fresh scratch one, the main menu is shot at 1.5 s of its clock and the HUD when the game's clock is 4 hours
+in, every later step a fixed number of frames. `python tools/imgdiff.py` compares each `cpp-*` / `csharp-*` pair (share of
+pixels differing by more than 24/255 in any channel, and a diff image under `Saved/ImageDiff`). Against the original's own
+player (`Unity.SpaceGod/Builds/Windows`, `-capture` starts in the game; same camera placement, so the same sky region), the
+three differences US-T38 left were all the C# track's:
+- *The many long straight lines* in the C++ game view are the original's (Earth's docking-ring and Moon orbit lines and the
+  planets' passing near the camera); the C# view lacked them, and Earth, the Moon and the rings' markers, because
+  `r.SetNearClipPlane` floors the near plane at 1 cm, and one Unity unit is one Unreal unit there: the original's near
+  plane beside Earth (~0.2) became 1. The C# primary module adds `sg.SetNearClipPlane` (`SetNearClipPlaneGlobals`, the
+  C++ track's 1e-4 floor).
+- *The C# title's soft glow* is not in the original: Canvas rasterises a runtime font at its `LegacyFontSize` and scales the
+  quads, so one 16 pt Arial drawn at 40 px blurred. Each face is now a font per whole point size (scale near 1).
+- *The C# sky and menu stars were darker*: the app's Unity camera was never bound to its Unreal camera, so the render
+  backend's look (manual exposure, no tone curve) never reached it and the filmic curve crushed the dark end (~14/255 drew
+  as ~2). Also aligned: Arial's line height (15 at 13 px, as Slate and Unity's hinted font give it; C# measured 14).
+
+Left: text is drawn by Slate (C++) and by Canvas from a whole-point font (C#), so glyph edges and some advances differ by a
+pixel (C++ widths match the original's; C# runs about 1% narrower, which can move a wrap); the C# asteroid belt and ship
+detail are US-T40's.
 
 ## C# track
 
