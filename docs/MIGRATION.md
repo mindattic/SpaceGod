@@ -78,10 +78,74 @@ side by side with the original.
 classes and inline code. Constructors keep C#'s parameters and default arguments. Field initialisers move to
 default member initialisers in the same order (C# runs them before the constructor body, in textual order).
 
+**Conventions settled during wave 1** (apply them too):
+- C# tuples `(A a, B b)` → `std::tuple<A, B>` (or a small named struct when the C# names the elements and callers use the names); `T?` of a tuple → `cs::Nullable<std::tuple<…>>`.
+- A `string` that C# compares with `null` → `cs::String`, with empty standing for null (note it where null and "" mean different things).
+- A partial class spread over several C# files (e.g. `Battle` extended by `BoardingShuttles.cs`): the file that adds members writes their bodies in its own `.cpp` and lists the exact declarations in a comment at the top of its header; the integration ticket adds them to the main class header.
+- A class that passes `this` as a C# reference (`Foo(this)`) → inherit `std::enable_shared_from_this<T>` and pass `shared_from_this()`.
+- `[SettingsSource]` and other attribute-reflection discovery → explicit registration; list what the integration ticket must call.
+
 **Don't compile in the porting waves** (memory is shared by many agents): write the files faithfully, then
 the integration ticket compiles all of SpaceGodCore and fixes the seams. If a referenced C# member's shape is
 ambiguous, read its declaration in Unity.SpaceGod and apply the table above; if still unclear, note it on
 your ticket.
+
+## C# track
+
+**Decision (US-T6, 2026-11-03): UnrealSharp**, pinned as a git submodule at `CSharp/Plugins/UnrealSharp`
+(upstream `main` @ `115e6753`, 2026-10-26). Reasons:
+
+- It is the maintained way to write a UE game in C# today: `main` declares UE 5.6–5.8, 5.8-specific fixes have
+  landed (issue #705, PR #794), it was pushed a week ago, and it is MIT. A C# class is a real `UCLASS`
+  (`[UClass] public partial class ASpaceGameMode : AGameModeBase`), so the engine side is written in C# against the
+  ordinary Unreal API, not through a scripting sandbox.
+- **CoreCLR, .NET 10**: Unity.SpaceGod's Core (netstandard2.1, C# 9) is referenced as a plain library and runs
+  *unchanged*, which is the point of this track. Hot reload: a watcher rebuilds `Script/` on save and swaps the
+  collectible AssemblyLoadContext (editor only; off in commandlets and `-unattended`).
+- **Packaging works** (Win64/Mac, Development and Shipping): the managed code is published self-contained, the
+  .NET runtime ships next to the exe. Today that is a second step after UE's own package
+  (`RunUAT PackageProject -ScriptDir=<plugin>\Build\Scripts ...`; open PR #795 folds it into cook/stage). Native
+  AOT is not supported.
+- **Replication from C#**: `[UProperty(PropertyFlags.Replicated)]`, `ReplicatedUsing` OnReps, lifetime conditions
+  and `RunOnServer` / `RunOnClient` / `Multicast` RPCs, so co-op can stay in C#.
+- Alternatives looked at: UnrealCSharp (crazytuzi, active, 5.0–5.8, also .NET 10; a Mono/CoreCLR binding layer
+  with a mostly Chinese doc set, smaller English community) — the fallback if UnrealSharp stalls. UnrealCLR (last
+  push 2023), USharp (archived 2020) and MonoUE are dead. A self-written host (hostfxr + a C ABI bridge) would
+  work for the Core alone but means hand-writing every engine binding UnrealSharp generates.
+
+Submodule rather than vendoring: the plugin is ~1,700 files we never edit, a pin records the exact upstream
+commit for the benchmark write-up, and an update is a one-line diff. Its build outputs (`Binaries/`,
+`Intermediate/`, `Generated/`, `*.props`) are ignored by its own `.gitignore`, so the submodule stays clean.
+
+**Layout.**
+
+| Path | What |
+|---|---|
+| `CSharp/UnrealSpaceGodCSharp.uproject` | UE 5.8 project, plugin UnrealSharp. Config mirrors `Cpp/` (`/Engine/Maps/Entry`, game mode by class path) |
+| `CSharp/Source/UnrealSpaceGodCSharp/` | the empty C++ primary game module every UE game target needs; no game code |
+| `CSharp/Core/SpaceGod.Core/` | csproj compiling `../Unity.SpaceGod/Assets/UnitySpace/Core/**/*.cs` **in place** (assembly `Unity.SpaceGod.Core`, netstandard2.1, C# 9), as Unity.SpaceGod's `Tests/UnitySpace.Core` does. `UnitySpaceGodDir` overrides the checkout |
+| `CSharp/Core/Unity.Shared.Core/` | the same for `../Unity.Shared/unity/com.mindattic.unity.shared/Runtime/Core` (`UnitySharedDir`) |
+| `CSharp/Script/ManagedUnrealSpaceGodCSharp/` | the UnrealSharp user project (`Managed<ProjectName>`): the engine side in C#. Class path `/Script/ManagedUnrealSpaceGodCSharp.<Name>` |
+
+The Core projects live outside `Script/` on purpose: UnrealSharp treats every csproj under `Script/` as a user
+module (glue, load order, hot reload); the Core is a plain dependency that goes into the publish output.
+
+**Build** (`tools/build.ps1 -Track CSharp`): fetches the submodule if missing; UBT builds the plugin's C++ and its
+UBT plugin generates the C# glue and builds UnrealSharp's managed bindings; then `tools/build-managed.ps1` runs the
+plugin's own `BuildUserSolution` UAT command (what the editor runs on launch) to publish `Script/` + Core into
+`CSharp/Binaries/Managed/net10.0` with its `UserCode.LoadOrder.json`. Two workarounds, both in our scripts, none in
+the submodule:
+
+1. On an *installed* (launcher) engine UnrealSharp's `UnrealSharp.Automation.props` cannot see `UE_5_8_OR_LATER`
+   (it reads a rules csproj only source builds have), keeps `net8.0`, and UBT skips its glue plugin
+   ("Skipping net8.0 project"; upstream PR #717 was closed unmerged). `build.ps1` writes the plugin's optional,
+   gitignored `*.csproj.props` hooks defining the symbol.
+2. UnrealSharp needs the .NET SDK **10.0.3xx or later** (Roslyn 5.6, since 2026-09-16) and takes the
+   highest-*named* `sdk\10.*` folder without checking it is complete. When the machine's dotnet fails either check
+   (this workstation: newest complete SDK 10.0.202, plus two empty `10.0.300/400-preview` leftovers),
+   `tools/dotnet-sdk.ps1` installs SDK 10.0.403 privately into `CSharp/Intermediate/DotNet` (Microsoft's
+   `dotnet-install.ps1`, no admin) and puts it on PATH for the build. Installing SDK ≥ 10.0.300 machine-wide (and
+   deleting the empty preview folders) makes this a no-op.
 
 ## Order of work
 
