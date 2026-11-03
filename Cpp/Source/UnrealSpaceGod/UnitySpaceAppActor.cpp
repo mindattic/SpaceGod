@@ -50,7 +50,11 @@ void AUnitySpaceAppActor::BeginPlay()
 	RefreshUnityStatics(0);
 
 	if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+	{
 		PC->SetViewTarget(this);
+		// The controller processes this frame's input first, so Feed sees this frame's keys (no one-frame lag).
+		AddTickPrerequisiteActor(PC);
+	}
 
 	App = std::make_shared<UnitySpaceApp>();
 	App->Awake();
