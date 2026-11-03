@@ -1066,7 +1066,7 @@ namespace SpaceGod::Core
 	void Contracts::Standing(const cs::Ref<LawRecord>& r, const cs::Ref<Faction>& f, double delta)
 	{
 		if (r == nullptr || f == nullptr || f->IsPirate || delta == 0) return;
-		r->Standing[f] = r->StandingWith(f) + delta;
+		(*r->Standing)[f] = r->StandingWith(f) + delta;
 	}
 
 	void Contracts::Trim()

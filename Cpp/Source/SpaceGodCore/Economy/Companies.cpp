@@ -203,7 +203,7 @@ namespace SpaceGod::Core
 		ship->LoadedCredits = ship->Credits;
 	}
 
-	void Companies::OnSold(const cs::Ref<Ship>& ship, const cs::Ref<Settlement>& to, Good good, double tonnes)
+	void Companies::OnSold(const cs::Ref<Ship>& ship, const cs::Ref<Settlement>& to, Good good, double /*tonnes*/)
 	{
 		auto c = ship->Company;
 		if (c == nullptr) return;
@@ -474,9 +474,9 @@ namespace SpaceGod::Core
 		return first;
 	}
 
-	bool Companies::PaidFor(const cs::Ref<Settlement>& yard, ShipClass cls, double price) const { return FirstOrderAt(yard, cls) != nullptr; }
+	bool Companies::PaidFor(const cs::Ref<Settlement>& yard, ShipClass cls, double /*price*/) const { return FirstOrderAt(yard, cls) != nullptr; }
 
-	cs::Ref<Company> Companies::TakeDelivery(const cs::Ref<Settlement>& yard, ShipClass cls, double jd)
+	cs::Ref<Company> Companies::TakeDelivery(const cs::Ref<Settlement>& yard, ShipClass cls, double /*jd*/)
 	{
 		auto c = FirstOrderAt(yard, cls);
 		if (c == nullptr) return nullptr;

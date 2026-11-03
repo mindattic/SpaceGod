@@ -5,6 +5,7 @@
 #include "Economy/Goods.h"
 #include "Economy/Settlement.h"
 #include "Economy/TradeDesk.h"
+#include "Settings/GameSetting.h"
 #include "Combat/Diplomacy.h"
 #include "Law/Law.h"
 #include "Ships.h"

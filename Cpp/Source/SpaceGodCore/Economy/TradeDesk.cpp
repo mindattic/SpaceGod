@@ -340,7 +340,7 @@ namespace SpaceGod::Core
 		return list;
 	}
 
-	cs::List<cs::Ref<TradeTip>> TradeDesk::ShockTips(const cs::Ref<TradeDesk>& desk, double jd)
+	cs::List<cs::Ref<TradeTip>> TradeDesk::ShockTips(const cs::Ref<TradeDesk>& desk, double /*jd*/)
 	{
 		cs::List<cs::Ref<TradeTip>> result;
 		for (const auto& e : desk->world->Shocks->Active)

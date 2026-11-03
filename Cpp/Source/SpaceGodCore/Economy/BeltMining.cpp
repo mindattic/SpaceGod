@@ -642,7 +642,7 @@ namespace SpaceGod::Core
 		return nullptr;
 	}
 
-	int BeltMining::FreighterNext(const ShipRef& freighter, int here) const
+	int BeltMining::FreighterNext(const ShipRef& freighter, int /*here*/) const
 	{
 		auto c = ConvoyOf(freighter);
 		if (c != nullptr) return c->To->Body;

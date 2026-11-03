@@ -423,7 +423,7 @@ namespace SpaceGod::Core
 		return PriceFactor == nullptr ? 1 : cs::Math::Max(0.1, PriceFactor(ship, s));
 	}
 
-	void Economy::OnArrive(const cs::Ref<Ship>& ship, int body, double jd)
+	void Economy::OnArrive(const cs::Ref<Ship>& ship, int body, double /*jd*/)
 	{
 		if (!ship->HasCargo) return;
 		cs::Ref<Settlement> best = nullptr;
@@ -860,7 +860,7 @@ namespace SpaceGod::Core
 		return best == cs::Double::MaxValue ? Propulsion::PropellantBasePrice() * (1 + PortTax) : best;
 	}
 
-	double Economy::Refuel(const cs::Ref<Ship>& ship, int body, double jd, bool force)
+	double Economy::Refuel(const cs::Ref<Ship>& ship, int body, double /*jd*/, bool force)
 	{
 		if (ship->PropellantCapacity() <= 0 || (!force && ship->PropellantFraction() >= Propulsion::TopUpBelow)) return 0;
 		auto markets = cs::List<cs::Ref<Settlement>>();
