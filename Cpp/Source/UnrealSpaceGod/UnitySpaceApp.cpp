@@ -100,7 +100,7 @@ namespace SpaceGod
 	const cs::Ref<Core::Fleet>& UnitySpaceApp::Fleet() const { return World()->Fleet; }
 	const cs::Ref<Core::Economy>& UnitySpaceApp::Economy() const { return World()->Economy; }
 
-	float UnitySpaceApp::PilotLookSensitivity() { return Cameras::SpaceCamera::LookSensitivity(); }
+	float UnitySpaceApp::PilotLookSensitivity() { return std::isnan(CoopLookSensitivity) ? Cameras::SpaceCamera::LookSensitivity() : CoopLookSensitivity; } // US-T44 (US-T43): the helm holder's in co-op
 
 	void UnitySpaceApp::ResetPilotAim()
 	{
@@ -130,6 +130,7 @@ namespace SpaceGod
 
 	bool UnitySpaceApp::ClickPanelOpen() const
 	{
+		if (coopPanelOverride.has_value()) return *coopPanelOverride; // US-T44 (US-T43): the helm holder's, while its frame is flown in co-op
 		return !ScreenCleared && (ShowSpawn || ShowSaves || ShowGalaxyMap || ShowHelp || (ShowHud && (ShowMarket || ShowCargo || ShowNews || ShowOutfit || ShowBounties || ShowContracts || ShowFleet || ShowTrade || ShowPicker))); // a cleared screen (F11) shows none of them; market, cargo, outfitting, bounties, contracts and news are HUD panels, hidden with it
 	}
 
@@ -314,7 +315,7 @@ namespace SpaceGod
 	void UnitySpaceApp::TravelTo(const cs::Ref<StarSystem>& system)
 	{
 		if (system == nullptr || system == ActiveSystem || Travel->Active) return;
-		if (CoopRefusesTravel()) return; // US-T44: in co-op the host picks the system
+		if (CoopRefusesTravel(system)) return; // US-T44 (US-T39/US-T43): in co-op the party travels together, or not while another player is at the controls
 		// Already on the way somewhere under the hull's own drive (U.SPC-T417).
 		if (InFtlCruise()) { ShowToast(cs::Cat("Under FTL for ", FtlCruise->ToName, ": the view goes where the hull goes")); return; }
 		// The pilot session belongs to this system's ship and world: the gate is the way across while flying.
@@ -323,6 +324,7 @@ namespace SpaceGod
 		if (IsPiloting()) { PlotCourse(system); return; }
 		// A ship followed in the god view is sent on the course and the view goes with it (U.SPC-T516); no ship, the view's own trip.
 		if (TrySendFollowedShip(system)) return;
+		if (CoopPartyTrip(system)) return; // US-T44 (US-T43): the trip goes into the frames; the host's view makes it, every peer arrives
 		Select(Target::None());
 		Travel->Begin(system);
 	}
@@ -440,7 +442,7 @@ namespace SpaceGod
 		// The hull flies in real seconds while the battle it is in steps in sim seconds (U.SPC-T555): under warp the
 		// AI units would outrun it and the swept collision test (which assumes real-dt motion) would miss them, so
 		// time is held at real speed for as long as the piloted hull is in a battle ('.' is refused at the helm).
-		if (IsPiloting() && Piloted.Ship != nullptr && Piloted.Ship->Battle != nullptr && Clock->WarpIndex > 0)
+		if (!Piloted.IsNone() && Piloted.Ship != nullptr && Piloted.Ship->Battle != nullptr && Clock->WarpIndex > 0) // US-T44 (US-T43): was IsPiloting() (any player's helm holds the shared clock)
 		{
 			Clock->SetWarp(0);
 			ShowToast("Time warp is held at real time while the helm is in a battle");
@@ -455,16 +457,16 @@ namespace SpaceGod
 		AnimateScale(dt);
 		Scale()->Layout(Ephemeris(), bodyScene);
 		UpdateRadii();
-		UpdatePiloting(dt);
+		CoopUpdatePiloting(dt); // US-T44 (US-T43): UpdatePiloting(dt), on the helm holder's frame of input on every peer in co-op
 		UpdateSeat(dt);
 		ShowLawNotices();
 		UpdateShips(dt);
 		Structures->Layout();
 		CoopUpdateAdventures(!Travel->Active && !InFtlCruise()); // US-T44: was `if (that) World()->UpdateAdventures(Clock->Jd, PlayerHelioKm());`, the host's call in co-op
 
-		DropLostTargets();
+		CoopShared([this] { DropLostTargets(); }); // US-T44 (US-T43): DropLostTargets(); a helm lost is lost on every peer
 		BattleTime();
-		UpdateCourseShip();
+		CoopShared([this] { UpdateCourseShip(); }); // US-T44 (US-T43): UpdateCourseShip(); the course is the shared helm's on every peer
 		if (Travel->Active) Travel->Update(dt);
 		// Between the stars under the hull's own drive (U.SPC-T417): the view goes with it.
 		else if (InFtlCruise()) UpdateFtlCruiseView(dt);
@@ -784,7 +786,7 @@ namespace SpaceGod
 
 	void UnitySpaceApp::EnterPiloting(const Target& t)
 	{
-		if (CoopRefusesHelm()) return; // US-T44: the pilot loop is not lockstepped yet
+		if (CoopRoutesHelmTake(t)) return; // US-T44 (US-T39/US-T43): in co-op a take goes into the frames, and every peer takes it there
 		auto ship = t.Ship;
 		Piloted = t;
 		// A fresh helm: no drives-down timer left over from the hull flown before (spawned or loaded in the same frame).
@@ -840,8 +842,8 @@ namespace SpaceGod
 		laneRejoinable = false;
 		if (!riding && (ship->Battle == nullptr || ship->Orbit == nullptr)) PinWherePiloted(ship);
 
-		Select(t);
-		SpaceCamera->EnterPilotChase(t, 6);
+		if (CoopHelmMine()) Select(t); // US-T44 (US-T43): the holder's view (every peer flies the helm, one watches from it)
+		if (CoopHelmMine()) SpaceCamera->EnterPilotChase(t, 6); // US-T44
 		Clock->SetWarp(0);
 		ShowToast(cs::Cat("Piloting ", ship->Name, ", ", Clock->Warp().Label, "  (", HelmControls::Of(ship).Hint(), "; P to release, . to speed up, Left-click to fire, T to lock a target, Z/X to roll, F flight assist, hold J to cruise)"));
 		if (riding)
@@ -863,6 +865,7 @@ namespace SpaceGod
 		auto offsetKm = Scale()->InverseLocalOffset((*Catalog())[frame], SpaceCamera->ScenePosition - BodyScene(frame));
 		auto forwardUnity = SpaceCamera->Rotation * Vector3::forward();
 		auto forward = DVec3(forwardUnity.x, forwardUnity.y, forwardUnity.z).SwapYZ();
+		if (CoopSpawns("spawn", cs::Cat(static_cast<int>(cls), " ", hostile ? 1 : 0), frame, offsetKm, forward)) return; // US-T44 (US-T43): the rest on every peer (CoopSpawnShip)
 
 		auto faction = hostile ? World()->Pirates : World()->Sol;
 		int spawned = ++spawnedCount;
@@ -895,7 +898,7 @@ namespace SpaceGod
 	void UnitySpaceApp::SeedPilot(DVec3 offsetKm, DVec3 velocityKmS, DVec3 facing)
 	{
 		pilot() = PilotState::At(offsetKm, velocityKmS, facing);
-		auto upUnity = SpaceCamera->UpFrame * Vector3::up();
+		auto upUnity = (CoopUpFrame.has_value() ? *CoopUpFrame : SpaceCamera->UpFrame) * Vector3::up(); // US-T44 (US-T43): the helm holder's frame in co-op
 		auto upReference = DVec3(upUnity.x, upUnity.y, upUnity.z).SwapYZ();
 		auto level = upReference - pilot().Forward * DVec3::Dot(upReference, pilot().Forward);
 		if (level.LengthSquared() > 1e-6) pilot().Up = level.Normalized();
@@ -921,13 +924,14 @@ namespace SpaceGod
 		SetpilotCruise(PilotCruiseState());
 		// A trigger held as the helm was taken is not still held by the next hull flown.
 		helmTriggerWas = false;
-		SpaceCamera->PilotLockTarget = Target::None();
-		SpaceCamera->ExitFocus();
+		if (CoopHelmMine()) SpaceCamera->PilotLockTarget = Target::None(); // US-T44 (US-T43): the holder's view only
+		if (CoopHelmMine()) SpaceCamera->ExitFocus(); // US-T44
 		ShowToast(cs::Cat("The ", ship->Name, " has been boarded and taken"));
 	}
 
 	void UnitySpaceApp::ExitPiloting()
 	{
+		if (CoopRoutesHelmRelease()) return; // US-T44 (US-T43): a release the player asks for goes into the frames in co-op
 		// A charge stops where it is (U.SPC-T417): the crew does not jump on its own.
 		StopFtl();
 		EndSalvage(cs::String());
@@ -947,7 +951,7 @@ namespace SpaceGod
 		pilotLockUnit = nullptr;
 		pilotBoosting = false;
 		SetpilotCruise(PilotCruiseState());
-		SpaceCamera->PilotLockTarget = Target::None();
+		if (CoopHelmMine()) SpaceCamera->PilotLockTarget = Target::None(); // US-T44 (US-T43): the holder's view only
 		bool rode = ship != nullptr && !ship->Destroyed && ship->Battle == nullptr && ship->Phase == ShipPhase::Lane;
 		EndRide();
 		// Mid-ride the crew rides it on: the fleet brings it off at the far ramp and on into that system.
@@ -968,7 +972,7 @@ namespace SpaceGod
 				Fleet()->ScheduleNext(ship, Clock->Jd);
 			}
 		}
-		SpaceCamera->ExitFocus();
+		if (CoopHelmMine()) SpaceCamera->ExitFocus(); // US-T44 (US-T43): the holder's view only
 		// A trigger held as the helm was let go is not still held by the next hull taken.
 		helmTriggerWas = false;
 		// A hull shot to pieces under the helm ends the session as a loss, not as a release the player chose.

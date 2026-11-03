@@ -185,7 +185,7 @@ namespace SpaceGod
 		TankerDueS = -1;
 		SpaceCamera->PilotLockTarget = Target::None();
 		SpaceCamera->PilotView = std::nullopt;
-		SpaceCamera->ExitFocus();
+		if (CoopHelmMine()) SpaceCamera->ExitFocus(); // US-T44 (US-T43): the holder's view only (the cruise view below is everyone's)
 		Select(Target::None());
 
 		FtlCruise = c;
@@ -312,6 +312,7 @@ namespace SpaceGod
 
 	bool UnitySpaceApp::PlotFtlCourse(const cs::Ref<Core::FtlTarget>& target, bool quiet)
 	{
+		if (target != nullptr && CoopSends("ftlplot", cs::Cat(quiet ? "1 " : "0 ", target->Name))) return true; // US-T44 (US-T43): the shared helm's course: into the frames
 		if (!IsPiloting() || Piloted.Ship == nullptr)
 		{
 			ShowToast("Take the helm of a capital ship or an explorer (P) to plot an FTL course");
@@ -343,6 +344,7 @@ namespace SpaceGod
 
 	void UnitySpaceApp::ClearFtlCourse()
 	{
+		if (CoopSends("ftlclear")) return; // US-T44 (US-T43): into the frames (the loop's own Delete key is already in them)
 		if (FtlAutopilot->Active()) DisengageFtlAutopilot(cs::String());
 		PlottedCourse = nullptr;
 		ShowToast("FTL course cleared");
@@ -367,6 +369,7 @@ namespace SpaceGod
 
 	bool UnitySpaceApp::EngageFtlAutopilot()
 	{
+		if (CoopSends("ftlauto")) return true; // US-T44 (US-T43): into the frames (the loop's own End key is already in them)
 		if (!IsPiloting() || Piloted.Ship == nullptr)
 		{
 			ShowToast("Take the helm of a capital ship or an explorer (P) to fly an FTL course");

@@ -157,6 +157,7 @@ namespace SpaceGod
 
 	bool UnitySpaceApp::LoadFrom(const cs::String& slot)
 	{
+		if (CoopRoutesLoad(slot)) return false; // US-T44 (US-T43): a client's load is a request to the host, whose save every peer loads
 		// (Loading drops whatever the session held, a hulk latched to included: only a trip between the stars stops it.)
 		cs::String blocked = Travel->Active || InFtlCruise() || Ftl->Stage != FtlStage::Idle ? SaveBlocker() : cs::String();
 		if (!blocked.empty())
@@ -176,7 +177,7 @@ namespace SpaceGod
 			ShowToast(cs::Cat("Could not load ", SlotName(slot), ": ", e.what()));
 			return false;
 		}
-		ApplyLoaded(data);
+		CoopLoadingHere([this, &data] { ApplyLoaded(data); }); // US-T44 (US-T43): ApplyLoaded(data); the loaded helm is everyone's in co-op
 		ShowSaves = false;
 		ShowToast(cs::Cat("Loaded ", SlotName(slot), "  (", DescribeSave(header), ")"));
 		return true;
@@ -190,7 +191,7 @@ namespace SpaceGod
 		cs::Ref<SaveSession> s = data->Session;
 		s->ActiveSystem = ActiveSystem->Name;
 		s->ScaleGoal = ScaleGoal;
-		if (IsPiloting())
+		if (!Piloted.IsNone()) // US-T44 (US-T43): was IsPiloting() (in co-op whoever flies it: the host's save is everyone's)
 		{
 			s->Piloted = Piloted.Ship;
 			s->PilotFrameBody = pilotFrameBody;

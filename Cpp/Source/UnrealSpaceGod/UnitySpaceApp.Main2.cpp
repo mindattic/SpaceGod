@@ -203,6 +203,7 @@ namespace SpaceGod
 
 	void UnitySpaceApp::CallTanker()
 	{
+		if (CoopSends("tanker")) return; // US-T44 (US-T43): into the frames (the tanker's timer is the shared helm's)
 		if (!IsPiloting() || TankerDueS >= 0) return;
 		auto ship = Piloted.Ship;
 		if (ship == nullptr || Core::Propulsion::TankerLoad(ship) < 1) { ShowToast("Tanks are full"); return; }
@@ -257,7 +258,7 @@ namespace SpaceGod
 		TankerDueS = -1;
 
 		Select(Piloted);
-		SpaceCamera->EnterPilotChase(Piloted, 6);
+		if (CoopHelmMine()) SpaceCamera->EnterPilotChase(Piloted, 6); // US-T44 (US-T43): the holder's view only
 		ShowToast(cs::Cat("Jumped to ", cs::Strings::ToUpperInvariant(destination->Name), " through the gate"));
 		return true;
 	}
@@ -767,6 +768,7 @@ namespace SpaceGod
 
 	void UnitySpaceApp::ShowToast(const cs::String& message)
 	{
+		if (coopMuteToasts > 0) return; // US-T44 (US-T43): another player's action, replayed here
 		Toast = message;
 		ToastAge = 0;
 	}
@@ -774,10 +776,11 @@ namespace SpaceGod
 	void UnitySpaceApp::ResetToNow()
 	{
 		// A reset can rebuild the galaxy out from under the piloted ship (the HUD's Now button lands here too).
-		if (AtControls()) { ShowToast("Release the helm or seat (P) before resetting the time"); return; }
+		if (CoopAtControls()) { ShowToast("Release the helm or seat (P) before resetting the time"); return; } // US-T44 (US-T43): was AtControls() (in co-op: anyone's)
 		// Nor under the hull's own FTL drive: the crossing holds the old galaxy's systems (the Now button reaches here too).
 		if (InFtlCruise()) { ShowToast("Not under FTL: wait until the drive drops out before resetting the time"); return; }
-		double now = Core::Astro::JulianDate(cs::DateTime::UtcNow());
+		double now = CoopNow.has_value() ? *CoopNow : Core::Astro::JulianDate(cs::DateTime::UtcNow()); // US-T44 (US-T43): in co-op the asker's now
+		if (CoopSends("reset", Coop::Wire::D(now))) return; // US-T44 (US-T43): into the frames
 		bool backwards = now < Clock->Jd;
 		// Rebuilding the systems mid-trip would leave the trip pointing at the old ones: land first.
 		if (backwards && Travel->Active) Travel->Finish();

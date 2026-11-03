@@ -100,15 +100,11 @@ namespace SpaceGod::UI
 			if (alongside && !port->Owner->IsPirate && (!o->Record->Wanted() || o->Record->WantedBy(port->Owner)) &&
 				GUI::Button(Rect(r.xMax() - 180, y, 168, 20), cs::Cat("Hand over  +", Credits(o->Record->TotalBounty())), button))
 			{
-				double paid = outlaws->Deliver(o, port, app->Clock->Jd);
-				app->ShowToast(o->Fate == OutlawFate::Captured
-					? cs::Cat(o->Name(), " handed over at ", port->Name, paid > 0 ? cs::Cat(" for ", Credits(paid)) : cs::String())
-					: cs::String("Not welcome here"));
+				if (!CoopSends("deliver", K(port), K(held, o))) DeliverOutlaw(outlaws, o, port); // US-T44 (US-T43): an entry in co-op; the original's lines in DeliverOutlaw (Hud.Coop.cpp)
 			}
 			else if (alongside && port->Owner->IsPirate && GUI::Button(Rect(r.xMax() - 180, y, 168, 20), cs::Cat("Ransom  +", Credits(Outlaws::RansomFor(o))), button))
 			{
-				double paid = outlaws->Ransom(o, port, app->Clock->Jd);
-				app->ShowToast(paid > 0 ? cs::Cat(o->Name(), " ransomed back for ", Credits(paid)) : cs::Cat("The ", port->Owner->Name, " will not pay"));
+				if (!CoopSends("ransom", K(port), K(held, o))) RansomOutlaw(outlaws, o, port); // US-T44 (US-T43): likewise
 			}
 			y += 22;
 		}
@@ -161,21 +157,9 @@ namespace SpaceGod::UI
 			float y = r.y + 48 + i * rowH;
 			GUI::contentColor = c->Urgency >= 0.6 ? Color(1.0f, 0.78f, 0.35f) : Color::white();
 			GUI::Label(Rect(r.x + 12, y, w - 110, rowH), Contracts::Describe(c, jd), small);
-			if (alongside && GUI::Button(Rect(r.xMax() - 90, y, 78, rowH - 2), "Take", button))
-			{
-				auto outcome = contracts->Take(c, ship, true, jd);
-				cs::String message;
-				switch (outcome)
-				{
-				case Contracts::TakeOutcome::Ok: message = cs::Cat("Contract taken: ", c->Title(), ", due in ", cs::Fmt(c->DeadlineDays, "0"), " d"); break;
-				case Contracts::TakeOutcome::NotOffered: message = cs::Cat(c->Patron->Name, " offers you no contracts"); break;
-				case Contracts::TakeOutcome::NoRoom: message = "No room aboard for that"; break;
-				case Contracts::TakeOutcome::Unarmed: message = "That job wants an armed ship"; break;
-				case Contracts::TakeOutcome::NotHere: message = cs::Cat("Fly alongside ", c->Board->Name, " to sign"); break;
-				default: message = "No longer on offer"; break;
-				}
-				app->ShowToast(message);
-			}
+			if (alongside && GUI::Button(Rect(r.xMax() - 90, y, 78, rowH - 2), "Take", button) &&
+				!CoopSends("ctake", K(port), i)) // US-T44 (US-T43): an entry in co-op
+				TakeContract(contracts, c, ship, jd); // US-T44 (US-T43): the original's lines, moved into TakeContract (Hud.Coop.cpp)
 		}
 		if (ownRows > 0)
 		{
@@ -188,7 +172,7 @@ namespace SpaceGod::UI
 				float y = y0 + 22 + i * rowH;
 				GUI::contentColor = c->DueJd - jd < 1 ? Color(1.0f, 0.55f, 0.45f) : Color(0.6f, 0.9f, 1.0f);
 				GUI::Label(Rect(r.x + 12, y, w - 110, rowH), Contracts::Describe(c, jd), small);
-				if (GUI::Button(Rect(r.xMax() - 90, y, 78, rowH - 2), "Abandon", button) && contracts->Abandon(c, jd))
+				if (GUI::Button(Rect(r.xMax() - 90, y, 78, rowH - 2), "Abandon", button) && !CoopSends("cabandon", i) && contracts->Abandon(c, jd)) // US-T44 (US-T43): an entry in co-op
 					app->ShowToast(cs::Cat("Contract abandoned: ", c->Title()));
 			}
 		}
@@ -229,11 +213,11 @@ namespace SpaceGod::UI
 		float x = r.x + 12, y = r.y + 30;
 		if (purse != nullptr)
 		{
-			if (GUI::Button(Rect(x, y, 150, 20), "Deposit 10 M cr", button))
+			if (GUI::Button(Rect(x, y, 150, 20), "Deposit 10 M cr", button) && !CoopSends("deposit")) // US-T44 (US-T43): an entry in co-op (as each button below)
 				app->ShowToast(h->Deposit(purse, 1e7, jd) ? cs::String("10 M cr into the house account") : cs::String("The purse cannot spare it"));
-			if (GUI::Button(Rect(x + 156, y, 150, 20), "Withdraw 10 M cr", button))
+			if (GUI::Button(Rect(x + 156, y, 150, 20), "Withdraw 10 M cr", button) && !CoopSends("withdraw"))
 				app->ShowToast(h->Withdraw(purse, 1e7, jd) ? cs::Cat("10 M cr out to the ", purse->Name) : cs::String("Not that much in the account"));
-			if (!h->Owns(flown) && GUI::Button(Rect(x + 312, y, 220, 20), cs::Cat("Take ", flown->Name, " into the fleet"), button))
+			if (!h->Owns(flown) && GUI::Button(Rect(x + 312, y, 220, 20), cs::Cat("Take ", flown->Name, " into the fleet"), button) && !CoopSends("enlist"))
 				app->ShowToast(h->Enlist(flown, jd) != nullptr ? cs::Cat(flown->Name, " flies your flag now") : cs::String("It cannot join the fleet"));
 		}
 		else
@@ -253,17 +237,18 @@ namespace SpaceGod::UI
 			if (h->CanBuyAt(port))
 				for (auto cls : { ShipClass::Freighter, ShipClass::Miner, ShipClass::Courier, ShipClass::Destroyer })
 				{
-					if (GUI::Button(Rect(bx, y, 112, 20), cs::Cat(ShipClassSpec::Of(cls)->DisplayName, " ", Credits(Economy::HullPrice(cls))), button))
+					if (GUI::Button(Rect(bx, y, 112, 20), cs::Cat(ShipClassSpec::Of(cls)->DisplayName, " ", Credits(Economy::HullPrice(cls))), button) &&
+						!CoopSends("hull", K(port), static_cast<int>(cls))) // US-T44 (US-T43)
 					{
 						auto bought = h->Buy(port, cls, cs::String(), jd);
 						app->ShowToast(bought != nullptr ? cs::Cat("Bought the ", bought->Name(), " at ", port->Name) : cs::String("Cannot afford it here"));
 					}
 					bx += 116;
 				}
-			if (GUI::Button(Rect(bx, y, 96, 20), "Warehouse", button))
+			if (GUI::Button(Rect(bx, y, 96, 20), "Warehouse", button) && !CoopSends("warehouse", K(port))) // US-T44 (US-T43)
 				app->ShowToast(h->BuyWarehouse(port, jd) != nullptr ? cs::Cat("A warehouse at ", port->Name, " for ", Credits(Holdings::WarehousePrice)) : cs::String("Not for sale"));
 			bx += 100;
-			if (GUI::Button(Rect(bx, y, 108, 20), cs::Cat("5% share ", Credits(Holdings::SharePrice(port, 0.05))), button))
+			if (GUI::Button(Rect(bx, y, 108, 20), cs::Cat("5% share ", Credits(Holdings::SharePrice(port, 0.05))), button) && !CoopSends("share", K(port))) // US-T44 (US-T43)
 				app->ShowToast(h->BuyShare(port, 0.05, jd) != nullptr ? cs::Cat("5% of ", port->Name, " is yours") : cs::String("Not for sale"));
 		}
 		else
@@ -277,7 +262,8 @@ namespace SpaceGod::UI
 			float cx = r.xMax() - 12 - 2 * 150;
 			for (auto ore : { Good::NickelIron, Good::Water })
 			{
-				if (GUI::Button(Rect(cx, y + 24, 146, 20), cs::Cat("Claim ", cs::Strings::ToLowerInvariant(GoodInfo::Of(ore)->Name), " ", Credits(Holdings::ClaimPrice(ore))), button))
+				if (GUI::Button(Rect(cx, y + 24, 146, 20), cs::Cat("Claim ", cs::Strings::ToLowerInvariant(GoodInfo::Of(ore)->Name), " ", Credits(Holdings::ClaimPrice(ore))), button) &&
+					!CoopSends("claim", sel.Body, static_cast<int>(ore))) // US-T44 (US-T43)
 					app->ShowToast(h->StakeClaim(sel.Body, ore, jd) != nullptr ? cs::Cat("Claim staked on ", (*world->Catalog())[sel.Body]->Name) : cs::String("Cannot stake that claim"));
 				cx += 150;
 			}
@@ -301,7 +287,7 @@ namespace SpaceGod::UI
 				world->Trade != nullptr && world->Trade->Insurance->Of(o) != nullptr ? "  ·  insured" : "");
 			GUI::Label(Rect(4, ly, 540, rowH), cs::Cat(o->Name(), "  (", o->Ship->Spec->DisplayName, ")  ·  ", captain, "  ·  ", o->Orders->Describe(world->Catalog()),
 				"  ·  net ", Credits(o->Net())), small);
-			if (GUI::Button(Rect(w - 36 - 236, ly, 70, rowH - 2), o->Captain == nullptr ? "Hire" : "Dismiss", button))
+			if (GUI::Button(Rect(w - 36 - 236, ly, 70, rowH - 2), o->Captain == nullptr ? "Hire" : "Dismiss", button) && !CoopSends("captain", K(h->Ships, o))) // US-T44 (US-T43)
 			{
 				if (o->Captain == nullptr)
 				{
@@ -315,7 +301,8 @@ namespace SpaceGod::UI
 				GUI::contentColor = Dim;
 				GUI::Label(Rect(w - 36 - 162, ly, 160, rowH), "on charter (\\)", small);
 			}
-			else if (GUI::Button(Rect(w - 36 - 162, ly, 160, rowH - 2), "Orders: next", button))
+			else if (GUI::Button(Rect(w - 36 - 162, ly, 160, rowH - 2), "Orders: next", button) &&
+				!CoopSends("orders", K(h->Ships, o), CoopKeyText(sel))) // US-T44 (US-T43)
 			{
 				auto next = NextOrders(o, sel);
 				app->ShowToast(cs::Cat(o->Name(), ": ", next->Describe(world->Catalog())));
@@ -391,7 +378,7 @@ namespace SpaceGod::UI
 		// over at right now -- not one merely being looked at from across the system.
 		bool canTrade = market != nullptr && app->CanTradeNow(market);
 		// Prices seen in port go into the trade desk's intelligence (U.SPC-T426).
-		if (canTrade && Event::current().type == EventType::Layout && app->World()->Trade != nullptr)
+		if (canTrade && Event::current().type == EventType::Layout && !CoopObserve(market) && app->World()->Trade != nullptr) // US-T44 (US-T43): an entry in co-op
 			app->World()->Trade->Intel->Observe(market, app->Clock->Jd, "seen in port");
 		auto law = app->World()->Law;
 		cs::Ref<LawRecord> pilotRecord = app->IsPiloting() && law != nullptr ? law->Player : nullptr;
@@ -435,13 +422,9 @@ namespace SpaceGod::UI
 			GUI::Label(Rect(r.x + 12, r.y + 50 + extra, w - 230, 18), refused ? cs::Cat("DOCKING REFUSED: ", market->Owner->Name, " will not let you in")
 				: cs::Cat("WANTED by ", market->Owner->Name), small);
 			// Fines are paid at the port's office even when it will not let the ship dock to trade.
-			if (wantedHere && GUI::Button(Rect(r.xMax() - 210, r.y + 48 + extra, 196, 20), cs::Cat("Pay bounty  ", Credits(pilotRecord->BountyBy(market->Owner))), button))
-			{
-				double paid = 0;
-				app->ShowToast(law->PayFine(app->World()->PilotedShip, market->Owner, app->Clock->Jd, paid)
-					? cs::Cat("Paid ", Credits(paid), " to ", market->Owner->Name, ": the bounty is lifted")
-					: cs::String("Not enough credits to pay off the bounty"));
-			}
+			if (wantedHere && GUI::Button(Rect(r.xMax() - 210, r.y + 48 + extra, 196, 20), cs::Cat("Pay bounty  ", Credits(pilotRecord->BountyBy(market->Owner))), button) &&
+				!CoopSends("bounty", K(market))) // US-T44 (US-T43): an entry in co-op
+				PayBounty(market); // US-T44 (US-T43): the original's call, moved into PayBounty (Hud.Coop.cpp)
 			GUI::contentColor = Dim;
 		}
 		float top = r.y + 50 + extra + lawRow;
@@ -503,6 +486,7 @@ namespace SpaceGod::UI
 
 	void Hud::ClickBuy(const cs::Ref<Settlement>& market, Good good)
 	{
+		if (CoopSends("buy", K(market), static_cast<int>(good), tradeCrates)) return; // US-T44 (US-T43): an entry in co-op
 		auto ship = app->World()->PilotedShip;
 		int bought = 0;
 		Economy::TradeOutcome stoppedBy{};
@@ -539,6 +523,7 @@ namespace SpaceGod::UI
 
 	void Hud::ClickRefuel(const cs::Ref<Settlement>& market)
 	{
+		if (CoopSends("refuel", K(market))) return; // US-T44 (US-T43): an entry in co-op
 		auto ship = app->World()->PilotedShip;
 		double tonnes = 0, cost = 0;
 		auto outcome = app->Economy()->RefuelAt(ship, market, tonnes, cost);
@@ -563,6 +548,7 @@ namespace SpaceGod::UI
 
 	void Hud::ClickSell(const cs::Ref<Settlement>& market, Good good)
 	{
+		if (CoopSends("sell", K(market), static_cast<int>(good), tradeCrates)) return; // US-T44 (US-T43): an entry in co-op
 		auto ship = app->World()->PilotedShip;
 		int sold = 0;
 		auto outcome = app->Economy()->SellFromHold(ship, market, good, tradeCrates, sold);
@@ -628,11 +614,9 @@ namespace SpaceGod::UI
 		if (brig > 0 || ship->Prisoners > 0)
 		{
 			GUI::Label(Rect(r.x + 230, r.y + 46, 200, 18), cs::Cat("Brig ", cs::Fmt(ship->Prisoners, "0"), " / ", cs::Fmt(brig, "0"), " prisoners"), small);
-			if (ship->Prisoners > 0 && port != nullptr && GUI::Button(Rect(r.xMax() - 170, r.y + 44, 158, 20), cs::Cat("Hand over  +", Credits(ship->PrisonerBounty)), button))
-			{
-				double paid = Outfitting::HandOverPrisoners(app->Economy(), ship, port);
-				app->ShowToast(paid > 0 ? cs::Cat("Prisoners handed over at ", port->Name, " for ", Credits(paid)) : cs::String("Not welcome here"));
-			}
+			if (ship->Prisoners > 0 && port != nullptr && GUI::Button(Rect(r.xMax() - 170, r.y + 44, 158, 20), cs::Cat("Hand over  +", Credits(ship->PrisonerBounty)), button) &&
+				!CoopSends("prisoners", K(port))) // US-T44 (US-T43): an entry in co-op
+				HandOverPrisoners(ship, port); // US-T44 (US-T43): the original's lines, moved into HandOverPrisoners (Hud.Coop.cpp)
 		}
 		GUI::contentColor = Dim;
 		GUI::Label(Rect(r.x + 12, r.y + 64, w - 24, 18), yard != nullptr
@@ -751,6 +735,14 @@ namespace SpaceGod::UI
 		GUI::contentColor = Color::white();
 		if (current || !q.InStock || !builds) return;
 		if (!GUI::Button(Rect(x + w - 100, y - 1, 84, rowH - 1), strip ? "Strip" : "Fit", button)) return;
+		if (CoopSendsOutfit(yard, option)) return; // US-T44 (US-T43): an entry in co-op
+		OutfitApply(ship, yard, loadout, option); // US-T44 (US-T43): the original's lines below, moved into OutfitApply so a frame can run them too
+	}
+
+	void Hud::OutfitApply(const cs::Ref<Ship>& ship, const cs::Ref<Settlement>& yard, const cs::Ref<Loadout>& loadout, const OutfitChoice& option)
+	{
+		int hardpoints = loadout->Slots.Count();
+		bool onHardpoint = outfitSlot < hardpoints, strip = !onHardpoint && option.facility == nullptr;
 		cs::String what = strip ? loadout->Facilities[outfitSlot - hardpoints]->Name : option.name;
 		OutfitQuote paid;
 		auto outcome = onHardpoint ? Outfitting::Fit(app->Economy(), ship, yard, outfitSlot, option.module, paid)

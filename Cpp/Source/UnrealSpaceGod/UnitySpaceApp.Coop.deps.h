@@ -8,6 +8,9 @@
 #include "Coop/CoopPeer.h" // CoopPeer::NewSession (the session's initialiser, UnitySpaceApp.Embodiment.inl)
 
 #include <cstdint>
+#include <functional>
+#include <optional>
+#include <utility>
 #include <limits>
 #include <memory>
 #include <vector>

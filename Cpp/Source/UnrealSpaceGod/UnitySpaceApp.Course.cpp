@@ -23,6 +23,7 @@ namespace SpaceGod
 {
 	void UnitySpaceApp::PlotCourse(const cs::Ref<Core::StarSystem>& to)
 	{
+		if (to != nullptr && CoopSends("plot", to->Name)) return; // US-T44 (US-T43): the course is the shared helm's: into the frames
 		auto ship = Piloted.Ship;
 		if (ship == nullptr || to == nullptr) return;
 		if (to == ActiveSystem) { Course = nullptr; return; }
@@ -42,6 +43,7 @@ namespace SpaceGod
 
 	bool UnitySpaceApp::EngageCourseAutopilot()
 	{
+		if (CoopSends("autopilot")) return true; // US-T44 (US-T43): into the frames (it hands the shared helm to the crew)
 		if (Course == nullptr || Course->Done() || !IsPiloting() || Piloted.Ship != courseShip || CourseByCrew) return false;
 		auto ship = courseShip;
 		auto to = Course->Destination;
@@ -55,8 +57,10 @@ namespace SpaceGod
 		return true;
 	}
 
-	bool UnitySpaceApp::StartCrewCourse(const cs::Ref<Core::Ship>& ship, const cs::Ref<Core::StarSystem>& to, bool follow)
+	bool UnitySpaceApp::StartCrewCourse(const cs::Ref<Core::Ship>& ship, const cs::Ref<Core::StarSystem>& to, bool followIn)
 	{
+		if (CoopSends("crew", cs::Cat(ship->Id, " ", followIn ? 1 : 0, " ", to->Name))) return true; // US-T44 (US-T43): into the frames (it sends the ship)
+		bool follow = followIn && CoopActing(); // US-T44 (US-T43): another player's crew course: their view follows it, not this one
 		auto course = Core::TravelCourse::Plan(Galaxy->Network, ActiveSystem, to, ship->Faction, Clock->Jd);
 		if (course == nullptr || Galaxy->Traffic == nullptr || Galaxy->Traffic->SendPlotted(ship, ActiveSystem, to, Clock->Jd) == nullptr) return false;
 		Course = course;
@@ -71,6 +75,7 @@ namespace SpaceGod
 
 	bool UnitySpaceApp::TrySendFollowedShip(const cs::Ref<Core::StarSystem>& to)
 	{
+		if (CoopExecuting()) return false; // US-T44 (US-T43): the asker's camera chose this (its "crew" entry), not this peer's
 		if (SpaceCamera->Mode != Cameras::SpaceCamera::CameraMode::Focus || !SpaceCamera->FocusTarget.IsShip()) return false;
 		auto ship = SpaceCamera->FocusTarget.Ship;
 		// A house ship is the player's own money: sent through the gates by a stray click on the map it could be lost
@@ -121,7 +126,7 @@ namespace SpaceGod
 		auto where = SystemHolding(ship);
 		// Inside a gate: nothing to see until it comes out.
 		if (where == nullptr) return;
-		if (where != ActiveSystem && courseFollow && !Travel->Active)
+		if (where != ActiveSystem && courseFollow && !Travel->Active && !CoopIsClient()) // US-T44 (US-T43): the host's view takes the party (its Activate goes out with its frame)
 		{
 			Activate(where);
 			SetSystemVisible(true);

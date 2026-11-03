@@ -22,6 +22,7 @@
 #include "UI/Hud.Panels.deps.h"
 #include "UI/Hud.Boards.deps.h"
 #include "UI/Hud.Trade.deps.h"
+#include "UI/Hud.Coop.deps.h" // US-T44
 
 namespace SpaceGod
 {
@@ -48,5 +49,6 @@ namespace SpaceGod::UI
 #include "UI/Hud.Panels.inl"
 #include "UI/Hud.Boards.inl"
 #include "UI/Hud.Trade.inl"
+#include "UI/Hud.Coop.inl" // US-T44: co-op (the C# track's Hud.Coop.cs)
 	};
 }

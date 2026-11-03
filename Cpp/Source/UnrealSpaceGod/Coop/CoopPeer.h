@@ -7,6 +7,7 @@
 #include "Cs/Cs.h"
 #include "DVec3.h"
 #include "Coop/CoopWire.h"
+#include "Coop/CoopInput.h"
 
 #include <deque>
 #include <map>
@@ -102,6 +103,45 @@ namespace SpaceGod::Coop
 		void Submit(const cs::String& entry);
 		/// A change of the shared clock asked for at this machine ("warp 5", "pause 1").
 		void RequestClock(const cs::String& request);
+		// ---- US-T43: requests, the helm's hands, sync state
+
+		/// The host's next frame carries `entry` (a shared setting changed here, an app entry).
+		void QueueEntry(const cs::String& entry);
+		/// A client asks the host to set a shared setting (CoopSettings).
+		void RequestSetting(const cs::String& key, const cs::String& value);
+		/// A client asks the host to take the party to another star.
+		void RequestTravel(const cs::String& system);
+		/// A client asks the host to load one of the host's save slots (every peer then loads the host's save).
+		void RequestLoad(const cs::String& slot);
+		/// A client asks for a resync now (the smoke run's deliberate one; a slow client's is "resync <frames>").
+		void RequestResync(const cs::String& why);
+
+		/// The engine tick a client is in (several host frames can replay in one): edges are sent once a tick.
+		static inline long long EngineTick = 0;
+		/// Whether a second Update in one engine tick sees the same edges again (the player controller: yes; the smoke
+		/// run's scripted device clears them after every Update, so no).
+		static inline bool EdgesPerTick = true;
+		/// Whether the edges this Update read are new ones (false for a repeat within the tick).
+		static bool FreshEdges(long long& lastTick);
+
+		/// The helm holder (a client) sends its hands for the frame it just replayed.
+		void SendPilot(PilotFrame frame);
+		int PilotSent = 0;
+		/// The host's frame for a client's helm: what came from it since the last frame (PilotFrame::Compose).
+		PilotFrame HostPilotFor(int seat);
+		/// Forgets a seat's hands (the helm changed hands): the next holder starts from idle.
+		void ForgetPilot(int seat);
+
+		/// The state a sync's save does not hold, sent with it (who flies the helm, each player's seat, the shared settings).
+		cs::String PendingSyncState;
+		/// The sync state that came with the client's current sync (haveClientSyncState false until it has).
+		cs::String ClientSyncState;
+		bool HaveClientSyncState = false;
+		int Retakes = 0;
+
+		/// A sync for a load (every view starts again, as a load does); else a resync, which leaves each view as it was.
+		void RequestSync(const cs::String& reason, bool load);
+
 		/// This machine's player selected something: everyone sees it (applied with the frames, as commands are).
 		void Selected(const cs::String& key);
 		/// Applies a frame's roster entries ("a", "j", "l"); session entries are the app's.
@@ -197,6 +237,10 @@ namespace SpaceGod::Coop
 		bool haveSyncChunks = false;
 		long long syncFrame = -1;
 		int presenceTick = 0;
+		bool syncLoad = false;
+		long long pilotSentTick = -1;
+		std::map<int, std::vector<PilotFrame>> pilotIn;
+		std::map<int, PilotFrame> pilotLast;
 
 		Remote* FindRemote(ICoopLink* link);
 		void HostPresence(UnitySpaceApp* app);

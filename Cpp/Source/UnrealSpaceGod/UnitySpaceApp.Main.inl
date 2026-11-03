@@ -54,7 +54,7 @@ public:
 
 	/// <summary>The ship under direct player control, if any (ship-only, or <see cref="Target.None"/>).</summary>
 	Target Piloted = Target::None();
-	bool IsPiloting() const { return !Piloted.IsNone(); }
+	bool IsPiloting() const { return !Piloted.IsNone() && CoopHelmHere(); } // US-T44 (US-T43): in co-op the helm is everyone's in the shared steps, the holder's elsewhere
 
 	/// <summary>Where the piloted ship really is (its body frame and true km offset) and how fast it is
 	/// flying: its schedule shows only the spot it was pinned at when the helm was taken.</summary>

@@ -102,6 +102,7 @@ void ASpaceCoopLink::Tick(float DeltaSeconds)
 	if (HasAuthority()) return;
 	CoopPeer* peer = CoopPeer::Current();
 	if (peer == nullptr || !peer->IsClient()) return;
+	CoopPeer::EngineTick++; // US-T43: the device's edges belong to the tick, however many host frames it replays
 	CoopSmoke::ClientTick(*peer);
 	UWorld* World = GetWorld();
 	if (!bStarted)
@@ -118,6 +119,7 @@ void ASpaceCoopLink::Tick(float DeltaSeconds)
 		if (CoopSmoke::Active())
 		{
 			CoopSmoke::UseScript();
+			CoopPeer::EdgesPerTick = false; // US-T43: the script clears its edges after every Update
 			SpaceGod::UnityCompat::Application::SetTargetFrameRate(60);
 		}
 		CoopPeer::Log(cs::Cat("client app up in ", static_cast<long long>((FPlatformTime::Seconds() - StartSeconds) * 1000.0), " ms; asking the host for a seat as ",

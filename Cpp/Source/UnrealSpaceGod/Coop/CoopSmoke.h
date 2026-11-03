@@ -6,8 +6,9 @@
 // -SpaceGodCoopSmoke=host|client: a listen server and a client on localhost (-nullrhi). The client joins (the host's save
 // comes over and both load it), then plays a few things as a player would, by the keys and the picker: '.' (time warp
 // up: a request the host grants for everyone), '3' (select Earth: every peer sees it), and a station's seat through the
-// picker (a take command the host's frame grants, through SeatAuthority on every peer), and tampers with its own Core
-// once (an injected desync the host must catch and resync). Both log a digest of the shared state every
+// picker (a take command the host's frame grants, through SeatAuthority on every peer), and (US-T43) keeps it through a
+// deliberate resync, flies a freighter's helm, trades at Earth, takes a fighter's cockpit in a fight and uses its keys,
+// takes the party to another star and has the host load its quicksave. Both log a digest of the shared state every
 // CoopPeer::DigestEvery frames; the host compares them and logs each match or desync. After ClientFrames replayed
 // frames the client says bye and both quit.
 
@@ -23,7 +24,7 @@ namespace SpaceGod::Coop
 
 	namespace CoopSmoke
 	{
-		constexpr int ClientFrames = 1200;
+		constexpr int ClientFrames = 3000; // US-T43's longer run
 
 		/// "host", "client", or empty (no smoke).
 		const cs::String& Role();

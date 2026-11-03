@@ -4,6 +4,7 @@
 #include "Coop/CoopPeer.h"
 
 #include "Coop/CoopSmoke.h"
+#include "Coop/CoopSettings.h"
 #include "Bootstrap.h"
 #include "UnitySpaceApp.h"
 #include "UnrealSpaceGodLog.h"
@@ -19,6 +20,7 @@
 #include "Misc/Parse.h"
 
 #include <algorithm>
+#include <cctype>
 #include <exception>
 
 using namespace SpaceGod::Core;
@@ -81,6 +83,7 @@ namespace SpaceGod::Coop
 
 	CoopPeer* CoopPeer::StartHost(const cs::String& name)
 	{
+		CoopSettings::Hook(); // US-T43
 		current.reset(new CoopPeer(true, name));
 		current->HostReloads = !Bootstrap::HasCommandLineFlag("-CoopNoHostReload");
 		Log(cs::Cat("hosting as ", current->Players[0]->Name, " (player 1), up to ", MaxPlayers, " players; host reloads its sync saves: ",
@@ -90,6 +93,7 @@ namespace SpaceGod::Coop
 
 	CoopPeer* CoopPeer::StartClient(ICoopLink* host, const cs::String& name)
 	{
+		CoopSettings::Hook(); // US-T43
 		current.reset(new CoopPeer(false, name));
 		current->hostLink = host;
 		return current.get();
@@ -126,6 +130,76 @@ namespace SpaceGod::Coop
 	void CoopPeer::RequestClock(const cs::String& request)
 	{
 		if (IsClient() && hostLink) hostLink->Send(request);
+	}
+
+	// ---------------------------------------------------------------- US-T43: requests, the helm's hands, sync state
+
+	void CoopPeer::QueueEntry(const cs::String& entry)
+	{
+		if (isHost) pending.push_back(entry);
+	}
+
+	void CoopPeer::RequestSetting(const cs::String& key, const cs::String& value)
+	{
+		if (IsClient() && hostLink) hostLink->Send(cs::Cat("setreq ", key, " ", value));
+	}
+
+	void CoopPeer::RequestTravel(const cs::String& system)
+	{
+		if (IsClient() && hostLink) hostLink->Send(cs::Cat("travel ", system));
+	}
+
+	void CoopPeer::RequestLoad(const cs::String& slot)
+	{
+		if (IsClient() && hostLink) hostLink->Send(cs::Cat("load ", slot));
+	}
+
+	void CoopPeer::RequestResync(const cs::String& why)
+	{
+		if (IsClient() && hostLink) hostLink->Send(cs::Cat("resync ", why));
+	}
+
+	bool CoopPeer::FreshEdges(long long& lastTick)
+	{
+		if (!EdgesPerTick) return true;
+		bool fresh = lastTick != EngineTick;
+		lastTick = EngineTick;
+		return fresh;
+	}
+
+	void CoopPeer::SendPilot(PilotFrame frame)
+	{
+		if (!IsClient()) return;
+		if (!FreshEdges(pilotSentTick)) frame = frame.HeldOnly();
+		if (hostLink) hostLink->Send(cs::Cat("pin ", frame.Write()));
+		PilotSent++;
+	}
+
+	PilotFrame CoopPeer::HostPilotFor(int seat)
+	{
+		static const std::vector<PilotFrame> none;
+		auto in = pilotIn.find(seat);
+		auto last = pilotLast.find(seat);
+		const std::vector<PilotFrame>& since = in != pilotIn.end() ? in->second : none;
+		PilotFrame frame = PilotFrame::Compose(last != pilotLast.end() ? &last->second : nullptr, since);
+		if (in != pilotIn.end() && !in->second.empty())
+		{
+			pilotLast[seat] = in->second.back();
+			in->second.clear();
+		}
+		return frame;
+	}
+
+	void CoopPeer::ForgetPilot(int seat)
+	{
+		pilotIn.erase(seat);
+		pilotLast.erase(seat);
+	}
+
+	void CoopPeer::RequestSync(const cs::String& reason, bool load)
+	{
+		syncLoad |= load;
+		RequestSync(reason);
 	}
 
 	void CoopPeer::Selected(const cs::String& key)
@@ -238,12 +312,17 @@ namespace SpaceGod::Coop
 		if (!app->CoopSaveBlocker().empty()) return; // tried again next frame
 		syncWanted = false;
 		double t0 = FPlatformTime::Seconds();
+		// US-T43: what the save does not hold (who flies the helm, every player's seat, the shared settings), taken before it,
+		// so every peer (this one too) takes the seats again after loading the same bytes.
+		cs::String state = cs::Cat(app->CoopSyncState(!syncLoad), "\n", CoopSettings::Snapshot());
+		syncLoad = false;
+		PendingSyncState = state;
 		cs::List<uint8_t> save = app->CoopCaptureSave();
 		long long captured = Ms(t0);
 		if (HostReloads)
 		{
 			applying = true;
-			try { app->CoopApplySave(save); }
+			try { app->CoopApplySave(save, state); }
 			catch (...)
 			{
 				applying = false;
@@ -267,6 +346,7 @@ namespace SpaceGod::Coop
 			r.NextChunk = 0;
 			r.Acked = -1;
 			r.Link->Send(cs::Cat("sync ", syncId, " ", syncFrame, " ", static_cast<int>(syncChunks.size())));
+			r.Link->Send(cs::Cat("syncstate ", syncId, "\n", state)); // US-T43
 			sent++;
 		}
 		Log(cs::Cat("sync #", syncId, " at frame ", syncFrame, " (", syncReason, "): save ", save.Count() / 1024, " KB in ", static_cast<int>(syncChunks.size()),
@@ -314,7 +394,9 @@ namespace SpaceGod::Coop
 		if (seat > 0)
 		{
 			pending.push_back(cs::Cat("s ", CommandCodec::Write(cs::New<ReleaseSeatCommand>(PlayerId(seat)))));
+			pending.push_back(cs::Cat("h ", seat, " release")); // US-T43: a helm they flew goes back to its crew too
 			pending.push_back(cs::Cat("l ", seat));
+			ForgetPilot(seat);
 			Log(cs::Cat(NameOf(seat), " (player ", seat + 1, ") left"));
 		}
 	}
@@ -368,7 +450,27 @@ namespace SpaceGod::Coop
 					p->OffsetKm = DVec3(Wire::ParseD(f[1]), Wire::ParseD(f[2]), Wire::ParseD(f[3]));
 				}
 			}
-			else if (kind == "resync") RequestSync(cs::Cat(NameOf(r.Seat), " fell ", rest, " frames behind"));
+			else if (kind == "resync")
+				RequestSync(!rest.empty() && std::isdigit(static_cast<unsigned char>(rest[0])) ? cs::Cat(NameOf(r.Seat), " fell ", rest, " frames behind")
+					: cs::Cat(NameOf(r.Seat), " asked: ", rest));
+			// US-T43: the helm's hands, and what a client asks of the host.
+			else if (kind == "pin")
+			{
+				if (r.Seat >= 0) pilotIn[r.Seat].push_back(PilotFrame::Read(rest));
+			}
+			else if (kind == "setreq")
+			{
+				size_t sp2 = rest.find(' ');
+				cs::String key = sp2 != cs::String::npos && sp2 > 0 ? rest.substr(0, sp2) : rest;
+				if (sp2 == cs::String::npos || !CoopSettings::IsSharedKey(key)) Warn(cs::Cat("player ", r.Seat + 1, " asked to set '", key, "', not a shared setting"));
+				else
+				{
+					pending.push_back(cs::Cat("a ", r.Seat, " set ", rest));
+					pending.push_back(cs::Cat("set ", rest));
+				}
+			}
+			else if (kind == "travel") pending.push_back(cs::Cat("t ", r.Seat, " ", rest));
+			else if (kind == "load") pending.push_back(cs::Cat("a ", r.Seat, " load ", rest));
 			else if (kind == "bye")
 			{
 				r.Bye = true;
@@ -413,6 +515,26 @@ namespace SpaceGod::Coop
 
 	void CoopPeer::Command(Remote& r, const cs::String& entry)
 	{
+		// US-T43: the app's own entries ("h" the helm, "k" a cockpit key, "x" an action that writes the Core), each
+		// "<kind> <seat> ...": a client speaks only for its own seat.
+		if (entry.size() > 2 && (entry[0] == 'h' || entry[0] == 'k' || entry[0] == 'x') && entry[1] == ' ')
+		{
+			auto f = Wire::Split(entry, ' ', 3);
+			int seat = -1;
+			bool ok = f.size() >= 3;
+			if (ok)
+			{
+				try { seat = Wire::ParseI(f[1]); }
+				catch (const std::exception&) { ok = false; }
+			}
+			if (!ok || seat != r.Seat)
+			{
+				Warn(cs::Cat("player ", r.Seat + 1, " sent '", entry, "' for another seat: dropped"));
+				return;
+			}
+			pending.push_back(entry);
+			return;
+		}
 		if (!Wire::StartsWith(entry, "s "))
 		{
 			Warn(cs::Cat("unknown command entry '", entry, "'"));
@@ -552,9 +674,21 @@ namespace SpaceGod::Coop
 				chunks.assign(static_cast<size_t>(Wire::ParseI(f.at(3))), cs::String());
 				haveChunks = true;
 				chunksGot = 0;
+				ClientSyncState.clear();
+				HaveClientSyncState = false;
 				running = false;
 				// Everything queued is from before the save; what comes now is after it.
 				queue.clear();
+			}
+			else if (kind == "syncstate")
+			{
+				// US-T43: "syncstate <id>\n<the state>", sent just after its "sync".
+				size_t nl = msg.find('\n');
+				if (nl != cs::String::npos && nl > 10 && Wire::ParseI(msg.substr(10, nl - 10)) == clientSyncId)
+				{
+					ClientSyncState = msg.substr(nl + 1);
+					HaveClientSyncState = true;
+				}
 			}
 			else if (kind == "chunk")
 			{
@@ -589,7 +723,7 @@ namespace SpaceGod::Coop
 
 	bool CoopPeer::ClientTryLoad(UnitySpaceApp* app)
 	{
-		if (!haveChunks || chunksGot < static_cast<int>(chunks.size()) || app == nullptr) return false;
+		if (!haveChunks || chunksGot < static_cast<int>(chunks.size()) || app == nullptr || !HaveClientSyncState) return false;
 		double t0 = FPlatformTime::Seconds();
 		cs::List<uint8_t> save = Wire::Unpack(chunks);
 		chunks.clear();
@@ -597,7 +731,7 @@ namespace SpaceGod::Coop
 		applying = true;
 		try
 		{
-			app->CoopApplySave(save);
+			app->CoopApplySave(save, ClientSyncState);
 		}
 		catch (const std::exception& e)
 		{
