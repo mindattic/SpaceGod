@@ -50,7 +50,7 @@ namespace SpaceGod::Core
 		static constexpr int StockSpheres = 2;
 
 		/// <summary>An empty pod's and an empty sphere's own mass, tonnes.</summary>
-		static constexpr double PodMassTonnes = 150, SphereMassTonnes = 90;
+		static constexpr double PodMassTonnes = 150; static constexpr double SphereMassTonnes = 90;
 
 	private:
 		// C# `static readonly HashSet<ShipClass> trusses`: mutable (RegisterTruss), so a non-const function-local static.

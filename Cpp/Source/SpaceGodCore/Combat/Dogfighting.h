@@ -197,7 +197,7 @@ namespace SpaceGod::Core
 	class PowerDistribution final
 	{
 	public:
-		static constexpr int TotalPips = 6, MaxPips = 4, EvenPips = 2;
+		static constexpr int TotalPips = 6; static constexpr int MaxPips = 4; static constexpr int EvenPips = 2;
 		static constexpr double PerPip = 0.25;
 
 	private:
@@ -247,7 +247,7 @@ namespace SpaceGod::Core
 	{
 	public:
 		/// <summary>How long a cloud burns, and how far off a homing round must be to be drawn onto it, km.</summary>
-		static constexpr double LifeSeconds = 4, ReachKm = 3;
+		static constexpr double LifeSeconds = 4; static constexpr double ReachKm = 3;
 
 		/// <summary>The share of an incoming torpedo's chance of being seduced to a missile's: a torpedo's seeker is harder to fool.</summary>
 		static constexpr double TorpedoShare = 0.4;
@@ -290,7 +290,7 @@ namespace SpaceGod::Core
 
 	public:
 		/// <summary>The smallest hull with weak points to go for, km (a destroyer and up), and the largest that counts as a small craft.</summary>
-		static constexpr double MinCapitalKm = 0.4, MaxSmallCraftKm = 0.2;
+		static constexpr double MinCapitalKm = 0.4; static constexpr double MaxSmallCraftKm = 0.2;
 
 		static const cs::Ref<RangeSetting>& Damage();
 

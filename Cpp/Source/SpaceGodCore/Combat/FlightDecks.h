@@ -150,16 +150,16 @@ namespace SpaceGod::Core
 		static const cs::Ref<LodClass>& Lod();
 
 		/// <summary>How long a deck runs either side of its hangar: this many ship lengths, at most <see cref="MaxHalfLengthKm"/>.</summary>
-		static constexpr double HalfLengthShipLengths = 0.15, MaxHalfLengthKm = 0.5;
+		static constexpr double HalfLengthShipLengths = 0.15; static constexpr double MaxHalfLengthKm = 0.5;
 
 		/// <summary>How far astern of the stern mouth the approach gate lies, km, and how near it a craft must come to be cleared.</summary>
-		static constexpr double ApproachKm = 1.2, GateCaptureKm = 0.3;
+		static constexpr double ApproachKm = 1.2; static constexpr double GateCaptureKm = 0.3;
 
 		/// <summary>Coming in from ahead: how far out from the keel it swings round the hull, in ship lengths of beam plus km clear.</summary>
-		static constexpr double BeamShipLengths = 0.15, RoundHullKm = 0.3;
+		static constexpr double BeamShipLengths = 0.15; static constexpr double RoundHullKm = 0.3;
 
 		/// <summary>The holding pattern: how far astern of the gate it circles, and how wide, km.</summary>
-		static constexpr double HoldAsternKm = 0.9, HoldRadiusKm = 0.6;
+		static constexpr double HoldAsternKm = 0.9; static constexpr double HoldRadiusKm = 0.6;
 
 		/// <summary>How long a craft home for good sits on its spot before it is struck down into the hangar, seconds.</summary>
 		static constexpr double StowSeconds = 8;
@@ -170,15 +170,15 @@ namespace SpaceGod::Core
 
 		/// <summary>The glide path: the fastest and slowest a craft closes on its spot, km/s relative to the deck, and how quickly
 		/// (seconds, e-folding) it is drawn onto the deck's axis.</summary>
-		static constexpr double FinalSpeedKmS = 0.12, MinCloseKmS = 0.02, LineUpSeconds = 2.5;
+		static constexpr double FinalSpeedKmS = 0.12; static constexpr double MinCloseKmS = 0.02; static constexpr double LineUpSeconds = 2.5;
 
 		/// <summary>A launch: seconds between craft out of one deck, how far apart a squadron's column starts down the deck,
 		/// and how far clear of the bow mouth a craft is handed back to its pilot, km.</summary>
-		static constexpr double LaunchIntervalSeconds = 3, LaunchSpacingKm = 0.07, ExitKm = 0.35;
+		static constexpr double LaunchIntervalSeconds = 3; static constexpr double LaunchSpacingKm = 0.07; static constexpr double ExitKm = 0.35;
 
 		/// <summary>The player's capture: how far off the axis, how far round from it (deg), and how fast relative to the
 		/// deck (km/s) a craft may be on the glide path for the deck to take it in.</summary>
-		static constexpr double CaptureOffAxisKm = 0.15, CaptureAlignDeg = 30, CaptureSpeedKmS = 0.2;
+		static constexpr double CaptureOffAxisKm = 0.15; static constexpr double CaptureAlignDeg = 30; static constexpr double CaptureSpeedKmS = 0.2;
 
 		/// <summary>How far off a friendly deck the cockpit starts giving landing guidance, km.</summary>
 		static constexpr double GuideKm = 12;

@@ -62,7 +62,7 @@ namespace SpaceGod::Core
 		static constexpr double LaunchSeconds = 4;
 
 		/// <summary>How near its docking point (km) a shuttle must be, and how closely matched to the prize's drift (km/s), to latch on.</summary>
-		static constexpr double DockKm = 0.06, MatchKmS = 0.01;
+		static constexpr double DockKm = 0.06; static constexpr double MatchKmS = 0.01;
 
 		/// <summary>How far off the prize's side (km) a shuttle docks.</summary>
 		static constexpr double StandOffKm = 0.02;

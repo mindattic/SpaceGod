@@ -47,15 +47,15 @@ namespace SpaceGod::Core
 		// ------------------------------------------------------------ fixed figures
 
 		/// <summary>An interceptor's own toughness and how long it flies before it gives up, seconds.</summary>
-		static constexpr double InterceptorHp = 8, InterceptorLifeSeconds = 30;
+		static constexpr double InterceptorHp = 8; static constexpr double InterceptorLifeSeconds = 30;
 
 		/// <summary>How near an interceptor's proximity fuze goes off, km, and how far off it looks for another round when
 		/// the one it was hunting is gone, km.</summary>
-		static constexpr double FuzeKm = 0.12, ReacquireKm = 4;
+		static constexpr double FuzeKm = 0.12; static constexpr double ReacquireKm = 4;
 
 		/// <summary>How far a screening hull keeps out from its ward's hull toward the threat, km, and how far off a ward
 		/// can be for a hull to screen it at all.</summary>
-		static constexpr double StandoffKm = 1.5, WardSearchKm = 30;
+		static constexpr double StandoffKm = 1.5; static constexpr double WardSearchKm = 30;
 
 		// ------------------------------------------------------------ rules
 

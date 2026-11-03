@@ -181,17 +181,17 @@ namespace SpaceGod::Core
 		static double MinCapitalKm();
 
 		/// <summary>How long a brace lasts, and how long before the crew can brace again, s.</summary>
-		static constexpr double BraceSeconds = 3, BraceCooldownSeconds = 12;
+		static constexpr double BraceSeconds = 3; static constexpr double BraceCooldownSeconds = 12;
 
 		/// <summary>How much harder, and surer, a crew's volley is than the same guns at will.</summary>
-		static constexpr double CrewVolleyDamageBonus = 0.2, CrewVolleyAccuracyBonus = 0.2;
+		static constexpr double CrewVolleyDamageBonus = 0.2; static constexpr double CrewVolleyAccuracyBonus = 0.2;
 
 		/// <summary>How loaded the guns of a volley building on a hull must be before that hull's AI captain braces.</summary>
 		static constexpr double BraceAtLoaded = 0.75;
 
 		/// <summary>People per damage control team, the most teams any hull musters, the hit points a team puts back a
 		/// second, and how whole it can make a mount in the field (a refit at a yard does the rest).</summary>
-		static constexpr double CrewPerTeam = 250, RepairHpPerTeamS = 1.5, FieldRepairCap = 0.85;
+		static constexpr double CrewPerTeam = 250; static constexpr double RepairHpPerTeamS = 1.5; static constexpr double FieldRepairCap = 0.85;
 
 		static constexpr int MaxTeams = 8;
 

@@ -173,12 +173,16 @@ namespace SpaceGod::Core
 		static void RunClassConstructor();
 
 		// The structure every hull is built around (not fittable: it comes with the frame).
-		static constexpr const char* Bridge = "bridge", * Engineering = "engineering", * Quarters = "quarters", * Hangar = "hangar", * Hold = "hold",
-			* Battery = "battery", * Bow = "bow", * Midships = "midships", * TroopCompartment = "troop-compartment";
+		// (One declaration each: MSVC rejects the later declarators of a multi-declarator static in a dllexport class, C2487.)
+		static constexpr const char* Bridge = "bridge"; static constexpr const char* Engineering = "engineering";
+		static constexpr const char* Quarters = "quarters"; static constexpr const char* Hangar = "hangar"; static constexpr const char* Hold = "hold";
+		static constexpr const char* Battery = "battery"; static constexpr const char* Bow = "bow"; static constexpr const char* Midships = "midships";
+		static constexpr const char* TroopCompartment = "troop-compartment";
 
 		// What a yard fits into free space.
-		static constexpr const char* ArmourPlating = "armour-plating", * CargoRacks = "cargo-racks", * Scanner = "scanner-suite", * Brig = "brig",
-			* MarineHabitat = "marine-habitat";
+		static constexpr const char* ArmourPlating = "armour-plating"; static constexpr const char* CargoRacks = "cargo-racks";
+		static constexpr const char* Scanner = "scanner-suite"; static constexpr const char* Brig = "brig";
+		static constexpr const char* MarineHabitat = "marine-habitat";
 
 		/// <summary>The firing room that launches Breacher rounds (U.SPC-T466, U.SPC-T521, see <see cref="BreacherBays"/>): any
 		/// ship's to fit that has the space, the reactor power and the crew for it, and only beside a marine habitat to
@@ -197,7 +201,8 @@ namespace SpaceGod::Core
 		static const cs::List<HullCategory>& MarineHulls();
 
 		// What makes a hull a fleet's command ship (U.SPC-T477, see FleetCoordination): a capital's to fit.
-		static constexpr const char* SensorArray = "sensor-array", * CommsSuite = "comms-suite", * TargetingComputers = "targeting-computers";
+		static constexpr const char* SensorArray = "sensor-array"; static constexpr const char* CommsSuite = "comms-suite";
+		static constexpr const char* TargetingComputers = "targeting-computers";
 
 	private:
 		static const cs::List<HullCategory>& Capitals();
@@ -220,7 +225,7 @@ namespace SpaceGod::Core
 		static constexpr const char* SpinalPlant = "spinal-plant";
 
 		// What clamps along a truss freighter's spine (U.SPC-T482, see BulkFreighters).
-		static constexpr const char* CargoPod = "cargo-pod", * FuelSphere = "fuel-sphere";
+		static constexpr const char* CargoPod = "cargo-pod"; static constexpr const char* FuelSphere = "fuel-sphere";
 
 		/// <summary>
 		/// An interdiction field projector (U.SPC-T507, see <see cref="LaneInterdictors"/>): the heavy equipment that disrupts
@@ -273,7 +278,7 @@ namespace SpaceGod::Core
 		/// space opening off midships; otherwise the index of the facility in the same layout it branches off.</summary>
 		int Link = 0;
 
-		static constexpr int Keel = -1, Amidships = -2;
+		static constexpr int Keel = -1; static constexpr int Amidships = -2;
 
 		/// <summary>The marines this space quarters as the hull was designed (U.SPC-T465), or null for its kind's
 		/// (<see cref="FacilityKind.Berths"/>, grown with the hull): a stock design's habitat holds the complement it was drawn for.</summary>

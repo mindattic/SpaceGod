@@ -116,7 +116,7 @@ namespace SpaceGod::Core
 	class FighterAI
 	{
 	public:
-		static constexpr double FighterLengthKm = 0.016, BomberLengthKm = 0.024;
+		static constexpr double FighterLengthKm = 0.016; static constexpr double BomberLengthKm = 0.024;
 
 		static const cs::Ref<CombatSpec>& Interceptor();
 
@@ -182,7 +182,7 @@ namespace SpaceGod::Core
 
 		/// <summary>How much nearer than it is an enemy fighter on one of its own bombers counts for an interceptor, and a
 		/// capital with its shields down toward it for a bomber, km.</summary>
-		static constexpr double ScreenBonusKm = 8, BareHullBonusKm = 8;
+		static constexpr double ScreenBonusKm = 8; static constexpr double BareHullBonusKm = 8;
 
 		/// <summary>How near one of <paramref name="u"/>'s side's bombers an enemy fighter must be to count as on it, km.</summary>
 		static constexpr double ScreenKm = 4;

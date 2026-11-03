@@ -505,7 +505,7 @@ namespace SpaceGod::Core
 		cs::Ref<Battle> NewBattle(int body, double jd, const cs::List<cs::Ref<Ship>>& present, cs::Nullable<DVec3> at = cs::Nullable<DVec3>());
 
 		// battleCount keys for concealed skirmishes and fights at gates (body indices are never negative).
-		static constexpr int ConcealedBelt = -1, ConcealedDark = -2, GateKey = -10;
+		static constexpr int ConcealedBelt = -1; static constexpr int ConcealedDark = -2; static constexpr int GateKey = -10;
 
 		/// <summary>The gate whose approach <paramref name="offsetKm"/> (off the system root) is on, or null.</summary>
 		cs::Ref<JumpGate> GateNear(DVec3 offsetKm);

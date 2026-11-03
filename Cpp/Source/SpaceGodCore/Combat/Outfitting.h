@@ -368,10 +368,10 @@ namespace SpaceGod::Core
 		bool IsStock() const;
 
 		/// <summary>Armour each plate adds (flat damage off every hit) and the share of the design's hull points.</summary>
-		static constexpr double ArmourPerPlate = 2, HullPerPlate = 0.08;
+		static constexpr double ArmourPerPlate = 2; static constexpr double HullPerPlate = 0.08;
 
 		/// <summary>A hardened generator's grade, and a torch drive's, against stock.</summary>
-		static constexpr double HardenedRating = 1.5, TorchRating = 1.3;
+		static constexpr double HardenedRating = 1.5; static constexpr double TorchRating = 1.3;
 
 		/// <summary>Extra trade hold each rack adds, as a share of the hull's own, and grid hold rows.</summary>
 		static constexpr double RackCapacityShare = 0.15;
@@ -481,7 +481,7 @@ namespace SpaceGod::Core
 		static constexpr double TradeInShare = 0.5;
 
 		/// <summary>Credits a pirate prisoner fetches a navy port as bounty, and anyone else's people as ransom.</summary>
-		static constexpr double PirateBounty = 50000, Ransom = 20000;
+		static constexpr double PirateBounty = 50000; static constexpr double Ransom = 20000;
 
 		/// <summary>Share of a taken prize's crew its captors lock up, as far as their brigs have room.</summary>
 		static constexpr double PrisonerShare = 0.5;

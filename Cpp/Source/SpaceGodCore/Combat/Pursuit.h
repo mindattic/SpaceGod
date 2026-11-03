@@ -67,14 +67,14 @@ namespace SpaceGod::Core
 	{
 	public:
 		/// <summary>How far off a chasing group shows up, km, and how far off it gives up.</summary>
-		static constexpr double ContactKm = 320, GiveUpKm = 2500;
+		static constexpr double ContactKm = 320; static constexpr double GiveUpKm = 2500;
 
 		/// <summary>A chasing group's top speed, km/s, and its acceleration, km/s².</summary>
-		static constexpr double TopSpeedKmS = 6, AccelKmS2 = 0.5;
+		static constexpr double TopSpeedKmS = 6; static constexpr double AccelKmS2 = 0.5;
 
 		/// <summary>How near the EMP reaches when it charges, km (it must still be within a quarter more when it goes off),
 		/// how long it charges, how long it knocks the drives out, and how long before it can charge again, seconds.</summary>
-		static constexpr double EmpRangeKm = 30, EmpChargeSeconds = 3, EmpStunSeconds = 7, EmpCooldownSeconds = 25;
+		static constexpr double EmpRangeKm = 30; static constexpr double EmpChargeSeconds = 3; static constexpr double EmpStunSeconds = 7; static constexpr double EmpCooldownSeconds = 25;
 
 		/// <summary>How near a chasing group must close to start the fight, km.</summary>
 		static constexpr double EngageKm = 15;

@@ -762,7 +762,7 @@ namespace SpaceGod::Core
 
 		/// <summary>How close the merge is, km (inside it the attacker extends), how far it extends before coming
 		/// round, and how near a hostile behind must be to count as on its tail.</summary>
-		static constexpr double MergeKm = 0.3, ExtendKm = 1.6, TailKm = 2.5;
+		static constexpr double MergeKm = 0.3; static constexpr double ExtendKm = 1.6; static constexpr double TailKm = 2.5;
 
 		/// <summary>How far off a dogfighter goes for the player in preference to whatever else it was after, km.</summary>
 		static constexpr double HuntPlayerKm = 8;
@@ -918,7 +918,7 @@ namespace SpaceGod::Core
 
 		/// <summary>Seconds a volley takes to build to full, the extra damage a full one does (as a share of each
 		/// gun's own), and how much surer its gunners' aim is than their aim at will.</summary>
-		static constexpr double VolleyBuildSeconds = 1.5, VolleyDamageBonus = 0.5, VolleyAccuracyBonus = 0.25;
+		static constexpr double VolleyBuildSeconds = 1.5; static constexpr double VolleyDamageBonus = 0.5; static constexpr double VolleyAccuracyBonus = 0.25;
 
 		/// <summary>How far off the line the player is looking a volley will take a target, deg.</summary>
 		static constexpr double VolleyConeDeg = 25;
@@ -942,7 +942,7 @@ namespace SpaceGod::Core
 		// ---------------------------------------------------------------- the dogfight arsenal (U.SPC-T271)
 
 		/// <summary>How long a mine takes to arm once laid, and how long it lies waiting, seconds.</summary>
-		static constexpr double MineArmSeconds = 1.5, MineLifeSeconds = 240;
+		static constexpr double MineArmSeconds = 1.5; static constexpr double MineLifeSeconds = 240;
 
 		/// <summary>How near a mine a hostile hull must come to set it off, km beyond the hull's own size.</summary>
 		static constexpr double MineTriggerKm = 0.12;

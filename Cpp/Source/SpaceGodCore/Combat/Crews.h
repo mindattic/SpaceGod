@@ -92,7 +92,7 @@ namespace SpaceGod::Core
 		/// <summary>Share of the way back to 1 that morale recovers each day.</summary>
 		static constexpr double MoraleRecoveryPerDay = 0.02;
 
-		static constexpr double MinMorale = 0.5, MaxMorale = 1.15;
+		static constexpr double MinMorale = 0.5; static constexpr double MaxMorale = 1.15;
 
 		/// <summary>Spacers recruited a day per person in a faction's settlements.</summary>
 		static constexpr double RecruitPerPersonPerDay = 2e-5;
@@ -101,11 +101,11 @@ namespace SpaceGod::Core
 		static constexpr double ReserveShare = 0.004;
 
 		/// <summary>The pirates' reserve (they recruit from the desperate and the wanted, not from a census), and its daily intake.</summary>
-		static constexpr double PirateReserve = 6000, PirateRecruitPerDay = 25;
+		static constexpr double PirateReserve = 6000; static constexpr double PirateRecruitPerDay = 25;
 
 		/// <summary>How often a ship sharing a body with drifting pods finds them, per day: patrols search,
 		/// merchants happen on them, raiders hunt for hostages.</summary>
-		static constexpr double PatrolFindRate = 3, MerchantFindRate = 0.8, PirateFindRate = 2;
+		static constexpr double PatrolFindRate = 3; static constexpr double MerchantFindRate = 0.8; static constexpr double PirateFindRate = 2;
 
 		cs::List<cs::Ref<EscapePod>> Pods;
 		cs::List<cs::Ref<Captives>> Held;

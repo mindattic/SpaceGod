@@ -162,7 +162,7 @@ namespace SpaceGod::Core
 		static constexpr double StructurePerMass = 1.5;
 
 		/// <summary>A keel joint's strength and a sponson root's, shares of the hull's points.</summary>
-		static constexpr double KeelJointShare = 0.2, SponsonJointShare = 0.06;
+		static constexpr double KeelJointShare = 0.2; static constexpr double SponsonJointShare = 0.06;
 
 		/// <summary>The share of a hit on a module that loads the joints around it, shared between them by how near
 		/// each is to where it struck.</summary>

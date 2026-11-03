@@ -102,7 +102,7 @@ namespace SpaceGod::Core
 		/// <summary>How often a captain weighs the fire again, s, how much better a new attitude must be to be worth the
 		/// roll, and how strongly it otherwise keeps to its rest (level, for an AI captain; where the helm has it, for the
 		/// player).</summary>
-		static constexpr double ReconsiderSeconds = 1, Hysteresis = 0.04, RestBias = 0.02;
+		static constexpr double ReconsiderSeconds = 1; static constexpr double Hysteresis = 0.04; static constexpr double RestBias = 0.02;
 
 		/// <summary>The rolls a captain weighs, evenly round the full turn.</summary>
 		static constexpr int RollSteps = 12;
