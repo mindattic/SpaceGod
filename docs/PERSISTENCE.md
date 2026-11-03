@@ -181,12 +181,15 @@ format supports; not done here.
 ## 7. Compression (DEFLATE)
 
 `SaveGame` needs raw DEFLATE (`deflateInit2`/`inflateInit2` with windowBits -15, level 1 = `CompressionLevel.Fastest`).
-Nothing is vendored. `SaveGame.cpp` compiles against either:
+Nothing is vendored: both builds use the engine's own zlib 1.3.
 
-- **Unreal**: the engine's ThirdParty zlib. In `SpaceGodCore.Build.cs`:
-  `AddEngineThirdPartyPrivateStaticDependencies(Target, "zlib"); PublicDefinitions.Add("SPACEGOD_WITH_ZLIB=1");`
-- **Standalone** (`tools/build-core.ps1`): miniz (single file `miniz.c/.h`, MIT; exposes zlib-compatible names). Add it
-  to the standalone build and define `SPACEGOD_WITH_MINIZ=1`.
+- **Unreal**: `SpaceGodCore.Build.cs` has `AddEngineThirdPartyPrivateStaticDependencies(Target, "zlib")` and
+  `PrivateDefinitions.Add("SPACEGOD_WITH_ZLIB=1")`.
+- **Standalone** (`tools/build-core.ps1`, Release): when UE 5.8 is installed (`tools/engine.ps1`), it compiles with
+  `SPACEGOD_WITH_ZLIB` against `Engine/Source/ThirdParty/zlib/1.3/include` and merges the engine's prebuilt `/MD`
+  `zlib/1.3/lib/Win64/Release/zlibstatic.lib` into `SpaceGodCore.lib`, so whatever links the lib (CsParity, Bench.Cpp)
+  has it. Debug builds (`/MDd`) and machines without UE go without. `SPACEGOD_WITH_MINIZ` (single-file miniz, MIT) remains
+  the way to a zlib-free standalone build if ever needed.
 
 Without either, `SaveGame::Deflate/Inflate` throw `NotSupportedException` (ObjectGraph itself needs nothing).
 
@@ -198,7 +201,40 @@ link with `/WHOLEARCHIVE` (or `--whole-archive`), or reference the registrations
 standalone build's direct object lists are unaffected. `Graph::Finalize()` (called by every write and read) resolves
 base chains and orders fields once all registrations have run.
 
-## 9. Integration checklist
+## 9. The registrations as built (US-T36)
+
+All in `Persistence/Registrations/` (new files, so the folders' own `.cpp` files stay as ported):
+
+- `<Folder>.cpp` (Combat, Economy, Embodiment, Events, Information, Infrastructure, Root, Sensors, Systems): every type a
+  save reaches from `SaveData` (through every field's type, generic arguments, array elements and every implementer of
+  an interface a field is declared as): 262 types (66 enums, 23 structs, 1 interface, 172 classes), each listing every C#
+  instance field by .NET name. **Generated** from `Unity.SpaceGod.Core.dll`'s metadata (reflection over the C# build, the
+  same `GetFields(Instance | Public | NonPublic | DeclaredOnly)` FieldsOf uses); Law, Outlaws and SaveGame keep their
+  hand-written registrations in their own `.cpp`. Checked by a probe that resolves every registered field's key and
+  declared .NET type in the C++ build and diffs them against the C# metadata: all 2,285 fields match.
+- `Registrations.h`: `SG_TUPLE` for the C++ structs that stand for C# value tuples (`Appraisal::Reason`,
+  `InterstellarTraffic::AtGateEntry`/`ExpeditionWanted`, `InterstellarWars::TakenGate`, `Statecraft::FactionPair`/`WarBegun`,
+  `War::LanePass`: they save as `System.ValueTuple`N`), and helpers for fields declared as a type the C++ member does not
+  name (`b.Typed(...)`: `IReadOnlyList<T>` held as a `cs::List`, delegates returning `IEnumerable<T>`).
+- `Statics.cpp`: `SG_STATIC_OF` for the 96 static fields of Core types whose type holds a class a save reaches (ship
+  class, combat, weapon and subsystem specs, facility layouts, deals, pact kinds, research tracks, megastructures, build
+  plans, recipes, ...). Private tables are read through `Graph::Access<0>`, which `SG_SERIALIZABLE` befriends.
+- `Wiring.cpp`: Galaxy's `SG_LOADED` hook, `RewireGalaxy`: every world's delegates again (`World::RewireAfterLoad`
+  repeats `Construct`/`Wire`/`WireMining`/`WireColonisation`'s delegate statements verbatim; MarketShocks', War's
+  escape-pod hooks, trade insurance and `War::Hook` per running battle through `Graph::Access<1>`), then the galaxy's
+  (InterstellarTraffic's `Register` per system and its cruise hooks, the polities' transit hook, InterstellarColonisation).
+  For every event with several subscribers the handler order is construction's. **A change to World's wiring must be
+  repeated there.** Delegates held by static tables (Deal, PactKind, ResearchTrack, MegastructureSpec) need no rewiring:
+  the save names those tables, so a load binds to the live ones.
+
+New codecs for shapes the port uses: `std::array<T, N>` as a C# array (`SG_ARRAY`), `SG_ARRAYVALUES` for a
+`Dictionary<K, V[]>` held with `cs::List` values, tuples of 8+ items (`ValueTuple`8` + `Rest`).
+
+Limits that remain: a C++ save loaded in C# has null delegates (section 5); the static walk declares only statics whose
+type holds a saved class directly, so an object reachable first through another static (a type the save never holds)
+could be named differently from C#'s walk; and a World saved without its Galaxy is not rewired (saves are SaveData).
+
+## 10. Integration checklist
 
 1. Add `SG_SERIALIZABLE(T)` to every Core class with private fields; `SG_SERIALIZE`/`SG_STRUCT`/`SG_ENUM`/`SG_INTERFACE`
    for every type reachable from `SaveData` (World, Galaxy, Fleet, Ship, Faction, Economy, War, Battle, ..., and every

@@ -667,10 +667,11 @@ namespace SpaceGod::Core
 				d.Clear();
 				for (size_t i = 0; i < keys.size(); i++) d.Add(keys[i], values[i]);
 				w.Payload().Var(static_cast<int>(keys.size()));
+				// The values as the dictionary now holds them, not the copies: a collection value is identified by its address.
 				for (size_t i = 0; i < keys.size(); i++)
 				{
 					Codec<K>::Write(w, keys[i]);
-					Codec<V>::Write(w, values[i]);
+					Codec<V>::Write(w, d.At(keys[i]));
 				}
 			}
 			static void Fill(Reader& r, const Node& n, cs::Dictionary<K, V, H, E>& d)
@@ -689,12 +690,11 @@ namespace SpaceGod::Core
 			{
 				int i = 0;
 				std::deque<K> keys;
-				std::deque<V> values;
-				for (auto [k, v] : d) { keys.push_back(k); values.push_back(v); }
+				for (auto [k, v] : d) keys.push_back(k);
 				for (size_t j = 0; j < keys.size(); j++)
 				{
 					Codec<K>::Walk(s, keys[j], cs::Cat(key, "{k", i, "}"), depth + 1);
-					Codec<V>::Walk(s, values[j], cs::Cat(key, "{", i, "}"), depth + 1);
+					Codec<V>::Walk(s, d.At(keys[j]), cs::Cat(key, "{", i, "}"), depth + 1); // the held value: its address names it
 					i++;
 				}
 			}

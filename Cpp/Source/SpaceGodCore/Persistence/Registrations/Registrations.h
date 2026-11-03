@@ -32,7 +32,14 @@ SG_TUPLE(SpaceGod::Core::War::LanePass, &SpaceGod::Core::War::LanePass::lane, &S
 namespace SpaceGod::Core::Registrations
 {
 	/// System.Collections.Generic.IEnumerable`1 / IReadOnlyList`1 of <paramref name="item"/>, as a field's declared type.
-	inline const Graph::NetType* IEnumerableOf(const Graph::NetType* item) { return Graph::Generic("System.Collections.Generic.IEnumerable`1", Graph::CoreLibAssembly, { item }, Graph::Kind::Object); }
-	inline const Graph::NetType* IReadOnlyListOf(const Graph::NetType* item) { return Graph::Generic("System.Collections.Generic.IReadOnlyList`1", Graph::CoreLibAssembly, { item }, Graph::Kind::Object); }
+	/// (An interface: no instance fields, so its type-table entry lists none, as C#'s FieldsOf finds none.)
+	inline const Graph::NetType* InterfaceOf(const char* definition, const Graph::NetType* item)
+	{
+		const Graph::NetType* t = Graph::Generic(definition, Graph::CoreLibAssembly, { item }, Graph::Kind::Object);
+		Graph::SetShape(t, [] { return std::vector<Graph::FieldDecl>(); });
+		return t;
+	}
+	inline const Graph::NetType* IEnumerableOf(const Graph::NetType* item) { return InterfaceOf("System.Collections.Generic.IEnumerable`1", item); }
+	inline const Graph::NetType* IReadOnlyListOf(const Graph::NetType* item) { return InterfaceOf("System.Collections.Generic.IReadOnlyList`1", item); }
 	template <class T> const Graph::NetType* TypeOf() { return Graph::Codec<T>::Type(); }
 }

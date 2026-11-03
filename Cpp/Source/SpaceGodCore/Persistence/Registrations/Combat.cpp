@@ -151,6 +151,8 @@ namespace SpaceGod::Core
 
 	SG_ENUM(WingOrder, "Unity.SpaceGod.Core.WingOrder")
 
+	SG_INTERFACE(IPartSpec, "Unity.SpaceGod.Core.IPartSpec")
+
 	SG_STRUCT(BoardingNote, "Unity.SpaceGod.Core.BoardingNote",
 		SG_F(Compartment), SG_F(Seconds), SG_F(Text))
 
@@ -356,4 +358,13 @@ namespace SpaceGod::Core
 
 	SG_SERIALIZE(Wrecks, "Unity.SpaceGod.Core.Wrecks",
 		SG_F(DefaultLifetimeDays), SG_F(Items), SG_F(nextId))
+
+	SG_SERIALIZE_ABSTRACT(FacilityKind, "Unity.SpaceGod.Core.FacilityKind",
+		SG_F(Effect), SG_IMPLEMENTS(IPartSpec))
+
+	SG_SERIALIZE_ABSTRACT(FighterCraft, "Unity.SpaceGod.Core.FighterCraft",
+		SG_F(Spec))
+
+	SG_SERIALIZE_ABSTRACT(HullFrame, "Unity.SpaceGod.Core.HullFrame",
+		SG_F(Design), SG_F(Facilities))
 }

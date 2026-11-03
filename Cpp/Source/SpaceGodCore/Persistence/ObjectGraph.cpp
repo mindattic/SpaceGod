@@ -1062,6 +1062,9 @@ namespace SpaceGod::Core
 					{
 						n.Str = r.Str();
 						const StaticEntry* s = StaticByKey(n.Str);
+						// A compiler-generated closure's cached instance (`World+<>c::<>9`, a C# lambda's target): only
+						// delegates point at it, and C++ drops saved delegates, so it binds to nothing (as closures do).
+						if (!s && n.Str.find("+<") != cs::String::npos) break;
 						if (!s) throw InvalidDataException(cs::Cat("The save refers to a static object this build does not have: ", n.Str));
 						n.Obj = s->Obj;
 						n.Class = s->Class;
@@ -1307,8 +1310,9 @@ namespace SpaceGod::Core
 			}
 			const NetType* SeedImplType()
 			{
-				const NetType* t = Plain("System.Random+Net5CompatSeedImpl", CoreLibAssembly, Kind::Object);
-				SetShape(t, [] { return std::vector<FieldDecl>{ { "Net5CompatSeedImpl:_prng", PrngType() } }; });
+				// .NET 10's name (.NET 5-7 called it Net5CompatSeedImpl; the reader takes either).
+				const NetType* t = Plain("System.Random+CompatSeedImpl", CoreLibAssembly, Kind::Object);
+				SetShape(t, [] { return std::vector<FieldDecl>{ { "CompatSeedImpl:_prng", PrngType() } }; });
 				return t;
 			}
 
@@ -1375,12 +1379,13 @@ namespace SpaceGod::Core
 			RandomState s{};
 			if (const Value* impl = FieldOf(n.Type, n.Fields, "Random:_impl"))
 			{
-				// .NET 5+: Random._impl (Net5CompatSeedImpl) -> _prng (CompatPrng).
+				// .NET 5+: Random._impl (CompatSeedImpl; Net5CompatSeedImpl before .NET 8) -> _prng (CompatPrng).
 				if (impl->ValueTag != Value::Tag::Ref) return;
 				const Node& in = r.NodeOf(impl->Id);
-				if (in.Entry != EntryKind::Object || !in.Type || in.Type->FullName != "System.Random+Net5CompatSeedImpl")
+				bool net8 = in.Type && in.Type->FullName == "System.Random+CompatSeedImpl";
+				if (in.Entry != EntryKind::Object || !in.Type || (!net8 && in.Type->FullName != "System.Random+Net5CompatSeedImpl"))
 					throw InvalidDataException(cs::Cat("Cannot load a System.Random of kind ", in.Type ? in.Type->FullName : cs::String("?"), " (only seeded ones)"));
-				const Value* prng = FieldOf(in.Type, in.Fields, "Net5CompatSeedImpl:_prng");
+				const Value* prng = FieldOf(in.Type, in.Fields, net8 ? "CompatSeedImpl:_prng" : "Net5CompatSeedImpl:_prng");
 				if (!prng || prng->ValueTag != Value::Tag::Struct) return;
 				if (!ReadInt(FieldOf(prng->Type, prng->Items, "CompatPrng:_inext"), s.inext)) return;
 				if (!ReadInt(FieldOf(prng->Type, prng->Items, "CompatPrng:_inextp"), s.inextp)) return;

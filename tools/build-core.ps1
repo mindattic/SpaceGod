@@ -76,6 +76,28 @@ $common = @('/nologo', '/c', '/std:c++20', '/EHsc', '/GR', '/W4', '/permissive-'
   '/Zc:__cplusplus', '/Zc:preprocessor', '/bigobj', '/DSPACEGOD_STANDALONE', '/D_CRT_SECURE_NO_WARNINGS', "/I`"$core`"")
 if ($Configuration -eq 'Release') { $common += @('/O2', '/MD', '/DNDEBUG', '/Zi') } else { $common += @('/Od', '/MDd', '/Zi', '/RTC1') }
 
+# SaveGame's raw DEFLATE (docs/PERSISTENCE.md, section 7): the engine's own zlib 1.3 when UE 5.8 is installed (its
+# headers, and its prebuilt /MD zlibstatic.lib merged into SpaceGodCore.lib, so whatever links the lib has it). Release
+# only (the prebuilt lib is not /MDd); without it SaveGame::Deflate/Inflate throw NotSupportedException.
+$zlibLib = $null
+if ($Configuration -eq 'Release') {
+  try {
+    . (Join-Path $PSScriptRoot 'engine.ps1')
+    $zlib = Join-Path (Find-UnrealEngine '5.8') 'Engine\Source\ThirdParty\zlib\1.3'
+    $zlibCandidate = Join-Path $zlib 'lib\Win64\Release\zlibstatic.lib'
+    if ((Test-Path -LiteralPath (Join-Path $zlib 'include\zlib.h')) -and (Test-Path -LiteralPath $zlibCandidate)) {
+      $common += @('/DSPACEGOD_WITH_ZLIB', "/I`"$(Join-Path $zlib 'include')`"")
+      $zlibLib = $zlibCandidate
+      Write-Host "zlib:  $zlib"
+    }
+  } catch { Write-Host 'zlib:  none (no UE 5.8): saves throw NotSupportedException' }
+}
+# Objects built with other flags (zlib found or gone) are stale.
+New-Item -ItemType Directory -Force $out | Out-Null
+$flagsStamp = Join-Path $out 'flags.txt'
+$flagsNow = $common -join ' '
+if (-not (Test-Path -LiteralPath $flagsStamp) -or (Get-Content -LiteralPath $flagsStamp -Raw).Trim() -ne $flagsNow) { $Rebuild = $true }
+
 # ---------------------------------------------------------------- compile (at most $MaxParallel cl.exe at once)
 function Invoke-Compile([object[]]$files, [string]$objRoot) {
   $jobs = @()
@@ -136,8 +158,10 @@ if ($result.Failed.Count -gt 0) {
 $lib = Join-Path $out 'SpaceGodCore.lib'
 $rsp = Join-Path $out 'lib.rsp'
 ($result.Objs | ForEach-Object { "`"$_`"" }) -join "`n" | Set-Content -LiteralPath $rsp -Encoding ascii
+if ($zlibLib) { "`"$zlibLib`"" | Add-Content -LiteralPath $rsp -Encoding ascii }
 & lib.exe /nologo "/OUT:$lib" "@$rsp"
 if ($LASTEXITCODE -ne 0) { throw 'lib.exe failed.' }
+Set-Content -LiteralPath $flagsStamp -Value $flagsNow -Encoding ascii
 Write-Host "lib     $lib"
 
 # ---------------------------------------------------------------- CsParity
