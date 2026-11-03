@@ -398,5 +398,6 @@ namespace SpaceGod::Core
 		static const cs::Ref<CombatSpec>& Platform();
 
 		static constexpr double PlatformLengthKm = 1.4;
+		SG_SERIALIZABLE(CombatSpec); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

@@ -198,6 +198,7 @@ namespace SpaceGod::Core
 
 		/// <summary>How far from <paramref name="system"/>'s root a cruise engages and drops out, km.</summary>
 		static double WellLimitKm(const cs::Ref<StarSystem>& system);
+		SG_SERIALIZABLE(CruiseDrives); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	/// <summary>

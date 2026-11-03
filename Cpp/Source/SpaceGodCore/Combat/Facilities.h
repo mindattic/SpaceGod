@@ -372,5 +372,6 @@ namespace SpaceGod::Core
 
 		/// <summary>The space a layout's facilities take, sections.</summary>
 		static double SpaceOf(const cs::List<cs::Ref<FacilitySite>>& layout);
+		SG_SERIALIZABLE(FacilityLayouts); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

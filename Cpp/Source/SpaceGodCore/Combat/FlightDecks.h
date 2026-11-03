@@ -329,5 +329,6 @@ namespace SpaceGod::Core
 	private:
 		static cs::String Metres(double km);
 		static cs::String Pct(double f);
+		SG_SERIALIZABLE(FlightDecks); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

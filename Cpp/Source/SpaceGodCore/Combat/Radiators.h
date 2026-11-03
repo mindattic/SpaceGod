@@ -2,6 +2,7 @@
 // Port of Unity.SpaceGod Assets/UnitySpace/Core/Combat/Radiators.cs (see docs/MIGRATION.md).
 
 #include "Cs/Cs.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -133,5 +134,6 @@ namespace SpaceGod::Core
 		/// <summary>How much gunners want a panel on <paramref name="target"/>: some, and more as the hull runs hotter (it
 		/// shows, and they know what it means).</summary>
 		static double TargetWeight(const cs::Ref<BattleUnit>& target);
+		SG_SERIALIZABLE(Radiators); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

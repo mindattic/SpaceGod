@@ -3,6 +3,7 @@
 // Ships.h includes this header for CivilCraft, so it must not include Ships.h back: forward declarations only.
 
 #include "Cs/Cs.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -98,5 +99,6 @@ namespace SpaceGod::Core
 
 	private:
 		static cs::Ref<Ship> Add(const cs::Ref<World>& w, const cs::String& name, CivilCraft kind, const cs::Ref<Faction>& owner, const cs::List<int>& ports, int at, double jd);
+		SG_SERIALIZABLE(LocalTraffic); // ObjectGraph registration (Persistence/Registrations)
 	};
 }
