@@ -632,9 +632,43 @@ Single-player is unchanged (`-Mode smoke` as before). The host and clients raise
 command line (`play.ps1`'s `-ini:Engine:...` overrides, no Config change): at the default ~100 KB/s a join's save would
 take most of a minute; on localhost it takes about a second.
 
-**For the C++ track.** The same record and message formats (`CoopWire.cs`), the same hook points in the app (clock step,
-adventures, seats, take/release/move-up, helm and travel gates, `Activate`, loads), a C++ link actor with the same four
-RPCs, and its own digest over the same fields; the C++ Core's saves already round-trip with C#'s (US-T36).
+**The C++ track (US-T44).** `Cpp/Source/UnrealSpaceGod/Coop/` (`CoopWire`, `CoopPeer`, `SpaceCoopLink`, `CoopSmoke`) and
+the app partial `UnitySpaceApp.Coop.{inl,cpp}` are the C# files member for member: the same frame record and message
+texts (`frame`, `hello`/`welcome`/`full`, `cmd`, `warp`/`pause`, `select`, `sync`/`chunk`/`ack`/`synced`, `digest`,
+`roster`/`pres`, `resync`, `bye`), the same CommandCodec lines with seat keys, the same digest text over the same fields
+(FNV-1a, so a C++ and a C# peer at the same state hash alike), the same resync flow and limits, the same hook points in
+the ported app (marked `US-T44`: clock step, adventures, session creation, take/release/move-up, seat stepping, helm and
+client travel gates, `Activate`, `ApplyLoaded`/`DropSession`), and the same smoke script and log lines. What differs is
+only the engine side: `ASpaceCoopLink` is a native actor (`bOnlyRelevantToOwner`, owned by the client's player
+controller) with `Client`/`Server` `Reliable`/`Unreliable` UFUNCTIONs; the game mode (`PostLogin`/`Logout`) spawns and
+drops the links, and a listen server starts the host peer when it opens the game scene (here a scene is a map: a load
+with clients connected is a `ServerTravel`, which takes them along). The app actor's own `Tick` stands aside on a client
+(`NM_Client`): the link starts the client's app (its own profile, `Saved/<SmokeProfiles|SpaceGod>/CoopClient`) and steps
+it once per host frame, and on the host `HostEndUpdate` runs after the app's `Update` in the actor's `Step`. The pause's
+private flags are set through member pointers (C#: reflection); the C++ save walk never took in the weak-table caches
+(US-T41), so there is no statics snapshot to prime. The first Sol slice's `ASpaceGameState` clock anchor is gone (the
+frames carry the clock); the state keeps only the scene. The co-op HUD is an OnGUI handler after the app's and the
+asteroid belt's.
+
+`tools/play.ps1 -Track Cpp -Mode coop-smoke` (2026-11-03), the same scenario and checks:
+
+```
+[host]   SpaceGodCoop: Client joined as player 2
+[host]   SpaceGodCoop: sync #1 at frame 675 (Client joined): save 3956 KB in 338 chunks to 1 player(s); captured in 321 ms, host reloaded it in 282 ms; ...
+[client] SpaceGodCoop: loaded sync #1 at frame 675: save 3956 KB in 357 ms, 127 frames already waiting
+[client] SpaceGodCoop: smoke: client's warp 1 hour/s -> 6 hours/s (the host's clock) at frame 975
+[host]   SpaceGodCoop: Client (player 2) selected 'b 3' at frame 970
+[host]   SpaceGodCoop: Client (player 2) takes seat 1 (Earth Orbital defence platform 1) at frame 1098
+[client] SpaceGodCoop: smoke: client tampers with Sol Federation's treasury at frame 1375 (an injected desync)
+[host]   SpaceGodCoop: DESYNC at frame 1380: host D094B6D95BD5BF36, Client (player 2) 6EE5EBEC852EF060
+[host]   SpaceGodCoop: Client (player 2) is in sync #2 from frame 1383
+[host]   SpaceGodCoop: smoke (host) done: the client said bye; frame 1909, 21 digest matches, 1 desyncs, 47 s; quitting
+co-op smoke: 22 frames with both digests, 21 identical (frames 675..1860)
+co-op smoke: injected desync detected at frame 1380; resynced: True; 9 digests after it, all identical: True
+```
+
+The C++ host's app is up in ~7 s (C#: ~16 s), so the client joins at an earlier host frame; the frame numbers differ
+from the C# run's, the steps (counted in replayed frames after the join) do not.
 
 ## Packaging (US-T25)
 
