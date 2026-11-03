@@ -278,6 +278,36 @@ than the language: `cs::Ref` (shared_ptr) passed and copied by value through hot
 bookkeeping, and per-object heap allocations the GC would have bump-allocated. A profiler pass on high-warp is the
 first optimisation step; anything changed must keep the five digests identical.
 
+## C++ Runtime: first compile and smoke (US-T38)
+
+`tools/build.ps1 -Track Cpp` builds the editor target with 0 errors and 0 warnings, the Runtime (`Cpp/Source/UnrealSpaceGod`:
+app, camera, input, views, rendering facade, the IMGUI layer and every screen) included. What it took beyond include and
+namespace fixes:
+- **Non-unity module** (`bUseUnity = false`): the ported files keep file-local helpers as the C# files keep private members
+  (`static ToF` in several facade files, an anonymous-namespace `Cache`), which collide in a unity file.
+- **The app actor runs Unity's frame**: `UnityScene::Attach` at BeginPlay, `BeginFrame` before the Updates, `Sync` after,
+  `Detach` at EndPlay; `Time.deltaTime`/`time` scaled by `Time.timeScale` (the pause menu) as the C# UnityBridge; the
+  Rendering and BattleFx `[SettingsSource]`s registered in `GameSettingsHost`; `GameLaunch::SceneInBuild` is false (no Asset
+  Store demo scenes in Unreal, as the C# SceneUtility). The main menu scene gets a scene host too (its starfield and camera).
+- **Bugs the smoke found**: the world and system roots were `GameObject::Create`d, so held only weakly, and
+  `Destroy(systemRoot->gameObject())` did nothing: every Activate or load kept the old system's views (use `NewGameObject`);
+  triangles were not re-wound on upload (Unity's front face is clockwise, Unreal's counter-clockwise), so bodies and ships
+  showed their back faces; empty meshes (an idle exhaust) became Unreal primitives; statics holding UObjects crashed at exit;
+  the legacy editor startup script `Cpp/Content/Python/init_unreal.py` ran in `-game` and crashed after New Game.
+
+**Checks** (`Smoke/SpaceGodSmoke.cpp`, the C# scripts and log lines): `tools/play.ps1 -Track Cpp -Mode smoke | views | viewshot |
+shots`. A scene change is a map load in C++, so the run is driven from the core ticker and picks up again in the next world.
+The smoke's app part matches the C# log: `'.'` 1 hour/s -> 6 hours/s, W moves the camera 338 units, the right-drag turns it
+21.6 deg, `3` twice selects Earth and travels to it, save/load returns the clock to within 720 s (one frame at 6 hours/s),
+ships unchanged; after the load 1650 renderers (C# 1644). Every UI screen draws with the same labels/boxes/buttons as C#
+(within a few, from the game's moment); texture quads count lower (a 9-sliced box is one Slate box, nine Canvas quads in
+C#) and text runs higher (one per line). The views check logs the same line as C#'s (5083 renderers, 36 primitives, 543,314
+triangles). Images: `docs/images/cpp-ui-*.png`, `cpp-views-sol.png` beside the `csharp-*` ones.
+
+Not identical yet: the in-game scene shows more long straight line strips than the C# track's (what the app's view update
+places, not the line facade: the views check's orbit line is identical); the C# track's HUD shot does not draw Earth at the
+reticle where the C++ one does (a C# near-plane question, not this port's); the main menu title has no soft halo in C++.
+
 ## C# track
 
 **Decision (US-T6, 2026-11-03): UnrealSharp**, pinned as a git submodule at `CSharp/Plugins/UnrealSharp`
