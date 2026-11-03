@@ -1,0 +1,85 @@
+// Unity.SpaceGod/Planet (Planet.shader + Passes/Planet.hlsl), the fragment, line for line.
+// Lit by the Sun's position (not an engine light): Lambert with a softened terminator, a faint ambient so night
+// sides read, an optional relief normal map derived from real elevation data, procedural surface variation for
+// bodies with no colour map, an opaque haze or cloud layer (Titan, Venus), and an atmosphere rim on the day side.
+#ifndef SPACEGOD_PLANET_USH
+#define SPACEGOD_PLANET_USH
+#include "/Plugin/SpaceGodRender/SpaceGodCommon.ush"
+
+// uvUE: the mesh's TexCoord0 (Unreal V). normalWS: the vertex normal. positionCR: camera-relative world position.
+// positionOSUE: the local (object) position in Unreal's frame. sunRel/sun2Rel: camera-relative star positions.
+float3 SG_Planet(float2 uvUE, float3 normalWS, float3 positionCR, float3 positionOSUE,
+    float3x3 localToWorld, float3 invScale,
+    float3 sunRel, float3 sunColor, float3 sun2Rel, float3 sun2Color,
+    Texture2D mainTex, SamplerState mainTexSampler, Texture2D normalMap, SamplerState normalMapSampler,
+    float3 _Color, float _UseTexture, float _UseNormalMap, float _NormalStrength, float _PoleMargin,
+    float _NoiseStrength, float _NoiseScale, float _Haze, float3 _HazeColor, float _CloudSpin,
+    float3 _AtmoColor, float _AtmoStrength, float _Ambient, float _Highlight)
+{
+    float3 n = normalize(normalWS);
+    float3 l = normalize(sunRel - positionCR);
+    float3 viewDir = normalize(-positionCR);
+    float2 uvUnity = SG_UnityUv(uvUE);
+    float2 uv = SG_UnityUv(float2(uvUnity.x, clamp(uvUnity.y, _PoleMargin, 1.0 - _PoleMargin)));
+    float3 positionOS = SG_UnityFromUnreal(positionOSUE);
+
+    float3 albedo = _Color;
+    if (_UseTexture > 0.5)
+    {
+        albedo *= Texture2DSample(mainTex, mainTexSampler, uv).rgb;
+    }
+    else
+    {
+        float3 p = normalize(positionOS);
+        // A cloud deck turns rigidly about the pole relative to the surface.
+        float cs = cos(_CloudSpin), sn = sin(_CloudSpin);
+        p = float3(p.x * cs - p.z * sn, p.y, p.x * sn + p.z * cs);
+        if (_Haze > 0.99)
+        {
+            // Cloud streaks run along latitude circles: stretch the noise east-west.
+            float3 q = float3(p.x, p.y * 4.0, p.z) * _NoiseScale;
+            float streaks = SolarFbm(q) * 0.75 + SolarFbm(q * 3.1 + 5.3) * 0.25;
+            albedo *= lerp(1.0 - _NoiseStrength, 1.0 + _NoiseStrength, streaks);
+        }
+        else
+        {
+            p *= _NoiseScale;
+            float broad = SolarFbm(p);
+            float fine = SolarFbm(p * 6.0 + 3.7);
+            albedo *= lerp(1.0 - _NoiseStrength, 1.0 + _NoiseStrength, broad * 0.7 + fine * 0.3);
+        }
+    }
+    if (_Haze > 0.0 && _Haze <= 0.99)
+        albedo = lerp(albedo, _HazeColor, _Haze);
+
+    // Relief: perturb the shading normal with the elevation-derived map. The terminator
+    // is still taken from the smooth sphere so mountains cannot light the night side.
+    float3 shadingN = n;
+    if (_UseNormalMap > 0.5)
+    {
+        float3 t = Texture2DSample(normalMap, normalMapSampler, uv).xyz * 2.0 - 1.0;
+        t.xy *= _NormalStrength;
+        float3 up = normalize(positionOS);
+        float3 east = cross(up, float3(0, 1, 0));
+        east = dot(east, east) > 1e-6 ? normalize(east) : float3(1, 0, 0);
+        float3 north = cross(east, up);
+        float3 detailOS = normalize(east * t.x + north * t.y + up * max(t.z, 0.05));
+        shadingN = SG_LocalNormalToWorld(SG_UnrealFromUnity(detailOS), localToWorld, invScale);
+    }
+
+    float ndl = dot(n, l);
+    float relief = saturate(dot(shadingN, l));
+    float lit = saturate(relief * 1.05 + 0.03 * saturate(ndl * 4.0)) * smoothstep(-0.12, 0.1, ndl);
+    float3 l2 = normalize(sun2Rel - positionCR);
+    float ndl2 = dot(n, l2);
+    float lit2 = saturate(dot(shadingN, l2) * 1.05) * smoothstep(-0.12, 0.1, ndl2);
+    float3 col = albedo * (lit * sunColor + lit2 * sun2Color + _Ambient);
+
+    float rim = pow(1.0 - saturate(dot(n, viewDir)), 3.0);
+    float3 daySide = smoothstep(-0.35, 0.45, ndl) * sunColor + smoothstep(-0.35, 0.45, ndl2) * sun2Color;
+    col += _AtmoColor * rim * _AtmoStrength * daySide;
+    col += float3(0.35, 0.7, 1.0) * rim * _Highlight * 0.35;
+    return col;
+}
+
+#endif

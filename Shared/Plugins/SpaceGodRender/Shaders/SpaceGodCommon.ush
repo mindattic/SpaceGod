@@ -1,0 +1,144 @@
+// SpaceGodRender: what every ported shader shares. Unity.SpaceGod's SolarCommon.hlsl (noise) and
+// PipelineCore.hlsl (PipelineExpose, PipelineSunBrightness), plus the Unity -> Unreal frame conversions.
+//
+// These files hold pure maths only: no FMaterial*Parameters, no View. The materials' Custom nodes call them and pass
+// in everything the engine knows (positions, normals, the view), using the SG_* macros below, which expand inside the
+// Custom node's body where Parameters and ResolvedView exist.
+//
+// Unity -> Unreal conventions (see README.md):
+//  - Axes. Unity is left-handed Y-up, Unreal left-handed Z-up. The tracks map ecliptic (x, y, z) to Unity (x, z, y)
+//    and to Unreal (x, -y, z) (Cpp/Source/UnrealSpaceGod/Game/SolSystem.cpp), so Unity (x, y, z) == Unreal (x, -z, y):
+//    a proper rotation. Dot products, lengths and cross products need nothing; only code that names an object-space
+//    axis (the pole, a triplanar projection, the noise lattice) converts with SG_UnityFromUnreal first.
+//  - Texture V. Unity's v = 0 is the bottom row of an image, Unreal's V = 0 the top row: meshes carry V = 1 - v, and a
+//    shader that does maths on a uv converts with SG_UnityUv (its own inverse) both ways.
+//  - Positions. Unity draws camera-relative (floating origin: the camera at 0). The materials work in Unreal's
+//    camera-relative ("translated") world space, so they are right with or without a floating origin.
+//  - Colour. Both are linear-space with sRGB textures; Unity's SetColor converts sRGB -> linear, SetVector does not.
+//  - Depth. Unreal is always reversed-Z with an infinite far plane; the sky and stars, which Unity pushed to the far
+//    plane in clip space, are placed at a huge distance instead (SG_FarPoint).
+#ifndef SPACEGOD_COMMON_USH
+#define SPACEGOD_COMMON_USH
+
+#ifndef SG_PI
+#define SG_PI 3.14159265358979323846
+#endif
+
+// ---------------------------------------------------------------------------------------------------------------
+// SolarCommon.hlsl, verbatim.
+
+float SolarHash13(float3 p)
+{
+    p = frac(p * 0.1031);
+    p += dot(p, p.zyx + 31.32);
+    return frac((p.x + p.y) * p.z);
+}
+
+float SolarValueNoise(float3 p)
+{
+    float3 i = floor(p);
+    float3 f = frac(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float n000 = SolarHash13(i + float3(0, 0, 0));
+    float n100 = SolarHash13(i + float3(1, 0, 0));
+    float n010 = SolarHash13(i + float3(0, 1, 0));
+    float n110 = SolarHash13(i + float3(1, 1, 0));
+    float n001 = SolarHash13(i + float3(0, 0, 1));
+    float n101 = SolarHash13(i + float3(1, 0, 1));
+    float n011 = SolarHash13(i + float3(0, 1, 1));
+    float n111 = SolarHash13(i + float3(1, 1, 1));
+    float x00 = lerp(n000, n100, f.x);
+    float x10 = lerp(n010, n110, f.x);
+    float x01 = lerp(n001, n101, f.x);
+    float x11 = lerp(n011, n111, f.x);
+    return lerp(lerp(x00, x10, f.y), lerp(x01, x11, f.y), f.z);
+}
+
+float SolarFbm(float3 p)
+{
+    float sum = 0.0;
+    float amp = 0.5;
+    for (int octave = 0; octave < 5; octave++)
+    {
+        sum += amp * SolarValueNoise(p);
+        p = p * 2.03 + 17.1;
+        amp *= 0.5;
+    }
+    return sum / 0.97;
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// PipelineCore.hlsl.
+//
+// The shaders work in display-referred colour (1.0 is white). Unreal multiplies everything by the camera's exposure
+// after the material, so, as HDRP's PipelineExpose does, the colour becomes a luminance: times the scene's reference
+// luminance when the game sets one (_UnitySpaceSceneLuminance > 0, the HDRP-style physical path), otherwise times the
+// inverse of the current exposure, so it reaches the image exactly as drawn (the URP path: what Unity.SpaceGod shows by
+// default). Exposure is the material's EyeAdaptation node.
+float4 SG_Expose(float4 c, float exposure, float sceneLuminance)
+{
+    float luminance = sceneLuminance > 0.0 ? sceneLuminance : 1.0 / max(exposure, 1e-20);
+    return float4(c.rgb * luminance, c.a);
+}
+
+float3 SG_Expose3(float3 c, float exposure, float sceneLuminance)
+{
+    return SG_Expose(float4(c, 1.0), exposure, sceneLuminance).rgb;
+}
+
+// How much brighter than a lit surface's white the star's photosphere is (it glares and blooms).
+float SG_SunBrightness(float sunBrightness)
+{
+    return sunBrightness > 0.0 ? sunBrightness : 1.0;
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Frames.
+
+// Unity (x, y, z) == Unreal (x, -z, y).
+float3 SG_UnityFromUnreal(float3 v) { return float3(v.x, v.z, -v.y); }
+float3 SG_UnrealFromUnity(float3 v) { return float3(v.x, -v.z, v.y); }
+
+// Unity uv <-> Unreal UV (V flipped); the function is its own inverse.
+float2 SG_UnityUv(float2 uv) { return float2(uv.x, 1.0 - uv.y); }
+
+// Unity's TransformObjectToWorldNormal for an object-space normal in Unreal's local frame: the inverse transpose of
+// the local-to-world matrix, written as local-to-world (scale * rotation, row vectors) with the scale divided out twice.
+float3 SG_LocalNormalToWorld(float3 nLocal, float3x3 localToWorld, float3 invNonUniformScale)
+{
+    return normalize(mul(nLocal * invNonUniformScale * invNonUniformScale, localToWorld));
+}
+
+// The inverse: a world-space normal back to object space (Unity's normalOS), exact for non-uniform scale too.
+float3 SG_WorldNormalToLocal(float3 nWorld, float3x3 localToWorld)
+{
+    return normalize(mul(localToWorld, nWorld));
+}
+
+// Offsets a camera-relative point by a screen-space amount in pixels, as Unity's
+// clip.xy += pixels / _ScreenParams.xy * 2.0 * clip.w does in clip space.
+float3 SG_ScreenOffset(float3 targetCR, float2 pixels, float2 viewSize, float2 projScale, float3 right, float3 up, float3 forward)
+{
+    float w = dot(targetCR, forward);
+    return right * (pixels.x * 2.0 * w / (viewSize.x * projScale.x))
+         + up * (pixels.y * 2.0 * w / (viewSize.y * projScale.y));
+}
+
+// Unity's "push to the far plane" (cs.z = cs.w * 1e-7 under reversed Z) for a direction from the camera: Unreal's
+// projection has no far plane, so the point goes to a distance beyond all scene geometry instead.
+float3 SG_FarPoint(float3 dirWS, float distance)
+{
+    return normalize(dirWS) * distance;
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Macros for the Custom node bodies (they expand where Parameters and ResolvedView exist).
+
+// viewSize, projScale, right, up, forward for SG_ScreenOffset.
+#define SG_VIEW_ARGS ResolvedView.ViewSizeAndInvSize.xy, float2(ResolvedView.ViewToClip[0][0], ResolvedView.ViewToClip[1][1]), \
+    ResolvedView.ViewToTranslatedWorld[0].xyz, ResolvedView.ViewToTranslatedWorld[1].xyz, ResolvedView.ViewToTranslatedWorld[2].xyz
+
+#define SG_LOCAL_TO_WORLD_3X3 ((float3x3)GetLocalToWorld3x3(Parameters))
+#define SG_INV_SCALE (GetPrimitiveData(Parameters).InvNonUniformScale)
+
+#endif

@@ -1,0 +1,17 @@
+// Unity.SpaceGod/Glow (Glow.shader + Passes/Glow.hlsl): additive radial glow on a camera-facing quad (the Sun's
+// corona, engine plumes). The vertex colour is white on static quads and the particle colour on particles (Niagara's
+// sprites feed it through the VertexColor node), so a particle system's colour modules fade engine exhaust.
+#ifndef SPACEGOD_GLOW_USH
+#define SPACEGOD_GLOW_USH
+#include "/Plugin/SpaceGodRender/SpaceGodCommon.ush"
+
+float3 SG_Glow(float2 uvUE, float4 vertexColor, float3 _Color, float _Intensity, float _Falloff)
+{
+    float2 uv = SG_UnityUv(uvUE);
+    float d = length(uv * 2.0 - 1.0);
+    float a = saturate(1.0 - d);
+    float glow = pow(a, _Falloff) + pow(a, 12.0) * 0.6;
+    return _Color * vertexColor.rgb * glow * _Intensity * vertexColor.a;
+}
+
+#endif

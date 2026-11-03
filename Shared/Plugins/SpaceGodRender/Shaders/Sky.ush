@@ -1,0 +1,36 @@
+// Unity.SpaceGod/Sky (Sky.shader + Passes/Sky.hlsl, U.SPC-T595): the skybox. An equirectangular panorama on a cube
+// around the camera, pushed beyond everything (SG_SkyOffset) and drawn first. The panorama's frame axes (ecliptic,
+// equatorial or galactic) come from SkyboxCatalog.FrameAxes, so a real sky map sits where its stars really are.
+// _AxisX/_AxisY/_AxisZ are given in the same frame as the cube's local positions (Unreal axes: convert Unity's
+// BodyView.ToUnity(x) with the track's ecliptic -> Unreal mapping).
+#ifndef SPACEGOD_SKY_USH
+#define SPACEGOD_SKY_USH
+#include "/Plugin/SpaceGodRender/SpaceGodCommon.ush"
+
+// Vertex: World Position Offset that moves a vertex (dirWS = its local position taken to world, rotation and scale
+// only, as Unity's mul((float3x3)UNITY_MATRIX_M, positionOS)) to the far distance around the camera.
+float3 SG_SkyOffset(float3 dirWS, float3 vertexCR, float distance)
+{
+    return SG_FarPoint(dirWS, distance) - vertexCR;
+}
+
+float3 SG_Sky(float3 dirOS, Texture2D mainTex, SamplerState mainTexSampler,
+    float _Brightness, float3 _AxisX, float3 _AxisY, float3 _AxisZ)
+{
+    float3 d = normalize(dirOS);
+    // The direction in the panorama's own frame: longitude from its x toward its y, latitude toward its z.
+    float fx = dot(d, _AxisX), fy = dot(d, _AxisY), fz = dot(d, _AxisZ);
+    float lon = atan2(fy, fx);
+    float lat = asin(clamp(fz, -1.0, 1.0));
+    float2 uv = float2(0.5 - lon * (0.5 / SG_PI), 0.5 + lat / SG_PI);
+    // u jumps from 1 to 0 where longitude wraps: take the gradient from whichever of u and u + 0.5 is smooth there,
+    // so the seam does not drop to the smallest mip as a visible line.
+    float2 uvA = SG_UnityUv(uv), uvB = SG_UnityUv(float2(frac(uv.x + 0.5), uv.y));
+    float2 dxA = ddx(uvA), dyA = ddy(uvA), dxB = ddx(uvB), dyB = ddy(uvB);
+    float2 gx = abs(dxA.x) <= abs(dxB.x) ? dxA : dxB;
+    float2 gy = abs(dyA.x) <= abs(dyB.x) ? dyA : dyB;
+    float3 c = Texture2DSampleGrad(mainTex, mainTexSampler, uvA, gx, gy).rgb;
+    return c * _Brightness;
+}
+
+#endif

@@ -1,0 +1,57 @@
+// Unity.SpaceGod/Stars, /Points and /Line: the shaders Unity drew as point and line topology, which Unreal does not
+// rasterise. Each point becomes a camera-facing quad and each line segment a ribbon, expanded in screen space by World
+// Position Offset to Unity's one pixel (see README.md for the vertex layout).
+//
+// Stars (Stars.shader + Passes/Stars.hlsl): the background starfield, a point cloud on a unit sphere around the camera,
+// pushed beyond everything so it never clips and sits behind everything at any scale.
+// Points (Points.shader + Passes/Points.hlsl): pixel-sized points at real positions (satellite constellations),
+// depth-tested against the planets so a world hides the satellites behind it, added over whatever is behind them.
+// Line (Line.shader + Passes/Line.hlsl): one-pixel line strips (orbits, flight paths), vertex colour times tint,
+// depth-tested but not written.
+#ifndef SPACEGOD_POINTS_USH
+#define SPACEGOD_POINTS_USH
+#include "/Plugin/SpaceGodRender/SpaceGodCommon.ush"
+
+// A point's quad: corner is (+-1, +-1) (TexCoord0); sizePx the quad's full width in pixels (1 = Unity's point).
+float3 SG_PointOffset(float3 targetCR, float3 vertexCR, float2 corner, float sizePx,
+    float2 viewSize, float2 projScale, float3 right, float3 up, float3 forward)
+{
+    return targetCR + SG_ScreenOffset(targetCR, corner * 0.5 * sizePx, viewSize, projScale, right, up, forward) - vertexCR;
+}
+
+// Stars: the vertex goes to the far distance in its direction (rotation and scale only, as Unity's
+// mul((float3x3)UNITY_MATRIX_M, positionOS)), then grows to its quad.
+float3 SG_StarsOffset(float3 dirWS, float3 vertexCR, float2 corner, float sizePx, float distance,
+    float2 viewSize, float2 projScale, float3 right, float3 up, float3 forward)
+{
+    return SG_PointOffset(SG_FarPoint(dirWS, distance), vertexCR, corner, sizePx, viewSize, projScale, right, up, forward);
+}
+
+// Stars and Points share a fragment.
+float3 SG_PointColor(float4 vertexColor, float _Brightness)
+{
+    return vertexColor.rgb * vertexColor.a * _Brightness;
+}
+
+// Line: a segment's ribbon. The vertex sits at one end (vertexCR); otherCR is the segment's other end; side is -1 or +1
+// for the ribbon's two edges (0: no expansion, the mesh is drawn as it is). widthPx is the ribbon's full width.
+float3 SG_LineOffset(float3 vertexCR, float3 otherCR, float side, float widthPx,
+    float2 viewSize, float2 projScale, float3 right, float3 up, float3 forward)
+{
+    if (side == 0.0) return float3(0, 0, 0);
+    float wa = max(dot(vertexCR, forward), 1e-6), wb = max(dot(otherCR, forward), 1e-6);
+    float2 sa = float2(dot(vertexCR, right) * projScale.x, dot(vertexCR, up) * projScale.y) / wa * viewSize;
+    float2 sb = float2(dot(otherCR, right) * projScale.x, dot(otherCR, up) * projScale.y) / wb * viewSize;
+    float2 d = sb - sa;
+    d = dot(d, d) > 1e-12 ? normalize(d) : float2(1, 0);
+    float2 perp = float2(-d.y, d.x);
+    return SG_ScreenOffset(vertexCR, perp * side * 0.5 * widthPx, viewSize, projScale, right, up, forward);
+}
+
+// Line's fragment: vertex colour times tint (rgb, alpha).
+float4 SG_LineColor(float4 vertexColor, float4 _Color)
+{
+    return vertexColor * _Color;
+}
+
+#endif

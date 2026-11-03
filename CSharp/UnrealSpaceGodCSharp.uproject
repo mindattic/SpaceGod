@@ -12,8 +12,19 @@
 	],
 	"Plugins": [
 		{
+			"Name": "AndroidFileServer",
+			"Enabled": false
+		},
+		{
 			"Name": "UnrealSharp",
 			"Enabled": true
+		},
+		{
+			"Name": "SpaceGodRender",
+			"Enabled": true
 		}
+	],
+	"AdditionalPluginDirectories": [
+		"../Shared/Plugins"
 	]
 }

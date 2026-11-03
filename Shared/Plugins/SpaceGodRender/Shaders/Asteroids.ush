@@ -1,0 +1,90 @@
+// Unity.SpaceGod/Asteroids (Asteroids.shader + Passes/Asteroids.hlsl): the asteroid belt, one screen-facing dot per
+// real asteroid. Each vertex solves Kepler's equation for its asteroid on the GPU from the elements packed by
+// AsteroidField.PackGpu (AsteroidField.GpuPosition is the C# mirror the tests check), then maps the heliocentric
+// distance through ScaleModel's Sun mapping (AsteroidField.SunMapping), so the belt sits correctly at gameplay and
+// realistic scale and while blending between them.
+//
+// Unreal differences: a material cannot read a StructuredBuffer or SV_VertexID, so
+//  - the packed float4s (3 per asteroid: (e, n, M0, H), (a*P, 0), (b*Q, 0)) are the texels of a float RGBA texture
+//    (_Asteroids, PF_A32B32G32R32F, any width, row-major: float4 i at (i % width, i / width)), read with Load;
+//  - the mesh has 6 vertices per asteroid (two triangles), TexCoord0 = (asteroid index, corner index 0..5), and needs
+//    full-precision UVs; the vertex positions are ignored (World Position Offset moves each one to its asteroid).
+#ifndef SPACEGOD_ASTEROIDS_USH
+#define SPACEGOD_ASTEROIDS_USH
+#include "/Plugin/SpaceGodRender/SpaceGodCommon.ush"
+
+struct FSGAsteroidVertex
+{
+    float3 WorldCR;    // camera-relative position of the quad corner
+    float2 Corner;     // (+-1, +-1)
+    float Brightness;
+};
+
+float2 SG_AsteroidCorner(uint c)
+{
+    // Unity: { (-1, -1), (1, -1), (1, 1), (-1, -1), (1, 1), (-1, 1) }
+    float2 corner = float2(-1, -1);
+    if (c == 1) corner = float2(1, -1);
+    else if (c == 2 || c == 4) corner = float2(1, 1);
+    else if (c == 5) corner = float2(-1, 1);
+    return corner;
+}
+
+float4 SG_AsteroidTexel(Texture2D asteroids, uint i)
+{
+    uint w, h;
+    asteroids.GetDimensions(w, h);
+    return asteroids.Load(int3(i % w, i / w, 0));
+}
+
+// sunRel: camera-relative position of the Sun (Unity's _SunRelative). _SunMap0.y/.z/.w are in Unreal world units.
+FSGAsteroidVertex SG_AsteroidVertex(float2 uv0, Texture2D _Asteroids, float _DtDays, float4 _SunMap0, float4 _SunMap1,
+    float3 sunRel, float _Brightness, float _PointScale,
+    float2 viewSize, float2 projScale, float3 right, float3 up, float3 forward)
+{
+    FSGAsteroidVertex o;
+    uint id = (uint)(uv0.x + 0.5);
+    float2 corner = SG_AsteroidCorner((uint)(uv0.y + 0.5));
+    float4 k = SG_AsteroidTexel(_Asteroids, id * 3);
+    float3 aP = SG_AsteroidTexel(_Asteroids, id * 3 + 1).xyz;
+    float3 bQ = SG_AsteroidTexel(_Asteroids, id * 3 + 2).xyz;
+
+    float e = k.x;
+    float m = k.z + k.y * _DtDays;
+    m -= 6.2831853 * floor(m / 6.2831853 + 0.5);
+    float ecc = m + e * sin(m);
+    [unroll] for (int it = 0; it < 5; it++)
+        ecc -= (ecc - e * sin(ecc) - m) / (1.0 - e * cos(ecc));
+    float3 au = aP * (cos(ecc) - e) + bQ * sin(ecc); // heliocentric, ecliptic J2000
+
+    float d = max(length(au), 1e-4);
+    float trueScale = d * _SunMap0.y;
+    float gameScale = _SunMap0.z + _SunMap0.w * (pow(d, _SunMap1.x) - _SunMap1.y);
+    float scene = exp(lerp(log(trueScale), log(gameScale), _SunMap0.x));
+    // ecliptic -> Unreal axes (x, -y, z), as Unity's float3(au.x, au.z, au.y) is ecliptic -> Unity axes.
+    float3 world = sunRel + float3(au.x, -au.y, au.z) * (scene / d);
+
+    // Brighter (lower H) asteroids are drawn bigger and brighter: 1 px at H 15.5, ~3 px for Vesta.
+    float h = k.w;
+    float size = lerp(3.2, 1.0, saturate((h - 3.0) / 12.5)) * _PointScale;
+    o.WorldCR = world + SG_ScreenOffset(world, corner * size, viewSize, projScale, right, up, forward);
+    o.Corner = corner;
+    // Faint ones fade most: from inside the belt 100,000 dots would otherwise fill the sky.
+    o.Brightness = _Brightness * lerp(0.9, 0.16, saturate((h - 5.0) / 10.5));
+    // Seen from well inside the belt (Earth, Mars) the dots would cover the whole sky:
+    // dim them there, full strength from the belt itself or from outside it.
+    float cameraFromSun = length(sunRel);
+    o.Brightness *= lerp(0.2, 1.0, smoothstep(0.5, 1.1, cameraFromSun / scene));
+    return o;
+}
+
+// interp: (corner.x, corner.y, brightness) interpolated from the vertex shader.
+float3 SG_Asteroid(float3 interp, float3 _Color)
+{
+    float r2 = dot(interp.xy, interp.xy);
+    float a = saturate(1.0 - r2);
+    a *= a;
+    return _Color * (a * interp.z);
+}
+
+#endif

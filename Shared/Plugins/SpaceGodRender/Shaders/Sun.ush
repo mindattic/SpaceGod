@@ -1,0 +1,21 @@
+// Unity.SpaceGod/Sun (Sun.shader + Passes/Sun.hlsl): emissive photosphere with limb darkening and slowly churning
+// granulation. time is Unity's _Time.y (seconds; the material's Time node).
+#ifndef SPACEGOD_SUN_USH
+#define SPACEGOD_SUN_USH
+#include "/Plugin/SpaceGodRender/SpaceGodCommon.ush"
+
+float3 SG_Sun(float3 normalWS, float3 positionCR, float3 positionOSUE, float time, float sunBrightness,
+    float3 _Color, float _Intensity)
+{
+    float3 n = normalize(normalWS);
+    float3 viewDir = normalize(-positionCR);
+    float mu = saturate(dot(n, viewDir));
+    float limb = 0.45 + 0.55 * pow(mu, 0.55);
+    float3 p = normalize(SG_UnityFromUnreal(positionOSUE)) * 9.0;
+    float granulation = SolarFbm(p + time * 0.03) * 0.6 + SolarFbm(p * 4.0 - time * 0.05) * 0.4;
+    float3 col = _Color * _Intensity * limb * (0.82 + 0.36 * granulation);
+    col = lerp(col, float3(1.0, 0.55, 0.2), (1.0 - mu) * 0.35);
+    return col * SG_SunBrightness(sunBrightness);
+}
+
+#endif

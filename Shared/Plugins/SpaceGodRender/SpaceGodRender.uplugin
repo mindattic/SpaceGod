@@ -1,0 +1,19 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "SpaceGod Render",
+	"Description": "Unity.SpaceGod's twelve hand-written shaders ported to Unreal: .ush shader maths under /Plugin/SpaceGodRender and the unlit materials built on them, shared by the Cpp and CSharp tracks so both look identical to the original.",
+	"Category": "Rendering",
+	"CreatedBy": "MindAttic",
+	"CanContainContent": true,
+	"IsBetaVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "SpaceGodRender",
+			"Type": "Runtime",
+			"LoadingPhase": "PostConfigInit"
+		}
+	]
+}
