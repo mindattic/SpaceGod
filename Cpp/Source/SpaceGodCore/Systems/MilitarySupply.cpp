@@ -384,10 +384,15 @@ namespace SpaceGod::Core
 
 		double cost = 0;
 		double fromWater = cs::Math::Min(prop, stock[static_cast<int>(Good::Water)]);
-		cost += Take(station, Good::Water, fromWater) + Take(station, Good::Hydrocarbons, prop - fromWater);
+		// (Each Take its own statement, in C#'s left-to-right order: each one takes stock off the market.)
+		double waterCost = Take(station, Good::Water, fromWater);
+		double hydrocarbonsCost = Take(station, Good::Hydrocarbons, prop - fromWater);
+		cost += waterCost + hydrocarbonsCost;
 		cost += Take(station, Good::HeliumThree, prop * Propulsion::HeliumThreePerTonne);
 		cost += Take(station, Good::Munitions, mun);
-		cost += Take(station, Good::Alloys, alloysNeed * sparesShare) + Take(station, Good::Electronics, elecNeed * sparesShare);
+		double alloysCost = Take(station, Good::Alloys, alloysNeed * sparesShare);
+		double electronicsCost = Take(station, Good::Electronics, elecNeed * sparesShare);
+		cost += alloysCost + electronicsCost;
 		f->Treasury -= cost;
 
 		auto convoy = cs::New<SupplyConvoy>();
