@@ -399,10 +399,27 @@ three differences US-T38 left were all the C# track's:
 - *The C# sky and menu stars were darker*: the app's Unity camera was never bound to its Unreal camera, so the render
   backend's look (manual exposure, no tone curve) never reached it and the filmic curve crushed the dark end (~14/255 drew
   as ~2). Also aligned: Arial's line height (15 at 13 px, as Slate and Unity's hinted font give it; C# measured 14).
+- *Two more found by the diff*: the C# lines drew dashed (UProceduralMeshComponent keeps UVs at half precision and
+  M_Line's other end lives in TexCoord1/2, so an end millions of units out overflowed and its segment vanished; a line-only
+  mesh is now divided by a power of two and its component scaled back up); and the C++ track used Unreal's default TSR,
+  which smeared the one-pixel stars into soft blobs, where the original and the C# track draw them crisp: both use FXAA.
+
+Pixels differing (> 24/255) between `cpp-*` and `csharp-*`, before (US-T38's shots, wall-clock) and after:
+
+| Shot | before | after |
+|---|---|---|
+| views-sol | 0.44% | 0.00% (2 px) |
+| ui-main-menu | 0.87% | 0.40% |
+| ui-hud | 24.46% | 4.23% |
+| ui-help | 5.33% | 4.91% |
+| ui-galaxy-map | 4.17% | 2.23% |
+| ui-market-cargo | 23.56% | 4.30% |
+| ui-pause-menu | 7.46% | 1.61% |
 
 Left: text is drawn by Slate (C++) and by Canvas from a whole-point font (C#), so glyph edges and some advances differ by a
-pixel (C++ widths match the original's; C# runs about 1% narrower, which can move a wrap); the C# asteroid belt and ship
-detail are US-T40's.
+pixel (C++ widths match the original's; C# runs about 1% narrower, which can move a wrap): what remains of every shot's
+diff is text. One-pixel lines are aliased on both tracks (FXAA; the original's MSAA would need the forward renderer).
+The C# asteroid belt and ship detail are US-T40's.
 
 ## C# track
 
