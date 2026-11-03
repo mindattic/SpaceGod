@@ -123,6 +123,10 @@ namespace SpaceGod::UnityCompat
 
 			void Tri(int a, int b, int c, int material)
 			{
+				// Unity's front face is clockwise as seen by the viewer, Unreal's counter-clockwise; the axis mapping is a
+				// rotation, so every triangle is re-wound on upload (the C# track's UnrealSpace.FlipWinding). Without it the
+				// one-sided bodies and ships showed their back faces (the far hemisphere from inside, lit from behind).
+				std::swap(b, c);
 				if (a == b || b == c || a == c) return; // degenerate: Unity draws nothing for it either
 				int t = M.AppendTriangle(FIndex3i(a, b, c));
 				if (t < 0)

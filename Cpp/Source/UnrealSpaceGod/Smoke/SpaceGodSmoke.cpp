@@ -46,6 +46,7 @@
 #include "Misc/CoreDelegates.h"
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
+#include "UnrealClient.h"
 
 #include <set>
 
@@ -735,7 +736,8 @@ namespace SpaceGod::Smoke
 			{
 				FString file = ToF(viewShot).Replace(TEXT("\\"), TEXT("/"));
 				IFileManager::Get().MakeDirectory(*FPaths::GetPath(file), true);
-				if (GEngine) GEngine->Exec(world, *FString::Printf(TEXT("HighResShot 1600x900 filename=\"%s\""), *file));
+				// The C# track's HighResShot 1600x900 (the window's size): the scene alone, no UI.
+				FScreenshotRequest::RequestScreenshot(file, /*bShowUI*/ false, /*bAddFilenameSuffix*/ false);
 				Log(cs::Cat("SpaceGodViews: shot -> ", viewShot));
 			}
 			if (viewFrames == 150) Quit(world);
