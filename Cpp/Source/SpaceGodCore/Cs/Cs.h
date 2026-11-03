@@ -9,7 +9,9 @@
 // builds standalone (tools/build-core.ps1) for the headless Bench.
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
+#include <concepts>
 #include <cstdint>
 #include <functional>
 #include <limits>
@@ -18,6 +20,8 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <tuple>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -48,6 +52,9 @@ namespace cs
 	struct NotSupportedException : Exception { using Exception::Exception; };
 	struct FormatException : Exception { using Exception::Exception; };
 	struct IOException : Exception { using Exception::Exception; };
+	struct OverflowException : Exception { using Exception::Exception; };
+	struct NullReferenceException : Exception { using Exception::Exception; };
+	struct IndexOutOfRangeException : Exception { using Exception::Exception; };
 
 	// ---------------------------------------------------------------- hashing -----------------------------------
 	// Only lookup uses hashes; enumeration order never depends on them (see Dictionary), so any good hash will do.
@@ -63,6 +70,42 @@ namespace cs
 		size_t operator()(T v) const { return std::hash<std::underlying_type_t<T>>{}(static_cast<std::underlying_type_t<T>>(v)); }
 	};
 	inline size_t HashCombine(size_t seed, size_t h) { return seed ^ (h + 0x9e3779b97f4a7c15ull + (seed << 6) + (seed >> 2)); }
+	// C# value-tuple keys `(a, b)` / `(a, b, c)`: std::pair / std::tuple.
+	template <class A, class B> struct Hash<std::pair<A, B>>
+	{
+		size_t operator()(const std::pair<A, B>& v) const { return HashCombine(Hash<A>{}(v.first), Hash<B>{}(v.second)); }
+	};
+	template <class... A> struct Hash<std::tuple<A...>>
+	{
+		size_t operator()(const std::tuple<A...>& v) const
+		{
+			size_t h = 0;
+			std::apply([&](const auto&... x) { ((h = HashCombine(h, Hash<std::decay_t<decltype(x)>>{}(x))), ...); }, v);
+			return h;
+		}
+	};
+
+	// ---------------------------------------------------------------- default comparer ---------------------------
+	// .NET's Comparer<T>.Default.Compare(a, b) as -1/0/1: doubles order NaN before everything (double.CompareTo);
+	// a type with `int CompareTo(const T&) const` uses it; anything else uses operator<. Strings compare ordinally
+	// (.NET's default string comparer is culture-sensitive; for Core's ASCII identifiers the two differ only in
+	// case and punctuation order -- note it on your ticket if a port sorts mixed-case text by the default comparer).
+	template <class T> int Compare(const T& a, const T& b)
+	{
+		if constexpr (std::is_floating_point_v<T>)
+		{
+			if (a < b) return -1;
+			if (a > b) return 1;
+			if (a == b) return 0;
+			if (std::isnan(a)) return std::isnan(b) ? 0 : -1;
+			return 1;
+		}
+		else if constexpr (std::is_enum_v<T>) { using U = std::underlying_type_t<T>; return Compare(static_cast<U>(a), static_cast<U>(b)); }
+		else if constexpr (requires { { a.CompareTo(b) } -> std::convertible_to<int>; }) { int c = a.CompareTo(b); return c < 0 ? -1 : (c > 0 ? 1 : 0); }
+		else { return a < b ? -1 : (b < a ? 1 : 0); }
+	}
+	template <class A, class B, std::enable_if_t<!std::is_same_v<A, B> && std::is_arithmetic_v<A> && std::is_arithmetic_v<B>, int> = 0>
+	int Compare(const A& a, const B& b) { using C = std::common_type_t<A, B>; return Compare<C>(static_cast<C>(a), static_cast<C>(b)); }
 
 	// ---------------------------------------------------------------- List<T> -----------------------------------
 	template <class T> class List
@@ -321,8 +364,40 @@ namespace cs
 		inline long long Min(long long a, long long b) { return a < b ? a : b; }
 		inline double Clamp(double v, double lo, double hi) { if (lo > hi) throw ArgumentException("min > max"); return v < lo ? lo : (v > hi ? hi : v); }
 		inline int Clamp(int v, int lo, int hi) { if (lo > hi) throw ArgumentException("min > max"); return v < lo ? lo : (v > hi ? hi : v); }
+		// Math.Sign(NaN) throws ArithmeticException.
+		struct ArithmeticErrorT : Exception { ArithmeticErrorT() : Exception("Function does not accept floating point Not-a-Number values.") {} };
+		inline ArithmeticErrorT ArithmeticError() { return {}; }
 		inline int Sign(double v) { if (std::isnan(v)) throw ArithmeticError(); return v > 0 ? 1 : (v < 0 ? -1 : 0); }
 		inline int Sign(int v) { return v > 0 ? 1 : (v < 0 ? -1 : 0); }
+		inline int Sign(long long v) { return v > 0 ? 1 : (v < 0 ? -1 : 0); }
+		inline float Abs(float v) { return std::fabs(v); }
+		inline float Max(float a, float b) { return static_cast<float>(Max(static_cast<double>(a), static_cast<double>(b))); }
+		inline float Min(float a, float b) { return static_cast<float>(Min(static_cast<double>(a), static_cast<double>(b))); }
+		// Mixed argument types (C# `Math.Max(i, d)` widens the int to double; C++ would call that ambiguous).
+		// Each picks the overload C#'s implicit conversions would: the common arithmetic type.
+		template <class A, class B, std::enable_if_t<std::is_arithmetic_v<A> && std::is_arithmetic_v<B> && !std::is_same_v<A, B>, int> = 0>
+		auto Max(A a, B b)
+		{
+			using C = std::common_type_t<A, B>;
+			if constexpr (std::is_floating_point_v<C>) return static_cast<C>(Max(static_cast<double>(a), static_cast<double>(b)));
+			else return static_cast<C>(a) > static_cast<C>(b) ? static_cast<C>(a) : static_cast<C>(b);
+		}
+		template <class A, class B, std::enable_if_t<std::is_arithmetic_v<A> && std::is_arithmetic_v<B> && !std::is_same_v<A, B>, int> = 0>
+		auto Min(A a, B b)
+		{
+			using C = std::common_type_t<A, B>;
+			if constexpr (std::is_floating_point_v<C>) return static_cast<C>(Min(static_cast<double>(a), static_cast<double>(b)));
+			else return static_cast<C>(a) < static_cast<C>(b) ? static_cast<C>(a) : static_cast<C>(b);
+		}
+		template <class V, class L, class H, std::enable_if_t<std::is_arithmetic_v<V> && std::is_arithmetic_v<L> && std::is_arithmetic_v<H> && !(std::is_same_v<V, L> && std::is_same_v<L, H>), int> = 0>
+		auto Clamp(V v, L lo, H hi)
+		{
+			using C = std::common_type_t<V, L, H>;
+			C cv = static_cast<C>(v), cl = static_cast<C>(lo), ch = static_cast<C>(hi);
+			if (cl > ch) throw ArgumentException("min > max");
+			return cv < cl ? cl : (cv > ch ? ch : cv);
+		}
+		inline float Clamp(float v, float lo, float hi) { if (lo > hi) throw ArgumentException("min > max"); return v < lo ? lo : (v > hi ? hi : v); }
 		inline double Sqrt(double v) { return std::sqrt(v); }
 		inline double Sin(double v) { return std::sin(v); }
 		inline double Cos(double v) { return std::cos(v); }
@@ -350,14 +425,13 @@ namespace cs
 		enum class MidpointRounding { ToEven, AwayFromZero };
 		double Round(double v, MidpointRounding mode);
 		double Round(double v, int digits, MidpointRounding mode);
-		struct ArithmeticErrorT : Exception { ArithmeticErrorT() : Exception("Function does not accept floating point Not-a-Number values.") {} };
-		inline ArithmeticErrorT ArithmeticError() { return {}; }
 	}
 
 	// double.NaN, double.MaxValue, ... and the double.IsX tests.
 	namespace Double
 	{
-		constexpr double NaN = std::numeric_limits<double>::quiet_NaN();
+		// .NET's double.NaN is 0.0 / 0.0: the x64 default NaN, sign bit set (0xFFF8000000000000), unlike quiet_NaN().
+		constexpr double NaN = std::bit_cast<double>(0xFFF8000000000000ull);
 		constexpr double PositiveInfinity = std::numeric_limits<double>::infinity();
 		constexpr double NegativeInfinity = -std::numeric_limits<double>::infinity();
 		constexpr double MaxValue = std::numeric_limits<double>::max();
@@ -370,6 +444,19 @@ namespace cs
 		inline bool IsFinite(double v) { return std::isfinite(v); }
 		bool TryParse(std::string_view s, double& out); // invariant culture
 		double Parse(std::string_view s);
+	}
+	// float.NaN, float.MaxValue, ... (C# float is IEEE single, as C++ float).
+	namespace Single
+	{
+		constexpr float NaN = std::bit_cast<float>(0xFFC00000u); // 0f / 0f, as .NET
+		constexpr float PositiveInfinity = std::numeric_limits<float>::infinity();
+		constexpr float NegativeInfinity = -std::numeric_limits<float>::infinity();
+		constexpr float MaxValue = std::numeric_limits<float>::max();
+		constexpr float MinValue = -std::numeric_limits<float>::max();
+		constexpr float Epsilon = std::numeric_limits<float>::denorm_min();
+		inline bool IsNaN(float v) { return std::isnan(v); }
+		inline bool IsInfinity(float v) { return std::isinf(v); }
+		inline bool IsFinite(float v) { return std::isfinite(v); }
 	}
 	namespace Int
 	{
@@ -397,6 +484,8 @@ namespace cs
 	String Str(float v);
 	inline String Str(int v) { return std::to_string(v); }
 	inline String Str(long long v) { return std::to_string(v); }
+	inline String Str(long v) { return std::to_string(v); }
+	inline String Str(unsigned long v) { return std::to_string(v); }
 	inline String Str(unsigned v) { return std::to_string(v); }
 	inline String Str(unsigned long long v) { return std::to_string(v); }
 	inline String Str(bool v) { return v ? "True" : "False"; }
@@ -415,9 +504,36 @@ namespace cs
 	String Fmt(double v, std::string_view format);
 	String Fmt(int v, std::string_view format);
 	String Fmt(long long v, std::string_view format);
+	String Fmt(float v, std::string_view format); // a float formats with float's precision (7 digits), as .NET does
+	inline String Fmt(long v, std::string_view format) { return Fmt(static_cast<long long>(v), format); }
+	String Fmt(unsigned long long v, std::string_view format);
+	inline String Fmt(unsigned v, std::string_view format) { return Fmt(static_cast<unsigned long long>(v), format); }
+	inline String Fmt(unsigned long v, std::string_view format) { return Fmt(static_cast<unsigned long long>(v), format); }
 
 	// String concatenation: C# `"a" + x + "b"` is `cs::Cat("a", x, "b")`, each piece through Str.
 	template <class... A> String Cat(const A&... parts) { String s; ((s += Str(parts)), ...); return s; }
+
+	// string.Format(CultureInfo.InvariantCulture, "...{0:0.###}...{1,5}", a, b): composite formatting, each
+	// argument through Fmt (with a format) or Str. Supports {i}, {i:format}, {i,alignment[:format]}; "{{" "}}".
+	namespace FormatDetail
+	{
+		template <class T> String Arg(const T& v, std::string_view f)
+		{
+			if constexpr (std::is_arithmetic_v<T> && !std::is_same_v<T, bool> && !std::is_same_v<T, char>) { if (!f.empty()) return Fmt(v, f); }
+			return Str(v);
+		}
+		String Composite(std::string_view composite, const Func<String, int, std::string_view>& arg, int count);
+	}
+	template <class... A> String Format(std::string_view composite, const A&... args)
+	{
+		Func<String, int, std::string_view> get = [&](int i, std::string_view f)
+		{
+			String r; int k = 0;
+			((k++ == i ? (void)(r = FormatDetail::Arg(args, f)) : (void)0), ...);
+			return r;
+		};
+		return FormatDetail::Composite(composite, get, static_cast<int>(sizeof...(A)));
+	}
 
 	namespace Strings
 	{
@@ -467,19 +583,44 @@ namespace cs
 	};
 
 	// ---------------------------------------------------------------- LINQ (the few uses) -----------------------
-	// OrderBy / OrderByDescending are stable sorts in LINQ, unlike List.Sort.
+	// OrderBy / OrderByDescending are stable sorts in LINQ, unlike List.Sort. Keys compare with cs::Compare
+	// (.NET's Comparer<TKey>.Default).
 	template <class C, class KeyF> auto OrderBy(const C& c, KeyF key)
 	{
 		List<typename C::value_type> r; for (const auto& v : c) r.Add(v);
-		std::stable_sort(r.Raw().begin(), r.Raw().end(), [&](const auto& a, const auto& b) { return key(a) < key(b); });
+		std::stable_sort(r.Raw().begin(), r.Raw().end(), [&](const auto& a, const auto& b) { return Compare(key(a), key(b)) < 0; });
 		return r;
 	}
 	template <class C, class KeyF> auto OrderByDescending(const C& c, KeyF key)
 	{
 		List<typename C::value_type> r; for (const auto& v : c) r.Add(v);
-		std::stable_sort(r.Raw().begin(), r.Raw().end(), [&](const auto& a, const auto& b) { return key(b) < key(a); });
+		std::stable_sort(r.Raw().begin(), r.Raw().end(), [&](const auto& a, const auto& b) { return Compare(key(b), key(a)) < 0; });
 		return r;
 	}
+}
+
+// ---------------------------------------------------------------- [Flags] enums ---------------------------------
+// `CS_FLAGS(MyFlags)` after a `[Flags] enum class MyFlags : int` gives it C#'s bitwise operators (| & ^ ~ |= &= ^=);
+// cs::HasFlag(v, f) is `v.HasFlag(f)` and cs::Any(v) is `v != 0`. Use it at namespace scope, beside the enum.
+#define CS_FLAGS(E) \
+	[[maybe_unused]] constexpr E operator|(E a, E b) { using U = std::underlying_type_t<E>; return static_cast<E>(static_cast<U>(a) | static_cast<U>(b)); } \
+	[[maybe_unused]] constexpr E operator&(E a, E b) { using U = std::underlying_type_t<E>; return static_cast<E>(static_cast<U>(a) & static_cast<U>(b)); } \
+	[[maybe_unused]] constexpr E operator^(E a, E b) { using U = std::underlying_type_t<E>; return static_cast<E>(static_cast<U>(a) ^ static_cast<U>(b)); } \
+	[[maybe_unused]] constexpr E operator~(E a) { using U = std::underlying_type_t<E>; return static_cast<E>(~static_cast<U>(a)); } \
+	[[maybe_unused]] constexpr E& operator|=(E& a, E b) { return a = a | b; } \
+	[[maybe_unused]] constexpr E& operator&=(E& a, E b) { return a = a & b; } \
+	[[maybe_unused]] constexpr E& operator^=(E& a, E b) { return a = a ^ b; }
+
+namespace cs
+{
+	// Enum.HasFlag: (value & flag) == flag.
+	template <class E, std::enable_if_t<std::is_enum_v<E>, int> = 0> constexpr bool HasFlag(E value, E flag)
+	{
+		using U = std::underlying_type_t<E>;
+		return (static_cast<U>(value) & static_cast<U>(flag)) == static_cast<U>(flag);
+	}
+	// Any bit set: C# `(flags & X) != 0` is `cs::Any(flags & X)`.
+	template <class E, std::enable_if_t<std::is_enum_v<E>, int> = 0> constexpr bool Any(E value) { return static_cast<std::underlying_type_t<E>>(value) != 0; }
 }
 
 #include "Cs/CsSort.inl"

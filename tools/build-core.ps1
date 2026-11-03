@@ -1,0 +1,156 @@
+[CmdletBinding()]
+param(
+  # Top-level folders of Cpp/Source/SpaceGodCore to build (e.g. -Only Cs,Shared,Combat). Default: all of them.
+  # Cs is always built: everything else depends on it.
+  [string[]]$Only,
+  # Most cl.exe processes alive at once (memory is shared with other builds on this machine).
+  [int]$MaxParallel = 4,
+  [ValidateSet('Release', 'Debug')][string]$Configuration = 'Release',
+  # Recompile everything instead of only sources newer than their .obj (or older than a changed header).
+  [switch]$Rebuild,
+  # Build CsParity.exe but don't run it against Tests/CsParity/expected.txt.
+  [switch]$SkipParity
+)
+
+<#
+.SYNOPSIS
+Standalone build of SpaceGodCore (the C++ port of Unity.SpaceGod's Core) with MSVC, no Unreal involved.
+
+.DESCRIPTION
+Compiles every .cpp under Cpp/Source/SpaceGodCore except SpaceGodCoreModule.cpp (the one file with Unreal
+headers) and Tests/, archives them into SpaceGodCore.lib, then builds Tests/CsParity (the check that Cs/Cs.h
+reproduces .NET: formatting, Math.Round, System.Random, List.Sort, Parse) and runs it against the .NET output in
+Tests/CsParity/expected.txt. Output goes to Cpp/Intermediate/CoreStandalone/<Configuration> (gitignored).
+Flags: C++20, /EHsc /GR /W4 /permissive- /fp:precise /utf-8, SPACEGOD_STANDALONE defined.
+Finds Visual Studio 2022 (or a newer one with the C++ x64 tools) through vswhere.
+
+.EXAMPLE
+tools/build-core.ps1                       # everything
+tools/build-core.ps1 -Only Shared          # Cs + Shared
+tools/build-core.ps1 -Only Combat,Economy -MaxParallel 2
+#>
+
+$ErrorActionPreference = 'Stop'
+$repo = Split-Path -Parent $PSScriptRoot
+$core = Join-Path $repo 'Cpp\Source\SpaceGodCore'
+$out = Join-Path $repo "Cpp\Intermediate\CoreStandalone\$Configuration"
+if ($MaxParallel -lt 1) { $MaxParallel = 1 }
+
+# ---------------------------------------------------------------- MSVC environment
+function Import-VcVars {
+  if ($env:VCToolsInstallDir -and (Get-Command cl.exe -ErrorAction SilentlyContinue)) { return }
+  $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+  if (-not (Test-Path -LiteralPath $vswhere)) { throw 'vswhere.exe not found: install Visual Studio 2022 with "Desktop development with C++".' }
+  $req = 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64'
+  $vs = & $vswhere -products * -version '[17.0,18.0)' -requires $req -latest -property installationPath
+  if (-not $vs) { $vs = & $vswhere -products * -requires $req -latest -property installationPath }
+  if (-not $vs) { throw 'No Visual Studio with the C++ x64 build tools found (vswhere).' }
+  $bat = Join-Path $vs 'VC\Auxiliary\Build\vcvars64.bat'
+  $lines = & cmd.exe /c "`"$bat`" >nul 2>&1 && set"
+  foreach ($line in $lines) {
+    $i = $line.IndexOf('=')
+    if ($i -gt 0) { [Environment]::SetEnvironmentVariable($line.Substring(0, $i), $line.Substring($i + 1), 'Process') }
+  }
+  if (-not (Get-Command cl.exe -ErrorAction SilentlyContinue)) { throw "vcvars64.bat in $vs did not put cl.exe on PATH." }
+  Write-Host "MSVC: $vs"
+}
+Import-VcVars
+
+# ---------------------------------------------------------------- sources
+$dirs = Get-ChildItem -LiteralPath $core -Directory | Where-Object { $_.Name -ne 'Tests' } | ForEach-Object Name
+if ($Only) {
+  $want = @('Cs') + ($Only | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+  foreach ($w in $want) { if ($dirs -notcontains $w) { throw "No folder '$w' under $core." } }
+  $dirs = $dirs | Where-Object { $want -contains $_ }
+}
+$sources = @()
+foreach ($d in $dirs) { $sources += Get-ChildItem -LiteralPath (Join-Path $core $d) -Recurse -Filter '*.cpp' -File }
+# Loose .cpp files at the module root, except the Unreal module file.
+if (-not $Only) { $sources += Get-ChildItem -LiteralPath $core -Filter '*.cpp' -File | Where-Object { $_.Name -ne 'SpaceGodCoreModule.cpp' } }
+
+$headerTime = (Get-ChildItem -LiteralPath $core -Recurse -File -Include '*.h', '*.inl' |
+  Measure-Object -Property LastWriteTimeUtc -Maximum).Maximum
+
+$common = @('/nologo', '/c', '/std:c++20', '/EHsc', '/GR', '/W4', '/permissive-', '/utf-8', '/fp:precise',
+  '/Zc:__cplusplus', '/Zc:preprocessor', '/bigobj', '/DSPACEGOD_STANDALONE', '/D_CRT_SECURE_NO_WARNINGS', "/I`"$core`"")
+if ($Configuration -eq 'Release') { $common += @('/O2', '/MD', '/DNDEBUG', '/Zi') } else { $common += @('/Od', '/MDd', '/Zi', '/RTC1') }
+
+# ---------------------------------------------------------------- compile (at most $MaxParallel cl.exe at once)
+function Invoke-Compile([object[]]$files, [string]$objRoot) {
+  $jobs = @()
+  foreach ($f in $files) {
+    $rel = $f.FullName.Substring($core.Length).TrimStart('\')
+    $obj = Join-Path $objRoot ([IO.Path]::ChangeExtension($rel, '.obj'))
+    $stale = $Rebuild -or -not (Test-Path -LiteralPath $obj)
+    if (-not $stale) {
+      $t = (Get-Item -LiteralPath $obj).LastWriteTimeUtc
+      $stale = ($f.LastWriteTimeUtc -gt $t) -or ($headerTime -gt $t)
+    }
+    $jobs += [pscustomobject]@{ Src = $f.FullName; Rel = $rel; Obj = $obj; Stale = $stale }
+  }
+  $todo = @($jobs | Where-Object Stale)
+  Write-Host ("{0} source(s), {1} to compile, {2} at a time" -f $jobs.Count, $todo.Count, $MaxParallel)
+  $running = @(); $failed = @(); $queue = [Collections.Queue]::new(); $todo | ForEach-Object { $queue.Enqueue($_) }
+  while ($queue.Count -gt 0 -or $running.Count -gt 0) {
+    while ($queue.Count -gt 0 -and $running.Count -lt $MaxParallel) {
+      $j = $queue.Dequeue()
+      New-Item -ItemType Directory -Force (Split-Path -Parent $j.Obj) | Out-Null
+      $pdb = [IO.Path]::ChangeExtension($j.Obj, '.pdb')
+      $psi = [Diagnostics.ProcessStartInfo]::new('cl.exe')
+      $psi.Arguments = (($common + @("/Fo`"$($j.Obj)`"", "/Fd`"$pdb`"", "`"$($j.Src)`"")) -join ' ')
+      $psi.UseShellExecute = $false; $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true
+      $psi.WorkingDirectory = $core
+      $p = [Diagnostics.Process]::Start($psi)
+      $running += [pscustomobject]@{ Job = $j; Proc = $p; StdOut = $p.StandardOutput.ReadToEndAsync(); StdErr = $p.StandardError.ReadToEndAsync() }
+    }
+    Start-Sleep -Milliseconds 100
+    $still = @()
+    foreach ($r in $running) {
+      if ($r.Proc.HasExited) {
+        $text = ($r.StdOut.Result + $r.StdErr.Result) -split "`r?`n" | Where-Object { $_ -and ($_ -ne (Split-Path -Leaf $r.Job.Src)) }
+        if ($r.Proc.ExitCode -ne 0) {
+          $failed += $r.Job.Rel
+          Write-Host "FAILED  $($r.Job.Rel)" -ForegroundColor Red
+          if (Test-Path -LiteralPath $r.Job.Obj) { Remove-Item -LiteralPath $r.Job.Obj -Force }
+        } else {
+          Write-Host "ok      $($r.Job.Rel)"
+        }
+        $text | ForEach-Object { Write-Host "  $_" }
+      } else { $still += $r }
+    }
+    $running = $still
+  }
+  return , @{ Objs = @($jobs | ForEach-Object Obj); Failed = $failed }
+}
+
+$objRoot = Join-Path $out 'obj'
+$result = Invoke-Compile $sources $objRoot
+if ($result.Failed.Count -gt 0) {
+  Write-Host "`n$($result.Failed.Count) file(s) failed:" -ForegroundColor Red
+  $result.Failed | ForEach-Object { Write-Host "  $_" }
+  exit 1
+}
+
+# ---------------------------------------------------------------- archive
+$lib = Join-Path $out 'SpaceGodCore.lib'
+$rsp = Join-Path $out 'lib.rsp'
+($result.Objs | ForEach-Object { "`"$_`"" }) -join "`n" | Set-Content -LiteralPath $rsp -Encoding ascii
+& lib.exe /nologo "/OUT:$lib" "@$rsp"
+if ($LASTEXITCODE -ne 0) { throw 'lib.exe failed.' }
+Write-Host "lib     $lib"
+
+# ---------------------------------------------------------------- CsParity
+$parityDir = Join-Path $core 'Tests\CsParity'
+$parityObjRoot = Join-Path $out 'testobj'
+$pr = Invoke-Compile @(Get-Item -LiteralPath (Join-Path $parityDir 'CsParity.cpp')) $parityObjRoot
+if ($pr.Failed.Count -gt 0) { exit 1 }
+$exe = Join-Path $out 'CsParity.exe'
+& link.exe /nologo /DEBUG "/OUT:$exe" $pr.Objs $lib
+if ($LASTEXITCODE -ne 0) { throw 'link.exe failed (CsParity).' }
+Write-Host "exe     $exe"
+
+if (-not $SkipParity) {
+  & $exe (Join-Path $parityDir 'expected.txt')
+  if ($LASTEXITCODE -ne 0) { Write-Host 'CsParity: the C++ layer differs from .NET (see above).' -ForegroundColor Red; exit $LASTEXITCODE }
+}
+exit 0
