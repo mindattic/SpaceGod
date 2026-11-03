@@ -8,9 +8,25 @@
 #include <cstdlib>
 #include <cstring>
 #include <random>
+#include <cstdio>
 
 namespace cs
 {
+	// ============================================================ layout guard (US-T49) ========================
+	// Every object that includes Cs.h calls this while its module loads (Cs.h, "layout guard"). A difference means
+	// the objects were compiled against different versions of Cs.h (a stale incremental build): stop before any
+	// container is touched, rather than crash later in BucketOf or corrupt the heap.
+	int Abi::Check(uint64_t objectFingerprint)
+	{
+		if (objectFingerprint == Fingerprint) return 0;
+		std::fprintf(stderr, "cs::Abi::Check: an object was compiled against another Cs/Cs.h (layout fingerprint %llu, "
+			"SpaceGodCore's Cs.cpp has %llu). The build is stale or mixed: rebuild the modules (UBT -Clean, or "
+			"tools/build-core.ps1 -Rebuild) so every object sees the same header.\n",
+			static_cast<unsigned long long>(objectFingerprint), static_cast<unsigned long long>(Fingerprint));
+		std::fflush(stderr);
+		std::abort();
+	}
+
 	// ============================================================ System.Random ================================
 	// dotnet/runtime src/libraries/System.Private.CoreLib/src/System/Random.Net5CompatImpl.cs (CompatPrng).
 	namespace

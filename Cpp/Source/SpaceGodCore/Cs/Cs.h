@@ -865,3 +865,28 @@ namespace cs
 
 #include "Cs/CsSort.inl"
 #include "Cs/CsDateTime.h"
+// ---------------------------------------------------------------- layout guard (US-T49) --------------------------
+// Cs.h's containers are templates, so every object file carries its own inline copy of their code and its own idea
+// of their layout; the linker keeps one copy of each function, picked from any object. Objects built against two
+// versions of this header therefore mix silently: US-T42 step 3 added Dictionary::shift (64 -> 72 bytes) and an
+// incremental UE build that kept objects compiled from the step-2 header (the header was edited while UBT compiled,
+// so those objects looked newer than it) read `shift` from where step 2 keeps `tombstones` (0): Home(h) = h, an
+// access violation reading 0xffffffffffffffff in BucketOf (or a quiet heap overwrite in Place).
+// So every translation unit that includes Cs.h checks, while its module loads, that it agrees with Cs.cpp's (the
+// SpaceGodCore DLL's, for the game module) on this fingerprint, and stops with a clear message if not. Sizes change
+// on their own; bump CsAbiRevision for a change that keeps the sizes but changes what inline code means (a different
+// Home, hash, probe or growth rule), so that a stale object cannot place keys where a fresh one looks them up.
+namespace cs::Abi
+{
+	inline constexpr uint64_t CsAbiRevision = 3; // 3: US-T42 step 3 (Fibonacci Home, value hashes)
+	inline constexpr uint64_t Fingerprint = (((((CsAbiRevision * 1009 + sizeof(Dictionary<int, int>)) * 1009 + sizeof(Dictionary<int, int>::Entry)) * 1009
+		+ sizeof(HashSet<int>)) * 1009 + sizeof(List<int>)) * 1009 + sizeof(Queue<int>)) * 1009 + sizeof(Stack<int>);
+	static_assert(sizeof(Dictionary<int, int>) == 72, "cs::Dictionary's layout changed: also bump cs::Abi::CsAbiRevision, then fix this check");
+	// Compares an object's fingerprint with Cs.cpp's (the Core module's); prints both and aborts when they differ.
+	SPACEGODCORE_API int Check(uint64_t objectFingerprint);
+	namespace
+	{
+		// One per translation unit (internal linkage, so the linker cannot fold it into another object's copy).
+		[[maybe_unused]] const int checked = Check(Fingerprint);
+	}
+}

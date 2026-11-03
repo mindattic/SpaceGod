@@ -69,6 +69,7 @@ foreach ($d in $dirs) { $sources += Get-ChildItem -LiteralPath (Join-Path $core 
 # Loose .cpp files at the module root (Core's top-level .cs files), with a full build or -Only '.'.
 if (-not $Only -or $want -contains '.') { $sources += Get-ChildItem -LiteralPath $core -Filter '*.cpp' -File | Where-Object { $_.Name -ne 'SpaceGodCoreModule.cpp' } }
 
+$started = [DateTime]::UtcNow
 $headerTime = (Get-ChildItem -LiteralPath $core -Recurse -File -Include '*.h', '*.inl' |
   Measure-Object -Property LastWriteTimeUtc -Maximum).Maximum
 
@@ -155,6 +156,21 @@ if ($result.Failed.Count -gt 0) {
   Write-Host "`n$($result.Failed.Count) file(s) failed:" -ForegroundColor Red
   $result.Failed | ForEach-Object { Write-Host "  $_" }
   exit 1
+}
+# US-T49: a file edited while cl.exe ran can be in objects compiled from its old text that are newer than it, so they
+# would never be recompiled (mixed headers: an ODR violation). Give such files the time now and build once more.
+$edited = @(Get-ChildItem -LiteralPath $core -Recurse -File -Include '*.h', '*.inl', '*.cpp' | Where-Object LastWriteTimeUtc -gt $started)
+if ($edited.Count -gt 0) {
+  $now = [DateTime]::UtcNow
+  foreach ($f in $edited) { $f.LastWriteTimeUtc = $now; Write-Warning "edited during the build: $($f.FullName)" }
+  if (-not $env:SPACEGOD_CORE_AGAIN) {
+    $env:SPACEGOD_CORE_AGAIN = '1'
+    Write-Host 'Building again so every object sees the edited file(s).'
+    & $PSCommandPath @PSBoundParameters
+    $code = $LASTEXITCODE
+    Remove-Item Env:SPACEGOD_CORE_AGAIN
+    exit $code
+  }
 }
 
 # ---------------------------------------------------------------- archive

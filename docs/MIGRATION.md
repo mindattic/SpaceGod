@@ -270,6 +270,30 @@ What parity does *not* cover yet: code paths no scenario reaches (saves/loads th
 Session layer, the player-flown helm and seats, settings bound from a profile, the non-Latin text paths behind
 `cs::Char`). A scenario per area (a save/load round trip mid-run; a scripted helm) is the natural next step.
 
+3. **Objects built against two versions of `Cs/Cs.h` (US-T49).** After US-T42 step 3 every UE run of the C++ track died
+   early (the plain smoke too): an access violation reading `0xffffffffffffffff` in `cs::Dictionary::BucketOf` (from
+   `VoidStations::Destinations`' local HashSet, or `SpinalMounts::Classes()`), and after a fuller rebuild an exit in the
+   first frame; the standalone Bench never failed. Nothing in the hash, growth or probing was wrong: the generated code is
+   correct (checked in the UE compile's listing), and a clean UE build of the same HEAD passes `-Mode smoke` and
+   `-Mode coop-smoke`. The cause was the build. Cs.h's containers are templates, so every object carries its own
+   inline copy of their code and its own idea of their layout, and the linker keeps one copy of each function, picked
+   from any object. Step 3 added a member (`int shift`, so 64 → 72 bytes, `tombstones`/`freeList`/`count` moved), and
+   Cs.h was edited while another agent's UBT build was compiling SpaceGodCore. Objects compiled from the old text that
+   finished after the edit looked newer than Cs.h, and UBT, which compares timestamps, kept them in every later build.
+   So a step-2 `Insert`/`Grow` built a set and a step-3 `TryAdd` looked it up, reading `shift` from where step 2 keeps
+   `tombstones` (0): `Home(h) = h >> 0 = h`, a non-canonical address. Reproduced standalone: one object built with the
+   step-2 header, one with HEAD's, linked together → `AV reading 0xffffffffffffffff`; both with HEAD's → correct.
+   Reverting `Home` "fixed" it only because editing Cs.h again made UBT recompile everything against one version.
+   **Guards:** (a) every translation unit that includes Cs.h checks a layout fingerprint while its module loads
+   (`cs::Abi`: the sizes of Dictionary, its Entry, HashSet, List, Queue and Stack, and `CsAbiRevision`) against Cs.cpp's,
+   the SpaceGodCore DLL's for the game module, and aborts with a message naming both (`cs::Abi::Check`). A
+   `static_assert` pins `sizeof(Dictionary<int, int>) == 72`, so a layout change also has to touch `CsAbiRevision`
+   beside it. Bump the revision by hand for a change that keeps the sizes but changes what inline code means (`Home`,
+   a hash, probing, growth). (b) `tools/build.ps1` and `tools/build-core.ps1` look for sources or headers written during
+   the build, give them the time now (so everything that includes them is out of date) and build again. The lesson
+   for any shared checkout: a header edited while a build compiles can leave mixed objects behind, and with templates
+   that is an ODR violation the linker never reports.
+
 **Speed (first comparison, same workstation, shared with other builds, so ±20%).** The C++ Core is currently
 **about 2–2.5× slower per tick** than .NET 8's JIT on the same simulation (table in Bench/README.md), while building
 the galaxy at about the same speed. Nothing has been tuned yet; the likely costs are the translation's mechanics rather
@@ -319,6 +343,10 @@ over Bench.Cpp and over Bench.CSharp. That separates time in the CRT math librar
 3. `cs::Hash`: integers and doubles hash to their value (`-0.0` as `0.0`), a Ref to its pointer; the Dictionary takes a
    bucket from the top bits of the Fibonacci product. `/arch:AVX` (about −7% on economy-year, at the edge of noise).
 4. Fleet's per-ship delegates (`IsHeld`, `Lands`, `BurnsPropellant`) take `const cs::Ref<Ship>&`.
+
+The UE crashes after step 3 came from a stale, mixed incremental build, not from these steps (Parity finding 3, US-T49).
+Step 3's `Home` stays. Any change to a Cs.h container's members or inline index code changes the layout fingerprint
+(`cs::Abi`) or needs a `CsAbiRevision` bump.
 
 **Tried and dropped:** a size-class allocator in Bench.Cpp (per-class reserved ranges, thread-local free lists, like
 UE's binned allocator) was *slower* than Windows' low-fragmentation heap in every scenario (economy-year 184 vs 114 ms
