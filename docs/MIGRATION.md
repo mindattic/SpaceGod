@@ -288,6 +288,51 @@ Core and the game assembly before comparing with C++.
 less battle-tested than C++'s; the Session layer (host-authoritative commands) keeps the replicated surface small.
 UnrealSharp is pre-1.0 with no tags: updates are by commit, and two of our workarounds depend on its internals.
 
+### C# Runtime: app, camera, input (US-T26)
+
+`CSharp/Script/ManagedUnrealSpaceGodCSharp/Runtime/` mirrors Unity.SpaceGod's `Assets/UnitySpace/Runtime/`. The port
+runs on the shared **Unity facade** (`namespace UnityEngine`, `ManagedUnrealSpaceGodCSharp/UnityCompat/`, US-T27/T28:
+Unity's math with Unity's formulas, GameObject/Transform/MonoBehaviour, Camera, Material/Mesh, IMGUI; `UnityBridge`
+pushes what is drawn to Unreal once a frame). So the Runtime's own files are the **original source**, unchanged except
+where marked `US-T26`: `UnitySpaceApp.cs` (its piloting lines 976-2085 in `UnitySpaceApp.Helm.cs`) and all eleven
+partials, `Camera/SpaceCamera.cs`, `Camera/StarTravel.cs`, `Target.cs`, `EngineSettings.cs`, `GameSettingsHost.cs`,
+`ActiveProfile.cs`, `SessionAudio.cs`. The app is still a `MonoBehaviour`: same update order (input → clock →
+`Galaxy.Update` → scale layout → piloting/seat → ships → structures → adventures → camera → clip planes → streaming →
+views → hover/picking), same stepping (real `dt` capped at 0.1 s, the Core's own sim-time warp), same saves through
+Core/Persistence, same `LocalSession` command path for seats (the co-op seam).
+
+- **Player loop.** `ASpaceGameMode` hosts the scene: BeginPlay runs `Bootstrap.EnsureApp` (Unity's SubsystemRegistration /
+  BeforeSceneLoad / AfterSceneLoad hooks: profiles, the CLI mute, `new GameObject().AddComponent<UnitySpaceApp>()` and its
+  Awake); each Tick is `UnrealHost.BeforeUpdate` (viewport → `Screen`, input) → `UnityBridge.Tick(dt)` (Time, every
+  MonoBehaviour's Update) → `UnrealHost.AfterUpdate` (camera, cursor, frame cap) → `UnityBridge.Sync()`. EndPlay sends
+  OnApplicationQuit (the autosave) and destroys the app. `GameLaunch`'s two Unity scenes are a fresh app or the menu
+  screen (no level content).
+- **Input** (`Runtime/Input/`): raw key polling on the local `APlayerController` (`IsInputKeyDown`,
+  `WasInputKeyJustPressed/Released`, `GetMousePosition`, `GetInputMouseDelta`, the `MouseWheelAxis` key), behind
+  `IInputDevice`, read once a frame by `InputState.Poll` with the original's bindings and edge rules (Core/ControlsHelp.cs).
+  Chosen over Enhanced Input because the original polls every key in one place and resolves shared keys itself (F, T, B,
+  Backspace...), while Enhanced Input from C# needs an InputAction and mapping-context asset per binding. Key names:
+  backquote = Tilde, quote = Apostrophe, minus = Hyphen, numpad + - * / = Add/Subtract/Multiply/Divide; Unreal has one
+  Enter for both. The pointer is put in Unity's screen space (origin bottom-left) and the wheel in Unity's raw 120 a
+  notch, so the original's thresholds hold. The cursor lock is `ShowMouseCursor` + `SetInputMode_GameOnly`/`GameAndUI`.
+  `ScriptedInputDevice` drives the same poll headless.
+- **Camera**: `SpaceCamera`/`StarTravel` run unchanged in Unity axes and double scene units; `Camera.main` stays at the
+  origin (floating origin: every view is placed at scene − camera). `UnrealHost` copies it onto an `ACameraActor` that is
+  the player's view target, through the one axis helper `UnityEngine.UnrealSpace` (Unity left-handed Y-up → Unreal
+  left-handed Z-up: UE(X, Y, Z) = Unity(z, x, y), a proper rotation, quaternions permuted the same way; one unit a unit,
+  scene units not being metres). Unity's vertical FOV becomes Unreal's horizontal for the viewport aspect; the dynamic
+  near plane (nearest surface × 0.25) is `r.SetNearClipPlane` when it moves by over 10% (Unreal's far plane is infinite).
+- **Seams** for the later ports: stand-ins marked `Seam (US-T26)` with the originals' signatures and inert bodies, at the
+  original paths under `Runtime/Views`, `Runtime/UI`, `Runtime/Rendering` (and `ModelViewer`, `CaptureRunner`), each
+  replaced in place by its real port.
+- **Project settings**: `ImplicitUsings` is off (an implicit `using System` makes `Object`/`Random` ambiguous with
+  UnityEngine's in every ported file); `Runtime/GlobalUsings.cs` has `global using UnityEngine;` and the System aliases
+  UnrealSharp's glue generator emits unqualified.
+- **Smoke** (`tools/play.ps1 -Track CSharp -Mode smoke`, `-SpaceGodSmoke`): the profile goes to `CSharp/Saved/SmokeProfiles`;
+  the game mode steps the real app loop at 1/60 s with a scripted device — idle frames, `.` (time warp), W held (free
+  swim), a right-drag look, `3` twice (select and focus Earth), then `SaveTo`/`LoadFrom` through Core/Persistence — and
+  logs each.
+
 ## Packaging (US-T25)
 
 `tools/package.ps1 -Track Cpp|CSharp [-Configuration Development|Shipping] [-Verify]` builds the editor target (the
