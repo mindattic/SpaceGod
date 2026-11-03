@@ -24,7 +24,7 @@ namespace SpaceGod::Core
 	double EventDirector::ReputationWith(const cs::Ref<Faction>& f) const
 	{
 		double r = 0;
-		return f != nullptr && Reputation.TryGetValue(f, r) ? r : 0;
+		return f != nullptr && Reputation->TryGetValue(f, r) ? r : 0;
 	}
 
 	void EventDirector::Update(double jd, const cs::Ref<EventSources>& src, DVec3 playerHelio, const cs::Ref<Ship>& playerShip)
@@ -681,6 +681,6 @@ namespace SpaceGod::Core
 			op->Reward.CargoCrates = stored;
 		}
 		if (r.ReputationWith != nullptr && r.Reputation != 0)
-			Reputation[r.ReputationWith] = ReputationWith(r.ReputationWith) + r.Reputation;
+			(*Reputation)[r.ReputationWith] = ReputationWith(r.ReputationWith) + r.Reputation;
 	}
 }

@@ -82,7 +82,8 @@ namespace SpaceGod::Core
 		cs::List<cs::Ref<Opportunity>> History;
 
 		/// <summary>The player's standing with each faction, raised by opportunities seen through.</summary>
-		cs::Dictionary<cs::Ref<Faction>, double> Reputation;
+		// A C# reference shared with Law (its playerStanding table), so held as a Ref (see Law/Law.h).
+		cs::Ref<cs::Dictionary<cs::Ref<Faction>, double>> Reputation = cs::New<cs::Dictionary<cs::Ref<Faction>, double>>();
 
 		cs::Event<cs::Ref<Opportunity>> Spawned;
 		cs::Event<cs::Ref<Opportunity>> Resolved;

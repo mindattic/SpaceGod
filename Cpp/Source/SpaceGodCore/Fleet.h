@@ -4,8 +4,9 @@
 // Shapes chosen where the table leaves room (keep them when porting a body against this header):
 //  - C# value tuples are std::pair (two members: .first/.second, in the C# element order) or std::tuple (more);
 //    dictionaries keyed by one hash them with Fleet::ValueTupleHash.
-//  - Ship.Journey / Hyperlanes.Route are cs::List<LaneHop> held by value: C#'s null journey or route is the empty list
-//    (Route never returns an empty non-null list, so `x != null` is `x.Count() > 0`).
+//  - Ship.Journey is a cs::List<LaneHop> held by value: C#'s null journey is the empty list (a journey is never an empty
+//    non-null list, so `Journey != null` is `Journey.Count() > 0`). Hyperlanes.Route/RouteFor/HeavyRoute return
+//    cs::Ref<cs::List<LaneHop>> (nullptr = null, MIGRATION.md ruling 1); a journey copies the route's hops.
 //  - Ship.Path / PathCumulative (`DVec3[]` / `double[]`) are cs::List by value: `Path = null` is `Path = cs::List<DVec3>()`.
 //  - Array / List parameters are taken by value (cs::List<T>), `params T[]` too; `string` is cs::String (null -> "").
 //  - Class parameters are cs::Ref<T> by value; struct parameters by value; out / ref -> T&.

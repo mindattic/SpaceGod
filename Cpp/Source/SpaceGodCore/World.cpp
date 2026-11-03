@@ -38,6 +38,7 @@
 #include "Events/EventDirector.h"
 #include "Events/EventSources.h"
 #include "Events/Opportunity.h"
+#include "Systems/InterstellarTraffic.h"
 #include "Infrastructure/Infrastructure.h"
 #include "Law/Law.h"
 #include "Law/Outlaws.h"

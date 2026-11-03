@@ -571,7 +571,12 @@ namespace SpaceGod::Core
 		if (Lanes != nullptr && !direct)
 		{
 			int fromSystem = Lanes->SystemOf(from), toSystem = Lanes->SystemOf(to);
-			if (fromSystem != toSystem) ship->Journey = Lanes->RouteFor(ship, fromSystem, toSystem, departJd);
+			if (fromSystem != toSystem)
+			{
+				// A null route clears the journey (the empty list stands for C#'s null Journey; a route is never empty).
+				auto found = Lanes->RouteFor(ship, fromSystem, toSystem, departJd);
+				ship->Journey = found ? *found : cs::List<LaneHop>();
+			}
 		}
 		if (ship->Journey.Count() > 0)
 		{
@@ -590,16 +595,16 @@ namespace SpaceGod::Core
 			if (direct && ship->Conic == nullptr && Lanes != nullptr && !ship->Wander)
 			{
 				int fromSystem = Lanes->SystemOf(from), toSystem = Lanes->SystemOf(to);
-				auto route = fromSystem != toSystem ? Lanes->Route(fromSystem, toSystem, departJd) : cs::List<LaneHop>();
-				if (route.Count() > 0)
+				cs::Ref<cs::List<LaneHop>> route = fromSystem != toSystem ? Lanes->Route(fromSystem, toSystem, departJd) : nullptr;
+				if (route != nullptr)
 				{
 					RefundUnflown(ship, departJd);
 					ship->Orbit = home;
 					ship->Ring = ring;
 					ship->HoldPoint = hold;
-					ship->Journey = route;
+					ship->Journey = *route;
 					ship->JourneyIndex = 0;
-					auto hop = route[0];
+					auto hop = (*route)[0];
 					Burn(ship, departJd, hop.From, [&]() { return RampOrbit(hop, hop.From, departJd); }, std::nullopt, true);
 				}
 			}
@@ -636,8 +641,8 @@ namespace SpaceGod::Core
 		if (at != target->A)
 		{
 			auto between = Lanes->Route(at, target->A, jd);
-			if (between.Count() == 0) return false;
-			hops.AddRange(between);
+			if (between == nullptr) return false;
+			hops.AddRange(*between);
 		}
 		hops.Add(LaneHop(target, target->A, target->B));
 		ship->Journey = hops;
@@ -695,12 +700,12 @@ namespace SpaceGod::Core
 		}
 		int to = ship->FinalBody;
 		int toSystem = Lanes->SystemOf(to);
-		auto route = toSystem != hop.From ? Lanes->RouteFor(ship, hop.From, toSystem, jd) : cs::List<LaneHop>();
-		ship->Journey = route;
+		cs::Ref<cs::List<LaneHop>> route = toSystem != hop.From ? Lanes->RouteFor(ship, hop.From, toSystem, jd) : nullptr;
+		ship->Journey = route ? *route : cs::List<LaneHop>();
 		ship->JourneyIndex = 0;
-		if (route.Count() > 0)
+		if (route != nullptr)
 		{
-			auto next = route[0];
+			auto next = (*route)[0];
 			Burn(ship, jd, next.From, [&]() { return RampOrbit(next, next.From, jd); }, std::nullopt, true);
 		}
 		else if (ship->GateKm.has_value() && to == catalog->Root()->Index)
@@ -2142,7 +2147,7 @@ namespace SpaceGod::Core
 	}
 
 	// C#: static readonly DVec3[] EscortSlots (a function-local static, see docs/MIGRATION.md).
-	cs::List<DVec3> Fleet::EscortSlots()
+	const cs::List<DVec3>& Fleet::EscortSlots()
 	{
 		static const cs::List<DVec3> slots =
 		{
@@ -2250,7 +2255,7 @@ namespace SpaceGod::Core
 
 	// C#: static readonly double[] TransferTimeFactors (a function-local static, see docs/MIGRATION.md).
 	/// <summary>Flight times a slow boat tries, as fractions of the leg's Hohmann time.</summary>
-	cs::List<double> Fleet::TransferTimeFactors()
+	const cs::List<double>& Fleet::TransferTimeFactors()
 	{
 		static const cs::List<double> factors = { 0.15, 0.22, 0.3, 0.45, 0.6, 0.8, 1.0, 1.2 };
 		return factors;
@@ -2258,7 +2263,7 @@ namespace SpaceGod::Core
 
 	// C#: static readonly double[] CoarseTimeFactors (a function-local static, see docs/MIGRATION.md).
 	/// <summary>The fewer flight times a window search first sweeps its whole span with.</summary>
-	cs::List<double> Fleet::CoarseTimeFactors()
+	const cs::List<double>& Fleet::CoarseTimeFactors()
 	{
 		static const cs::List<double> factors = { 0.15, 0.3, 0.6, 1.0 };
 		return factors;
