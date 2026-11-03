@@ -95,6 +95,24 @@
 
 namespace SpaceGod::Core
 {
+	namespace
+	{
+		// (US-T41) A C# array or List field that stays null until something sets it (no initialiser): the port holds that null
+		// as the empty list (docs/MIGRATION.md), so an empty one is written as null, as the C# writes it. Written as empty it
+		// reads back in C# as an empty array where the C# code tests for null (Ship.Plunder: `ship.Plunder == null`).
+		template <class Base> struct EmptyIsNull : Base
+		{
+			template <class C> static void Write(Graph::Writer& w, C& v) { if (v.Count() == 0) w.Payload().Var(0); else Base::Write(w, v); }
+		};
+		template <class T, class E> Graph::ClassBuilder<T>& NullArray(Graph::ClassBuilder<T>& b, const char* name, cs::List<E> T::* m) { return b.template FieldWith<EmptyIsNull<Graph::ArrayCodec<E>>>(name, m); }
+		template <class T, class E> Graph::ClassBuilder<T>& NullList(Graph::ClassBuilder<T>& b, const char* name, cs::List<E> T::* m) { return b.template FieldWith<EmptyIsNull<Graph::Codec<cs::List<E>>>>(name, m); }
+	}
+}
+#define SG_NULLARRAY(member) NullArray(b, #member, &Self::member)
+#define SG_NULLLIST(member) NullList(b, #member, &Self::member)
+
+namespace SpaceGod::Core
+{
 	SG_ENUM(BodyKind, "Unity.SpaceGod.Core.BodyKind")
 
 	SG_ENUM(BodyStatus, "Unity.SpaceGod.Core.BodyStatus")
@@ -162,7 +180,7 @@ namespace SpaceGod::Core
 
 	SG_SERIALIZE(Faction, "Unity.SpaceGod.Core.Faction",
 		SG_P(Capital), SG_P(Color), SG_P(IsHouse), SG_P(IsMilitary), SG_P(IsPirate), SG_P(Kind), SG_P(MarineQuality),
-		SG_P(Name), SG_P(Prefix), SG_F(Contraband), SG_F(CrewLost), SG_F(CrewMorale), SG_F(CrewRescued),
+		SG_P(Name), b.String("<Prefix>k__BackingField", &Self::Prefix), SG_F(Contraband), SG_F(CrewLost), SG_F(CrewMorale), SG_F(CrewRescued),
 		SG_F(Manpower), SG_F(Treasury))
 
 	SG_SERIALIZE(Fleet, "Unity.SpaceGod.Core.Fleet",
@@ -200,16 +218,16 @@ namespace SpaceGod::Core
 		SG_F(Credits), SG_F(DepartureOrbit), SG_F(DepartureVelocity), SG_F(Derelict), SG_F(DerelictBy),
 		SG_F(DerelictSinceJd), SG_F(DestinationBody), SG_F(Destroyed), SG_F(Faction), SG_F(FinalBody),
 		SG_F(FormationSlot), SG_F(FrameBody), SG_F(FtlCoolUntilJd), SG_F(GateDeparted), SG_F(GateKm),
-		SG_F(GravityLossKmS), SG_F(HasCargo), SG_F(HoldPoint), SG_F(Homing), SG_F(Id), SG_F(Journey),
+		SG_F(GravityLossKmS), SG_F(HasCargo), SG_F(HoldPoint), SG_F(Homing), SG_F(Id), SG_NULLLIST(Journey),
 		SG_F(JourneyIndex), SG_F(LaneEndProgress), SG_F(LaneFromOffset), SG_F(LaneHold), SG_F(LaneHoldSide),
 		SG_F(LaneLeg), SG_F(LaneLengthKm), SG_F(LaneShape), SG_F(LaneStar), SG_F(LaneStartProgress),
 		SG_F(LaneSurged), SG_F(LaneToOffset), SG_F(Leader), SG_F(LegPropellant), SG_F(LoadedCredits),
 		SG_F(LoadedFrom), SG_F(LoadedJd), SG_F(Loadout), SG_F(LurkAt), SG_F(LurkDays), SG_F(LurkLane), SG_F(Name),
-		SG_F(Orbit), SG_F(OriginBody), SG_F(OutOfPropellant), SG_F(OutOfPropellantSinceJd), SG_ARRAY(Path),
-		SG_ARRAY(PathCumulative), SG_F(PathLength), SG_F(PatrolWing), SG_F(Phase), SG_F(PhaseEndJd),
+		SG_F(Orbit), SG_F(OriginBody), SG_F(OutOfPropellant), SG_F(OutOfPropellantSinceJd), SG_NULLARRAY(Path),
+		SG_NULLARRAY(PathCumulative), SG_F(PathLength), SG_F(PatrolWing), SG_F(Phase), SG_F(PhaseEndJd),
 		SG_F(PhaseStartJd), SG_F(PicketGate), SG_F(PicketPostKm), SG_F(PlannedConicDays), SG_F(PlannedConicDepartJd),
-		SG_F(PlannedDirect), SG_ARRAY(Plunder), SG_ARRAY(Ports), SG_F(PrisonerBounty), SG_F(Prisoners), SG_F(Ring),
-		SG_F(Role), SG_ARRAY(Route), SG_F(RouteIndex), SG_F(Runner), SG_F(Salvage), SG_F(Scrapped),
+		SG_F(PlannedDirect), SG_NULLARRAY(Plunder), SG_NULLARRAY(Ports), SG_F(PrisonerBounty), SG_F(Prisoners), SG_F(Ring),
+		SG_F(Role), SG_NULLARRAY(Route), SG_F(RouteIndex), SG_F(Runner), SG_F(Salvage), SG_F(Scrapped),
 		SG_F(SilentRunning), SG_F(Spec), SG_F(StakeoutKm), SG_F(StakeoutUntilJd), SG_F(Stalled), SG_F(StrandJd),
 		SG_F(StrandedInFlight), SG_F(Tow), SG_F(TripsCompleted), SG_F(Voyage), SG_F(WaitingForPropellant),
 		SG_F(Wander), SG_F(personalHold), SG_F(propellant))
@@ -226,7 +244,7 @@ namespace SpaceGod::Core
 		SG_P(Mining), SG_P(Outlaws), SG_P(Polities), SG_P(Pursuit), SG_P(Sensors), SG_P(Shocks), SG_P(Trade),
 		SG_P(War), SG_F(Belt), SG_F(Events), SG_F(Gates), SG_F(HavenSites), SG_F(HunterCap), SG_F(Independents),
 		SG_F(Logged), SG_F(MerchantCap), SG_F(MerchantTarget), SG_F(NavyCap), SG_F(NavyCapAtWar), SG_F(PilotedShip),
-		SG_F(PirateGroupCap), SG_F(PirateIncomePerDay), SG_F(Pirates), SG_ARRAY(RaiderNames), SG_F(Reach),
+		SG_F(PirateGroupCap), SG_F(PirateIncomePerDay), SG_F(Pirates), SG_NULLARRAY(RaiderNames), SG_F(Reach),
 		SG_F(ReachedGate), SG_F(RivalA), SG_F(RivalB), SG_F(ShipAdded), SG_F(Sol), SG_F(VoyageOrders),
 		SG_F(builtCount), SG_F(captureTugsNamed), SG_ARRAY(merchantNames), SG_ARRAY(minerNames), SG_F(nextRecountJd),
 		SG_F(tugsNamed), SG_F(worksEscortsRaised), SG_F(worksFreightersNamed))

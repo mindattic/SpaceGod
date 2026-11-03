@@ -95,6 +95,20 @@
 
 namespace SpaceGod::Core
 {
+	namespace
+	{
+		// (US-T41) Loadout.StockFacilities is declared IReadOnlyList<FacilitySite> and always holds an array in C#
+		// (`facilities ?? Array.Empty<FacilitySite>()`): written as that array (it was written as a List, which C# then
+		// loaded as one), declared as the interface.
+		struct StockFacilitiesCodec : Graph::ArrayCodec<cs::Ref<FacilitySite>>
+		{
+			static const Graph::NetType* Type() { return Registrations::IReadOnlyListOf(Registrations::TypeOf<cs::Ref<FacilitySite>>()); }
+		};
+	}
+}
+
+namespace SpaceGod::Core
+{
 	SG_ENUM(BatteryOrder, "Unity.SpaceGod.Core.BatteryOrder")
 
 	SG_ENUM(BoardingOrder, "Unity.SpaceGod.Core.BoardingOrder")
@@ -289,7 +303,7 @@ namespace SpaceGod::Core
 	SG_SERIALIZE(Loadout, "Unity.SpaceGod.Core.Loadout",
 		SG_F(Base), SG_F(BaseCapacityTonnes), SG_F(Category), SG_F(Class), SG_F(Facilities), SG_ARRAY(Fitted),
 		SG_F(InternalSpace), SG_F(Slots), SG_F(SmallCraft),
-		b.Typed("StockFacilities", &Self::StockFacilities, +[]() -> const ::SpaceGod::Core::Graph::NetType* { using namespace ::SpaceGod::Core::Registrations; using namespace ::SpaceGod::Core::Graph; return IReadOnlyListOf(TypeOf<cs::Ref<FacilitySite>>()); }))
+		b.FieldWith<StockFacilitiesCodec>("StockFacilities", &Self::StockFacilities))
 
 	SG_SERIALIZE(Mine, "Unity.SpaceGod.Core.Mine",
 		SG_F(ArmIn), SG_F(BlastKm), SG_F(Damage), SG_F(Gone), SG_F(Life), SG_F(Pos), SG_F(Side), SG_F(Vel))

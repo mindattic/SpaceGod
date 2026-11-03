@@ -12,7 +12,8 @@
 // after them), so a loaded game calls its handlers in the order the running one did.
 //
 // World::RewireAfterLoad repeats World::Construct/Wire/WireMining/WireColonisation's delegate statements verbatim
-// (extracted from World.cpp and World.Mining.cpp, creation left out): a change to that wiring must be made here too.
+// (extracted from World.cpp and World.Mining.cpp, creation left out): a change to that wiring must be made here too, and
+// in CSharp/Core/SaveCompat/SaveWiring.cs, which does the same for a C++ save loaded by the C# track (US-T41).
 // Subscribers outside Core (the views' toasts) subscribe to the loaded world again themselves, as in C#.
 
 #include "World.h"

@@ -95,6 +95,24 @@
 
 namespace SpaceGod::Core
 {
+	namespace
+	{
+		// (US-T41) A C# array or List field that stays null until something sets it (no initialiser): the port holds that null
+		// as the empty list (docs/MIGRATION.md), so an empty one is written as null, as the C# writes it. Written as empty it
+		// reads back in C# as an empty array where the C# code tests for null (Ship.Plunder: `ship.Plunder == null`).
+		template <class Base> struct EmptyIsNull : Base
+		{
+			template <class C> static void Write(Graph::Writer& w, C& v) { if (v.Count() == 0) w.Payload().Var(0); else Base::Write(w, v); }
+		};
+		template <class T, class E> Graph::ClassBuilder<T>& NullArray(Graph::ClassBuilder<T>& b, const char* name, cs::List<E> T::* m) { return b.template FieldWith<EmptyIsNull<Graph::ArrayCodec<E>>>(name, m); }
+		template <class T, class E> Graph::ClassBuilder<T>& NullList(Graph::ClassBuilder<T>& b, const char* name, cs::List<E> T::* m) { return b.template FieldWith<EmptyIsNull<Graph::Codec<cs::List<E>>>>(name, m); }
+	}
+}
+#define SG_NULLARRAY(member) NullArray(b, #member, &Self::member)
+#define SG_NULLLIST(member) NullList(b, #member, &Self::member)
+
+namespace SpaceGod::Core
+{
 	SG_ENUM(CivilCraft, "Unity.SpaceGod.Core.CivilCraft")
 
 	SG_ENUM(ColonyStage, "Unity.SpaceGod.Core.ColonyStage")
@@ -268,7 +286,7 @@ namespace SpaceGod::Core
 		SG_F(Name), SG_F(OreTugs), SG_F(Owner), SG_F(RefineryBody), SG_F(RocksCaptured), SG_F(SeparateTonnesPerDay),
 		SG_ARRAY(Separated), SG_F(SeparationEfficiency), SG_F(Slag), SG_F(TonnesCaptured), SG_F(TonnesGround),
 		SG_F(TonnesSeparated), SG_F(TugHaulsDelivered), SG_F(TugHaulsSent), SG_F(TugIceShare), SG_F(TugMaxLoadM),
-		SG_F(TugMinLoadM), SG_ARRAY(TugReadyJd), SG_F(TugSourceBody), SG_F(TugTonnesDelivered), SG_F(Tugs),
+		SG_F(TugMinLoadM), SG_NULLARRAY(TugReadyJd), SG_F(TugSourceBody), SG_F(TugTonnesDelivered), SG_F(Tugs),
 		SG_F(TugsLost))
 
 	SG_SERIALIZE(OwnedShip, "Unity.SpaceGod.Core.OwnedShip",

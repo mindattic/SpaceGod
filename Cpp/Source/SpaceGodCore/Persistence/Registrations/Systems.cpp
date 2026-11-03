@@ -95,6 +95,24 @@
 
 namespace SpaceGod::Core
 {
+	namespace
+	{
+		// (US-T41) A C# array or List field that stays null until something sets it (no initialiser): the port holds that null
+		// as the empty list (docs/MIGRATION.md), so an empty one is written as null, as the C# writes it. Written as empty it
+		// reads back in C# as an empty array where the C# code tests for null (Ship.Plunder: `ship.Plunder == null`).
+		template <class Base> struct EmptyIsNull : Base
+		{
+			template <class C> static void Write(Graph::Writer& w, C& v) { if (v.Count() == 0) w.Payload().Var(0); else Base::Write(w, v); }
+		};
+		template <class T, class E> Graph::ClassBuilder<T>& NullArray(Graph::ClassBuilder<T>& b, const char* name, cs::List<E> T::* m) { return b.template FieldWith<EmptyIsNull<Graph::ArrayCodec<E>>>(name, m); }
+		template <class T, class E> Graph::ClassBuilder<T>& NullList(Graph::ClassBuilder<T>& b, const char* name, cs::List<E> T::* m) { return b.template FieldWith<EmptyIsNull<Graph::Codec<cs::List<E>>>>(name, m); }
+	}
+}
+#define SG_NULLARRAY(member) NullArray(b, #member, &Self::member)
+#define SG_NULLLIST(member) NullList(b, #member, &Self::member)
+
+namespace SpaceGod::Core
+{
 	SG_ENUM(CampaignMission, "Unity.SpaceGod.Core.CampaignMission")
 
 	SG_ENUM(CampaignStage, "Unity.SpaceGod.Core.CampaignStage")
@@ -348,7 +366,7 @@ namespace SpaceGod::Core
 	SG_SERIALIZE(Voyage, "Unity.SpaceGod.Core.Voyage",
 		SG_F(AtGate), SG_F(AtGateJd), SG_F(ByCruise), SG_F(Campaign), SG_F(Convoy), SG_F(Destination), SG_F(DropDir),
 		SG_F(ExpectedSale), SG_F(Faction), SG_F(HoldGate), SG_F(Home), SG_ARRAY(HomePorts), SG_F(HomeRole),
-		SG_ARRAY(HomeRoute), SG_F(Leg), SG_F(Ly), SG_F(Origin), SG_F(PlannedMarket), SG_F(PlannedOnNewsJd),
+		SG_NULLARRAY(HomeRoute), SG_F(Leg), SG_F(Ly), SG_F(Origin), SG_F(PlannedMarket), SG_F(PlannedOnNewsJd),
 		SG_F(Purpose), SG_F(Quarry), SG_F(Route), SG_F(SetOutJd), SG_F(SiteName), SG_F(StarName), SG_F(Station),
 		SG_F(StationName), SG_F(StayUntilJd), SG_F(TargetBody), SG_F(Tolls), SG_F(WaitingSinceJd))
 

@@ -8,7 +8,10 @@
 // follow the order the process happened to register them in), compiler closure caches (`+<>c::<>9`), ObjectGraph's
 // own tables, locks, and LunarTheory's coefficient tables (constexpr in C++: no object to name). VoidStations' and
 // RenderLod's file-local tables are declared in their own .cpp. Generated from the C# walk (Unity.SpaceGod.Core.dll after
-// Galaxy.CreateDefault); regenerate rather than hand-edit.
+// Galaxy.CreateDefault); regenerate rather than hand-edit. Not walked, in either build: the ConditionalWeakTable caches
+// FlightDecks.decks and ArmourAngling.Tables (keyed by live battle units and combat specs). The original walks them and
+// so names live ships and factions through them, which no other process can resolve: a bug, fixed in both tracks
+// (the C# track: CSharp/Core/SaveCompat/SaveStatics.cs; docs/PERSISTENCE.md, section 11).
 
 #include "AssetLibraryCandidates.h"
 #include "Combat/AlphaStrike.h"
