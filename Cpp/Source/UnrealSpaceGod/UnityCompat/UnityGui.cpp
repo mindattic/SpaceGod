@@ -607,9 +607,9 @@ namespace SpaceGod::UnityCompat
 	void GUIStyle::Draw(const Rect& position, const GUIContent& content, int controlID, bool on) const
 	{
 		Vector2 m = Event::current().mousePosition;
-		bool active = GUIUtility::hotControl == controlID;
-		bool hover = GUI::enabled && position.Contains(m) && (GUIUtility::hotControl == 0 || active);
-		Draw(position, content, hover, active, on, GUIUtility::keyboardControl == controlID);
+		bool isActive = GUIUtility::hotControl == controlID;
+		bool isHover = GUI::enabled && position.Contains(m) && (GUIUtility::hotControl == 0 || isActive);
+		Draw(position, content, isHover, isActive, on, GUIUtility::keyboardControl == controlID);
 	}
 
 	// ---------------------------------------------------------------- Event
@@ -872,7 +872,7 @@ namespace SpaceGod::UnityCompat
 				{
 					// A single-line field takes printable characters up to maxLength (in UTF-16 units, as C#'s).
 					int length = 0;
-					cs::ForEachUtf16(result, [&](char16_t) { length++; });
+					cs::ForEachUtf16(result, [&](uint32_t) { length++; });
 					int add = e.character > 0xFFFF ? 2 : 1;
 					if (maxLength < 0 || length + add <= maxLength)
 					{
