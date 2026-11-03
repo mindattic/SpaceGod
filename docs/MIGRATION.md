@@ -181,6 +181,39 @@ and display names), JSON error positions count bytes. `Profiles::CommandLineArgs
 `std::filesystem` behind `Shared/Profiles/SharedIo.h`; `cs::IOException` covers IOException and
 UnauthorizedAccessException.
 
+## Integration decisions (seams between porting waves)
+
+The waves were written in parallel, so a few shapes disagree. These rulings settle them; the integration
+agents apply them across all folders (full list of reported seams: notes on US-T4).
+
+1. **C# null semantics win where code tests for null.** Gate routes are `cs::Ref<cs::List<cs::Ref<JumpGate>>>`
+   (nullable, shared by TravelCourse); Hyperlanes routes are `cs::Ref<cs::List<LaneHop>>`. Callers that took them
+   by value adapt (`if (!route)` for C#'s `route == null`).
+2. **The declaring file's shape wins** for tuples/structs (`PriorityResult`, recipe tuples, `ArmourAngling::Angling`)
+   and for nullable parameters: `WeakPatches::Orient` takes `const cs::Ref<cs::Dictionary<int, double>>&` (Battle's
+   shape, nullptr = null).
+3. **Replace local workarounds with Cs.h** now that it has them: `Systems/CsGaps.h` folds into Cs.h and is deleted;
+   upper/lower-cased keys → `cs::OrdinalIgnoreCaseComparer` (keys keep their original case, as .NET stores them);
+   `std::vector<bool>` / `List<uint8_t>` → `cs::List<bool>`; local CompareTo helpers → `cs::CompareTo`; hand-chained
+   plain `Action` fields → `cs::Delegate`; `std::fmod` → `cs::Mod`.
+4. **Dictionary reads.** Every C# `dict[k]` *read* must be `At(k)` (throws like C#) or the const indexer; only C#
+   *writes* (`dict[k] = v`, `dict[k] += …`) use the inserting `operator[]`. Each integration agent audits its
+   folders: an accidental insert changes `Count` and enumeration order and breaks parity.
+5. **Partial classes**: the main header declares every member, including those other files define
+   (`Battle` ← `BoardingShuttles.cpp`; `World` ← `SocietySpec.cpp`, listed in those headers' comments).
+6. **`this` as a reference**: a class that hands itself out as `cs::Ref` inherits `enable_shared_from_this` and,
+   if it does so from its constructor, uses two-phase construction (`static cs::Ref<T> Make(...)` → `Construct()`, as
+   `World` and `TradeDesk` do). Raw back-pointers (`Galaxy*`, `World*`, `InterstellarTraffic*`, `Statecraft*`) stay
+   where the receiver never outlives its owner. `Battle::Rng()` returns `cs::Random&`.
+7. **Settings**: `SettingsRegistry::DiscoverLoadedDeclarations()` (`Settings/SettingsSources.cpp`) is the single list
+   that touches every settings source; add any `RunClassConstructor()` it misses.
+8. **Exports**: `SPACEGODCORE_API` per the foundation note above.
+9. **Evaluation order**: files finished before that rule (Core root A and B, Combat 4 and 6, Economy 1) get a pass
+   for side-effecting operands in one expression.
+10. **Header hygiene**: break include cycles with forward declarations (`enum class HabitableZone : int;` in
+    BodyDefinition.h); members named like their type are declared with `::SpaceGod::Core::T`; locals named after
+    Windows macros (`near`, `far`, `small`, `min`, `max`) are renamed.
+
 ## C# track
 
 **Decision (US-T6, 2026-11-03): UnrealSharp**, pinned as a git submodule at `CSharp/Plugins/UnrealSharp`
