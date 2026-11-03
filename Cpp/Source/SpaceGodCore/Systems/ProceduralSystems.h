@@ -20,7 +20,7 @@ namespace SpaceGod::Core
 	/// galactic pole is at RA 12h51m26.28s, Dec +27°07'42.0" (J2000); the Sun sits 20.8 pc above the plane (Bennett and
 	/// Bovy 2019). Spiral arms are left out.
 	/// </summary>
-	class GalacticFrame
+	class SPACEGODCORE_API GalacticFrame
 	{
 	public:
 		/// <summary>Sol's distance from the galactic centre, light-years.</summary>
@@ -33,7 +33,7 @@ namespace SpaceGod::Core
 		static constexpr double LocalDensity = 0.0032;
 
 		/// <summary>The disc's scale length and height, light-years.</summary>
-		static constexpr double ScaleLengthLy = 8480, ScaleHeightLy = 980;
+		static constexpr double ScaleLengthLy = 8480; static constexpr double ScaleHeightLy = 980;
 
 		/// <summary>How far from the centre the disc runs at full strength before it fades, light-years.</summary>
 		static constexpr double DiscRadiusLy = 50000;
@@ -42,7 +42,7 @@ namespace SpaceGod::Core
 		static constexpr double EdgeFadeLy = 2000;
 
 		/// <summary>The bulge's density at the centre (a cubic light-year) and its scale, light-years.</summary>
-		static constexpr double BulgeDensity = 0.1, BulgeScaleLy = 1500;
+		static constexpr double BulgeDensity = 0.1; static constexpr double BulgeScaleLy = 1500;
 
 	private:
 		static DVec3 InPlane(DVec3 v);
@@ -65,7 +65,7 @@ namespace SpaceGod::Core
 	};
 
 	/// <summary>A small, fast random stream that comes out the same on every runtime (SplitMix64), for the galaxy's seeds.</summary>
-	class SeededRandom final
+	class SPACEGODCORE_API SeededRandom final
 	{
 		uint64_t state = 0;
 
@@ -111,7 +111,7 @@ namespace SpaceGod::Core
 	/// average, rocky ones most often), spaced as real systems are (each 1.4 to 3 times the last one's distance), and a
 	/// system now and then has a debris belt past its last planet. All of it is fiction, labelled so.
 	/// </summary>
-	class ProceduralSystems final : public SystemSource
+	class SPACEGODCORE_API ProceduralSystems final : public SystemSource
 	{
 	public:
 		static constexpr const char* SourceName = "Procedural";

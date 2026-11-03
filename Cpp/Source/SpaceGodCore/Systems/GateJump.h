@@ -22,7 +22,7 @@ namespace SpaceGod::Core
 	///     pulling back to the usual overview of the system.
 	/// A system with no gates, or none leading anywhere near the destination, is left to the old way across.
 	/// </summary>
-	class GateJump
+	class SPACEGODCORE_API GateJump
 	{
 	public:
 		enum class Phase : int
@@ -33,7 +33,7 @@ namespace SpaceGod::Core
 			Emerge,
 		};
 
-		static constexpr double ApproachSeconds = 2.8, PlungeSeconds = 0.9, TunnelSeconds = 1.8, EmergeSeconds = 3.4;
+		static constexpr double ApproachSeconds = 2.8; static constexpr double PlungeSeconds = 0.9; static constexpr double TunnelSeconds = 1.8; static constexpr double EmergeSeconds = 3.4;
 
 		/// <summary>The whole trip, seconds (the way across between the stars took 9.4).</summary>
 		static constexpr double TotalSeconds = ApproachSeconds + PlungeSeconds + TunnelSeconds + EmergeSeconds;
@@ -122,5 +122,5 @@ namespace SpaceGod::Core
 			return x * x * x * (x * (x * 6 - 15) + 10);
 		}
 	};
-	const char* ToString(GateJump::Phase v);
+	SPACEGODCORE_API const char* ToString(GateJump::Phase v);
 }

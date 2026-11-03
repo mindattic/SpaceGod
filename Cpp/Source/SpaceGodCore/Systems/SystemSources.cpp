@@ -203,12 +203,9 @@ namespace SpaceGod::Core
 		auto list = cs::New<cs::List<cs::Ref<StarEntry>>>();
 		for (const auto& [tag, spec] : Specs())
 		{
-			cs::Ref<StarSpec> first = nullptr;
-			for (const auto& st : spec->Stars())
-			{
-				first = st;
-				break;
-			}
+			// C#: foreach (var st in spec.Stars()) { first = st; break; } (Stars() builds a list: its first, if any)
+			auto starsOf = spec->Stars();
+			cs::Ref<StarSpec> first = starsOf.Count() > 0 ? starsOf[0] : nullptr;
 			auto e = cs::New<StarEntry>();
 			e->Name = !spec->NeighbourName.empty() ? spec->NeighbourName : spec->Name; e->PositionLy = spec->PositionLy();
 			e->Spectral = first ? first->Spectral : cs::String();

@@ -5,6 +5,7 @@
 #include "Astro.h"
 
 #include <utility>
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -27,7 +28,7 @@ namespace SpaceGod::Core
 	/// the magazines, and field repairs eat the spares), and its <see cref="MilitaryLogistics"/> fills them again from a
 	/// naval base by supply convoys. Low on any of them the fleet loses <see cref="Readiness"/>, and too low it withdraws.
 	/// </summary>
-	class FleetSupply final
+	class SPACEGODCORE_API FleetSupply final
 	{
 	public:
 		double Propellant = 1, Munitions = 1, Spares = 1;
@@ -108,7 +109,7 @@ namespace SpaceGod::Core
 	/// fleet and they cannot get through; whatever meets them on the way can destroy or take them, and what they carried
 	/// goes with them.
 	/// </summary>
-	class SupplyConvoy final
+	class SPACEGODCORE_API SupplyConvoy final
 	{
 	public:
 		cs::Ref<Core::Campaign> Campaign;
@@ -158,7 +159,7 @@ namespace SpaceGod::Core
 	/// <see cref="FleetSupply.WithdrawReadiness"/> it gives up the campaign and withdraws. Cutting a gate behind it, or
 	/// blockading the base it draws on, starves the fleet.
 	/// </summary>
-	class MilitaryLogistics final
+	class SPACEGODCORE_API MilitaryLogistics final
 	{
 		// The galaxy this belongs to (a back-reference, not owned).
 		Galaxy* galaxy;
@@ -175,13 +176,13 @@ namespace SpaceGod::Core
 		static constexpr double MunitionsPerHull = 150;
 
 		/// <summary>Alloys and electronics (t) a hull's stores of spares hold, full.</summary>
-		static constexpr double AlloysPerHull = 120, ElectronicsPerHull = 20;
+		static constexpr double AlloysPerHull = 120; static constexpr double ElectronicsPerHull = 20;
 
 		/// <summary>What one tanker and one ammunition collier carry (t).</summary>
-		static constexpr double TankerTonnes = 4000, CollierTonnes = 1500;
+		static constexpr double TankerTonnes = 4000; static constexpr double CollierTonnes = 1500;
 
 		/// <summary>Days a base takes to load its supply ships, and to cross a system to a fleet there.</summary>
-		static constexpr double LoadingDays = 0.5, CrossingDays = 0.5;
+		static constexpr double LoadingDays = 0.5; static constexpr double CrossingDays = 0.5;
 
 		explicit MilitaryLogistics(Galaxy* galaxy);
 
@@ -303,5 +304,8 @@ namespace SpaceGod::Core
 
 		/// <summary>A fleet's flagship and the hulls in its group.</summary>
 		static cs::List<cs::Ref<Ship>> Group(cs::Ref<World> world, cs::Ref<Ship> leader);
+	private:
+		MilitaryLogistics() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(MilitaryLogistics); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

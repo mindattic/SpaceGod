@@ -24,7 +24,7 @@ namespace SpaceGod::Core
 	/// Orbital planes and phases nobody has measured are assumed and say so. The societies settled on
 	/// them (<see cref="NearbySocieties"/>) are fiction, kept apart from these entries.
 	/// </summary>
-	class NearbySystems
+	class SPACEGODCORE_API NearbySystems
 	{
 		static constexpr double JupiterMassSolar = 9.547919e-4;
 

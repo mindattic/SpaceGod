@@ -27,7 +27,7 @@ namespace SpaceGod::Core
 		/// but it can jump in anywhere under its own drives, gates or none.</summary>
 		JumpStrikeGroup,
 	};
-	const char* ToString(ForceKind v);
+	SPACEGODCORE_API const char* ToString(ForceKind v);
 
 	/// <summary>What a campaign is sent to do (U.SPC-T474): its objective decides which kind of force goes.</summary>
 	enum class CampaignMission : int
@@ -47,7 +47,7 @@ namespace SpaceGod::Core
 		/// gather.</summary>
 		Raid,
 	};
-	const char* ToString(CampaignMission v);
+	SPACEGODCORE_API const char* ToString(CampaignMission v);
 
 	/// <summary>
 	/// AI fleet doctrine (U.SPC-T474): navies raise two kinds of force and use them differently. A gate fleet is large but
@@ -61,7 +61,7 @@ namespace SpaceGod::Core
 	/// Which hulls make a strike group is the carriage data (drives, berths and clamps), never a list of classes here.
 	/// </summary>
 	// [SettingsSource]
-	class FleetDoctrine
+	class SPACEGODCORE_API FleetDoctrine
 	{
 	public:
 		/// <summary>The settings menu's strike groups (AI): whether navies send jump strike groups on missions of their own.</summary>

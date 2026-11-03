@@ -3,6 +3,7 @@
 
 #include "Cs/Cs.h"
 #include "DVec3.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -25,7 +26,7 @@ namespace SpaceGod::Core
 	/// simulation clock at real time with no warp (see <c>UnitySpaceApp.TogglePiloting</c>) -- so the
 	/// gate has to sit somewhere an actual flight stick can reach in minutes, not light-years.
 	/// </summary>
-	class JumpGate final
+	class SPACEGODCORE_API JumpGate final
 	{
 	public:
 		cs::String Name;
@@ -151,5 +152,8 @@ namespace SpaceGod::Core
 		DVec3 ArrivalOffsetKm() const { return Partner == nullptr ? DVec3::Zero : Partner->PositionKm + ArrivalForward() * ArrivalInsetKm; }
 
 		cs::String ToString() const { return Name; }
+	private:
+		JumpGate() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(JumpGate); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

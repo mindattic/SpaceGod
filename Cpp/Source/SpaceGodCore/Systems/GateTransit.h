@@ -25,7 +25,7 @@ namespace SpaceGod::Core
 	/// clears it: the hull arrives a free agent, able to wander and dock same as any independent ship
 	/// (see <see cref="World.AddFreeShips"/>).
 	/// </summary>
-	class GateTransit
+	class SPACEGODCORE_API GateTransit
 	{
 	public:
 		/// <summary>

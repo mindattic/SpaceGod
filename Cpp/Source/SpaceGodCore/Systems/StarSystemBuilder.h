@@ -40,7 +40,7 @@ namespace SpaceGod::Core
 	///    node and phase are measured where the catalogue has them, assumed (and said so) where not;
 	///  - each planet is flagged against its star's habitable zone (<see cref="HabitableZones"/>).
 	/// </summary>
-	class StarSystemBuilder
+	class SPACEGODCORE_API StarSystemBuilder
 	{
 	public:
 		static constexpr double SunGm = 1.32712440018e11;

@@ -2,6 +2,7 @@
 // Port of Assets/UnitySpace/Core/Systems/GateConstruction.cs (see docs/MIGRATION.md).
 
 #include "Cs/Cs.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -26,7 +27,7 @@ namespace SpaceGod::Core
 		/// <summary>Rebuilding a ring damaged or wrecked in a war.</summary>
 		Repair,
 	};
-	const char* ToString(GateJob v);
+	SPACEGODCORE_API const char* ToString(GateJob v);
 
 	enum class GateStage : int
 	{
@@ -41,10 +42,10 @@ namespace SpaceGod::Core
 		/// <summary>Given up: its builder fell, or the way it was for was made some other way.</summary>
 		Abandoned,
 	};
-	const char* ToString(GateStage v);
+	SPACEGODCORE_API const char* ToString(GateStage v);
 
 	/// <summary>One gate being surveyed, built or rebuilt (see <see cref="GateConstruction"/>).</summary>
-	class GateProject final
+	class SPACEGODCORE_API GateProject final
 	{
 	public:
 		GateJob Work = GateJob::NewLink;
@@ -132,7 +133,7 @@ namespace SpaceGod::Core
 	/// ring below <see cref="JumpGate.OperationalIntegrity"/> is out of action until its owner rebuilds it, a repair
 	/// costing and taking the share of a new gate that the damage did. Repairs are planned before any new work.
 	/// </summary>
-	class GateConstruction final
+	class SPACEGODCORE_API GateConstruction final
 	{
 		// The galaxy this belongs to (a back-reference: Galaxy makes its GateConstruction with `this`).
 		Galaxy* galaxy;
@@ -301,5 +302,8 @@ namespace SpaceGod::Core
 
 		/// <summary>Now and then, a ring whose far end its owner's enemy holds is sabotaged from the far side.</summary>
 		void Sabotage(double jd);
+	private:
+		GateConstruction() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(GateConstruction); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

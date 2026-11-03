@@ -20,7 +20,7 @@ namespace SpaceGod::Core
 	/// into a system when a pilot sets out for it). Canon (U.SPC-T455): a jump only ever goes from one star to another,
 	/// never to somewhere inside a solar system, whose gravity wells make jumping there impossible.
 	/// </summary>
-	class FtlTarget final
+	class SPACEGODCORE_API FtlTarget final
 	{
 	public:
 		cs::String Name;
@@ -57,7 +57,7 @@ namespace SpaceGod::Core
 	/// What the helm can point its FTL drive at from a system (U.SPC-T417): the other stars, running systems and the
 	/// charts. A new kind of destination plugs in by adding a source to <see cref="Sources"/>, never by editing the helm.
 	/// </summary>
-	class FtlTargets
+	class SPACEGODCORE_API FtlTargets
 	{
 	public:
 		/// <summary>A source of targets: (the galaxy, the system the ship is in) to what it offers.</summary>
@@ -82,7 +82,7 @@ namespace SpaceGod::Core
 		/// <summary>Charging, beyond the rim, nose held on the star.</summary>
 		Spooling,
 	};
-	const char* ToString(FtlStage v);
+	SPACEGODCORE_API const char* ToString(FtlStage v);
 
 	/// <summary>What a step of the helm's FTL drive came to.</summary>
 	enum class FtlEvent : int
@@ -95,7 +95,7 @@ namespace SpaceGod::Core
 		/// <summary>Charged: the drive engages now (<see cref="HelmFtl.EngageInterstellar"/>).</summary>
 		Charged,
 	};
-	const char* ToString(FtlEvent v);
+	SPACEGODCORE_API const char* ToString(FtlEvent v);
 
 	/// <summary>
 	/// The helm's own FTL drive, I-War 2 style (U.SPC-T417): a carrier, a battleship fitted with a drive or a deep-space
@@ -119,7 +119,7 @@ namespace SpaceGod::Core
 	/// Engine-free and driven only by the sim clock, so the Runtime helm just feeds it the hull's place and heading.
 	/// </summary>
 	// A C# null string (no refusal) is the empty string here.
-	class HelmFtl final
+	class SPACEGODCORE_API HelmFtl final
 	{
 	public:
 		/// <summary>How near the nose must be to a star to pick it and start the charge, degrees.</summary>

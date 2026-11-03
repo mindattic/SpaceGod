@@ -18,7 +18,7 @@ namespace SpaceGod::Core
 	/// measurements named in Systems/SOURCES.md; where a star's luminosity is marked derived it is worked out from its
 	/// radius and temperature (Stefan-Boltzmann), and an unmeasured rotation is assumed.
 	/// </summary>
-	class FrontierSystems
+	class SPACEGODCORE_API FrontierSystems
 	{
 	public:
 		// IEnumerable + yield: built eagerly (making an entry has no side effects).

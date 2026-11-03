@@ -6,6 +6,7 @@
 #include "DVec3.h"
 #include "GalacticPosition.h"
 #include "Systems/CruiseDrive.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -31,7 +32,7 @@ namespace SpaceGod::Core
 	/// galaxy (<see cref="PositionAt"/>), moving at a real speed, where it can meet other groups and find what lies out
 	/// here, and from where it flies into the far system at the edge of its star's well.
 	/// </summary>
-	class Cruise final
+	class SPACEGODCORE_API Cruise final
 	{
 	public:
 		/// <summary>Flagship first, then its escorts.</summary>
@@ -167,10 +168,10 @@ namespace SpaceGod::Core
 		/// pirate lure dressed up as one.</summary>
 		Distress,
 	};
-	const char* ToString(DeepSpaceObjectKind v);
+	SPACEGODCORE_API const char* ToString(DeepSpaceObjectKind v);
 
 	/// <summary>Something in open space between the stars (U.SPC-T412): a wreck or a derelict, where it was left, and what is aboard.</summary>
-	class DeepSpaceObject final
+	class SPACEGODCORE_API DeepSpaceObject final
 	{
 	public:
 		DeepSpaceObjectKind Kind = DeepSpaceObjectKind::Wreck;
@@ -257,7 +258,7 @@ namespace SpaceGod::Core
 	/// Positions are <see cref="GalacticPosition"/>s, sector and offset, so a group a long way from Sol is placed as
 	/// exactly as one next to it.
 	/// </summary>
-	class DeepSpace final
+	class SPACEGODCORE_API DeepSpace final
 	{
 		// The galaxy this belongs to (a back-reference: Galaxy makes its DeepSpace with `this`). Written Core::Galaxy
 		// throughout the class, as its member Galaxy() hides the type's name in here.
@@ -563,6 +564,9 @@ namespace SpaceGod::Core
 
 		/// <summary>Lifts the ambushes whose time is up, whose band has gone, or whose band has set off.</summary>
 		void LiftAmbushes(double jd);
+	private:
+		DeepSpace() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(DeepSpace); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	/// <summary>
@@ -570,7 +574,7 @@ namespace SpaceGod::Core
 	/// left nor the one it is bound for) or a gravity projector's. It is pulled out at the field's edge, at the moment
 	/// it reaches it, and crosses under its ordinary drive (see <see cref="DeepSpace.Interdict"/>).
 	/// </summary>
-	class FtlInterdiction final : public IDeepSpaceEncounter
+	class SPACEGODCORE_API FtlInterdiction final : public IDeepSpaceEncounter
 	{
 	public:
 		void Step(DeepSpace& space, double fromJd, double toJd, cs::Random& rng) override;
@@ -587,7 +591,7 @@ namespace SpaceGod::Core
 	/// shot apart); a navy that wins leaves the beaten group wrecked out here. The loser's escorts are lost with it.
 	/// Either way the winners hold a while (the fight, the boarding) and then go on.
 	/// </summary>
-	class CruiseMeeting final : public IDeepSpaceEncounter
+	class SPACEGODCORE_API CruiseMeeting final : public IDeepSpaceEncounter
 	{
 	public:
 		/// <summary>How near (km) two groups' paths must come for either to pull the other out of cruise: about a light-hour.</summary>
@@ -615,7 +619,7 @@ namespace SpaceGod::Core
 	/// it finds (the flagship's purse and its flag's treasury), and goes on after <see cref="SalvageDays"/>. A war fleet
 	/// on campaign does not stop for it.
 	/// </summary>
-	class WreckSalvage final : public IDeepSpaceEncounter
+	class SPACEGODCORE_API WreckSalvage final : public IDeepSpaceEncounter
 	{
 	public:
 		/// <summary>How near (km) a group must pass for its sensors to pick out a wreck: about a light-hour.</summary>

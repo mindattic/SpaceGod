@@ -16,7 +16,7 @@ namespace SpaceGod::Core
 	/// system's gate for the next link, then through it; <see cref="Passed"/> moves on to the next leg (or replans if the
 	/// ship went through some other gate) and <see cref="Next"/> is the gate the HUD and map point at.
 	/// </summary>
-	class TravelCourse final
+	class SPACEGODCORE_API TravelCourse final
 	{
 		// The planner's own list (GateNetwork.Route's), held by reference as in the C#.
 		cs::Ref<cs::List<cs::Ref<JumpGate>>> gates;

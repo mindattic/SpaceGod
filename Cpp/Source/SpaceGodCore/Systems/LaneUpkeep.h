@@ -2,6 +2,7 @@
 // Port of Assets/UnitySpace/Core/Systems/LaneUpkeep.cs (see docs/MIGRATION.md).
 
 #include "Cs/Cs.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -25,7 +26,7 @@ namespace SpaceGod::Core
 	/// <see cref="FailAt"/> it fails and carries nothing until tenders bring it back above it.
 	/// </summary>
 	// [SettingsSource]
-	class LaneCondition
+	class SPACEGODCORE_API LaneCondition
 	{
 		static cs::String Share(double v);
 
@@ -75,7 +76,7 @@ namespace SpaceGod::Core
 	/// (<see cref="TenderFocus"/>), and navies at war and raiders go out of their way to fall on them (<see cref="HuntTarget"/>).
 	/// </summary>
 	// [SettingsSource]
-	class LaneUpkeep final
+	class SPACEGODCORE_API LaneUpkeep final
 	{
 	public:
 		/// <summary>How many tenders a polity keeps on each lane it keeps.</summary>
@@ -208,5 +209,8 @@ namespace SpaceGod::Core
 
 		/// <summary>Whether a raider band planning its next move goes hunting tenders this time (<see cref="RaiderHuntChance"/>).</summary>
 		bool RaidersHunt();
+	private:
+		LaneUpkeep() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(LaneUpkeep); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

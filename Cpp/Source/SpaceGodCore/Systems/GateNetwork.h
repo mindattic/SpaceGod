@@ -3,6 +3,7 @@
 
 #include "Cs/Cs.h"
 #include "DVec3.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -13,7 +14,7 @@ namespace SpaceGod::Core
 	class GateNetwork;
 
 	/// <summary>One jump-gate link: a gate in each of two systems, paired, and the light-years between them.</summary>
-	class GateLink final
+	class SPACEGODCORE_API GateLink final
 	{
 	public:
 		cs::Ref<StarSystem> A;
@@ -46,6 +47,9 @@ namespace SpaceGod::Core
 		bool Forcible(const cs::Ref<StarSystem>& from, const cs::Ref<Faction>& faction, double jd) const;
 
 		cs::String ToString() const;
+	private:
+		GateLink() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(GateLink); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	/// <summary>
@@ -61,7 +65,7 @@ namespace SpaceGod::Core
 	/// under blockade).
 	/// </summary>
 	// A route is a C# List that may be null (no way through): it is a cs::Ref<cs::List<cs::Ref<JumpGate>>> here.
-	class GateNetwork final
+	class SPACEGODCORE_API GateNetwork final
 	{
 		cs::List<cs::Ref<GateLink>> links;
 		cs::List<cs::Ref<StarSystem>> systems;
@@ -176,5 +180,6 @@ namespace SpaceGod::Core
 
 		/// <summary>Light-years along a route.</summary>
 		static double RouteLy(const RouteList& route);
+		SG_SERIALIZABLE(GateNetwork); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

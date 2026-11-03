@@ -25,10 +25,10 @@ namespace SpaceGod::Core
 		/// <summary>A gravity projector: a station (or anything else) throwing a field to pull hulls out of FTL.</summary>
 		Projector,
 	};
-	const char* ToString(GravityFieldKind v);
+	SPACEGODCORE_API const char* ToString(GravityFieldKind v);
 
 	/// <summary>A sphere an FTL drive will not hold in (U.SPC-T418): a body's well, or a projector's field.</summary>
-	struct GravityField
+	struct SPACEGODCORE_API GravityField
 	{
 		cs::String Name;
 		GravityFieldKind Kind = GravityFieldKind::Mass;
@@ -88,7 +88,7 @@ namespace SpaceGod::Core
 	///    drive crosses the galaxy in centuries; at the menu's top, in a few years (<see cref="GalaxyCrossingDays"/>).
 	/// </summary>
 	// [SettingsSource]: the settings registry finds the RangeSettings by touching their accessors.
-	class FtlRules
+	class SPACEGODCORE_API FtlRules
 	{
 	public:
 		/// <summary>The Sun's gravitational parameter, km³/s².</summary>

@@ -2,6 +2,7 @@
 // Port of Assets/UnitySpace/Core/Systems/Polities.cs (US-T17).
 
 #include "Cs/Cs.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -28,7 +29,7 @@ namespace SpaceGod::Core
 		/// <summary>Raiders working from their havens, hostile to everyone.</summary>
 		PirateClan,
 	};
-	const char* ToString(PolityKind v);
+	SPACEGODCORE_API const char* ToString(PolityKind v);
 
 	/// <summary>
 	/// The interstellar polities (U.SPC-T91): one faction model shared by every star system. A faction is one
@@ -40,7 +41,7 @@ namespace SpaceGod::Core
 	/// the Centauri Accord governs Proxima, each frontier colony has its own state, and the pirate clans keep
 	/// their own havens. A world built on its own (a test, a single system) gets a private set.
 	/// </summary>
-	class Polities final
+	class SPACEGODCORE_API Polities final
 	{
 		cs::List<cs::Ref<Faction>> factions;
 		cs::List<cs::Ref<World>> worlds;
@@ -128,5 +129,6 @@ namespace SpaceGod::Core
 		/// A faction from no registry (made directly on a fleet) is kept by whichever world it is in.
 		/// </summary>
 		cs::List<cs::Ref<Faction>> KeptBy(const cs::Ref<World>& world, const cs::List<cs::Ref<Faction>>& present) const;
+		SG_SERIALIZABLE(Polities); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

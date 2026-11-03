@@ -2,6 +2,7 @@
 // Port of Assets/UnitySpace/Core/Systems/InterstellarColonisation.cs (US-T17).
 
 #include "Cs/Cs.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -24,7 +25,7 @@ namespace SpaceGod::Core
 	/// settled, its founder holds it, and it runs (at the detail the player's whereabouts give it, U.SPC-T104) with
 	/// the gate traffic that now trades with it. One colony ship at a time goes to a system still waiting for its first.
 	/// </summary>
-	class InterstellarColonisation final
+	class SPACEGODCORE_API InterstellarColonisation final
 	{
 		cs::Ref<Galaxy> galaxy;
 
@@ -48,5 +49,8 @@ namespace SpaceGod::Core
 		/// days each would take. A system another colony ship is already bound for is left to it.
 		/// </summary>
 		cs::List<cs::Ref<ForeignSite>> SitesFrom(const cs::Ref<StarSystem>& home, const cs::Ref<Faction>& f, const cs::Ref<Settlement>& from, double jd);
+	private:
+		InterstellarColonisation() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(InterstellarColonisation); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

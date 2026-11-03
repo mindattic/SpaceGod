@@ -3,6 +3,7 @@
 
 #include "Cs/Cs.h"
 #include "Ships.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -19,7 +20,7 @@ namespace SpaceGod::Core
 	/// A drive is data, not code: a new one is a new spec registered for the hull classes that carry it
 	/// (<see cref="CruiseDrives.Register"/>).
 	/// </summary>
-	class CruiseDriveSpec final
+	class SPACEGODCORE_API CruiseDriveSpec final
 	{
 	public:
 		cs::String Name;
@@ -54,6 +55,9 @@ namespace SpaceGod::Core
 		double LyPerDay() const;
 
 		cs::String ToString() const { return Name; }
+	private:
+		CruiseDriveSpec() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(CruiseDriveSpec); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	/// <summary>
@@ -61,7 +65,7 @@ namespace SpaceGod::Core
 	/// once when the leg is set and closed-form after that, so where a group is between the stars never depends on how
 	/// often it is looked at.
 	/// </summary>
-	struct CruiseProfile
+	struct SPACEGODCORE_API CruiseProfile
 	{
 		/// <summary>The leg's length, light-years; its speed at cruise, light-years a day; the ramp up and the charge, days.</summary>
 		double Ly = 0, LyPerDay = 0, RampDays = 0, SpoolDays = 0;
@@ -111,7 +115,7 @@ namespace SpaceGod::Core
 		/// <summary>Never leaves its home system, by gate, drive or carriage: corvettes.</summary>
 		HomeSystem,
 	};
-	const char* ToString(FtlAccess v);
+	SPACEGODCORE_API const char* ToString(FtlAccess v);
 
 	/// <summary>
 	/// The owner's roster of who has their own FTL (U.SPC-T472), as data: carriers and gate breakers always have a
@@ -123,7 +127,7 @@ namespace SpaceGod::Core
 	/// systems that move fleets between the stars, which all ask <see cref="CruiseDrives.Of(Ship)"/> and
 	/// <see cref="LeavesHome"/>.
 	/// </summary>
-	class FtlRoster
+	class SPACEGODCORE_API FtlRoster
 	{
 		static cs::Dictionary<ShipClass, FtlAccess>& byClass();
 
@@ -159,7 +163,7 @@ namespace SpaceGod::Core
 	/// (see <see cref="FtlCarriage"/>).
 	/// </summary>
 	// [SettingsSource]: the settings registry finds SpeedScale and WellLimit by touching their accessors.
-	class CruiseDrives
+	class SPACEGODCORE_API CruiseDrives
 	{
 	public:
 		/// <summary>A capital ship's drive: a light-year a day, charging six hours and cooling twelve after, a charge burning
@@ -207,7 +211,7 @@ namespace SpaceGod::Core
 	/// craft's size are registered (<see cref="RegisterBerths"/>, <see cref="RegisterCraft"/>, <see cref="RegisterClamps"/>,
 	/// <see cref="RegisterClampable"/>), never threaded through the cruise.
 	/// </summary>
-	class FtlCarriage
+	class SPACEGODCORE_API FtlCarriage
 	{
 		/// <summary>Hangar berths each class of drive-carrying hull has for small craft.</summary>
 		static cs::Dictionary<ShipClass, int>& berths();

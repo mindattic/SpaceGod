@@ -32,7 +32,7 @@ namespace SpaceGod::Core
 	/// phases (only periods, separations and minimum masses are measured), the stars' spin poles,
 	/// and the orientation of Proxima's orbital plane. The stations are game-layer fiction.
 	/// </summary>
-	class AlphaCentauri
+	class SPACEGODCORE_API AlphaCentauri
 	{
 	public:
 		static constexpr double SunGm = StarSystemBuilder::SunGm;
@@ -41,16 +41,16 @@ namespace SpaceGod::Core
 		static constexpr double JupiterRadiusKm = 71492;
 
 	public:
-		static constexpr double MassA = 1.0788, MassB = 0.9092, MassProxima = 0.1221;
+		static constexpr double MassA = 1.0788; static constexpr double MassB = 0.9092; static constexpr double MassProxima = 0.1221;
 
 		/// <summary>Distance of the A-B pair (light-years, Akeson et al. 2021) and of Proxima (light-years).</summary>
-		static constexpr double DistanceLy = 4.344, ProximaDistanceLy = 4.2465;
+		static constexpr double DistanceLy = 4.344; static constexpr double ProximaDistanceLy = 4.2465;
 
 		/// <summary>Alpha Centauri A's position on the sky (ICRS J2000).</summary>
-		static inline const double RaDeg = Astro::Hms(14, 39, 36.494), DecDeg = Astro::Dms(60, 50, 2.37, true);
+		static inline const double RaDeg = Astro::Hms(14, 39, 36.494); static inline const double DecDeg = Astro::Dms(60, 50, 2.37, true);
 
 		/// <summary>Proxima Centauri's position on the sky (ICRS J2000).</summary>
-		static inline const double ProximaRaDeg = Astro::Hms(14, 29, 42.946), ProximaDecDeg = Astro::Dms(62, 40, 46.16, true);
+		static inline const double ProximaRaDeg = Astro::Hms(14, 29, 42.946); static inline const double ProximaDecDeg = Astro::Dms(62, 40, 46.16, true);
 
 		/// <summary>A-B relative orbit (Akeson et al. 2021): Campbell elements of B about A (a = 17.493" at 1.3319 pc).</summary>
 		static const cs::Ref<BinaryOrbitSpec>& Orbit();

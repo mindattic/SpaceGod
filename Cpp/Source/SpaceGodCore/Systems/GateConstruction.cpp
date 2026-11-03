@@ -367,8 +367,8 @@ namespace SpaceGod::Core
 
 	bool GateConstruction::Fallen(cs::Ref<Faction> f)
 	{
-		for (const auto& _ : galaxy->Polities->SettlementsOf(f)) { (void)_; return false; }
-		return true;
+		// C#: foreach (var _ in SettlementsOf(f)) return false; (an eager list here, so: is it empty)
+		return galaxy->Polities->SettlementsOf(f).Count() == 0;
 	}
 
 	cs::String GateConstruction::SiteName(cs::Ref<GateProject> p) { return p->Gate != nullptr ? p->Gate->Name : GateNetworkName(p->TargetName); }

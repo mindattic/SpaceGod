@@ -4,6 +4,7 @@
 #include "Cs/Cs.h"
 #include "DVec3.h"
 #include "GalacticPosition.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -80,14 +81,14 @@ namespace SpaceGod::Core
 		/// if the site was taken.</summary>
 		Colonise,
 	};
-	const char* ToString(VoyagePurpose v);
+	SPACEGODCORE_API const char* ToString(VoyagePurpose v);
 
 	/// <summary>
 	/// One ship's (or group's) trip across the gate network: where it belongs, where it is bound,
 	/// the gates to take, and what it does when it gets there. Kept on the flagship
 	/// (<see cref="Ship.Voyage"/>), the same object all the way (U.SPC-T453).
 	/// </summary>
-	class Voyage final
+	class SPACEGODCORE_API Voyage final
 	{
 	public:
 		VoyagePurpose Purpose = static_cast<VoyagePurpose>(0);
@@ -243,7 +244,7 @@ namespace SpaceGod::Core
 	/// raiders come through it; traffic then goes round by other gates where it can, or waits.
 	/// </summary>
 	// [SettingsSource]
-	class InterstellarTraffic final
+	class SPACEGODCORE_API InterstellarTraffic final
 	{
 		/// <summary>C#'s (StarSystem system, Ship ship).</summary>
 		struct AtGateEntry
@@ -651,5 +652,8 @@ namespace SpaceGod::Core
 	private:
 		/// <summary>Ships abroad whose stay is over turn for home, a freighter with a backhaul if one pays.</summary>
 		void SendHomeWhenDone(const cs::Ref<StarSystem>& system, double jd);
+	private:
+		InterstellarTraffic() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(InterstellarTraffic); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

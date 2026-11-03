@@ -20,7 +20,7 @@ namespace SpaceGod::Core
 		/// <summary>Inside the conservative zone (runaway to maximum greenhouse).</summary>
 		Conservative,
 	};
-	const char* ToString(HabitableZone v);
+	SPACEGODCORE_API const char* ToString(HabitableZone v);
 }
 
 #include "BodyDefinition.h"
@@ -66,7 +66,7 @@ namespace SpaceGod::Core
 	/// Either one star or a bound pair circling its own barycentre (A and B on a shared relative
 	/// orbit). A pair's barycentre is an invisible body named <see cref="Name"/>.
 	/// </summary>
-	class StellarNode final
+	class SPACEGODCORE_API StellarNode final
 	{
 	public:
 		cs::Ref<StarSpec> Star;
@@ -204,7 +204,7 @@ namespace SpaceGod::Core
 	/// invented stations. <see cref="StarSystemBuilder"/> turns it into bodies. Values are sourced in
 	/// Systems/SOURCES.md; only what the planet and station summaries call assumed or fiction is not.
 	/// </summary>
-	class SystemSpec final
+	class SPACEGODCORE_API SystemSpec final
 	{
 	public:
 		cs::String Name;
@@ -256,7 +256,7 @@ namespace SpaceGod::Core
 	/// The optimistic edges (recent Venus 1.7763, early Mars 0.3207 at the Sun) are scaled from the
 	/// conservative ones by their solar ratios, an approximation.
 	/// </summary>
-	class HabitableZones
+	class SPACEGODCORE_API HabitableZones
 	{
 	public:
 		/// <summary>Effective flux (Earth = 1) at the runaway-greenhouse inner edge.</summary>
@@ -266,7 +266,7 @@ namespace SpaceGod::Core
 		static double MaxGreenhouseFlux(double teffK) { return Seff(teffK, 0.3507, 5.9578e-5, 1.6707e-9, -3.0058e-12, -5.1925e-16); }
 
 	private:
-		static constexpr double RecentVenusRatio = 1.7763 / 1.0385, EarlyMarsRatio = 0.3207 / 0.3507;
+		static constexpr double RecentVenusRatio = 1.7763 / 1.0385; static constexpr double EarlyMarsRatio = 0.3207 / 0.3507;
 
 		static double Seff(double teffK, double s0, double a, double b, double c, double d);
 

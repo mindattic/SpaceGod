@@ -20,7 +20,7 @@ namespace SpaceGod::Core
 	/// entry (<see cref="SystemSpec"/>) when a pilot comes near enough for it to be simulated; the entry is made afresh each
 	/// time from the galaxy's seed, so a star is the same star whenever and however often it is reached.
 	/// </summary>
-	class StarEntry final
+	class SPACEGODCORE_API StarEntry final
 	{
 	public:
 		cs::String Name;
@@ -64,7 +64,7 @@ namespace SpaceGod::Core
 	/// procedural galaxy out of their neighbourhood. New stars, regions and their content plug in by registering a
 	/// source (<see cref="SystemSources.Register"/>) or a <see cref="SystemContent"/>, never by editing the galaxy.
 	/// </summary>
-	class SystemSource
+	class SPACEGODCORE_API SystemSource
 	{
 	public:
 		virtual ~SystemSource() = default;
@@ -116,7 +116,7 @@ namespace SpaceGod::Core
 	/// and the real catalogue stars near Sol (<see cref="CatalogueStars"/>), then the rest of the galaxy, generated from its seed (<see cref="ProceduralSystems"/>). Ask it for the stars near a place and
 	/// it merges what every source charts there; ask it for one of them and the source that charted it builds it.
 	/// </summary>
-	class SystemSources
+	class SPACEGODCORE_API SystemSources
 	{
 		static cs::List<cs::Ref<SystemSource>>& sources();
 
@@ -190,7 +190,7 @@ namespace SpaceGod::Core
 	/// (<see cref="NearbySystems"/>) and the frontier stars (<see cref="FrontierSystems"/>), each defined from its own
 	/// hand-written entry and built the way it always was (Alpha Centauri and the nearby systems with their societies).
 	/// </summary>
-	class HandBuiltSystems final : public SystemSource
+	class SPACEGODCORE_API HandBuiltSystems final : public SystemSource
 	{
 	public:
 		static constexpr const char* SourceName = "Hand-built";

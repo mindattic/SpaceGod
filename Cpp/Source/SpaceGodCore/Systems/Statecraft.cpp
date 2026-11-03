@@ -918,11 +918,8 @@ namespace SpaceGod::Core
 
 	bool Statecraft::Alive(const cs::Ref<Faction>& f) const
 	{
-		for (const auto& _ : Polities->SettlementsOf(f))
-		{
-			(void)_;
-			return true;
-		}
+		// C#: foreach (var _ in SettlementsOf(f)) return true; (an eager list here, so: is it non-empty)
+		if (Polities->SettlementsOf(f).Count() > 0) return true;
 		return Polities->Navy(f).Count() > 0;
 	}
 

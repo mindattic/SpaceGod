@@ -8,6 +8,7 @@
 #include "BodyDefinition.h"
 #include "Cs/Cs.h"
 #include "Systems/StarDiscovery.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -34,7 +35,7 @@ namespace SpaceGod::Core
 	/// barycentre), ephemeris, hyperlanes, fleet, markets and wars. Every system runs on the shared
 	/// clock, whether or not it is the one being looked at.
 	/// </summary>
-	class StarSystem final
+	class SPACEGODCORE_API StarSystem final
 	{
 	public:
 		cs::String Name;
@@ -159,10 +160,13 @@ namespace SpaceGod::Core
 
 	public:
 		cs::String ToString() const { return Name; }
+	private:
+		StarSystem() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(StarSystem); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	/// <summary>A real star near the Sun, for the interstellar view (not simulated).</summary>
-	struct NearbyStar
+	struct SPACEGODCORE_API NearbyStar
 	{
 		cs::String Name;
 		DVec3 PositionLy;
@@ -195,7 +199,7 @@ namespace SpaceGod::Core
 	/// The neighbourhood: the simulated star systems at their real positions, plus the nearest real
 	/// stars around them for the view between systems. The seed of a larger map.
 	/// </summary>
-	class Galaxy final
+	class SPACEGODCORE_API Galaxy final
 	{
 		// C# passes `this` (to DeepSpace, the polities' Command and Statecraft, the lookouts): a non-owning reference.
 		cs::Ref<Galaxy> Self() { return cs::Ref<Galaxy>(cs::Ref<Galaxy>(), this); }
@@ -470,5 +474,6 @@ namespace SpaceGod::Core
 
 		/// <summary>Takes the star called <paramref name="name"/> off the <see cref="Undiscovered"/> without news (it is running now); whether it was there.</summary>
 		bool Unhide(const cs::String& name);
+		SG_SERIALIZABLE(Galaxy); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

@@ -2,6 +2,7 @@
 // Port of Unity.SpaceGod Core/Systems/StrategicCommand.cs (US-T15, see docs/MIGRATION.md).
 
 #include "Cs/Cs.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -38,7 +39,7 @@ namespace SpaceGod::Core
 		/// <summary>Visit every world of a system in turn, then stand down.</summary>
 		Explore,
 	};
-	const char* ToString(ObjectiveKind v);
+	SPACEGODCORE_API const char* ToString(ObjectiveKind v);
 
 	/// <summary>How many of a polity's groups one command reaches: one squadron, every group in a system, or the whole navy.</summary>
 	enum class CommandScope : int
@@ -47,7 +48,7 @@ namespace SpaceGod::Core
 		System,
 		Polity,
 	};
-	const char* ToString(CommandScope v);
+	SPACEGODCORE_API const char* ToString(CommandScope v);
 
 	/// <summary>An objective a polity's command has given one of its fleet groups (U.SPC-T423).</summary>
 	class FleetObjective final
@@ -78,7 +79,7 @@ namespace SpaceGod::Core
 	/// up through a glut, so a war economy turns out alloys, electronics and munitions and a civil one food and medicine.
 	/// A new focus is one <see cref="Register"/> call.
 	/// </summary>
-	class ProductionFocus final
+	class SPACEGODCORE_API ProductionFocus final
 	{
 	public:
 		static const cs::List<cs::Ref<ProductionFocus>>& All();
@@ -111,6 +112,9 @@ namespace SpaceGod::Core
 		struct Statics;
 		static const Statics& statics();
 		static cs::Ref<ProductionFocus> Add(cs::String name, cs::String description, cs::List<IndustryKind> favoured);
+	private:
+		ProductionFocus() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(ProductionFocus); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	/// <summary>
@@ -118,7 +122,7 @@ namespace SpaceGod::Core
 	/// they keep (a share of the system's cap). A plan with no hulls leaves the slips to the merchant fleet. A new plan is
 	/// one <see cref="Register"/> call.
 	/// </summary>
-	class BuildPlan final
+	class SPACEGODCORE_API BuildPlan final
 	{
 	public:
 		static const cs::List<cs::Ref<BuildPlan>>& All();
@@ -177,6 +181,9 @@ namespace SpaceGod::Core
 		struct Statics;
 		static const Statics& statics();
 		static cs::Ref<BuildPlan> Add(cs::String name, cs::String description, double navyShare, cs::List<ShipClass> cycle);
+	private:
+		BuildPlan() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(BuildPlan); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	/// <summary>
@@ -184,7 +191,7 @@ namespace SpaceGod::Core
 	/// does is its own (<see cref="OnLevel"/>, or read by the code it improves through <see cref="StrategicCommand.Level"/>).
 	/// A new track is one <see cref="Register"/> call.
 	/// </summary>
-	class ResearchTrack final
+	class SPACEGODCORE_API ResearchTrack final
 	{
 	public:
 		static const cs::List<cs::Ref<ResearchTrack>>& All();
@@ -230,10 +237,13 @@ namespace SpaceGod::Core
 		struct Statics;
 		static const Statics& statics();
 		static cs::Ref<ResearchTrack> Add(cs::String name, cs::String description, double baseCost, int maxLevel, cs::Action<cs::Ref<Faction>, int> onLevel);
+	private:
+		ResearchTrack() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(ResearchTrack); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	/// <summary>One polity's standing directives (U.SPC-T423): its production, build and research priorities and its research so far.</summary>
-	class PolityDirectives final
+	class SPACEGODCORE_API PolityDirectives final
 	{
 	public:
 		cs::Ref<::SpaceGod::Core::Faction> Faction;
@@ -251,6 +261,9 @@ namespace SpaceGod::Core
 		explicit PolityDirectives(cs::Ref<::SpaceGod::Core::Faction> faction) { Faction = faction; }
 
 		int Level(const cs::Ref<ResearchTrack>& t) const;
+	private:
+		PolityDirectives() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(PolityDirectives); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	/// <summary>One fleet group in a polity's command report: where it is, what it is doing and what it was told to do.</summary>
@@ -300,7 +313,7 @@ namespace SpaceGod::Core
 	/// polity runs as before until it is given a directive: these are the player's levers, not a second AI.
 	/// </summary>
 	// [SettingsSource]
-	class StrategicCommand final
+	class SPACEGODCORE_API StrategicCommand final
 	{
 	public:
 		/// <summary>Economy hook result: C#'s (bool Favoured, double Bonus).</summary>
@@ -452,5 +465,8 @@ namespace SpaceGod::Core
 		/// <summary>Sends a group whose objective lies in another system there: as a campaign if it is to take a system it is at
 		/// war over, else through the open gates (or under its own drive).</summary>
 		void Dispatch(const cs::Ref<Ship>& leader, const cs::Ref<World>& from, const cs::Ref<FleetObjective>& o, double jd);
+	private:
+		StrategicCommand() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(StrategicCommand); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

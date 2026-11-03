@@ -28,7 +28,7 @@ namespace SpaceGod::Core
 	/// third system (that one would be the shorter way round), so no station sits on top of a star. They are numbered
 	/// outward from Sol, nearest first, and are the same in every galaxy: they come from the real stars, not the seed.
 	/// </summary>
-	class VoidStations final : public SystemSource
+	class SPACEGODCORE_API VoidStations final : public SystemSource
 	{
 	public:
 		static inline const cs::String SourceName = "Void stations";

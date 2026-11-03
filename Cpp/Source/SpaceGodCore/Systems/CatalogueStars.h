@@ -26,7 +26,7 @@ namespace SpaceGod::Core
 	/// are not modelled yet: each is built as its star, with the habitat orbit settlers would use.
 	/// </summary>
 	// The rows are compiled in (Beyond), as in the C#: nothing is read from docs/nearest_stars_2027.csv at run time.
-	class CatalogueStars final : public SystemSource
+	class SPACEGODCORE_API CatalogueStars final : public SystemSource
 	{
 	public:
 		static constexpr const char* SourceName = "Catalogue";

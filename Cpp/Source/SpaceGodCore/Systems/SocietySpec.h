@@ -26,10 +26,10 @@ namespace SpaceGod::Core
 		/// <summary>The raiders, at their haven.</summary>
 		Raiders,
 	};
-	const char* ToString(SocietyRole v);
+	SPACEGODCORE_API const char* ToString(SocietyRole v);
 
 	/// <summary>One of a settled system's factions (game layer).</summary>
-	class FactionSpec final
+	class SPACEGODCORE_API FactionSpec final
 	{
 	public:
 		cs::String Name, Prefix;
@@ -77,7 +77,7 @@ namespace SpaceGod::Core
 	/// live on, its hyperlanes and the names of its ships. All of it is fiction, placed on the real
 	/// bodies of the system's catalogue entry (or on stations in orbit where none will do).
 	/// </summary>
-	class SocietySpec final
+	class SPACEGODCORE_API SocietySpec final
 	{
 	public:
 		/// <summary>The system it settles (<see cref="SystemSpec.Name"/>).</summary>

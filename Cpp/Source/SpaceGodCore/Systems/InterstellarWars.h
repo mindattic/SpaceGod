@@ -2,6 +2,7 @@
 // Port of Unity.SpaceGod Core/Systems/InterstellarWars.cs (US-T15, see docs/MIGRATION.md).
 
 #include "Cs/Cs.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -41,7 +42,7 @@ namespace SpaceGod::Core
 		/// <summary>Home again, or lost.</summary>
 		Over,
 	};
-	const char* ToString(CampaignStage v);
+	SPACEGODCORE_API const char* ToString(CampaignStage v);
 
 	/// <summary>
 	/// One war fleet's campaign (U.SPC-T92): a navy group sent across the gates to take an enemy system. It plans its way
@@ -50,7 +51,7 @@ namespace SpaceGod::Core
 	/// settlement and lands its marines to take it. The flagship carries the campaign on its <see cref="Voyage"/>, so it
 	/// survives the gates' carrying a hull from one system to the next and a flagship lost to its heir.
 	/// </summary>
-	class Campaign final
+	class SPACEGODCORE_API Campaign final
 	{
 	public:
 		Campaign();
@@ -118,7 +119,7 @@ namespace SpaceGod::Core
 	/// A war between two powers over systems (U.SPC-T92): the aggressor's goals (the enemy systems it means to take), the
 	/// campaigns either side has sent, and, once it is over, the treaty that ended it.
 	/// </summary>
-	class Conflict final
+	class SPACEGODCORE_API Conflict final
 	{
 	public:
 		cs::Ref<Faction> Aggressor, Defender;
@@ -164,7 +165,7 @@ namespace SpaceGod::Core
 	/// loser's other settlements and its gates there go with it. Whatever else was occupied goes back, gates taken
 	/// elsewhere go back to their owners, the fleets go home, and the two keep the peace for <see cref="TruceDays"/>.
 	/// </summary>
-	class InterstellarWars final
+	class SPACEGODCORE_API InterstellarWars final
 	{
 	public:
 		/// <summary>C#'s (Conflict War, Faction Before).</summary>
@@ -510,5 +511,8 @@ namespace SpaceGod::Core
 		double NavyStrength(const cs::Ref<Faction>& f) const;
 
 		cs::Ref<StarSystem> SystemOf(const cs::Ref<World>& w) const;
+	private:
+		InterstellarWars() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(InterstellarWars); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

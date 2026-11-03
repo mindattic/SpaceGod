@@ -26,7 +26,7 @@ namespace SpaceGod::Core
 		/// <summary>On a settled end's approach, a tenth of the way out (a listening post).</summary>
 		Approach,
 	};
-	const char* ToString(FeaturePlacement v);
+	SPACEGODCORE_API const char* ToString(FeaturePlacement v);
 
 	/// <summary>
 	/// One kind of thing that lies out between the stars (U.SPC-T421): how many of it a route holds, on the gate network
@@ -68,7 +68,7 @@ namespace SpaceGod::Core
 	/// time, from the route's own name and the galaxy's seed, so the same route always holds the same things. Routes the
 	/// gates do not join hold the most, and pay the most to survey.
 	/// </summary>
-	class DeepSpaceFeatures
+	class SPACEGODCORE_API DeepSpaceFeatures
 	{
 	public:
 		/// <summary>Jupiter's gravitational parameter, km³/s² (a rogue planet's mass is reckoned in it).</summary>
@@ -117,7 +117,7 @@ namespace SpaceGod::Core
 	};
 
 	/// <summary>A route between two stars that has been seeded with what lies along it (U.SPC-T421).</summary>
-	class DeepSpaceRoute final
+	class SPACEGODCORE_API DeepSpaceRoute final
 	{
 	public:
 		/// <summary>The two ends, in name order, and where they are.</summary>
@@ -152,7 +152,7 @@ namespace SpaceGod::Core
 	/// <see cref="SurveyDays"/>, and its flag is paid for the charts: three times as much off the gate network. The player's
 	/// own hull logs it on the way past without stopping.
 	/// </summary>
-	class SurveyFinds final : public IDeepSpaceEncounter
+	class SPACEGODCORE_API SurveyFinds final : public IDeepSpaceEncounter
 	{
 	public:
 		/// <summary>How near (km) a survey hull's instruments pick a find out: about five light-hours.</summary>
@@ -168,7 +168,7 @@ namespace SpaceGod::Core
 	/// within <see cref="RangeKm"/> of an ice body with water left on it, drops out for <see cref="IceDays"/> to mine it and
 	/// fills its tanks as far as the ice goes.
 	/// </summary>
-	class IceRefuelling final : public IDeepSpaceEncounter
+	class SPACEGODCORE_API IceRefuelling final : public IDeepSpaceEncounter
 	{
 	public:
 		static constexpr double RangeKm = 1e9;
@@ -185,7 +185,7 @@ namespace SpaceGod::Core
 	/// are lures: a clan lies in wait at them, robs whoever answers or, against a strong enough warship, is beaten off. A
 	/// call nobody answers falls silent and leaves a derelict.
 	/// </summary>
-	class DistressCalls final : public IDeepSpaceEncounter
+	class SPACEGODCORE_API DistressCalls final : public IDeepSpaceEncounter
 	{
 	public:
 		/// <summary>How many calls go out a day across all the routes seeded.</summary>
@@ -218,7 +218,7 @@ namespace SpaceGod::Core
 	/// pass within <see cref="ListenRangeKm"/> and tells its home system; an enemy group with guns passing within a
 	/// light-hour of either knocks it out, leaving a wreck.
 	/// </summary>
-	class DeepSpaceOutposts final : public IDeepSpaceEncounter
+	class SPACEGODCORE_API DeepSpaceOutposts final : public IDeepSpaceEncounter
 	{
 	public:
 		/// <summary>How far (km) a listening post hears a drive: about a light-day.</summary>
@@ -235,7 +235,7 @@ namespace SpaceGod::Core
 	/// stations, and takes them down when they go (<see cref="DeepSpace.LieInWait"/>). The fights themselves are the
 	/// ordinary meetings out here (<see cref="CruiseMeeting"/>): a passer pulled out by the projector is within reach.
 	/// </summary>
-	class RouteAmbushes final : public IDeepSpaceEncounter
+	class SPACEGODCORE_API RouteAmbushes final : public IDeepSpaceEncounter
 	{
 	public:
 		void Step(DeepSpace& space, double fromJd, double toJd, cs::Random& rng) override;

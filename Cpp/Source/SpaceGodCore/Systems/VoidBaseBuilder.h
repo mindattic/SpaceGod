@@ -15,7 +15,7 @@ namespace SpaceGod::Core
 	/// perfectly ordinary suns that light the place without lighting what sits at its heart. Nothing else is ever
 	/// added: nothing could really orbit a machine this light, and nothing is meant to settle here.
 	/// </summary>
-	class VoidBaseBuilder
+	class SPACEGODCORE_API VoidBaseBuilder
 	{
 	public:
 		/// <summary>The generator's own bulk: a compact machine, nothing like a star's scale.</summary>

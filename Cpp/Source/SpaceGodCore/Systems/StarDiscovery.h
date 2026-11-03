@@ -24,7 +24,7 @@ namespace SpaceGod::Core
 		/// </summary>
 		Undiscovered,
 	};
-	const char* ToString(DiscoveryState v);
+	SPACEGODCORE_API const char* ToString(DiscoveryState v);
 
 	/// <summary>
 	/// How the real neighbourhood starts and is found (U.SPC-T456): every system of docs/nearest_stars_2027.csv and every void
@@ -35,7 +35,7 @@ namespace SpaceGod::Core
 	/// going to each star as it is found reaches every one in the end. New ways of finding a star plug in as a lookout.
 	/// </summary>
 	// [SettingsSource]: the settings registry finds Range by touching StarDiscovery::Range() (no reflection in C++).
-	class StarDiscovery
+	class SPACEGODCORE_API StarDiscovery
 	{
 	public:
 		/// <summary>How far from Sol the neighbourhood is known at the start: every real system and void station within it.</summary>

@@ -22,7 +22,7 @@ namespace SpaceGod::Core
 	/// light-year frontier a scatter of outposts. Physical values stay those of the catalogue; the only
 	/// numbers invented here are the stations' orbits and the people.
 	/// </summary>
-	class NearbySocieties
+	class SPACEGODCORE_API NearbySocieties
 	{
 	public:
 		/// <summary>The society planned for a system, or null if it has none.</summary>
@@ -45,9 +45,9 @@ namespace SpaceGod::Core
 
 		static cs::List<IndustryKind> I(std::initializer_list<IndustryKind> k) { return cs::List<IndustryKind>(k); }
 
-		static constexpr IndustryKind Smelter = IndustryKind::Smelter, Fab = IndustryKind::ElectronicsFab, Works = IndustryKind::MachineWorks, Pharma = IndustryKind::PharmaLab;
-		static constexpr SettlementKind Colony = SettlementKind::Colony, Station = SettlementKind::Station, Outpost = SettlementKind::MiningOutpost, Haven = SettlementKind::Haven;
-		static constexpr SocietyRole Gov = SocietyRole::Authority, Co = SocietyRole::Company, Raid = SocietyRole::Raiders;
+		static constexpr IndustryKind Smelter = IndustryKind::Smelter; static constexpr IndustryKind Fab = IndustryKind::ElectronicsFab; static constexpr IndustryKind Works = IndustryKind::MachineWorks; static constexpr IndustryKind Pharma = IndustryKind::PharmaLab;
+		static constexpr SettlementKind Colony = SettlementKind::Colony; static constexpr SettlementKind Station = SettlementKind::Station; static constexpr SettlementKind Outpost = SettlementKind::MiningOutpost; static constexpr SettlementKind Haven = SettlementKind::Haven;
+		static constexpr SocietyRole Gov = SocietyRole::Authority; static constexpr SocietyRole Co = SocietyRole::Company; static constexpr SocietyRole Raid = SocietyRole::Raiders;
 
 		// ---------------------------------------------------------------- 5.96 ly
 		static cs::Ref<SocietySpec> BarnardsStar();

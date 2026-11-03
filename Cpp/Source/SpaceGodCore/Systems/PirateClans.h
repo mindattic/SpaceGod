@@ -2,6 +2,7 @@
 // Port of Assets/UnitySpace/Core/Systems/PirateClans.cs (see docs/MIGRATION.md).
 
 #include "Cs/Cs.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -35,7 +36,7 @@ namespace SpaceGod::Core
 	/// Kept small enough that a thin frontier system's merchants live through it: one smuggler out from a system at a
 	/// time, a clan holds two havens at most, and founding, moving and splitting are rare.
 	/// </summary>
-	class PirateClans final
+	class SPACEGODCORE_API PirateClans final
 	{
 	public:
 		/// <summary>A gate route (GateNetwork.Route): null when there is no way through.</summary>
@@ -253,5 +254,8 @@ namespace SpaceGod::Core
 		/// that have been found, and bounty hunters go after its bands where they work.
 		/// </summary>
 		void Hunt(cs::Ref<Faction> clan, const cs::List<HavenEntry>& havens, double jd);
+	private:
+		PirateClans() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(PirateClans); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

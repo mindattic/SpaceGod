@@ -13,7 +13,7 @@ namespace SpaceGod::Core
 	/// <see cref="Galaxy.Explore"/>).
 	/// </summary>
 	// [SettingsSource]: the settings registry finds these by touching the accessors (no reflection in C++).
-	class GalaxyStreaming
+	class SPACEGODCORE_API GalaxyStreaming
 	{
 	public:
 		/// <summary>How far about the pilot stars are charted: shown in the interstellar view and open to a cruise.</summary>

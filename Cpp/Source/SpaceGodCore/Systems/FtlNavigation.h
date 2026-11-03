@@ -25,7 +25,7 @@ namespace SpaceGod::Core
 	/// <see cref="DeepSpace.FieldsAlong"/>), so the ETA and the fuel are the trip's own, not a guess.
 	/// </summary>
 	// A C# null string (Refusal: none) is the empty string here.
-	class FtlCourse final
+	class SPACEGODCORE_API FtlCourse final
 	{
 	public:
 		cs::Ref<FtlTarget> Target;
@@ -149,7 +149,7 @@ namespace SpaceGod::Core
 		/// <summary>The drive charging (the helm's own <see cref="HelmFtl"/>), the nose held on the target.</summary>
 		Spooling,
 	};
-	const char* ToString(FtlAutopilotStage v);
+	SPACEGODCORE_API const char* ToString(FtlAutopilotStage v);
 
 	/// <summary>What a step of the autopilot came to.</summary>
 	enum class FtlAutopilotEvent : int
@@ -165,7 +165,7 @@ namespace SpaceGod::Core
 		/// <summary>Let go of (a fight, or the course could not be flown on): see <see cref="FtlAutopilot.Reason"/>.</summary>
 		Disengaged,
 	};
-	const char* ToString(FtlAutopilotEvent v);
+	SPACEGODCORE_API const char* ToString(FtlAutopilotEvent v);
 
 	/// <summary>
 	/// The FTL autopilot (U.SPC-T420): given a plotted <see cref="FtlCourse"/>, flies the hull out beyond the rim under its
@@ -176,7 +176,7 @@ namespace SpaceGod::Core
 	///
 	/// Engine-free: the Runtime helm puts the hull where <see cref="PositionKm"/> says and turns it as <see cref="Turn"/> does.
 	/// </summary>
-	class FtlAutopilot final
+	class SPACEGODCORE_API FtlAutopilot final
 	{
 	public:
 		FtlAutopilotStage Stage = FtlAutopilotStage::Off;
@@ -254,7 +254,7 @@ namespace SpaceGod::Core
 	/// tuning is in the settings menu's FTL group.
 	/// </summary>
 	// [SettingsSource]: the settings registry finds TripRealSeconds by touching its accessor.
-	class FtlNavigation
+	class SPACEGODCORE_API FtlNavigation
 	{
 	public:
 		static const cs::Ref<RangeSetting>& TripRealSeconds();

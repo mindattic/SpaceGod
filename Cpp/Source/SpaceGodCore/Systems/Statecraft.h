@@ -2,6 +2,7 @@
 // Port of Unity.SpaceGod Core/Systems/Statecraft.cs (US-T15, see docs/MIGRATION.md).
 
 #include "Cs/Cs.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -21,7 +22,7 @@ namespace SpaceGod::Core
 	/// vassalage. What it does is its kind's: whether it keeps the two at peace, whether each joins the other's wars, and its
 	/// daily upkeep (trade, tribute, a vassal's levy). A new kind is one <see cref="Register"/> call.
 	/// </summary>
-	class PactKind final
+	class SPACEGODCORE_API PactKind final
 	{
 	public:
 		static const cs::List<cs::Ref<PactKind>>& All();
@@ -72,10 +73,13 @@ namespace SpaceGod::Core
 		static const Statics& statics();
 		static cs::Ref<PactKind> Add(cs::String name, cs::String description, bool directed, bool keepsPeace, bool callsToArms, double days,
 			double warmth, cs::Func<bool, Statecraft*, cs::Ref<Pact>, double> daily);
+	private:
+		PactKind() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(PactKind); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	/// <summary>A pact in force between two polities (U.SPC-T427). For a directed kind <see cref="A"/> pays or serves <see cref="B"/>.</summary>
-	class Pact final
+	class SPACEGODCORE_API Pact final
 	{
 	public:
 		cs::Ref<PactKind> Kind;
@@ -99,7 +103,7 @@ namespace SpaceGod::Core
 	class Deal;
 
 	/// <summary>What one polity puts to another (U.SPC-T427): a <see cref="Deal"/> from <see cref="From"/> to <see cref="To"/>, with a sum for tribute.</summary>
-	class Proposal final
+	class SPACEGODCORE_API Proposal final
 	{
 	public:
 		cs::Ref<::SpaceGod::Core::Deal> Deal;
@@ -113,7 +117,7 @@ namespace SpaceGod::Core
 	};
 
 	/// <summary>How a polity weighs a proposal: a score (above zero it agrees) and its reasons, the weightiest first.</summary>
-	class Appraisal final
+	class SPACEGODCORE_API Appraisal final
 	{
 	public:
 		/// <summary>C#'s (double Weight, string Why).</summary>
@@ -140,7 +144,7 @@ namespace SpaceGod::Core
 	/// the AI runs and for an answer the player's envoy reads), and what it does when agreed. A new deal is one
 	/// <see cref="Register"/> call.
 	/// </summary>
-	class Deal final
+	class SPACEGODCORE_API Deal final
 	{
 	public:
 		static const cs::List<cs::Ref<Deal>>& All();
@@ -202,6 +206,9 @@ namespace SpaceGod::Core
 		static cs::Ref<Deal> Add(cs::String name, cs::String description, bool hasAmount, cs::Func<cs::String, Statecraft*, cs::Ref<Faction>, cs::Ref<Faction>, double> unavailable,
 			cs::Func<cs::Ref<Appraisal>, Statecraft*, cs::Ref<Proposal>, double> appraise, cs::Action<Statecraft*, cs::Ref<Proposal>, double> enact,
 			cs::Func<cs::String, const Proposal&> words);
+	private:
+		Deal() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(Deal); // ObjectGraph registration (Persistence/Registrations)
 	};
 
 	/// <summary>One line of the envoy screen (U.SPC-T427): a deal, its sum, why it cannot be put (or null), and how the other side would take it.</summary>
@@ -233,7 +240,7 @@ namespace SpaceGod::Core
 	/// move money between treasuries and stir unrest among the people who pay it, and trade pacts pay both sides.
 	/// </summary>
 	// [SettingsSource]
-	class Statecraft final
+	class SPACEGODCORE_API Statecraft final
 	{
 	public:
 		/// <summary>C#'s (Faction, Faction) tuple key.</summary>
@@ -282,7 +289,7 @@ namespace SpaceGod::Core
 		static constexpr double TradePerDay = 2e4;
 
 		/// <summary>Unrest a day among the people of a polity paying tribute or a vassal's levy, up to <see cref="TributeUnrestCap"/>.</summary>
-		static constexpr double TributeUnrestPerDay = 0.002, TributeUnrestCap = 0.4;
+		static constexpr double TributeUnrestPerDay = 0.002; static constexpr double TributeUnrestCap = 0.4;
 
 		/// <summary>Days between the AI's rounds of proposals.</summary>
 		static constexpr double RoundDays = 30;
@@ -517,5 +524,8 @@ namespace SpaceGod::Core
 	public:
 		/// <summary>How <paramref name="f"/> stands with <paramref name="g"/>, in words: war, peace, and the pacts between them.</summary>
 		cs::String Standing(const cs::Ref<Faction>& f, const cs::Ref<Faction>& g) const;
+	private:
+		Statecraft() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(Statecraft); // ObjectGraph registration (Persistence/Registrations)
 	};
 }
