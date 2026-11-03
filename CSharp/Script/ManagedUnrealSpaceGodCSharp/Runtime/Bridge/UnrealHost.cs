@@ -14,7 +14,7 @@ namespace Unity.SpaceGod.Bridge
     ///
     /// The camera stays at Unreal's origin, as Unity's did: the app keeps every position in double-precision scene
     /// units and places everything camera-relative (floating origin), and the facade's UnrealSpace maps Unity axes
-    /// (left-handed Y up) onto Unreal's (left-handed Z up) with UE(X, Y, Z) = Unity(z, x, y), one unit a unit.
+    /// (left-handed Y up) onto Unreal's (left-handed Z up) with UE(X, Y, Z) = Unity(x, −z, y) (SpaceGodRender's convention, a proper rotation), one unit a unit.
     /// </summary>
     public sealed class UnrealHost
     {

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
@@ -47,7 +47,7 @@ namespace UnityEngine
     /// (/SpaceGodRender), then this track's (/Game/SpaceGod). Imported by CSharp/Content/Python/setup_csharp_assets.py
     /// from Unity.SpaceGod's Assets/UnitySpace/Resources. Ship models (Ships/*) are static meshes, wrapped in a
     /// GameObject prototype as Unity's glTF import makes them; binary data (Data/*.bytes, TextAsset) is read as a file
-    /// from Content/SpaceGod/Data, which packaging stages as is (DefaultGame.ini).
+    /// from the shared plugin's Content/Resources/Data (<see cref="DataDirectories"/>).
     /// </summary>
     public static class Resources
     {
@@ -156,22 +156,33 @@ namespace UnityEngine
 
         // ---------------------------------------------------------------- binary data
 
-        public static string DataDirectory
+        /// <summary>Where a Unity Resources path ("Data/asteroids") is looked up as a file: the shared SpaceGodRender
+        /// plugin's Content/Resources (both tracks read Data/asteroids.bytes and Data/ShipModels.json there, US-T40),
+        /// then this track's old Content/SpaceGod.</summary>
+        public static IEnumerable<string> DataDirectories
         {
             get
             {
-                try { return Path.Combine(SystemLibrary.ProjectContentDirectory, "SpaceGod"); }
-                catch { return Path.Combine(AppContext.BaseDirectory, "SpaceGod"); }
+                string? plugin = null;
+                try { if (UPluginBlueprintLibrary.GetPluginContentDir("SpaceGodRender", out var dir) && dir.Length > 0) plugin = dir; }
+                catch { }
+                if (plugin != null) yield return Path.Combine(plugin, "Resources");
+                string? content = null;
+                try { content = Path.Combine(SystemLibrary.ProjectContentDirectory, "SpaceGod"); }
+                catch { }
+                if (content != null) yield return content;
+                yield return Path.Combine(AppContext.BaseDirectory, "SpaceGod");
             }
         }
 
         static TextAsset? LoadBytes(string path)
         {
-            foreach (var ext in new[] { ".bytes", ".json", ".txt", "" })
-            {
-                var file = Path.Combine(DataDirectory, path.Replace('/', Path.DirectorySeparatorChar) + ext);
-                if (File.Exists(file)) return new TextAsset(File.ReadAllBytes(file)) { name = Leaf(path) };
-            }
+            foreach (var dir in DataDirectories)
+                foreach (var ext in new[] { ".bytes", ".json", ".txt", "" })
+                {
+                    var file = Path.Combine(dir, path.Replace('/', Path.DirectorySeparatorChar) + ext);
+                    if (File.Exists(file)) return new TextAsset(File.ReadAllBytes(file)) { name = Leaf(path) };
+                }
             return null;
         }
 

@@ -9,8 +9,8 @@ Unity facade (CSharp/Script/.../UnityCompat/UnityResources.cs, Resources.Roots) 
   - Skyboxes/*.jpg       the panoramas (8k), wrap U / clamp V, as Unity's.
   - Ships/*.glb          the five Kenney Space Kit craft (CC0) as static meshes; their glTF material names and base
                          colours, and the rotation/scale that brings Unreal's import back to the mesh Unity's glTF
-                         importer made (one unit long on +Z, nose +Z), go to CSharp/Content/SpaceGod/Data/ShipModels.json.
-  - Data/asteroids.bytes copied as is to CSharp/Content/SpaceGod/Data (read as a file; staged by DefaultGame.ini).
+                         importer made (one unit long on +Z, nose +Z), go to Content/Resources/Data/ShipModels.json (this plugin).
+  - Data/asteroids.bytes copied as is to Content/Resources/Data (this plugin; read as a file by both tracks).
 Commit the .uasset files and the Data folder. Re-running skips what exists (pass --force to re-import).
 
 Run headless (one UE process, no UI):
@@ -39,7 +39,7 @@ def _repo():
 REPO = _repo()
 UNITY = os.environ.get("UNITY_SPACEGOD_DIR") or os.path.normpath(os.path.join(REPO, "..", "Unity.SpaceGod"))
 SOURCE = os.path.join(UNITY, "Assets", "UnitySpace", "Resources")
-DATA_OUT = os.path.join(REPO, "CSharp", "Content", "SpaceGod", "Data")
+DATA_OUT = os.path.join(REPO, "Shared", "Plugins", "SpaceGodRender", "Content", "Resources", "Data")
 
 
 def _meta(path):
