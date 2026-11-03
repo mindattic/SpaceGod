@@ -1,5 +1,6 @@
 #include "Smoke/SpaceGodSmoke.h"
 #include "Smoke/ScriptedDevice.h"
+#include "Smoke/FeatureAudit.h"
 
 #include "Bootstrap.h"
 #include "CaptureRunner.h"
@@ -387,6 +388,8 @@ namespace SpaceGod::Smoke
 				{
 					GameTour(*app);
 					AppSmoke(*app);
+					// US-T48: -SpaceGodAudit (tools/play.ps1 -Mode audit) presses every binding the probes cover after the smoke.
+					if (Bootstrap::HasCommandLineFlag("-SpaceGodAudit")) FeatureAudit::Run(*app, run.script, [](int n) { Frames(n); });
 				}
 				catch (const std::exception& e)
 				{

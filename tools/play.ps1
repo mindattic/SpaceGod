@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-  [ValidateSet('solo', 'host', 'join', 'smoke', 'shots', 'views', 'viewshot', 'demo', 'fidelity', 'coop-smoke')][string]$Mode = 'solo',
+  [ValidateSet('solo', 'host', 'join', 'smoke', 'shots', 'views', 'viewshot', 'demo', 'fidelity', 'coop-smoke', 'audit')][string]$Mode = 'solo',
   [string]$CaptureDir = '',
   [string]$Address = '127.0.0.1',
   [ValidateSet('Cpp', 'CSharp')][string]$Track = 'Cpp',
@@ -32,6 +32,7 @@ quits; the log is <Track>/Saved/Logs/<project>.log. Both tracks log the same lin
   ./tools/play.ps1 -Track CSharp -Mode join -Address 192.168.1.20
   ./tools/play.ps1 -Track CSharp -Mode coop-smoke # headless: a host and a client on localhost, their digests compared
   ./tools/play.ps1 -Track Cpp -Mode coop-smoke    # the C++ track's same co-op smoke (US-T44)
+  ./tools/play.ps1 -Track CSharp -Mode audit     # headless: the smoke, then a probe per binding, PASS/FAIL each (US-T48)
 #>
 
 $ErrorActionPreference = 'Stop'
@@ -188,6 +189,21 @@ if ($Mode -eq 'coop-smoke') {
   "co-op smoke: syncs: $($syncs -join '; ')"
   foreach ($k in $checks.Keys) { "co-op smoke: $($k): $($checks[$k])" }
   if (@($checks.Values | Where-Object { -not $_ }).Count -gt 0) { exit 1 }
+  exit 0
+}
+
+if ($Mode -eq 'audit') {
+  # -Mode audit (either track, US-T48): the smoke, then FeatureAudit's probes (Runtime/Audit/FeatureAudit.cs, C++
+  # Smoke/FeatureAudit.cpp): each presses one of the original's bindings on the scripted device and checks the state the
+  # original's code changes, logging 'AUDIT <id> PASS|FAIL: ...'. Same ids on both tracks; docs/FAITHFULNESS.md records them.
+  $cmd = Join-Path $engine 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
+  $lines = & $cmd $project.FullName '/Engine/Maps/Entry' -game -nullrhi -nosound -unattended -nosplash -stdout -FullStdOutLogOutput -SpaceGodSmoke -SpaceGodAudit |
+    Select-String -Pattern 'AUDIT |Error:|Fatal' | ForEach-Object Line
+  $lines
+  $pass = @($lines | Where-Object { $_ -match 'AUDIT \S+ PASS' }).Count
+  $fail = @($lines | Where-Object { $_ -match 'AUDIT \S+ FAIL' }).Count
+  "audit ($Track): $pass PASS, $fail FAIL"
+  if ($fail -gt 0 -or $pass -eq 0) { exit 1 }
   exit 0
 }
 

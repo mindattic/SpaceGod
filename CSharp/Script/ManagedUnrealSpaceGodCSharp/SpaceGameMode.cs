@@ -43,7 +43,7 @@ public partial class ASpaceGameMode : AGameModeBase
             RunViews();
             return;
         }
-        bool smoke = Bootstrap.HasCommandLineFlag("-SpaceGodSmoke");
+        bool smoke = Bootstrap.HasCommandLineFlag("-SpaceGodSmoke") || Bootstrap.HasCommandLineFlag("-SpaceGodAudit"); // US-T48: the audit runs after the smoke
         if (smoke)
         {
             // The smoke run's profile (and its saves) in a scratch folder, never the player's own.
@@ -255,6 +255,9 @@ public partial class ASpaceGameMode : AGameModeBase
             saved ? "ok" : "FAILED", loaded ? "ok" : "FAILED", savedJd, ranOn, app.Clock.Jd, Math.Abs(app.Clock.Jd - savedJd) * 86400.0,
             savedShips, app.Fleet.Ships.Count));
         Report(app, $"smoke done in {t.ElapsedMilliseconds} ms");
+
+        // US-T48: -SpaceGodAudit (tools/play.ps1 -Mode audit) presses every binding the probes cover after the smoke.
+        if (Bootstrap.HasCommandLineFlag("-SpaceGodAudit")) Unity.SpaceGod.Audit.FeatureAudit.Run(app, script, Frames);
     }
 
     static string Describe(Target target) =>
