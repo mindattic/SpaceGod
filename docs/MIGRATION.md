@@ -96,6 +96,78 @@ the integration ticket compiles all of SpaceGodCore and fixes the seams. If a re
 ambiguous, read its declaration in Unity.SpaceGod and apply the table above; if still unclear, note it on
 your ticket.
 
+## Foundation (US-T5): Cs runtime, builds, Shared
+
+**What `Cs/` gives you beyond the table** (all in `Cs/Cs.h`, which also pulls in `Cs/CsSort.inl` and
+`Cs/CsDateTime.h`): `CS_FLAGS(E)` after a `[Flags] enum class` (bitwise operators; `cs::HasFlag(v, f)`,
+`cs::Any(v)` for `!= 0`); `cs::Single::NaN/MaxValue/…`, `cs::Long::MinValue/MaxValue`; `cs::CompareTo(a, b)`
+(double.CompareTo: NaN equal to NaN and below every number) and `cs::Compare` (Comparer<T>.Default, which
+`OrderBy` and `List.Sort()` use); mixed-type `Math::Max/Min/Clamp` (`Max(0, d)` is a double, as C# promotes);
+`cs::Mod(a, b)` for C#'s `%` on doubles; `List::GetRange`; `List<bool>` that hands out a real `bool&`;
+`cs::Delegate<A…>` for a plain Action *field* chained with `+=` (`d = h` replaces, `if (d)` is the null check;
+`event`s stay `cs::Event`); equality comparers on Dictionary/HashSet as the third template argument
+(`cs::Dictionary<String, V, cs::OrdinalIgnoreCaseComparer>`); `std::pair`/`std::tuple` keys; `cs::Format(
+"{0:0.###} {1,5}", a, b)` for `string.Format`; `cs::DateTime` / `cs::TimeSpan` (BCL properties are methods —
+`t.TotalDays()`, `d.Ticks()`, `DateTime::UtcNow()` — and BCL static fields are static members —
+`DateTime::MaxValue`, `TimeSpan::Zero`; .NET 7+ arithmetic, ToBinary/FromBinary, invariant ToString formats);
+`OverflowException`, `NullReferenceException`, `IndexOutOfRangeException`.
+
+**Exact .NET behaviours to know.** `cs::Double::NaN` has .NET's bits (0xFFF8…, what `0.0/0.0` gives).
+Standard formats with a precision (`F2`, `N0`, `P0`, `E3`, `G6`) round the exact binary value with ties to
+*even* (`0.125.ToString("F2")` is `"0.12"`, `2.5.ToString("F0")` is `"2"`); custom formats (`"0.##"`) first take
+15 significant digits (7 for float), then round half away from zero (`1.005` → `"1.01"`). `ToString()`/`"R"` is
+shortest round-trip with E notation past 17 digits of exponent (`1E+17`, but `10000000000000000`). Everything is
+the invariant culture: `P0` prints `"50 %"`, so the **C# track must run with `CultureInfo.InvariantCulture`** as
+its current culture (Core's `$"{x:P0}"` uses the current culture). `Math.Round` is ToEven. `List.Sort` is
+.NET's introsort (unstable) step for step. A non-const `Dictionary::operator[]` *inserts* a default when the
+key is missing (that is the C# setter); where C# reads `dict[k]` expecting a throw, use `At(k)` or the const
+indexer, or the insertion changes enumeration order.
+
+**DLL exports.** In UE's editor build SpaceGodCore is a DLL, so everything another module calls must be
+exported: put `SPACEGODCORE_API` on every non-template class or free function that is *defined in a .cpp*
+(`class SPACEGODCORE_API Fleet`, `SPACEGODCORE_API double Foo(...)`). Cs/ and Shared/ do; the porting waves were
+written without it, and the integration ticket adds it (scriptable: every `class`/`struct` with out-of-line
+members in a header). It is empty in standalone and monolithic builds. Don't export a class derived from
+`cs::List<T>` as a whole (that instantiates every List member, `Sort()` included): export its members.
+
+**Bit parity build flags.** UE compiles with `/fp:fast` by default; `SpaceGodCore.Build.cs` sets
+`FPSemantics = Precise` (`/fp:precise`), as `tools/build-core.ps1` does. With VS 2022's MSVC, `/fp:precise`
+already means no FP contraction (no FMA fusing) and there is no `/fp:contract-` switch to pass; clang builds get
+`-ffp-contract=off` from UBT. UBT always passes `/utf-8`, and build-core does too. The .NET side doesn't fuse
+either (RyuJIT never contracts `a*b+c`), and both call the same CRT `sin`/`cos`/`pow` on Windows x64.
+
+**Standalone build.** `tools/build-core.ps1` (MSVC from VS 2022 via vswhere; C++20 `/EHsc /GR /W4 /permissive-
+/fp:precise /utf-8`, `SPACEGOD_STANDALONE`) compiles SpaceGodCore except `Module/` and `Tests/` into
+`Cpp/Intermediate/CoreStandalone/<Config>/SpaceGodCore.lib`, at most `-MaxParallel` (default 4) cl.exe at once,
+only what changed; `-Only Combat,Economy` builds those folders (+ `Cs`; `.` = the loose root files), `-Rebuild`
+everything. It then builds and runs **Tests/CsParity** (`CsParity.exe`): the same ~32,000 lines that
+`Tests/CsParity/DotNet` prints from real .NET 10 (double/float/int/long formatting over 50 formats and ~600
+values incl. ties and random bit patterns, Math.Round, System.Random for ten seeds incl. the large-range
+`Next`, List.Sort with duplicates and the heapsort fallback, double/int TryParse, DateTime/TimeSpan) diffed
+against the committed `expected.txt`, plus self-checks of List<bool>, Delegate, comparers and Format.
+Result: 0 mismatches. Regenerate `expected.txt` with `dotnet run -c Release --project
+Cpp/Source/SpaceGodCore/Tests/CsParity/DotNet > Cpp/Source/SpaceGodCore/Tests/CsParity/expected.txt`.
+
+**UE module while porting.** `SpaceGodCore` is a Runtime module in `UnrealSpaceGod.uproject` and a public
+dependency of the game module (C++20, exceptions, RTTI, no unity, no PCH so Core never sees Unreal macros,
+`/fp:precise`). `Module/SpaceGodCoreModule.cpp` is its one Unreal file. UBT has no per-module source filter, so
+`SpaceGodCore.Build.cs` keeps a `PortingAllowList` (`Module`, `Cs`, `Shared`): it points the module's source
+root at `Module/` and adds the other allowed folders as module directories (one reflection call on UBT's
+`ModuleRules.DirectoriesForModuleSubClasses`; it throws a clear error if a UBT update removes that field).
+So the UE build compiles only finished folders while the waves commit half-ported files elsewhere — verified:
+the editor target builds with 0 warnings. **Integration:** add folders to the list as they compile, then set
+`PortingAllowList = null` to compile everything. `Tests/CsParity/CsParity.cpp` compiles to nothing in UE (it
+is wrapped in `#ifdef SPACEGOD_STANDALONE`).
+
+**Shared (`Unity.Shared.Core` → `SpaceGod::Shared`, `…::Json`).** C#'s `object` JSON values are
+`Json::JsonValue` (`v.AsString()`, `v.AsObject()`, `v.IsNumber()`, `v.IsNull()`; constructing one from any number
+makes a `JsonNumber`, as `Normalize` does). `JsonObject`'s indexer reads (`(*obj)["k"]`); writes go through
+`Set`. Text is UTF-8: `string.Length` checks use UTF-16 lengths (`Io::Utf16Length`) where it matters (profile
+and display names), JSON error positions count bytes. `Profiles::CommandLineArgs` stands in for
+`Environment.GetCommandLineArgs()` (standard C++ can't read it): the host sets it at startup. File I/O is
+`std::filesystem` behind `Shared/Profiles/SharedIo.h`; `cs::IOException` covers IOException and
+UnauthorizedAccessException.
+
 ## C# track
 
 **Decision (US-T6, 2026-11-03): UnrealSharp**, pinned as a git submodule at `CSharp/Plugins/UnrealSharp`
