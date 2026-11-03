@@ -96,11 +96,14 @@ namespace SpaceGod::Core
 
 	public:
 		/// <summary>How often companies post, days; how long an offer stays up; the most offers up at once.</summary>
-		static constexpr double PostEveryDays = 5, OfferDays = 15;
-		static constexpr int MaxOffers = 8, HistoryCap = 50;
+		static constexpr double PostEveryDays = 5;
+		static constexpr double OfferDays = 15;
+		static constexpr int MaxOffers = 8;
+		static constexpr int HistoryCap = 50;
 
 		/// <summary>The shortest and longest term asked, days.</summary>
-		static constexpr double MinDays = 30, MaxDays = 120;
+		static constexpr double MinDays = 30;
+		static constexpr double MaxDays = 120;
 
 		/// <summary>Days' hire the house pays to take a hull back early.</summary>
 		static constexpr double RecallPenaltyDays = 10;
@@ -150,7 +153,7 @@ namespace SpaceGod::Core
 			/// <summary>Already out on a charter.</summary>
 			Chartered,
 		};
-		friend const char* ToString(TakeOutcome v);
+		friend SPACEGODCORE_API const char* ToString(TakeOutcome v);
 
 		/// <summary>Whether <paramref name="ship"/> can go out on <paramref name="offer"/>.</summary>
 		TakeOutcome CanTake(const cs::Ref<CharterOffer>& offer, const cs::Ref<OwnedShip>& ship, double jd) const;

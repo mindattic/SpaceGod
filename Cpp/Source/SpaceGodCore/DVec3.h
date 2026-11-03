@@ -11,7 +11,7 @@ namespace SpaceGod::Core
 	/// when the camera sits a few kilometres from a ship. Conversion to float happens only after
 	/// subtracting the camera position (camera-relative rendering).
 	/// </summary>
-	struct SPACEGODCORE_API DVec3
+	struct DVec3
 	{
 		double X = 0;
 		double Y = 0;
@@ -64,7 +64,7 @@ namespace SpaceGod::Core
 		/// that at wide angles, next to nothing when nearly opposite, and never leaves the line when
 		/// exactly opposite, where any perpendicular is taken as the way round.
 		/// </summary>
-		static DVec3 TurnStep(const DVec3& a, const DVec3& b, double t);
+		static SPACEGODCORE_API DVec3 TurnStep(const DVec3& a, const DVec3& b, double t);
 
 		/// <summary>
 		/// Ecliptic (right-handed, z = ecliptic north) to scene (Unity, left-handed, y = up).
@@ -76,8 +76,8 @@ namespace SpaceGod::Core
 		// C# DVec3 defines no == operator; this is Equals, for cs::Dictionary/HashSet keys and List.IndexOf.
 		bool operator==(const DVec3& other) const { return Equals(other); }
 		bool operator!=(const DVec3& other) const { return !Equals(other); }
-		size_t HashCode() const;
-		cs::String ToString() const;
+		SPACEGODCORE_API size_t HashCode() const;
+		SPACEGODCORE_API cs::String ToString() const;
 	};
 
 	inline const DVec3 DVec3::Zero = DVec3(0, 0, 0);

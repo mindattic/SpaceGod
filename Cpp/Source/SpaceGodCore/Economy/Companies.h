@@ -180,17 +180,20 @@ namespace SpaceGod::Core
 		static constexpr double ReserveShare = 0.25;
 
 		/// <summary>What a second-hand hull fetches (to a rival), and what a breaker pays for one, as shares of its price.</summary>
-		static constexpr double ResaleShare = 0.55, ScrapShare = 0.15;
+		static constexpr double ResaleShare = 0.55;
+		static constexpr double ScrapShare = 0.15;
 
 		/// <summary>Debt beyond which a company sells hulls, and how long it may stay in debt before it is wound up (days).</summary>
 		static constexpr double DebtLimit = 4e6;
 		static constexpr double BankruptDays = 180;
 
 		/// <summary>Below this standing a company will not trade at a faction's ports; from this one it may buy at its yards.</summary>
-		static constexpr double ShunnedStanding = -0.5, YardStanding = -0.1;
+		static constexpr double ShunnedStanding = -0.5;
+		static constexpr double YardStanding = -0.1;
 
 		/// <summary>How much more a run the company has chosen scores in a captain's planning, and its home port.</summary>
-		static constexpr double ChosenBonus = 0.3, HomeBonus = 0.1;
+		static constexpr double ChosenBonus = 0.3;
+		static constexpr double HomeBonus = 0.1;
 
 		/// <summary>How many runs a company steers its fleet to.</summary>
 		static constexpr int ChosenRoutes = 6;

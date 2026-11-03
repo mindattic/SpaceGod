@@ -104,7 +104,7 @@ namespace SpaceGod::Core
 	/// registry (U.SPC-T431) changes them without touching <see cref="LightFighterFlightModel"/>. The game's
 	/// light fighters, interceptors and runners read theirs from Settings > Dogfighting (<see cref="LightFighterSettings"/>, U.SPC-T440).
 	/// </summary>
-	struct SPACEGODCORE_API LightFighterHandling
+	struct LightFighterHandling
 	{
 		/// <summary>With flight assist on, how hard the flight computer may push across the nose to pull
 		/// the track round after it (the "grip" that makes a turn a carve, not a slide), as a fraction of
@@ -270,7 +270,7 @@ namespace SpaceGod::Core
 	/// <summary>
 	/// The bomber's handling numbers (U.SPC-T484): data, not code, like <see cref="LightFighterHandling"/>.
 	/// </summary>
-	struct SPACEGODCORE_API BomberHandling
+	struct BomberHandling
 	{
 		/// <summary>With flight assist on, how hard the flight computer may push across the nose, as a fraction of the
 		/// push that holds the track to the nose through its tightest turn at top speed (top speed times turn rate):
@@ -325,7 +325,7 @@ namespace SpaceGod::Core
 	/// The heavy fighter's handling numbers (U.SPC-T441, docs/FLIGHT_MODELS.md, Heavy fighters): data, not code, like
 	/// <see cref="LightFighterHandling"/>, each one a setting for the settings registry (U.SPC-T431) to declare.
 	/// </summary>
-	struct SPACEGODCORE_API HeavyFighterHandling
+	struct HeavyFighterHandling
 	{
 		/// <summary>The cap on the nose's swing, as a fraction of the light fighter's turn rate (the space superiority
 		/// fighter's, <see cref="LightFighterTurnRateDegS"/>): stiff, below any light fighter. A class tuned slower still keeps
@@ -355,7 +355,7 @@ namespace SpaceGod::Core
 		}
 
 		/// <summary>The light fighter's turn rate the cap is a share of, deg/s: the space superiority fighter's.</summary>
-		static double LightFighterTurnRateDegS();
+		static SPACEGODCORE_API double LightFighterTurnRateDegS();
 
 		/// <summary>The first-pass numbers, for the owner's review (docs/FLIGHT_MODELS.md).</summary>
 		static const HeavyFighterHandling Default;
@@ -431,7 +431,7 @@ namespace SpaceGod::Core
 	/// to <see cref="ComeAboutS"/> (<see cref="CapitalFlightModel.PeakTurnRateDegS"/>), so the come-about is what the
 	/// numbers promise.
 	/// </summary>
-	struct SPACEGODCORE_API CapitalHandling
+	struct CapitalHandling
 	{
 		/// <summary>The telegraph's speeds as fractions of <see cref="PilotTuning.MaxSpeed"/> (Full is 1, Flank the boost
 		/// on top of it, Stop 0): Full Astern (astern, so the hull backs at this share), Slow and Half.</summary>
@@ -481,14 +481,14 @@ namespace SpaceGod::Core
 		static const CapitalHandling Default;
 
 	private:
-		static const cs::Dictionary<ShipClass, CapitalHandling>& ByClass();
+		static SPACEGODCORE_API const cs::Dictionary<ShipClass, CapitalHandling>& ByClass();
 
 	public:
 		/// <summary>The handling of a capital of class <paramref name="c"/>; <see cref="Default"/> for one with none of its own.</summary>
-		static CapitalHandling Of(ShipClass c);
+		static SPACEGODCORE_API CapitalHandling Of(ShipClass c);
 
 		/// <summary>The classes with handling of their own.</summary>
-		static cs::List<ShipClass> Classes();
+		static SPACEGODCORE_API cs::List<ShipClass> Classes();
 	};
 	inline constexpr CapitalHandling CapitalHandling::Default = CapitalHandling(
 		/*fullAsternFraction:*/ 0.4, /*slowFraction:*/ 0.25, /*halfFraction:*/ 0.5, /*spoolS:*/ 4, /*pivotFactor:*/ 0.25,

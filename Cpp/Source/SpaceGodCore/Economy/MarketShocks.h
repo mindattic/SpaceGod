@@ -104,10 +104,12 @@ namespace SpaceGod::Core
 		static constexpr double StrikeThreshold = 1.3;
 
 		/// <summary>A local price this many times base is a spike worth reporting, and one back under the lower figure is over.</summary>
-		static constexpr double SpikeRatio = 2.5, SpikeClear = 1.6;
+		static constexpr double SpikeRatio = 2.5;
+		static constexpr double SpikeClear = 1.6;
 
 		/// <summary>The same for a good's average across the system.</summary>
-		static constexpr double SystemSpikeRatio = 1.8, SystemSpikeClear = 1.3;
+		static constexpr double SystemSpikeRatio = 1.8;
+		static constexpr double SystemSpikeClear = 1.3;
 
 		/// <summary>Daily chance of an accident in a mine at its base level, fully worked; and of a blight in a farm.</summary>
 		double AccidentPerDay = 0.0006, BlightPerDay = 0.00025;

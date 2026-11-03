@@ -10,8 +10,9 @@ using UnrealBuildTool;
 public class SpaceGodCore : ModuleRules
 {
 	// Porting phase: while the Core waves commit not-yet-compilable files into SpaceGodCore/<Dir>/, UE compiles
-	// only these folders. The integration ticket sets this to null, and then UE compiles the whole module.
-	static readonly string[] PortingAllowList = { "Module", "Cs", "Shared" };
+	// only these folders. Null (since US-T37, the whole Core integrated): UE compiles the whole module. Tests/CsParity
+	// compiles to nothing outside the standalone build (#ifdef SPACEGOD_STANDALONE).
+	static readonly string[] PortingAllowList = null;
 
 	public SpaceGodCore(ReadOnlyTargetRules Target) : base(Target)
 	{

@@ -98,7 +98,7 @@ private:
 	void UpdateLaneRejoin(const cs::Ref<Core::Ship>& ship);
 
 	/// <summary>Where the hull was last frame, and in which system, for flying through a gate spur's ring (U.SPC-T379); null after a ride or a jump.</summary>
-	cs::Nullable<DVec3> lastSpurCheckHelio;
+	cs::Nullable<Core::DVec3> lastSpurCheckHelio;
 	cs::Ref<Core::StarSystem> lastSpurCheckSystem;
 
 	/// <summary>
@@ -106,7 +106,7 @@ private:
 	/// A spur is joined by threading its ring the way it runs rather than by being inside it, so a hull just come out
 	/// of a gate (right beside the spur's ring there) or just brought off at its ramp is not swept back in.
 	/// </summary>
-	cs::Nullable<Core::LaneHop> SpurRingFlownThrough(const cs::Ref<Core::Hyperlanes>& lanes, DVec3 helio);
+	cs::Nullable<Core::LaneHop> SpurRingFlownThrough(const cs::Ref<Core::Hyperlanes>& lanes, Core::DVec3 helio);
 
 	/// <summary>What the war has to say about the lane ridden (a pulse slipped, or one that caught the hull), as toasts.</summary>
 	void ShowWarNotices();

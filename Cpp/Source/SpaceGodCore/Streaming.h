@@ -191,7 +191,8 @@ namespace SpaceGod::Core
 		bool Done() const { return !Active && Elapsed > 0; }
 
 		/// <summary>The helm's own flight through a ring (no camera trip): seconds, and where it holds.</summary>
-		static constexpr double HelmSeconds = 1.6, HelmHoldAt = 0.4;
+		static constexpr double HelmSeconds = 1.6;
+		static constexpr double HelmHoldAt = 0.4;
 
 		/// <summary>The glow of the far side's arrival through a ring at the helm, 0..1: up at once, held, then gone.</summary>
 		static double HelmGlow(double t);

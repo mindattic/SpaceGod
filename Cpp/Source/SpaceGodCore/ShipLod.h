@@ -24,7 +24,9 @@ namespace SpaceGod::Core
 		/// <summary>Below this many pixels long on screen a ship is drawn as its icon, not its model.</summary>
 		static const cs::Ref<RangeSetting>& IconBelowPx();
 
-		static constexpr int NamesOff = 0, NamesWarships = 1, NamesAll = 2;
+		static constexpr int NamesOff = 0;
+		static constexpr int NamesWarships = 1;
+		static constexpr int NamesAll = 2;
 
 		/// <summary>Which ships drawn as icons have their names beside them.</summary>
 		static const cs::Ref<ChoiceSetting>& IconNames();

@@ -32,6 +32,13 @@
 #ifndef SPACEGODCORE_API
 #define SPACEGODCORE_API
 #endif
+// The Core keeps C#'s names, cs::Math::PI among them: Unreal's legacy PI macro (UnrealMathUtility.h, deprecated since
+// 5.1 for UE_PI; the only legacy math name the Core uses) would rewrite it in a module that includes Unreal's headers
+// first. So it is gone from here on in any file that includes a Core header (Unreal code says UE_PI). Defining
+// UE_DEFINE_LEGACY_MATH_CONSTANT_MACRO_NAMES=0 per module does not work: the engine's shared PCH has the macros.
+#ifdef PI
+#undef PI
+#endif
 // UBT defines SPACEGODCORE_API as DLLEXPORT / DLLIMPORT, which Unreal's own headers define; SpaceGodCore's files
 // include none, so define them here exactly as WindowsPlatform.h does (an identical redefinition is legal).
 // Exported classes hold standard-library members (std::string, shared_ptr, cs::List); both sides of the DLL

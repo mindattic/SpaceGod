@@ -28,7 +28,9 @@ namespace SpaceGod::Core
 		static constexpr int MaxEscorts = 60;
 
 		/// <summary>What it costs to take on a light and a heavy fighter, and each escort's wage a day, credits.</summary>
-		static constexpr double LightHireFee = 60000, HeavyHireFee = 140000, DailyWage = 4000;
+		static constexpr double LightHireFee = 60000;
+		static constexpr double HeavyHireFee = 140000;
+		static constexpr double DailyWage = 4000;
 
 	private:
 		/// <summary>Owners take on a wing only with this many times its cost in hand.</summary>

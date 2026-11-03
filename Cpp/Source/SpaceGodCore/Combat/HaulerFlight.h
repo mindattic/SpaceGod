@@ -17,7 +17,7 @@ namespace SpaceGod::Core
 	/// <see cref="LightFighterHandling"/>, so a tuning pass or the settings registry (U.SPC-T431) changes them without
 	/// touching <see cref="HaulerFlightModel"/>.
 	/// </summary>
-	struct SPACEGODCORE_API HaulerHandling
+	struct HaulerHandling
 	{
 		/// <summary>The mass-per-tonne weighting: how much of each tonne aboard beyond the hull's ready mass (dry, tanks
 		/// full, hold empty: what its thrust and turn figures were set for) counts against its drive, thrusters and

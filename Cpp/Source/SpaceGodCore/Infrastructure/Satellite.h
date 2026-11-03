@@ -42,7 +42,8 @@ namespace SpaceGod::Core
 		static constexpr double ThrustKmS2 = 0.002;
 
 		/// <summary>How fast it turns its boresight and rolls, deg/s.</summary>
-		static constexpr double SlewDegS = 20, RollDegS = 30;
+		static constexpr double SlewDegS = 20;
+		static constexpr double RollDegS = 30;
 
 		/// <summary>Half-width of its sensor field and relay beam about the boresight, degrees.</summary>
 		static constexpr double BeamHalfDeg = 15;
@@ -55,10 +56,13 @@ namespace SpaceGod::Core
 
 	private:
 		/// <summary>Station-keeping: the closing-speed ramp near the slot (1/s) and how hard it chases that speed (1/s).</summary>
-		static constexpr double ClosingRate = 0.02, ChaseGain = 0.1;
+		static constexpr double ClosingRate = 0.02;
+		static constexpr double ChaseGain = 0.1;
 
 		/// <summary>Within these of its slot (km, km/s, degrees) it is on station.</summary>
-		static constexpr double StationKm = 0.01, StationKmS = 1e-3, StationDeg = 1;
+		static constexpr double StationKm = 0.01;
+		static constexpr double StationKmS = 1e-3;
+		static constexpr double StationDeg = 1;
 
 	public:
 		cs::Ref<SpaceGod::Core::Constellation> Constellation;

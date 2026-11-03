@@ -277,19 +277,24 @@ namespace SpaceGod::Core
 		static constexpr double ReinforceCost = 4e7;
 
 		/// <summary>Days of food, water and air the colonists' starter goods hold, and of medicine and the habitat's spares.</summary>
-		static constexpr double StarterDays = 180, MedicineDays = 365;
+		static constexpr double StarterDays = 180;
+		static constexpr double MedicineDays = 365;
 
 		/// <summary>Days a voyage takes when nobody has said how far it is.</summary>
 		static constexpr double DefaultTravelDays = 60;
 
 		/// <summary>An outpost becomes a colony with this many people and this many facility jobs.</summary>
-		static constexpr double ColonyPopulation = 25000, ColonyJobs = 1000;
+		static constexpr double ColonyPopulation = 25000;
+		static constexpr double ColonyJobs = 1000;
 
 		/// <summary>A founded settlement this full (of its cap), and this well, is built out by <see cref="ExpandFactor"/>.</summary>
-		static constexpr double ExpandAt = 0.75, ExpandWellbeing = 0.9, ExpandFactor = 1.5;
+		static constexpr double ExpandAt = 0.75;
+		static constexpr double ExpandWellbeing = 0.9;
+		static constexpr double ExpandFactor = 1.5;
 
 		/// <summary>Share of its industrial labour a founded settlement's first mine employs, and each mine opened as it is built out (assumed).</summary>
-		static constexpr double FirstMineShare = 0.25, NextMineShare = 0.15;
+		static constexpr double FirstMineShare = 0.25;
+		static constexpr double NextMineShare = 0.15;
 
 		/// <summary>Building out a habitat, credits per person of new base population (assumed).</summary>
 		static constexpr double ExpansionCostPerPerson = 4000;

@@ -83,7 +83,8 @@ namespace SpaceGod::Core
 		static bool TryParse(const cs::String& text, DisplaySettings& settings);
 
 		/// <summary>The smallest size worth restoring: anything below it is a damaged preference, not a choice.</summary>
-		static constexpr int MinWidth = 640, MinHeight = 360;
+		static constexpr int MinWidth = 640;
+		static constexpr int MinHeight = 360;
 
 		/// <summary>
 		/// The sizes the menu offers: each width x height once, at the highest refresh rate the screen gives it,

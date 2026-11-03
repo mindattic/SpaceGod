@@ -81,7 +81,7 @@ namespace SpaceGod::Core
 	};
 
 	/// <summary>A scanner fit: how far it sees a one-unit signature, km, and how finely it resolves what it sees.</summary>
-	struct SPACEGODCORE_API SensorSuite
+	struct SensorSuite
 	{
 		double RangeKm = 0;
 		double Resolution = 0;
@@ -107,14 +107,14 @@ namespace SpaceGod::Core
 	private:
 		/// <summary>Hull classes built round a suite of their own rather than the civil or military base (the extension
 		/// point: register a class's suite, see <see cref="RegisterBase"/>).</summary>
-		static cs::Dictionary<ShipClass, SensorSuite>& baseByClass();
+		static SPACEGODCORE_API cs::Dictionary<ShipClass, SensorSuite>& baseByClass();
 
 	public:
 		/// <summary>Gives hulls of <paramref name="cls"/> <paramref name="suite"/> as their base suite.</summary>
-		static void RegisterBase(ShipClass cls, SensorSuite suite);
+		static SPACEGODCORE_API void RegisterBase(ShipClass cls, SensorSuite suite);
 
 		/// <summary>The suite a hull of <paramref name="cls"/> is built with, before any scanner is fitted.</summary>
-		static SensorSuite BaseOf(ShipClass cls, bool military);
+		static SPACEGODCORE_API SensorSuite BaseOf(ShipClass cls, bool military);
 
 		/// <summary>What a command ship's sensor array (<see cref="FacilityKinds.SensorArray"/>, U.SPC-T477) is worth in
 		/// scanner suites.</summary>
@@ -122,7 +122,7 @@ namespace SpaceGod::Core
 
 		/// <summary>The suite <paramref name="s"/> carries: its hull's base, more with each scanner fitted, much more
 		/// with a sensor array inside it, and more again with recon fighters aboard to scout ahead (U.SPC-T485).</summary>
-		static SensorSuite Of(const cs::Ref<Ship>& s);
+		static SPACEGODCORE_API SensorSuite Of(const cs::Ref<Ship>& s);
 
 		/// <summary>The better of two suites, term by term (a group sees with its best scanners).</summary>
 		static SensorSuite Best(SensorSuite a, SensorSuite b) { return SensorSuite(cs::Math::Max(a.RangeKm, b.RangeKm), cs::Math::Max(a.Resolution, b.Resolution)); }

@@ -78,7 +78,8 @@ namespace SpaceGod::Core
 		cs::Nullable<WeaponGroup> CycleSecondaryGroup();
 
 		/// <summary>How far round the crosshair a lock may be taken, deg, and how far off, km.</summary>
-		static constexpr double LockPickDeg = 30, LockPickKm = 15;
+		static constexpr double LockPickDeg = 30;
+		static constexpr double LockPickKm = 15;
 
 		/// <summary>
 		/// Takes a lock on the hostile nearest the crosshair <paramref name="aim"/> (within <see cref="LockPickDeg"/> and

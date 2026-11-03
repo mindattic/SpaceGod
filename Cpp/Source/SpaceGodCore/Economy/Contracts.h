@@ -185,7 +185,8 @@ namespace SpaceGod::Core
 		static constexpr int ParcelCrates = 8;
 
 		/// <summary>How long an untaken offer stays up, days, by kind.</summary>
-		static constexpr double OfferDays = 12, SurveyOfferDays = 30;
+		static constexpr double OfferDays = 12;
+		static constexpr double SurveyOfferDays = 30;
 
 		/// <summary>The most open contracts one board holds.</summary>
 		static constexpr int BoardCap = 14;
@@ -197,7 +198,8 @@ namespace SpaceGod::Core
 		static constexpr double MinPeopleShare = 0.6;
 
 		/// <summary>Danger (0..1) at a settlement past which its owner posts a patrol, and into which a valuable cargo wants an escort.</summary>
-		static constexpr double PatrolDanger = 0.3, EscortDanger = 0.3;
+		static constexpr double PatrolDanger = 0.3;
+		static constexpr double EscortDanger = 0.3;
 
 		/// <summary>A cargo worth this much at base prices is worth escorting, credits.</summary>
 		static constexpr double EscortCargoValue = 2e6;
@@ -209,7 +211,10 @@ namespace SpaceGod::Core
 		static constexpr double PatrolStationDays = 1;
 
 		/// <summary>Standing a completed contract earns (more for an urgent one), and what failing or abandoning one costs.</summary>
-		static constexpr double CompleteStanding = 2, UrgentStanding = 3, FailStanding = 6, AbandonStanding = 4;
+		static constexpr double CompleteStanding = 2;
+		static constexpr double UrgentStanding = 3;
+		static constexpr double FailStanding = 6;
+		static constexpr double AbandonStanding = 4;
 
 		/// <summary>How many closed contracts are kept for the record.</summary>
 		static constexpr int HistoryCap = 200;
@@ -351,7 +356,7 @@ namespace SpaceGod::Core
 			/// <summary>Freight: the port has not the goods to sell, or the taker cannot pay for them.</summary>
 			NoGoods,
 		};
-		friend const char* ToString(TakeOutcome v);
+		friend SPACEGODCORE_API const char* ToString(TakeOutcome v);
 
 		/// <summary>People a hull can carry: berths on a courier, a colony deck in a freighter, ten to a cell of a pilot's hold.</summary>
 		static int Berths(const cs::Ref<Ship>& ship, bool player);

@@ -490,10 +490,12 @@ namespace SpaceGod::Core
 		static constexpr double RaidShare = 0.35;
 
 		/// <summary>A full escort cuts a convoy's risk by this share; a guarded warehouse's risk is cut by <see cref="GuardedRaidCut"/>.</summary>
-		static constexpr double EscortCut = 0.75, GuardedRaidCut = 0.6;
+		static constexpr double EscortCut = 0.75;
+		static constexpr double GuardedRaidCut = 0.6;
 
 		/// <summary>How fast a convoy covers the distance from refinery to warehouse, AU a day, and the shortest trip, days.</summary>
-		static constexpr double ConvoyAuPerDay = 0.1, MinTransitDays = 2;
+		static constexpr double ConvoyAuPerDay = 0.1;
+		static constexpr double MinTransitDays = 2;
 
 	private:
 		/// <summary>Tonnes in a sphere of <paramref name="diameterM"/> metres at <paramref name="density"/> tonnes a cubic metre.</summary>

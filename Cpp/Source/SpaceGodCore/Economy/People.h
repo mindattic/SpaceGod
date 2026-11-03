@@ -36,7 +36,8 @@ namespace SpaceGod::Core
 		static constexpr double LeakAirKg = 0.23 / 6;
 
 		/// <summary>Nitrogen's share of breathing air by mass (dry air: 75.5% N2, 23.1% O2).</summary>
-		static constexpr double AirNitrogenShare = 0.755, AirOxygenShare = 0.231;
+		static constexpr double AirNitrogenShare = 0.755;
+		static constexpr double AirOxygenShare = 0.231;
 
 		/// <summary>Medical supplies per person a day, kg: between the clinical share (~7 g) and the whole (~47 g) of US hospital waste per head.</summary>
 		static constexpr double MedicalKg = 0.020;
@@ -81,7 +82,8 @@ namespace SpaceGod::Core
 		static constexpr double FaminePerDay = 0.004;
 
 		/// <summary>A settlement never shrinks below this share of its founding population (a hard core stays), nor grows past <see cref="MaxGrowth"/> times it.</summary>
-		static constexpr double MinShare = 0.25, MaxGrowth = 4;
+		static constexpr double MinShare = 0.25;
+		static constexpr double MaxGrowth = 4;
 
 		/// <summary>Population growth rate per day from how well needs were met this tick.</summary>
 		static double GrowthRate(double sustenance, double health);

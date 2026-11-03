@@ -23,7 +23,7 @@ namespace SpaceGod::Core
 	/// ephemeris and fleet have always had them); <see cref="StarSystem.Origin"/> is where that frame sits in the
 	/// galaxy, and <see cref="StarSystem.At"/> / <see cref="StarSystem.LocalKm"/> convert between the two levels.
 	/// </summary>
-	struct SPACEGODCORE_API GalacticPosition
+	struct GalacticPosition
 	{
 		/// <summary>The edge of one sector, km (a billion km, about 6.7 AU): small enough that the offset inside it holds to
 		/// a tenth of a millimetre, large enough that a star system's inner worlds share a handful of sectors.</summary>
@@ -40,17 +40,17 @@ namespace SpaceGod::Core
 		GalacticPosition() = default;
 
 		/// <summary>The sector's centre plus <paramref name="localKm"/>, carried into neighbouring sectors as far as it reaches.</summary>
-		GalacticPosition(long long x, long long y, long long z, DVec3 localKm);
+		SPACEGODCORE_API GalacticPosition(long long x, long long y, long long z, DVec3 localKm);
 
 		static const GalacticPosition Origin;
 
 	private:
 		/// <summary>Splits <paramref name="km"/> into whole sectors and what is left over, the remainder within half a sector.</summary>
-		static void Carry(double km, long long& sectors, double& rest);
+		static SPACEGODCORE_API void Carry(double km, long long& sectors, double& rest);
 
 	public:
 		/// <summary>The place <paramref name="ly"/> light-years from Sol's root (a catalogue star's position).</summary>
-		static GalacticPosition FromLy(DVec3 ly);
+		static SPACEGODCORE_API GalacticPosition FromLy(DVec3 ly);
 
 		/// <summary>This place moved by <paramref name="km"/>.</summary>
 		GalacticPosition Offset(DVec3 km) const { return GalacticPosition(X, Y, Z, LocalKm + km); }
@@ -85,12 +85,12 @@ namespace SpaceGod::Core
 
 		bool Equals(const GalacticPosition& o) const { return X == o.X && Y == o.Y && Z == o.Z && LocalKm.Equals(o.LocalKm); }
 
-		size_t HashCode() const;
+		SPACEGODCORE_API size_t HashCode() const;
 
 		bool operator==(const GalacticPosition& b) const { return Equals(b); }
 		bool operator!=(const GalacticPosition& b) const { return !Equals(b); }
 
-		cs::String ToString() const;
+		SPACEGODCORE_API cs::String ToString() const;
 	};
 
 	inline const GalacticPosition GalacticPosition::Origin = GalacticPosition(0, 0, 0, DVec3::Zero);

@@ -107,7 +107,8 @@ namespace SpaceGod::Core
 		static constexpr double PropellantDemandDays = 10;
 
 		/// <summary>A hyperlane's toll for one ride: a flat fee plus so much per tonne of ship (hull, tanks and hold).</summary>
-		static constexpr double LaneTollBase = 5000, LaneTollPerTonne = 0.5;
+		static constexpr double LaneTollBase = 5000;
+		static constexpr double LaneTollPerTonne = 0.5;
 
 	private:
 		cs::Random rng;
@@ -378,7 +379,7 @@ namespace SpaceGod::Core
 			/// <summary>All there is of that good aboard is stolen, and a lawful market will not take it.</summary>
 			Contraband,
 		};
-		friend const char* ToString(TradeOutcome v);
+		friend SPACEGODCORE_API const char* ToString(TradeOutcome v);
 
 		/// <summary>
 		/// Fills the player's piloted <paramref name="ship"/> at <paramref name="s"/>, as far as the market can

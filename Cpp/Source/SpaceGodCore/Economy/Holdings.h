@@ -266,16 +266,21 @@ namespace SpaceGod::Core
 
 		/// <summary>Damage at which a captain takes the ship to a yard, and the share a yard mends a day (at the hull's
 		/// price times <see cref="RepairRate"/> for each share).</summary>
-		static constexpr double RepairDamage = 0.25, RepairPerDay = 0.2, RepairRate = 0.3;
+		static constexpr double RepairDamage = 0.25;
+		static constexpr double RepairPerDay = 0.2;
+		static constexpr double RepairRate = 0.3;
 
 		/// <summary>A warehouse: its price, rent a day, and what it holds.</summary>
-		static constexpr double WarehousePrice = 2e6, WarehouseRentPerDay = 1500, WarehouseTonnes = 20000;
+		static constexpr double WarehousePrice = 2e6;
+		static constexpr double WarehouseRentPerDay = 1500;
+		static constexpr double WarehouseTonnes = 20000;
 
 		/// <summary>What a settlement is worth per resident (a share is priced at that fraction of it).</summary>
 		static constexpr double ValuePerResident = 250;
 
 		/// <summary>A claim: its price per tonne-a-day of yield at the ore's base price, and its fee a day.</summary>
-		static constexpr double ClaimPricePerYield = 60, ClaimFeePerDay = 300;
+		static constexpr double ClaimPricePerYield = 60;
+		static constexpr double ClaimFeePerDay = 300;
 
 		/// <summary>How fast a hauler on a claim cuts ore, tonnes a day, before the ore's richness (rarer ores come slower).</summary>
 		static constexpr double BaseYieldPerDay = 4000;

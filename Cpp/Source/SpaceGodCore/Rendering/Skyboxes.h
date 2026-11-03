@@ -85,7 +85,9 @@ namespace SpaceGod::Core
 	class SPACEGODCORE_API SkyboxCatalog
 	{
 	public:
-		static constexpr const char* SeededNebulaId = "seeded-nebula", * DeepStarMapId = "nasa-deep-star-map", * StarfieldId = "starfield";
+		static constexpr const char* SeededNebulaId = "seeded-nebula";
+		static constexpr const char* DeepStarMapId = "nasa-deep-star-map";
+		static constexpr const char* StarfieldId = "starfield";
 
 		/// <summary>The folder under Resources the shipped panoramas live in.</summary>
 		static constexpr const char* ResourceFolder = "Skyboxes/";

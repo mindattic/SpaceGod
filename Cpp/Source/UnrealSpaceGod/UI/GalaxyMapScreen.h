@@ -78,7 +78,7 @@ namespace SpaceGod::UI
 		Vector2 pan;
 		bool fitted = false;
 		float fitScale = 1.0f;
-		DVec3 centreLy;
+		Core::DVec3 centreLy;
 
 		bool showTerritory = true, showFlows = true, showFronts = true, showPirates = true, showConstruction = true;
 
@@ -123,12 +123,12 @@ namespace SpaceGod::UI
 		void Fit(Rect canvas);
 
 		/// A point (light-years) on the canvas: turned by the yaw about the ecliptic pole, tilted, scaled and panned.
-		Vector2 Project(Rect canvas, DVec3 ly, float& depth);
+		Vector2 Project(Rect canvas, Core::DVec3 ly, float& depth);
 
-		Vector2 Project(Rect canvas, DVec3 ly);
+		Vector2 Project(Rect canvas, Core::DVec3 ly);
 
 		/// The same point dropped to the ecliptic plane (z = the map's middle): where a star's stalk stands.
-		Vector2 Foot(Rect canvas, DVec3 ly);
+		Vector2 Foot(Rect canvas, Core::DVec3 ly);
 
 		/// The plain stars on the charts nearest the system the player is in, up to MaxChartStars.
 		void GatherChartStars();

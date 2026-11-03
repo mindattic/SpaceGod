@@ -105,16 +105,20 @@ namespace SpaceGod::Core
 		static constexpr double MiddleGrey = 0.18;
 
 		/// <summary>How far an adapting exposure may stop down (the star in frame) and open up (a dim view), in stops.</summary>
-		static constexpr double MinStops = -4, MaxStops = 1.5;
+		static constexpr double MinStops = -4;
+		static constexpr double MaxStops = 1.5;
 
 		/// <summary>The darkest luminance metered (black space counts as this, not as zero), and the brightest.</summary>
-		static constexpr double MinLuminance = 1.0 / 1024, MaxLuminance = 1024;
+		static constexpr double MinLuminance = 1.0 / 1024;
+		static constexpr double MaxLuminance = 1024;
 
 		/// <summary>The shares of the histogram's darkest and brightest pixels thrown out before averaging.</summary>
-		static constexpr double HistogramLow = 0.45, HistogramHigh = 0.98;
+		static constexpr double HistogramLow = 0.45;
+		static constexpr double HistogramHigh = 0.98;
 
 		/// <summary>How fast an adapting exposure follows: per second, toward a brighter view and toward a darker one.</summary>
-		static constexpr double SpeedToBright = 3.0, SpeedToDark = 1.0;
+		static constexpr double SpeedToBright = 3.0;
+		static constexpr double SpeedToDark = 1.0;
 
 	private:
 		static constexpr int HistogramBins = 64;

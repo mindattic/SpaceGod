@@ -95,7 +95,7 @@ namespace SpaceGod::Core
 			/// <summary>No crate of that good needs the back door (or none is aboard): sell it on the open market.</summary>
 			NothingToSmuggle,
 		};
-		friend const char* ToString(Outcome v);
+		friend SPACEGODCORE_API const char* ToString(Outcome v);
 
 		/// <summary>
 		/// Sells up to <paramref name="crates"/> crates of <paramref name="g"/> out of <paramref name="ship"/>'s hold (the one

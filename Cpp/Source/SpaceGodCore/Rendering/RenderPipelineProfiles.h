@@ -123,8 +123,19 @@ namespace SpaceGod::Core
 	class SPACEGODCORE_API RenderShaders
 	{
 	public:
-		static constexpr const char* Planet = "Planet", * Sun = "Sun", * Glow = "Glow", * Ring = "Ring", * Ship = "Ship", * Line = "Line",
-			* Stars = "Stars", * GasGiant = "GasGiant", * Asteroids = "Asteroids", * Fx = "Fx", * Points = "Points", * Sky = "Sky";
+		// One per declaration: a multi-declarator static in a dllexport class is C2487.
+		static constexpr const char* Planet = "Planet";
+		static constexpr const char* Sun = "Sun";
+		static constexpr const char* Glow = "Glow";
+		static constexpr const char* Ring = "Ring";
+		static constexpr const char* Ship = "Ship";
+		static constexpr const char* Line = "Line";
+		static constexpr const char* Stars = "Stars";
+		static constexpr const char* GasGiant = "GasGiant";
+		static constexpr const char* Asteroids = "Asteroids";
+		static constexpr const char* Fx = "Fx";
+		static constexpr const char* Points = "Points";
+		static constexpr const char* Sky = "Sky";
 
 		static const cs::List<cs::String>& All();
 	};

@@ -74,7 +74,7 @@ public:
 
 private:
 	/// <summary>Where the hull is, km from the system's root.</summary>
-	DVec3 PilotRootKm();
+	Core::DVec3 PilotRootKm();
 
 public:
 	/// <summary>The system's outer rim, AU from its star: beyond it the drive can spool.</summary>
@@ -94,7 +94,7 @@ private:
 	bool UpdateHelmFtl(const cs::Ref<Core::Ship>& ship);
 
 	/// <summary>The star dead ahead of the nose, from a list of what is charted brought up to date every second or so.</summary>
-	cs::Ref<Core::FtlTarget> PointedTarget(DVec3 rootKm, DVec3 forward);
+	cs::Ref<Core::FtlTarget> PointedTarget(Core::DVec3 rootKm, Core::DVec3 forward);
 
 public:
 	/// <summary>How far <paramref name="t"/> is from the hull, light-years.</summary>
@@ -172,7 +172,7 @@ private:
 
 public:
 	/// <summary>The way to the plotted course's star or beacon from the hull (unit), and how far, km; false with none.</summary>
-	bool PlottedBearing(DVec3& direction, double& km);
+	bool PlottedBearing(Core::DVec3& direction, double& km);
 
 private:
 	/// <summary>
@@ -183,4 +183,4 @@ private:
 	bool UpdateFtlAutopilot(const cs::Ref<Core::Ship>& ship, float dt);
 
 	/// <summary>The hull's nose put on <paramref name="forward"/> (ecliptic, unit), its roof kept as square to it as it was.</summary>
-	void SetPilotFacing(DVec3 forward);
+	void SetPilotFacing(Core::DVec3 forward);
