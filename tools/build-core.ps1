@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
-  # Top-level folders of Cpp/Source/SpaceGodCore to build (e.g. -Only Cs,Shared,Combat). Default: all of them.
-  # Cs is always built: everything else depends on it.
+  # Top-level folders of Cpp/Source/SpaceGodCore to build (e.g. -Only Cs,Shared,Combat; '.' = the loose files at
+  # the module root). Default: all of them. Cs is always built: everything else depends on it.
   [string[]]$Only,
   # Most cl.exe processes alive at once (memory is shared with other builds on this machine).
   [int]$MaxParallel = 4,
@@ -17,8 +17,8 @@ param(
 Standalone build of SpaceGodCore (the C++ port of Unity.SpaceGod's Core) with MSVC, no Unreal involved.
 
 .DESCRIPTION
-Compiles every .cpp under Cpp/Source/SpaceGodCore except SpaceGodCoreModule.cpp (the one file with Unreal
-headers) and Tests/, archives them into SpaceGodCore.lib, then builds Tests/CsParity (the check that Cs/Cs.h
+Compiles every .cpp under Cpp/Source/SpaceGodCore except Module/ (SpaceGodCoreModule.cpp, the one file with
+Unreal headers) and Tests/, archives them into SpaceGodCore.lib, then builds Tests/CsParity (the check that Cs/Cs.h
 reproduces .NET: formatting, Math.Round, System.Random, List.Sort, Parse) and runs it against the .NET output in
 Tests/CsParity/expected.txt. Output goes to Cpp/Intermediate/CoreStandalone/<Configuration> (gitignored).
 Flags: C++20, /EHsc /GR /W4 /permissive- /fp:precise /utf-8, SPACEGOD_STANDALONE defined.
@@ -57,16 +57,17 @@ function Import-VcVars {
 Import-VcVars
 
 # ---------------------------------------------------------------- sources
-$dirs = Get-ChildItem -LiteralPath $core -Directory | Where-Object { $_.Name -ne 'Tests' } | ForEach-Object Name
+# Module/ holds SpaceGodCoreModule.cpp, the one file with Unreal headers; Tests/ builds separately below.
+$dirs = Get-ChildItem -LiteralPath $core -Directory | Where-Object { $_.Name -notin @('Tests', 'Module') } | ForEach-Object Name
 if ($Only) {
   $want = @('Cs') + ($Only | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
-  foreach ($w in $want) { if ($dirs -notcontains $w) { throw "No folder '$w' under $core." } }
+  foreach ($w in $want) { if ($w -ne '.' -and $dirs -notcontains $w) { throw "No folder '$w' under $core." } }
   $dirs = $dirs | Where-Object { $want -contains $_ }
 }
 $sources = @()
 foreach ($d in $dirs) { $sources += Get-ChildItem -LiteralPath (Join-Path $core $d) -Recurse -Filter '*.cpp' -File }
-# Loose .cpp files at the module root, except the Unreal module file.
-if (-not $Only) { $sources += Get-ChildItem -LiteralPath $core -Filter '*.cpp' -File | Where-Object { $_.Name -ne 'SpaceGodCoreModule.cpp' } }
+# Loose .cpp files at the module root (Core's top-level .cs files), with a full build or -Only '.'.
+if (-not $Only -or $want -contains '.') { $sources += Get-ChildItem -LiteralPath $core -Filter '*.cpp' -File | Where-Object { $_.Name -ne 'SpaceGodCoreModule.cpp' } }
 
 $headerTime = (Get-ChildItem -LiteralPath $core -Recurse -File -Include '*.h', '*.inl' |
   Measure-Object -Property LastWriteTimeUtc -Maximum).Maximum

@@ -26,6 +26,19 @@
 #include <utility>
 #include <vector>
 
+// SpaceGodCore is a DLL in UE's modular (editor) builds: UBT defines SPACEGODCORE_API as dllexport/dllimport there
+// (empty in monolithic builds). Standalone builds (tools/build-core.ps1) define nothing, so it is empty here.
+// Mark every non-template class and free function that is *defined in a .cpp* with it, as below.
+#ifndef SPACEGODCORE_API
+#define SPACEGODCORE_API
+#endif
+// UBT defines SPACEGODCORE_API as DLLEXPORT / DLLIMPORT, which Unreal's own headers define; SpaceGodCore's files
+// include none, so define them here exactly as WindowsPlatform.h does (an identical redefinition is legal).
+#if defined(_WIN32) && !defined(DLLEXPORT)
+#define DLLEXPORT __declspec(dllexport)
+#define DLLIMPORT __declspec(dllimport)
+#endif
+
 namespace cs
 {
 	// ---------------------------------------------------------------- references --------------------------------
@@ -325,7 +338,7 @@ namespace cs
 	// ---------------------------------------------------------------- System.Random -----------------------------
 	// .NET's seeded Random (Net5CompatSeedImpl: Knuth's subtractive generator), bit-exact with `new Random(seed)`
 	// on .NET 5+ and on Unity's Mono. The unseeded constructor seeds from the clock (non-deterministic, as .NET).
-	class Random
+	class SPACEGODCORE_API Random
 	{
 	public:
 		Random();
@@ -421,10 +434,10 @@ namespace cs
 		inline double IEEERemainder(double a, double b) { return std::remainder(a, b); }
 		// Math.Round defaults to MidpointRounding.ToEven (banker's rounding), unlike C's round().
 		inline double Round(double v) { return std::nearbyint(v); } // FE_TONEAREST is ties-to-even
-		double Round(double v, int digits);                          // ToEven, as .NET (Cs.cpp)
+		SPACEGODCORE_API double Round(double v, int digits);                          // ToEven, as .NET (Cs.cpp)
 		enum class MidpointRounding { ToEven, AwayFromZero };
-		double Round(double v, MidpointRounding mode);
-		double Round(double v, int digits, MidpointRounding mode);
+		SPACEGODCORE_API double Round(double v, MidpointRounding mode);
+		SPACEGODCORE_API double Round(double v, int digits, MidpointRounding mode);
 	}
 
 	// double.NaN, double.MaxValue, ... and the double.IsX tests.
@@ -442,8 +455,8 @@ namespace cs
 		inline bool IsPositiveInfinity(double v) { return std::isinf(v) && v > 0; }
 		inline bool IsNegativeInfinity(double v) { return std::isinf(v) && v < 0; }
 		inline bool IsFinite(double v) { return std::isfinite(v); }
-		bool TryParse(std::string_view s, double& out); // invariant culture
-		double Parse(std::string_view s);
+		SPACEGODCORE_API bool TryParse(std::string_view s, double& out); // invariant culture
+		SPACEGODCORE_API double Parse(std::string_view s);
 	}
 	// float.NaN, float.MaxValue, ... (C# float is IEEE single, as C++ float).
 	namespace Single
@@ -462,8 +475,8 @@ namespace cs
 	{
 		constexpr int MaxValue = std::numeric_limits<int>::max();
 		constexpr int MinValue = std::numeric_limits<int>::min();
-		bool TryParse(std::string_view s, int& out);
-		int Parse(std::string_view s);
+		SPACEGODCORE_API bool TryParse(std::string_view s, int& out);
+		SPACEGODCORE_API int Parse(std::string_view s);
 	}
 
 	// ---------------------------------------------------------------- conversions -------------------------------
@@ -480,8 +493,8 @@ namespace cs
 	// ---------------------------------------------------------------- strings & formatting ----------------------
 	// Invariant culture throughout. Str(x) is C#'s x.ToString(); for a double that is .NET Core 3.0+'s shortest
 	// round-trip text ("0.1", "1E+15", "NaN", "∞" -> "Infinity" as .NET prints it, "-0" for negative zero).
-	String Str(double v);
-	String Str(float v);
+	SPACEGODCORE_API String Str(double v);
+	SPACEGODCORE_API String Str(float v);
 	inline String Str(int v) { return std::to_string(v); }
 	inline String Str(long long v) { return std::to_string(v); }
 	inline String Str(long v) { return std::to_string(v); }
@@ -501,12 +514,12 @@ namespace cs
 	// x.ToString(format) for the .NET standard and custom numeric formats Core uses: "0", "0.0", "0.00", "0.000",
 	// "0.#", "0.##", "#,0", "N0".."N3", "F0".."F3", "P0".."P1", "R", "G", "+0;-0", ... Rounding follows .NET Core 3.0+
 	// (exact decimal value of the double, midpoint away from zero).
-	String Fmt(double v, std::string_view format);
-	String Fmt(int v, std::string_view format);
-	String Fmt(long long v, std::string_view format);
-	String Fmt(float v, std::string_view format); // a float formats with float's precision (7 digits), as .NET does
+	SPACEGODCORE_API String Fmt(double v, std::string_view format);
+	SPACEGODCORE_API String Fmt(int v, std::string_view format);
+	SPACEGODCORE_API String Fmt(long long v, std::string_view format);
+	SPACEGODCORE_API String Fmt(float v, std::string_view format); // a float formats with float's precision (7 digits), as .NET does
 	inline String Fmt(long v, std::string_view format) { return Fmt(static_cast<long long>(v), format); }
-	String Fmt(unsigned long long v, std::string_view format);
+	SPACEGODCORE_API String Fmt(unsigned long long v, std::string_view format);
 	inline String Fmt(unsigned v, std::string_view format) { return Fmt(static_cast<unsigned long long>(v), format); }
 	inline String Fmt(unsigned long v, std::string_view format) { return Fmt(static_cast<unsigned long long>(v), format); }
 
@@ -522,7 +535,7 @@ namespace cs
 			if constexpr (std::is_arithmetic_v<T> && !std::is_same_v<T, bool> && !std::is_same_v<T, char>) { if (!f.empty()) return Fmt(v, f); }
 			return Str(v);
 		}
-		String Composite(std::string_view composite, const Func<String, int, std::string_view>& arg, int count);
+		SPACEGODCORE_API String Composite(std::string_view composite, const Func<String, int, std::string_view>& arg, int count);
 	}
 	template <class... A> String Format(std::string_view composite, const A&... args)
 	{
@@ -538,27 +551,27 @@ namespace cs
 	namespace Strings
 	{
 		inline bool IsNullOrEmpty(const String& s) { return s.empty(); }
-		bool IsNullOrWhiteSpace(const String& s);
-		String ToLowerInvariant(const String& s);
-		String ToUpperInvariant(const String& s);
-		String Trim(const String& s);
-		String TrimStart(const String& s);
-		String TrimEnd(const String& s);
-		String Substring(const String& s, int start);
-		String Substring(const String& s, int start, int length);
-		bool StartsWith(const String& s, std::string_view prefix); // ordinal
-		bool EndsWith(const String& s, std::string_view suffix);   // ordinal
-		bool Contains(const String& s, std::string_view part);     // ordinal
-		int IndexOf(const String& s, std::string_view part, int start = 0);
-		int IndexOf(const String& s, char c, int start = 0);
-		int LastIndexOf(const String& s, char c);
-		String Replace(const String& s, std::string_view from, std::string_view to);
-		List<String> Split(const String& s, char sep);
-		List<String> Split(const String& s, std::string_view seps); // any of the characters
-		String PadLeft(const String& s, int width, char pad = ' ');
-		String PadRight(const String& s, int width, char pad = ' ');
-		int CompareOrdinal(const String& a, const String& b);
-		bool EqualsOrdinalIgnoreCase(const String& a, const String& b);
+		SPACEGODCORE_API bool IsNullOrWhiteSpace(const String& s);
+		SPACEGODCORE_API String ToLowerInvariant(const String& s);
+		SPACEGODCORE_API String ToUpperInvariant(const String& s);
+		SPACEGODCORE_API String Trim(const String& s);
+		SPACEGODCORE_API String TrimStart(const String& s);
+		SPACEGODCORE_API String TrimEnd(const String& s);
+		SPACEGODCORE_API String Substring(const String& s, int start);
+		SPACEGODCORE_API String Substring(const String& s, int start, int length);
+		SPACEGODCORE_API bool StartsWith(const String& s, std::string_view prefix); // ordinal
+		SPACEGODCORE_API bool EndsWith(const String& s, std::string_view suffix);   // ordinal
+		SPACEGODCORE_API bool Contains(const String& s, std::string_view part);     // ordinal
+		SPACEGODCORE_API int IndexOf(const String& s, std::string_view part, int start = 0);
+		SPACEGODCORE_API int IndexOf(const String& s, char c, int start = 0);
+		SPACEGODCORE_API int LastIndexOf(const String& s, char c);
+		SPACEGODCORE_API String Replace(const String& s, std::string_view from, std::string_view to);
+		SPACEGODCORE_API List<String> Split(const String& s, char sep);
+		SPACEGODCORE_API List<String> Split(const String& s, std::string_view seps); // any of the characters
+		SPACEGODCORE_API String PadLeft(const String& s, int width, char pad = ' ');
+		SPACEGODCORE_API String PadRight(const String& s, int width, char pad = ' ');
+		SPACEGODCORE_API int CompareOrdinal(const String& a, const String& b);
+		SPACEGODCORE_API bool EqualsOrdinalIgnoreCase(const String& a, const String& b);
 		// string.Join(sep, items): each item through Str.
 		template <class C> String Join(std::string_view sep, const C& items)
 		{

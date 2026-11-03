@@ -10,6 +10,7 @@ public class UnrealSpaceGod : ModuleRules
 		PublicDependencyModuleNames.AddRange(new[]
 		{
 			"Core", "CoreUObject", "Engine", "InputCore", "NetCore", "Slate", "SlateCore", "ProceduralMeshComponent", "ImageWrapper",
+			"SpaceGodCore", // the C++ port of Unity.SpaceGod's Core (Cpp/Source/SpaceGodCore)
 		});
 	}
 }
