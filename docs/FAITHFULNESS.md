@@ -34,8 +34,9 @@ wire it?), and by running it headless wherever a script can drive it.
 - **Both tracks** run the same UI tour (`-Mode smoke`: every main-menu page, New Game, the HUD and every HUD panel,
   galaxy map Diplomacy/Command, the pause menu's Settings/Display pages, Help with a chapter turn, each clicked by label)
   and the same views check (`-Mode views`: identical renderer, primitive and triangle counts). Deterministic
-  screenshots of both (`-Mode shots`) differ by at most 4.9% of pixels, all of it text rasterisation (MIGRATION.md
-  "Visual parity").
+  screenshots of both (`-Mode shots`) differed by at most 4.9% of pixels, nearly all of it text rasterisation; since
+  US-T54 draws the C# GUI through Slate as the C++ track does, at most 3.6% (Help 0.01%, galaxy map 0.02%; what is
+  left is world labels and lines, MIGRATION.md "Visual parity").
 
 ## The binding audit (`tools/play.ps1 -Track <Cpp|CSharp> -Mode audit`)
 
@@ -220,7 +221,7 @@ Sources: **CH** = ControlsHelp binding, **GM** = GameManual chapter, **US** = U.
 | Navigator collapsed by default, marquee lines (U.SPC-T328, T495) | US | ✓R | ✓R | HUD drawn in smoke and shots |
 | Pause menu: Resume, Help, Save/Load, Settings > Display, Main Menu, Quit | CH, US-T276 | ✓R | ✓R | |
 | Text fields (profile and save names) | US-T327 | ≠ | ✓C | C++: append and backspace only (**US-T52**) |
-| Text clipped at scroll and clip edges | (IMGUI) | ✓C | ≠ | C#: whole glyphs dropped; icons have no mip chain (**US-T54**) |
+| Text clipped at scroll and clip edges | (IMGUI) | ✓C | ✓R | C#: drawn through a Slate overlay with clipping zones, glyphs cut at the edge; icons with Unity's mip chain (US-T54; shots: the clipped panels match the C++ shot, 22% → 0.04% of pixels) |
 | Unity default skin (ModelViewer, asteroid labels) | (IMGUI) | ≠ | ≠ | approximated greys (**US-T57**) |
 
 ### Rendering features
@@ -249,7 +250,7 @@ The 88 rows of the checklist above (a row with two marks, such as `✓R / ✓C`,
 | Track | ✓R | ✓C | ✗ | ≠ |
 |---|---|---|---|---|
 | C++ | 60 | 21 | 0 | 7 |
-| C# | 66 | 14 | 3 | 5 |
+| C# | 67 | 14 | 3 | 4 |
 
 Binding audit: 47 PASS, 0 FAIL on each track.
 
@@ -261,7 +262,7 @@ Binding audit: 47 PASS, 0 FAIL on each track.
 | US-T51 | C# | Render Pipeline and Post-processing settings missing |
 | US-T52 | C++ | GUI.TextField has no TextEditor (caret, selection, clipboard) |
 | US-T53 | C++ | the model viewer camera's depth and culling mask are not rendered |
-| US-T54 | C# | IMGUI text clipped by whole glyphs; icons without mips |
+| US-T54 | C# | IMGUI text clipped by whole glyphs; icons without mips (fixed: Slate overlay, mip chain) |
 | US-T55 | both | MSAA setting is FXAA (deferred renderer) |
 | US-T56 | both | display modes all at 60 Hz |
 | US-T57 | both | Light components data only, glTF without PBR, default skin approximated |

@@ -4,8 +4,8 @@ using System.Collections.Generic;
 // Unity's immediate-mode GUI (UnityEngine.GUI / GUIUtility), the way the original's OnGUI code uses it: Label, Box,
 // Button, DrawTexture, TextField, HorizontalSlider, groups, clips and scroll views, the colour/enabled/matrix state,
 // hot and keyboard controls. Each OnGUI pass runs once per event (Layout, then the input event; Layout, then
-// Repaint), and only Repaint draws, as in Unity. Drawing goes to IGuiCanvas in screen pixels (AHUD's Canvas in a
-// window, a counting canvas headless).
+// Repaint), and only Repaint draws, as in Unity. Drawing goes to IGuiCanvas in screen pixels (the Slate overlay in a
+// window, US-T54, else AHUD's Canvas; a counting canvas headless).
 namespace UnityEngine
 {
     /// <summary>Thrown by <see cref="GUIUtility.ExitGUI"/> to end the current OnGUI pass at once, as in Unity.</summary>
@@ -44,6 +44,14 @@ namespace UnityEngine
         /// rotated <paramref name="rotation"/> degrees clockwise about its centre.</summary>
         void DrawTexture(Texture texture, Rect screen, Rect uv, Color tint, float rotation);
         void DrawText(string text, Vector2 screen, int size, FontStyle style, Color tint);
+    }
+
+    /// <summary>US-T54: a canvas that clips what it draws (Slate's clipping zones), as Unity's GUIClip does: text at a
+    /// clip edge is cut through its glyphs, a rotated quad exactly at the clip.</summary>
+    public interface IClippingGuiCanvas : IGuiCanvas
+    {
+        /// <summary>The clip (screen pixels) for the draws after it; null: none.</summary>
+        void SetClip(Rect? screen);
     }
 
     public static class GUIUtility
@@ -198,6 +206,16 @@ namespace UnityEngine
         {
             if (tex == null || tint.a <= 0 || local.width == 0 || local.height == 0) return;
             var screen = ToScreen(local);
+            if (!matrix.isIdentity && Canvas is IClippingGuiCanvas clipping)
+            {
+                // US-T54: the canvas clips (Slate's clipping zone), so the rotated quad is cut exactly where it leaves the
+                // clip, corners included, as Unity's GUIClip cuts it.
+                clipping.SetClip(clips.Count > 0 ? Top.Clip : null);
+                var c = matrix.MultiplyPoint(screen.center);
+                Canvas.DrawTexture(tex, new Rect(c.x - screen.width * 0.5f, c.y - screen.height * 0.5f, screen.width, screen.height), uv, tint, matrix.AngleDegrees);
+                ImguiHost.Stats.Textures++;
+                return;
+            }
             if (!matrix.isIdentity)
             {
                 var centre = matrix.MultiplyPoint(screen.center);
@@ -228,6 +246,7 @@ namespace UnityEngine
                 uv = new Rect(u0, v0, cut.width / screen.width * uv.width, cut.height / screen.height * uv.height);
                 screen = cut;
             }
+            (Canvas as IClippingGuiCanvas)?.SetClip(clips.Count > 0 ? clip : null);
             Canvas.DrawTexture(tex, screen, uv, tint, 0);
             ImguiHost.Stats.Textures++;
         }
@@ -272,8 +291,8 @@ namespace UnityEngine
         }
 
         /// <summary>One line of text at a local position, cut to the current clip (and <paramref name="styleClip"/>, a style
-        /// that clips): characters past either side are dropped; a line less than half inside vertically is not drawn
-        /// (Canvas text cannot be cut through a glyph).</summary>
+        /// that clips): on a clipping canvas (Slate, US-T54) through the glyphs; on AHUD's Canvas, which cannot cut a
+        /// glyph, characters past either side are dropped and a line less than half inside vertically is not drawn.</summary>
         internal static void DrawTextLine(string text, Vector2 local, int size, FontStyle style, Color tint, Rect? styleClip, float lineHeight)
         {
             if (string.IsNullOrEmpty(text) || tint.a <= 0) return;
@@ -281,6 +300,16 @@ namespace UnityEngine
             var clip = Top.Clip;
             if (styleClip.HasValue) clip = Intersect(clip, ToScreen(styleClip.Value));
             if (!matrix.isIdentity) p = matrix.MultiplyPoint(p);
+            if (Canvas is IClippingGuiCanvas clipping)
+            {
+                // US-T54: the canvas cuts the run at the clip, through the glyphs, as Unity does.
+                if (p.y >= clip.yMax || p.y + lineHeight <= clip.yMin || p.x >= clip.xMax) return;
+                if (p.x + Canvas.Measure(text, size, style) <= clip.xMin) return;
+                clipping.SetClip(clips.Count > 0 || styleClip.HasValue ? clip : null);
+                Canvas.DrawText(text, p, size, style, tint);
+                ImguiHost.Stats.Texts++;
+                return;
+            }
             float visible = Math.Min(p.y + lineHeight, clip.yMax) - Math.Max(p.y, clip.yMin);
             if (visible < lineHeight * 0.5f) return;
             float w = Canvas.Measure(text, size, style);

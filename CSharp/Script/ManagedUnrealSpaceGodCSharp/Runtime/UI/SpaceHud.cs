@@ -22,6 +22,9 @@ namespace Unity.SpaceGod.UI
     /// labels; Canvas is Unreal's immediate-mode 2D API and UnrealSharp exposes all of it (DrawTexture with UVs, tint and
     /// rotation, DrawText with a font and scale, GetTextSize), so the original's code ports line for line on a thin
     /// IMGUI facade. UMG would mean rebuilding every screen as retained widgets and diffing state into them.
+    /// US-T54: Canvas cannot cut a glyph at a clip edge, so the Repaint pass is now recorded into the game module's Slate
+    /// overlay (<see cref="SlateCanvas"/>, the C++ track's GuiHost drawing: clipping zones, Slate text) and painted over
+    /// the viewport in the same frame; DrawHUD still drives the cycle, and the Canvas is the fallback.
     /// </summary>
     [UClass]
     public partial class ASpaceHud : AHUD
@@ -55,13 +58,13 @@ namespace Unity.SpaceGod.UI
         /// <summary>Milliseconds the last GUI frame (every OnGUI pass) took, averaged (US-T40's frame-time log).</summary>
         public static float GuiMs;
 
-        HudCanvas canvas;
+        IGuiCanvas canvas;
         MeasuringCanvas measuring;
         UnrealInputDevice device;
         readonly GuiInput input = new GuiInput();
 
         /// <summary>Which font the canvas draws with (logged once).</summary>
-        public string FontSource => canvas?.FontSource ?? "measuring canvas (headless)";
+        public string FontSource => canvas is SlateCanvas s ? s.FontSource : canvas is HudCanvas h ? h.FontSource : "measuring canvas (headless)";
 
         public override void Tick(float deltaSeconds)
         {
@@ -74,10 +77,18 @@ namespace Unity.SpaceGod.UI
             Screen.SetSize(sizeX, sizeY);
             if (canvas == null)
             {
-                canvas = new HudCanvas(this, o => Kept.Add(o));
-                Debug.Log("[Unity.SpaceGod] HUD canvas " + sizeX + "x" + sizeY + ", font " + canvas.FontSource);
+                // US-T54: drawn through the game module's Slate overlay (clipping zones cut text at a clip edge through the
+                // glyphs, as Unity does); the Canvas only if that is not bound.
+                canvas = SlateGui.Available ? new SlateCanvas(o => Kept.Add(o)) : new HudCanvas(this, o => Kept.Add(o));
+                Debug.Log("[Unity.SpaceGod] HUD canvas " + sizeX + "x" + sizeY + ", " + canvas.GetType().Name + ", font " + FontSource);
             }
-            RunFrame(canvas);
+            if (canvas is SlateCanvas slate)
+            {
+                slate.BeginFrame();
+                try { RunFrame(canvas); }
+                finally { slate.EndFrame(); }
+            }
+            else RunFrame(canvas);
         }
 
         void RunFrame(IGuiCanvas target)

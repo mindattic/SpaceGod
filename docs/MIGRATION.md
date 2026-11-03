@@ -434,19 +434,21 @@ three differences US-T38 left were all the C# track's:
 
 Pixels differing (> 24/255) between `cpp-*` and `csharp-*`, before (US-T38's shots, wall-clock) and after:
 
-| Shot | before | after |
-|---|---|---|
-| views-sol | 0.44% | 0.00% (2 px) |
-| ui-main-menu | 0.87% | 0.40% |
-| ui-hud | 24.46% | 4.23% |
-| ui-help | 5.33% | 4.91% |
-| ui-galaxy-map | 4.17% | 2.23% |
-| ui-market-cargo | 23.56% | 4.30% |
-| ui-pause-menu | 7.46% | 1.61% |
+| Shot | before | after | US-T54 (C# GUI through Slate) |
+|---|---|---|---|
+| views-sol | 0.44% | 0.00% (2 px) | 0.00% (2 px) |
+| ui-main-menu | 0.87% | 0.40% | 0.21% |
+| ui-hud | 24.46% | 4.23% | 3.57% |
+| ui-help | 5.33% | 4.91% | 0.01% |
+| ui-galaxy-map | 4.17% | 2.23% | 0.02% |
+| ui-market-cargo | 23.56% | 4.30% | 3.03% |
+| ui-pause-menu | 7.46% | 1.61% | 1.18% |
 
-Left: text is drawn by Slate (C++) and by Canvas from a whole-point font (C#), so glyph edges and some advances differ by a
-pixel (C++ widths match the original's; C# runs about 1% narrower, which can move a wrap): what remains of every shot's
-diff is text. One-pixel lines are aliased on both tracks (FXAA; the original's MSAA would need the forward renderer).
+Left after US-T45: text was drawn by Slate (C++) and by Canvas from a whole-point font (C#), so glyph edges and some
+advances differed by a pixel (C# ran about 1% narrower, which could move a wrap). US-T54 draws the C# GUI through the same
+Slate text, measure and clipping zones as the C++ track, so screens of GUI alone now match within a few hundred pixels;
+what remains in the HUD, market and pause shots is world labels and orbit lines over the scene. One-pixel lines are
+aliased on both tracks (FXAA; the original's MSAA would need the forward renderer).
 The C# asteroid belt and ship detail are US-T40's.
 
 ## C# track
@@ -580,13 +582,24 @@ In the window the colours come out as the original's arithmetic gives them (e.g.
 
 ![HUD](images/csharp-ui-hud.png)
 
-**Not faithful yet (UI).** Canvas cannot cut a glyph, so text at a clip edge (scroll views, `TextClipping.Clip`) is
-dropped character by character horizontally and line by line vertically (a line less than half inside is not
-drawn), where Unity cuts through the glyphs (US-T40 tried drawing such runs into render targets and compositing them cut
-at the clip, Modulate + Additive; drawing a canvas into a render target from the HUD, during DrawHUD or from its Tick,
-crashed the renderer, so it is not used). Rotated quads (`GUI.matrix`: lines, arrows) are cut to the clip along their
-length (US-T40; a thick quad's corners can overhang by half its thickness). Unity's default-skin look (only `ModelViewer` and AsteroidBelt's labels use `GUI.skin`) is approximated with
-generated greys. Icons are drawn from one 64 px texture without the original's mip chain (no trilinear minification).
+**Clipping and icons (US-T54).** Canvas cannot cut a glyph (UE5's FCanvas has no clip stack, and US-T40 found that
+drawing a canvas into a render target from the HUD crashed the renderer), so it dropped text at a clip edge by whole
+characters and lines. The GUI is now drawn through a Slate overlay, as the C++ track's GuiHost draws it: ASpaceHud's
+DrawHUD still runs Unity's OnGUI cycle, but `SlateCanvas` records the Repaint pass (clips, texture quads, text runs)
+into the C# primary module's `SpaceGodGuiOverlay.cpp`, reached through UnrealSharp's binds registry (the `SpaceGodGui`
+binder: no reflection or glue), and a hit-test-invisible Slate widget on the game viewport paints it the same frame,
+each draw under its `FSlateClippingZone`, text in the same Arial composite font and measured with Slate's font measure.
+Text at a scroll view's or `TextClipping.Clip` style's edge is cut through the glyphs, and rotated quads exactly at the
+clip, as Unity cuts them; layout widths are the C++ track's. `Texture2D.Apply` re-uploads a texture that asks for a mip
+chain (the icons: 64 px drawn at 10-30 px, trilinear; the skin) with Unity's box-filtered chain down to 1x1, its filter
+and wrap (`UploadTexture`, the C++ GuiHost's upload), so small icons minify as the original's. The HUD falls back to
+Canvas only if the binder is missing. Before / after against the C++ shot, the info panel's line cut at its right edge
+(C++, C# before, C# after; 22% of that strip's pixels differed, now 0.04%):
+
+![clip edge: C++, C# before, C# after](images/csharp-ui-clip-compare.png)
+
+**Not faithful yet (UI).** Unity's default-skin look (only `ModelViewer` and AsteroidBelt's labels use `GUI.skin`) is
+approximated with generated greys.
 The text field is Unity's TextEditor (US-T40): cursor and selection, click/double-click/triple-click/shift-click/drag,
 arrows, Home/End, Ctrl word moves and deletes, Ctrl+A/C/X/V on the Windows clipboard, the cursor kept in view, with
 OS-style key repeat; not ported: IME composition and undo (Unity's TextField has no undo either).

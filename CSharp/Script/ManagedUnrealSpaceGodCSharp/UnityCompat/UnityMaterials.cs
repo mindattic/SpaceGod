@@ -79,7 +79,12 @@ namespace UnityEngine
             this.width = width;
             this.height = height;
             this.format = format;
+            mipChain = mipCount < 0;
+            this.linear = linear;
         }
+
+        // US-T54: what Apply uploads (Unity's full mip chain when asked for one; linear: not sRGB).
+        readonly bool mipChain, linear;
 
         internal static Texture2D FromUnreal(UTexture2D texture, string name)
         {
@@ -150,7 +155,13 @@ namespace UnityEngine
         public void Apply(bool updateMipmaps, bool makeNoLongerReadable = false)
         {
             if (pixels == null) return;
-            Unreal = UnityBridge.TextureFromPixels(width, height, pixels);
+            var made = UnityBridge.TextureFromPixels(width, height, pixels);
+            Unreal = made;
+            // US-T54: the import makes one level with the default sampler; a texture with Unity's mip chain (the icons,
+            // drawn at 10-30 px from 64, the skin) or point filtering is re-uploaded as Unity's Apply makes it -- the box-filtered
+            // chain down to 1x1, its filter and wrap -- as the C++ track's GuiHost uploads it, so it minifies as the original.
+            if (made != null && width * height > 1 && (mipChain || filterMode == FilterMode.Point) && SlateGui.Available)
+                SlateGui.Upload(made.NativeObject, pixels, width, height, mipChain, filterMode, wrapMode, linear);
             if (makeNoLongerReadable) pixels = null;
         }
     }

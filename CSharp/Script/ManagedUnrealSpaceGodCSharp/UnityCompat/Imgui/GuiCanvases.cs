@@ -174,4 +174,79 @@ namespace UnityEngine
         public void DrawText(string text, Vector2 screen, int size, FontStyle style, Color tint) =>
             hud.DrawText(text, ToLinear(tint), screen.x, screen.y, FontFor(style, size), Scale(size, style), false);
     }
+
+    /// <summary>
+    /// US-T54: the GUI through the game module's Slate overlay (<see cref="SlateGui"/>), as the C++ track's GuiHost draws
+    /// it: the Repaint pass is recorded during ASpaceHud's DrawHUD and painted by a Slate widget over the viewport, each
+    /// draw under its clipping zone, so text at a clip edge is cut through the glyphs (Canvas could only drop whole
+    /// glyphs and lines) and rotated quads are cut exactly. Text is Arial at Unity's pixel em, measured with Slate's font
+    /// measure, the C++ track's text for text.
+    /// </summary>
+    public sealed class SlateCanvas : IClippingGuiCanvas
+    {
+        readonly Action<UObject> keep;
+        readonly HashSet<UTexture> kept = new HashSet<UTexture>();
+        readonly Dictionary<(string, int, int), float> widths = new Dictionary<(string, int, int), float>();
+        readonly Dictionary<(int, int), float> lineHeights = new Dictionary<(int, int), float>();
+        bool hasClip;
+        Rect clip;
+
+        public SlateCanvas(Action<UObject> keep) => this.keep = keep;
+
+        public string FontSource => "Arial (system fonts) through Slate";
+
+        /// <summary>Starts recording the frame's Repaint pass.</summary>
+        public void BeginFrame()
+        {
+            SlateGui.Begin();
+            hasClip = false;
+            SlateGui.Clip(null);
+        }
+
+        /// <summary>Shows the recorded frame.</summary>
+        public void EndFrame() => SlateGui.End();
+
+        public float Measure(string text, int size, FontStyle style)
+        {
+            if (string.IsNullOrEmpty(text)) return 0;
+            var key = (text, size, (int)style);
+            if (widths.TryGetValue(key, out float w)) return w;
+            w = SlateGui.Measure(text, size, style);
+            if (widths.Count > 20000) widths.Clear();
+            widths[key] = w;
+            return w;
+        }
+
+        public float LineHeight(int size, FontStyle style)
+        {
+            var key = (size, (int)style);
+            if (!lineHeights.TryGetValue(key, out float h)) lineHeights[key] = h = SlateGui.LineHeight(size, style);
+            return h;
+        }
+
+        public void SetClip(Rect? screen)
+        {
+            if (screen.HasValue == hasClip && (!hasClip || screen!.Value.Equals(clip))) return;
+            hasClip = screen.HasValue;
+            if (hasClip) clip = screen!.Value;
+            SlateGui.Clip(screen);
+        }
+
+        static Color Linear(Color c)
+        {
+            var l = HudCanvas.ToLinear(c);
+            return new Color(l.R, l.G, l.B, l.A);
+        }
+
+        public void DrawTexture(Texture texture, Rect screen, Rect uv, Color tint, float rotation)
+        {
+            var native = texture.Unreal;
+            if (native == null || native.IsDestroyed) return;
+            if (kept.Add(native)) keep(native);
+            SlateGui.Texture(native.NativeObject, screen, uv, Linear(tint), rotation);
+        }
+
+        public void DrawText(string text, Vector2 screen, int size, FontStyle style, Color tint) =>
+            SlateGui.Text(text, screen, Measure(text, size, style), LineHeight(size, style), size, style, Linear(tint));
+    }
 }
