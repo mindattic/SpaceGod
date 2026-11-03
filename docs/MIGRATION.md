@@ -883,7 +883,7 @@ co-op smoke: party trip (both peers), arrival: True
 ```
 
 The digest now also covers the helm (holder, hull, frame body, position, velocity, facing, tanks, hold, flight assist,
-the courses). Single-player is unchanged: every hook is the original's line when `CoopPeer.Current` is null. These additions are the C# track's; the C++ track below mirrors US-T39.
+the courses). Single-player is unchanged: every hook is the original's line when `CoopPeer.Current` is null. The C++ track mirrors all of it (US-T44, below).
 
 **The C++ track (US-T44).** `Cpp/Source/UnrealSpaceGod/Coop/` (`CoopWire`, `CoopPeer`, `SpaceCoopLink`, `CoopSmoke`) and
 the app partial `UnitySpaceApp.Coop.{inl,cpp}` are the C# files member for member: the same frame record and message
@@ -922,6 +922,39 @@ co-op smoke: injected desync detected at frame 1380; resynced: True; 9 digests a
 
 The C++ host's app is up in ~7 s (C#: ~16 s), so the client joins at an earlier host frame; the frame numbers differ
 from the C# run's, the steps (counted in replayed frames after the join) do not.
+
+**US-T43 on the C++ track (US-T44).** `Coop/CoopInput` (`PilotFrame`: C# collects `InputState`'s public bool / int /
+float / Vector2 / Vector3 fields by reflection in ordinal name order; C++ lists the same 70 fields in the same order, so a
+`pi` / `pin` line is the C# text), `Coop/CoopSettings` (the same nine groups through `SettingsRegistry`), `UI/Hud.Coop`
+(every `x` verb of `Hud.Coop.cs`, the original's inline button bodies moved into the same small methods), and the rest
+of `UnitySpaceApp.Coop.cs` (helm entries, the shared scope, `CoopUpdatePiloting`, cockpit keys, party trips, spawns,
+loads, the sync state with seats retaken in seat order and views kept, the helm in the digest). The ported originals'
+`US-T43` lines are in the C++ files at the same places, marked `US-T44 (US-T43)`; `PilotLookSensitivity`, `ClickPanelOpen`
+and `IsPiloting` read the same overrides. The C++ smoke runs the C# script and `play.ps1` makes the same checks on either
+track (the injected-desync check of US-T39 is gone from both). One timing difference: the C++ client replays the host's
+backlog more slowly, so its spawned freighter's helm can still be in flight at replayed frame 730; the C++ script waits
+there for it (the C# run reached the helm a frame before its X, which at the helm rolls and in command opens the news
+panel, which would keep the cockpit's keys off later).
+
+`tools/play.ps1 -Track Cpp -Mode coop-smoke` (2026-11-03; the run used a local, uncommitted revert of `Cs.h`'s
+`Dictionary::Home` to its US-T42 step-2 form, since the step-3 form kills every C++ editor run early, the plain smoke
+too: noted on US-T42), excerpt:
+
+```
+[host]   Client (player 2) keeps seat 1 (Earth Orbital defence platform 1) through the sync
+[host]   Client (player 2) takes the helm of SFS Sandbox Freighter 1 (ship 269) at frame 1456
+[host]   Client (player 2) action 'buy 0 0 1' at frame 1609
+[host]   Client (player 2) cockpit key 'n 7' on Sandbox Carrier 2 interceptor 1-1 at frame 2203
+[client] Client (player 2) cockpit key 'n 7' on Sandbox Carrier 2 interceptor 1-1 at frame 2203
+[client] arrived in Alpha Centauri with the host's frame 2663
+[host]   smoke (host) done: the client said bye; frame 3812, 55 digest matches, 0 desyncs, 575 helm frames made here, 0 helm inputs sent, 3 cockpit keys, 4 actions, 1 seats kept through syncs, 0 settings taken, 80 s; quitting
+co-op smoke: 55 frames with both digests, 55 identical (frames 705..3780)
+co-op smoke: syncs: #1 at 705: Client joined; #2 at 1219: Client asked: a deliberate resync (smoke; #3 at 3281: the host loaded a save
+co-op smoke: every digest identical / no DESYNC / syncs only the join, the asked-for one and the load / seat kept through the resync /
+             helm taken in the frames / helm flown on the client's input / trade / cockpit keys / party trip / client load: all True
+```
+
+(The checks `play.ps1` adds for US-T47, the galaxy map's screens and the hail, are not part of this port.)
 
 ## Packaging (US-T25)
 
