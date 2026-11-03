@@ -202,10 +202,10 @@ namespace SpaceGod::Core
 
 	// ---------------------------------------------------------------- propulsion (see Propulsion)
 
-	cs::Ref<CombatSpec> Ship::Design() const
+	const cs::Ref<CombatSpec>& Ship::Design() const
 	{
-		cs::Ref<CombatSpec> d = Combat ? Combat->Spec : nullptr;
-		return d ? d : CombatSpec::Of(Spec->Class);
+		if (Combat && Combat->Spec) return Combat->Spec;
+		return CombatSpec::Of(Spec->Class);
 	}
 
 	double Ship::DryMassTonnes() const { return Design()->DryMassTonnes; }

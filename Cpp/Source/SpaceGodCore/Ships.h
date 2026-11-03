@@ -586,7 +586,8 @@ namespace SpaceGod::Core
 
 	private:
 		/// <summary>The design whose drive and tanks this hull has (its combat design, or its class's first).</summary>
-		cs::Ref<CombatSpec> Design() const;
+		// US-T42: a const& (to Combat->Spec or the static table) rather than a counted copy; every caller dereferences it at once.
+		const cs::Ref<CombatSpec>& Design() const;
 
 	public:
 		/// <summary>Mass with empty tanks and an empty hold, tonnes.</summary>

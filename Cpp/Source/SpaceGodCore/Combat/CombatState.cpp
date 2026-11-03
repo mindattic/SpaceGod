@@ -221,7 +221,7 @@ namespace SpaceGod::Core
 		double dps = 0;
 		for (const auto& s : Subsystems)
 		{
-			auto w = s->Def->Weapon;
+			const auto& w = s->Def->Weapon;
 			if (w == nullptr || s->Destroyed() || w->Supporting()) continue;
 			dps += w->Damage * w->Salvo / w->Cooldown * (w->AntiSmall ? 0.3 : 1);
 		}

@@ -262,19 +262,22 @@ namespace cs
 	// Reproduces .NET's Dictionary layout: entries live in an array in insertion order, a Remove frees its slot
 	// onto a free list, and the next Add fills the most recently freed slot first. Enumeration walks the array,
 	// so it comes out in exactly .NET's order, including after removals.
+	// Lookup (never enumeration) goes through an open-addressing index of entry numbers (linear probing over a
+	// power-of-two table, at most half full, each entry keeping its hash): no node allocation per key, one probe
+	// sequence per lookup (US-T42; it was a std::unordered_map<K, int>).
 	template <class K, class V, class H = Hash<K>, class Eq = EqualFor_t<H, K>> class Dictionary
 	{
 	public:
-		struct Entry { K Key; V Value; bool Used = false; int NextFree = -1; };
+		struct Entry { K Key; V Value; bool Used = false; int NextFree = -1; size_t HashCode = 0; };
 		using KeyValuePair = std::pair<const K&, V&>;
 
 		int Count() const { return count; }
-		bool ContainsKey(const K& k) const { return index.find(k) != index.end(); }
-		bool TryGetValue(const K& k, V& out) const { auto it = index.find(k); if (it == index.end()) return false; out = entries[static_cast<size_t>(it->second)].Value; return true; }
+		bool ContainsKey(const K& k) const { return Find(k) >= 0; }
+		bool TryGetValue(const K& k, V& out) const { int i = Find(k); if (i < 0) return false; out = entries[static_cast<size_t>(i)].Value; return true; }
 		// Indexer get throws KeyNotFoundException; set adds or replaces.
-		const V& operator[](const K& k) const { auto it = index.find(k); if (it == index.end()) throw KeyNotFoundException("key"); return entries[static_cast<size_t>(it->second)].Value; }
-		V& operator[](const K& k) { auto it = index.find(k); if (it != index.end()) return entries[static_cast<size_t>(it->second)].Value; return Insert(k, V{}); }
-		V& At(const K& k) { auto it = index.find(k); if (it == index.end()) throw KeyNotFoundException("key"); return entries[static_cast<size_t>(it->second)].Value; }
+		const V& operator[](const K& k) const { int i = Find(k); if (i < 0) throw KeyNotFoundException("key"); return entries[static_cast<size_t>(i)].Value; }
+		V& operator[](const K& k) { int i = Find(k); if (i >= 0) return entries[static_cast<size_t>(i)].Value; return Insert(k, V{}); }
+		V& At(const K& k) { int i = Find(k); if (i < 0) throw KeyNotFoundException("key"); return entries[static_cast<size_t>(i)].Value; }
 		const V& At(const K& k) const { return (*this)[k]; }
 		void Set(const K& k, const V& v) { (*this)[k] = v; }
 		void Add(const K& k, const V& v) { if (ContainsKey(k)) throw ArgumentException("An item with the same key has already been added."); Insert(k, v); }
@@ -282,10 +285,12 @@ namespace cs
 		V GetValueOrDefault(const K& k, const V& fallback = V{}) const { V v; return TryGetValue(k, v) ? v : fallback; }
 		bool Remove(const K& k)
 		{
-			auto it = index.find(k);
-			if (it == index.end()) return false;
-			int slot = it->second;
-			index.erase(it);
+			size_t h = HashOf(k);
+			size_t b = BucketOf(k, h);
+			if (b == NoBucket) return false;
+			int slot = buckets[b];
+			buckets[b] = Tombstone;
+			++tombstones;
 			Entry& e = entries[static_cast<size_t>(slot)];
 			e = Entry{};
 			e.NextFree = freeList;
@@ -293,10 +298,10 @@ namespace cs
 			--count;
 			return true;
 		}
-		void Clear() { entries.clear(); index.clear(); freeList = -1; count = 0; }
+		void Clear() { entries.clear(); std::fill(buckets.begin(), buckets.end(), Empty); tombstones = 0; freeList = -1; count = 0; }
 
-		List<K> Keys() const { List<K> r; for (const auto& e : entries) if (e.Used) r.Add(e.Key); return r; }
-		List<V> Values() const { List<V> r; for (const auto& e : entries) if (e.Used) r.Add(e.Value); return r; }
+		List<K> Keys() const { List<K> r; r.Raw().reserve(static_cast<size_t>(count)); for (const auto& e : entries) if (e.Used) r.Add(e.Key); return r; }
+		List<V> Values() const { List<V> r; r.Raw().reserve(static_cast<size_t>(count)); for (const auto& e : entries) if (e.Used) r.Add(e.Value); return r; }
 
 		// for (auto [key, value] : dict) — in .NET's enumeration order. Don't add or remove while iterating.
 		class Iterator
@@ -316,19 +321,64 @@ namespace cs
 		Iterator end() const { return Iterator(const_cast<std::vector<Entry>*>(&entries), entries.size()); }
 
 	private:
+		static constexpr int Empty = -1, Tombstone = -2;
+		static constexpr size_t NoBucket = static_cast<size_t>(-1);
+		// The comparer's hash, mixed (Fibonacci) so identity-like hashes still spread over the table's low bits.
+		static size_t HashOf(const K& k) { return static_cast<size_t>(H{}(k)) * 0x9E3779B97F4A7C15ull; }
+		size_t Home(size_t h) const { return (h >> 32 ^ h) & (buckets.size() - 1); }
+		// The bucket holding k, or NoBucket.
+		size_t BucketOf(const K& k, size_t h) const
+		{
+			if (count == 0) return NoBucket;
+			const size_t mask = buckets.size() - 1;
+			for (size_t b = Home(h);; b = (b + 1) & mask)
+			{
+				int s = buckets[b];
+				if (s == Empty) return NoBucket;
+				if (s >= 0)
+				{
+					const Entry& e = entries[static_cast<size_t>(s)];
+					if (e.HashCode == h && Eq{}(e.Key, k)) return b;
+				}
+			}
+		}
+		int Find(const K& k) const { size_t b = BucketOf(k, HashOf(k)); return b == NoBucket ? -1 : buckets[b]; }
+		void Place(int slot, size_t h)
+		{
+			const size_t mask = buckets.size() - 1;
+			size_t b = Home(h);
+			while (buckets[b] >= 0) b = (b + 1) & mask;
+			if (buckets[b] == Tombstone) --tombstones;
+			buckets[b] = slot;
+		}
+		void Grow()
+		{
+			// At most half full counting tombstones; a rehash drops the tombstones.
+			size_t used = static_cast<size_t>(count) + 1;
+			if (!buckets.empty() && (used + tombstones) * 2 <= buckets.size()) return;
+			size_t n = 8;
+			while (n < used * 2) n *= 2;
+			buckets.assign(n, Empty);
+			tombstones = 0;
+			for (size_t i = 0; i < entries.size(); ++i)
+				if (entries[i].Used) Place(static_cast<int>(i), entries[i].HashCode);
+		}
 		V& Insert(const K& k, const V& v)
 		{
+			size_t h = HashOf(k);
+			Grow();
 			int slot;
 			if (freeList >= 0) { slot = freeList; freeList = entries[static_cast<size_t>(slot)].NextFree; }
 			else { slot = static_cast<int>(entries.size()); entries.emplace_back(); }
 			Entry& e = entries[static_cast<size_t>(slot)];
-			e.Key = k; e.Value = v; e.Used = true; e.NextFree = -1;
-			index.emplace(k, slot);
+			e.Key = k; e.Value = v; e.Used = true; e.NextFree = -1; e.HashCode = h;
+			Place(slot, h);
 			++count;
 			return e.Value;
 		}
 		std::vector<Entry> entries;
-		std::unordered_map<K, int, H, Eq> index;
+		std::vector<int> buckets;
+		size_t tombstones = 0;
 		int freeList = -1;
 		int count = 0;
 	};

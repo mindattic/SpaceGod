@@ -55,6 +55,6 @@ namespace SpaceGod::Core
 		static const cs::List<cs::Ref<GoodInfo>>& All();
 
 	public:
-		static cs::Ref<GoodInfo> Of(::SpaceGod::Core::Good g);
+		static const cs::Ref<GoodInfo>& Of(::SpaceGod::Core::Good g); // US-T42: a const& into All()
 	};
 }

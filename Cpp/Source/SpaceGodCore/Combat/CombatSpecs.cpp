@@ -1362,7 +1362,7 @@ namespace SpaceGod::Core
 		return c;
 	}
 
-	cs::Ref<CombatSpec> CombatSpec::Of(ShipClass c)
+	const cs::Ref<CombatSpec>& CombatSpec::Of(ShipClass c)
 	{
 		const auto& specs = Specs();
 		return specs.ContainsKey(c) ? specs[c][0] : specs[ShipClass::Destroyer][0];

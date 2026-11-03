@@ -95,7 +95,7 @@ namespace SpaceGod::Core
 
 	DVec3 Ephemeris::HelioAt(int body, double jd)
 	{
-		auto b = (*Catalog)[body];
+		const auto& b = (*Catalog)[body];
 		if (b->Elements == nullptr) return DVec3::Zero;
 		if (memoJd[body] == jd) return memoHelio[body];
 		auto rel = body == moonIndex ? Lunar(jd) : frames[body].ToEcliptic(Kepler::Position(b->Elements->At(jd))) * b->OrbitScale;

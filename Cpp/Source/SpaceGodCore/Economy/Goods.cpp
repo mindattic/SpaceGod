@@ -74,5 +74,5 @@ namespace SpaceGod::Core
 		return all;
 	}
 
-	cs::Ref<GoodInfo> GoodInfo::Of(::SpaceGod::Core::Good g) { return All()[static_cast<int>(g)]; }
+	const cs::Ref<GoodInfo>& GoodInfo::Of(::SpaceGod::Core::Good g) { return All()[static_cast<int>(g)]; }
 }

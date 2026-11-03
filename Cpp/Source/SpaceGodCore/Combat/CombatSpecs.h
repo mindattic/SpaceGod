@@ -386,7 +386,7 @@ namespace SpaceGod::Core
 		/// (sharing the unchanged <see cref="SubsystemDef"/>s, which are never mutated).</summary>
 		cs::Ref<CombatSpec> Clone() const;
 
-		static cs::Ref<CombatSpec> Of(ShipClass c);
+		static const cs::Ref<CombatSpec>& Of(ShipClass c); // US-T42: a const& into the static table (C# returns the reference)
 
 		/// <summary>Every design of a class (the construction catalogue lists each as its own hull frame, U.SPC-T377).</summary>
 		static const cs::List<cs::Ref<CombatSpec>>& DesignsOf(ShipClass c);
