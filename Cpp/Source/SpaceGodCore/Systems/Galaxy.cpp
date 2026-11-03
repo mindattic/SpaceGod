@@ -195,7 +195,7 @@ namespace SpaceGod::Core
 	Galaxy::Galaxy()
 		: Polities(cs::New<SpaceGod::Core::Polities>())
 	{
-		DeepSpace = cs::New<SpaceGod::Core::DeepSpace>(Self());
+		DeepSpace = cs::New<SpaceGod::Core::DeepSpace>(this);
 		Polities->Command->Galaxy = Self();
 		Polities->Statecraft->Galaxy = Self();
 	}
@@ -298,7 +298,7 @@ namespace SpaceGod::Core
 		Traffic = cs::New<InterstellarTraffic>(Self(), jd);
 		auto traffic = Traffic;
 		Polities->InTransit = [traffic]() { return traffic->InTransit(); };
-		Construction = cs::New<GateConstruction>(Self(), jd);
+		Construction = cs::New<GateConstruction>(this, jd);
 		Wars = cs::New<InterstellarWars>(Self(), jd);
 		Colonisation = cs::New<InterstellarColonisation>(Self());
 	}

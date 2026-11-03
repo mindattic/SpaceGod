@@ -128,7 +128,7 @@ namespace SpaceGod::Core
 		}
 	}
 
-	bool VoidStations::Claims(DVec3 ly)
+	bool VoidStations::Claims(DVec3 ly) const
 	{
 		if (ly.Length() > CatalogueStars::ChartedToLy + ClearLy) return false;
 		for (const auto& s : Stations())
@@ -136,7 +136,7 @@ namespace SpaceGod::Core
 		return false;
 	}
 
-	cs::List<cs::Ref<StarEntry>> VoidStations::StarsNear(DVec3 centreLy, double radiusLy, int seed)
+	cs::List<cs::Ref<StarEntry>> VoidStations::StarsNear(DVec3 centreLy, double radiusLy, int /*seed*/)
 	{
 		cs::List<cs::Ref<StarEntry>> result;
 		for (const auto& s : Stations())
@@ -150,7 +150,7 @@ namespace SpaceGod::Core
 		return result;
 	}
 
-	cs::Ref<SystemSpec> VoidStations::Define(cs::Ref<StarEntry> star, int seed)
+	cs::Ref<SystemSpec> VoidStations::Define(const cs::Ref<StarEntry>& star, int /*seed*/)
 	{
 		cs::Ref<StarEntry> row = nullptr;
 		for (const auto& s : Stations())
@@ -171,7 +171,7 @@ namespace SpaceGod::Core
 		return spec;
 	}
 
-	cs::Ref<StarSystem> VoidStations::Build(cs::Ref<StarEntry> star, cs::Ref<SystemSpec> spec, double jd, cs::Ref<Polities> polities)
+	cs::Ref<StarSystem> VoidStations::Build(const cs::Ref<StarEntry>& star, const cs::Ref<SystemSpec>& /*spec*/, double jd, const cs::Ref<Polities>& polities)
 	{
 		return StarSystem::CreateVoidBase(star->Name, star->PositionLy, jd, polities);
 	}

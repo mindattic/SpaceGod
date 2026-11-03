@@ -62,14 +62,14 @@ namespace SpaceGod::Core
 		/// <summary>The two real systems whose link the station called <paramref name="name"/> stands on; nulls if there is none.</summary>
 		static std::pair<cs::String, cs::String> Bridges(const cs::String& name);
 
-		bool Claims(DVec3 ly) override;
+		bool Claims(DVec3 ly) const override;
 
 		cs::List<cs::Ref<StarEntry>> StarsNear(DVec3 centreLy, double radiusLy, int seed) override;
 
-		cs::Ref<SystemSpec> Define(cs::Ref<StarEntry> star, int seed) override;
+		cs::Ref<SystemSpec> Define(const cs::Ref<StarEntry>& star, int seed) override;
 
 		/// <summary>Built as the relay it is: the generator and its tiny suns, unsettled and nobody's (see <see cref="StarSystem.IsVoidBase"/>).</summary>
-		cs::Ref<StarSystem> Build(cs::Ref<StarEntry> star, cs::Ref<SystemSpec> spec, double jd, cs::Ref<Polities> polities) override;
+		cs::Ref<StarSystem> Build(const cs::Ref<StarEntry>& star, const cs::Ref<SystemSpec>& spec, double jd, const cs::Ref<Polities>& polities) override;
 
 	private:
 		static void Lay();

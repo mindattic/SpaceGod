@@ -122,7 +122,7 @@ namespace SpaceGod::Core
 		return LineToResult{ best, bestRoute };
 	}
 
-	void MilitaryLogistics::InGate(cs::Ref<Campaign> c, double jd) { c->Supply->Drain(1, /*moving:*/ true, /*fighting:*/ false); }
+	void MilitaryLogistics::InGate(cs::Ref<Campaign> c, double /*jd*/) { c->Supply->Drain(1, /*moving:*/ true, /*fighting:*/ false); }
 
 	void MilitaryLogistics::Day(cs::Ref<Campaign> c, cs::Ref<StarSystem> system, cs::Ref<Ship> leader, double jd)
 	{
@@ -303,7 +303,7 @@ namespace SpaceGod::Core
 			if (v->AtGate) traffic->Hold(s, ship, jd);
 			if (traffic->Redirect(s, ship, v->Home, jd, /*force:*/ false)) continue;
 			v->Destination = s;
-			v->Route = cs::List<cs::Ref<JumpGate>>();
+			v->Route = cs::New<cs::List<cs::Ref<JumpGate>>>();
 			v->Leg = 0;
 			v->StayUntilJd = jd;
 		}
@@ -340,7 +340,7 @@ namespace SpaceGod::Core
 		}
 	}
 
-	void MilitaryLogistics::Dispatch(cs::Ref<Campaign> c, cs::Ref<Settlement> station, GateRoute route, cs::Ref<StarSystem> system, cs::Ref<Ship> leader, const cs::List<cs::Ref<Ship>>& group, double jd)
+	void MilitaryLogistics::Dispatch(cs::Ref<Campaign> c, cs::Ref<Settlement> station, GateRoute route, cs::Ref<StarSystem> system, cs::Ref<Ship> /*leader*/, const cs::List<cs::Ref<Ship>>& group, double jd)
 	{
 		auto f = c->Faction;
 		if (f->Treasury <= 0) return;

@@ -64,9 +64,9 @@ namespace SpaceGod::Core
 	{
 		auto w = system->World;
 		if (w->War == nullptr) return;
-		w->War->Plundered += [this, w](cs::Ref<Faction> clan, double value, double jd) { OnPlundered(w, clan, value); };
+		w->War->Plundered += [this, w](cs::Ref<Faction> clan, double value, double /*jd*/) { OnPlundered(w, clan, value); };
 		// A hull destroyed rather than robbed brings the state down on the clan far harder (U.SPC-T374).
-		w->War->Heat += [this, w](cs::Ref<Faction> clan, double heat, double jd) { Pledge(Polities::HolderOf(w), clan, heat); };
+		w->War->Heat += [this, w](cs::Ref<Faction> clan, double heat, double /*jd*/) { Pledge(Polities::HolderOf(w), clan, heat); };
 		w->War->BattleEnded += [this, w](cs::Ref<Battle> b, double jd) { OnBattleEnded(w, b, jd); };
 	}
 

@@ -99,7 +99,7 @@ namespace SpaceGod::Core
 		cs::Ref<StarSystem> Destination;
 
 		/// <summary>The gates still to take, in order (see <see cref="GateNetwork.Route"/>), and the next one's index.</summary>
-		cs::List<cs::Ref<JumpGate>> Route = cs::List<cs::Ref<JumpGate>>();
+		cs::Ref<cs::List<cs::Ref<JumpGate>>> Route = cs::New<cs::List<cs::Ref<JumpGate>>>();
 		int Leg = 0;
 
 		/// <summary>Held at a gate: waiting to go through (it is about to, or the way is shut).</summary>
@@ -179,7 +179,7 @@ namespace SpaceGod::Core
 		/// out on the side facing the way it came.</summary>
 		cs::Nullable<DVec3> DropDir;
 
-		cs::Ref<JumpGate> NextGate() const { return Leg < Route.Count() ? Route[Leg] : nullptr; }
+		cs::Ref<JumpGate> NextGate() const { return Route != nullptr && Leg < Route->Count() ? (*Route)[Leg] : nullptr; }
 		bool Homeward() const { return Destination == Home; }
 	};
 
@@ -549,7 +549,7 @@ namespace SpaceGod::Core
 		/// <paramref name="route"/> (gates that will open for it; empty when the fleet is in the base's own system, when it
 		/// just flies to it). The hulls carry <paramref name="convoy"/> on the voyage until they hand over its load.
 		/// </summary>
-		cs::Ref<Voyage> SendSupply(const cs::Ref<Ship>& ship, const cs::Ref<StarSystem>& from, const cs::Ref<StarSystem>& to, const cs::List<cs::Ref<JumpGate>>& route, const cs::Ref<SupplyConvoy>& convoy, double jd);
+		cs::Ref<Voyage> SendSupply(const cs::Ref<Ship>& ship, const cs::Ref<StarSystem>& from, const cs::Ref<StarSystem>& to, const cs::Ref<cs::List<cs::Ref<JumpGate>>>& route, const cs::Ref<SupplyConvoy>& convoy, double jd);
 
 		/// <summary>
 		/// Stops a hull on a voyage where it is (U.SPC-T525: supply ships that have found their war fleet in the system they
@@ -588,7 +588,7 @@ namespace SpaceGod::Core
 		void Release(const cs::Ref<StarSystem>& system, const cs::Ref<Ship>& ship, double jd);
 
 		/// <summary>Starts <paramref name="ship"/> on a voyage from <paramref name="from"/> to <paramref name="to"/> by <paramref name="route"/>.</summary>
-		cs::Ref<Voyage> SetOut(const cs::Ref<StarSystem>& from, const cs::Ref<StarSystem>& to, const cs::Ref<Ship>& ship, VoyagePurpose purpose, const cs::List<cs::Ref<JumpGate>>& route, double jd); // internal in C#
+		cs::Ref<Voyage> SetOut(const cs::Ref<StarSystem>& from, const cs::Ref<StarSystem>& to, const cs::Ref<Ship>& ship, VoyagePurpose purpose, const cs::Ref<cs::List<cs::Ref<JumpGate>>>& route, double jd); // internal in C#
 
 	private:
 		/// <summary>Sends an idle freighter with the most profitable cargo for <paramref name="to"/>'s markets, if one pays.</summary>
@@ -602,7 +602,7 @@ namespace SpaceGod::Core
 		/// marked up by the tolls for the route's light-years (<see cref="MarkupPerLy"/>) and the days
 		/// on the way, against what the dearest market there would pay. True if one clears <see cref="MinMargin"/>.
 		/// </summary>
-		static bool BestCargo(const cs::Ref<StarSystem>& from, const cs::Ref<StarSystem>& to, const cs::Ref<Ship>& ship, int port, const cs::List<cs::Ref<JumpGate>>& route, double jd,
+		static bool BestCargo(const cs::Ref<StarSystem>& from, const cs::Ref<StarSystem>& to, const cs::Ref<Ship>& ship, int port, const cs::Ref<cs::List<cs::Ref<JumpGate>>>& route, double jd,
 			cs::Ref<Settlement>& source, Good& good, double& tonnes, double& profit);
 
 		/// <summary>
@@ -611,7 +611,7 @@ namespace SpaceGod::Core
 		/// they are. <paramref name="market"/> is the board the run is planned on and <paramref name="sale"/> what it says
 		/// the cargo will fetch there, after port tax.
 		/// </summary>
-		static bool BestCargo(const cs::Ref<StarSystem>& from, const cs::Ref<StarSystem>& to, const cs::Ref<Ship>& ship, int port, const cs::List<cs::Ref<JumpGate>>& route, double jd, const cs::List<cs::Ref<Settlement>>& markets,
+		static bool BestCargo(const cs::Ref<StarSystem>& from, const cs::Ref<StarSystem>& to, const cs::Ref<Ship>& ship, int port, const cs::Ref<cs::List<cs::Ref<JumpGate>>>& route, double jd, const cs::List<cs::Ref<Settlement>>& markets,
 			cs::Ref<Settlement>& source, Good& good, double& tonnes, double& profit, cs::Ref<Settlement>& market, double& sale);
 
 	private:
@@ -620,7 +620,7 @@ namespace SpaceGod::Core
 
 	public:
 		/// <summary>Rough door-to-door days: out to the gate, through the gates, and in from the far gate to a port.</summary>
-		static double VoyageDays(const cs::Ref<StarSystem>& from, const cs::Ref<StarSystem>& to, const cs::Ref<Ship>& ship, int port, const cs::List<cs::Ref<JumpGate>>& route);
+		static double VoyageDays(const cs::Ref<StarSystem>& from, const cs::Ref<StarSystem>& to, const cs::Ref<Ship>& ship, int port, const cs::Ref<cs::List<cs::Ref<JumpGate>>>& route);
 
 	private:
 		/// <summary>A system's own working freighters, at home or away.</summary>

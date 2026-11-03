@@ -135,7 +135,7 @@ namespace SpaceGod::Core
 	{
 		cs::List<cs::Ref<Ship>> navy;
 		for (const auto& w : worlds)
-			for (const auto& s : w->Fleet->Ships)
+			for (const auto& s : w->Fleet->Ships())
 				if (!s->Destroyed && s->Faction == f && s->Spec->IsMilitary) navy.Add(s);
 		if (InTransit != nullptr)
 			for (const auto& s : InTransit())
@@ -147,7 +147,7 @@ namespace SpaceGod::Core
 	{
 		int n = 0;
 		for (const auto& w : worlds)
-			for (const auto& s : w->Fleet->Ships)
+			for (const auto& s : w->Fleet->Ships())
 				if (!s->Destroyed && s->Faction == f && s->Convoy && !s->IsEscort()) n++;
 		if (InTransit != nullptr)
 			for (const auto& s : InTransit())

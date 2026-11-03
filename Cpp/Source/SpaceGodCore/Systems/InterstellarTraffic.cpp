@@ -23,6 +23,7 @@
 #include "Ships.h"
 #include "Systems/CruiseDrive.h"
 #include "Systems/DeepSpace.h"
+#include "Systems/DeepSpaceLife.h"
 #include "Systems/FleetDoctrine.h"
 #include "Systems/Galaxy.h"
 #include "Systems/GateNetwork.h"
@@ -126,7 +127,7 @@ namespace SpaceGod::Core
 		nextDailyJd = jd + 0.5;
 		News = cs::New<Newswire>(galaxy, jd);
 		// C# hands PirateClans `this`; no Ref to this traffic exists while it is being constructed.
-		Clans = cs::New<PirateClans>(galaxy, this, seed + 7);
+		Clans = cs::New<PirateClans>(galaxy.get(), this, seed + 7);
 		for (const auto& system : galaxy->Systems) Register(system);
 		galaxy->DeepSpace->Arrived += [this](cs::Ref<Cruise> c, double when) { OnCruiseArrived(c, when); };
 		galaxy->DeepSpace->ReachedStar += [this](cs::Ref<Cruise> c, double when) { OnReachedStar(c, when); };
@@ -243,7 +244,7 @@ namespace SpaceGod::Core
 		if (gate == nullptr || gate->Home != system || !gate->Link->Open(system, ship->Faction, when) || !here)
 		{
 			auto route = Network()->Route(system, v->Destination, ship->Faction, now, campaign);
-			if (route.Count() > 0 && route[0] != gate)
+			if (route != nullptr && route->Count() > 0 && (*route)[0] != gate)
 			{
 				// Round by another gate.
 				atGates.RemoveAll(isShip);
@@ -251,18 +252,18 @@ namespace SpaceGod::Core
 				v->Leg = 0;
 				v->AtGate = false;
 				v->WaitingSinceJd = cs::Double::NaN;
-				ship->GateKm = route[0]->PositionKm;
+				ship->GateKm = (*route)[0]->PositionKm;
 				system->World->Fleet->ScheduleNext(ship, now);
 				if (gate != nullptr)
-					system->World->Log(now, cs::Cat(ship->Name, " turns for the ", route[0]->Name, ": the ", gate->Name, " is shut to it"), WorldEventKind::Info, system->Catalog->Root()->Index);
+					system->World->Log(now, cs::Cat(ship->Name, " turns for the ", (*route)[0]->Name, ": the ", gate->Name, " is shut to it"), WorldEventKind::Info, system->Catalog->Root()->Index);
 				return;
 			}
-			if (route.Count() > 0 && !here)
+			if (route != nullptr && route->Count() > 0 && !here)
 			{
 				// The right gate, but not at it (it was knocked off course): fly the last of the way.
 				atGates.RemoveAll(isShip);
 				v->AtGate = false;
-				ship->GateKm = route[0]->PositionKm;
+				ship->GateKm = (*route)[0]->PositionKm;
 				system->World->Fleet->ScheduleNext(ship, now);
 				return;
 			}
@@ -476,7 +477,7 @@ namespace SpaceGod::Core
 		v->Purpose = purpose;
 		v->Home = from;
 		v->Destination = to;
-		v->Route = cs::List<cs::Ref<JumpGate>>();
+		v->Route = cs::New<cs::List<cs::Ref<JumpGate>>>();
 		v->SetOutJd = jd;
 		v->Faction = ship->Faction;
 		v->Ly = target->DistanceLy(from->Origin);
@@ -501,7 +502,7 @@ namespace SpaceGod::Core
 		v->ByCruise = true;
 		v->StarName = cs::String();
 		v->Station = std::nullopt;
-		v->Route = cs::List<cs::Ref<JumpGate>>();
+		v->Route = cs::New<cs::List<cs::Ref<JumpGate>>>();
 		v->Leg = 0;
 		v->AtGate = false;
 		v->WaitingSinceJd = cs::Double::NaN;
@@ -566,7 +567,8 @@ namespace SpaceGod::Core
 		}
 		DepartLeader(world, leader, v);
 
-		auto news = News->Bundle(system, jd);
+		// (Cruise.News is a nullable C# list reference; Bundle builds a fresh list, so boxing it shares nothing.)
+		auto news = cs::New<cs::List<cs::Ref<SystemReport>>>(News->Bundle(system, jd));
 		auto c = v->Station.has_value() && v->Destination == nullptr
 			? galaxy->DeepSpace->LaunchToPoint(ships, system, at, *v->Station, !v->StationName.empty() ? v->StationName : cs::String("open space"), drive, jd, news)
 			: star.has_value()
@@ -596,19 +598,19 @@ namespace SpaceGod::Core
 			else
 			{
 				// Sent somewhere else on the way: on from here, by the gates if they go there, else by its drive.
-				auto route = v->Destination == nullptr ? cs::List<cs::Ref<JumpGate>>() : Network()->Route(system, v->Destination, leader->Faction, jd);
-				if (route.Count() > 0)
+				auto route = v->Destination == nullptr ? GateNetwork::RouteList() : Network()->Route(system, v->Destination, leader->Faction, jd);
+				if (route != nullptr && route->Count() > 0)
 				{
 					v->Route = route;
 					v->Leg = 0;
-					leader->GateKm = route[0]->PositionKm;
+					leader->GateKm = (*route)[0]->PositionKm;
 					system->World->Fleet->ScheduleNext(leader, jd);
 				}
 				else if (v->Destination != nullptr && CanCruise(leader)) CruiseFrom(system, leader, v->Destination, jd);
 				else Arrive(system, leader, nullptr, jd);
 			}
 		}
-		News->Carried(system, c->News, leader->Name, jd);
+		if (c->News != nullptr) News->Carried(system, *c->News, leader->Name, jd); // (Carried returns at once on a null bundle)
 	}
 
 	void InterstellarTraffic::OnReachedStar(const cs::Ref<Cruise>& c, double jd)
@@ -874,7 +876,7 @@ namespace SpaceGod::Core
 		}
 		// Stranded abroad (or between): it stays a while and tries again for home.
 		v->Destination = system;
-		v->Route = cs::List<cs::Ref<JumpGate>>();
+		v->Route = cs::New<cs::List<cs::Ref<JumpGate>>>();
 		v->Leg = 0;
 		v->StayUntilJd = jd + 3;
 		ship->Ports = ship->Role == ShipRole::Free || ship->Spec->IsMilitary || ship->Faction->IsPirate ? system->World->FreeShipPorts() : system->World->PortBodies();
@@ -985,7 +987,7 @@ namespace SpaceGod::Core
 
 		auto settled = cs::List<cs::Ref<StarSystem>>();
 		for (const auto& s : galaxy->Systems)
-			if (s->Settled) settled.Add(s);
+			if (s->Settled()) settled.Add(s);
 
 		for (const auto& s : galaxy->Systems) SendHomeWhenDone(s, jd);
 		// Every voyage under way, gathered once: the dispatchers below count them for each of many routes.
@@ -1043,7 +1045,7 @@ namespace SpaceGod::Core
 		int n = 0;
 		auto Counts = [&](const cs::Ref<Voyage>& v)
 		{
-			return v != nullptr && v->Home == home && v->Purpose == purpose && (bound == nullptr || v->Destination == bound || (v->Homeward() && v->Route.Count() > 0 && v->Route[0]->Home == bound) || v->Destination == bound);
+			return v != nullptr && v->Home == home && v->Purpose == purpose && (bound == nullptr || v->Destination == bound || (v->Homeward() && v->Route->Count() > 0 && (*v->Route)[0]->Home == bound) || v->Destination == bound);
 		};
 		if (outCache != nullptr)
 		{
@@ -1064,7 +1066,7 @@ namespace SpaceGod::Core
 		if (from == to || !Idle(from->World, ship)) return nullptr;
 		auto route = Network()->Route(from, to, ship->Faction, jd);
 		// No way through the gates: a hull with a drive of its own goes through open space instead (U.SPC-T412).
-		if (route.Count() == 0) return CanCruise(ship) ? SetOutByCruise(from, to, cs::String(), ship, purpose, jd) : nullptr;
+		if (route == nullptr || route->Count() == 0) return CanCruise(ship) ? SetOutByCruise(from, to, cs::String(), ship, purpose, jd) : nullptr;
 		return SetOut(from, to, ship, purpose, route, jd);
 	}
 
@@ -1072,7 +1074,7 @@ namespace SpaceGod::Core
 	{
 		if (from == to || !Idle(from->World, ship)) return nullptr;
 		auto route = Network()->Route(from, to, ship->Faction, jd, true);
-		if (route.Count() == 0) return nullptr;
+		if (route == nullptr || route->Count() == 0) return nullptr;
 		auto v = SetOut(from, to, ship, VoyagePurpose::Campaign, route, jd);
 		v->Campaign = campaign;
 		v->StayUntilJd = cs::Double::PositiveInfinity;
@@ -1089,15 +1091,15 @@ namespace SpaceGod::Core
 			ship->GateKm.has_value() || ship->Orbit == nullptr || (ship->Phase != ShipPhase::Parked && ship->Phase != ShipPhase::Landed) ||
 			ship->Id < 0 || ship->Id >= world->Fleet->Ships().Count() || world->Fleet->Ships()[ship->Id] != ship) return nullptr;
 		auto route = Network()->Route(from, to, ship->Faction, jd);
-		if (route.Count() == 0) return nullptr;
+		if (route == nullptr || route->Count() == 0) return nullptr;
 		return SetOut(from, to, ship, VoyagePurpose::Plotted, route, jd);
 	}
 
-	cs::Ref<Voyage> InterstellarTraffic::SendSupply(const cs::Ref<Ship>& ship, const cs::Ref<StarSystem>& from, const cs::Ref<StarSystem>& to, const cs::List<cs::Ref<JumpGate>>& route, const cs::Ref<SupplyConvoy>& convoy, double jd)
+	cs::Ref<Voyage> InterstellarTraffic::SendSupply(const cs::Ref<Ship>& ship, const cs::Ref<StarSystem>& from, const cs::Ref<StarSystem>& to, const cs::Ref<cs::List<cs::Ref<JumpGate>>>& route, const cs::Ref<SupplyConvoy>& convoy, double jd)
 	{
 		if (ship == nullptr || from == nullptr || to == nullptr || ship->Voyage != nullptr) return nullptr;
 		cs::Ref<Voyage> v;
-		if (from == to || route.Count() == 0)
+		if (from == to || route == nullptr || route->Count() == 0)
 		{
 			if (from != to) return nullptr;
 			// No gate to take: a voyage that never leaves home, so the hull is flown to the fleet by its orders here.
@@ -1131,7 +1133,7 @@ namespace SpaceGod::Core
 		v->HoldGate = nullptr;
 		v->WaitingSinceJd = cs::Double::NaN;
 		v->Destination = system;
-		v->Route = cs::List<cs::Ref<JumpGate>>();
+		v->Route = cs::New<cs::List<cs::Ref<JumpGate>>>();
 		v->Leg = 0;
 		v->ByCruise = false;
 		ship->GateKm = std::nullopt;
@@ -1162,7 +1164,7 @@ namespace SpaceGod::Core
 		else
 		{
 			auto route = Network()->Route(from, to, ship->Faction, jd);
-			if (route.Count() == 0) v = CanCruise(ship) ? SetOutByCruise(from, to, cs::String(), ship, VoyagePurpose::Directed, jd) : nullptr;
+			if (route == nullptr || route->Count() == 0) v = CanCruise(ship) ? SetOutByCruise(from, to, cs::String(), ship, VoyagePurpose::Directed, jd) : nullptr;
 			else v = SetOut(from, to, ship, VoyagePurpose::Directed, route, jd);
 		}
 		if (v != nullptr) v->StayUntilJd = cs::Double::PositiveInfinity;
@@ -1185,19 +1187,18 @@ namespace SpaceGod::Core
 			v->ByCruise = true;
 			v->StarName = cs::String();
 			v->Station = std::nullopt;
-			v->Route = cs::List<cs::Ref<JumpGate>>();
+			v->Route = cs::New<cs::List<cs::Ref<JumpGate>>>();
 			v->Leg = 0;
 			v->DropDir = to == v->Home ? cs::Nullable<DVec3>() : cs::Nullable<DVec3>(FleetDoctrine::DropDirection(to, system->Origin, ship->Faction));
 			ship->GateKm = DeepSpace::DeparturePointKm(system, to->Origin);
 			if (ship->Battle == nullptr) system->World->Fleet->ScheduleNext(ship, jd);
 			return true;
 		}
-		cs::List<cs::Ref<JumpGate>> route;
+		cs::Ref<cs::List<cs::Ref<JumpGate>>> route = nullptr;
 		if (system != to)
 		{
 			route = Network()->Route(system, to, ship->Faction, jd, force);
-			// (GateNetwork.Route's null, no way through, is an empty list here: system != to, so a real route is never empty.)
-			if (route.Count() == 0 || (!force && route.Count() == 0)) return false;
+			if (route == nullptr || (!force && route->Count() == 0)) return false;
 		}
 		atGates.RemoveAll(isShip);
 		v->AtGate = false;
@@ -1209,12 +1210,12 @@ namespace SpaceGod::Core
 			return true;
 		}
 		v->Destination = to;
-		v->Route = route;
+		v->Route = route != nullptr ? route : cs::New<cs::List<cs::Ref<JumpGate>>>();
 		v->Leg = 0;
 		v->ByCruise = false;
 		v->StarName = cs::String();
 		v->Station = std::nullopt;
-		ship->GateKm = v->Route.Count() > 0 ? cs::Nullable<DVec3>(v->Route[0]->PositionKm) : cs::Nullable<DVec3>();
+		ship->GateKm = v->Route->Count() > 0 ? cs::Nullable<DVec3>((*v->Route)[0]->PositionKm) : cs::Nullable<DVec3>();
 		if (ship->Battle == nullptr) system->World->Fleet->ScheduleNext(ship, jd);
 		return true;
 	}
@@ -1237,7 +1238,7 @@ namespace SpaceGod::Core
 		if (ship->Battle == nullptr) system->World->Fleet->ScheduleNext(ship, jd);
 	}
 
-	cs::Ref<Voyage> InterstellarTraffic::SetOut(const cs::Ref<StarSystem>& from, const cs::Ref<StarSystem>& to, const cs::Ref<Ship>& ship, VoyagePurpose purpose, const cs::List<cs::Ref<JumpGate>>& route, double jd)
+	cs::Ref<Voyage> InterstellarTraffic::SetOut(const cs::Ref<StarSystem>& from, const cs::Ref<StarSystem>& to, const cs::Ref<Ship>& ship, VoyagePurpose purpose, const cs::Ref<cs::List<cs::Ref<JumpGate>>>& route, double jd)
 	{
 		ship->StakeoutKm = std::nullopt;
 		auto v = cs::New<Voyage>();
@@ -1253,7 +1254,7 @@ namespace SpaceGod::Core
 		v->HomePorts = ship->Ports;
 		ship->Voyage = v;
 		if (outCache) outCache->Add(v);
-		ship->GateKm = route[0]->PositionKm;
+		ship->GateKm = (*route)[0]->PositionKm;
 		from->World->Fleet->ScheduleNext(ship, jd);
 		return v;
 	}
@@ -1270,14 +1271,14 @@ namespace SpaceGod::Core
 		cs::Ref<Settlement> bestFrom = nullptr;
 		Good bestGood{};
 		double bestTonnes = 0, bestProfit = 0;
-		cs::List<cs::Ref<JumpGate>> bestRoute;
+		cs::Ref<cs::List<cs::Ref<JumpGate>>> bestRoute = nullptr;
 		cs::Ref<Settlement> bestTo = nullptr;
 		double bestSale = 0;
 		for (const auto& ship : world->Fleet->Ships())
 		{
 			if (!Idle(world, ship) || ship->Role != ShipRole::Trader || ship->Spec->Class != ShipClass::Freighter || ship->HasCargo) continue;
 			auto route = Network()->Route(from, to, ship->Faction, jd);
-			if (route.Count() == 0) continue;
+			if (route == nullptr || route->Count() == 0) continue;
 			cs::Ref<Settlement> src, dst;
 			Good good{};
 			double tonnes = 0, profit = 0, sale = 0;
@@ -1303,12 +1304,12 @@ namespace SpaceGod::Core
 			voyage->ExpectedSale = bestSale;
 			voyage->PlannedOnNewsJd = news->AsOfJd;
 		}
-		world->Log(jd, cs::Cat(bestShip->Name, " loads ", Tonnes(bestTonnes), " ", GoodInfo::Of(bestGood)->Name, " at ", bestFrom->Name, " for ", bestTo->Name, " at ", to->Name, ", by the ", bestRoute[0]->Name, ", on news ", LightSpeed::Describe(news->AgeDays(jd)), " old"), WorldEventKind::Info, bestFrom->Body);
+		world->Log(jd, cs::Cat(bestShip->Name, " loads ", Tonnes(bestTonnes), " ", GoodInfo::Of(bestGood)->Name, " at ", bestFrom->Name, " for ", bestTo->Name, " at ", to->Name, ", by the ", (*bestRoute)[0]->Name, ", on news ", LightSpeed::Describe(news->AgeDays(jd)), " old"), WorldEventKind::Info, bestFrom->Body);
 	}
 
 	cs::String InterstellarTraffic::Tonnes(double t) { return cs::Cat(cs::Fmt(t, "N0"), " t"); }
 
-	bool InterstellarTraffic::BestCargo(const cs::Ref<StarSystem>& from, const cs::Ref<StarSystem>& to, const cs::Ref<Ship>& ship, int port, const cs::List<cs::Ref<JumpGate>>& route, double jd,
+	bool InterstellarTraffic::BestCargo(const cs::Ref<StarSystem>& from, const cs::Ref<StarSystem>& to, const cs::Ref<Ship>& ship, int port, const cs::Ref<cs::List<cs::Ref<JumpGate>>>& route, double jd,
 		cs::Ref<Settlement>& source, Good& good, double& tonnes, double& profit)
 	{
 		cs::Ref<Settlement> market;
@@ -1316,7 +1317,7 @@ namespace SpaceGod::Core
 		return BestCargo(from, to, ship, port, route, jd, to->World->Economy->Settlements, source, good, tonnes, profit, market, sale);
 	}
 
-	bool InterstellarTraffic::BestCargo(const cs::Ref<StarSystem>& from, const cs::Ref<StarSystem>& to, const cs::Ref<Ship>& ship, int port, const cs::List<cs::Ref<JumpGate>>& route, double jd, const cs::List<cs::Ref<Settlement>>& markets,
+	bool InterstellarTraffic::BestCargo(const cs::Ref<StarSystem>& from, const cs::Ref<StarSystem>& to, const cs::Ref<Ship>& ship, int port, const cs::Ref<cs::List<cs::Ref<JumpGate>>>& route, double /*jd*/, const cs::List<cs::Ref<Settlement>>& markets,
 		cs::Ref<Settlement>& source, Good& good, double& tonnes, double& profit, cs::Ref<Settlement>& market, double& sale)
 	{
 		market = nullptr;
@@ -1361,7 +1362,7 @@ namespace SpaceGod::Core
 		return source != nullptr;
 	}
 
-	double InterstellarTraffic::VoyageDays(const cs::Ref<StarSystem>& from, const cs::Ref<StarSystem>& to, const cs::Ref<Ship>& ship, int port, const cs::List<cs::Ref<JumpGate>>& route)
+	double InterstellarTraffic::VoyageDays(const cs::Ref<StarSystem>& from, const cs::Ref<StarSystem>& /*to*/, const cs::Ref<Ship>& ship, int port, const cs::Ref<cs::List<cs::Ref<JumpGate>>>& route)
 	{
 		double accel = ship->Spec->AccelG * Astro::GravityKmPerDay2;
 		auto Burn = [&](double km) { return 2 * cs::Math::Sqrt(cs::Math::Max(km, 1.0) / accel); };
@@ -1387,10 +1388,10 @@ namespace SpaceGod::Core
 		{
 			if (!Idle(world, ship) || ship->Role != ShipRole::Courier || ship->HasCargo) continue;
 			auto route = Network()->Route(from, to, ship->Faction, jd);
-			if (route.Count() == 0) continue;
+			if (route == nullptr || route->Count() == 0) continue;
 			SetOut(from, to, ship, VoyagePurpose::Courier, route, jd);
 			ship->Cargo = cs::Cat("Interstellar mail and data cores for ", to->Name);
-			world->Log(jd, cs::Cat(ship->Name, " takes the mail for ", to->Name, " by the ", route[0]->Name), WorldEventKind::Info, PortOf(ship));
+			world->Log(jd, cs::Cat(ship->Name, " takes the mail for ", to->Name, " by the ", (*route)[0]->Name), WorldEventKind::Info, PortOf(ship));
 			return;
 		}
 	}
@@ -1408,7 +1409,7 @@ namespace SpaceGod::Core
 		{
 			if (!Idle(world, ship) || ship->Faction != world->Pirates || ship->Phase != ShipPhase::Parked || ship->Combat->HullDamage() > 0.2 || !ship->Combat->Armed()) continue;
 			auto route = Network()->Route(from, to, ship->Faction, jd);
-			if (route.Count() == 0) continue;
+			if (route == nullptr || route->Count() == 0) continue;
 			SetOut(from, to, ship, VoyagePurpose::Raid, route, jd);
 			world->Log(jd, cs::Cat("The ", world->Pirates->Name, " raiders under ", ship->Name, " slip away for ", to->Name), WorldEventKind::Info, -1);
 			return;
@@ -1423,17 +1424,17 @@ namespace SpaceGod::Core
 		auto world = from->World;
 		auto wild = cs::List<cs::Ref<StarSystem>>();
 		for (const auto& s : galaxy->Systems)
-			if (s != from && !s->Settled) wild.Add(s);
+			if (s != from && !s->Settled()) wild.Add(s);
 		if (wild.Count() == 0) return;
 		auto to = wild[rng.Next(wild.Count())];
 		for (const auto& ship : world->Fleet->Ships())
 		{
 			if (!Idle(world, ship) || !IsSurveyHull(ship)) continue;
 			auto route = Network()->Route(from, to, ship->Faction, jd);
-			if (route.Count() == 0) continue;
+			if (route == nullptr || route->Count() == 0) continue;
 			SetOut(from, to, ship, VoyagePurpose::Survey, route, jd);
 			ship->Cargo = cs::Cat("Survey instruments, bound for ", to->Name);
-			world->Log(jd, cs::Cat(ship->Name, " sets out to survey ", to->Name, ", ", route.Count(), " gate", (route.Count() == 1 ? "" : "s"), " out"), WorldEventKind::Info, PortOf(ship));
+			world->Log(jd, cs::Cat(ship->Name, " sets out to survey ", to->Name, ", ", route->Count(), " gate", (route->Count() == 1 ? "" : "s"), " out"), WorldEventKind::Info, PortOf(ship));
 			return;
 		}
 	}
@@ -1474,10 +1475,10 @@ namespace SpaceGod::Core
 			if (!Idle(world, ship) || ship->Faction != navy || !ship->Spec->IsMilitary || ship->PatrolWing || ship->Phase != ShipPhase::Parked) continue;
 			if (world->War->IsHomeGuard(ship) || ship->Combat->HullDamage() > 0.2 || !ship->Combat->Armed()) continue;
 			auto route = Network()->Route(from, to, ship->Faction, jd);
-			if (route.Count() == 0) continue;
+			if (route == nullptr || route->Count() == 0) continue;
 			auto v = SetOut(from, to, ship, VoyagePurpose::Expedition, route, jd);
 			v->Quarry = quarry;
-			world->Log(jd, cs::Cat(ship->Name, " leads an expedition through the ", route[0]->Name, " after the ", quarry->Name, " at ", to->Name), WorldEventKind::Info, PortOf(ship));
+			world->Log(jd, cs::Cat(ship->Name, " leads an expedition through the ", (*route)[0]->Name, " after the ", quarry->Name, " at ", to->Name), WorldEventKind::Info, PortOf(ship));
 			return true;
 		}
 		return false;
@@ -1508,7 +1509,7 @@ namespace SpaceGod::Core
 			if (ship->HasCargo && v->Purpose == VoyagePurpose::Trade && jd < v->StayUntilJd + 30) continue;
 			auto route = Network()->Route(system, v->Home, ship->Faction, jd);
 			ship->StakeoutKm = std::nullopt;
-			if (route.Count() == 0)
+			if (route == nullptr || route->Count() == 0)
 			{
 				// No way home through the gates, but a drive of its own (U.SPC-T412): home through open space.
 				if (CanCruise(ship) && system != v->Home) CruiseFrom(system, ship, v->Home, jd);
@@ -1529,7 +1530,7 @@ namespace SpaceGod::Core
 			v->Route = route;
 			v->Leg = 0;
 			v->ByCruise = false;
-			ship->GateKm = route[0]->PositionKm;
+			ship->GateKm = (*route)[0]->PositionKm;
 			world->Fleet->ScheduleNext(ship, jd);
 		}
 	}

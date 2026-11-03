@@ -21,6 +21,7 @@
 #include "Systems/Galaxy.h"
 #include "Systems/InterstellarTraffic.h"
 #include "Systems/Polities.h"
+#include "Settings/GameSetting.h"
 
 namespace SpaceGod::Core
 {
@@ -531,7 +532,7 @@ namespace SpaceGod::Core
 
 	// ================================================================ FtlInterdiction
 
-	void FtlInterdiction::Step(DeepSpace& space, double fromJd, double toJd, cs::Random& rng)
+	void FtlInterdiction::Step(DeepSpace& space, double fromJd, double toJd, cs::Random& /*rng*/)
 	{
 		if (space.Cruises().Count() == 0) return;
 		for (const auto& c : space.Cruises().ToList())
@@ -662,7 +663,7 @@ namespace SpaceGod::Core
 
 	// ================================================================ WreckSalvage
 
-	void WreckSalvage::Step(DeepSpace& space, double fromJd, double toJd, cs::Random& rng)
+	void WreckSalvage::Step(DeepSpace& space, double fromJd, double toJd, cs::Random& /*rng*/)
 	{
 		if (space.Objects().Count() == 0) return;
 		for (const auto& c : space.Cruises().ToList())

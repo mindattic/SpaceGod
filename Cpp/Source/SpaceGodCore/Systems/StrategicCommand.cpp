@@ -217,7 +217,7 @@ namespace SpaceGod::Core
 		all();
 		static const Statics s{
 			Add("Marine training", "Better marines, man for man, in boarding and on the ground", 2000, 5,
-				[](cs::Ref<Faction> f, int level) { f->MarineQuality += MarinesPerLevel; }),
+				[](cs::Ref<Faction> f, int /*level*/) { f->MarineQuality += MarinesPerLevel; }),
 			Add("Shipyards", "A bigger navy for the same yards", 3000, 5, nullptr),
 			Add("Industry", "The favoured industries grow faster", 2500, 5, nullptr),
 		};
@@ -702,7 +702,7 @@ namespace SpaceGod::Core
 		}
 	}
 
-	cs::Ref<PolityReport> StrategicCommand::Report(const cs::Ref<Faction>& f, double jd) const
+	cs::Ref<PolityReport> StrategicCommand::Report(const cs::Ref<Faction>& f, double /*jd*/) const
 	{
 		auto r = cs::New<PolityReport>();
 		r->Faction = f;

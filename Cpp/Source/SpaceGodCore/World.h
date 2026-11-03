@@ -51,6 +51,8 @@ namespace SpaceGod::Core
 	class MiningOperation;
 	class TugHaul;
 	class MaterialConvoy;
+	class SocietySpec;
+	class Facility;
 	struct TugDanger;
 	struct HeavyLanePath;
 	enum class PodState : int;
@@ -652,5 +654,38 @@ namespace SpaceGod::Core
 
 		/// <summary>A works' freighter has brought its convoy in: the news, and home empty to its refinery.</summary>
 		void FreighterDelivered(cs::Ref<MaterialConvoy> convoy, double jd);
+
+		// ================================================================ Systems/SocietySpec.cs (defined in Systems/SocietySpec.cpp)
+
+	public:
+		/// <summary>
+		/// A nearby system settled by <paramref name="society"/> (U.SPC-T90): the same machinery as Sol and Alpha
+		/// Centauri, sized to how far out it is. Every settlement grows most of its own food and water; the mines
+		/// and factories are then sized so that the system as a whole makes a little more of every good than it
+		/// uses (<see cref="BalanceSupply"/>), leaving the traders a living carrying the rest about.
+		/// </summary>
+		static cs::Ref<World> CreateSettled(cs::Ref<::SpaceGod::Core::Ephemeris> ephemeris, double jd, int seed, cs::Ref<SocietySpec> society,
+			cs::Ref<::SpaceGod::Core::Polities> polities = nullptr);
+
+		/// <summary>
+		/// Sizes a system's mines and factories so it makes <see cref="SupplyMargin"/> times what it uses of every good
+		/// that is used: each good short is made up by raising every facility that makes it in proportion, again and
+		/// again, since a bigger smelter wants more ore and a bigger mine more machinery; each counted at the share of
+		/// its capacity it can expect to run at (<see cref="ExpectedRunning"/>). Havens fend for themselves
+		/// and are left out. A good used but made nowhere is a mistake in the society's plan, and throws.
+		/// </summary>
+		static void BalanceSupply(const cs::List<cs::Ref<Settlement>>& settlements, const cs::String& system);
+
+	private:
+		/// <summary>
+		/// The share of capacity a facility can count on: all of it if every consumable it burns (a mine's machinery
+		/// and helium-3, a lab's rare earths) is made where it stands, else <see cref="Recipe.MinorFloor"/>, since in a
+		/// thin system those come in dribs and drabs. Life support runs on regardless.
+		/// </summary>
+		static double ExpectedRunning(const cs::Ref<Settlement>& s, const cs::Ref<Facility>& f);
+
+	public:
+		/// <summary>How much more of every good a settled system makes than it uses: the traders' living, and the slack for the shipyards' and the ships' own wants.</summary>
+		static constexpr double SupplyMargin = 1.15;
 	};
 }

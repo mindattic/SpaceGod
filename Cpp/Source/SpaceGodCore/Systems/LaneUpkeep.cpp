@@ -358,9 +358,9 @@ namespace SpaceGod::Core
 		return (e->HelioAt(lane->A, jd) - at).Length() <= (e->HelioAt(lane->B, jd) - at).Length() ? lane->A : lane->B;
 	}
 
-	double LaneUpkeep::Dwell(cs::Ref<Ship> tender) { return DwellDays()->Value * (0.75 + rng.NextDouble() * 0.5); }
+	double LaneUpkeep::Dwell(cs::Ref<Ship> /*tender*/) { return DwellDays()->Value * (0.75 + rng.NextDouble() * 0.5); }
 
-	void LaneUpkeep::OnLaneJoined(cs::Ref<Ship> ship, LaneHop hop, double jd)
+	void LaneUpkeep::OnLaneJoined(cs::Ref<Ship> ship, LaneHop hop, double /*jd*/)
 	{
 		auto lanes = Lanes();
 		if (lanes == nullptr || ship == nullptr || ship == world->PilotedShip) return;

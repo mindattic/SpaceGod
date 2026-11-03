@@ -36,7 +36,7 @@ namespace SpaceGod::Core
 			Add("Non-aggression pact", "Neither goes to war with the other for five years",
 				false, true, false, 5 * 365.25, 10, nullptr),
 			Add("Trade pact", "Tariffs lifted between them: both treasuries gain from the trade every day",
-				false, false, false, cs::Double::NaN, 15, [](Statecraft* s, cs::Ref<Pact> p, double jd) { return s->KeepTrade(p); }),
+				false, false, false, cs::Double::NaN, 15, [](Statecraft* s, cs::Ref<Pact> p, double /*jd*/) { return s->KeepTrade(p); }),
 			Add("Alliance", "At peace with each other, and each joins the wars the other is attacked in",
 				false, true, true, cs::Double::NaN, 35, nullptr),
 			Add("Tribute", "One pays the other a sum every month for two years",
@@ -144,80 +144,80 @@ namespace SpaceGod::Core
 		all();
 		static const Statics s{
 			Add("Peace", "End the war between you: white peace, all occupied ground given back unless a treaty cedes it", false,
-				[](Statecraft* s, cs::Ref<Faction> a, cs::Ref<Faction> b, double jd) { return s->Polities->Diplomacy->Get(a, b) == Relation::Peace ? cs::String("You are not at war") : cs::String(); },
+				[](Statecraft* s, cs::Ref<Faction> a, cs::Ref<Faction> b, double /*jd*/) { return s->Polities->Diplomacy->Get(a, b) == Relation::Peace ? cs::String("You are not at war") : cs::String(); },
 				[](Statecraft* s, cs::Ref<Proposal> p, double jd) { return s->AppraisePeace(p->To, p->From, jd); },
 				[](Statecraft* s, cs::Ref<Proposal> p, double jd) { s->MakePeace(p->From, p->To, jd, "terms agreed through their envoys"); },
 				[](const Proposal& p) { return cs::Cat("the ", p.From->Name, " offers the ", p.To->Name, " peace"); }),
 
 			Add("Non-aggression pact", PactKind::NonAggression()->Description, false,
-				[](Statecraft* s, cs::Ref<Faction> a, cs::Ref<Faction> b, double jd)
+				[](Statecraft* s, cs::Ref<Faction> a, cs::Ref<Faction> b, double /*jd*/)
 				{
 					auto r = s->NotAtPeace(a, b);
 					if (!r.empty()) return r;
 					return s->PactBetween(a, b, PactKind::NonAggression()) != nullptr || s->PactBetween(a, b, PactKind::Alliance()) != nullptr ? cs::String("Already bound not to fight") : cs::String();
 				},
-				[](Statecraft* s, cs::Ref<Proposal> p, double jd) { return s->AppraiseNonAggression(p->To, p->From); },
+				[](Statecraft* s, cs::Ref<Proposal> p, double /*jd*/) { return s->AppraiseNonAggression(p->To, p->From); },
 				[](Statecraft* s, cs::Ref<Proposal> p, double jd) { s->Sign(PactKind::NonAggression(), p->From, p->To, jd); },
 				nullptr),
 
 			Add("Trade pact", PactKind::Trade()->Description, false,
-				[](Statecraft* s, cs::Ref<Faction> a, cs::Ref<Faction> b, double jd)
+				[](Statecraft* s, cs::Ref<Faction> a, cs::Ref<Faction> b, double /*jd*/)
 				{
 					auto r = s->NotAtPeace(a, b);
 					if (!r.empty()) return r;
 					return s->PactBetween(a, b, PactKind::Trade()) != nullptr ? cs::String("Already trading under a pact")
 						: s->Polities->Diplomacy->IsEmbargoed(a, b) || s->Polities->Diplomacy->IsEmbargoed(b, a) ? cs::String("An embargo stands between you") : cs::String();
 				},
-				[](Statecraft* s, cs::Ref<Proposal> p, double jd) { return s->AppraiseTrade(p->To, p->From); },
+				[](Statecraft* s, cs::Ref<Proposal> p, double /*jd*/) { return s->AppraiseTrade(p->To, p->From); },
 				[](Statecraft* s, cs::Ref<Proposal> p, double jd) { s->Sign(PactKind::Trade(), p->From, p->To, jd); },
 				nullptr),
 
 			Add("Alliance", PactKind::Alliance()->Description, false,
-				[](Statecraft* s, cs::Ref<Faction> a, cs::Ref<Faction> b, double jd)
+				[](Statecraft* s, cs::Ref<Faction> a, cs::Ref<Faction> b, double /*jd*/)
 				{
 					auto r = s->NotAtPeace(a, b);
 					if (!r.empty()) return r;
 					return s->PactBetween(a, b, PactKind::Alliance()) != nullptr ? cs::String("Already allies") : s->Liege(a, b) ? cs::String("A vassal and its overlord") : cs::String();
 				},
-				[](Statecraft* s, cs::Ref<Proposal> p, double jd) { return s->AppraiseAlliance(p->To, p->From); },
+				[](Statecraft* s, cs::Ref<Proposal> p, double /*jd*/) { return s->AppraiseAlliance(p->To, p->From); },
 				[](Statecraft* s, cs::Ref<Proposal> p, double jd) { s->Sign(PactKind::Alliance(), p->From, p->To, jd); },
 				nullptr),
 
 			Add("Offer tribute", "Pay them a sum every month for two years: goodwill, and peace bought", true,
-				[](Statecraft* s, cs::Ref<Faction> a, cs::Ref<Faction> b, double jd)
+				[](Statecraft* s, cs::Ref<Faction> a, cs::Ref<Faction> b, double /*jd*/)
 				{
 					auto r = s->NotAtPeace(a, b);
 					if (!r.empty()) return r;
 					return s->TributeBetween(a, b) != nullptr ? cs::String("Tribute already flows between you") : cs::String();
 				},
-				[](Statecraft* s, cs::Ref<Proposal> p, double jd) { return s->AppraiseTributeReceived(p->To, p->From, p->Amount); },
+				[](Statecraft* s, cs::Ref<Proposal> p, double /*jd*/) { return s->AppraiseTributeReceived(p->To, p->From, p->Amount); },
 				[](Statecraft* s, cs::Ref<Proposal> p, double jd) { s->Sign(PactKind::Tribute(), p->From, p->To, jd, p->Amount); },
 				[](const Proposal& p) { return cs::Cat("the ", p.From->Name, " offers the ", p.To->Name, " tribute of ", Cr(p.Amount), " a month"); }),
 
 			Add("Demand tribute", "They pay you a sum every month for two years, or face your navy", true,
-				[](Statecraft* s, cs::Ref<Faction> a, cs::Ref<Faction> b, double jd)
+				[](Statecraft* s, cs::Ref<Faction> a, cs::Ref<Faction> b, double /*jd*/)
 				{
 					auto r = s->NotAtPeace(a, b);
 					if (!r.empty()) return r;
 					return s->TributeBetween(a, b) != nullptr ? cs::String("Tribute already flows between you") : cs::String();
 				},
-				[](Statecraft* s, cs::Ref<Proposal> p, double jd) { return s->AppraiseTributePaid(p->To, p->From, p->Amount); },
+				[](Statecraft* s, cs::Ref<Proposal> p, double /*jd*/) { return s->AppraiseTributePaid(p->To, p->From, p->Amount); },
 				[](Statecraft* s, cs::Ref<Proposal> p, double jd) { s->Sign(PactKind::Tribute(), p->To, p->From, jd, p->Amount); },
 				[](const Proposal& p) { return cs::Cat("the ", p.From->Name, " demands tribute of ", Cr(p.Amount), " a month from the ", p.To->Name); }),
 
 			Add("Offer fealty", "Become their vassal: their protection, for a share of your treasury and your navy in their wars", false,
-				[](Statecraft* s, cs::Ref<Faction> a, cs::Ref<Faction> b, double jd)
+				[](Statecraft* s, cs::Ref<Faction> a, cs::Ref<Faction> b, double /*jd*/)
 				{
 					auto r = s->NotAtPeace(a, b);
 					if (!r.empty()) return r;
 					return s->OverlordOf(a) != nullptr ? cs::String("Already a vassal") : s->OverlordOf(b) == a ? cs::String("They are your vassal") : cs::String();
 				},
-				[](Statecraft* s, cs::Ref<Proposal> p, double jd) { return s->AppraiseVassalTaken(p->To, p->From); },
+				[](Statecraft* s, cs::Ref<Proposal> p, double /*jd*/) { return s->AppraiseVassalTaken(p->To, p->From); },
 				[](Statecraft* s, cs::Ref<Proposal> p, double jd) { s->Sign(PactKind::Vassalage(), p->From, p->To, jd); },
 				[](const Proposal& p) { return cs::Cat("the ", p.From->Name, " offers its fealty to the ", p.To->Name); }),
 
 			Add("Demand fealty", "They become your vassal (a war between you ends with it)", false,
-				[](Statecraft* s, cs::Ref<Faction> a, cs::Ref<Faction> b, double jd)
+				[](Statecraft* s, cs::Ref<Faction> a, cs::Ref<Faction> b, double /*jd*/)
 				{
 					return s->OverlordOf(b) != nullptr ? cs::String("They already serve an overlord") : s->OverlordOf(a) == b ? cs::String("You are their vassal") : s->OverlordOf(a) != nullptr ? cs::String("A vassal takes no vassals") : cs::String();
 				},
@@ -471,7 +471,7 @@ namespace SpaceGod::Core
 		return true;
 	}
 
-	bool Statecraft::KeepTribute(const cs::Ref<Pact>& p, double jd)
+	bool Statecraft::KeepTribute(const cs::Ref<Pact>& p, double /*jd*/)
 	{
 		double due = p->Amount / 30;
 		if (p->A->Treasury < due) return false;
@@ -481,7 +481,7 @@ namespace SpaceGod::Core
 		return true;
 	}
 
-	bool Statecraft::KeepVassalage(const cs::Ref<Pact>& p, double jd)
+	bool Statecraft::KeepVassalage(const cs::Ref<Pact>& p, double /*jd*/)
 	{
 		double levy = cs::Math::Max(0.0, p->A->Treasury) * VassalLevy()->Value / 30;
 		p->A->Treasury -= levy;
@@ -783,7 +783,7 @@ namespace SpaceGod::Core
 		return a;
 	}
 
-	cs::Ref<Appraisal> Statecraft::AppraiseTributeReceived(const cs::Ref<Faction>& me, const cs::Ref<Faction>& them, double amount)
+	cs::Ref<Appraisal> Statecraft::AppraiseTributeReceived(const cs::Ref<Faction>& /*me*/, const cs::Ref<Faction>& /*them*/, double amount)
 	{
 		auto a = cs::New<Appraisal>();
 		a->Add(amount > 0 ? 50 : -10, amount > 0 ? "money is money" : "an empty offer");
@@ -816,7 +816,7 @@ namespace SpaceGod::Core
 		return a;
 	}
 
-	cs::Ref<Appraisal> Statecraft::AppraiseFealty(const cs::Ref<Faction>& me, const cs::Ref<Faction>& them, double jd)
+	cs::Ref<Appraisal> Statecraft::AppraiseFealty(const cs::Ref<Faction>& me, const cs::Ref<Faction>& them, double /*jd*/)
 	{
 		auto a = cs::New<Appraisal>();
 		double ratio = Ratio(them, me);

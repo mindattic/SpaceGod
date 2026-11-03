@@ -362,7 +362,7 @@ namespace SpaceGod::Core
 
 	// ---------------------------------------------------------------- what the features do
 
-	cs::List<GravityField> DeepSpace::RogueWells(DeepSpace& space, cs::Ref<Cruise> c, GalacticPosition near, double km)
+	cs::List<GravityField> DeepSpace::RogueWells(DeepSpace& space, cs::Ref<Cruise> /*c*/, GalacticPosition near, double km)
 	{
 		cs::List<GravityField> found;
 		for (const auto& o : space.objects)
@@ -442,7 +442,7 @@ namespace SpaceGod::Core
 
 	// ================================================================ SurveyFinds
 
-	void SurveyFinds::Step(DeepSpace& space, double fromJd, double toJd, cs::Random& rng)
+	void SurveyFinds::Step(DeepSpace& space, double fromJd, double toJd, cs::Random& /*rng*/)
 	{
 		if (space.Objects().Count() == 0) return;
 		for (const auto& c : space.Cruises().ToList())
@@ -469,7 +469,7 @@ namespace SpaceGod::Core
 
 	// ================================================================ IceRefuelling
 
-	void IceRefuelling::Step(DeepSpace& space, double fromJd, double toJd, cs::Random& rng)
+	void IceRefuelling::Step(DeepSpace& space, double fromJd, double toJd, cs::Random& /*rng*/)
 	{
 		if (space.Objects().Count() == 0) return;
 		for (const auto& c : space.Cruises().ToList())
@@ -510,7 +510,7 @@ namespace SpaceGod::Core
 
 	// ================================================================ DistressCalls
 
-	void DistressCalls::Step(DeepSpace& space, double fromJd, double toJd, cs::Random& rng)
+	void DistressCalls::Step(DeepSpace& space, double fromJd, double toJd, cs::Random& /*rng*/)
 	{
 		auto& r = space.LifeRng();
 		if (space.Routes().Count() > 0 && r.NextDouble() < CallsPerDay * (toJd - fromJd)) Call(space, toJd, r);
@@ -627,7 +627,7 @@ namespace SpaceGod::Core
 
 	// ================================================================ DeepSpaceOutposts
 
-	void DeepSpaceOutposts::Step(DeepSpace& space, double fromJd, double toJd, cs::Random& rng)
+	void DeepSpaceOutposts::Step(DeepSpace& space, double fromJd, double toJd, cs::Random& /*rng*/)
 	{
 		if (space.Objects().Count() == 0 || space.Cruises().Count() == 0) return;
 		for (const auto& o : space.Objects().ToList())
@@ -674,7 +674,7 @@ namespace SpaceGod::Core
 
 	// ================================================================ RouteAmbushes
 
-	void RouteAmbushes::Step(DeepSpace& space, double fromJd, double toJd, cs::Random& rng)
+	void RouteAmbushes::Step(DeepSpace& space, double /*fromJd*/, double toJd, cs::Random& /*rng*/)
 	{
 		if (space.Ambushes().Count() > 0) space.LiftAmbushes(toJd);
 	}

@@ -71,7 +71,7 @@ namespace SpaceGod::Core
 		: rng(seed)
 	{
 		this->galaxy = galaxy;
-		Logistics = cs::New<MilitaryLogistics>(galaxy);
+		Logistics = cs::New<MilitaryLogistics>(galaxy.get());
 		nextDailyJd = jd + 0.75;
 		nextDeclareJd = jd + 60;
 	}
@@ -265,16 +265,15 @@ namespace SpaceGod::Core
 
 		// The nearest goal (by the way it would go) that this group is strong enough for.
 		cs::Ref<StarSystem> goal = nullptr;
-		cs::List<cs::Ref<JumpGate>> route;
+		cs::Ref<cs::List<cs::Ref<JumpGate>>> route = nullptr;
 		double bestDays = cs::Double::MaxValue;
 		for (const auto& g : goals)
 		{
 			// Taking back what was lost at home is its own navy's work there, not a campaign's.
 			if (g == from) continue;
-			// (GateNetwork.Route: null, no way through, is an empty list here; g != from, so a real route is never empty.)
 			auto r = galaxy->Network->Route(from, g, f, jd, true);
-			if (r.Count() == 0) continue;
-			if (bestStrength < LaunchRatio * Expected(f, w->Enemy(f), g, r)) continue;
+			if (r == nullptr) continue;
+			if (bestStrength < LaunchRatio * Expected(f, w->Enemy(f), g, *r)) continue;
 			double days = GateNetwork::RouteDays(r);
 			if (days < bestDays)
 			{
@@ -297,7 +296,7 @@ namespace SpaceGod::Core
 		w->Campaigns.Add(c2);
 		campaigns.Add(c2);
 		w->LastActiveJd = jd;
-		from->World->Log(jd, cs::Cat("The ", best->Name, " leads the ", f->Name, " war fleet out for ", goal->Name, ", ", route.Count(), " gate", (route.Count() == 1 ? "" : "s"), " away by the ", route[0]->Name),
+		from->World->Log(jd, cs::Cat("The ", best->Name, " leads the ", f->Name, " war fleet out for ", goal->Name, ", ", route->Count(), " gate", (route->Count() == 1 ? "" : "s"), " away by the ", (*route)[0]->Name),
 			WorldEventKind::Diplomacy, from->Catalog->Root()->Index);
 	}
 
@@ -492,7 +491,7 @@ namespace SpaceGod::Core
 			return strike;
 		}
 		auto route = galaxy->Network->Route(from, goal, f, jd, true);
-		if (route.Count() == 0) return nullptr;
+		if (route == nullptr || route->Count() == 0) return nullptr;
 		auto campaign = cs::New<Campaign>();
 		campaign->War = w;
 		campaign->Faction = f;
@@ -506,7 +505,7 @@ namespace SpaceGod::Core
 		w->Campaigns.Add(campaign);
 		campaigns.Add(campaign);
 		w->LastActiveJd = jd;
-		from->World->Log(jd, cs::Cat("The ", leader->Name, " leads a ", f->Name, " war fleet out for ", goal->Name, " on its command's orders, ", route.Count(), " gate", (route.Count() == 1 ? "" : "s"), " away"),
+		from->World->Log(jd, cs::Cat("The ", leader->Name, " leads a ", f->Name, " war fleet out for ", goal->Name, " on its command's orders, ", route->Count(), " gate", (route->Count() == 1 ? "" : "s"), " away"),
 			WorldEventKind::Diplomacy, from->Catalog->Root()->Index);
 		return campaign;
 	}
@@ -957,9 +956,8 @@ namespace SpaceGod::Core
 		for (const auto& g : GoalsOf(c->War, c->Faction))
 		{
 			if (g == system) continue;
-			// (GateNetwork.Route's null, no way through, is an empty list here; g != system, so a real route is never empty.)
 			auto r = galaxy->Network->Route(system, g, c->Faction, jd, true);
-			if (r.Count() == 0) continue;
+			if (r == nullptr) continue;
 			if (Traffic()->Redirect(system, ship, g, jd))
 			{
 				c->Goal = g;
@@ -1114,7 +1112,7 @@ namespace SpaceGod::Core
 		return false;
 	}
 
-	void InterstellarWars::RebuildForts(double jd)
+	void InterstellarWars::RebuildForts(double /*jd*/)
 	{
 		if (galaxy->Network == nullptr) return;
 		for (const auto& link : galaxy->Network->Links())
