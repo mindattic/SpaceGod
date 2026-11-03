@@ -22,4 +22,4 @@ _Nothing recorded yet._
 | ID | Date | Type | Status | Summary | Ref |
 |---|---|---|---|---|---|
 | US-T1 | 2026-11-03 | docs | closed | Start the permanent ticket log in the ticket database | — |
-| US-T2 | 2026-11-03 | feature | open | Recreate Unity.Space's Sol system in Unreal Engine 5 (C++) as a co-op game: JPL ephemeris, ELP-2000 Moon, IAU orientation, textured bodies, gameplay/realistic scale, focus camera, shared time warp over listen-server multiplayer | MAT-T87 |
+| US-T2 | 2026-11-03 | feature | closed | Recreate Unity.Space's Sol system in Unreal Engine 5 (C++) as a co-op game: JPL ephemeris, ELP-2000 Moon, IAU orientation, textured bodies, gameplay/realistic scale, focus camera, shared time warp over listen-server multiplayer | e1b6839 |
