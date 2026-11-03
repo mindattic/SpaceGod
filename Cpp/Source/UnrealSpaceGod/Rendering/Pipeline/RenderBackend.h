@@ -175,6 +175,9 @@ namespace SpaceGod::Rendering
 
 		void SetupCamera(Camera* camera, CameraRole role) override;
 		void SetPostProcessing(Camera* camera, const PostProcessLook& look) override;
+		/// The C# track's UnrealRenderBackend.SetMsaa (US-T45): MSAA is forward-only in Unreal, so the deferred path's
+		/// nearest, FXAA, on or off.
+		void SetMsaa(Camera* camera, bool on) override;
 
 		/// <summary>Puts <paramref name="value"/> into effect on the game's own camera (the settings menu's choice).</summary>
 		void SetLook(const Core::CameraLook& value);

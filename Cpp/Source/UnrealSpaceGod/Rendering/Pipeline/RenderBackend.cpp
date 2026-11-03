@@ -6,6 +6,7 @@
 #include "UnityCompat/UnityScene.h"
 
 #include "Engine/PostProcessVolume.h"
+#include "HAL/IConsoleManager.h"
 #include "Engine/World.h"
 
 #include <cmath>
@@ -133,12 +134,35 @@ namespace SpaceGod::Rendering
 
 	float UnrealRenderBackend::StarGlare() const { return look.Enabled ? static_cast<float>(cs::Math::Max(1.0, look.SunBrightness)) : 1.0f; }
 
+	namespace
+	{
+		void SetCVar(const TCHAR* name, int value)
+		{
+			if (IConsoleVariable* v = IConsoleManager::Get().FindConsoleVariable(name)) v->Set(value, ECVF_SetByCode);
+		}
+	}
+
 	void UnrealRenderBackend::SetupCamera(Camera* camera, CameraRole role)
 	{
 		NeutralRenderBackend::SetupCamera(camera, role);
+		// US-T45, the C# track's UnrealRenderBackend.SetCvars: FXAA, not the engine's default TSR, which smeared the
+		// one-pixel stars into soft blobs (the original's are crisp single pixels, as the C# track's are); the rest
+		// of the engine-wide look the C# track sets is the post-process volume's below.
+		static bool cvarsSet = false;
+		if (!cvarsSet)
+		{
+			cvarsSet = true;
+			SetCVar(TEXT("r.AntiAliasingMethod"), 1);
+		}
 		if (role != CameraRole::Main) return;
 		mainSetUp = true;
 		Apply();
+	}
+
+	void UnrealRenderBackend::SetMsaa(Camera* camera, bool on)
+	{
+		NeutralRenderBackend::SetMsaa(camera, on);
+		SetCVar(TEXT("r.AntiAliasingMethod"), on ? 1 : 0);
 	}
 
 	void UnrealRenderBackend::SetPostProcessing(Camera* camera, const PostProcessLook& value)
