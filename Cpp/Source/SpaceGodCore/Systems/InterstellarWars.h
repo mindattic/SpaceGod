@@ -514,7 +514,5 @@ namespace SpaceGod::Core
 	private:
 		InterstellarWars() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 		SG_SERIALIZABLE(InterstellarWars); // ObjectGraph registration (Persistence/Registrations)
-	private:
-		InterstellarWars() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 	};
 }

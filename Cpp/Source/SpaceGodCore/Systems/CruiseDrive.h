@@ -58,8 +58,6 @@ namespace SpaceGod::Core
 	private:
 		CruiseDriveSpec() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 		SG_SERIALIZABLE(CruiseDriveSpec); // ObjectGraph registration (Persistence/Registrations)
-	private:
-		CruiseDriveSpec() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 	};
 
 	/// <summary>

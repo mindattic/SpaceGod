@@ -76,8 +76,6 @@ namespace SpaceGod::Core
 	private:
 		PactKind() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 		SG_SERIALIZABLE(PactKind); // ObjectGraph registration (Persistence/Registrations)
-	private:
-		PactKind() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 	};
 
 	/// <summary>A pact in force between two polities (U.SPC-T427). For a directed kind <see cref="A"/> pays or serves <see cref="B"/>.</summary>
@@ -211,8 +209,6 @@ namespace SpaceGod::Core
 	private:
 		Deal() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 		SG_SERIALIZABLE(Deal); // ObjectGraph registration (Persistence/Registrations)
-	private:
-		Deal() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 	};
 
 	/// <summary>One line of the envoy screen (U.SPC-T427): a deal, its sum, why it cannot be put (or null), and how the other side would take it.</summary>
@@ -531,7 +527,5 @@ namespace SpaceGod::Core
 	private:
 		Statecraft() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 		SG_SERIALIZABLE(Statecraft); // ObjectGraph registration (Persistence/Registrations)
-	private:
-		Statecraft() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 	};
 }

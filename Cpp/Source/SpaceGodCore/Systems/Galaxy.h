@@ -163,8 +163,6 @@ namespace SpaceGod::Core
 	private:
 		StarSystem() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 		SG_SERIALIZABLE(StarSystem); // ObjectGraph registration (Persistence/Registrations)
-	private:
-		StarSystem() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 	};
 
 	/// <summary>A real star near the Sun, for the interstellar view (not simulated).</summary>

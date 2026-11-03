@@ -212,7 +212,5 @@ namespace SpaceGod::Core
 	private:
 		LaneUpkeep() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 		SG_SERIALIZABLE(LaneUpkeep); // ObjectGraph registration (Persistence/Registrations)
-	private:
-		LaneUpkeep() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 	};
 }

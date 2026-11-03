@@ -305,7 +305,5 @@ namespace SpaceGod::Core
 	private:
 		GateConstruction() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 		SG_SERIALIZABLE(GateConstruction); // ObjectGraph registration (Persistence/Registrations)
-	private:
-		GateConstruction() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
 	};
 }
