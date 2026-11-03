@@ -203,4 +203,11 @@ def _when_ready(_delta):
         unreal.log_error(f"Unreal.SpaceGod asset setup failed: {error}")
 
 
-_handle = unreal.register_slate_post_tick_callback(_when_ready)
+def _is_game():
+    # The editor binaries running -game (tools/play.ps1, the smoke runs) load Python too; the editor asset tools
+    # are not usable there (EditorAssetLibrary in a game world crashed the C++ smoke, US-T38), and nothing is built.
+    return "-game" in unreal.SystemLibrary.get_command_line().lower().split()
+
+
+if not _is_game():
+    _handle = unreal.register_slate_post_tick_callback(_when_ready)

@@ -193,7 +193,7 @@ namespace SpaceGod
 		Galaxy = Core::Galaxy::CreateDefault(Clock->Jd);
 
 		SetupCamera();
-		worldRoot = GameObject::Create("World")->transform;
+		worldRoot = NewGameObject("World")->transform; // held by the scene until Destroy (US-T30), as Unity's new GameObject
 		auto starfield = Views::Starfield::Create(worldRoot);
 		// The skybox behind every system (U.SPC-T595): the player's own panoramas join the catalogue first.
 		Views::SkyView::DiscoverDropIns();
@@ -255,7 +255,7 @@ namespace SpaceGod
 		Galaxy->Promote(system, Clock->Jd);
 		// The galaxy is charted and built about wherever the player is (U.SPC-T413).
 		Galaxy->Viewpoint = system->Origin;
-		systemRoot = GameObject::Create(system->Name)->transform;
+		systemRoot = NewGameObject(system->Name)->transform;
 		systemRoot->SetParent(worldRoot, false);
 		SystemVisible = true;
 
