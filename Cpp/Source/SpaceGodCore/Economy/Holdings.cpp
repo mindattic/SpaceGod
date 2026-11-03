@@ -372,7 +372,10 @@ namespace SpaceGod::Core
 
 	bool Holdings::HasMarketAtEveryStop(const cs::Ref<StandingOrder>& o) const
 	{
-		// C#'s null Stops is an empty list here (an order with no stops has no market at every stop).
+		// C#'s null Stops is an empty list here (an order with no stops has no market at every stop). C# would answer
+		// true for a non-null empty array, but no order ever has one: Stops is null unless set by TradeRoute/Patrol
+		// (both called with stops), and the one caller, SetOrders, has already required two stops (CanFollow). So
+		// empty-as-null gives C#'s answer for every order Core and the HUD can make (US-T35).
 		if (o->Stops.Count() == 0) return false;
 		for (auto stop : o->Stops)
 		{

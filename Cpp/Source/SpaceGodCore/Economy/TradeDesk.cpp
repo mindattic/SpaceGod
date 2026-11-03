@@ -186,6 +186,13 @@ namespace SpaceGod::Core
 	{
 	}
 
+	cs::Ref<TradeDesk> TradeDesk::Make(cs::Ref<::SpaceGod::Core::World> world, int seed)
+	{
+		auto desk = cs::New<TradeDesk>(world, seed);
+		desk->Construct();
+		return desk;
+	}
+
 	void TradeDesk::Construct()
 	{
 		auto self = shared_from_this();

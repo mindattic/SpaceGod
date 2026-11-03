@@ -2,6 +2,7 @@
 // Port of Unity.SpaceGod Assets/UnitySpace/Core/Economy/TradeDesk.cs (US-T19).
 
 #include "Cs/Cs.h"
+#include "Persistence/Serializable.h"
 
 namespace SpaceGod::Core
 {
@@ -114,7 +115,7 @@ namespace SpaceGod::Core
 	/// New kinds of trade news plug in by registering a source in <see cref="TipSources"/>.
 	/// </summary>
 	// TradeDesk hands itself to its parts (new MarketIntel(this), ...), hence enable_shared_from_this; its C# constructor
-	// body runs as Construct() right after the Ref is made: create it as `auto d = cs::New<TradeDesk>(world, seed); d->Construct();`.
+	// body runs as Construct() right after the Ref is made: create it with `TradeDesk::Make(world, seed)` (ruling 6).
 	class TradeDesk final : public std::enable_shared_from_this<TradeDesk>
 	{
 		cs::Ref<::SpaceGod::Core::World> world;
@@ -146,6 +147,9 @@ namespace SpaceGod::Core
 		static cs::List<cs::Func<cs::List<cs::Ref<TradeTip>>, cs::Ref<TradeDesk>, double>>& TipSources();
 
 		TradeDesk(cs::Ref<::SpaceGod::Core::World> world, int seed);
+
+		/// <summary>C#'s `new TradeDesk(world, seed)`: constructs the desk, then runs its constructor body (Construct).</summary>
+		static cs::Ref<TradeDesk> Make(cs::Ref<::SpaceGod::Core::World> world, int seed);
 
 		/// <summary>The C# constructor's body (it passes `this` to the desk's parts); call once right after construction.</summary>
 		void Construct();
@@ -236,5 +240,8 @@ namespace SpaceGod::Core
 		cs::List<cs::String> TakeNotices();
 
 		static cs::String Cr(double v);
+	private:
+		TradeDesk() = default; // ObjectGraph loads (docs/PERSISTENCE.md): no side effects
+		SG_SERIALIZABLE(TradeDesk); // ObjectGraph registration (Persistence/Registrations)
 	};
 }

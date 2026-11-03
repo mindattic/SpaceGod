@@ -382,7 +382,7 @@ namespace SpaceGod::Core
 		}
 		// Each subsystem its own offset: two on one seed would draw the very same "random" numbers in step.
 		Holdings = cs::New<HoldingsT>(shared_from_this(), seed + 23);
-		Trade = cs::New<TradeDesk>(shared_from_this(), seed + 41);
+		Trade = TradeDesk::Make(shared_from_this(), seed + 41);
 		WireMining(seed + 31);
 		{
 			auto law = Law;
