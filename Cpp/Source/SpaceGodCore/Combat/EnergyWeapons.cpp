@@ -206,18 +206,19 @@ namespace SpaceGod::Core
 	{
 		double reach = PhaserSweep()->RangeKm * 1.5, reach2 = reach * reach;
 		double lance = PhaserLance()->RangeKm;
-		int small = 0;
+		// (C#'s local is small; renamed because <rpcndr.h> defines small as a macro in a UE unity build.)
+		int smallCount = 0;
 		bool hullInReach = false;
 		for (const auto& o : b->Units)
 		{
 			if (o == u || !b->Hostile(u, o) || o->Surrendering || o->Captured) continue;
 			double d = (o->Pos - u->Pos).Length();
-			if (o->Kind == UnitKind::Fighter) { if (d * d <= reach2) small++; }
+			if (o->Kind == UnitKind::Fighter) { if (d * d <= reach2) smallCount++; }
 			else if (d - o->Radius() <= lance) hullInReach = true;
 		}
 		for (const auto& m : b->Missiles)
-			if (!m->Gone && m->Side != u->Side && (m->Pos - u->Pos).LengthSquared() <= reach2) small++;
-		return small >= SweepThreats || (small > 0 && !hullInReach) ? PhaserTuning::Sweep : PhaserTuning::Lance;
+			if (!m->Gone && m->Side != u->Side && (m->Pos - u->Pos).LengthSquared() <= reach2) smallCount++;
+		return smallCount >= SweepThreats || (smallCount > 0 && !hullInReach) ? PhaserTuning::Sweep : PhaserTuning::Lance;
 	}
 
 	void EnergyWeapons::Step(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& u)
