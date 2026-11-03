@@ -588,15 +588,12 @@ active system every ship's position, every settlement's people and stock, every 
 FNV-1a), clients send theirs, the host compares and logs `digests match` or `DESYNC`, and a desync resyncs (at most three
 times a player). A client also clamps its clock to the host's date after each frame (`clock corrections`: 0 so far).
 
-**Failure modes.** What the hash catches and the save fixes: anything a peer does to the Core outside the commands. Known
-ones, all left to resync rather than shared yet: the helm's pilot loop (refused in co-op: it flies the hull from this
-machine's keys every frame; fighters, guns and stations are the seats), the cockpit's extra keys (flight assist, locks,
-wing orders, power: off in co-op), HUD actions that write the Core (trade, spawning, hails), a client's own loads, and
-settings the Core reads from each machine's profile. A client's trips to other stars are refused (the host picks the
-system; the host's `Activate` goes out as a post step). A resync drops every seat (a save does not hold the session) and
-costs a hitch on every peer (~0.3 s capture, ~0.3 s load each on this workstation). A client whose pause menu is open
-stops replaying and catches up after; 900 frames behind, it asks for a resync instead. The host's pause menu pauses
-everyone (no frames are made).
+**Failure modes.** What the hash catches and the save fixes: anything a peer does to the Core outside the frames. Since
+US-T43 normal play does nothing of the kind (the helm, the cockpit, the HUD's writers, loads and settings all go through the
+frames, below); what is left is listed at the end of the US-T43 section. A resync keeps every seat and the helm and each
+player's view, and costs a hitch on every peer (~0.3 s capture, ~0.3 s load each on this workstation). A client whose pause
+menu is open stops replaying and catches up after; 900 frames behind, it asks for a resync instead. The host's pause menu
+pauses everyone (no frames are made).
 
 **A Core finding on the way.** Core/Persistence names objects reachable from the Core's static fields once per process,
 the first time anything is saved or loaded, and refers to them by name; that walk also takes in what static caches hold
@@ -631,6 +628,107 @@ co-op smoke: injected desync detected at frame 1920; resynced: True; 8 digests a
 Single-player is unchanged (`-Mode smoke` as before). The host and clients raise Unreal's per-client net rates on the
 command line (`play.ps1`'s `-ini:Engine:...` overrides, no Config change): at the default ~100 KB/s a join's save would
 take most of a minute; on localhost it takes about a second.
+
+### Co-op completed (US-T43)
+
+US-T39 left five things single-machine; each now goes through the frames. Code: `Runtime/Coop/CoopInput.cs` (`PilotFrame`),
+`Runtime/Coop/CoopSettings.cs`, `Runtime/UI/Hud.Coop.cs` and more of `UnitySpaceApp.Coop.cs` / `CoopPeer.cs`; the ported
+originals change only at lines marked `US-T43`, each the original's behaviour in single-player. New frame entries:
+`h <p> take <ship> <up frame>` / `h <p> release` (the helm), `pi <p> <hands>` (the helm's input this frame), `k <p> <key>`
+(a cockpit key), `x <p> <verb> <args>` (an action that writes the Core), `set <key> <value>` (a shared setting).
+
+- **The helm (one per party).** The app has one pilot loop and the Core one `World.PilotedShip`; the law, sensors, the
+  chase, contracts and adventures all follow "the player's ship". So the party flies one helm at a time (other players
+  take guns, fighters and stations meanwhile; a take while someone else flies is refused). A take or release from the keys,
+  the picker, a spawn or a seat cycle goes out as an `h` entry; every peer runs the original `EnterPiloting`/`ExitPiloting`
+  at that frame. Then **every peer runs the whole original pilot loop** (`UpdatePiloting`: flight, collisions, the battle,
+  the law, the chase, gates, FTL, lanes) every frame on the holder's hands: the host writes them into each frame as a `pi`
+  entry (`PilotFrame`: every public field of the original `InputState` by name, plus what of the holder's machine the loop
+  reads: look sensitivity, whether a click panel had the mouse, its selection and hover for a lock, its camera's up frame
+  for levelling a fresh helm; the vertical mouse delta as "look up", each peer turning it back into its own invert
+  convention, a sign flip, so the loop sees the holder's look bit for bit). A client holder sends its hands every Update
+  (`pin`, reliable); the host composes what came since the last frame (held state from the latest, edges ORed, mouse deltas
+  summed, picks the latest) and the holder's own loop flies them when the frame comes back, like everyone's: a client's
+  helm answers one round trip late. Inside the loop (and the other shared steps: lost targets, the crew's course, a frame's
+  entries, a synced load) `IsPiloting` is true on every peer; outside it only on the holder's, so the others' keys, HUD and
+  cursor stay theirs. The holder's view, selection and toasts are the holder's alone (`CoopHelmMine` guards on the
+  camera lines; other players' toasts muted). Actions of the helm outside the loop are entries too: the tanker, a gate
+  course (`PlotCourse`), the course autopilot, a crew course, the FTL plot / clear / autopilot from the galaxy map.
+- **Cockpit keys.** At a fighter's cockpit, flight assist, a lock (with the aim), flares and the number keys (weapon
+  group, wing orders, weak point, power) go out as `k` commands; every peer runs the original `UpdateCockpit` at that frame
+  with that key alone pressed on the fighter that player holds.
+- **Trips: the party travels together.** The original's Session design has one local player, and the game's model one
+  system at full detail (`Galaxy.Focus`, promoted by `Activate`, coarse elsewhere) and one player point; players in
+  different systems would make different systems fine on different peers, which the lockstep cannot carry. So a trip
+  (the galaxy map, the star list) is the party's: an `x travel` entry; the host's view makes the trip (StarTravel) and every
+  client arrives with the host's `Activate` post step, on the system's overview. None starts while another player holds a
+  seat or the helm (it would be torn from them). The helm's own ways out (gates, its FTL drive) take everyone, as every
+  peer flies it; a crew course followed into another system takes the party when the host follows it.
+- **The Core's other writers.** The HUD's buttons that write the Core go out as `x` entries by what they act on (indices
+  every peer reads back the same: a settlement, a row of a board, an owned hull, a good) and every peer does at that
+  frame what the button does (`Hud.CoopExecute`, the original's calls, moved into small methods where they were inline):
+  the market board (buy, sell, refuel, pay a bounty, and the trade desk's price intelligence the open board records), the
+  prisoners' and outlaws' hand-over and ransom, outfitting (fit, strip, facility), contracts (take, abandon), the fleet
+  (deposit, withdraw, enlist, buy a hull, a warehouse, a share, a claim, hire/dismiss, orders), the trade desk (send on a
+  run, charter, recall, insure, cancel). Spawns (the dev grid, the practice fighter) carry the asker's camera spot in true
+  km and its up frame; every peer builds the hull and the asker takes its helm. A reset of time carries the asker's date.
+  A client's load is a request to the host (`load <slot>`): the host loads that slot of its own and every peer loads the
+  host's save. The **settings** the Core reads (the Streaming, Simulation, FTL, Civilizations, AI, Dogfighting,
+  Broadsides, Weapons and Economy groups) are the host's: every sync carries its values; a change the host makes goes out
+  as a `set` entry; a client's change is put back at once and asked of the host. Graphics, LOD, controls and audio stay
+  each machine's.
+- **Seats survive a resync.** A sync sends, with the save, what the save does not hold: who flies the helm (the save holds
+  the helm itself), each player's seat by its key (`seat <p> <key>`) and the host's shared settings. Every peer, the host
+  too, loads the bytes and takes the seats again on its fresh session in seat order (so every `SeatAuthority` names them
+  with the same ids), the clock's warp kept. A resync (a join, a desync, a slow client) also leaves each player's view as
+  it was (the system, scale, selection and camera); a load starts every view again, and its seats are gone (the loaded
+  game starts in command, as the original's).
+- **Edge timing.** Unreal's player controller reports a key pressed for the whole engine tick, and a client catching up
+  replays several host frames in one tick; the helm's and the cockpit's edges are sent once a tick (the smoke run's
+  scripted device clears its own after each Update).
+
+**Not co-op yet.** The galaxy map's strategy and envoy screens (production, build and research priorities, orders to
+groups, proposals, gifts, answers, broken pacts, declarations of war) and a polity hail (F12) still write the Core on the
+machine that clicks: the digest catches it and the host's save puts it right, so the host's own choices stand and a
+client's are lost. Seats in a fight are retaken by position (battle and unit index), so one lost in the very frame of a
+resync is not retaken. HostReloads off (`-CoopNoHostReload`, a debugging switch) keeps the host's session as it was, so
+seats are not retaken there.
+
+**Proof (2026-11-03).** `tools/play.ps1 -Track CSharp -Mode coop-smoke` (same two headless instances; the injected
+desync is gone, US-T39 proved detection): the client keeps a station's seat through a resync it asks for, spawns a
+freighter and flies it (throttle, mouse, roll, flight assist off) on its input stream, buys a crate at Earth through the
+market board's own handler, spawns a pirate carrier into a fight near Earth, hands it to its crew and takes one of its
+fighters' cockpits (7, F, Ctrl), takes the party to Alpha Centauri, and asks the host to load its quicksave; every digest
+must match and the only syncs be the join, the asked-for resync and the load (excerpt):
+
+```
+[client] smoke: client holds Earth Orbital defence platform 1 and asks for a resync at frame 1343 (a deliberate one: the seat must be kept)
+[host]   Client (player 2) keeps seat 1 (Earth Orbital defence platform 1) through the sync
+[client] Client (player 2) keeps seat 1 (Earth Orbital defence platform 1) through the sync
+[host]   Client (player 2) takes the helm of SFS Sandbox Freighter 1 (ship 266) at frame 1624
+[client] Client (player 2) takes the helm of SFS Sandbox Freighter 1 (ship 266) at frame 1624
+[client] smoke: client's helm at frame 1764: 0.031 km/s, flight assist off
+[host]   Client (player 2) action 'buy 0 0 1' at frame 1786
+[client] smoke: client's carrier Sandbox Carrier 2 is in Second Battle of Earth; 1 battles in Sol System; hands the helm to its crew at frame 2204
+[host]   Client (player 2) cockpit key 'n 7' on Sandbox Carrier 2 interceptor 1-1 at frame 2289
+[client] Client (player 2) cockpit key 'n 7' on Sandbox Carrier 2 interceptor 1-1 at frame 2289
+[host]   Client (player 2) action 'travel Alpha Centauri' at frame 2626
+[client] arrived in Alpha Centauri with the host's frame 2850
+[client] Client (player 2) asked: load quicksave (applied at frame 3459)
+[client] smoke: after the load the client is in Sol System at frame 3665
+[host]   smoke (host) done: the client said bye; frame 3898, 53 digest matches, 0 desyncs, 544 helm frames made here, 3 cockpit keys, 4 actions, 1 seats kept through syncs
+co-op smoke: 53 frames with both digests, 53 identical (frames 863..3840)
+co-op smoke: syncs: #1 at 863: Client joined; #2 at 1346: Client asked: a deliberate resync (smoke; #3 at 3367: the host loaded a save
+co-op smoke: every digest identical: True
+co-op smoke: no DESYNC: True
+co-op smoke: helm flown on the client's input: True   (544 helm inputs sent)
+co-op smoke: trade carried out (both peers): True
+co-op smoke: cockpit keys carried out (both peers): True
+co-op smoke: party trip (both peers), arrival: True
+```
+
+The digest now also covers the helm (holder, hull, frame body, position, velocity, facing, tanks, hold, flight assist,
+the courses). Single-player is unchanged: every hook is the original's line when `CoopPeer.Current` is null. These additions are the C# track's; the C++ track below mirrors US-T39.
 
 **The C++ track (US-T44).** `Cpp/Source/UnrealSpaceGod/Coop/` (`CoopWire`, `CoopPeer`, `SpaceCoopLink`, `CoopSmoke`) and
 the app partial `UnitySpaceApp.Coop.{inl,cpp}` are the C# files member for member: the same frame record and message

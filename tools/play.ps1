@@ -90,7 +90,10 @@ $coopNet = '-ini:Engine:[/Script/Engine.Player]:ConfiguredInternetSpeed=10000000
 if ($Mode -eq 'coop-smoke') {
   # -Mode coop-smoke (either track: US-T39 C#, US-T44 C++): two headless instances on localhost, a listen server (-SpaceGodCoopSmoke=host) and a
   # client (-SpaceGodCoopSmoke=client). The client joins and loads the host's save, presses '.' (warp) and '3' (select),
-  # takes a station's seat through the picker, and says bye after 1200 frames (tampering with its own Core once at 700: the host must detect it and resync); both log a digest of the shared state every
+  # takes a station's seat through the picker, keeps it through a deliberate resync, flies a freighter's helm, trades at
+  # Earth, takes a fighter's cockpit in a fight and uses its keys, takes the party to another star and has the host load
+  # its quicksave (C#, US-T43; the C++ track's client instead tampers with its own Core once at 700 and must be resynced),
+  # and says bye; both log a digest of the shared state every
   # 60 frames and this script compares them. Logs: <Track>/Saved/Logs/CoopSmokeHost.log and CoopSmokeClient.log.
   $cmd = Join-Path $engine 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
   $logs = Join-Path $project.DirectoryName 'Saved\Logs'
@@ -110,7 +113,7 @@ if ($Mode -eq 'coop-smoke') {
   }
   $clientArgs = @("`"$($project.FullName)`"", '127.0.0.1') + $common + @('-SpaceGodCoopSmoke=client', "`"-abslog=$clientLog`"")
   $clientP = Start-Process -FilePath $cmd -PassThru -NoNewWindow -ArgumentList $clientArgs -RedirectStandardOutput "$clientLog.out"
-  $deadline = (Get-Date).AddMinutes(8)
+  $deadline = (Get-Date).AddMinutes(11)
   while (-not ($hostP.HasExited -and $clientP.HasExited)) {
     if ((Get-Date) -gt $deadline) {
       foreach ($p in @($hostP, $clientP)) { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } }
@@ -131,14 +134,39 @@ if ($Mode -eq 'coop-smoke') {
   $same = @($frames | Where-Object { $digests.host[$_] -eq $digests.client[$_] })
   $range = if ($frames.Count -gt 0) { " (frames $($frames[0])..$($frames[-1]))" } else { '' }
   "co-op smoke: $($frames.Count) frames with both digests, $($same.Count) identical$range"
-  # The client tampers with its own Core once (CoopSmoke, frame 700 after the join): exactly that one digest must differ,
-  # the host must resync (sync #2), and every digest after it must match again.
   $differ = @($frames | Where-Object { $digests.host[$_] -ne $digests.client[$_] })
-  $resynced = Select-String -LiteralPath $hostLog -Pattern 'is in sync #2' -Quiet
-  $after = if ($differ.Count -eq 1) { @($frames | Where-Object { $_ -gt $differ[0] }) } else { @() }
-  "co-op smoke: injected desync detected at frame $($differ -join ', '); resynced: $resynced; $($after.Count) digests after it, all identical: $(@($after | Where-Object { $digests.host[$_] -ne $digests.client[$_] }).Count -eq 0)"
-  if ($frames.Count -eq 0 -or $differ.Count -ne 1 -or -not $resynced -or $after.Count -lt 2 -or
-    @($after | Where-Object { $digests.host[$_] -ne $digests.client[$_] }).Count -gt 0) { exit 1 }
+  if ($Track -eq 'Cpp') {
+    # The C++ track's client tampers with its own Core once (CoopSmoke, frame 700 after the join): exactly that one digest
+    # must differ, the host must resync (sync #2), and every digest after it must match again.
+    $resynced = Select-String -LiteralPath $hostLog -Pattern 'is in sync #2' -Quiet
+    $after = if ($differ.Count -eq 1) { @($frames | Where-Object { $_ -gt $differ[0] }) } else { @() }
+    "co-op smoke: injected desync detected at frame $($differ -join ', '); resynced: $resynced; $($after.Count) digests after it, all identical: $(@($after | Where-Object { $digests.host[$_] -ne $digests.client[$_] }).Count -eq 0)"
+    if ($frames.Count -eq 0 -or $differ.Count -ne 1 -or -not $resynced -or $after.Count -lt 2 -or
+      @($after | Where-Object { $digests.host[$_] -ne $digests.client[$_] }).Count -gt 0) { exit 1 }
+    exit 0
+  }
+  # US-T43 (the C# track): every digest must match (nothing writes the Core outside the frames any more), and the only
+  # syncs are the deliberate ones: the join, the client's asked-for resync (its seat kept through it on both peers) and
+  # the host's load.
+  $hostText = if (Test-Path -LiteralPath $hostLog) { Get-Content -LiteralPath $hostLog -Raw } else { '' }
+  $clientText = if (Test-Path -LiteralPath $clientLog) { Get-Content -LiteralPath $clientLog -Raw } else { '' }
+  $syncs = @([regex]::Matches($hostText, 'sync #(\d+) at frame (\d+) \(([^)]*)\)') | ForEach-Object { "#$($_.Groups[1].Value) at $($_.Groups[2].Value): $($_.Groups[3].Value)" })
+  function Both([string]$pattern) { ($hostText -match $pattern) -and ($clientText -match $pattern) }
+  $checks = [ordered]@{
+    'every digest identical'                    = $frames.Count -ge 10 -and $differ.Count -eq 0
+    'no DESYNC'                                 = -not ($hostText -cmatch 'DESYNC at')
+    'syncs only the join, the asked-for one and the load' = $syncs.Count -eq 3 -and $syncs[0] -match 'joined' -and $syncs[1] -match 'deliberate resync' -and $syncs[2] -match 'loaded a save'
+    'seat kept through the resync (both peers)' = Both 'keeps seat \d+ \(.*\) through the sync'
+    'helm taken in the frames (both peers)'     = Both 'takes the helm of .*Sandbox Freighter'
+    'helm flown on the client''s input'         = ($clientText -match '(\d+) helm inputs sent') -and [int]([regex]::Match($clientText, '(\d+) helm inputs sent').Groups[1].Value) -gt 100
+    'trade carried out (both peers)'            = Both "action 'buy "
+    'cockpit keys carried out (both peers)'     = Both "cockpit key 'n 7'"
+    'party trip (both peers), arrival'          = (Both "action 'travel ") -and ($clientText -match 'arrived in .* with the host''s frame')
+    'client load asked of the host'             = $hostText -match "asked: load quick"
+  }
+  "co-op smoke: syncs: $($syncs -join '; ')"
+  foreach ($k in $checks.Keys) { "co-op smoke: $($k): $($checks[$k])" }
+  if (@($checks.Values | Where-Object { -not $_ }).Count -gt 0) { exit 1 }
   exit 0
 }
 
