@@ -246,16 +246,10 @@ namespace SpaceGod::UnityCompat
 				e.type = e.rawType = EventType::KeyDown;
 				e.keyCode = code;
 				FillModifiers(e, k.GetModifierKeys());
-				Enqueue(e, input.absMouse);
-				// Unity follows a key that types with a KeyDown carrying the character (and KeyCode None).
+				// One KeyDown carrying the key and the character it types, as the C# track's host sends it (US-T28).
 				char32_t ch = TypedCharacter(code, k.IsShiftDown(), k.AreCapsLocked());
-				if (ch != 0 && !k.IsControlDown() && !k.IsAltDown())
-				{
-					Event c = e;
-					c.keyCode = KeyCode::None;
-					c.character = ch;
-					Enqueue(c, input.absMouse);
-				}
+				if (ch != 0 && !k.IsControlDown() && !k.IsAltDown()) e.character = ch;
+				Enqueue(e, input.absMouse);
 				return false;
 			}
 
