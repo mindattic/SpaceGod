@@ -11,7 +11,7 @@ namespace SpaceGod::Core
 	/// when the camera sits a few kilometres from a ship. Conversion to float happens only after
 	/// subtracting the camera position (camera-relative rendering).
 	/// </summary>
-	struct DVec3
+	struct SPACEGODCORE_API DVec3
 	{
 		double X = 0;
 		double Y = 0;

@@ -18,14 +18,14 @@ namespace SpaceGod::Core
 	/// warp, never drifts, and can be evaluated at arbitrary future dates, which ship flight
 	/// planning needs for intercepts.
 	/// </summary>
-	class Ephemeris final
+	class SPACEGODCORE_API Ephemeris final
 	{
 	public:
 		cs::Ref<BodyCatalog> Catalog;
 		double Jd = cs::Double::NaN;
 
 	private:
-		struct FrameBasis
+		struct SPACEGODCORE_API FrameBasis
 		{
 		private:
 			DVec3 x;

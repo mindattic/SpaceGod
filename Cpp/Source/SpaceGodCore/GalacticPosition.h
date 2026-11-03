@@ -23,7 +23,7 @@ namespace SpaceGod::Core
 	/// ephemeris and fleet have always had them); <see cref="StarSystem.Origin"/> is where that frame sits in the
 	/// galaxy, and <see cref="StarSystem.At"/> / <see cref="StarSystem.LocalKm"/> convert between the two levels.
 	/// </summary>
-	struct GalacticPosition
+	struct SPACEGODCORE_API GalacticPosition
 	{
 		/// <summary>The edge of one sector, km (a billion km, about 6.7 AU): small enough that the offset inside it holds to
 		/// a tenth of a millimetre, large enough that a star system's inner worlds share a handful of sectors.</summary>

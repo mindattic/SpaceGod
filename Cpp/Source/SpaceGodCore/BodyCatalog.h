@@ -30,7 +30,7 @@ namespace SpaceGod::Core
 	///    the ecliptic, not on the ICRF equator as in JPL's table.
 	///  - Radii, GM, poles and rotation: IAU WGCCRE report and NASA planetary fact sheets.
 	/// </summary>
-	class BodyCatalog final
+	class SPACEGODCORE_API BodyCatalog final
 	{
 	public:
 		const cs::List<cs::Ref<BodyDefinition>>& Bodies() const { return bodies; }
@@ -39,11 +39,9 @@ namespace SpaceGod::Core
 
 	private:
 		cs::List<cs::Ref<BodyDefinition>> bodies;
-		// C#: Dictionary<string, BodyDefinition>(StringComparer.OrdinalIgnoreCase). cs::Dictionary has no comparer
-		// parameter, so names are keyed by their lower-case form (NameKey); the map is only looked up, never enumerated.
-		cs::Dictionary<cs::String, cs::Ref<BodyDefinition>> byName;
+		// C#: Dictionary<string, BodyDefinition>(StringComparer.OrdinalIgnoreCase).
+		cs::Dictionary<cs::String, cs::Ref<BodyDefinition>, cs::OrdinalIgnoreCaseComparer> byName;
 		cs::List<cs::List<int>> children;
-		static cs::String NameKey(const cs::String& name) { return cs::Strings::ToLowerInvariant(name); }
 
 	public:
 		explicit BodyCatalog(const cs::List<cs::Ref<BodyDefinition>>& definitions);
@@ -68,8 +66,8 @@ namespace SpaceGod::Core
 		double OuterEdgeKm() const;
 
 		cs::Ref<BodyDefinition> operator[](int index) const { return bodies[index]; }
-		cs::Ref<BodyDefinition> operator[](const cs::String& name) const { return byName[NameKey(name)]; }
-		bool TryGet(const cs::String& name, cs::Ref<BodyDefinition>& body) const { return byName.TryGetValue(NameKey(name), body); }
+		cs::Ref<BodyDefinition> operator[](const cs::String& name) const { return byName.At(name); }
+		bool TryGet(const cs::String& name, cs::Ref<BodyDefinition>& body) const { return byName.TryGetValue(name, body); }
 		const cs::List<int>& ChildrenOf(int index) const { return children[index]; }
 
 		static cs::Ref<BodyCatalog> CreateSolSystem();

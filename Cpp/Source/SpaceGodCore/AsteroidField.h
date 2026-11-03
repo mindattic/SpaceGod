@@ -29,7 +29,7 @@ namespace SpaceGod::Core
 	/// drifts from its true place by roughly 0.01 AU per year (see the tests against JPL Horizons).
 	/// Kirkwood gaps and the Trojan clouds are in the data itself, not modelled.
 	/// </summary>
-	class AsteroidField final
+	class SPACEGODCORE_API AsteroidField final
 	{
 	public:
 		/// <summary>Gaussian gravitational constant: mean motion (rad/day) of a 1 AU orbit around the Sun.</summary>

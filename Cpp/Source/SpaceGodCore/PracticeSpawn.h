@@ -9,7 +9,7 @@ namespace SpaceGod::Core
 	class Ship;
 
 	/// <summary>Something a practice fighter must not be spawned inside: a sphere, heliocentric km.</summary>
-	struct SpawnObstacle
+	struct SPACEGODCORE_API SpawnObstacle
 	{
 		DVec3 CentreKm;
 		double RadiusKm = 0;
@@ -26,7 +26,7 @@ namespace SpaceGod::Core
 	/// taken, or still in a fight is replaced by a new one. This is the placement: the spot nudged clear of every hull,
 	/// station, wreck and world near it, so the fighter never starts inside anything.
 	/// </summary>
-	class PracticeSpawn
+	class SPACEGODCORE_API PracticeSpawn
 	{
 	public:
 		/// <summary>What a practice fighter is called (after its faction's prefix): how one is found again, a save later.</summary>

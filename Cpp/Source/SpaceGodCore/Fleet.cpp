@@ -650,7 +650,7 @@ namespace SpaceGod::Core
 		return true;
 	}
 
-	cs::Ref<ParkingOrbit> Fleet::WanderOrbit(int body, cs::Ref<Ship> ship)
+	cs::Ref<ParkingOrbit> Fleet::WanderOrbit(int body, cs::Ref<Ship> /*ship*/)
 	{
 		auto b = (*catalog)[body];
 		double inner = b->RadiusKm * 3;

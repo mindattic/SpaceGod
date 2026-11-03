@@ -26,7 +26,7 @@ namespace SpaceGod::Core
 	/// One chapter of the in-game manual: its title in the contents list, a line saying what it covers, its topics,
 	/// and the <see cref="ControlsHelp"/> groups whose keys it prints after them (the keys live in one place only).
 	/// </summary>
-	class ManualChapter final
+	class SPACEGODCORE_API ManualChapter final
 	{
 	public:
 		cs::String Title;
@@ -55,7 +55,7 @@ namespace SpaceGod::Core
 	/// its line in <see cref="ControlsHelp"/> (which the chapters print, so a key is never written twice). A new
 	/// chapter is one more entry in <see cref="Chapters"/>.
 	/// </summary>
-	class GameManual
+	class SPACEGODCORE_API GameManual
 	{
 	public:
 		/// <summary>The last chapter: every key group of <see cref="ControlsHelp"/>, the whole reference card.</summary>

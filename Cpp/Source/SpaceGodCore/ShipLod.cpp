@@ -84,8 +84,8 @@ namespace SpaceGod::Core
 		for (const auto& k : order)
 		{
 			if (sb.Length() > 0) sb.Append(", ");
-			sb.Append(mounted[k]).Append(' ').Append(cs::Strings::ToLowerInvariant(SubsystemDef::Name(k)));
-			if (lost[k] > 0) sb.Append(" (").Append(lost[k]).Append(" lost)");
+			sb.Append(mounted.At(k)).Append(' ').Append(cs::Strings::ToLowerInvariant(SubsystemDef::Name(k)));
+			if (lost.At(k) > 0) sb.Append(" (").Append(lost.At(k)).Append(" lost)");
 		}
 		return sb.ToString();
 	}

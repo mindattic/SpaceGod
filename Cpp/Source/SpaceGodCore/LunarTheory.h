@@ -13,7 +13,7 @@ namespace SpaceGod::Core
 	/// the Sun's pull swings it up to 1.3° ahead or behind (evection) and 0.7° more (variation).
 	/// With these terms it stays within a few hundredths of a degree of JPL Horizons.
 	/// </summary>
-	class LunarTheory
+	class SPACEGODCORE_API LunarTheory
 	{
 	public:
 		// The coefficient tables (LrArgs, Lcoef, Rcoef, BArgs, Bcoef) are private constant arrays in LunarTheory.cpp.

@@ -27,7 +27,7 @@ namespace SpaceGod::Core
 	/// stay outside the body at every blend. Intermediate blends interpolate in log space, which
 	/// reads as a smooth zoom across the factor-of-40 differences.
 	/// </summary>
-	class ScaleModel final
+	class SPACEGODCORE_API ScaleModel final
 	{
 	public:
 		static constexpr double KmPerUnit = 1000.0;

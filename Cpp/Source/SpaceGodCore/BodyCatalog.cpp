@@ -13,7 +13,7 @@ namespace SpaceGod::Core
 		for (int i = 0; i < bodies.Count(); i++)
 		{
 			bodies[i]->Index = i;
-			byName[NameKey(bodies[i]->Name)] = bodies[i];
+			byName[bodies[i]->Name] = bodies[i];
 		}
 
 		children = cs::NewArray<cs::List<int>>(bodies.Count());
@@ -24,7 +24,7 @@ namespace SpaceGod::Core
 			if (!b->ParentName.empty()) // C#: b.ParentName != null
 			{
 				cs::Ref<BodyDefinition> parent;
-				if (!byName.TryGetValue(NameKey(b->ParentName), parent))
+				if (!byName.TryGetValue(b->ParentName, parent))
 					throw cs::InvalidOperationException(cs::Cat(b->Name, ": unknown parent ", b->ParentName));
 				if (parent->Index > b->Index)
 					throw cs::InvalidOperationException(cs::Cat(b->Name, ": parent ", parent->Name, " must be listed first"));

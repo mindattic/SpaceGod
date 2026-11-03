@@ -31,7 +31,7 @@ namespace SpaceGod::Core
 		/// <summary>A minor body smaller than a dwarf planet: the main belt's Psyche, Lutetia and Ida, Jupiter's Trojans Hektor, Patroclus and Eurybates.</summary>
 		Asteroid,
 	};
-	const char* ToString(BodyKind v);
+	SPACEGODCORE_API const char* ToString(BodyKind v);
 
 	/// <summary>How sure astronomy is that a body exists.</summary>
 	enum class BodyStatus : int
@@ -47,7 +47,7 @@ namespace SpaceGod::Core
 		/// <summary>Invented for the game layer (stations).</summary>
 		Fictional,
 	};
-	const char* ToString(BodyStatus v);
+	SPACEGODCORE_API const char* ToString(BodyStatus v);
 
 	/// <summary>Which plane a body's orbital elements are measured against.</summary>
 	enum class OrbitPlane : int
@@ -61,7 +61,7 @@ namespace SpaceGod::Core
 		/// </summary>
 		ParentEquator,
 	};
-	const char* ToString(OrbitPlane v);
+	SPACEGODCORE_API const char* ToString(OrbitPlane v);
 
 	struct Rgb
 	{

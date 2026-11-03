@@ -10,7 +10,7 @@ namespace SpaceGod::Core
 	/// <summary>Simulation time as a Julian date, advanced by real time multiplied by a warp level.</summary>
 	// C#: [SettingsSource] -- its settings (StartingWarp) register when StartingWarp() is first called; the C++
 	// stand-in for SettingsRegistry.DiscoverDeclarations must call it (see the Settings port).
-	class SimClock final
+	class SPACEGODCORE_API SimClock final
 	{
 	public:
 		struct WarpLevel

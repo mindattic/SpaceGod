@@ -7,7 +7,7 @@
 namespace SpaceGod::Core
 {
 	/// <summary>Physical constants and time conversions shared by the whole simulation.</summary>
-	class Astro
+	class SPACEGODCORE_API Astro
 	{
 	public:
 		static constexpr double AuKm = 149597870.7;

@@ -126,7 +126,7 @@ namespace SpaceGod::Core
 		/// an <see cref="OreTug"/>'s machinery on a lighter frame, for far smaller loads.</summary>
 		CaptureTug,
 	};
-	const char* ToString(ShipClass v);
+	SPACEGODCORE_API const char* ToString(ShipClass v);
 
 	enum class ShipRole : int
 	{
@@ -186,7 +186,7 @@ namespace SpaceGod::Core
 		/// </summary>
 		Colonist,
 	};
-	const char* ToString(ShipRole v);
+	SPACEGODCORE_API const char* ToString(ShipRole v);
 
 	enum class ShipPhase : int
 	{
@@ -216,9 +216,9 @@ namespace SpaceGod::Core
 		/// <summary>Climbing back up to the ring to leave.</summary>
 		Ascent,
 	};
-	const char* ToString(ShipPhase v);
+	SPACEGODCORE_API const char* ToString(ShipPhase v);
 
-	class ShipClassSpec final
+	class SPACEGODCORE_API ShipClassSpec final
 	{
 	public:
 		ShipClass Class = ShipClass::Carrier;
@@ -238,7 +238,7 @@ namespace SpaceGod::Core
 		static cs::Ref<ShipClassSpec> Of(ShipClass c);
 	};
 
-	class Faction final
+	class SPACEGODCORE_API Faction final
 	{
 	public:
 		cs::String Name;
@@ -292,7 +292,7 @@ namespace SpaceGod::Core
 	};
 
 	/// <summary>A circular parking orbit around a body, in a plane given by an orthonormal pair (U, V).</summary>
-	class ParkingOrbit final
+	class SPACEGODCORE_API ParkingOrbit final
 	{
 	public:
 		int Body = 0;
@@ -331,7 +331,7 @@ namespace SpaceGod::Core
 	};
 
 	// Ship passes itself as a Ref (Controller => Leader ?? this), hence enable_shared_from_this.
-	class Ship final : public std::enable_shared_from_this<Ship>
+	class SPACEGODCORE_API Ship final : public std::enable_shared_from_this<Ship>
 	{
 	public:
 		int Id = 0;

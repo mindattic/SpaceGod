@@ -25,7 +25,7 @@ namespace SpaceGod::Core
 		Aggregate,
 		Culled,
 	};
-	const char* ToString(LodTier v);
+	SPACEGODCORE_API const char* ToString(LodTier v);
 
 	/// <summary>What a class of thing becomes once it is too small to draw as a model.</summary>
 	enum class LodFar : int
@@ -39,14 +39,14 @@ namespace SpaceGod::Core
 		/// <summary>An icon however small it gets, folded into a mark with its neighbours when they crowd (ships, worlds).</summary>
 		Icon,
 	};
-	const char* ToString(LodFar v);
+	SPACEGODCORE_API const char* ToString(LodFar v);
 
 	/// <summary>
 	/// One class of renderable thing and how it degrades: whether it has a simpler model, the apparent size below which
 	/// its model gives way to its far form, and what that far form is. New renderable things register one with
 	/// <see cref="RenderLod.Register"/> instead of drawing in full at every size.
 	/// </summary>
-	class LodClass final
+	class SPACEGODCORE_API LodClass final
 	{
 	public:
 		cs::String Key, Name;
@@ -94,7 +94,7 @@ namespace SpaceGod::Core
 	};
 
 	/// <summary>One mark drawn for one or more icons (see <see cref="RenderLod.Aggregate"/>).</summary>
-	class LodCluster final
+	class SPACEGODCORE_API LodCluster final
 	{
 	public:
 		/// <summary>Index of the icon that stands for the mark.</summary>
@@ -128,7 +128,7 @@ namespace SpaceGod::Core
 	/// touched (C#'s type initialiser); here they live in one function-local State built the same way, and every
 	/// static field is reached through an accessor of the same name.
 	/// </remarks>
-	class RenderLod
+	class SPACEGODCORE_API RenderLod
 	{
 	public:
 		/// <summary>Below this many pixels long a model drops its detail for its simplified form.</summary>

@@ -55,7 +55,7 @@ namespace SpaceGod::Core
 		return made;
 	}
 
-	int World::ReplaceWorksEscorts(double jd)
+	int World::ReplaceWorksEscorts(double /*jd*/)
 	{
 		if (Mining == nullptr) return 0;
 		int built = 0;

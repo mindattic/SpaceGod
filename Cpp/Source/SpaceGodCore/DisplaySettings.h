@@ -17,10 +17,10 @@ namespace SpaceGod::Core
 		/// <summary>The screen handed over to the game outright, switched to the chosen size and refresh rate.</summary>
 		Exclusive,
 	};
-	const char* ToString(DisplayMode v);
+	SPACEGODCORE_API const char* ToString(DisplayMode v);
 
 	/// <summary>One size the screen can be set to, at the highest refresh rate it offers that size.</summary>
-	struct DisplayResolution
+	struct SPACEGODCORE_API DisplayResolution
 	{
 		int Width = 0, Height = 0;
 		double RefreshHz = 0;
@@ -53,7 +53,7 @@ namespace SpaceGod::Core
 	/// screen, and whether frames wait for the screen's refresh. Kept free of the engine, so the pause menu's
 	/// choices and what is remembered between runs can be checked without it.
 	/// </summary>
-	struct DisplaySettings
+	struct SPACEGODCORE_API DisplaySettings
 	{
 		int Width = 0, Height = 0;
 		DisplayMode Mode{};

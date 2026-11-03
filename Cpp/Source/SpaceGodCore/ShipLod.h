@@ -18,7 +18,7 @@ namespace SpaceGod::Core
 	/// so they always agree on which form a ship is in.
 	/// </summary>
 	/// <remarks>C#: [SettingsSource]. Both settings are built together on first use (C#'s type initialiser), in textual order.</remarks>
-	class ShipLod
+	class SPACEGODCORE_API ShipLod
 	{
 	public:
 		/// <summary>Below this many pixels long on screen a ship is drawn as its icon, not its model.</summary>

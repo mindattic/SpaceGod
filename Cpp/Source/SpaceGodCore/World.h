@@ -79,7 +79,7 @@ namespace SpaceGod::Core
 		/// <summary>A crime recorded, a bounty posted, paid or collected (see <see cref="Law"/>).</summary>
 		Law,
 	};
-	const char* ToString(WorldEventKind v);
+	SPACEGODCORE_API const char* ToString(WorldEventKind v);
 
 	struct WorldEvent
 	{
@@ -100,7 +100,7 @@ namespace SpaceGod::Core
 	/// </summary>
 	// World hands itself to its subsystems (new Sensors(this), Polities.Register(this), ...), hence enable_shared_from_this;
 	// its C# constructor body runs as Construct() right after the Ref is made (shared_from_this is not usable inside a constructor).
-	class World final : public std::enable_shared_from_this<World>
+	class SPACEGODCORE_API World final : public std::enable_shared_from_this<World>
 	{
 	public:
 		// ================================================================ World.cs

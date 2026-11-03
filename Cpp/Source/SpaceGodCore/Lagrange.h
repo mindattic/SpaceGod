@@ -31,7 +31,7 @@ namespace SpaceGod::Core
 		/// <summary>60° behind it (stable: Jupiter's Trojan camp).</summary>
 		L5 = 5,
 	};
-	const char* ToString(LagrangePoint v);
+	SPACEGODCORE_API const char* ToString(LagrangePoint v);
 
 	/// <summary>
 	/// The Lagrange points of every body pair, from the circular restricted three-body problem
@@ -42,7 +42,7 @@ namespace SpaceGod::Core
 	/// Earth-Moon barycentre, EM-L1 to L5 for Earth and the Moon). Each point moves with its pair,
 	/// so anything put there stays co-orbital.
 	/// </summary>
-	class Lagrange
+	class SPACEGODCORE_API Lagrange
 	{
 	private:
 		static inline const double Sin60 = cs::Math::Sqrt(3) / 2;

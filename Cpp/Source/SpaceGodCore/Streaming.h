@@ -24,7 +24,7 @@ namespace SpaceGod::Core
 	/// once; the gate transit covers it (<see cref="GateCover"/>), holding its tunnel open until the far side is in.
 	/// </summary>
 	/// <remarks>C#: [SettingsSource]. The three settings are built together on first use (C#'s type initialiser), in textual order.</remarks>
-	class Streaming
+	class SPACEGODCORE_API Streaming
 	{
 	public:
 		/// <summary>The share of a frame's time loading may spend.</summary>
@@ -156,7 +156,7 @@ namespace SpaceGod::Core
 	/// (<see cref="HoldAt"/> of the way through) it is held for as long as the far side is still loading, up to a cap,
 	/// so the destination is never seen half built; the rest of it plays out once loading is done.
 	/// </summary>
-	class GateCover final
+	class SPACEGODCORE_API GateCover final
 	{
 	public:
 		/// <summary>The effect's own length, seconds, with no hold.</summary>

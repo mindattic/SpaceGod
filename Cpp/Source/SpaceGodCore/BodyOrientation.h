@@ -20,7 +20,7 @@ namespace SpaceGod::Core
 	/// Maps are east-positive: with the map's north up, longitude increases to the right, which is
 	/// counter-clockwise seen from above the north pole.
 	/// </summary>
-	class BodyOrientation
+	class SPACEGODCORE_API BodyOrientation
 	{
 	public:
 		/// <summary>The map's north pole (ecliptic unit vector).</summary>

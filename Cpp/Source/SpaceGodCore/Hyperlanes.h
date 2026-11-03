@@ -90,7 +90,7 @@ namespace SpaceGod::Core
 	/// C++: a route (Route, HeavyRoute, RouteFor) is a cs::Ref&lt;cs::List&lt;LaneHop&gt;&gt;: C# returns null for
 	/// no route and hands out the cached list itself.
 	/// </remarks>
-	class Hyperlanes final
+	class SPACEGODCORE_API Hyperlanes final
 	{
 	public:
 		cs::List<cs::Ref<Lane>> Lanes;

@@ -20,14 +20,14 @@ namespace SpaceGod::Core
 		/// <summary>Open the pause menu.</summary>
 		OpenPauseMenu,
 	};
-	const char* ToString(EscapeAction v);
+	SPACEGODCORE_API const char* ToString(EscapeAction v);
 
 	/// <summary>
 	/// Esc backs out of one layer at a time (U.SPC-T276): an open panel first, then the camera's focus, then the
 	/// selection, and with nothing left to back out of it opens the pause menu. At the helm the chase camera and
 	/// the selection belong to the flight, so Esc goes straight from the panels to the menu (P lets go of the helm).
 	/// </summary>
-	class EscapeKey
+	class SPACEGODCORE_API EscapeKey
 	{
 	public:
 		static EscapeAction Route(bool panelOpen, bool piloting, bool focused, bool selected);

@@ -44,7 +44,7 @@ namespace SpaceGod::Core
 	/// whole schedule is deterministic and can be evaluated at any time. A hop within one planet's
 	/// system is flown in that planet's frame, which carries the ship along the planet's orbit.
 	/// </summary>
-	class Fleet final
+	class SPACEGODCORE_API Fleet final
 	{
 	private:
 		// C++ only: hashes the value-tuple keys of helioCache and conicOptions (cs::Hash has no tuple support).

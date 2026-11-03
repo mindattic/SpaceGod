@@ -24,7 +24,7 @@ namespace SpaceGod::Core
 	///  - Uranus: Sromovsky &amp; Fry 2005 / Hammel et al. 2001; retrograde equator, +250 m/s near 60°.
 	///  - Neptune: Voyager, Sromovsky et al. 1993; -400 m/s at the equator, +250 m/s near 70°.
 	/// </summary>
-	class GasGiantWeather
+	class SPACEGODCORE_API GasGiantWeather
 	{
 	public:
 		/// <summary>

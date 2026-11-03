@@ -12,7 +12,7 @@ namespace SpaceGod::Core
 		HardpointBuilding,
 		StaticStructures,
 	};
-	const char* ToString(CandidateRole v);
+	SPACEGODCORE_API const char* ToString(CandidateRole v);
 
 	/// <summary>How sure the project is that a candidate runs on a given Unity / render pipeline.</summary>
 	enum class Compatibility : int
@@ -22,13 +22,13 @@ namespace SpaceGod::Core
 		Works,
 		Fails,
 	};
-	const char* ToString(Compatibility v);
+	SPACEGODCORE_API const char* ToString(Compatibility v);
 
 	/// <summary>
 	/// One Asset Store package under evaluation. The demo scene is where a showcase goes once the package is
 	/// bought and imported; the menu shows the candidate as not installed until that scene is in the build.
 	/// </summary>
-	class AssetCandidate final
+	class SPACEGODCORE_API AssetCandidate final
 	{
 	public:
 		cs::String Id;
@@ -54,7 +54,7 @@ namespace SpaceGod::Core
 	};
 
 	/// <summary>The leading Asset Store candidates the proof-of-concept submenu lists.</summary>
-	class AssetLibraryCandidates
+	class SPACEGODCORE_API AssetLibraryCandidates
 	{
 	public:
 		static const cs::List<cs::Ref<AssetCandidate>>& All();

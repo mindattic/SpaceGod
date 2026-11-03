@@ -13,7 +13,7 @@ namespace SpaceGod::Core
 	/// longitude of perihelion ϖ, longitude of ascending node Ω, each with a per-century rate.
 	/// Every body uses this one shape; moons and minor planets are converted into it.
 	/// </summary>
-	class OrbitalElements final
+	class SPACEGODCORE_API OrbitalElements final
 	{
 	public:
 		double EpochJd = 0;

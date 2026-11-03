@@ -210,7 +210,7 @@ namespace SpaceGod::Core
 			s->Role != ShipRole::Tender && s->Role != ShipRole::Tug && s->Role != ShipRole::Hauler;
 	}
 
-	void World::PayToll(cs::Ref<Ship> ship, LaneHop hop, double jd)
+	void World::PayToll(cs::Ref<Ship> ship, LaneHop hop, double /*jd*/)
 	{
 		// An ore tug on its works' heavy lanes rides at its works' charge, like a tender at its upkeep (U.SPC-T498).
 		if (ship->Spec->IsMilitary || ship->PatrolWing || ship->Faction->IsPirate || ship == PilotedShip || ship->Role == ShipRole::Tender || ship->Role == ShipRole::Tug ||
@@ -673,7 +673,7 @@ namespace SpaceGod::Core
 		cs::List<cs::String> haulers = { "Dross", "Cinder", "Ore Moth", "Spoil" };
 		cs::List<cs::String> couriers = { "Long Shot", "Lightspeed Promise" };
 		w->BuildMerchants(startJd, freighters, haulers, couriers,
-			cs::List<cs::Ref<Faction>>{ w->Independents, w->Independents, combine, w->Independents, accord }, [combine](int i) { return combine; });
+			cs::List<cs::Ref<Faction>>{ w->Independents, w->Independents, combine, w->Independents, accord }, [combine](int /*i*/) { return combine; });
 
 		w->Companies->MaxCompanies = 5;
 		using Co = std::tuple<cs::String, cs::String, cs::String, cs::Ref<Faction>, bool>;
@@ -1187,7 +1187,7 @@ namespace SpaceGod::Core
 		return navy < NavyCap ? War->ChooseWarship(yard) : std::nullopt;
 	}
 
-	cs::Nullable<ShipClass> World::ChooseBuild(cs::Ref<Settlement> yard)
+	cs::Nullable<ShipClass> World::ChooseBuild(cs::Ref<Settlement> /*yard*/)
 	{
 		if (TraderCount() >= MerchantCap) return std::nullopt;
 		return builtCount % 3 == 2 ? ShipClass::Miner : ShipClass::Freighter;

@@ -41,7 +41,7 @@ namespace SpaceGod::Core
 	/// Every key, control and help line of the game, in groups (U.SPC-T494): what the Help screen prints, from the
 	/// main menu, the Esc menu or H / F1 in game. A new key gets its line here, in the group it belongs to.
 	/// </summary>
-	class ControlsHelp
+	class SPACEGODCORE_API ControlsHelp
 	{
 	private:
 		static HelpLine L(const cs::String& keys, const cs::String& text) { return HelpLine(keys, text); }

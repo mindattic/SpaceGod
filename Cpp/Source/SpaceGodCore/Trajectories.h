@@ -18,7 +18,7 @@ namespace SpaceGod::Core
 		Torch,
 		LowThrust,
 	};
-	const char* ToString(DriveKind v);
+	SPACEGODCORE_API const char* ToString(DriveKind v);
 
 	/// <summary>
 	/// Two-body orbital mechanics for planning transfers: universal-variable Kepler propagation, a
@@ -26,7 +26,7 @@ namespace SpaceGod::Core
 	/// of influence, escape and capture burns, the hyperbola a ship flies out of a world's well).
 	/// Every function takes any consistent units (km and seconds, or km and days with mu in km³/day²).
 	/// </summary>
-	class Conics
+	class SPACEGODCORE_API Conics
 	{
 	public:
 		/// <summary>Stumpff function C(z) = (1 - cos √z) / z (its hyperbolic form for z &lt; 0).</summary>
@@ -129,7 +129,7 @@ namespace SpaceGod::Core
 	/// <see cref="VInf"/>, in the plane of <see cref="P"/> (towards periapsis) and <see cref="Q"/>
 	/// (the way it moves there). Time is measured from periapsis: positive leaving, negative arriving.
 	/// </summary>
-	class Hyperbola final
+	class SPACEGODCORE_API Hyperbola final
 	{
 	public:
 		double Mu = 0, Rp = 0, VInf = 0, E = 0, A = 0;
@@ -194,7 +194,7 @@ namespace SpaceGod::Core
 	/// hyperbola to circularise in its new parking orbit. Times in days, distances in km, velocities in
 	/// km/day, mu in km³/day².
 	/// </summary>
-	class ConicTransfer final
+	class SPACEGODCORE_API ConicTransfer final
 	{
 	public:
 		/// <summary>The frame's gravitational parameter, km³/day².</summary>

@@ -257,6 +257,7 @@ namespace cs
 		const V& operator[](const K& k) const { auto it = index.find(k); if (it == index.end()) throw KeyNotFoundException("key"); return entries[static_cast<size_t>(it->second)].Value; }
 		V& operator[](const K& k) { auto it = index.find(k); if (it != index.end()) return entries[static_cast<size_t>(it->second)].Value; return Insert(k, V{}); }
 		V& At(const K& k) { auto it = index.find(k); if (it == index.end()) throw KeyNotFoundException("key"); return entries[static_cast<size_t>(it->second)].Value; }
+		const V& At(const K& k) const { return (*this)[k]; }
 		void Set(const K& k, const V& v) { (*this)[k] = v; }
 		void Add(const K& k, const V& v) { if (ContainsKey(k)) throw ArgumentException("An item with the same key has already been added."); Insert(k, v); }
 		bool TryAdd(const K& k, const V& v) { if (ContainsKey(k)) return false; Insert(k, v); return true; }

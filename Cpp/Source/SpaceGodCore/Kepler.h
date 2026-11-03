@@ -36,7 +36,7 @@ namespace SpaceGod::Core
 	};
 
 	/// <summary>Two-body (Keplerian) propagation: Kepler's equation and the perifocal-to-reference rotation.</summary>
-	class Kepler
+	class SPACEGODCORE_API Kepler
 	{
 	public:
 		/// <summary>Solves M = E - e·sin(E) for E by Newton-Raphson; robust up to e≈0.99.</summary>

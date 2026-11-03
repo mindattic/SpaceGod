@@ -38,7 +38,7 @@ namespace SpaceGod::Core
 		m->FreighterFree = [this](cs::Ref<Ship> freighter) { return FreighterFree(freighter); };
 		m->ConvoySailed = [this](cs::Ref<MaterialConvoy> convoy, double jd) { FreighterSailed(convoy, jd); };
 		m->ConvoyDelivered = [this](cs::Ref<MaterialConvoy> convoy, double jd) { FreighterDelivered(convoy, jd); };
-		m->YardBuilt = [this](cs::Ref<MegastructureProject> p, double jd)
+		m->YardBuilt = [this](cs::Ref<MegastructureProject> p, double /*jd*/)
 		{
 			for (const auto& s : Economy->Settlements)
 			{
