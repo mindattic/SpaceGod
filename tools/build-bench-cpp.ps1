@@ -48,7 +48,7 @@ if (-not ($env:VCToolsInstallDir -and (Get-Command cl.exe -ErrorAction SilentlyC
 
 $flags = @('/nologo', '/c', '/std:c++20', '/EHsc', '/GR', '/W4', '/permissive-', '/utf-8', '/fp:precise',
   '/Zc:__cplusplus', '/Zc:preprocessor', '/bigobj', '/DSPACEGOD_STANDALONE', '/D_CRT_SECURE_NO_WARNINGS', "/I`"$core`"", "/I`"$src`"")
-if ($Configuration -eq 'Release') { $flags += @('/O2', '/MD', '/DNDEBUG', '/Zi') } else { $flags += @('/Od', '/MDd', '/Zi', '/RTC1') }
+if ($Configuration -eq 'Release') { $flags += @('/O2', '/GL', '/Gw', '/MD', '/DNDEBUG', '/Zi') } else { $flags += @('/Od', '/MDd', '/Zi', '/RTC1') }
 
 $objDir = Join-Path $out 'benchobj'
 New-Item -ItemType Directory -Force $objDir | Out-Null
@@ -63,7 +63,9 @@ foreach ($f in Get-ChildItem -LiteralPath $src -Filter '*.cpp' -File) {
 if ($failed) { exit 1 }
 
 $exe = Join-Path $out 'Bench.Cpp.exe'
-& link.exe /nologo /DEBUG "/OUT:$exe" @objs $lib psapi.lib dbghelp.lib
+# Release: link-time code generation across Bench.Cpp and SpaceGodCore.lib (both compiled /GL).
+[string[]]$linkOpt = if ($Configuration -eq 'Release') { @('/LTCG', '/OPT:REF', '/OPT:ICF', "/CGTHREADS:$([Math]::Min($MaxParallel, 8))") } else { @() }
+& link.exe /nologo /DEBUG @linkOpt "/OUT:$exe" @objs $lib psapi.lib dbghelp.lib
 if ($LASTEXITCODE -ne 0) { throw 'link.exe failed (Bench.Cpp).' }
 Write-Host "exe     $exe"
 exit 0

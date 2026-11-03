@@ -81,6 +81,17 @@ namespace cs
 	struct NullReferenceException : Exception { using Exception::Exception; };
 	struct IndexOutOfRangeException : Exception { using Exception::Exception; };
 
+	// ---------------------------------------------------------------- IEEE tests --------------------------------
+	// MSVC's std::isnan / isinf / isfinite / signbit on a double are out-of-line UCRT calls (_dclass, _dtest, _dsign);
+	// these are the same tests inline (/fp:precise keeps NaN comparisons as written). Hot: every Math.Max/Min.
+	inline bool IsNaNFast(double v) { return v != v; }
+	inline bool IsNaNFast(float v) { return v != v; }
+	inline bool IsInfFast(double v) { return (std::bit_cast<uint64_t>(v) & 0x7FFFFFFFFFFFFFFFull) == 0x7FF0000000000000ull; }
+	inline bool IsInfFast(float v) { return (std::bit_cast<uint32_t>(v) & 0x7FFFFFFFu) == 0x7F800000u; }
+	inline bool IsFiniteFast(double v) { return (std::bit_cast<uint64_t>(v) & 0x7FF0000000000000ull) != 0x7FF0000000000000ull; }
+	inline bool IsFiniteFast(float v) { return (std::bit_cast<uint32_t>(v) & 0x7F800000u) != 0x7F800000u; }
+	inline bool SignBitFast(double v) { return (std::bit_cast<uint64_t>(v) >> 63) != 0; }
+
 	// ---------------------------------------------------------------- hashing -----------------------------------
 	// Only lookup uses hashes; enumeration order never depends on them (see Dictionary), so any good hash will do.
 	template <class T, class = void> struct Hash { size_t operator()(const T& v) const { return std::hash<T>{}(v); } };
@@ -122,7 +133,7 @@ namespace cs
 			if (a < b) return -1;
 			if (a > b) return 1;
 			if (a == b) return 0;
-			if (std::isnan(a)) return std::isnan(b) ? 0 : -1;
+			if (IsNaNFast(a)) return IsNaNFast(b) ? 0 : -1;
 			return 1;
 		}
 		else if constexpr (std::is_enum_v<T>) { using U = std::underlying_type_t<T>; return Compare(static_cast<U>(a), static_cast<U>(b)); }
@@ -460,8 +471,8 @@ namespace cs
 		inline int Abs(int v) { if (v == std::numeric_limits<int>::min()) throw std::overflow_error("Negating the minimum value of a twos complement number is invalid."); return v < 0 ? -v : v; }
 		inline long long Abs(long long v) { return v < 0 ? -v : v; }
 		// .NET Math.Max/Min on doubles return NaN if either is NaN.
-		inline double Max(double a, double b) { if (std::isnan(a) || std::isnan(b)) return std::numeric_limits<double>::quiet_NaN(); return a > b ? a : (a < b ? b : (a == 0 && b == 0 ? (std::signbit(a) ? b : a) : a)); }
-		inline double Min(double a, double b) { if (std::isnan(a) || std::isnan(b)) return std::numeric_limits<double>::quiet_NaN(); return a < b ? a : (a > b ? b : (a == 0 && b == 0 ? (std::signbit(a) ? a : b) : a)); }
+		inline double Max(double a, double b) { if (IsNaNFast(a) || IsNaNFast(b)) return std::numeric_limits<double>::quiet_NaN(); return a > b ? a : (a < b ? b : (a == 0 && b == 0 ? (SignBitFast(a) ? b : a) : a)); }
+		inline double Min(double a, double b) { if (IsNaNFast(a) || IsNaNFast(b)) return std::numeric_limits<double>::quiet_NaN(); return a < b ? a : (a > b ? b : (a == 0 && b == 0 ? (SignBitFast(a) ? a : b) : a)); }
 		inline int Max(int a, int b) { return a > b ? a : b; }
 		inline int Min(int a, int b) { return a < b ? a : b; }
 		inline long long Max(long long a, long long b) { return a > b ? a : b; }
@@ -471,7 +482,7 @@ namespace cs
 		// Math.Sign(NaN) throws ArithmeticException.
 		struct ArithmeticErrorT : Exception { ArithmeticErrorT() : Exception("Function does not accept floating point Not-a-Number values.") {} };
 		inline ArithmeticErrorT ArithmeticError() { return {}; }
-		inline int Sign(double v) { if (std::isnan(v)) throw ArithmeticError(); return v > 0 ? 1 : (v < 0 ? -1 : 0); }
+		inline int Sign(double v) { if (IsNaNFast(v)) throw ArithmeticError(); return v > 0 ? 1 : (v < 0 ? -1 : 0); }
 		inline int Sign(int v) { return v > 0 ? 1 : (v < 0 ? -1 : 0); }
 		inline int Sign(long long v) { return v > 0 ? 1 : (v < 0 ? -1 : 0); }
 		inline float Abs(float v) { return std::fabs(v); }
@@ -541,11 +552,11 @@ namespace cs
 		constexpr double MaxValue = std::numeric_limits<double>::max();
 		constexpr double MinValue = -std::numeric_limits<double>::max();
 		constexpr double Epsilon = std::numeric_limits<double>::denorm_min();
-		inline bool IsNaN(double v) { return std::isnan(v); }
-		inline bool IsInfinity(double v) { return std::isinf(v); }
-		inline bool IsPositiveInfinity(double v) { return std::isinf(v) && v > 0; }
-		inline bool IsNegativeInfinity(double v) { return std::isinf(v) && v < 0; }
-		inline bool IsFinite(double v) { return std::isfinite(v); }
+		inline bool IsNaN(double v) { return IsNaNFast(v); }
+		inline bool IsInfinity(double v) { return IsInfFast(v); }
+		inline bool IsPositiveInfinity(double v) { return IsInfFast(v) && v > 0; }
+		inline bool IsNegativeInfinity(double v) { return IsInfFast(v) && v < 0; }
+		inline bool IsFinite(double v) { return IsFiniteFast(v); }
 		SPACEGODCORE_API bool TryParse(std::string_view s, double& out); // invariant culture
 		SPACEGODCORE_API double Parse(std::string_view s);
 	}
@@ -558,9 +569,9 @@ namespace cs
 		constexpr float MaxValue = std::numeric_limits<float>::max();
 		constexpr float MinValue = -std::numeric_limits<float>::max();
 		constexpr float Epsilon = std::numeric_limits<float>::denorm_min();
-		inline bool IsNaN(float v) { return std::isnan(v); }
-		inline bool IsInfinity(float v) { return std::isinf(v); }
-		inline bool IsFinite(float v) { return std::isfinite(v); }
+		inline bool IsNaN(float v) { return IsNaNFast(v); }
+		inline bool IsInfinity(float v) { return IsInfFast(v); }
+		inline bool IsFinite(float v) { return IsFiniteFast(v); }
 	}
 	namespace Long
 	{
@@ -573,7 +584,7 @@ namespace cs
 		if (a < b) return -1;
 		if (a > b) return 1;
 		if (a == b) return 0;
-		if (std::isnan(a)) return std::isnan(b) ? 0 : -1;
+		if (IsNaNFast(a)) return IsNaNFast(b) ? 0 : -1;
 		return 1;
 	}
 	inline int CompareTo(float a, float b) { return CompareTo(static_cast<double>(a), static_cast<double>(b)); }

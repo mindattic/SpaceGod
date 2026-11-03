@@ -74,7 +74,9 @@ $headerTime = (Get-ChildItem -LiteralPath $core -Recurse -File -Include '*.h', '
 
 $common = @('/nologo', '/c', '/std:c++20', '/EHsc', '/GR', '/W4', '/permissive-', '/utf-8', '/fp:precise',
   '/Zc:__cplusplus', '/Zc:preprocessor', '/bigobj', '/DSPACEGOD_STANDALONE', '/D_CRT_SECURE_NO_WARNINGS', "/I`"$core`"")
-if ($Configuration -eq 'Release') { $common += @('/O2', '/MD', '/DNDEBUG', '/Zi') } else { $common += @('/Od', '/MDd', '/Zi', '/RTC1') }
+# Release: whole-program optimisation (/GL here, /LTCG on lib and link: Core's small inline-looking members such as DVec3
+# operators live in .cpp files, so only link-time code generation can inline them across files). /fp:precise stays (bit parity).
+if ($Configuration -eq 'Release') { $common += @('/O2', '/GL', '/Gw', '/MD', '/DNDEBUG', '/Zi') } else { $common += @('/Od', '/MDd', '/Zi', '/RTC1') }
 
 # SaveGame's raw DEFLATE (docs/PERSISTENCE.md, section 7): the engine's own zlib 1.3 when UE 5.8 is installed (its
 # headers, and its prebuilt /MD zlibstatic.lib merged into SpaceGodCore.lib, so whatever links the lib has it). Release
@@ -159,7 +161,8 @@ $lib = Join-Path $out 'SpaceGodCore.lib'
 $rsp = Join-Path $out 'lib.rsp'
 ($result.Objs | ForEach-Object { "`"$_`"" }) -join "`n" | Set-Content -LiteralPath $rsp -Encoding ascii
 if ($zlibLib) { "`"$zlibLib`"" | Add-Content -LiteralPath $rsp -Encoding ascii }
-& lib.exe /nologo "/OUT:$lib" "@$rsp"
+[string[]]$ltcg = if ($Configuration -eq 'Release') { @('/LTCG') } else { @() }
+& lib.exe /nologo @ltcg "/OUT:$lib" "@$rsp"
 if ($LASTEXITCODE -ne 0) { throw 'lib.exe failed.' }
 Set-Content -LiteralPath $flagsStamp -Value $flagsNow -Encoding ascii
 Write-Host "lib     $lib"
@@ -170,7 +173,8 @@ $parityObjRoot = Join-Path $out 'testobj'
 $pr = Invoke-Compile @(Get-Item -LiteralPath (Join-Path $parityDir 'CsParity.cpp')) $parityObjRoot
 if ($pr.Failed.Count -gt 0) { exit 1 }
 $exe = Join-Path $out 'CsParity.exe'
-& link.exe /nologo /DEBUG "/OUT:$exe" $pr.Objs $lib
+[string[]]$linkOpt = if ($Configuration -eq 'Release') { @('/LTCG', '/OPT:REF', '/OPT:ICF', "/CGTHREADS:$([Math]::Min($MaxParallel, 8))") } else { @() }
+& link.exe /nologo /DEBUG @linkOpt "/OUT:$exe" $pr.Objs $lib
 if ($LASTEXITCODE -ne 0) { throw 'link.exe failed (CsParity).' }
 Write-Host "exe     $exe"
 
