@@ -34,6 +34,7 @@ namespace SpaceGod
 
 	void UnitySpaceApp::ReleaseSeat()
 	{
+		if (CoopRoutes(cs::New<ReleaseSeatCommand>(session->LocalPlayer()))) return; // US-T44: to the host in co-op
 		session->Submit(cs::New<ReleaseSeatCommand>(session->LocalPlayer()));
 		session->ApplyPending();
 	}
@@ -50,6 +51,7 @@ namespace SpaceGod
 
 	bool UnitySpaceApp::SeatToHost(const cs::Ref<IEmbodiable>& host)
 	{
+		if (CoopRoutes(cs::New<MoveToHostCommand>(session->LocalPlayer()))) return true; // US-T44: to the host in co-op
 		session->Submit(cs::New<MoveToHostCommand>(session->LocalPlayer()));
 		session->ApplyPending();
 		return host != nullptr && EmbodiableEquals(HeldNonHelm(), host);
@@ -86,6 +88,7 @@ namespace SpaceGod
 			return;
 		}
 		if (IsPiloting()) ExitPiloting();
+		if (CoopTakeSeat(next)) return; // US-T44: to the host in co-op; the view follows when a frame grants it
 		if (!SwitchSeat(next))
 		{
 			cs::String blocker = next->Blocker();
@@ -412,6 +415,7 @@ namespace SpaceGod
 
 	void UnitySpaceApp::UpdateSeat(float dt)
 	{
+		if (Coop::CoopPeer::Active()) { CoopUpdateSeat(dt); return; } // US-T44: every player's seat, stepped on every peer
 		auto held = HeldNonHelm();
 		if (held == nullptr) return;
 		auto look = ClickPanelOpen() ? Vector2::zero() : Input.MouseDelta;

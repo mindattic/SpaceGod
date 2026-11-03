@@ -302,6 +302,7 @@ namespace SpaceGod
 		SpaceCamera->SetPose(SpaceCamera->ScenePosition, SpaceCamera->Rotation);
 		// Each system keeps its own sky (U.SPC-T595); the last one stays up until this one has loaded.
 		if (Sky != nullptr) Sky->Show(system->Name);
+		CoopActivated(system); // US-T44: the host's frame tells its clients
 	}
 
 	void UnitySpaceApp::SetSystemVisible(bool visible)
@@ -313,6 +314,7 @@ namespace SpaceGod
 	void UnitySpaceApp::TravelTo(const cs::Ref<StarSystem>& system)
 	{
 		if (system == nullptr || system == ActiveSystem || Travel->Active) return;
+		if (CoopRefusesTravel()) return; // US-T44: in co-op the host picks the system
 		// Already on the way somewhere under the hull's own drive (U.SPC-T417).
 		if (InFtlCruise()) { ShowToast(cs::Cat("Under FTL for ", FtlCruise->ToName, ": the view goes where the hull goes")); return; }
 		// The pilot session belongs to this system's ship and world: the gate is the way across while flying.
@@ -444,7 +446,7 @@ namespace SpaceGod
 			ShowToast("Time warp is held at real time while the helm is in a battle");
 		}
 
-		Clock->Advance(dt);
+		CoopAdvance(dt); // US-T44: Clock->Advance(dt), in lockstep with the host in co-op
 		Galaxy->Update(Clock->Jd);
 		RefreshCharts();
 		UpdateSaves(dt);
@@ -458,7 +460,7 @@ namespace SpaceGod
 		ShowLawNotices();
 		UpdateShips(dt);
 		Structures->Layout();
-		if (!Travel->Active && !InFtlCruise()) World()->UpdateAdventures(Clock->Jd, PlayerHelioKm());
+		CoopUpdateAdventures(!Travel->Active && !InFtlCruise()); // US-T44: was `if (that) World()->UpdateAdventures(Clock->Jd, PlayerHelioKm());`, the host's call in co-op
 
 		DropLostTargets();
 		BattleTime();
@@ -782,6 +784,7 @@ namespace SpaceGod
 
 	void UnitySpaceApp::EnterPiloting(const Target& t)
 	{
+		if (CoopRefusesHelm()) return; // US-T44: the pilot loop is not lockstepped yet
 		auto ship = t.Ship;
 		Piloted = t;
 		// A fresh helm: no drives-down timer left over from the hull flown before (spawned or loaded in the same frame).

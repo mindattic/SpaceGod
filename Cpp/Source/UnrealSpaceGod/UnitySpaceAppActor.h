@@ -21,8 +21,9 @@ namespace SpaceGod { class UnitySpaceApp; class CaptureRunner; }
  * Its tick group is PrePhysics with a high priority, standing in for [DefaultExecutionOrder(-100)]: the app runs
  * before the views and HUD read it.
  *
- * Co-op: every machine that draws runs its own app; the host's is authoritative (ASpaceGameState mirrors its clock
- * to clients), and player actions go through the app's Core::LocalSession, which the co-op ticket networks.
+ * Co-op (US-T44): every machine runs its own app on the same Core; the host's is authoritative, and its frames (clock,
+ * commands through the app's Core::LocalSession) are replayed by each client, whose link actor (ASpaceCoopLink) steps the
+ * app once per host frame instead of this actor's Tick.
  */
 UCLASS()
 class AUnitySpaceAppActor : public AActor

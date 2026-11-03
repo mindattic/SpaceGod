@@ -20,7 +20,7 @@ private:
 	/// U.SPC-LAW-1): input here only submits commands stamped with <see cref="LocalSession.LocalPlayer"/>, and reads back
 	/// what the session's authority says the local player holds. Replaced with a fresh one when a game is loaded.
 	/// </summary>
-	cs::Ref<Core::LocalSession> session = Core::LocalSession::Create(/*seed:*/ 0);
+	cs::Ref<Core::LocalSession> session = Coop::CoopPeer::NewSession(); // US-T44: LocalSession::Create(/*seed:*/ 0) single-player; every seat in co-op
 
 	/// <summary>What the local player holds at a non-helm seat, as the session's state says, or null.</summary>
 	cs::Ref<Core::IEmbodiable> HeldNonHelm() const;

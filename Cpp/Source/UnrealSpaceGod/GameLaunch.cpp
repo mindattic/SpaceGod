@@ -1,11 +1,13 @@
 #include "GameLaunch.h"
 #include "Bootstrap.h"
+#include "Coop/CoopPeer.h"
 
 namespace SpaceGod
 {
 	bool GameLaunch::SkipsMenu()
 	{
-		return Bootstrap::HasCommandLineFlag("-demo") || Bootstrap::HasCommandLineFlag("-capture") || Bootstrap::HasCommandLineFlag("-continue");
+		return Bootstrap::HasCommandLineFlag("-demo") || Bootstrap::HasCommandLineFlag("-capture") || Bootstrap::HasCommandLineFlag("-continue")
+			|| Coop::CoopPeer::SkipsMenu(); // US-T44: a co-op client (and the smoke host) goes straight in
 	}
 
 	void GameLaunch::NewGame() { Start(cs::String()); }

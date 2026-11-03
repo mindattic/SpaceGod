@@ -9,8 +9,8 @@
  * frame into Input::InputState, with Unity.SpaceGod's own bindings) and views through the app's camera. Nothing here
  * changes the world: every player action goes through the app's Core Session.
  *
- * Co-op (kept from the first slice): the console command `Host` reopens the game as a listen server; friends join
- * with `open <host ip>`. The co-op ticket adds the command RPCs (Core::CommandCodec bytes to the host's session).
+ * Co-op: the console command `Host` reopens the game as a listen server; friends join with `open <host ip>` (or
+ * tools/play.ps1 -Mode host / join). Co-op's messages go through each client's ASpaceCoopLink (US-T44).
  */
 UCLASS()
 class ASpacePlayerController : public APlayerController

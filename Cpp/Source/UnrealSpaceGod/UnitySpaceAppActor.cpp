@@ -8,6 +8,7 @@
 #include "UnityCompat/UnityScene.h"
 #include "CaptureRunner.h"
 #include "Views/AsteroidBelt.h"
+#include "Coop/CoopPeer.h"
 
 #include "Camera/CameraComponent.h"
 #include "Engine/Engine.h"
@@ -29,7 +30,7 @@ AUnitySpaceAppActor::AUnitySpaceAppActor()
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.TickGroup = TG_PrePhysics;
 	PrimaryActorTick.bTickEvenWhenPaused = true; // the app keeps its own pause (Esc menu, SimClock)
-	bReplicates = false; // each machine runs its own app; ASpaceGameState carries what is shared
+	bReplicates = false; // each machine runs its own app; co-op's lockstep (Coop/CoopPeer, ASpaceCoopLink) keeps them the same
 
 	MainCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("Main Camera"));
 	RootComponent = MainCamera;
@@ -81,6 +82,8 @@ void AUnitySpaceAppActor::BeginPlay()
 		{
 			if (AppPtr->AsteroidBelt && AppPtr->AsteroidBelt->enabled) AppPtr->AsteroidBelt->OnGUI();
 		}, 1);
+		// US-T44: co-op's HUD after both (the C# track's CoopHud MonoBehaviour); draws nothing outside co-op.
+		GuiHost::Register(&AppPtr->Clock, [AppPtr] { if (AppPtr->enabled) AppPtr->CoopGui(); }, 2);
 	}
 	ApplyCamera();
 	ApplyCursor();
@@ -98,6 +101,7 @@ void AUnitySpaceAppActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		}
 		GuiHost::Unregister(App.get());
 		GuiHost::Unregister(&App->AsteroidBelt);
+		GuiHost::Unregister(&App->Clock); // US-T44
 		if (EndPlayReason == EEndPlayReason::Quit || EndPlayReason == EEndPlayReason::EndPlayInEditor) App->OnApplicationQuit();
 		App->OnDestroy();
 		App.reset();
@@ -110,6 +114,8 @@ void AUnitySpaceAppActor::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	if ((!App && !bSceneHost) || bExternallyStepped) return;
+	// US-T44: a co-op client replays the host's frames: its link actor (ASpaceCoopLink) steps the app, one Step per frame.
+	if (GetNetMode() == NM_Client) return;
 	// Unity's unscaled delta: real seconds, not dilated (the app clamps it to 0.1 s itself).
 	Step(static_cast<float>(FApp::GetDeltaTime()));
 }
@@ -144,6 +150,8 @@ void AUnitySpaceAppActor::Step(float RealDelta)
 		Capture->Start();
 	}
 	if (App->enabled) App->Update();
+	// US-T44: the host's frame to its clients (the C# track's game mode Step: CoopPeer.HostEndUpdate after the Update).
+	if (Coop::CoopPeer* Peer = Coop::CoopPeer::Current(); Peer && Peer->IsHost()) Peer->HostEndUpdate(App.get());
 	if (Capture) Capture->Update();
 	// End of the frame (Unity's render): every renderer the views placed to its Unreal component.
 	UnityScene::Sync();

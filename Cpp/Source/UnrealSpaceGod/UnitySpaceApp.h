@@ -34,6 +34,7 @@
 #include "UnitySpaceApp.Practice.deps.h"
 #include "UnitySpaceApp.Saves.deps.h"
 #include "UnitySpaceApp.Streaming.deps.h"
+#include "UnitySpaceApp.Coop.deps.h" // US-T44
 
 namespace SpaceGod
 {
@@ -85,3 +86,4 @@ namespace SpaceGod
 #include "UnitySpaceApp.Streaming.inl"
 	};
 }
+#include "UnitySpaceApp.Coop.inl" // US-T44: co-op (the C# track's UnitySpaceApp.Coop.cs)

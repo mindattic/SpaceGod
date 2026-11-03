@@ -31,6 +31,7 @@ quits; the log is <Track>/Saved/Logs/<project>.log. Both tracks log the same lin
   ./tools/play.ps1 -Track CSharp -Mode coop-smoke # headless: a host and a client on localhost, their digests compared
 #>
 
+  ./tools/play.ps1 -Track Cpp -Mode coop-smoke    # the C++ track's same co-op smoke (US-T44)
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot/engine.ps1"
 $repo = Split-Path -Parent $PSScriptRoot
@@ -84,11 +85,10 @@ $coopNet = '-ini:Engine:[/Script/Engine.Player]:ConfiguredInternetSpeed=10000000
   '[/Script/OnlineSubsystemUtils.IpNetDriver]:MaxClientRate=100000000,[/Script/OnlineSubsystemUtils.IpNetDriver]:MaxInternetClientRate=100000000'
 
 if ($Mode -eq 'coop-smoke') {
-  # -Mode coop-smoke (CSharp, US-T39): two headless instances on localhost, a listen server (-SpaceGodCoopSmoke=host) and a
+  # -Mode coop-smoke (either track: US-T39 C#, US-T44 C++): two headless instances on localhost, a listen server (-SpaceGodCoopSmoke=host) and a
   # client (-SpaceGodCoopSmoke=client). The client joins and loads the host's save, presses '.' (warp) and '3' (select),
   # takes a station's seat through the picker, and says bye after 1200 frames (tampering with its own Core once at 700: the host must detect it and resync); both log a digest of the shared state every
-  # 60 frames and this script compares them. Logs: CSharp/Saved/Logs/CoopSmokeHost.log and CoopSmokeClient.log.
-  if ($Track -ne 'CSharp') { throw '-Mode coop-smoke is the C# track''s co-op check: use -Track CSharp.' }
+  # 60 frames and this script compares them. Logs: <Track>/Saved/Logs/CoopSmokeHost.log and CoopSmokeClient.log.
   $cmd = Join-Path $engine 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
   $logs = Join-Path $project.DirectoryName 'Saved\Logs'
   New-Item -ItemType Directory -Force -Path $logs | Out-Null

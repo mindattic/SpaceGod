@@ -242,13 +242,14 @@ namespace SpaceGod
 			FocusSystemOverview();
 		}
 		autosaveDueS = AutosaveIntervalS;
+		CoopLoaded(); // US-T44
 	}
 
 	void UnitySpaceApp::DropSession()
 	{
 		// A fighter or gun held in the world being left goes back to its AI there (U.SPC-T422); the loaded game starts in command.
 		ReleaseSeat();
-		session = LocalSession::Create(/*seed:*/ 0);
+		session = Coop::CoopPeer::NewSession(); // US-T44: LocalSession::Create(/*seed:*/ 0) single-player
 		commandWarp = -1;
 		commandFocus = Target::None();
 		Piloted = Target::None();

@@ -1,4 +1,5 @@
 #include "Smoke/SpaceGodSmoke.h"
+#include "Smoke/ScriptedDevice.h"
 
 #include "Bootstrap.h"
 #include "CaptureRunner.h"
@@ -94,75 +95,6 @@ namespace SpaceGod::Smoke
 			if (!FParse::Value(FCommandLine::Get(), key, v)) return cs::String();
 			return cs::String(TCHAR_TO_UTF8(*v));
 		}
-
-		// ---------------------------------------------------------------- the scripted keyboard and mouse
-
-		/// The C# track's ScriptedInputDevice: keys held / tapped / pressed this frame, the mouse, written into
-		/// InputDevice::current() before each app frame (the actor's Feed is off while it runs).
-		struct ScriptedDevice
-		{
-			std::set<Key> held, pressed, tapped;
-			std::set<MouseButton> buttons, buttonsPressed, buttonsReleased;
-			Vector2 mouseDelta;
-			float scrollY = 0;
-
-			void Hold(Key k)
-			{
-				if (held.insert(k).second) pressed.insert(k);
-			}
-			void Release(Key k) { held.erase(k); }
-			/// Pressed (and held) for the next frame only.
-			void Tap(Key k)
-			{
-				pressed.insert(k);
-				held.insert(k);
-				tapped.insert(k);
-			}
-			void HoldButton(MouseButton b)
-			{
-				if (buttons.insert(b).second) buttonsPressed.insert(b);
-			}
-			void ReleaseButton(MouseButton b)
-			{
-				if (buttons.erase(b) > 0) buttonsReleased.insert(b);
-			}
-
-			void Write() const
-			{
-				auto& d = Input::InputDevice::current();
-				d.Clear();
-				d.present = true;
-				d.position = Vector2(Screen::width / 2.0f, Screen::height / 2.0f);
-				d.delta = mouseDelta;
-				d.scrollY = scrollY;
-				for (int k = 1; k < static_cast<int>(Key::Count); k++)
-				{
-					auto key = static_cast<Key>(k);
-					auto& c = d[key];
-					c.isPressed = held.count(key) > 0;
-					c.wasPressedThisFrame = pressed.count(key) > 0;
-				}
-				for (MouseButton b : { MouseButton::Left, MouseButton::Right, MouseButton::Middle })
-				{
-					auto& c = d.Button(b);
-					c.isPressed = buttons.count(b) > 0;
-					c.wasPressedThisFrame = buttonsPressed.count(b) > 0;
-					c.wasReleasedThisFrame = buttonsReleased.count(b) > 0;
-				}
-			}
-
-			/// This frame's edges cleared (after the game has polled).
-			void EndFrame()
-			{
-				pressed.clear();
-				buttonsPressed.clear();
-				buttonsReleased.clear();
-				for (Key k : tapped) held.erase(k);
-				tapped.clear();
-				mouseDelta = Vector2(0, 0);
-				scrollY = 0;
-			}
-		};
 
 		// ---------------------------------------------------------------- the run
 
