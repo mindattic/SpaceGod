@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-  [ValidateSet('solo', 'host', 'join', 'smoke', 'shots', 'views', 'viewshot', 'coop-smoke')][string]$Mode = 'solo',
+  [ValidateSet('solo', 'host', 'join', 'smoke', 'shots', 'views', 'viewshot', 'demo', 'fidelity', 'coop-smoke')][string]$Mode = 'solo',
+  [string]$CaptureDir = '',
   [string]$Address = '127.0.0.1',
   [ValidateSet('Cpp', 'CSharp')][string]$Track = 'Cpp',
   [string]$EngineVersion = '5.8'
@@ -25,13 +26,14 @@ quits; the log is <Track>/Saved/Logs/<project>.log. Both tracks log the same lin
   ./tools/play.ps1 -Track Cpp -Mode shots      # docs/images/cpp-ui-*.png
   ./tools/play.ps1 -Track CSharp -Mode shots   # windowed: the UI's screenshots into docs/images
   ./tools/play.ps1 -Track CSharp -Mode views   # headless: Sol's views (US-T27) built for a frame, counts logged
+  ./tools/play.ps1 -Track CSharp -Mode demo     # windowed: the -demo scene tour, every stop captured (US-T40)
   ./tools/play.ps1 -Track CSharp -Mode viewshot # windowed: those views on screen, docs/images/csharp-views-sol.png
   ./tools/play.ps1 -Track CSharp -Mode host      # co-op (US-T39): a listen server, player 1
   ./tools/play.ps1 -Track CSharp -Mode join -Address 192.168.1.20
   ./tools/play.ps1 -Track CSharp -Mode coop-smoke # headless: a host and a client on localhost, their digests compared
+  ./tools/play.ps1 -Track Cpp -Mode coop-smoke    # the C++ track's same co-op smoke (US-T44)
 #>
 
-  ./tools/play.ps1 -Track Cpp -Mode coop-smoke    # the C++ track's same co-op smoke (US-T44)
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot/engine.ps1"
 $repo = Split-Path -Parent $PSScriptRoot
@@ -61,6 +63,30 @@ if ($Mode -eq 'shots') {
   $p = Start-Process -FilePath $editor -PassThru -Wait -ArgumentList @("`"$($project.FullName)`"", '/Engine/Maps/Entry', '-game',
     '-windowed', '-ResX=1600', '-ResY=900', '-nosound', '-unattended', '-log', '-UseFixedTimeStep', '-FPS=60', '-SpaceGodUiShots', "`"-capturedir=$images`"")
   Get-ChildItem -LiteralPath $images -Filter "$prefix-ui-*.png" -ErrorAction SilentlyContinue | ForEach-Object FullName
+  exit $p.ExitCode
+}
+
+if ($Mode -eq 'fidelity') {
+  # -Mode fidelity (CSharp, US-T40): a window and FidelityShots (asteroid belt, Kenney craft, model viewer, spawn-grid
+  # thumbnails), each saved as docs/images/csharp-fidelity-*.png (or -CaptureDir), frame times logged; then quits.
+  if ($Track -ne 'CSharp') { throw '-Mode fidelity is the C# track''s check: use -Track CSharp.' }
+  $editor = Join-Path $engine 'Engine\Binaries\Win64\UnrealEditor.exe'
+  if (-not $CaptureDir) { $CaptureDir = Join-Path $repo 'docs\images' }
+  $p = Start-Process -FilePath $editor -PassThru -Wait -ArgumentList @("`"$($project.FullName)`"", '/Engine/Maps/Entry', '-game',
+    '-windowed', '-ResX=1600', '-ResY=900', '-nosound', '-unattended', '-log', '-SpaceGodFidelityShots', "`"-capturedir=$CaptureDir`"")
+  Get-ChildItem -LiteralPath $CaptureDir -Filter 'csharp-fidelity-*.png' -ErrorAction SilentlyContinue | ForEach-Object FullName
+  exit $p.ExitCode
+}
+
+if ($Mode -eq 'demo') {
+  # -Mode demo (CSharp, US-T40): Unity.SpaceGod's -demo SceneTour (CaptureRunner) end to end in a window, -capture
+  # saving every stop as Saved/Screenshots/Tour/<stop>.png (or -CaptureDir); the game quits when the tour ends.
+  if ($Track -ne 'CSharp') { throw '-Mode demo is the C# track''s scene tour: use -Track CSharp.' }
+  $editor = Join-Path $engine 'Engine\Binaries\Win64\UnrealEditor.exe'
+  if (-not $CaptureDir) { $CaptureDir = Join-Path $project.DirectoryName 'Saved\Screenshots\Tour' }
+  $p = Start-Process -FilePath $editor -PassThru -Wait -ArgumentList @("`"$($project.FullName)`"", '/Engine/Maps/Entry', '-game',
+    '-windowed', '-ResX=1600', '-ResY=900', '-nosound', '-unattended', '-log', '-demo', '-capture', "`"-capturedir=$CaptureDir`"")
+  Get-ChildItem -LiteralPath $CaptureDir -Filter '*.png' -ErrorAction SilentlyContinue | ForEach-Object FullName
   exit $p.ExitCode
 }
 

@@ -441,10 +441,14 @@ In the window the colours come out as the original's arithmetic gives them (e.g.
 
 **Not faithful yet (UI).** Canvas cannot cut a glyph, so text at a clip edge (scroll views, `TextClipping.Clip`) is
 dropped character by character horizontally and line by line vertically (a line less than half inside is not
-drawn), where Unity cuts through the glyphs; rotated quads (`GUI.matrix`: lines, arrows) are not clipped to scroll
-views. Unity's default-skin look (only `ModelViewer` and AsteroidBelt's labels use `GUI.skin`) is approximated with
+drawn), where Unity cuts through the glyphs (US-T40 tried drawing such runs into render targets and compositing them cut
+at the clip, Modulate + Additive; drawing a canvas into a render target from the HUD, during DrawHUD or from its Tick,
+crashed the renderer, so it is not used). Rotated quads (`GUI.matrix`: lines, arrows) are cut to the clip along their
+length (US-T40; a thick quad's corners can overhang by half its thickness). Unity's default-skin look (only `ModelViewer` and AsteroidBelt's labels use `GUI.skin`) is approximated with
 generated greys. Icons are drawn from one 64 px texture without the original's mip chain (no trilinear minification).
-The text field has no caret movement or selection (type and backspace only, as the game's two fields are used).
+The text field is Unity's TextEditor (US-T40): cursor and selection, click/double-click/triple-click/shift-click/drag,
+arrows, Home/End, Ctrl word moves and deletes, Ctrl+A/C/X/V on the Windows clipboard, the cursor kept in view, with
+OS-style key repeat; not ported: IME composition and undo (Unity's TextField has no undo either).
 Unreal reports no refresh rates, so every display mode lists as 60 Hz. Slate's Arial advances at fractional sizes
 can differ by a pixel from Unity's hinted ones, so a line that just fitted in Unity can wrap here (seen once, on the
 Opportunities card). Cargo, outfitting and the other piloting panels draw only once a hull is flown; the smoke opens
@@ -522,18 +526,56 @@ The facade does the engine work (`UnityCompat/`):
 - **Resources** (`UnityResources.cs`): `Textures/…`, `Skyboxes/…` → `/SpaceGodRender/Resources/…` (shared by both tracks,
   imported headless by `Shared/Plugins/SpaceGodRender/Content/Python/spacegod_import_resources.py` with Unity's per-file
   max size and sRGB); `Ships/*` → the Kenney craft as one static mesh per glTF node, rebuilt as Unity's prefab hierarchy
-  from `CSharp/Content/SpaceGod/Data/ShipModels.json` (glTF material names/colours, the import's axis/scale correction);
-  `Data/asteroids.bytes` read as a file (staged non-UFS). Loads are async, completed on the game thread in `UnityBridge.Tick`.
+  from `Shared/Plugins/SpaceGodRender/Content/Resources/Data/ShipModels.json` (glTF material names/colours, the import's
+  axis/scale correction); `Data/asteroids.bytes` read as a file from the same folder (both tracks read the plugin's copy,
+  US-T40; found through `UPluginBlueprintLibrary.GetPluginContentDir`). Loads are async, completed on the game thread in
+  `UnityBridge.Tick`.
 - **ParticleSystem** (ShipView's exhaust): a CPU emitter with the modules the original sets, drawn as camera-facing quads.
 - **Check**: `tools/play.ps1 -Track CSharp -Mode views` builds Sol's views without the app (`ViewsSmoke`) and logs them;
   `-Mode viewshot` keeps them on screen and saves `docs/images/csharp-views-sol.png`. The app smoke (`-Mode smoke`) logs
   the facade's counts each report (`UnityBridge.Last`).
 
-Not exact yet: the asteroid belt (Asteroids.shader reads a StructuredBuffer per vertex; a material cannot, and
-`UProceduralMeshComponent` keeps UVs at half precision, so `M_Asteroids`' index-in-TexCoord0 cannot be fed) is propagated
-on the CPU with the shader's own maths at ≤ 4 Hz and drawn with `M_Points`, every asteroid 1 px; `ShipThumbnails` renders
-through a `USceneCaptureComponent2D` without layer isolation; `Light` components are data only (the shaders light
-themselves); one Unreal component per Unity renderer, no instancing of shared meshes.
+**US-T40 (faithfulness).** Fixed against Unity.SpaceGod, checked with `tools/play.ps1 -Track CSharp -Mode fidelity`
+(`-SpaceGodFidelityShots`: the shots below, frame times logged; ~60 fps at 1600×900) and `-Mode demo` (the `-demo`
+SceneTour with `-capture`, windowed: all 55 stops captured with no error, e.g. `images/csharp-tour-17-asteroid-belt-gameplay.png`
+beside the original's `17-asteroid-belt-gameplay.jpg`; the game now quits at the end: `Application.Quit` had no handler, so
+the tour, the screenshot runs and the menus' Quit left the game running):
+
+- **Asteroid belt on the GPU, as the original** (`UnityCompat/ProceduralAsteroids.cs`): `M_Asteroids` solves every orbit
+  per vertex every frame from `AsteroidField.PackGpu`'s float4s, 1–3 px by H. UnrealSharp cannot make a float texture or
+  full-precision UVs, so the elements are written as a DDS (legacy FourCC 116, `D3DFMT_A32B32G32R32F`) and imported with
+  `RenderingLibrary.ImportBufferAsTexture2D` (RGBA32F kept exactly), and the belt is 55 components of 2048 asteroids (a
+  half-float UV holds integers exactly only to 2048), each with its own slice and MID (not parented to a shared MID: Unreal
+  accepts only a Material or MIC as parent). Vertex positions span a unit box (WPO precision), `BoundsScale` covers the belt.
+- **Cameras as Unity's**: the screen is drawn by the enabled camera with the highest depth (`UnityBridge.ScreenCamera`), only
+  the layers in its culling mask, over its SolidColor clear (a far `M_Sky` cube on a 1×1 texture, "backdrop"), lit by its own
+  key light (pushed as the Sun globals); every camera rotation goes through `CameraRotationToUnreal` (UnrealHost and the scene
+  capture used `ToUnreal`, which pointed the view a quarter turn off, along the Unity camera's right: the reason the C#
+  HUD shots showed no Earth or ships at the reticle).
+- **Model viewer (F9)**: `ModelViewer.Ensure` runs as Unity's AfterSceneLoad hook did (with Awake/Start), so F9 works; its
+  camera (depth 1000, ModelViewer layer only) takes the screen; the raw glTF prefab's materials draw with `M_Ship` in their
+  base colour, lit by the viewer's key light.
+- **ShipThumbnails**: `Camera.Render` captures with a show-only list of the camera's layers (the hull alone) plus the backdrop,
+  the camera's own near/far planes (`CustomNearClippingPlane`), final LDR colour with the main camera's look.
+- **Kenney craft**: orientation (nose +Z, from the cab's position in the viewer) and scale (the hull fills its selection
+  bracket) checked on screen; the import correction (half a turn about Unity's Y, 1/100) is right.
+- **MaterialPropertyBlock**: per-primitive MIDs were parented to the shared MID, which Unreal refuses (parentless instances:
+  a render-thread crash at Unreal's 61 s GC and objects drawn with nothing); they are now made from the shader's material
+  with the material's values and the block's on top. Shared MIDs are also held by a hidden component (Unreal's GC does not
+  see C# references).
+- **Shared data**: `asteroids.bytes` and `ShipModels.json` live in `Shared/Plugins/SpaceGodRender/Content/Resources/Data`.
+
+| | Before | After | Unity.SpaceGod |
+|---|---|---|---|
+| Belt (system overview) | ![](images/csharp-fidelity-before-belt-gameplay.png) | ![](images/csharp-fidelity-belt-gameplay.png) | ![](../../Unity.SpaceGod/docs/images/17-asteroid-belt-gameplay.jpg) |
+| Kenney miner | ![](images/csharp-fidelity-before-kenney-miner.png) | ![](images/csharp-fidelity-kenney-miner.png) | |
+| Model viewer (F9) | ![](images/csharp-fidelity-before-model-viewer.png) | ![](images/csharp-fidelity-model-viewer.png) | |
+| Spawn grid thumbnails | ![](images/csharp-fidelity-before-spawn-thumbnails.png) | ![](images/csharp-fidelity-spawn-thumbnails.png) | |
+
+Not exact yet: `Light` components are data only (the shaders light themselves; a camera's own key light is the one
+exception above); one Unreal component per Unity renderer, no instancing of shared meshes; the backdrop colour is matched
+through a measured transfer (M_Sky's texel does not reach the screen as Unity's clear colour does), so it is within a few
+levels, not exact; the viewer's glTF materials are the game's Ship shader in the glTF base colour, not URP Lit's PBR.
 
 ## Co-op (US-T39, C# track; the C++ track mirrors it)
 

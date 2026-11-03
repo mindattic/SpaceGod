@@ -51,6 +51,9 @@ namespace UnityEngine
             var scene = UObject.SpawnActor<AActor>(new UnrealSharp.TSubclassOf<AActor>(), new FTransform(),
                 ESpawnActorCollisionHandlingMethod.AlwaysSpawn, null, actor);
             host = scene ?? actor;
+            // Unity's Application.Quit ends the player (the -demo tour, the screenshot tours, the menus' Quit): the
+            // handler was never set, so the game stayed up after them (US-T40).
+            Application.QuitHandler = () => SystemLibrary.ExecuteConsoleCommand("quit");
             if (host.RootComponent == null)
                 host.AddComponentByClass<USceneComponent>(false, new FTransform());
         }
