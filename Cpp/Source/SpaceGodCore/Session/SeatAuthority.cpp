@@ -34,7 +34,7 @@ namespace SpaceGod::Core
 		cs::Ref<IEmbodiable> s;
 		if (!byId.TryGetValue(seat, s)) return PlayerId::None();
 		for (const auto& p : players)
-			if (EmbodiableEquals(seats[p]->Current, s)) return p;
+			if (EmbodiableEquals(seats.At(p)->Current, s)) return p;
 		return PlayerId::None();
 	}
 
@@ -70,7 +70,7 @@ namespace SpaceGod::Core
 			raise(cs::New<CommandRefused>(command, p.IsNone() ? cs::String("no player issued it") : cs::Cat(p, " is not in this session")));
 			return;
 		}
-		auto session = seats[p];
+		auto session = seats.At(p);
 		if (auto take = cs::As<TakeSeatCommand>(command))
 		{
 			auto next = Seat(take->Seat);
@@ -146,7 +146,7 @@ namespace SpaceGod::Core
 	{
 		for (const auto& p : players)
 		{
-			auto session = seats[p];
+			auto session = seats.At(p);
 			if (session->Current == nullptr) continue;
 			int was = SeatIdOf(p);
 			EmbodimentInput input{};
