@@ -27,6 +27,11 @@
 #include "Ships.h"
 #include "SimClock.h"
 #include "Systems/Galaxy.h"
+#include "Systems/Polities.h" // US-T47
+#include "Systems/Statecraft.h"
+#include "Systems/StrategicCommand.h"
+#include "Target.h"
+#include "UI/GalaxyMapScreen.h"
 #include "World.h"
 
 #include "Engine/Engine.h"
@@ -59,6 +64,11 @@ namespace SpaceGod::Coop::CoopSmoke
 		cs::String warpBefore;
 		long long fighterFrom = -1, travelFrom = -1, loadFrom = -1;
 		cs::Ref<FighterSeat> fighter;
+		cs::Ref<Faction> speaker; // US-T47
+		cs::Ref<Ship> hailed;
+		cs::String productionBefore;
+		int objectivesBefore = 0, recordBefore = 0;
+		double treasuryBefore = 0;
 		UnitySpaceApp* lastApp = nullptr;
 
 		void Finish(const cs::String& why, CoopPeer& peer, UnitySpaceApp* app)
@@ -271,6 +281,70 @@ namespace SpaceGod::Coop::CoopSmoke
 					app.ActiveSystem->Name, ")"));
 				if (to != nullptr) app.TravelTo(to);
 				travelFrom = n;
+				break;
+			}
+			// US-T47: the galaxy map's strategy and envoy screens and a hail (F12), from the client.
+			case 2050:
+			{
+				cs::Ref<Ship> other;
+				for (const auto& s : app.World()->Fleet->Ships())
+					if (!s->Destroyed && Statecraft::Party(s->Faction)) { other = s; break; }
+				speaker = nullptr;
+				for (const auto& f : app.Galaxy->Polities->Factions())
+					if (Statecraft::Party(f) && (other == nullptr || f != other->Faction)) { speaker = f; break; }
+				hailed = other;
+				CoopPeer::Log(cs::Cat("smoke: client speaks for the ", speaker != nullptr ? speaker->Name : cs::String(), " (the COMMAND panel's arrows) at frame ", peer.Frame()));
+				if (speaker != nullptr) app.CoopHud()->CoopMap()->CoopSmokeSpeak(speaker);
+				break;
+			}
+			case 2080:
+			{
+				if (speaker == nullptr) break;
+				auto d = app.Galaxy->Polities->Command->Find(speaker);
+				productionBefore = d != nullptr ? d->Production->Name : ProductionFocus::Balanced()->Name;
+				CoopPeer::Log(cs::Cat("smoke: client clicks Production (", productionBefore, ") at frame ", peer.Frame()));
+				app.CoopHud()->CoopMap()->CoopSmokeProduction();
+				break;
+			}
+			case 2110:
+				if (speaker == nullptr) break;
+				objectivesBefore = app.Galaxy->Polities->Command->ObjectiveCount();
+				CoopPeer::Log(cs::Cat("smoke: client orders the ", speaker->Name, "'s navy to EXPLORE ", app.ActiveSystem->Name, " at frame ", peer.Frame()));
+				app.CoopHud()->CoopMap()->CoopSmokeExplore(app.ActiveSystem);
+				break;
+			case 2160:
+				if (hailed == nullptr)
+				{
+					CoopPeer::Warn(cs::Cat("smoke: no ship of a state to hail in ", app.ActiveSystem->Name));
+					break;
+				}
+				app.Select(Target::OfShip(hailed));
+				break;
+			case 2170:
+				if (hailed == nullptr) break;
+				CoopPeer::Log(cs::Cat("smoke: client selects ", hailed->Name, " (", hailed->Faction->Name, ") and presses F12 (hail) at frame ", peer.Frame()));
+				script->Tap(Input::Key::F12);
+				break;
+			case 2240:
+				if (hailed == nullptr || speaker == nullptr) break;
+				recordBefore = app.Galaxy->Polities->Statecraft->Record().Count();
+				treasuryBefore = hailed->Faction->Treasury;
+				CoopPeer::Log(cs::Cat("smoke: client sends the ", hailed->Faction->Name, " a gift (the envoy screen's button) at frame ", peer.Frame(), "; envoy open: ",
+					app.ShowGalaxyMap ? "True" : "False"));
+				app.CoopHud()->CoopMap()->CoopSmokeGift(hailed->Faction);
+				break;
+			case 2320:
+			{
+				if (speaker == nullptr || hailed == nullptr) break;
+				const auto& command = app.Galaxy->Polities->Command;
+				auto d = command->Find(speaker);
+				cs::String production = d != nullptr ? d->Production->Name : cs::String("-");
+				int record = app.Galaxy->Polities->Statecraft->Record().Count();
+				bool ok = command->Player == speaker && production != productionBefore && record > recordBefore;
+				CoopPeer::Log(cs::Cat("smoke: statecraft at frame ", peer.Frame(), ": speaker ", command->Player != nullptr ? command->Player->Name : cs::String(), ", production ",
+					productionBefore, " -> ", production, ", objectives ", objectivesBefore, " -> ", command->ObjectiveCount(), ", record ", recordBefore, " -> ", record,
+					", the ", hailed->Faction->Name, "'s treasury ", cs::Fmt(treasuryBefore, "N0"), " -> ", cs::Fmt(hailed->Faction->Treasury, "N0"), "; carried out: ", ok ? "True" : "False"));
+				app.ShowGalaxyMap = false;
 				break;
 			}
 			case 2500:

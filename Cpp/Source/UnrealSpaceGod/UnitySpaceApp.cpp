@@ -13,6 +13,7 @@
 #include "Rendering/Pipeline/RenderBackend.h"
 #include "UI/DisplayOptions.h"
 #include "UI/Hud.h"
+#include "UI/GalaxyMapScreen.h" // US-T47
 #include "UI/PauseMenu.h"
 #include "UI/UiInput.h"
 #include "UnityCompat/UnityGui.h"
@@ -122,6 +123,7 @@ namespace SpaceGod
 			ShowToast("Nobody to hail: lock or select a ship of another polity first (F12 hails it)");
 			return;
 		}
+		if (UI::GalaxyMapScreen::CoopSendsHail(this, from, to)) return; // US-T47: the hail at its frame on every peer, the envoy opened here
 		ShowToast(statecraft->Hail(from, to, Clock->Jd));
 		if (!Core::Statecraft::Party(to)) return;
 		EnvoyTo = to;

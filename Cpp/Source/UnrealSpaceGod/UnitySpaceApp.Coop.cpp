@@ -8,6 +8,11 @@
 #include "Coop/CoopSettings.h"
 #include "Camera/SpaceCamera.h"
 #include "UI/Hud.h"
+#include "UI/GalaxyMapScreen.h" // US-T47
+#include "Combat/Diplomacy.h"
+#include "Systems/Polities.h"
+#include "Systems/Statecraft.h"
+#include "Systems/StrategicCommand.h"
 #include "Combat/CombatSpecs.h"
 #include "Embodiment/ShipHelm.h"
 #include "Ephemeris.h"
@@ -713,7 +718,40 @@ namespace SpaceGod
 		}
 		sb += cs::Cat(" ", Course != nullptr && Course->Destination != nullptr ? Course->Destination->Name : cs::String("-"), " ",
 			PlottedCourse != nullptr ? "ftl" : "-", InFtlCruise() ? " cruise" : "", "\n");
+		CoopDigestStatecraft(sb); // US-T47
 		return Wire::Hex(Wire::Fnv1a64(sb));
+	}
+
+	void UnitySpaceApp::CoopDigestStatecraft(cs::String& sb)
+	{
+		const auto& polities = Galaxy->Polities;
+		const auto& command = polities->Command;
+		const auto& statecraft = polities->Statecraft;
+		const auto& factions = polities->Factions();
+		int player = -1;
+		for (int i = 0; i < factions.Count(); i++)
+			if (factions[i] == command->Player) player = i;
+		sb += cs::Cat("polities ", player, " ", command->ObjectiveCount(), " ", statecraft->Pacts().Count(), " ", statecraft->Inbox().Count(), " ",
+			statecraft->Record().Count(), "\n");
+		for (int i = 0; i < factions.Count(); i++)
+		{
+			auto d = command->Find(factions[i]);
+			if (d == nullptr) continue;
+			sb += cs::Cat("directives ", i, " ", d->Production->Name, " / ", d->Build->Name, " / ", d->Research != nullptr ? d->Research->Name : cs::String("-"),
+				" ", Wire::D(d->ResearchPoints));
+			for (const auto& t : Core::ResearchTrack::All()) sb += cs::Cat(" ", d->Level(t));
+			sb += '\n';
+		}
+		for (int i = 0; i < factions.Count(); i++)
+		{
+			if (!Core::Statecraft::Party(factions[i])) continue;
+			for (int j = i + 1; j < factions.Count(); j++)
+			{
+				if (!Core::Statecraft::Party(factions[j])) continue;
+				sb += cs::Cat("states ", i, " ", j, " ", static_cast<int>(polities->Diplomacy->Get(factions[i], factions[j])), " ",
+					Wire::D(statecraft->Opinion(factions[i], factions[j])), " ", Wire::D(statecraft->Opinion(factions[j], factions[i])), "\n");
+			}
+		}
 	}
 
 	void UnitySpaceApp::CoopPresence(int& body, DVec3& offsetKm)
@@ -1137,7 +1175,8 @@ namespace SpaceGod
 			catch (...) { CoopNow.reset(); throw; }
 			CoopNow.reset();
 		}
-		else if (!hud->CoopExecute(verb, a)) CoopPeer::Warn(cs::Cat("unknown action '", verb, "' from player ", seat + 1));
+		else if (!hud->CoopExecute(verb, a) && !UI::GalaxyMapScreen::CoopExecute(this, verb, a)) // US-T47: the galaxy map's screens and the hail
+			CoopPeer::Warn(cs::Cat("unknown action '", verb, "' from player ", seat + 1));
 		CoopActions++;
 		CoopPeer::Log(cs::Cat(peer.NameOf(seat), " (player ", seat + 1, ") action '", verb,
 			!args.empty() ? cs::Cat(" ", args.size() > 60 ? cs::Cat(args.substr(0, 60), "...") : args) : cs::String(), "' at frame ", peer.Frame()));

@@ -629,7 +629,8 @@ namespace SpaceGod::UI
 			auto mine = command->Player != nullptr ? command->Player : (app->Piloted.Ship != nullptr ? app->Piloted.Ship->Faction : nullptr);
 			auto holder = app->ActiveSystem->Holder();
 			commanded = mine != nullptr && states.Contains(mine) ? mine : holder != nullptr && states.Contains(holder) ? holder : states[0];
-			command->Player = commanded;
+			if (!CoopSpeaks(commanded)) // US-T47: the party's speaker goes through the frames
+				command->Player = commanded;
 			reportAt = -10.0f;
 		}
 		if (report == nullptr || report->Faction != commanded || Time::unscaledTime - reportAt > 0.5f)
@@ -660,12 +661,13 @@ namespace SpaceGod::UI
 		y += 4;
 
 		Heading(y, x, w, "PRIORITIES");
-		auto d = command->Of(commanded);
+		auto d = CoopDirectives(command, commanded); // US-T47: command->Of(commanded) in single-player
 		if (GUI::Button(Rect(x, y, w, 22), cs::Cat("Production: ", d->Production->Name), button))
+			if (!CoopSendsProduction(Next(ProductionFocus::All(), d->Production))) // US-T47
 			command->SetProduction(commanded, Next(ProductionFocus::All(), d->Production));
 		y += 24;
 		Line(y, x, w, d->Production->Description, Dim);
-		if (GUI::Button(Rect(x, y, w, 22), cs::Cat("Build: ", d->Build->Name), button)) command->SetBuild(commanded, Next(BuildPlan::All(), d->Build));
+		if (GUI::Button(Rect(x, y, w, 22), cs::Cat("Build: ", d->Build->Name), button)) { if (!CoopSendsBuild(Next(BuildPlan::All(), d->Build))) command->SetBuild(commanded, Next(BuildPlan::All(), d->Build)); } // US-T47
 		y += 24;
 		Line(y, x, w, d->Build->Description, Dim);
 		cs::String research = d->Research == nullptr ? cs::String("nothing")
@@ -676,6 +678,7 @@ namespace SpaceGod::UI
 			cs::List<cs::Ref<ResearchTrack>> tracks;
 			tracks.Add(nullptr);
 			for (const auto& t : ResearchTrack::All()) tracks.Add(t);
+			if (!CoopSendsResearch(tracks[(tracks.IndexOf(d->Research) + 1) % tracks.Count()])) // US-T47
 			command->SetResearch(commanded, tracks[(tracks.IndexOf(d->Research) + 1) % tracks.Count()]);
 		}
 		y += 24;
@@ -708,6 +711,7 @@ namespace SpaceGod::UI
 		y += 28;
 		if (GUI::Button(Rect(x, y, w, 22), "CLEAR ORDERS (back to their own command's plans)", button))
 		{
+			if (CoopSendsClear(from != nullptr ? from : app->ActiveSystem->World)) { reportAt = -10.0f; return; } // US-T47
 			int n = command->Clear(commanded, commandScope, commandGroup, from != nullptr ? from : app->ActiveSystem->World);
 			app->ShowToast(n == 0 ? cs::String("No group there was under orders") : cs::Cat(n, (n == 1 ? " group stands down" : " groups stand down")));
 			reportAt = -10.0f;
@@ -741,6 +745,7 @@ namespace SpaceGod::UI
 	{
 		int i = states.IndexOf(commanded);
 		commanded = states[((i < 0 ? 0 : i) + step + states.Count()) % states.Count()];
+		if (!CoopSpeaks(commanded)) // US-T47
 		app->Galaxy->Polities->Command->Player = commanded;
 		commandGroup = nullptr;
 		reportAt = -10.0f;
@@ -758,6 +763,7 @@ namespace SpaceGod::UI
 		auto pilot = app->Piloted.Ship;
 		if (kind == ObjectiveKind::Escort && pilot != nullptr && target->World->Fleet->IsPresent(pilot) && !app->Galaxy->Polities->Diplomacy->Hostile(commanded, pilot->Faction))
 			charge = pilot;
+		if (CoopSendsOrder(kind, target, from, charge)) { reportAt = -10.0f; return; } // US-T47
 		int given = 0;
 		cs::String why = command->Order(commanded, commandScope, commandGroup, from != nullptr ? from : app->ActiveSystem->World, kind, target->World, jd, given, -1, charge);
 		app->ShowToast(!why.empty() ? why : cs::Cat(given, (given == 1 ? " group: " : " groups: "), cs::Strings::ToLowerInvariant(command->Describe(kind, target->World, -1, charge))));
@@ -786,6 +792,8 @@ namespace SpaceGod::UI
 			commanded = mine != nullptr && states.Contains(mine) ? mine : holder != nullptr && states.Contains(holder) ? holder : states[0];
 			envoyWith = nullptr;
 		}
+		CoopAdoptSpeaker(states); // US-T47: the party's speaker, which another player may have picked
+		if (!CoopSpeaks(commanded)) // US-T47
 		command->Player = commanded;
 
 		if (GUI::Button(Rect(x, top, 26, 22), "<", button)) CycleSpeaker(states, -1);
@@ -817,9 +825,11 @@ namespace SpaceGod::UI
 				Line(y, x, w, cs::Cat(Capital(p->Describe()), "  (", cs::Fmt(cs::Math::Max(0, left), "0"), " days to answer)"), Accent);
 				float half = (w - 4) / 2;
 				if (GUI::Button(Rect(x, y, half, 22), "ACCEPT", buttonOn))
+					if (!CoopSendsAnswer(p, true)) // US-T47
 					app->ShowToast(statecraft->Answer(p, true, jd) ? cs::Cat("Agreed: ", p->Describe()) : cs::String("That offer no longer stands"));
 				if (GUI::Button(Rect(x + half + 4, y, half, 22), "DECLINE", button))
 				{
+					if (CoopSendsAnswer(p, false)) { y += 26; continue; } // US-T47
 					statecraft->Answer(p, false, jd);
 					app->ShowToast(cs::Cat("Declined: ", p->Describe()));
 				}
@@ -864,6 +874,7 @@ namespace SpaceGod::UI
 				Line(y, x, w, Capital(p->Describe()) + until, CourseColor);
 				if (GUI::Button(Rect(x, y, w, 20), p->Kind == PactKind::Vassalage() && p->A == commanded ? "THROW OFF THEIR RULE" : "BREAK IT", button))
 				{
+					if (CoopSendsBreak(p)) { y += 24; continue; } // US-T47
 					statecraft->Break(p, commanded, jd);
 					app->ShowToast(cs::Cat("You break the ", p->Describe(), ": they will not forget it"));
 				}
@@ -878,6 +889,7 @@ namespace SpaceGod::UI
 				auto was = GUI::enabled;
 				GUI::enabled = was && can;
 				if (GUI::Button(Rect(x, y, w, 22), name, can && o->Read->Accepted() ? buttonOn : button))
+				if (!CoopSendsPropose(o, them)) // US-T47
 				{
 					cs::Ref<Appraisal> answer;
 					cs::String why = statecraft->Propose(o->Deal, commanded, them, jd, answer, o->Amount);
@@ -891,6 +903,7 @@ namespace SpaceGod::UI
 
 			double gift = Statecraft::SuggestedGift(commanded);
 			if (GUI::Button(Rect(x, y, w, 22), cs::Cat("SEND A GIFT  ", cs::Fmt(gift, "N0"), " cr"), button))
+			if (!CoopSendsGift(them, gift)) // US-T47
 			{
 				cs::String refused = statecraft->Gift(commanded, them, gift, jd);
 				app->ShowToast(!refused.empty() ? refused : cs::Cat("The ", them->Name, " receives your gift"));
@@ -904,8 +917,11 @@ namespace SpaceGod::UI
 					else
 					{
 						warArmed = false;
+						if (!CoopSendsWar(them)) // US-T47
+						{
 						cs::String why = statecraft->DeclareWar(commanded, them, jd);
 						app->ShowToast(!why.empty() ? why : cs::Cat("The ", commanded->Name, " is at war with the ", them->Name));
+						} // US-T47
 					}
 				}
 				y += 28;
@@ -924,6 +940,7 @@ namespace SpaceGod::UI
 	{
 		int i = states.IndexOf(commanded);
 		commanded = states[((i < 0 ? 0 : i) + step + states.Count()) % states.Count()];
+		if (!CoopSpeaks(commanded)) // US-T47
 		app->Galaxy->Polities->Command->Player = commanded;
 		envoyWith = nullptr;
 		warArmed = false;

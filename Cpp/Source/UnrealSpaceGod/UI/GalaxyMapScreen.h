@@ -10,6 +10,8 @@
 #include "UnityCompat/UnityTypes.h"
 #include "UnityCompat/UnityGui.h"
 
+#include <vector> // US-T47
+
 namespace SpaceGod
 {
 	class UnitySpaceApp;
@@ -27,6 +29,13 @@ namespace SpaceGod::Core
 	class World;
 	class FtlTarget;
 	struct Rgb;
+	class PolityDirectives; // US-T47
+	class ProductionFocus;
+	class BuildPlan;
+	class ResearchTrack;
+	class Proposal;
+	class Pact;
+	class EnvoyOption;
 }
 
 namespace SpaceGod::UI
@@ -58,7 +67,40 @@ namespace SpaceGod::UI
 		/// otherwise, so every game session that opened the map would leave its textures behind.
 		void DestroyOwnedTextures();
 
+		// ---------------------------------------------------------------- US-T47: co-op (GalaxyMapScreen.Coop.cpp)
+
+		/// A frame's map action on every peer (the C# track's GalaxyMapScreen.CoopExecute): what the button does, by the same
+		/// objects read back from their keys, its toast the asker's. False for a verb the map does not know.
+		static bool CoopExecute(UnitySpaceApp* app, const cs::String& verb, const std::vector<cs::String>& a);
+		/// F12 (UnitySpaceApp::HailPolity): the hail and its answer at its frame on every peer, the envoy opened on the hailer's.
+		static bool CoopSendsHail(UnitySpaceApp* app, const cs::Ref<Core::Faction>& from, const cs::Ref<Core::Faction>& to);
+		/// The smoke run's clicks (CoopSmoke): the speaker arrows, Production, an EXPLORE for the whole navy, SEND A GIFT.
+		void CoopSmokeSpeak(const cs::Ref<Core::Faction>& f);
+		void CoopSmokeProduction();
+		void CoopSmokeExplore(const cs::Ref<Core::StarSystem>& target);
+		void CoopSmokeGift(const cs::Ref<Core::Faction>& them);
+
 	private:
+		static bool CoopSendsText(UnitySpaceApp* app, const cs::String& verb, const cs::String& args);
+		/// command->Player = f in co-op: a "speak" entry (true when sent, or already the party's / already asked for).
+		bool CoopSpeaks(const cs::Ref<Core::Faction>& f);
+		/// The envoy screen, drawn: in co-op it speaks for the party's polity rather than writing its own pick back each frame.
+		void CoopAdoptSpeaker(const cs::List<cs::Ref<Core::Faction>>& states);
+		/// The directives the COMMAND panel reads: in co-op what the Core holds, without making them (command->Of makes them).
+		cs::Ref<Core::PolityDirectives> CoopDirectives(const cs::Ref<Core::StrategicCommand>& command, const cs::Ref<Core::Faction>& f);
+		bool CoopSendsProduction(const cs::Ref<Core::ProductionFocus>& p);
+		bool CoopSendsBuild(const cs::Ref<Core::BuildPlan>& p);
+		bool CoopSendsResearch(const cs::Ref<Core::ResearchTrack>& t);
+		bool CoopSendsOrder(Core::ObjectiveKind kind, const cs::Ref<Core::StarSystem>& target, const cs::Ref<Core::World>& from, const cs::Ref<Core::Ship>& charge);
+		bool CoopSendsClear(const cs::Ref<Core::World>& from);
+		bool CoopSendsAnswer(const cs::Ref<Core::Proposal>& p, bool accept);
+		bool CoopSendsBreak(const cs::Ref<Core::Pact>& p);
+		bool CoopSendsPropose(const cs::Ref<Core::EnvoyOption>& o, const cs::Ref<Core::Faction>& them);
+		bool CoopSendsGift(const cs::Ref<Core::Faction>& them, double amount);
+		bool CoopSendsWar(const cs::Ref<Core::Faction>& them);
+		static inline cs::Ref<Core::Faction> speakSent;
+		static inline long long speakSentAt = -1000;
+
 		UnitySpaceApp* app;
 		cs::Ref<Core::GalaxyMapModel> model;
 		float builtAt = -10.0f;

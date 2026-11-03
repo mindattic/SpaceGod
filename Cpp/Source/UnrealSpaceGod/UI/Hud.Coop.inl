@@ -58,3 +58,5 @@ public:
 	bool CoopExecute(const cs::String& verb, const std::vector<cs::String>& a);
 	/// For the smoke run: what the market board's Buy button does for this good at this market.
 	void CoopSmokeBuy(const cs::Ref<Core::Settlement>& market, Core::Good good) { ClickBuy(market, good); }
+	/// US-T47: the galaxy map's screen (made if it was never opened), for the smoke run's clicks.
+	GalaxyMapScreen* CoopMap();

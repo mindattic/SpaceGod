@@ -2,6 +2,7 @@
 // Declarations in Hud.Coop.inl. In single-player every hook is false and the original goes on.
 
 #include "UI/Hud.h"
+#include "UI/GalaxyMapScreen.h" // US-T47
 
 #include "UnitySpaceApp.h"
 #include "Coop/CoopPeer.h"
@@ -36,6 +37,12 @@ namespace Wire = SpaceGod::Coop::Wire;
 
 namespace SpaceGod::UI
 {
+	GalaxyMapScreen* Hud::CoopMap() // US-T47
+	{
+		if (!galaxyMap) galaxyMap = cs::New<GalaxyMapScreen>(app);
+		return galaxyMap.get();
+	}
+
 	bool Hud::CoopSendsText(const cs::String& verb, const cs::String& args)
 	{
 		if (CoopPeer::Current() == nullptr) return false;
