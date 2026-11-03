@@ -50,7 +50,9 @@ namespace UnityEngine
         /// <summary>The Unreal parent material for <paramref name="shader"/>.</summary>
         public static UMaterialInterface? Parent(Shader? shader)
         {
-            string name = ShaderName(shader);
+            // The glTF import's own (lit PBR) material, shown only by the model viewer, which draws the raw prefab: drawn
+            // with the game's Ship material in its base colour (ModelViewer's key light feeds the Sun globals, US-T40).
+            string name = shader?.name == ImportedShader ? "Ship" : ShaderName(shader);
             if (Parents.TryGetValue(name, out var cached)) return cached;
             UMaterialInterface? m = TryLoad($"{MaterialRoot}/M_{name}.M_{name}");
             if (m == null)
@@ -104,6 +106,8 @@ namespace UnityEngine
         {
             foreach (var kv in m.Floats) mid.SetScalarParameterValue(new FName(kv.Key), kv.Value);
             foreach (var kv in m.Vectors) mid.SetVectorParameterValue(new FName(kv.Key), ToUnreal(kv.Key, kv.Value, m.ColorNames.Contains(kv.Key)));
+            if (m.shader?.name == ImportedShader && m.Vectors.TryGetValue("_BaseColor", out var baseColor))
+                mid.SetVectorParameterValue(new FName("_Color"), ToUnreal("_Color", baseColor, true));
             foreach (var kv in m.Textures)
             {
                 var t = kv.Value?.Unreal;

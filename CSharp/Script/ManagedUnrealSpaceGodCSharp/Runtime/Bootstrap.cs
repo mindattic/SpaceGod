@@ -22,7 +22,7 @@ namespace Unity.SpaceGod
         /// <summary>Raised when an app is made or torn down (the host wires its camera and input to it).</summary>
         public static event Action<UnitySpaceApp> AppChanged;
 
-        static bool initialised;
+        static bool initialised, viewerEnsured;
 
         /// <summary>Unity's SubsystemRegistration / BeforeSceneLoad hooks: the profile store and the CLI mute.</summary>
         public static void InitialiseOnce()
@@ -40,6 +40,19 @@ namespace Unity.SpaceGod
         public static void EnsureApp()
         {
             InitialiseOnce();
+            // Unity's other AfterSceneLoad hook (US-T40): ModelViewer.Ensure, the F9 viewer that lives in every scene
+            // (DontDestroyOnLoad); the facade runs no Awake/Start on AddComponent, so they are sent here as Unity would.
+            if (!viewerEnsured)
+            {
+                viewerEnsured = true;
+                ModelViewer.Ensure();
+                var viewer = Object.FindAnyObjectByType<ModelViewer>();
+                if (viewer != null)
+                {
+                    UnityBridge.Invoke(viewer, "Awake");
+                    UnityBridge.Invoke(viewer, "Start");
+                }
+            }
             // The main menu is a scene of its own, and the app is not made in it: the menu loads the game scene
             // when the player starts. A run for the tour, a capture or -continue goes straight there.
             if (UI.MainMenu.Available && !GameLaunch.SkipsMenu)

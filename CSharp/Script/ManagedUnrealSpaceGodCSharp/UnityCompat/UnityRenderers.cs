@@ -129,6 +129,9 @@ namespace UnityEngine
     public class Camera : Behaviour
     {
         static Camera? mainCamera;
+        /// <summary>Every Camera made (destroyed ones are dropped as they are met), for UnityBridge.ScreenCamera.</summary>
+        internal static readonly List<Camera> All = new List<Camera>();
+        public Camera() { All.Add(this); }
         public static Camera? main
         {
             get => mainCamera != null && !mainCamera.destroyed ? mainCamera : null;

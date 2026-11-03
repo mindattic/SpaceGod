@@ -70,10 +70,13 @@ namespace Unity.SpaceGod.Bridge
 
         void ApplyCamera()
         {
-            var cam = Camera.main;
+            // The screen's camera as Unity picks it (the model viewer's over the game's, US-T40), not only Camera.main.
+            var cam = UnityBridge.ScreenCamera;
             if (cam == null || cameraActor == null || !cameraActor.IsValid()) return;
             // The camera never leaves the origin (floating origin); it turns and changes its lens.
-            var rotation = UnrealSpace.ToUnreal(cam.transform.rotation);
+            // A camera's rotation goes through CameraRotationToUnreal: Unity cameras look along +Z, Unreal's along +X
+            // (US-T40; ToUnreal alone pointed the view a quarter turn off, along the Unity camera's right).
+            var rotation = UnrealSpace.CameraRotationToUnreal(cam.transform.rotation);
             cameraActor.SetActorTransform(new FTransform(rotation, UnrealSpace.ToUnreal(cam.transform.position)));
             var component = cameraActor.CameraComponent;
             if (component != null)

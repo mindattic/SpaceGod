@@ -124,6 +124,7 @@ namespace UnityEngine
         /// <summary>Start of a frame: Unity's clock, loads that finished, particles, then MonoBehaviour.Update.</summary>
         public static void Tick(float realDeltaSeconds)
         {
+            tickStart = System.Diagnostics.Stopwatch.GetTimestamp();
             Time.unscaledDeltaTime = realDeltaSeconds;
             Time.unscaledTime += realDeltaSeconds;
             Time.deltaTime = realDeltaSeconds * Time.timeScale;
@@ -146,7 +147,22 @@ namespace UnityEngine
                 if (p.gameObject.activeInHierarchy) p.Simulate(Time.deltaTime);
             foreach (var b in behaviours.ToArray())
                 if (b.enabled && b.gameObject.activeInHierarchy) Invoke(b, "Update");
+            float ms = (float)System.Diagnostics.Stopwatch.GetElapsedTime(tickStart).TotalMilliseconds;
+            Timing.UpdateMs = Timing.UpdateMs * 0.9f + ms * 0.1f;
+            Timing.FrameMs = Timing.FrameMs * 0.9f + realDeltaSeconds * 1000f * 0.1f;
         }
+
+        /// <summary>Smoothed frame times (US-T40): real frame, every MonoBehaviour.Update, and Sync.</summary>
+        public struct FrameTiming
+        {
+            public float FrameMs, UpdateMs, SyncMs;
+            public override string ToString() =>
+                string.Format(System.Globalization.CultureInfo.InvariantCulture, "frame {0:F1} ms ({1:F1} fps), Update {2:F1} ms, Sync {3:F1} ms",
+                    FrameMs, FrameMs > 0 ? 1000f / FrameMs : 0, UpdateMs, SyncMs);
+        }
+
+        public static FrameTiming Timing;
+        static long tickStart;
 
         public struct Stats
         {
@@ -161,14 +177,20 @@ namespace UnityEngine
         /// <summary>End of a frame (Unity's LateUpdate and render): pushes everything drawn to Unreal.</summary>
         public static Stats Sync()
         {
+            long syncStart = System.Diagnostics.Stopwatch.GetTimestamp();
             foreach (var b in behaviours.ToArray())
                 if (b.enabled && b.gameObject.activeInHierarchy) Invoke(b, "LateUpdate");
 
             ProceduralAsteroids.EndFrame();
-            var cam = Camera.main;
+            screenCamera = FindScreenCamera();
+            var cam = screenCamera;
             var camPos = cam != null ? cam.transform.position : Vector3.zero;
             var camRot = cam != null ? cam.transform.rotation : Quaternion.identity;
-            PushGlobals();
+            PushGlobals(cam != null && !ReferenceEquals(cam, Camera.main) && captureCamera == null ? KeyLightOf(cam) : null);
+            // What the screen shows is what its camera renders: the layers in its culling mask (ModelViewer's camera
+            // sees only its own layer) over its clear colour (Backdrop); a Camera.Render capture adds its own mask.
+            int mask = (cam?.cullingMask ?? -1) | captureMask;
+            Backdrop.Update(captureCamera ?? cam);
 
             var s = new Stats { Renderers = renderers.Count };
             meshUploads = 0;
@@ -176,7 +198,8 @@ namespace UnityEngine
             {
                 if (r is ParticleSystemRenderer pr && r.enabled && r.gameObject.activeInHierarchy) pr.Rebuild(camPos, camRot);
                 var mesh = r.DrawMesh;
-                bool want = r.enabled && mesh != null && mesh.vertexCount + (mesh.StaticMesh != null ? 1 : 0) > 0 && r.gameObject.activeInHierarchy;
+                bool want = r.enabled && mesh != null && mesh.vertexCount + (mesh.StaticMesh != null ? 1 : 0) > 0 && r.gameObject.activeInHierarchy
+                    && (Backdrop.Is(r) || ((mask >> (r.gameObject.layer & 31)) & 1) != 0);
                 if (!want)
                 {
                     r.Primitive?.SetVisible(false);
@@ -194,11 +217,127 @@ namespace UnityEngine
             s.MeshUploads = meshUploads;
             s.MaterialInstances = materialInstances;
             Last = s;
+            if (captureCamera == null)
+                Timing.SyncMs = Timing.SyncMs * 0.9f + (float)System.Diagnostics.Stopwatch.GetElapsedTime(syncStart).TotalMilliseconds * 0.1f;
             return s;
         }
 
-        static void PushGlobals()
+        static Camera? screenCamera, captureCamera;
+        static int captureMask;
+
+        /// <summary>The camera that draws the screen, as Unity picks it: of the enabled, active cameras without a target
+        /// texture, the one with the highest depth (the model viewer's, depth 1000, over the game's); Camera.main if
+        /// there is none.</summary>
+        public static Camera? ScreenCamera => FindScreenCamera();
+
+        static Camera? FindScreenCamera()
         {
+            Camera? best = null;
+            for (int i = Camera.All.Count - 1; i >= 0; i--)
+            {
+                var c = Camera.All[i];
+                if (c.destroyed) { Camera.All.RemoveAt(i); continue; }
+                if (!c.enabled || c.targetTexture != null || !c.gameObject.activeInHierarchy) continue;
+                if (best == null || c.depth > best.depth || (c.depth == best.depth && ReferenceEquals(c, Camera.main))) best = c;
+            }
+            return best ?? Camera.main;
+        }
+
+        /// <summary>A camera's clear colour (CameraClearFlags.SolidColor, not black, which is what Unreal clears to):
+        /// a Sky cube on a 1x1 texture of that colour, pushed to the far distance around whichever view draws it.</summary>
+        static class Backdrop
+        {
+            static GameObject? go;
+            static MeshRenderer? renderer;
+            static Material? material;
+            static Color shown = new Color(-1, -1, -1, -1);
+
+            public static bool Is(Renderer r) => ReferenceEquals(r, renderer);
+
+            static float Encode(float c) => c <= 0.0031308f ? c * 12.92f : 1.055f * Mathf.Pow(c, 1f / 2.4f) - 0.055f;
+            public static Renderer? Renderer => renderer;
+
+            public static void Update(Camera? cam)
+            {
+                var c = cam != null && cam.clearFlags == CameraClearFlags.SolidColor ? cam.backgroundColor : Color.black;
+                bool want = host != null && c.r + c.g + c.b > 0;
+                if (!want)
+                {
+                    if (renderer != null) renderer.enabled = false;
+                    return;
+                }
+                if (go == null)
+                {
+                    go = new GameObject("Camera backdrop") { hideFlags = HideFlags.HideAndDontSave };
+                    go.AddComponent<MeshFilter>().sharedMesh = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
+                    renderer = go.AddComponent<MeshRenderer>();
+                    material = new Material(Shader.Find("Unity.SpaceGod/Sky")) { name = "Backdrop" };
+                    material.SetFloat("_Brightness", 1f);
+                    renderer.sharedMaterial = material;
+                }
+                go.transform.position = cam!.transform.position;
+                if (c != shown)
+                {
+                    shown = c;
+                    var t = new Texture2D(1, 1) { name = "Backdrop" };
+                    // Measured (US-T40): M_Sky's sRGB texel reaches the screen decoded but not re-encoded (a 13/15/23
+                    // texel showed as 1/1/2), so the texel is the colour encoded once more; on screen it is then
+                    // Unity's clear colour exactly as Unity shows it (its gamma value).
+                    t.SetPixel(0, 0, new Color(Encode(c.r), Encode(c.g), Encode(c.b), 1));
+                    t.Apply();
+                    material!.SetTexture("_MainTex", t);
+                }
+                renderer!.enabled = true;
+            }
+        }
+
+        static UProceduralMeshComponent? keeper;
+        static int keptSlots;
+
+        /// <summary>Unreal's GC does not see C# references: a shared material instance that no component uses directly
+        /// (only property-block children, or per-chunk ones) would be collected under them. A hidden component holds every
+        /// shared instance in its material slots.</summary>
+        static void Keep(UMaterialInstanceDynamic mid, int slot)
+        {
+            if (host == null) return;
+            keeper ??= host.AddComponentByClass<UProceduralMeshComponent>(false, new FTransform(), c =>
+            {
+                c.CastShadow = false;
+                c.CollisionEnabled = ECollisionEnabled.NoCollision;
+                c.SetVisibility(false);
+            });
+            keeper.SetMaterial(slot, mid);
+        }
+
+        /// <summary>A directional light under a camera that is not the game's (ModelViewer's key light, AddKeyLight).</summary>
+        static Light? KeyLightOf(Camera cam)
+        {
+            foreach (var l in cam.gameObject.GetComponentsInChildren<Light>())
+                if (l.enabled && l.type == LightType.Directional && (l.cullingMask & cam.cullingMask) != 0) return l;
+            return null;
+        }
+
+        static bool keyLit;
+
+        /// <summary>Unity lights are data only (the shaders light themselves from the Sun globals); while a camera that
+        /// brings its own key light draws the screen (the model viewer), that light is the Sun the globals carry, as
+        /// ShipThumbnails sets them for its capture.</summary>
+        static void PushGlobals(Light? key)
+        {
+            if (key != null && host != null)
+            {
+                PushGlobals(null);
+                if (globals == null) return;
+                var far = key.transform.position - key.transform.forward * 1e7f;
+                var c = key.color;
+                MaterialLibrary.SetVectorParameterValue(globals, new FName("_SunPositionWS"), ShaderBinding.ToUnreal("_SunPositionWS", new Vector4(far.x, far.y, far.z, 1), false));
+                MaterialLibrary.SetVectorParameterValue(globals, new FName("_SunColor"), new FLinearColor(c.r * key.intensity, c.g * key.intensity, c.b * key.intensity, 1));
+                MaterialLibrary.SetVectorParameterValue(globals, new FName("_Sun2PositionWS"), ShaderBinding.ToUnreal("_Sun2PositionWS", new Vector4(far.x, far.y, far.z, 1), false));
+                MaterialLibrary.SetVectorParameterValue(globals, new FName("_Sun2Color"), new FLinearColor(0, 0, 0, 1));
+                keyLit = true;
+                return;
+            }
+            if (keyLit) { keyLit = false; globalsPushed = -1; }
             if (globalsPushed == Shader.globalsVersion) return;
             globalsPushed = Shader.globalsVersion;
             if (host == null) return;
@@ -224,6 +363,7 @@ namespace UnityEngine
                 if (parent == null) return null;
                 m.Instance = MaterialLibrary.CreateDynamicMaterialInstance(parent, new FName(m.name.Length > 0 ? Sanitize(m.name) : "Material"));
                 m.pushedVersion = -1;
+                Keep(m.Instance, keptSlots++);
                 materialInstances++;
             }
             if (m.pushedVersion != m.version)
@@ -249,9 +389,11 @@ namespace UnityEngine
             UStaticMeshComponent? staticMesh;
             Mesh? shownMesh;
             int shownMeshVersion = -1, shownTransform = -1, shownMaterials = -1, shownBlock = -1, sections;
-            readonly List<(UMaterialInstanceDynamic? Mid, UMaterialInstanceDynamic? Parent)> blockInstances = new List<(UMaterialInstanceDynamic?, UMaterialInstanceDynamic?)>();
+            readonly List<(UMaterialInstanceDynamic? Mid, Material? Of, int Version)> blockInstances = new List<(UMaterialInstanceDynamic?, Material?, int)>();
             bool visible;
             public int Triangles;
+            public UPrimitiveComponent? Component => component;
+            public bool Visible => visible && component != null;
 
             public Primitive(Renderer r) { }
 
@@ -368,23 +510,38 @@ namespace UnityEngine
                             component!.SetMaterial(i, parent);
                             continue;
                         }
-                        while (blockInstances.Count <= i) blockInstances.Add((null, null));
-                        // Our own record of the parent: the glue hands back a fresh wrapper for mid.Parent each time.
-                        var (mid, ofParent) = blockInstances[i];
-                        if (mid == null || !ReferenceEquals(ofParent, parent))
+                        while (blockInstances.Count <= i) blockInstances.Add((null, null, -1));
+                        // A MaterialPropertyBlock = the shared material's values with the block's on top, on a per-primitive
+                        // instance of the shader's parent material. Not parented to the shared instance: Unreal accepts only
+                        // a Material or a MaterialInstanceConstant as a parent (an MID parent is refused, leaving the
+                        // instance parentless, which crashes the renderer, US-T40).
+                        var (mid, ofMaterial, _) = blockInstances[i];
+                        if (mid == null || !ReferenceEquals(ofMaterial, m))
                         {
-                            mid = MaterialLibrary.CreateDynamicMaterialInstance(parent, new FName("Block"));
-                            blockInstances[i] = (mid, parent);
+                            var root = ShaderBinding.Parent(m.shader);
+                            if (root == null) continue;
+                            mid = MaterialLibrary.CreateDynamicMaterialInstance(root, new FName("Block"));
                             materialInstances++;
                         }
+                        ShaderBinding.Push(m, mid);
                         ShaderBinding.Push(r.Block, mid);
+                        blockInstances[i] = (mid, m, m.version);
                         component!.SetMaterial(i, mid);
                     }
                 }
                 else
                 {
-                    // Shared materials whose values moved since: push them (the primitives follow their instances).
+                    // Shared materials whose values moved since: push them (primitives using them directly follow their
+                    // instance; block instances take the material's values again, then the block's on top).
                     foreach (var m in r.RawMaterials) if (m != null && m.pushedVersion != m.version) InstanceOf(m);
+                    for (int i = 0; i < blockInstances.Count; i++)
+                    {
+                        var (mid, m, pushed) = blockInstances[i];
+                        if (mid == null || m == null || pushed == m.version || r.Block == null) continue;
+                        ShaderBinding.Push(m, mid);
+                        ShaderBinding.Push(r.Block, mid);
+                        blockInstances[i] = (mid, m, m.version);
+                    }
                 }
 
                 SetVisible(true);
@@ -418,6 +575,8 @@ namespace UnityEngine
         }
 
         static USceneCaptureComponent2D? capture;
+        /// <summary>How many primitives the last Camera.Render capture drew (its layers + the backdrop).</summary>
+        public static int LastCaptureShown;
 
         /// <summary>Camera.Render into its targetTexture (ShipThumbnails): a scene capture from the camera's pose.</summary>
         internal static void RenderCamera(Camera camera)
@@ -425,17 +584,58 @@ namespace UnityEngine
             if (host == null || camera.targetTexture == null) return;
             EnsureRenderTarget(camera.targetTexture);
             if (camera.targetTexture.Unreal is not UTextureRenderTarget2D target) return;
-            Sync();
+            // The capture renders what this camera would: its culling mask's layers (ShipThumbnails: only the preview
+            // hull on the ModelViewer layer) over its clear colour, nothing else of the scene.
+            captureCamera = camera;
+            captureMask = camera.cullingMask;
+            try { Sync(); }
+            finally { captureCamera = null; captureMask = 0; }
             capture ??= host.AddComponentByClass<USceneCaptureComponent2D>(false, new FTransform(), c =>
             {
                 c.CaptureEveryFrame = false;
                 c.CaptureOnMovement = false;
+                c.PrimitiveRenderMode = ESceneCapturePrimitiveRenderMode.PRM_UseShowOnlyList;
+                // The final LDR colour with the main camera's look (RenderBackend: manual exposure, linear tone curve).
+                c.CaptureSource = ESceneCaptureSource.SCS_FinalColorLDR;
+                var pp = c.PostProcessSettings;
+                pp.Override_ToneCurveAmount = true;
+                pp.ToneCurveAmount = 0f;
+                pp.Override_ExpandGamut = true;
+                pp.ExpandGamut = 0f;
+                pp.Override_AutoExposureMethod = true;
+                pp.MeteringMode = EAutoExposureMethod.AEM_Manual;
+                pp.Override_AutoExposureBias = true;
+                pp.ExposureCompensation = 0f;
+                pp.Override_AutoExposureApplyPhysicalCameraExposure = true;
+                pp.ApplyPhysicalCameraExposure = false;
+                pp.Override_BloomIntensity = true;
+                pp.BloomIntensity = 0f;
+                pp.Override_MotionBlurAmount = true;
+                pp.Amount = 0f;
+                c.PostProcessSettings = pp;
+                c.PostProcessBlendWeight = 1f;
             });
-            // Unity's fieldOfView is vertical, Unreal's horizontal; Unity's +Z forward is Unreal's +X, so the pose maps as is.
+            // The camera's own clip planes (r.SetNearClipPlane cannot go under 1 Unreal unit; a thumbnail's camera sits
+            // a hull's few units away with a near plane of 1% of its radius).
+            capture.Override_CustomNearClippingPlane = true;
+            capture.CustomNearClippingPlane = (float)Math.Max(camera.nearClipPlane * UnrealSpace.UnitsPerUnity, 1e-4);
+            capture.MaxViewDistanceOverride = (float)(camera.farClipPlane * UnrealSpace.UnitsPerUnity);
+            capture.ClearShowOnlyComponents();
+            int shown = 0;
+            foreach (var r in renderers)
+            {
+                if (r.Primitive?.Component is not { } pc || !r.Primitive.Visible) continue;
+                if (!Backdrop.Is(r) && ((camera.cullingMask >> (r.gameObject.layer & 31)) & 1) == 0) continue;
+                capture.ShowOnlyComponent(pc);
+                shown++;
+            }
+            LastCaptureShown = shown;
+            // Unity's fieldOfView is vertical, Unreal's horizontal; a camera's rotation maps through CameraRotationToUnreal
             float aspect = camera.targetTexture.height > 0 ? (float)camera.targetTexture.width / camera.targetTexture.height : camera.aspect;
             capture.FieldofView = 2f * Mathf.Atan(Mathf.Tan(camera.fieldOfView * 0.5f * Mathf.Deg2Rad) * aspect) * Mathf.Rad2Deg;
             capture.TextureTarget = target;
-            capture.SetWorldTransform(UnrealSpace.ToUnreal(camera.transform.position, camera.transform.rotation, Vector3.one), false, out _, true);
+            // (Unity cameras look along +Z, Unreal's along +X).
+            capture.SetWorldTransform(new FTransform(UnrealSpace.CameraRotationToUnreal(camera.transform.rotation), UnrealSpace.ToUnreal(camera.transform.position)), false, out _, true);
             capture.CaptureScene();
         }
 
