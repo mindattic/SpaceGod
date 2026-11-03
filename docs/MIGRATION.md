@@ -214,6 +214,53 @@ agents apply them across all folders (full list of reported seams: notes on US-T
     BodyDefinition.h); members named like their type are declared with `::SpaceGod::Core::T`; locals named after
     Windows macros (`near`, `far`, `small`, `min`, `max`) are renamed.
 
+## Parity findings (US-T37)
+
+The first C++ vs C# comparison (`tools/bench.ps1 -Track Both`, Bench/README.md): Bench.Cpp runs the same startup
+and scenarios over the C++ Core and writes the same digest. **All five scenarios are byte-identical** to Bench.CSharp
+over Unity.SpaceGod's unchanged Core (sol-idle, high-warp, economy-year, battle, galaxy-ftl: same `digestHash`, which
+also matches the C#-only hashes recorded before Bench.Cpp existed). A year of the whole galaxy at full warp
+(high-warp: every system, interstellar traffic, construction, wars, statecraft) and a year of Sol's economy at full
+detail come out bit for bit the same, which is the strongest check the translation rules (Cs.h, the evaluation-order
+rule, the Dictionary rulings) have had.
+
+Only two defects stood between the integrated Core and parity. Each is a *class* of translation bug worth checking for
+in any later port:
+
+1. **Evaluation order inside one call's arguments** (the rule above, missed once). `War::RaisePirateGroup`:
+   `Fleet.AddShip(Name(), raidersRaised % 3 == 0 ? Cruiser : Destroyer, ...)` — C# runs `Name()` (which bumps
+   `raidersRaised`) before reading the counter; MSVC read the counter first, so every raider band's leader came out
+   a Cruiser where C# made a Destroyer. Visible already in the **build** digest (Alpha Centauri's, Barnard's Star's and
+   Epsilon Eridani's raider hulls and pirate treasuries), and from there it diverged everything. The hidden form is
+   worth noting: the side effect was inside a *local lambda* (`Name()`), not an `rng.Next()`, so a grep for draws in
+   one expression does not find it. Fix: hoist the call into a local.
+2. **A `const cs::Ref<T>&` parameter aliasing a field the callee reassigns.** C# passes a reference by value; a C++
+   `const shared_ptr&` is a reference to the caller's *variable*. `FighterAI::Dock(b, u, u->BoardTarget, dt)` hands the
+   field itself down to `Battle::ShuttleLatch(shuttle, t)`, whose third line is `shuttle->BoardTarget = nullptr` — and
+   `t`, an alias of that field, went null; the next line dereferenced it (an access violation on the first shuttle
+   that latched on: in `battle` at tick ~355, with every trace line up to then identical to C#; before fix 1,
+   sol-idle's diverged opening battles hit it too). Fix: copy the parameter first. The pattern to look
+   for: a call passing `x->Field` (or a container element) by `const&` into code that can assign that field, remove
+   that element or clear the container.
+
+How the first divergence was found: both runners take `--trace N` (every N ticks one line of FNV-1a hashes, the
+digest's head and each system's block) and `--dump-at T` (the full digest at tick T). Tick 0 of the trace is the
+build digest, so a divergence during `Galaxy.CreateDefault` shows as "which systems differ" before any tick runs;
+for a crash, the C++ trace stopping while every line so far matches C# says the crash is a C++ bug at an identical
+state, not a consequence of an earlier divergence.
+
+What parity does *not* cover yet: code paths no scenario reaches (saves/loads through ObjectGraph and SaveGame, the
+Session layer, the player-flown helm and seats, settings bound from a profile, the non-Latin text paths behind
+`cs::Char`). A scenario per area (a save/load round trip mid-run; a scripted helm) is the natural next step.
+
+**Speed (first comparison, same workstation, shared with other builds, so ±20%).** The C++ Core is currently
+**about 2–2.5× slower per tick** than .NET 8's JIT on the same simulation (table in Bench/README.md), while building
+the galaxy at about the same speed. Nothing has been tuned yet; the likely costs are the translation's mechanics rather
+than the language: `cs::Ref` (shared_ptr) passed and copied by value through hot paths (atomic reference counts where
+.NET copies a pointer), `std::function` for every C# delegate and LINQ-style callback, `cs::Dictionary`'s .NET-order
+bookkeeping, and per-object heap allocations the GC would have bump-allocated. A profiler pass on high-warp is the
+first optimisation step; anything changed must keep the five digests identical.
+
 ## C# track
 
 **Decision (US-T6, 2026-11-03): UnrealSharp**, pinned as a git submodule at `CSharp/Plugins/UnrealSharp`

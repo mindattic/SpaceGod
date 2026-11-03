@@ -6,7 +6,7 @@ Headless runners over the two simulation Cores, driven by the same scenarios wit
 | Runner | Status | Core |
 |---|---|---|
 | `Bench/CSharp/` (`Bench.CSharp.exe`, .NET 8) | done (US-T23) | `../Unity.SpaceGod/Assets/UnitySpace/Core/**/*.cs` + `../Unity.Shared/.../Runtime/Core`, linked **in place** by `CSharp/Lib/*.csproj` (netstandard2.1, C# 9, as Unity.SpaceGod's `Tests/UnitySpace.Core` does). Nothing is copied. `UnitySpaceGodDir` / `UnitySharedDir` override the checkouts. |
-| `Bench/Cpp/` (`Bench.Cpp.exe`) | later ticket | `Cpp/Source/SpaceGodCore` |
+| `Bench/Cpp/` (`Bench.Cpp.exe`) | done (US-T37) | `Cpp/Source/SpaceGodCore` (the standalone `SpaceGodCore.lib` from `tools/build-core.ps1`); `src/` is a line-for-line port of `CSharp/src` (Program, Simulation, Digest), built by `tools/build-bench-cpp.ps1` into `Cpp/Intermediate/CoreStandalone/Release/Bench.Cpp.exe` |
 
 ```powershell
 tools/bench.ps1                         # dotnet build -c Release, then every scenario, one process each (~2 min)
@@ -152,7 +152,36 @@ process).
 
 The max tick is the first (JIT) or a coarse 0.25-day step of every other system landing in that frame.
 
-## Compare (later ticket)
+## Compare (US-T37)
 
-`tools/bench.ps1` has a marked hook for Bench.Cpp. The compare script diffs `csharp-<s>.digest.txt` against
-`cpp-<s>.digest.txt` (first differing line names the system/ship/field) and tabulates both runners' timings.
+```powershell
+tools/bench.ps1 -Track Both                  # build both runners, run every scenario on each, then compare
+tools/bench.ps1 -Track Cpp -NoBuild -Scenario battle
+tools/bench.ps1 -Compare                     # compare what is already in Bench/results
+```
+
+Per scenario the compare prints `IDENTICAL` with the digest hash, or the first differing line (with the `system` /
+`battle` line it belongs to, two lines of context from each side and the first differing token), then both runners'
+timings. Bench.Cpp reports allocations as the bytes its replaced `operator new` handed out (the C# side's
+`GC.GetTotalAllocatedBytes`); its `runtime` names the compiler. On a native fault it prints a symbolised stack.
+
+**Finding a divergence.** Both runners take `--trace N` (writes `<track>-<scenario>.trace.txt`: at tick 0, after the
+setup, and every N ticks, `tick T head=<hash> s0=<hash> s1=...`, the FNV-1a of the digest's head and of each system's
+block) and `--dump-at T` (the full digest at tick T as `<track>-<scenario>.t<T>.digest.txt`). Diff the two traces for
+the first differing line, then dump both at that tick (or the tick before) and diff the system that differs. Tracing
+is outside the timings. The root causes found so far are in docs/MIGRATION.md, "Parity findings".
+
+**First comparison (2026-11-03, US-T37): every scenario identical.**
+
+| Scenario | Ticks | digestHash | C# build / tick mean / p50 / p95 / total ms | C++ build / tick mean / p50 / p95 / total ms |
+|---|---|---|---|---|
+| sol-idle | 3600 | `B30509691F52C9E0` | 6277 / 1.79 / 0.65 / 1.73 / 12725 | 5435 / 2.38 / 1.15 / 2.25 / 14014 |
+| high-warp | 60 | `A8A790EC13FD23C8` | 4679 / 653 / 622 / 837 / 43851 | 5601 / 1557 / 1513 / 1895 / 98996 |
+| economy-year | 731 | `7F6533416B74D14D` | 4760 / 59.3 / 55.2 / 78.6 / 48086 | 5624 / 142 / 131 / 208 / 109071 |
+| battle | 2149 | `ABD80179E1D7F1AC` | 6261 / 1.71 / 0.63 / 5.36 / 9943 | 5457 / 2.22 / 1.44 / 6.16 / 10230 |
+| galaxy-ftl | 745 | `F1E614170D1B1960` | 5821 / 5.04 / 1.53 / 14.6 / 9575 | 5537 / 9.70 / 3.62 / 31.7 / 12762 |
+
+(C#: .NET 8.0.33 RyuJIT; C++: MSVC 19.44 `/O2 /fp:precise`, not tuned. The workstation was shared with other builds,
+so treat differences under ~20% as noise.) The C++ Core is 2–2.5× slower per simulation tick on the heavy scenarios
+and about even on building the galaxy; see docs/MIGRATION.md for the likely causes. Peak working set: C++ 38–81 MB,
+C# 85–146 MB.
