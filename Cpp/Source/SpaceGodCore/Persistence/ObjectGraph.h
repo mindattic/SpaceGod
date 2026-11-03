@@ -42,6 +42,8 @@ namespace SpaceGod::Core
 	{
 		struct ClassInfo;
 		struct Node;
+		struct Value;
+		struct RType;
 		class Writer;
 		class Reader;
 		class StaticWalker;
@@ -115,7 +117,7 @@ namespace SpaceGod::Core
 			cs::String Key;
 			std::function<const NetType*()> Type;
 			std::function<void(Writer&, void*)> Write;
-			std::function<void(Reader&, const struct Value&, void*)> Read;
+			std::function<void(Reader&, const Value&, void*)> Read;
 			std::function<void(StaticWalker&, void*, const cs::String&, int)> Walk;
 		};
 
@@ -227,7 +229,7 @@ namespace SpaceGod::Core
 			TypeCode Code = TypeCode::Empty;
 			union { int64_t I; uint64_t U; double D; float F; } Prim{};
 			int Id = 0;                         // Ref: the entry id
-			const struct RType* Type = nullptr; // Struct / Boxed / Prim: the saved type
+			const RType* Type = nullptr; // Struct / Boxed / Prim: the saved type
 			std::vector<Value> Items;           // Struct: fields in saved order; Boxed: [0]; Decimal: 4 Int32
 		};
 
