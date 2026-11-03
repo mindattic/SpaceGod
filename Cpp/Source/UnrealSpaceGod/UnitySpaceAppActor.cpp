@@ -5,6 +5,7 @@
 #include "UnrealSpaceGodLog.h"
 #include "Input/UnrealInputDevice.h"
 #include "UnityCompat/GuiHost.h"
+#include "Views/AsteroidBelt.h"
 
 #include "Camera/CameraComponent.h"
 #include "Engine/Engine.h"
@@ -63,6 +64,12 @@ void AUnitySpaceAppActor::BeginPlay()
 	{
 		UnitySpaceApp* AppPtr = App.get();
 		GuiHost::Register(AppPtr, [AppPtr] { if (AppPtr->enabled) AppPtr->OnGUI(); });
+		// The asteroid belt is a second MonoBehaviour on the app's GameObject in Unity, added after it: its OnGUI (the
+		// named asteroids' labels) runs after the app's in every pass.
+		GuiHost::Register(&AppPtr->AsteroidBelt, [AppPtr]
+		{
+			if (AppPtr->AsteroidBelt && AppPtr->AsteroidBelt->enabled) AppPtr->AsteroidBelt->OnGUI();
+		}, 1);
 	}
 	ApplyCamera();
 	ApplyCursor();
@@ -74,6 +81,7 @@ void AUnitySpaceAppActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	if (App)
 	{
 		GuiHost::Unregister(App.get());
+		GuiHost::Unregister(&App->AsteroidBelt);
 		if (EndPlayReason == EEndPlayReason::Quit || EndPlayReason == EEndPlayReason::EndPlayInEditor) App->OnApplicationQuit();
 		App->OnDestroy();
 		App.reset();
