@@ -1,6 +1,6 @@
 {
 	"FileVersion": 3,
-	"EngineAssociation": "5.5",
+	"EngineAssociation": "5.8",
 	"Category": "",
 	"Description": "The real Sol system in Unreal Engine 5, played co-op: a C++ port of Unity.SpaceGod's simulation core.",
 	"Modules": [

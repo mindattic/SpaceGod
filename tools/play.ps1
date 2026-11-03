@@ -2,7 +2,7 @@
 param(
   [ValidateSet('solo', 'host', 'join')][string]$Mode = 'solo',
   [string]$Address = '127.0.0.1',
-  [string]$EngineVersion = '5.5'
+  [string]$EngineVersion = '5.8'
 )
 
 <#

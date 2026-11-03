@@ -37,7 +37,7 @@ you in GAMEPLAY scale still agree on where they are.
 
 ## Running it
 
-Needs Unreal Engine 5.5 with Visual Studio 2022 (the "Game development with C++" workload).
+Needs Unreal Engine 5.8 with Visual Studio 2022 (the "Game development with C++" workload).
 
 1. Right-click `UnrealSpaceGod.uproject` and pick **Generate Visual Studio project files**, then open
    the project. The editor offers to build the module.
