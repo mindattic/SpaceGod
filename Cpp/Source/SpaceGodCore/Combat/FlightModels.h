@@ -48,7 +48,7 @@ namespace SpaceGod::Core
 		/// Last in the list so the other families keep their numbers.</summary>
 		Runner,
 	};
-	const char* ToString(FlightFamily v);
+	SPACEGODCORE_API const char* ToString(FlightFamily v);
 
 	/// <summary>
 	/// How one family of craft turns the pilot's input into motion each frame (U.SPC-T17). Every model
@@ -59,7 +59,7 @@ namespace SpaceGod::Core
 	/// instance serves every hull of its family. A new way of flying is a new implementation registered
 	/// for its family, never a branch in <see cref="PilotFlight"/>.
 	/// </summary>
-	class IFlightModel
+	class SPACEGODCORE_API IFlightModel
 	{
 	public:
 		virtual ~IFlightModel() = default;
@@ -76,7 +76,7 @@ namespace SpaceGod::Core
 	/// The shared Newtonian model every hull flew before U.SPC-T17 (U.SPC-T59, <see cref="PilotFlight.Step"/>),
 	/// unchanged: the families with no model of their own yet fly it.
 	/// </summary>
-	class NewtonianFlightModel final : public IFlightModel
+	class SPACEGODCORE_API NewtonianFlightModel final : public IFlightModel
 	{
 	public:
 		static const cs::Ref<NewtonianFlightModel>& Instance();
@@ -97,14 +97,14 @@ namespace SpaceGod::Core
 		/// of its rate while the boost fires and at the full rate at any speed once it is let go.</summary>
 		BoostHeld,
 	};
-	const char* ToString(TurnPenaltyRule v);
+	SPACEGODCORE_API const char* ToString(TurnPenaltyRule v);
 
 	/// <summary>
 	/// The light fighter's handling numbers (U.SPC-T17): data, not code, so a tuning pass or the settings
 	/// registry (U.SPC-T431) changes them without touching <see cref="LightFighterFlightModel"/>. The game's
 	/// light fighters, interceptors and runners read theirs from Settings > Dogfighting (<see cref="LightFighterSettings"/>, U.SPC-T440).
 	/// </summary>
-	struct LightFighterHandling
+	struct SPACEGODCORE_API LightFighterHandling
 	{
 		/// <summary>With flight assist on, how hard the flight computer may push across the nose to pull
 		/// the track round after it (the "grip" that makes a turn a carve, not a slide), as a fraction of
@@ -176,7 +176,7 @@ namespace SpaceGod::Core
 	/// pilot's tool. The player and the crews in a battle's dogfight (<see cref="Battle"/>, U.SPC-T274, U.SPC-T440)
 	/// fly the same model.
 	/// </summary>
-	class LightFighterFlightModel final : public IFlightModel
+	class SPACEGODCORE_API LightFighterFlightModel final : public IFlightModel
 	{
 		cs::Func<LightFighterHandling> handling;
 
@@ -229,7 +229,7 @@ namespace SpaceGod::Core
 	/// the player's hands and the crews' at once.
 	/// </summary>
 	// [SettingsSource]
-	class LightFighterSettings
+	class SPACEGODCORE_API LightFighterSettings
 	{
 		/// <summary>The <see cref="TurnPenaltyRule"/> options, in its order.</summary>
 		static const cs::List<cs::String>& TurnPenaltyOptions();
@@ -241,7 +241,7 @@ namespace SpaceGod::Core
 		static TurnPenaltyRule Rule();
 
 		/// <summary>One family's four numbers.</summary>
-		class Family final
+		class SPACEGODCORE_API Family final
 		{
 		public:
 			cs::Ref<RangeSetting> Grip, Strafe, CornerSpeed, OverspeedTurn;
@@ -270,7 +270,7 @@ namespace SpaceGod::Core
 	/// <summary>
 	/// The bomber's handling numbers (U.SPC-T484): data, not code, like <see cref="LightFighterHandling"/>.
 	/// </summary>
-	struct BomberHandling
+	struct SPACEGODCORE_API BomberHandling
 	{
 		/// <summary>With flight assist on, how hard the flight computer may push across the nose, as a fraction of the
 		/// push that holds the track to the nose through its tightest turn at top speed (top speed times turn rate):
@@ -304,7 +304,7 @@ namespace SpaceGod::Core
 	/// <see cref="BomberHandling.ThrottleAuthority"/> of the drive, so a bomber is slow to gather way and slow to shed
 	/// it. With flight assist off the hull is the Newtonian one, unchanged.
 	/// </summary>
-	class BomberFlightModel final : public IFlightModel
+	class SPACEGODCORE_API BomberFlightModel final : public IFlightModel
 	{
 	public:
 		BomberHandling Handling;
@@ -325,7 +325,7 @@ namespace SpaceGod::Core
 	/// The heavy fighter's handling numbers (U.SPC-T441, docs/FLIGHT_MODELS.md, Heavy fighters): data, not code, like
 	/// <see cref="LightFighterHandling"/>, each one a setting for the settings registry (U.SPC-T431) to declare.
 	/// </summary>
-	struct HeavyFighterHandling
+	struct SPACEGODCORE_API HeavyFighterHandling
 	{
 		/// <summary>The cap on the nose's swing, as a fraction of the light fighter's turn rate (the space superiority
 		/// fighter's, <see cref="LightFighterTurnRateDegS"/>): stiff, below any light fighter. A class tuned slower still keeps
@@ -375,7 +375,7 @@ namespace SpaceGod::Core
 	/// <see cref="HeavyFighterHandling.BoostBleedS"/> rather than being braked away, so a boosted run carries through.
 	/// With flight assist off the hull is the Newtonian one, unchanged.
 	/// </summary>
-	class HeavyFighterFlightModel final : public IFlightModel
+	class SPACEGODCORE_API HeavyFighterFlightModel final : public IFlightModel
 	{
 	public:
 		HeavyFighterHandling Handling;
@@ -423,7 +423,7 @@ namespace SpaceGod::Core
 		Full,
 		Flank,
 	};
-	const char* ToString(EngineTelegraph v);
+	SPACEGODCORE_API const char* ToString(EngineTelegraph v);
 
 	/// <summary>
 	/// A capital ship's handling numbers (U.SPC-T499, docs/FLIGHT_MODELS.md, Capital ships): data, not code, with a
@@ -431,7 +431,7 @@ namespace SpaceGod::Core
 	/// to <see cref="ComeAboutS"/> (<see cref="CapitalFlightModel.PeakTurnRateDegS"/>), so the come-about is what the
 	/// numbers promise.
 	/// </summary>
-	struct CapitalHandling
+	struct SPACEGODCORE_API CapitalHandling
 	{
 		/// <summary>The telegraph's speeds as fractions of <see cref="PilotTuning.MaxSpeed"/> (Full is 1, Flank the boost
 		/// on top of it, Stop 0): Full Astern (astern, so the hull backs at this share), Slow and Half.</summary>
@@ -504,7 +504,7 @@ namespace SpaceGod::Core
 	/// capital climbs, dives and rolls to bring a broadside to bear above or below. The turn is fitted to the class's
 	/// come-about (<see cref="CapitalHandling.ComeAboutS"/>). With flight assist off the hull is the Newtonian one, unchanged.
 	/// </summary>
-	class CapitalFlightModel final : public IFlightModel
+	class SPACEGODCORE_API CapitalFlightModel final : public IFlightModel
 	{
 	public:
 		CapitalHandling Handling;
@@ -569,7 +569,7 @@ namespace SpaceGod::Core
 	/// flies the capital model on its own <see cref="CapitalHandling"/> (U.SPC-T499). <see cref="Default"/> is the
 	/// game's; tests build their own.
 	/// </summary>
-	class FlightModelRegistry final
+	class SPACEGODCORE_API FlightModelRegistry final
 	{
 		cs::Dictionary<ShipClass, FlightFamily> families;
 		cs::Dictionary<FlightFamily, cs::Ref<IFlightModel>> models;

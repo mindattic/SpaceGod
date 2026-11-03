@@ -26,7 +26,7 @@ namespace SpaceGod::Core
 	/// the menu's Broadsides group.
 	/// </summary>
 	// [SettingsSource]
-	class FleetCoordination
+	class SPACEGODCORE_API FleetCoordination
 	{
 	public:
 		/// <summary>C# RuntimeHelpers.RunClassConstructor (what SettingsRegistry does for a [SettingsSource] class): creates

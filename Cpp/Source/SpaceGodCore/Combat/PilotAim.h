@@ -9,7 +9,7 @@ namespace SpaceGod::Core
 	/// (U.SPC-T269). The result is <see cref="PilotInput.DesiredForward"/>; the hull then swings toward
 	/// it at its own rate (<see cref="PilotFlight.Step"/>).
 	/// </summary>
-	class PilotAim
+	class SPACEGODCORE_API PilotAim
 	{
 	public:
 		/// <summary>How far a free-aim crosshair may run ahead of the nose: anywhere in front of the hull,

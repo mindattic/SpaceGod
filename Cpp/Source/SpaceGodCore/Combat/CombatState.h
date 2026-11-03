@@ -16,7 +16,7 @@ namespace SpaceGod::Core
 	enum class PhaserTuning : int;
 
 	/// <summary>A hardpoint's live state: health, reload, what it is shooting at and where it points.</summary>
-	class Subsystem final
+	class SPACEGODCORE_API Subsystem final
 	{
 	public:
 		const cs::Ref<SubsystemDef> Def;
@@ -60,7 +60,7 @@ namespace SpaceGod::Core
 	/// </summary>
 	/// <remarks>C# hands `this` to <see cref="CarrierWings"/>, which takes a cs::Ref, hence enable_shared_from_this (the
 	/// constructor, before anything owns it, passes a non-owning alias instead).</remarks>
-	class ShipCombat final : public std::enable_shared_from_this<ShipCombat>
+	class SPACEGODCORE_API ShipCombat final : public std::enable_shared_from_this<ShipCombat>
 	{
 	public:
 		const cs::Ref<CombatSpec> Spec;

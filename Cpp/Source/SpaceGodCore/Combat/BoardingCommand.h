@@ -17,7 +17,7 @@ namespace SpaceGod::Core
 		Boarders,
 		Defenders,
 	};
-	const char* ToString(BoardingRole v);
+	SPACEGODCORE_API const char* ToString(BoardingRole v);
 
 	/// <summary>
 	/// A standing order to one side of a fight aboard (U.SPC-T468, docs/BOARDING.md). <see cref="Auto"/> is the
@@ -37,13 +37,13 @@ namespace SpaceGod::Core
 		/// defenders hold their posts instead of mustering.</summary>
 		Hold,
 	};
-	const char* ToString(BoardingOrder v);
+	SPACEGODCORE_API const char* ToString(BoardingOrder v);
 
 	/// <summary>
 	/// The player's side of a fight aboard (U.SPC-T468): which fight a battle unit can command, and giving it orders.
 	/// The fight itself stays <see cref="Interior.Step"/>; with no orders given it runs exactly as it always has.
 	/// </summary>
-	class BoardingCommand
+	class SPACEGODCORE_API BoardingCommand
 	{
 	public:
 		/// <summary>

@@ -13,7 +13,7 @@ namespace SpaceGod::Core
 	/// <summary>The pilot of one of a carrier's craft (U.SPC-T526): how good a shot, how quick to react (seconds of lag), how
 	/// tidy in formation (0..1), and the wander that makes their flying their own. Rolled the first time the craft launches and
 	/// kept with it from then on, fight after fight, until the craft is lost.</summary>
-	class CraftPilot final
+	class SPACEGODCORE_API CraftPilot final
 	{
 	public:
 		double Skill = 0, Reaction = 0, Discipline = 0, Seed = 0;
@@ -26,7 +26,7 @@ namespace SpaceGod::Core
 	/// What makes a <see cref="Ship"/> one of a carrier's craft (U.SPC-T526, see <see cref="CarrierWings"/>): its class, the
 	/// berth it holds in its carrier's hangar (and so the squadron it flies in), and its pilot. Null on any other hull.
 	/// </summary>
-	class WingCraft final
+	class SPACEGODCORE_API WingCraft final
 	{
 	public:
 		FighterRole Role{};
@@ -61,7 +61,7 @@ namespace SpaceGod::Core
 	/// when it lands, carried hurt until a yard mends it, lost as itself when shot down; a yard builds new ones only for the
 	/// shuttle berths left empty (<see cref="ShipCombat.RestoreShuttles"/>).
 	/// </summary>
-	class CarrierWings
+	class SPACEGODCORE_API CarrierWings
 	{
 	public:
 		static constexpr int SquadronSize = 6;

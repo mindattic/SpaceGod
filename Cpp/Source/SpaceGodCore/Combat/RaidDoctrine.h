@@ -29,7 +29,7 @@ namespace SpaceGod::Core
 	/// a running war; <see cref="War"/> asks it before a band springs an ambush, pulses a lane or falls on a port's
 	/// merchants, and <see cref="Battle"/> fights by it.
 	/// </summary>
-	class RaidDoctrine
+	class SPACEGODCORE_API RaidDoctrine
 	{
 	public:
 		/// <summary>The share of its own strength in hostile guns a band takes on for a mark worth nothing much: the old

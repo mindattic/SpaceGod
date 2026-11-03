@@ -14,10 +14,10 @@ namespace SpaceGod::Core
 		Ceasefire,
 		War,
 	};
-	const char* ToString(Relation v);
+	SPACEGODCORE_API const char* ToString(Relation v);
 
 	/// <summary>One faction closing its ports to another's ships (see <see cref="Diplomacy.DeclareEmbargo"/>).</summary>
-	class Embargo final
+	class SPACEGODCORE_API Embargo final
 	{
 	public:
 		cs::Ref<Faction> By, Against;
@@ -32,7 +32,7 @@ namespace SpaceGod::Core
 	/// cedes (every settlement and gate it held there goes to the winner; whatever else either side had occupied goes
 	/// back), and how long the two keep the peace before either may go to war with the other again.
 	/// </summary>
-	class Treaty final
+	class SPACEGODCORE_API Treaty final
 	{
 	public:
 		cs::Ref<Faction> A, B;
@@ -61,11 +61,11 @@ namespace SpaceGod::Core
 	/// peace a faction can declare an embargo (its ports refuse another faction's ships) and a besieger
 	/// can declare a blockade of a port (nobody docks there until it is lifted).
 	/// </summary>
-	class Diplomacy final
+	class SPACEGODCORE_API Diplomacy final
 	{
 		using FactionPair = std::pair<cs::Ref<Faction>, cs::Ref<Faction>>;
 		// Cs.h has no Hash for a tuple key: hash the two references, as C#'s ValueTuple hashes its items.
-		struct FactionPairHash
+		struct SPACEGODCORE_API FactionPairHash
 		{
 			size_t operator()(const FactionPair& k) const
 			{

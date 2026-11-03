@@ -28,7 +28,7 @@ namespace SpaceGod::Core
 	/// here. Every figure is a setting in Settings &gt; Broadsides.
 	/// </summary>
 	// [SettingsSource]
-	class SpinalMounts
+	class SPACEGODCORE_API SpinalMounts
 	{
 	public:
 		/// <summary>C# RuntimeHelpers.RunClassConstructor (what SettingsRegistry does for a [SettingsSource] class): creates
@@ -90,7 +90,7 @@ namespace SpaceGod::Core
 		static constexpr double HpFactor = 1.5;
 
 		/// <summary>One weapon that goes in a spinal mount: the hardpoint it becomes, what it fires there and what the yard builds.</summary>
-		class Kind final
+		class SPACEGODCORE_API Kind final
 		{
 		public:
 			ModuleKind Module;

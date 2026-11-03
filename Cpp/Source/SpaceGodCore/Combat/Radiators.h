@@ -29,7 +29,7 @@ namespace SpaceGod::Core
 	/// Settings > Broadsides.
 	/// </summary>
 	// [SettingsSource]
-	class Radiators
+	class SPACEGODCORE_API Radiators
 	{
 	public:
 		/// <summary>C# RuntimeHelpers.RunClassConstructor (what SettingsRegistry does for a [SettingsSource] class): creates

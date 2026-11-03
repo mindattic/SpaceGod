@@ -23,7 +23,7 @@ namespace SpaceGod::Core
 		Egress,
 	};
 
-	const char* ToString(StrikePhase v);
+	SPACEGODCORE_API const char* ToString(StrikePhase v);
 
 	/// <summary>
 	/// The frigate's doctrine, the alpha strike (U.SPC-T475, docs/SHIP_ROSTER.md): a fast, lightly armoured missile and
@@ -37,7 +37,7 @@ namespace SpaceGod::Core
 	/// Broadsides group.
 	/// </summary>
 	// [SettingsSource]
-	class AlphaStrike
+	class SPACEGODCORE_API AlphaStrike
 	{
 		static cs::String Km(double v);
 

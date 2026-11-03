@@ -25,7 +25,7 @@ namespace SpaceGod::Core
 	/// another of its navy's ports.</para>
 	/// </summary>
 	// [SettingsSource]
-	class Corvettes
+	class SPACEGODCORE_API Corvettes
 	{
 	public:
 		/// <summary>The settings menu's corvettes per navy (AI): how many a navy keeps in each system it holds ports in.</summary>

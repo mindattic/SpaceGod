@@ -24,7 +24,7 @@ namespace SpaceGod::Core
 	/// settings menu's AI group.
 	/// </summary>
 	/// [SettingsSource]
-	class LaneInterdictors
+	class SPACEGODCORE_API LaneInterdictors
 	{
 	public:
 		/// <summary>The projector's installed mass with its reactor, tonnes (one fixed fitting whatever the hull).</summary>

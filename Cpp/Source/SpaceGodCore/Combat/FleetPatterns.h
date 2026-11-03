@@ -22,7 +22,7 @@ namespace SpaceGod::Core
 	/// the weapon, and the stock part it goes in place of on that design, up to <see cref="Count"/> of them. A hull built to
 	/// the pattern carries the weapon there from the slips; a warship refitting at its own yard may take it there later.
 	/// </summary>
-	class WeaponPattern final
+	class SPACEGODCORE_API WeaponPattern final
 	{
 	public:
 		const cs::String Name;
@@ -52,7 +52,7 @@ namespace SpaceGod::Core
 	/// figure is a setting in Settings &gt; AI.
 	/// </summary>
 	// [SettingsSource]
-	class FleetPatterns
+	class SPACEGODCORE_API FleetPatterns
 	{
 	public:
 		/// <summary>C# RuntimeHelpers.RunClassConstructor (what SettingsRegistry does for a [SettingsSource] class): creates

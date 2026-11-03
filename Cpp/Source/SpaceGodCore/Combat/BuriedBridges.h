@@ -17,7 +17,7 @@ namespace SpaceGod::Core
 	/// it, so boarders take it only by fighting through the spaces around it. A design buries a hardpoint with
 	/// <see cref="SubsystemDef.Buried"/> and a space with <see cref="FacilitySite.Buried"/>; this class holds the figures.
 	/// </summary>
-	class BuriedBridges
+	class SPACEGODCORE_API BuriedBridges
 	{
 	public:
 		static const cs::Ref<RangeSetting>& Depth();

@@ -19,7 +19,7 @@ namespace SpaceGod::Core
 	/// <see cref="War"/> (<see cref="War.PicketWarnings"/>), whose command acts on a fresh one by sending a group to hold
 	/// the gate while there is still time (see <see cref="GatePickets.WarningDays"/>).
 	/// </summary>
-	class PicketWarning final
+	class SPACEGODCORE_API PicketWarning final
 	{
 	public:
 		/// <summary>The gate the warning came from (the picket's), and the navy that holds it.</summary>
@@ -61,7 +61,7 @@ namespace SpaceGod::Core
 	/// destroyer patrol wing (<see cref="PatrolWings"/>), which flies a beat of its ports.</para>
 	/// </summary>
 	/// [SettingsSource]
-	class GatePickets
+	class SPACEGODCORE_API GatePickets
 	{
 	public:
 		/// <summary>The settings menu's pickets per gate (AI): how many a navy keeps at each gate it holds.</summary>

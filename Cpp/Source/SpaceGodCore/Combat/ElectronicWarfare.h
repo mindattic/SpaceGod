@@ -31,7 +31,7 @@ namespace SpaceGod::Core
 	/// one pays nothing for any of this.
 	/// </summary>
 	// [SettingsSource]
-	class ElectronicWarfare
+	class SPACEGODCORE_API ElectronicWarfare
 	{
 		static cs::String Km(double v);
 

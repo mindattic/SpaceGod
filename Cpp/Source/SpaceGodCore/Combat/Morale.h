@@ -19,14 +19,14 @@ namespace SpaceGod::Core
 		/// <summary>Let it go unharmed.</summary>
 		LetGo,
 	};
-	const char* ToString(SurrenderTerms v);
+	SPACEGODCORE_API const char* ToString(SurrenderTerms v);
 
 	/// <summary>
 	/// Whether a battered hull strikes its colours instead of fighting to the last, and what its captor
 	/// then does about it. Pure functions of hull/shield loss, the fight's odds and a faction's
 	/// temperament, so the model can be tuned and exercised without a running battle.
 	/// </summary>
-	class Morale
+	class SPACEGODCORE_API Morale
 	{
 	public:
 		/// <summary>

@@ -22,7 +22,7 @@ namespace SpaceGod::Core
 	/// of the line. Its tunables are declared settings.
 	/// </summary>
 	// [SettingsSource]
-	class TachyonLances
+	class SPACEGODCORE_API TachyonLances
 	{
 	public:
 		/// <summary>C# RuntimeHelpers.RunClassConstructor (what SettingsRegistry does for a [SettingsSource] class): creates

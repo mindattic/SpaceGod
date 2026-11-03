@@ -13,7 +13,7 @@ namespace SpaceGod::Core
 	/// One frame of player flight input, already translated into pure flight terms by the Runtime
 	/// input layer, so the integration math below stays engine-free and unit-testable.
 	/// </summary>
-	struct PilotInput
+	struct SPACEGODCORE_API PilotInput
 	{
 		/// <summary>The direction the player wants the nose turned toward (unit vector, ecliptic axes).
 		/// Zero means no stick input: flight assist then stops the nose swinging, while with assist off
@@ -65,7 +65,7 @@ namespace SpaceGod::Core
 	/// drive tier for open-space travel, distinct from tactical boost. Persists across frames inside
 	/// <see cref="PilotState"/>.
 	/// </summary>
-	struct PilotCruiseState
+	struct SPACEGODCORE_API PilotCruiseState
 	{
 		/// <summary>0 (tactical flight) .. 1 (full cruise thrust) -- eases up over
 		/// <see cref="PilotTuning.CruiseRampS"/> while engaged, but drops to 0 instantly the moment any
@@ -98,7 +98,7 @@ namespace SpaceGod::Core
 	/// torque and moments of inertia on its <see cref="CombatSpec"/>. A design with no mass (a defence
 	/// platform) cannot move at all.
 	/// </summary>
-	struct HullDynamics
+	struct SPACEGODCORE_API HullDynamics
 	{
 		double MassKt = 0;
 
@@ -130,7 +130,7 @@ namespace SpaceGod::Core
 	/// and how fast it is going (km, km/s, in its body's frame, ecliptic axes), its full attitude
 	/// (nose and roof, so roll is a real axis) and how fast it is spinning, and the cruise drive's ramp.
 	/// </summary>
-	struct PilotState
+	struct SPACEGODCORE_API PilotState
 	{
 		DVec3 Pos, Vel;
 
@@ -176,7 +176,7 @@ namespace SpaceGod::Core
 	/// heading it was going, so it can turn its nose and fire across its own track or flip and burn
 	/// to brake. Either way the nose follows the stick, as fast as the hull's torque allows.
 	/// </summary>
-	class PilotFlight
+	class SPACEGODCORE_API PilotFlight
 	{
 	public:
 		/// <summary>Flight assist's strafe set point, as a fraction of its forward one.</summary>

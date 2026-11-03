@@ -23,7 +23,7 @@ namespace SpaceGod::Core
 	/// shot-away emitter or gun mount back given time (<see cref="Broadsides.StepDamageControl"/>). Every rate is a setting.
 	/// </summary>
 	// [SettingsSource]
-	class ShieldEmitters
+	class SPACEGODCORE_API ShieldEmitters
 	{
 	public:
 		/// <summary>C# RuntimeHelpers.RunClassConstructor (what SettingsRegistry does for a [SettingsSource] class): creates

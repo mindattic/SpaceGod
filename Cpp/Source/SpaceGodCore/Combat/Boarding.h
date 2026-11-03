@@ -27,14 +27,14 @@ namespace SpaceGod::Core
 		/// <summary>A marine habitat (U.SPC-T465): where the ship's marines live and drill, and muster from to repel boarders.</summary>
 		Barracks,
 	};
-	const char* ToString(CompartmentKind v);
+	SPACEGODCORE_API const char* ToString(CompartmentKind v);
 
 	/// <summary>
 	/// One space inside a hull. Who is in it (crew, defending marines, boarders), whether it is open
 	/// to vacuum, and its place in the ship: ship lengths along the keel and its neighbours. This is
 	/// everything a shipboard battle view will need to draw the fight deck by deck.
 	/// </summary>
-	class Compartment final
+	class SPACEGODCORE_API Compartment final
 	{
 	public:
 		int Index = 0;
@@ -69,7 +69,7 @@ namespace SpaceGod::Core
 	};
 
 	/// <summary>A line in a ship's boarding log: what happened, where, and when (battle seconds).</summary>
-	struct BoardingNote
+	struct SPACEGODCORE_API BoardingNote
 	{
 		double Seconds = 0;
 		int Compartment = 0;
@@ -89,7 +89,7 @@ namespace SpaceGod::Core
 	/// (marines times quality). Allied factions on one side fight a hull's defenders as one party; what each committed is
 	/// its claim on the prize when it falls (see <see cref="PrizeSettlement"/>).
 	/// </summary>
-	class BoardingParty final
+	class SPACEGODCORE_API BoardingParty final
 	{
 	public:
 		cs::Ref<::SpaceGod::Core::Faction> Faction; // qualified: the member's own name hides the type
@@ -108,7 +108,7 @@ namespace SpaceGod::Core
 	/// takes the ship; losing every boarder repels them. A breach vents its compartment: crew there
 	/// die until the emergency bulkheads close.
 	/// </summary>
-	class Interior final
+	class SPACEGODCORE_API Interior final
 	{
 	public:
 		cs::List<cs::Ref<Compartment>> Compartments;

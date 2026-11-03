@@ -26,7 +26,7 @@ namespace SpaceGod::Core
 	/// assault teams are drawn from. The tunables are in the settings menu's Broadsides group.
 	/// </summary>
 	// [SettingsSource]
-	class MarineHabitats
+	class SPACEGODCORE_API MarineHabitats
 	{
 	public:
 		/// <summary>Marines one fitted habitat quarters per unit of hull scale (<see cref="Loadout.Scale"/>): fifty on a destroyer.</summary>

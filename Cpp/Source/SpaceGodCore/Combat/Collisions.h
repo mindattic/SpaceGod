@@ -16,7 +16,7 @@ namespace SpaceGod::Core
 	/// ship and as thick as its beam; a station, an asteroid or a piece of debris is a sphere (no axis).
 	/// Positions and velocities are km and km/s in whatever frame the caller shares between the two.
 	/// </summary>
-	struct CollisionVolume
+	struct SPACEGODCORE_API CollisionVolume
 	{
 		DVec3 Pos, Vel;
 
@@ -52,7 +52,7 @@ namespace SpaceGod::Core
 
 	/// <summary>What one contact did: where, along which normal, how hard, and how much energy the
 	/// crumpling took out of it (each body's share of which is what damages it).</summary>
-	struct Impact
+	struct SPACEGODCORE_API Impact
 	{
 		bool Hit = false;
 
@@ -88,7 +88,7 @@ namespace SpaceGod::Core
 	/// are fender bumps: no bounce and no damage, which is what lets a pilot nudge alongside a hulk.
 	/// The impulse acts through the centres (no spin is imparted).
 	/// </summary>
-	class Collisions
+	class SPACEGODCORE_API Collisions
 	{
 	public:
 		/// <summary>The share of closing speed a hard impact gives back as bounce; the rest crumples metal.</summary>

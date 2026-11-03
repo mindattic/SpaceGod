@@ -34,7 +34,7 @@ namespace SpaceGod::Core
 	/// settings menu's Broadsides group.
 	/// </summary>
 	// [SettingsSource]
-	class BreacherBays
+	class SPACEGODCORE_API BreacherBays
 	{
 		static cs::String Seconds(double v);
 

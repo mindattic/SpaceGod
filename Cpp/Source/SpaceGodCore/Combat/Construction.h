@@ -29,13 +29,13 @@ namespace SpaceGod::Core
 		/// <summary>A polity's unarmed service hulls: the lane tenders that keep its hyperlanes running (U.SPC-T481).</summary>
 		Support,
 	};
-	const char* ToString(HullCategory v);
+	SPACEGODCORE_API const char* ToString(HullCategory v);
 
 	/// <summary>How big a hardpoint is (a fighter's gun, a destroyer's turret, a battleship's or a station's), and so the
 	/// biggest part it takes (U.SPC-T508): a part's own size (<see cref="ModuleSpec.Size"/>) must be no bigger. A model
 	/// library sizes the part it sets in the socket by it too.</summary>
 	enum class HardpointSize : int { Small, Medium, Large };
-	const char* ToString(HardpointSize v);
+	SPACEGODCORE_API const char* ToString(HardpointSize v);
 
 	/// <summary>
 	/// One hardpoint of a hull frame (U.SPC-T377): a place on the hull's surface -- where it sits (hull lengths, nose +Z,
@@ -45,7 +45,7 @@ namespace SpaceGod::Core
 	/// launcher or tube on each socket puts it exactly where the fight thinks it is. What is inside the hull is not a
 	/// hardpoint but a facility (<see cref="FacilitySite"/>, U.SPC-T470), with a size and no fire cone.
 	/// </summary>
-	class Hardpoint final
+	class SPACEGODCORE_API Hardpoint final
 	{
 	public:
 		/// <summary>The slot's index in the frame's <see cref="Loadout.Slots"/>.</summary>
@@ -102,7 +102,7 @@ namespace SpaceGod::Core
 	/// A yard fits them exactly as it refits a ship (<see cref="Outfitting"/>), and a <see cref="ConstructionPlan"/>
 	/// builds one from scratch.
 	/// </summary>
-	class HullFrame final
+	class SPACEGODCORE_API HullFrame final
 	{
 	public:
 		cs::String Id;
@@ -164,7 +164,7 @@ namespace SpaceGod::Core
 	/// field, and an orbital station) and satellites (a weapons satellite and a sensor satellite). New hulls plug in
 	/// with <see cref="Register"/>: a frame, never an edit to the code that builds the first.
 	/// </summary>
-	class HullFrames final
+	class SPACEGODCORE_API HullFrames final
 	{
 		static cs::List<cs::Ref<HullFrame>>& All();
 		// new Dictionary<string, HullFrame>(StringComparer.OrdinalIgnoreCase)
@@ -210,7 +210,7 @@ namespace SpaceGod::Core
 	/// than the hull's free internal space; <see cref="NoPower"/>, <see cref="NoCrew"/>: the hull has not the reactor power
 	/// or the hands to spare for it, U.SPC-T521).</summary>
 	enum class ConstructionOutcome : int { Ok, NoSuchSocket, WontFit, NoRoom, NoPower, NoCrew };
-	const char* ToString(ConstructionOutcome v);
+	SPACEGODCORE_API const char* ToString(ConstructionOutcome v);
 
 	/// <summary>
 	/// Building a hull from scratch (U.SPC-T377): pick a <see cref="HullFrame"/>, fit what goes on each of its hardpoints
@@ -219,7 +219,7 @@ namespace SpaceGod::Core
 	/// materials and its price. A plan launches as a new ship's loadout (<see cref="Apply"/>) or as a station's or
 	/// satellite's combat state (<see cref="BuildCombat"/>), its interior built from its facilities.
 	/// </summary>
-	class ConstructionPlan final
+	class SPACEGODCORE_API ConstructionPlan final
 	{
 	public:
 		cs::Ref<HullFrame> Frame;
@@ -257,7 +257,7 @@ namespace SpaceGod::Core
 
 	private:
 		// The C# `(IPartSpec part, double sign)` tuple.
-		struct PartChange
+		struct SPACEGODCORE_API PartChange
 		{
 			cs::Ref<IPartSpec> part;
 			double sign = 0;

@@ -25,7 +25,7 @@ namespace SpaceGod::Core
 	/// round a run of its ports under two fighters, flown as a wing is but never turning aside to defend or hunt
 	/// (<see cref="Ship.Convoy"/>).</para>
 	/// </summary>
-	class PatrolWings
+	class SPACEGODCORE_API PatrolWings
 	{
 	public:
 		/// <summary>The most wings one navy flies in one system.</summary>

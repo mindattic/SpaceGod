@@ -27,7 +27,7 @@ namespace SpaceGod::Core
 		/// <summary>Alongside with velocities matched: the docking clamps can take hold.</summary>
 		Ready,
 	};
-	const char* ToString(LatchState v);
+	SPACEGODCORE_API const char* ToString(LatchState v);
 
 	/// <summary>What became of a part stripped from a hulk.</summary>
 	enum class StripUse : int
@@ -44,10 +44,10 @@ namespace SpaceGod::Core
 		/// <summary>No room in the hold for what it breaks down into: it stays where it is.</summary>
 		NoRoom,
 	};
-	const char* ToString(StripUse v);
+	SPACEGODCORE_API const char* ToString(StripUse v);
 
 	/// <summary>The result of <see cref="SalvageSession.Strip"/>.</summary>
-	struct StripResult
+	struct SPACEGODCORE_API StripResult
 	{
 		StripUse Use{};
 		cs::Ref<Subsystem> Part;
@@ -82,7 +82,7 @@ namespace SpaceGod::Core
 	/// compartment by the player's marines (<see cref="SendBoarders"/>, <see cref="Step"/>) before anything
 	/// can be taken; crew left behind (<see cref="Compartment.Survivors"/>) are rescued once it is clear.
 	/// </summary>
-	class SalvageSession final
+	class SPACEGODCORE_API SalvageSession final
 	{
 	public:
 		/// <summary>Gap the clamps can bridge between the two hulls, km, on top of half of each one's length.</summary>

@@ -30,7 +30,7 @@ namespace SpaceGod::Core
 	/// setting in the menu's Broadsides and AI groups.</para>
 	/// </summary>
 	/// [SettingsSource]
-	class GateBreakers
+	class SPACEGODCORE_API GateBreakers
 	{
 		static cs::String Count(double v);
 

@@ -25,7 +25,7 @@ namespace SpaceGod::Core
 	/// player mans all work from the cones.
 	/// </summary>
 	// [SettingsSource]
-	class FireCones
+	class SPACEGODCORE_API FireCones
 	{
 	public:
 		/// <summary>C# RuntimeHelpers.RunClassConstructor (what SettingsRegistry does for a [SettingsSource] class): creates

@@ -23,7 +23,7 @@ namespace SpaceGod::Core
 	/// Every figure is a setting in the menu's Broadsides group.
 	/// </summary>
 	/// [SettingsSource]
-	class RearLine
+	class SPACEGODCORE_API RearLine
 	{
 		static cs::String Km(double v);
 

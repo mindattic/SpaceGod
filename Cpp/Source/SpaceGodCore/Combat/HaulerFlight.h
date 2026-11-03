@@ -17,7 +17,7 @@ namespace SpaceGod::Core
 	/// <see cref="LightFighterHandling"/>, so a tuning pass or the settings registry (U.SPC-T431) changes them without
 	/// touching <see cref="HaulerFlightModel"/>.
 	/// </summary>
-	struct HaulerHandling
+	struct SPACEGODCORE_API HaulerHandling
 	{
 		/// <summary>The mass-per-tonne weighting: how much of each tonne aboard beyond the hull's ready mass (dry, tanks
 		/// full, hold empty: what its thrust and turn figures were set for) counts against its drive, thrusters and
@@ -61,7 +61,7 @@ namespace SpaceGod::Core
 	/// its full push, the retros against the way along the nose (the main drive for a hull backing), the manoeuvre
 	/// thrusters across it. What the HUD shows a hauler's pilot so the braking can be planned.
 	/// </summary>
-	struct HaulerStop
+	struct SPACEGODCORE_API HaulerStop
 	{
 		/// <summary>From the hull to where it stops, km (its own frame's axes).</summary>
 		DVec3 OffsetKm;
@@ -91,7 +91,7 @@ namespace SpaceGod::Core
 	/// turn, with no boost or cruise. (4) No combat agility: the strafe is weak and the boost a short emergency burn.
 	/// With flight assist off the hull is the Newtonian one on its laden mass: mass is physics, not the flight computer.
 	/// </summary>
-	class HaulerFlightModel final : public IFlightModel
+	class SPACEGODCORE_API HaulerFlightModel final : public IFlightModel
 	{
 	public:
 		/// <summary>The least a light hull's mass factor goes to, however far its tanks are burned down.</summary>

@@ -26,7 +26,7 @@ namespace SpaceGod::Core
 		/// and the turrets fight on their own.</summary>
 		Helm,
 	};
-	const char* ToString(PilotControl v);
+	SPACEGODCORE_API const char* ToString(PilotControl v);
 
 	/// <summary>
 	/// How a hull handles under a human's hands, independent of <see cref="CombatSpec"/>'s AI-battle
@@ -39,7 +39,7 @@ namespace SpaceGod::Core
 	/// the flight computer does with them: the speeds and turn rates flight assist holds the hull to,
 	/// and the boost and cruise drive tiers.
 	/// </summary>
-	struct PilotTuning
+	struct SPACEGODCORE_API PilotTuning
 	{
 		/// <summary>The speed flight assist flies the hull at with the throttle floored, km/s: its
 		/// set point, not a hard limit -- with assist off nothing caps the speed a hull can burn up to.</summary>

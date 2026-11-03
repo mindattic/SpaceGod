@@ -91,16 +91,16 @@ namespace SpaceGod::Core
 		/// must throttle down or cook.</summary>
 		Radiator,
 	};
-	const char* ToString(SubsystemKind v);
+	SPACEGODCORE_API const char* ToString(SubsystemKind v);
 
 	/// <summary>What a non-gun weapon puts out into the battle instead of firing at a target.</summary>
 	enum class DeployKind : int { None, Mine, Decoy };
-	const char* ToString(DeployKind v);
+	SPACEGODCORE_API const char* ToString(DeployKind v);
 
 	class CombatSpec;
 
 	/// <summary>What a weapon does. Ranges are km, damage is hit points, cooldowns are seconds.</summary>
-	class WeaponSpec final
+	class SPACEGODCORE_API WeaponSpec final
 	{
 	public:
 		double RangeKm = 0;
@@ -219,7 +219,7 @@ namespace SpaceGod::Core
 
 	/// <summary>One hardpoint on a hull: its kind, where it sits (ship lengths, nose +Z, up +Y) and its toughness.</summary>
 	// enable_shared_from_this: the bodied members hand `this` to FireCones, which takes a cs::Ref<SubsystemDef>.
-	class SubsystemDef final : public std::enable_shared_from_this<SubsystemDef>
+	class SPACEGODCORE_API SubsystemDef final : public std::enable_shared_from_this<SubsystemDef>
 	{
 	public:
 		SubsystemKind Kind{};
@@ -291,7 +291,7 @@ namespace SpaceGod::Core
 	/// <summary>A hull design's fighting qualities and hardpoint layout (positions match its mesh). Several
 	/// designs can share a <see cref="ShipClass"/> (its broad category); each ship picks one at construction
 	/// and keeps it for its lifetime, so two ships of the same class can fly and fight differently.</summary>
-	class CombatSpec final
+	class SPACEGODCORE_API CombatSpec final
 	{
 	public:
 		/// <summary>A display name for this specific design, distinct from its class.</summary>

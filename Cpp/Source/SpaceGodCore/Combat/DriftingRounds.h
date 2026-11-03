@@ -26,7 +26,7 @@ namespace SpaceGod::Core
 	/// salvage it for the marines inside, whom they ransom back to their owners or sell as slaves to the side they were
 	/// fighting (<see cref="SlavePricePerHead"/>, <see cref="Crews.Daily"/>). A round nobody reaches runs out of air.
 	/// </summary>
-	class DriftingRounds
+	class SPACEGODCORE_API DriftingRounds
 	{
 	public:
 		/// <summary>Days of air a round carries for its team once it is adrift.</summary>

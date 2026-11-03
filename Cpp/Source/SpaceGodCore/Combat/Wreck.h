@@ -18,7 +18,7 @@ namespace SpaceGod::Core
 	struct CollisionVolume;
 
 	/// <summary>One good and how many tonnes of it a wreck's hold still carries for whoever salvages it.</summary>
-	struct SalvageStack
+	struct SPACEGODCORE_API SalvageStack
 	{
 		SpaceGod::Core::Good Good{};
 		double Tonnes = 0;
@@ -38,7 +38,7 @@ namespace SpaceGod::Core
 	/// convention as <see cref="Battle.Anchor"/> and <see cref="BattleUnit.Pos"/>, since a wreck is
 	/// created exactly where its unit died and then just sits there.
 	/// </summary>
-	class Wreck final
+	class SPACEGODCORE_API Wreck final
 	{
 	public:
 		int Id = 0;
@@ -123,7 +123,7 @@ namespace SpaceGod::Core
 	/// Every lasting wreck in the system: one is left wherever a ship dies in battle, and each is
 	/// cleared away once its own lifetime runs out.
 	/// </summary>
-	class Wrecks final
+	class SPACEGODCORE_API Wrecks final
 	{
 	public:
 		/// <summary>Lifetime given to a new wreck when <see cref="Add"/> is not told one explicitly, days.</summary>

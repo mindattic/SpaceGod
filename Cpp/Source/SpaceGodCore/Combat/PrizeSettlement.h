@@ -10,7 +10,7 @@ namespace SpaceGod::Core
 
 	/// <summary>One allied faction's claim on a hull its marines took together with others (U.SPC-T392), and what it
 	/// comes away with once the claims are settled.</summary>
-	class PrizeClaim final
+	class SPACEGODCORE_API PrizeClaim final
 	{
 	public:
 		cs::Ref<Faction> Faction;
@@ -40,7 +40,7 @@ namespace SpaceGod::Core
 	/// </list>
 	/// A boarding by one faction alone is no negotiation: it keeps everything, as it always has.
 	/// </summary>
-	class PrizeSettlement final
+	class SPACEGODCORE_API PrizeSettlement final
 	{
 	public:
 		/// <summary>What a taken hull is worth to the allies who share it, as a part of its price new (by how much of it
