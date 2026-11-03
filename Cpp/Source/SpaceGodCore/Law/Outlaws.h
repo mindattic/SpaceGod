@@ -249,11 +249,11 @@ namespace SpaceGod::Core
 
 		/// <summary>What each deed adds to the bounty a recorded crime posts, credits: a lawful hull or platform
 		/// destroyed, a hull robbed (ransomed or taken), and a cargo ransomed on top of that.</summary>
-		static constexpr double KillBounty = 40000, RobbedBounty = 30000, RansomBounty = 20000;
+		static constexpr double KillBounty = 40000; static constexpr double RobbedBounty = 30000; static constexpr double RansomBounty = 20000;
 
 		/// <summary>Days at large, and the record (recorded crimes, or kills), that make a feared name.</summary>
 		static constexpr double FearedDays = 120;
-		static constexpr int FearedCrimes = 4, FearedKills = 6;
+		static constexpr int FearedCrimes = 4; static constexpr int FearedKills = 6;
 
 		/// <summary>How a feared name's bounties grow (once when it becomes feared, and on every crime after).</summary>
 		static constexpr double FearedBountyFactor = 1.5;
@@ -265,7 +265,7 @@ namespace SpaceGod::Core
 		static constexpr double MinContract = 100000;
 
 		/// <summary>How long a hunter keeps at a contract, days, and how stale a sighting it will still follow.</summary>
-		static constexpr double ContractDays = 60, StaleSightingDays = 30;
+		static constexpr double ContractDays = 60; static constexpr double StaleSightingDays = 30;
 
 		/// <summary>Of its target's strength a hunter group must match to take a contract on it (all of it for a feared name).</summary>
 		static constexpr double MatchShare = 0.7;
@@ -345,13 +345,13 @@ namespace SpaceGod::Core
 		static constexpr double DeadShare = 0.5;
 
 		/// <summary>Chance a captain reaches the pods as their flagship goes: shot apart over minutes, or when the reactor goes.</summary>
-		static constexpr double EjectChance = 0.8, EjectChanceReactor = 0.35;
+		static constexpr double EjectChance = 0.8; static constexpr double EjectChanceReactor = 0.35;
 
 		/// <summary>A holding hull beaten below this share of its hull has its brig breached: the captain gets away.</summary>
 		static constexpr double BrigBreachHull = 0.25;
 
 		/// <summary>What the raiders pay to have a captain back: this share of the price on their head, and at least <see cref="MinRansom"/> credits.</summary>
-		static constexpr double RansomShare = 0.75, MinRansom = 50000;
+		static constexpr double RansomShare = 0.75; static constexpr double MinRansom = 50000;
 
 		/// <summary>How close the player's ship must come to a wreck to scan it for proof of kill, km.</summary>
 		static constexpr double ProofScanKm = 2000;

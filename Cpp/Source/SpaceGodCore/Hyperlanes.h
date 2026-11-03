@@ -203,7 +203,7 @@ namespace SpaceGod::Core
 		static constexpr double RingSpacingKm = 2e6;
 
 		/// <summary>The fewest and most rings strung along any one lane.</summary>
-		static constexpr int MinRings = 6, MaxRings = 240;
+		static constexpr int MinRings = 6; static constexpr int MaxRings = 240;
 
 		/// <summary>How many rings are strung along a lane of this length (between its two ramps' ring gates).</summary>
 		static int RingCount(double lengthKm);

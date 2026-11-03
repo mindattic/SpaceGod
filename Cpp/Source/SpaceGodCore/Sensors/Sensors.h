@@ -48,7 +48,7 @@ namespace SpaceGod::Core
 		static constexpr double DriveFactor = 40;
 
 		/// <summary>A warship's active systems (fire control, shields up) and a civilian's lesser ones.</summary>
-		static constexpr double MilitaryEm = 1, CivilEm = 0.2;
+		static constexpr double MilitaryEm = 1; static constexpr double CivilEm = 0.2;
 
 		/// <summary>Guns, lasers and missile motors in a fight.</summary>
 		static constexpr double WeaponsFire = 24;
@@ -90,10 +90,10 @@ namespace SpaceGod::Core
 
 		/// <summary>A civilian hull's navigation sensors, a warship's search and fire-control suite, and a
 		/// settlement's traffic control.</summary>
-		static const SensorSuite Civil, Military, Station;
+		static const SensorSuite Civil; static const SensorSuite Military; static const SensorSuite Station;
 
 		/// <summary>What each scanner suite fitted (<see cref="ModuleKind.Scanner"/>) adds: half the base range again, and resolution.</summary>
-		static constexpr double ScannerRangeShare = 0.5, ScannerResolution = 0.5;
+		static constexpr double ScannerRangeShare = 0.5; static constexpr double ScannerResolution = 0.5;
 
 		/// <summary>A gate picket's long-range search suite (U.SPC-T480): six times a warship's reach and twice its
 		/// resolution, so it makes out a raider lying dark off its gate and an arrival's class as it comes through.</summary>
@@ -279,7 +279,7 @@ namespace SpaceGod::Core
 
 		/// <summary>Resolve thresholds: how many times inside its detection reach a contact must be (divided by the
 		/// suite's resolution) for its class, and for its identity, to be made out.</summary>
-		static constexpr double ClassQuality = 2.5, IdentifyQuality = 6;
+		static constexpr double ClassQuality = 2.5; static constexpr double IdentifyQuality = 6;
 
 	private:
 		double nextSweepJd = cs::Double::NegativeInfinity, nextPlayerSweepJd = cs::Double::NegativeInfinity, lastSweepJd = cs::Double::NegativeInfinity;
