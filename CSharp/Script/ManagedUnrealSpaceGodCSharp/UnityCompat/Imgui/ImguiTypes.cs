@@ -400,7 +400,7 @@ namespace UnityEngine
         }
     }
 
-    /// <summary>Unity's built-in game skin: box, button, label, text field, scrollbars, slider.</summary>
+    /// <summary>Unity's built-in game skin: box, button, toggle, label, text field / area, window, scrollbars, slider.</summary>
     public sealed class GUISkin
     {
         public Font font = new Font();
@@ -424,69 +424,10 @@ namespace UnityEngine
             }
         }
 
-        static Texture2D Rounded(Color fill, Color edge)
-        {
-            const int n = 8;
-            var t = new Texture2D(n, n) { name = "Skin" };
-            for (int y = 0; y < n; y++)
-                for (int x = 0; x < n; x++)
-                {
-                    bool corner = (x == 0 || x == n - 1) && (y == 0 || y == n - 1);
-                    bool rim = x == 0 || y == 0 || x == n - 1 || y == n - 1;
-                    t.SetPixel(x, y, corner ? Color.clear : rim ? edge : fill);
-                }
-            t.Apply();
-            return t;
-        }
-
-        /// <summary>Unity's dark runtime skin, approximated: the default font at 13, its padding and margins, and its greys.</summary>
-        internal static GUISkin BuiltIn()
-        {
-            var light = new Color(0.9f, 0.9f, 0.9f);
-            var boxBg = Rounded(new Color(0.1f, 0.1f, 0.1f, 0.5f), new Color(0.2f, 0.2f, 0.2f, 0.6f));
-            var buttonBg = Rounded(new Color(0.33f, 0.33f, 0.33f, 1f), new Color(0.14f, 0.14f, 0.14f, 1f));
-            var buttonHover = Rounded(new Color(0.4f, 0.4f, 0.4f, 1f), new Color(0.14f, 0.14f, 0.14f, 1f));
-            var buttonDown = Rounded(new Color(0.2f, 0.2f, 0.2f, 1f), new Color(0.1f, 0.1f, 0.1f, 1f));
-            var fieldBg = Rounded(new Color(0.16f, 0.16f, 0.16f, 1f), new Color(0.1f, 0.1f, 0.1f, 1f));
-            var track = Rounded(new Color(0.12f, 0.12f, 0.12f, 0.6f), new Color(0.12f, 0.12f, 0.12f, 0.6f));
-            var thumb = Rounded(new Color(0.5f, 0.5f, 0.5f, 0.95f), new Color(0.35f, 0.35f, 0.35f, 0.95f));
-            var b = new RectOffset(2, 2, 2, 2);
-            return new GUISkin
-            {
-                box = new GUIStyle
-                {
-                    name = "box", normal = { background = boxBg, textColor = new Color(0.8f, 0.8f, 0.8f) }, border = b,
-                    padding = new RectOffset(4, 4, 4, 4), margin = new RectOffset(4, 4, 4, 4), alignment = TextAnchor.UpperCenter, wordWrap = true,
-                },
-                button = new GUIStyle
-                {
-                    name = "button", border = b, padding = new RectOffset(6, 6, 3, 3), margin = new RectOffset(4, 4, 4, 4),
-                    alignment = TextAnchor.MiddleCenter, normal = { background = buttonBg, textColor = light },
-                    hover = { background = buttonHover, textColor = Color.white }, active = { background = buttonDown, textColor = Color.white },
-                },
-                label = new GUIStyle
-                {
-                    name = "label", padding = new RectOffset(2, 2, 1, 2), margin = new RectOffset(4, 4, 2, 2), wordWrap = true,
-                    normal = { textColor = light },
-                },
-                textField = new GUIStyle
-                {
-                    name = "textfield", border = b, padding = new RectOffset(3, 3, 3, 3), margin = new RectOffset(4, 4, 2, 2),
-                    clipping = TextClipping.Clip, normal = { background = fieldBg, textColor = new Color(0.8f, 0.8f, 0.8f) },
-                    focused = { background = fieldBg, textColor = Color.white },
-                },
-                verticalScrollbar = new GUIStyle { name = "verticalscrollbar", normal = { background = track }, border = b, fixedWidth = 15 },
-                verticalScrollbarThumb = new GUIStyle { name = "verticalscrollbarthumb", normal = { background = thumb }, border = b, fixedWidth = 15 },
-                horizontalScrollbar = new GUIStyle { name = "horizontalscrollbar", normal = { background = track }, border = b, fixedHeight = 15 },
-                horizontalScrollbarThumb = new GUIStyle { name = "horizontalscrollbarthumb", normal = { background = thumb }, border = b, fixedHeight = 15 },
-                horizontalSlider = new GUIStyle { name = "horizontalslider", normal = { background = track }, border = b, fixedHeight = 12 },
-                horizontalSliderThumb = new GUIStyle
-                {
-                    name = "horizontalsliderthumb", normal = { background = thumb }, hover = { background = buttonHover }, border = b, fixedWidth = 12, fixedHeight = 12,
-                },
-                scrollView = new GUIStyle { name = "scrollview" },
-            };
-        }
+        /// <summary>Unity's runtime default skin, exactly: GENERATED (BuiltinSkin.cs, tools/unity_extract.py) from the
+        /// original player's GameSkin: every style's states, border, margin, padding, overflow, alignment, clipping and
+        /// fixed sizes, and its textures pixel for pixel; the font is Unity's built-in Arial at 13 (US-T57).</summary>
+        internal static GUISkin BuiltIn() => BuiltinSkin.Make();
     }
 
     [Flags]

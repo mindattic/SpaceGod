@@ -1,0 +1,119 @@
+// Universal Render Pipeline/Lit (URP 17, metallic workflow, forward), the shader Unity.SpaceGod's imported glTF models
+// draw with (glTFast's "glTF-pbrMetallicRoughness" shader graph is a URP Lit target; smoothness = 1 - roughness): the
+// ONE lit material. Every other Unity.SpaceGod shader is unlit and lights itself from the Sun globals; only this one
+// takes Unity Light components, so a Light lights exactly what it lit in Unity (US-T57).
+//
+// What follows is URP's own maths (ShaderLibrary/BRDF.hlsl, Lighting.hlsl, GlobalIllumination.hlsl,
+// AmbientProbe/EntityLighting.hlsl), per pixel:
+//   InitializeBRDFData        diffuse = albedo * 0.96 * (1 - metallic), specular = lerp(0.04, albedo, metallic),
+//                             perceptualRoughness = 1 - smoothness, roughness = max(pr^2, 2^-7), roughness2 = max(r^2, 2^-14)
+//   DirectBRDFSpecular        roughness2 / (d^2 * max(0.1, LoH^2) * (4 roughness + 2)), d = NoH^2 (roughness2 - 1) + 1.00001
+//   LightingPhysicallyBased   (diffuse + specular * that) * lightColor * saturate(NoL)   (no shadows: Light.shadows None)
+//   GlobalIllumination        SampleSH(n) * diffuse
+//                             + GlossyEnvironmentReflection(reflect(-v, n), pr) * lerp(specular, grazing, (1 - NoV)^4)
+//                               / (roughness2 + 1)
+//   + emission
+// Unity's ambient probe (RenderSettings.ambientProbe) arrives as its shader constants (unity_SHAr ... unity_SHC); the
+// reflection probe (the generated skybox cubemap, unity_SpecCube0) as the L2 projection of the mip the roughness picks
+// (see M_Lit's parameter notes in README.md). Directions are Unity's world axes: SH and cube maps are evaluated there.
+#ifndef SPACEGOD_LIT_USH
+#define SPACEGOD_LIT_USH
+#include "/Plugin/SpaceGodRender/SpaceGodCommon.ush"
+
+// EntityLighting.hlsl SHEvalLinearL0L1 + SHEvalLinearL2 (normal in Unity's axes).
+float3 SG_SampleSH9(float3 n, float4 shAr, float4 shAg, float4 shAb, float4 shBr, float4 shBg, float4 shBb, float4 shC)
+{
+    float4 v = float4(n, 1.0);
+    float3 x1 = float3(dot(shAr, v), dot(shAg, v), dot(shAb, v));
+    float4 vB = n.xyzz * n.yzzx;
+    float3 x2 = float3(dot(shBr, vB), dot(shBg, vB), dot(shBb, vB));
+    float vC = n.x * n.x - n.y * n.y;
+    float3 x3 = shC.rgb * vC;
+    return max(0.0, x1 + x2 + x3);
+}
+
+struct FSGBrdf
+{
+    float3 diffuse;
+    float3 specular;
+    float perceptualRoughness;
+    float roughness;
+    float roughness2;
+    float grazingTerm;
+    float normalizationTerm;
+    float roughness2MinusOne;
+};
+
+FSGBrdf SG_InitBrdf(float3 albedo, float metallic, float smoothness)
+{
+    const float4 kDielectricSpec = float4(0.04, 0.04, 0.04, 1.0 - 0.04);
+    FSGBrdf b;
+    float oneMinusReflectivity = kDielectricSpec.a - metallic * kDielectricSpec.a;
+    float reflectivity = 1.0 - oneMinusReflectivity;
+    b.diffuse = albedo * oneMinusReflectivity;
+    b.specular = lerp(kDielectricSpec.rgb, albedo, metallic);
+    b.perceptualRoughness = 1.0 - smoothness;
+    b.roughness = max(b.perceptualRoughness * b.perceptualRoughness, 0.0078125);   // HALF_MIN_SQRT
+    b.roughness2 = max(b.roughness * b.roughness, 6.103515625e-5);                  // HALF_MIN
+    b.grazingTerm = saturate(smoothness + reflectivity);
+    b.normalizationTerm = b.roughness * 4.0 + 2.0;
+    b.roughness2MinusOne = b.roughness2 - 1.0;
+    return b;
+}
+
+float SG_DirectBrdfSpecular(FSGBrdf b, float3 n, float3 l, float3 v)
+{
+    float3 h = normalize(l + v);
+    float NoH = saturate(dot(n, h));
+    float LoH = saturate(dot(l, h));
+    float d = NoH * NoH * b.roughness2MinusOne + 1.00001;
+    float LoH2 = LoH * LoH;
+    return b.roughness2 / ((d * d) * max(0.1, LoH2) * b.normalizationTerm);
+}
+
+float3 SG_LightingPbr(FSGBrdf b, float3 lightColor, float3 l, float3 n, float3 v)
+{
+    if (dot(lightColor, lightColor) <= 0.0) return 0;
+    float NdotL = saturate(dot(n, l));
+    float3 radiance = lightColor * NdotL;
+    return (b.diffuse + b.specular * SG_DirectBrdfSpecular(b, n, l, v)) * radiance;
+}
+
+// lightDir*: Unreal world direction towards the light (xyz; the zero vector = no light), lightColor*: colour * intensity,
+// linear. n (Unreal world, normalised, normal map applied), v towards the eye.
+float3 SG_Lit(float3 n, float3 v, float3 albedo, float metallic, float smoothness, float occlusion, float3 emission,
+    float3 mainDir, float3 mainColor, float3 add0Dir, float3 add0Color, float3 add1Dir, float3 add1Color,
+    float4 shAr, float4 shAg, float4 shAb, float4 shBr, float4 shBg, float4 shBb, float4 shC,
+    float4 envAr, float4 envAg, float4 envAb, float4 envBr, float4 envBg, float4 envBb, float4 envC)
+{
+    FSGBrdf b = SG_InitBrdf(albedo, metallic, smoothness);
+
+    // GlobalIllumination: the ambient probe, the glossy environment reflection, EnvironmentBRDF.
+    float3 nU = SG_UnityFromUnreal(n);
+    float3 bakedGI = SG_SampleSH9(nU, shAr, shAg, shAb, shBr, shBg, shBb, shC);
+    float3 reflectU = SG_UnityFromUnreal(reflect(-v, n));
+    float NoV = saturate(dot(n, v));
+    float fresnelTerm = pow(1.0 - NoV, 4.0);
+    float3 indirectDiffuse = bakedGI * occlusion;
+    float3 indirectSpecular = SG_SampleSH9(reflectU, envAr, envAg, envAb, envBr, envBg, envBb, envC) * occlusion;
+    float surfaceReduction = 1.0 / (b.roughness2 + 1.0);
+    float3 color = indirectDiffuse * b.diffuse
+        + indirectSpecular * (surfaceReduction * lerp(b.specular, b.grazingTerm.xxx, fresnelTerm));
+
+    if (dot(mainDir, mainDir) > 0.0) color += SG_LightingPbr(b, mainColor, normalize(mainDir), n, v);
+    if (dot(add0Dir, add0Dir) > 0.0) color += SG_LightingPbr(b, add0Color, normalize(add0Dir), n, v);
+    if (dot(add1Dir, add1Dir) > 0.0) color += SG_LightingPbr(b, add1Color, normalize(add1Dir), n, v);
+    return color + emission;
+}
+
+// Unity's UnpackNormalScale for an RGB normal map (the map as Unity imports it: OpenGL-style, green = +v), into the
+// pixel's Unreal tangent frame: Unreal's V runs the other way (meshes carry 1 - v), so green flips.
+float3 SG_UnpackUnityNormal(float4 packed, float scale)
+{
+    float3 t = packed.rgb * 2.0 - 1.0;
+    t.xy *= scale;
+    t.y = -t.y;
+    return normalize(t);
+}
+
+#endif

@@ -189,7 +189,9 @@ namespace UnityEngine
             var cam = screenCamera;
             var camPos = cam != null ? cam.transform.position : Vector3.zero;
             var camRot = cam != null ? cam.transform.rotation : Quaternion.identity;
-            PushGlobals(cam != null && !ReferenceEquals(cam, Camera.main) && captureCamera == null ? KeyLightOf(cam) : null);
+            PushGlobals();
+            // Unity's Light components reach only URP Lit materials (M_Lit), per renderer layer (US-T57).
+            UnityLights.BeginFrame(captureCamera ?? cam);
             // What the screen shows is what its camera renders: the layers in its culling mask (ModelViewer's camera
             // sees only its own layer) over its clear colour (Backdrop); a Camera.Render capture adds its own mask.
             int mask = (cam?.cullingMask ?? -1) | captureMask;
@@ -315,35 +317,10 @@ namespace UnityEngine
             keeper.SetMaterial(slot, mid);
         }
 
-        /// <summary>A directional light under a camera that is not the game's (ModelViewer's key light, AddKeyLight).</summary>
-        static Light? KeyLightOf(Camera cam)
+        /// <summary>Unity's shader globals (Shader.SetGlobal*) to MPC_SpaceGod. Unity's Light components never touch them
+        /// (the game's shaders light themselves from these; Lights reach only URP Lit, UnityLights, US-T57).</summary>
+        static void PushGlobals()
         {
-            foreach (var l in cam.gameObject.GetComponentsInChildren<Light>())
-                if (l.enabled && l.type == LightType.Directional && (l.cullingMask & cam.cullingMask) != 0) return l;
-            return null;
-        }
-
-        static bool keyLit;
-
-        /// <summary>Unity lights are data only (the shaders light themselves from the Sun globals); while a camera that
-        /// brings its own key light draws the screen (the model viewer), that light is the Sun the globals carry, as
-        /// ShipThumbnails sets them for its capture.</summary>
-        static void PushGlobals(Light? key)
-        {
-            if (key != null && host != null)
-            {
-                PushGlobals(null);
-                if (globals == null) return;
-                var far = key.transform.position - key.transform.forward * 1e7f;
-                var c = key.color;
-                MaterialLibrary.SetVectorParameterValue(globals, new FName("_SunPositionWS"), ShaderBinding.ToUnreal("_SunPositionWS", new Vector4(far.x, far.y, far.z, 1), false));
-                MaterialLibrary.SetVectorParameterValue(globals, new FName("_SunColor"), new FLinearColor(c.r * key.intensity, c.g * key.intensity, c.b * key.intensity, 1));
-                MaterialLibrary.SetVectorParameterValue(globals, new FName("_Sun2PositionWS"), ShaderBinding.ToUnreal("_Sun2PositionWS", new Vector4(far.x, far.y, far.z, 1), false));
-                MaterialLibrary.SetVectorParameterValue(globals, new FName("_Sun2Color"), new FLinearColor(0, 0, 0, 1));
-                keyLit = true;
-                return;
-            }
-            if (keyLit) { keyLit = false; globalsPushed = -1; }
             if (globalsPushed == Shader.globalsVersion) return;
             globalsPushed = Shader.globalsVersion;
             if (host == null) return;
@@ -552,6 +529,15 @@ namespace UnityEngine
                         ShaderBinding.Push(r.Block, mid);
                         blockInstances[i] = (mid, m, m.version);
                     }
+                }
+
+                // Unity's lights on URP Lit materials: those whose culling mask has this renderer's layer (US-T57).
+                for (int i = 0; i < sections && r.RawMaterials.Length > 0; i++)
+                {
+                    var m = r.RawMaterials[Math.Min(i, r.RawMaterials.Length - 1)];
+                    if (!UnityLights.IsLit(m)) continue;
+                    var mid = r.Block == null ? m!.Instance : i < blockInstances.Count ? blockInstances[i].Mid : null;
+                    if (mid != null) UnityLights.Apply(mid, r.gameObject.layer);
                 }
 
                 SetVisible(true);

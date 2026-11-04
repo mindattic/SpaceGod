@@ -193,6 +193,10 @@ namespace UnityEngine
             public string Mesh { get; set; } = "";
             public string Material { get; set; } = "";
             public float[] BaseColor { get; set; } = { 1, 1, 1, 1 };
+            // glTF metallicFactor / roughnessFactor / emissiveFactor (US-T57; glTF's defaults when absent).
+            public float Metallic { get; set; } = 1;
+            public float Roughness { get; set; } = 1;
+            public float[] Emissive { get; set; } = { 0, 0, 0 };
         }
 
         sealed class ModelInfo
@@ -262,6 +266,26 @@ namespace UnityEngine
         /// reads both). An asset: only its Instantiate copies are in the scene.</summary>
         static float Gamma(float l) => l <= 0.0031308f ? l * 12.92f : 1.055f * Mathf.Pow(l, 1f / 2.4f) - 0.055f;
 
+        /// <summary>The imported part's bounds in Unity's frame, as Unity's glTF import gives the mesh (the asset's box
+        /// through the same correction UnityBridge draws it with), so renderer.bounds frame the model as Unity's do
+        /// (ModelViewer fits its camera to them; a unit box placed the camera too far, US-T57).</summary>
+        static Bounds ImportedBounds(UStaticMesh mesh, (Quaternion Rotation, Vector3 Scale) correction)
+        {
+            try
+            {
+                var box = mesh.BoundingBox;
+                var b = new Bounds();
+                for (int i = 0; i < 8; i++)
+                {
+                    var corner = new FVector((i & 1) != 0 ? box.Max.X : box.Min.X, (i & 2) != 0 ? box.Max.Y : box.Min.Y, (i & 4) != 0 ? box.Max.Z : box.Min.Z);
+                    var u = correction.Rotation * Vector3.Scale(UnrealSpace.DirectionFromUnreal(corner), correction.Scale);
+                    if (i == 0) b = new Bounds(u, Vector3.zero);
+                    else b.Encapsulate(u);
+                }
+                return b;
+            }
+            catch (Exception) { return new Bounds(Vector3.zero, Vector3.one); }
+        }
         static GameObject ModelPrototype(ModelInfo info, List<UStaticMesh> meshes, string path)
         {
             string model = Leaf(path);
@@ -274,13 +298,19 @@ namespace UnityEngine
                 var child = new GameObject(i == 0 ? model : model + "_" + i);
                 child.transform.SetParent(go.transform, false);
                 var unityMesh = new Mesh { name = child.name, StaticMesh = meshes[i], Correction = correction };
-                unityMesh.bounds = new Bounds(Vector3.zero, Vector3.one);
+                unityMesh.bounds = ImportedBounds(meshes[i], correction);
                 child.AddComponent<MeshFilter>().sharedMesh = unityMesh;
                 var r = child.AddComponent<MeshRenderer>();
                 var c = part.BaseColor;
                 var m = new Material(ImportedShader) { name = part.Material };
                 // glTF factors are linear; Unity's glTF import sets the material colour in gamma space (Color.gamma).
                 m.SetColor("_BaseColor", new Color(Gamma(c[0]), Gamma(c[1]), Gamma(c[2]), c.Length > 3 ? c[3] : 1));
+                // The rest of glTFast's glTF-pbrMetallicRoughness (a URP Lit target) in URP Lit's terms, drawn by M_Lit (US-T57):
+                // smoothness = 1 - roughness, the emissive factor (linear) as a colour like the base colour.
+                m.SetFloat("_Metallic", part.Metallic);
+                m.SetFloat("_Smoothness", 1f - part.Roughness);
+                var e = part.Emissive;
+                m.SetColor("_EmissionColor", new Color(Gamma(e[0]), Gamma(e[1]), Gamma(e[2]), 1));
                 r.sharedMaterial = m;
             }
             return go;

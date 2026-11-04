@@ -813,13 +813,14 @@ namespace UnityEngine
         public static float HorizontalSlider(Rect position, float value, float leftValue, float rightValue, GUIStyle slider, GUIStyle thumb)
         {
             int id = GUIUtility.GetControlID(FocusType.Passive);
-            float thumbW = thumb.fixedWidth > 0 ? thumb.fixedWidth : 12;
-            float thumbH = thumb.fixedHeight > 0 ? thumb.fixedHeight : position.height;
-            float trackH = slider.fixedHeight > 0 ? slider.fixedHeight : position.height;
-            float span = Math.Max(1f, position.width - thumbW);
+            // Unity's SliderHandler (US-T57): the thumb is ThumbSize wide (the thumb's fixed width, else its horizontal
+            // padding) inside the track's padding, at full height less that padding; the styles' overflows shape both.
+            float thumbW = thumb.fixedWidth != 0 ? thumb.fixedWidth : thumb.padding.horizontal;
+            float span = Math.Max(1f, position.width - slider.padding.horizontal - thumbW);
             float range = rightValue - leftValue;
             float t = range == 0 ? 0 : Math.Clamp((value - leftValue) / range, 0f, 1f);
-            var thumbRect = new Rect(position.x + t * span, position.y + (position.height - thumbH) * 0.5f, thumbW, thumbH);
+            var thumbRect = new Rect(position.x + slider.padding.left + t * span, position.y + slider.padding.top, thumbW,
+                position.height - slider.padding.vertical);
             var e = Event.current;
             switch (e.GetTypeForControl(id))
             {
@@ -828,7 +829,7 @@ namespace UnityEngine
                     {
                         GUIUtility.hotControl = id;
                         sliderGrab = thumbRect.Contains(e.mousePosition) ? e.mousePosition.x - thumbRect.x : thumbW * 0.5f;
-                        value = leftValue + Math.Clamp((e.mousePosition.x - sliderGrab - position.x) / span, 0f, 1f) * range;
+                        value = leftValue + Math.Clamp((e.mousePosition.x - sliderGrab - position.x - slider.padding.left) / span, 0f, 1f) * range;
                         changed = true;
                         e.Use();
                     }
@@ -836,7 +837,7 @@ namespace UnityEngine
                 case EventType.MouseDrag:
                     if (GUIUtility.hotControl == id)
                     {
-                        value = leftValue + Math.Clamp((e.mousePosition.x - sliderGrab - position.x) / span, 0f, 1f) * range;
+                        value = leftValue + Math.Clamp((e.mousePosition.x - sliderGrab - position.x - slider.padding.left) / span, 0f, 1f) * range;
                         changed = true;
                         e.Use();
                     }
@@ -849,7 +850,7 @@ namespace UnityEngine
                     }
                     break;
                 case EventType.Repaint:
-                    slider.Draw(new Rect(position.x, position.y + (position.height - trackH) * 0.5f, position.width, trackH), false, false, false, false);
+                    slider.Draw(position, false, false, false, false);
                     thumb.Draw(thumbRect, Hover(thumbRect, id), GUIUtility.hotControl == id, false, false);
                     break;
             }
@@ -928,12 +929,21 @@ namespace UnityEngine
 
         static float Scrollbar(int id, Rect bar, float value, float visible, float total, bool vertical, GUIStyle track, GUIStyle thumb, ScrollState state)
         {
+            // Unity's GUI.Scroller -> SliderHandler (US-T57): inside the track's padding, the thumb is ThumbSize (the
+            // thumb's fixed length, else its padding along the bar) plus the visible part at the track's pixels per value.
+            float pad = vertical ? track.padding.vertical : track.padding.horizontal;
+            float padStart = vertical ? track.padding.top : track.padding.left;
+            float thumbSize = vertical ? (thumb.fixedHeight != 0 ? thumb.fixedHeight : thumb.padding.vertical)
+                : (thumb.fixedWidth != 0 ? thumb.fixedWidth : thumb.padding.horizontal);
             float length = vertical ? bar.height : bar.width;
-            float thumbLen = Math.Max(Math.Min(length, 12f), length * Math.Min(1f, visible / Math.Max(1f, total)));
-            float travel = Math.Max(1f, length - thumbLen);
             float max = Math.Max(0f, total - visible);
-            float at = max <= 0 ? 0 : value / max * travel;
-            var thumbRect = vertical ? new Rect(bar.x, bar.y + at, bar.width, thumbLen) : new Rect(bar.x + at, bar.y, thumbLen, bar.height);
+            value = Math.Clamp(value, 0, max);
+            float perValue = (length - pad - thumbSize) / Math.Max(1e-6f, total);
+            float thumbLen = Math.Min(visible, total) * perValue + thumbSize;
+            float at = padStart + value * perValue;
+            var thumbRect = vertical
+                ? new Rect(bar.x + track.padding.left, bar.y + at, bar.width - track.padding.horizontal, thumbLen)
+                : new Rect(bar.x + at, bar.y + track.padding.top, thumbLen, bar.height - track.padding.vertical);
             var e = Event.current;
             float Along(Vector2 p) => vertical ? p.y - bar.y : p.x - bar.x;
             switch (e.GetTypeForControl(id))
@@ -956,7 +966,7 @@ namespace UnityEngine
                 case EventType.MouseDrag:
                     if (GUIUtility.hotControl == id)
                     {
-                        value = Math.Clamp((Along(e.mousePosition) - state.Grab) / travel * max, 0, max);
+                        value = Math.Clamp((Along(e.mousePosition) - state.Grab - padStart) / Math.Max(1e-6f, perValue), 0, max);
                         e.Use();
                     }
                     break;
@@ -969,9 +979,7 @@ namespace UnityEngine
                     break;
                 case EventType.Repaint:
                     track.Draw(bar, false, false, false, false);
-                    var inner = vertical ? new Rect(thumbRect.x + 2, thumbRect.y + 1, thumbRect.width - 4, thumbRect.height - 2)
-                        : new Rect(thumbRect.x + 1, thumbRect.y + 2, thumbRect.width - 2, thumbRect.height - 4);
-                    thumb.Draw(inner, false, false, false, false);
+                    thumb.Draw(thumbRect, false, false, false, false);
                     break;
             }
             return value;

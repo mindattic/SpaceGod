@@ -134,7 +134,8 @@ def import_ships():
                 continue
             prim = doc["meshes"][node["mesh"]]["primitives"][0]
             mat = materials[prim["material"]] if "material" in prim else {"name": "default"}
-            color = mat.get("pbrMetallicRoughness", {}).get("baseColorFactor", [1, 1, 1, 1])
+            pbr = mat.get("pbrMetallicRoughness", {})
+            color = pbr.get("baseColorFactor", [1, 1, 1, 1])
             if k is None:
                 acc = doc["accessors"][prim["attributes"]["POSITION"]]
                 gltf_z = acc["max"][2] - acc["min"][2]
@@ -142,7 +143,11 @@ def import_ships():
                 ue_y = box.max.y - box.min.y
                 k = ue_y / gltf_z if gltf_z > 0 else 1.0
             parts.append({"mesh": f"{path}.{path.rsplit('/', 1)[1]}", "material": mat.get("name", "default"),
-                          "baseColor": [float(c) for c in color]})
+                          "baseColor": [float(c) for c in color],
+                          # The rest of the glTF material, as glTFast hands it to URP Lit (US-T57).
+                          "metallic": float(pbr.get("metallicFactor", 1.0)),
+                          "roughness": float(pbr.get("roughnessFactor", 1.0)),
+                          "emissive": [float(c) for c in mat.get("emissiveFactor", [0, 0, 0])]})
             eal.save_asset(path, only_if_is_dirty=False)
         # Unity's import (glTFast) is glTF with x negated: (-x, y, z), nose +Z (AssetForge). Interchange's is glTF as
         # (x, z, y) (GLTFCore ConversionUtilities ConvertVec3) times its unit scale k. With UnrealSpace

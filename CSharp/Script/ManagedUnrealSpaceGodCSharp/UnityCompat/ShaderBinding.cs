@@ -47,12 +47,15 @@ namespace UnityEngine
         /// <summary>The material Unity's glTF import gave a Kenney craft (ShipModels re-materials them with Ship at once).</summary>
         public const string ImportedShader = "glTF/Imported";
 
+        /// <summary>Drawn with URP Lit (M_Lit, the one material Unity's Light components reach, US-T57): the glTF
+        /// import's material (glTFast's glTF-pbrMetallicRoughness shader graph, a URP Lit target; the model viewer shows
+        /// it on the raw prefab) and URP's own Lit shader.</summary>
+        public static bool IsLit(Shader? shader) => shader?.name == ImportedShader || ShaderName(shader) == "Lit";
+
         /// <summary>The Unreal parent material for <paramref name="shader"/>.</summary>
         public static UMaterialInterface? Parent(Shader? shader)
         {
-            // The glTF import's own (lit PBR) material, shown only by the model viewer, which draws the raw prefab: drawn
-            // with the game's Ship material in its base colour (ModelViewer's key light feeds the Sun globals, US-T40).
-            string name = shader?.name == ImportedShader ? "Ship" : ShaderName(shader);
+            string name = IsLit(shader) ? "Lit" : ShaderName(shader);
             if (Parents.TryGetValue(name, out var cached)) return cached;
             UMaterialInterface? m = TryLoad($"{MaterialRoot}/M_{name}.M_{name}");
             if (m == null)
@@ -106,8 +109,6 @@ namespace UnityEngine
         {
             foreach (var kv in m.Floats) mid.SetScalarParameterValue(new FName(kv.Key), kv.Value);
             foreach (var kv in m.Vectors) mid.SetVectorParameterValue(new FName(kv.Key), ToUnreal(kv.Key, kv.Value, m.ColorNames.Contains(kv.Key)));
-            if (m.shader?.name == ImportedShader && m.Vectors.TryGetValue("_BaseColor", out var baseColor))
-                mid.SetVectorParameterValue(new FName("_Color"), ToUnreal("_Color", baseColor, true));
             foreach (var kv in m.Textures)
             {
                 var t = kv.Value?.Unreal;

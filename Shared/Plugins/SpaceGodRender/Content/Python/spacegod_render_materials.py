@@ -581,16 +581,83 @@ def build_ship(mpc):
     return mat
 
 
+# Unity's environment lighting in Unity.SpaceGod's two scenes (MainMenu, UnitySpace: identical RenderSettings, the
+# default procedural skybox, no baked lighting): read from the original player's built scenes (level0/level1
+# RenderSettings.m_AmbientProbe) and its generated skybox reflection (sharedassets0 Default-Skybox-Cubemap, 128 px
+# RGBM, 8 mips) by tools/unity_extract.py, US-T57. Each set is Unity's seven SH shader constants
+# (unity_SHAr ... unity_SHC: L0+L1 per channel, L2 per channel, L2 xx-yy), in Unity's world axes.
+UNITY_AMBIENT_SH = {
+    "unity_SHAr": (0.0072520152, -0.0056823115, -0.0125606805, 0.1699536266),
+    "unity_SHAg": (0.0114032608, 0.0413438305, -0.0197532624, 0.2113341503),
+    "unity_SHAb": (0.0196566433, 0.1274849474, -0.0340533927, 0.2892073002),
+    "unity_SHBr": (0.0056999680, -0.0098724226, 0.0309904749, -0.0104363170),
+    "unity_SHBg": (0.0091119735, -0.0157832708, 0.0431399010, -0.0152235953),
+    "unity_SHBb": (0.0163651910, -0.0283491500, 0.0531466585, -0.0220852569),
+    "unity_SHC": (0.0250355694, 0.0344360620, 0.0404654965, 1.0),
+}
+# unity_SpecCube0 as URP's GlossyEnvironmentReflection reads it for the imported glTFs (roughness 0.9, smoothness 0.1:
+# PerceptualRoughnessToMipmapLevel = 5.78, trilinear between mips 5 and 6), RGBM-decoded and projected onto L2.
+UNITY_SPECCUBE_SH = {
+    "_SpecCube0_SHAr": (0.0063588499, -0.0107562379, -0.0108583746, 0.1544257020),
+    "_SpecCube0_SHAg": (0.0101747567, 0.0337584819, -0.0177938450, 0.1915096029),
+    "_SpecCube0_SHAb": (0.0192097141, 0.1159604430, -0.0335932938, 0.2665424793),
+    "_SpecCube0_SHBr": (0.0055854343, -0.0091257940, 0.0172249946, -0.0103934777),
+    "_SpecCube0_SHBg": (0.0087074613, -0.0152277223, 0.0251886272, -0.0150673483),
+    "_SpecCube0_SHBb": (0.0163190497, -0.0303222533, 0.0342876216, -0.0220301071),
+    "_SpecCube0_SHC": (0.0140453382, 0.0203410273, 0.0252878624, 1.0),
+}
+# Light slots (UnityBridge / UnityRendering fill them from the scene's enabled Light components whose culling mask has
+# the renderer's layer, URP's main light first): direction towards the light in world axes (zero = no light), colour
+# = Light.color (linear) * intensity. SetVector values: no sRGB conversion.
+LIT_LIGHTS = ["_MainLight", "_AdditionalLight0", "_AdditionalLight1"]
+
+
+def build_lit(mpc):
+    mat = new_material("M_Lit", unreal.BlendMode.BLEND_OPAQUE, False)
+    g = Graph(mat, mpc)
+    lights = []
+    for slot in LIT_LIGHTS:
+        lights += [vec4(slot + "Direction", (0, 0, 0, 0)), vec4(slot + "Color", (0, 0, 0, 0))]
+    sh = [vec4(k, v) for k, v in UNITY_AMBIENT_SH.items()] + [vec4(k, v) for k, v in UNITY_SPECCUBE_SH.items()]
+    inputs = [("UV", ("uv", 0, "rg")), ("PositionCR", ("pos_cr",))] + [
+        color3("_BaseColor", (1, 1, 1, 1)), texture("_BaseMap", "T_SG_White"), scalar("_Metallic", 0),
+        scalar("_Smoothness", 0.5), texture("_BumpMap", "T_SG_Bump"), scalar("_BumpScale", 1),
+        color3("_EmissionColor", (0, 0, 0, 1)), texture("_EmissionMap", "T_SG_White"),
+    ] + lights + sh + EXPOSE
+    light_args = ", ".join(f"{slot}Direction.xyz, {slot}Color.rgb" for slot in LIT_LIGHTS)
+    code = ("float3 tn = SG_UnpackUnityNormal(Texture2DSample(_BumpMap, _BumpMapSampler, UV), _BumpScale);\n"
+            "float3 n = normalize(mul(tn, (float3x3)Parameters.TangentToWorld));\n"
+            "float3 v = normalize(-PositionCR);\n"
+            "float3 albedo = Texture2DSample(_BaseMap, _BaseMapSampler, UV).rgb * _BaseColor;\n"
+            "float3 emission = Texture2DSample(_EmissionMap, _EmissionMapSampler, UV).rgb * _EmissionColor;\n"
+            "return SG_Expose3(SG_Lit(n, v, albedo, _Metallic, _Smoothness, 1.0, emission, " + light_args + ", "
+            + ", ".join(UNITY_AMBIENT_SH) + ", " + ", ".join(UNITY_SPECCUBE_SH) + "), Exposure, SceneLuminance);")
+    c = g.custom("Universal Render Pipeline/Lit", "Lit.ush", code, F3, inputs)
+    finish(mat, (c, ""))
+    return mat
+
+
+def _snake(name):
+    """GasGiant -> gas_giant (a material's builder name)."""
+    return "".join(("_" + ch.lower()) if ch.isupper() and i else ch.lower() for i, ch in enumerate(name))
+
+
 BUILDERS = [build_planet, build_sun, build_ring, build_gas_giant, build_sky, build_stars, build_points, build_line,
-            build_glow, build_fx, build_asteroids, build_ship]
+            build_glow, build_fx, build_asteroids, build_ship, build_lit]
 
 
 def main():
+    # SPACEGOD_RENDER_ONLY=M_Lit,M_Ship rebuilds just those (the other .uassets stay byte-identical).
+    only = [n.strip() for n in os.environ.get("SPACEGOD_RENDER_ONLY", "").split(",") if n.strip()]
     import_default_textures()
-    mpc = build_collection()
-    built = [mpc] + [default_texture(name) for name in DEFAULT_TEXTURES]
+    # Rebuilding the collection gives its parameters new ids: with only some materials rebuilt (and the collection not
+    # saved), they must reference the collection as it is on disk.
+    mpc = unreal.load_asset(f"{MATERIALS}/{MPC_NAME}") if only else build_collection()
+    built = [] if only else [mpc] + [default_texture(name) for name in DEFAULT_TEXTURES]
     failed = []
     for build in BUILDERS:
+        if only and not any(build.__name__ == "build_" + _snake(n[2:]) for n in only):
+            continue
         try:
             mat = build(mpc)
             built.append(mat)

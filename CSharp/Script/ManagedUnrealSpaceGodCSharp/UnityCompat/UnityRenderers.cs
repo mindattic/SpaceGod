@@ -187,8 +187,9 @@ namespace UnityEngine
     public enum LightType { Spot = 0, Directional = 1, Point = 2 }
     public enum LightShadows { None = 0, Hard = 1, Soft = 2 }
 
-    /// <summary>A light (ShipThumbnails' key light). Kept as data: the ported shaders light themselves from their own
-    /// Sun parameters, as the originals do, so no Unreal light is spawned for it.</summary>
+    /// <summary>A light (ModelViewer's and ShipThumbnails' key lights). As in Unity.SpaceGod under URP, it lights only
+    /// URP Lit materials (M_Lit, the imported glTF craft) on the layers of its culling mask, through UnityLights
+    /// (US-T57); the game's own shaders are unlit and light themselves from the Sun globals, as the originals do.</summary>
     public class Light : Behaviour
     {
         public LightType type { get; set; } = LightType.Directional;

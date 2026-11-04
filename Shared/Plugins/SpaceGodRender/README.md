@@ -52,7 +52,7 @@ Use a material through a `UMaterialInstanceDynamic` and set parameters **by the 
 
 ## Shader → material
 
-All are unlit. Every material also takes `Exposure` (EyeAdaptation) and `_UnitySpaceSceneLuminance` (MPC).
+All are unlit (`M_Lit` computes URP's lighting itself). Every material also takes `Exposure` (EyeAdaptation) and `_UnitySpaceSceneLuminance` (MPC).
 
 | Unity shader | UE material | Blend | Parameters (Unity names kept) | Notes |
 |---|---|---|---|---|
@@ -70,12 +70,20 @@ All are unlit. Every material also takes `Exposure` (EyeAdaptation) and `_UnityS
 | Asteroids | `M_Asteroids` | Additive, 2-sided | `_Color`, `_Brightness`, `_PointScale`, `_DtDays`, `_SunMap0`, `_SunMap1`, `_SunRelative` (world position of the Sun), **`_Asteroids` (texture)** | No StructuredBuffer / SV_VertexID in materials: `AsteroidField.PackGpu`'s float4s go into a float RGBA texture (`PF_A32B32G32R32F`, row-major, any width); the mesh has 6 vertices per asteroid with TexCoord0 = (index, corner 0..5) at full UV precision; positions are ignored. Lengths in `_SunMap0` in world units |
 | Ship | `M_Ship` | Opaque | `_Color`, `_Tint`, `_UseVertexColor`, `_EngineGlow`, `_EngineColor`, `_Highlight`, `_Plating` (grey), `_PlatingScale`, `_PlatingStrength` | `ship_plating.png` imports sRGB **off**, uncompressed or Default (R detail, G/B normal) |
 
+| URP Lit (`Universal Render Pipeline/Lit`; glTFast's `glTF-pbrMetallicRoughness`, a URP Lit target) | `M_Lit` | Opaque | `_BaseColor`, `_BaseMap` (white), `_Metallic`, `_Smoothness` (= 1 − glTF roughness), `_BumpMap` (bump), `_BumpScale`, `_EmissionColor`, `_EmissionMap` (white); lights `_MainLightDirection`/`Color`, `_AdditionalLight0…1Direction`/`Color`; environment `unity_SHAr…unity_SHC`, `_SpecCube0_SHAr…SHC` | US-T57. The one lit material and the only one Unity's `Light` components reach (the game's shaders are unlit). `Shaders/Lit.ush` is URP 17's forward PBR line for line: `InitializeBRDFData`, `DirectBRDFSpecular`, `LightingPhysicallyBased`, `GlobalIllumination` (ambient SH × diffuse + glossy reflection × `EnvironmentBRDF`), emission. Light slots are SetVector values: direction **towards** the light in world axes (zero = none), colour = `Light.color.linear × intensity`. The SH defaults are Unity.SpaceGod's scenes' own environment (both scenes: default procedural skybox, nothing baked), read from the original player by `tools/unity_extract.py`: `RenderSettings.m_AmbientProbe` as Unity's seven shader constants, and the generated skybox reflection (`unity_SpecCube0`, RGBM) at the mip URP picks for the imported glTFs' roughness 0.9 (5.78) projected onto L2. Normal maps as Unity imports them (green up); the shader flips green for Unreal's V |
+
 Unity's unused `_MainTex_ST` / `_NormalMap_ST` / `_Plating_ST` (declared, never applied) have no counterpart.
+
+`spacegod_render_materials.py` rebuilds every material; `SPACEGOD_RENDER_ONLY=M_Lit` (comma-separated) rebuilds just those, so
+the other `.uasset`s stay untouched.
 
 ## Not (yet) exactly Unity
 
 - Stars/Points: a 1-pixel quad lands on one pixel or straddles two depending on sub-pixel position; Unity's point is
   always exactly one pixel. Lines are 1-pixel ribbons, not hardware lines (no gaps/joins handling at strip corners).
 - The URP Volume stack (UrpRenderBackend's adapting exposure meter, bloom, colour grading) is engine-side, not in here.
+- `M_Lit`'s glossy reflection is the skybox cube's L2 projection at one mip (roughness 0.9, all the imported glTFs):
+  exact in the low frequencies URP samples there; a smoother URP Lit material would need that mip's projection.
+  Directional lights only (all Unity.SpaceGod creates), no shadows (its lights cast none).
 - Untested on screen in this ticket: the materials compile for SM5/SM6 (`spacegod_render_verify.py`), but no view
   draws them yet.
