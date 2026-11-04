@@ -33,10 +33,21 @@ New-Item -ItemType Directory -Force $Out | Out-Null
 $heavy = '^(cl|link|UnrealEditor.*|UnrealBuildTool|ShaderCompileWorker|MSBuild|UnrealPak|UnrealSpaceGod.*|Unreal\.SpaceGod.*|Bench\..*)$'
 $gameArgs = @('-windowed', "-ResX=$ResX", "-ResY=$ResY", '-nosound', '-unattended', '-nosplash', '-UseFixedTimeStep', '-FPS=60', '-SpaceGodRace')
 
+# The rest of the machine's CPU over a few seconds, % of all logical CPUs (other agents share this machine).
+function Get-OthersCpuPct([int]$Seconds = 5) {
+  $a = @{}; foreach ($p in Get-Process) { if ($p.CPU) { $a[$p.Id] = $p.CPU } }
+  Start-Sleep -Seconds $Seconds
+  $sum = 0.0
+  foreach ($p in Get-Process) { if ($p.Id -ne $PID -and $p.CPU) { $sum += $p.CPU - $(if ($a.ContainsKey($p.Id)) { $a[$p.Id] } else { 0 }) } }
+  [Math]::Round(100.0 * $sum / $Seconds / [Environment]::ProcessorCount, 1)
+}
+
 for ($n = 1; $n -le $Runs; $n++) {
+  # A quiet machine first: the rest of it under 8% of the CPUs (at most 10 minutes of waiting).
   $t0 = Get-Date
-  while (@(Get-Process | Where-Object { $_.ProcessName -match $heavy }).Count -gt 0 -and ((Get-Date) - $t0).TotalMinutes -lt 30) { Start-Sleep -Seconds 10 }
-  $busy = (Get-Process | Where-Object { $_.ProcessName -match $heavy } | ForEach-Object ProcessName | Sort-Object -Unique) -join ','
+  do { $others = Get-OthersCpuPct } while ($others -ge 8 -and ((Get-Date) - $t0).TotalMinutes -lt 10)
+  $busy = "others $others% after $([int]((Get-Date) - $t0).TotalSeconds) s; " + ((Get-Process | Where-Object { $_.ProcessName -match $heavy } | ForEach-Object ProcessName | Sort-Object -Unique) -join ',')
+  $t0 = Get-Date
   $file = Join-Path $Out ("{0}-{1}{2}.json" -f $Track.ToLowerInvariant(), $(if ($Editor) { 'editor-' } else { '' }), $n)
   Remove-Item -LiteralPath $file -ErrorAction SilentlyContinue
   $runArgs = $gameArgs + @("-SpaceGodRaceOut=$file")
@@ -56,7 +67,7 @@ for ($n = 1; $n -le $Runs; $n++) {
   # The launcher starts the real exe and returns; wait for every process of the package (or the editor) to end.
   $deadline = (Get-Date).AddMinutes(30)
   Start-Sleep -Seconds 3
-  $peakWs = 0
+  [long]$peakWs = 0
   do {
     Start-Sleep -Milliseconds 500
     $game = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -match '^(UnrealSpaceGod|UnrealSpaceGodCSharp)(-Win64-Shipping)?$|^UnrealEditor$' -and $_.StartTime -ge $t0 })

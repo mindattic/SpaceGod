@@ -12,6 +12,8 @@
 #include "UnitySpaceApp.h"
 #include "UnitySpaceAppActor.h"
 #include "UnrealSpaceGodLog.h"
+#include "Target.h"
+#include "Camera/SpaceCamera.h"
 #include "Camera/StarTravel.h"
 #include "Input/InputDevice.h"
 #include "UI/MainMenu.h"
@@ -115,6 +117,8 @@ namespace SpaceGod::Race
 			UnitySpaceApp::StartJd = StartJd;
 			while (!UI::MainMenu::Showing() && App() == nullptr) co_yield nullptr;
 			Cmd(TEXT("sg.Race.NoteAge processToMenuMs"));
+			// The menu up for 30 frames (its first frames end before New Game's galaxy is built), then New Game.
+			for (int i = 0; i < 30; i++) co_yield nullptr;
 			const double t = Probe::Now();
 			if (UI::MainMenu::Showing())
 			{
@@ -143,6 +147,19 @@ namespace SpaceGod::Race
 			Note(TEXT("solIdleEndJd"), app->Clock->Jd);
 			Note(TEXT("solIdleShips"), app->Fleet()->Ships().Count());
 			Cmd(TEXT("memreport -full"));
+
+			// Fifteen days at 1 month/s, the second-highest warp (every system stepped several times a frame). The highest warp,
+			// 1 yr/s, trips US-T59 on both tracks within a few months of game time, as does a longer stretch at 1 month/s.
+			app = App();
+			app->Clock->SetPaused(false);
+			app->Clock->SetWarp(SimClock::Levels().Count() - 2);
+			Cmd(TEXT("sg.Race.Phase month-warp"));
+			co_yield Frames(MaxWarpFrames);
+			Cmd(TEXT("sg.Race.End"));
+			app = App();
+			app->Clock->SetWarp(SimClock::DefaultWarpIndex);
+			Note(TEXT("monthWarpEndJd"), app->Clock->Jd);
+			co_yield Frames(30);
 
 			// A staged battle (SceneTour's broadside showcase): 2 battleships + a cruiser each for Sol and Reach off
 			// Uranus, watched at battle time, then 1 min/s.
@@ -175,6 +192,30 @@ namespace SpaceGod::Race
 			app->Clock->SetWarp(SimClock::DefaultWarpIndex);
 			co_yield Frames(30);
 
+			// To Alpha Centauri (StarTravel: the jump between the stars, the system promoted), a while there, and home
+			// again (not timed).
+			app = App();
+			auto ac = app->Galaxy->Find("Alpha Centauri");
+			cs::Ref<StarSystem> sol = app->ActiveSystem;
+			if (ac != nullptr)
+			{
+				// The view's own trip (a followed ship, the battle's flagship, would be sent on a crew course instead).
+				app->SpaceCamera->ExitFocus();
+				app->Select(Target::None());
+				Cmd(TEXT("sg.Race.Phase galaxy-ftl"));
+				app->TravelTo(ac);
+				int f = 0;
+				while (App()->Travel->Active && f < 3000) { f++; co_yield Frame(); }
+				Note(TEXT("ftlTravelFrames"), f);
+				co_yield Frames(ArrivedFrames);
+				Cmd(TEXT("sg.Race.End"));
+				Note(TEXT("ftlArrivedIn"), App()->ActiveSystem->Name == "Alpha Centauri" ? 1 : 0);
+				App()->TravelTo(sol);
+				for (int g = 0; App()->Travel->Active && g < 3000; g++) co_yield nullptr;
+				co_yield Frames(30);
+			}
+
+			Uncapped();
 			// Saves and loads (Core/Persistence, the original's format), three of each, timed.
 			double saveSum = 0, loadSum = 0, saveMin = 1e300, loadMin = 1e300;
 			for (int k = 0; k < 3; k++)
@@ -200,32 +241,6 @@ namespace SpaceGod::Race
 			Note(TEXT("loadMeanMs"), loadSum / 3);
 			Uncapped();
 
-			// A year at the highest warp (1 yr/s: every system stepped many times a frame).
-			app = App();
-			app->Clock->SetPaused(false);
-			app->Clock->SetWarp(SimClock::Levels().Count() - 1);
-			Cmd(TEXT("sg.Race.Phase max-warp"));
-			co_yield Frames(MaxWarpFrames);
-			Cmd(TEXT("sg.Race.End"));
-			app = App();
-			app->Clock->SetWarp(SimClock::DefaultWarpIndex);
-			Note(TEXT("maxWarpEndJd"), app->Clock->Jd);
-			co_yield Frames(30);
-
-			// To Alpha Centauri (StarTravel: the jump between the stars, the system promoted), then a while there.
-			app = App();
-			auto ac = app->Galaxy->Find("Alpha Centauri");
-			if (ac != nullptr)
-			{
-				Cmd(TEXT("sg.Race.Phase galaxy-ftl"));
-				app->TravelTo(ac);
-				int f = 0;
-				while (App()->Travel->Active && f < 3000) { f++; co_yield Frame(); }
-				Note(TEXT("ftlTravelFrames"), f);
-				co_yield Frames(ArrivedFrames);
-				Cmd(TEXT("sg.Race.End"));
-				Note(TEXT("ftlArrivedIn"), App()->ActiveSystem->Name == "Alpha Centauri" ? 1 : 0);
-			}
 			Note(TEXT("endJd"), App()->Clock->Jd);
 			Cmd(TEXT("sg.Race.Write ") + results);
 			UE_LOG(LogSpaceGod, Display, TEXT("SpaceGodRace: done -> %s"), *results);

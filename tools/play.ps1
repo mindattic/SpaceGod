@@ -144,7 +144,13 @@ if ($Mode -eq 'coop-smoke') {
   $result = 1
   try {
   $common = @('-game', '-nullrhi', '-nosound', '-unattended', '-nosplash', $coopNet)
-  $hostArgs = @("`"$($project.FullName)`"", '/Engine/Maps/Entry?listen') + $common + @("-port=$port", '-SpaceGodCoopSmoke=host', "`"-abslog=$hostLog`"")
+  # US-T46: SPACEGOD_RACE_DIR set, each instance's frames and net totals go to <dir>/<track>-coop-<host|client>-<run>.json
+  # (the shared sampler's -SpaceGodRaceAuto; docs/RACE.md).
+  $race = @{ host = @(); client = @() }
+  if ($env:SPACEGOD_RACE_DIR) {
+    foreach ($side in 'host', 'client') { $race[$side] = @("`"-SpaceGodRaceAuto=$(Join-Path $env:SPACEGOD_RACE_DIR "$prefix-coop-$side-$run.json")`"") }
+  }
+  $hostArgs = @("`"$($project.FullName)`"", '/Engine/Maps/Entry?listen') + $common + $race.host + @("-port=$port", '-SpaceGodCoopSmoke=host', "`"-abslog=$hostLog`"")
   # Not -WindowStyle (ShellExecute): CreateProcess, so the instances inherit the PATH with the private .NET SDK on it.
   $hostP = Start-Process -FilePath $cmd -PassThru -NoNewWindow -ArgumentList $hostArgs -RedirectStandardOutput "$hostLog.out"
   # The client starts once the host's app is up (two UnrealSharp startups at once contend for the managed build).
@@ -155,7 +161,7 @@ if ($Mode -eq 'coop-smoke') {
     }
     Start-Sleep -Seconds 2
   }
-  $clientArgs = @("`"$($project.FullName)`"", "127.0.0.1:$port") + $common + @('-SpaceGodCoopSmoke=client', "`"-abslog=$clientLog`"")
+  $clientArgs = @("`"$($project.FullName)`"", "127.0.0.1:$port") + $common + $race.client + @('-SpaceGodCoopSmoke=client', "`"-abslog=$clientLog`"")
   $clientP = Start-Process -FilePath $cmd -PassThru -NoNewWindow -ArgumentList $clientArgs -RedirectStandardOutput "$clientLog.out"
   $deadline = (Get-Date).AddMinutes(11)
   while (-not ($hostP.HasExited -and $clientP.HasExited)) {

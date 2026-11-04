@@ -27,8 +27,8 @@ namespace Unity.SpaceGod.Race
     /// the C++ track's (Cpp/Source/UnrealSpaceGod/Smoke/SpaceGodRace.cpp). Run with <c>-UseFixedTimeStep -FPS=60</c> so
     /// every frame is 1/60 s of game time (the same simulation on both tracks, frame for frame) while the engine runs
     /// as fast as it can (no frame cap, no VSync): New Game at the screenshots' fixed moment and seed, then Sol idle,
-    /// a staged battle off Uranus at battle time, three saves and loads, a year at the highest warp, and a trip to
-    /// Alpha Centauri; the shared sampler (SpaceGodRender's SpaceGodRace.cpp) times every frame and writes the results.
+    /// a staged battle off Uranus at battle time, a trip to Alpha Centauri (and home), a year at the highest warp, and
+    /// three saves and loads; the shared sampler (SpaceGodRender's SpaceGodRace.cpp) times every frame and writes the results.
     /// </summary>
     public static class RaceRun
     {
@@ -78,6 +78,8 @@ namespace Unity.SpaceGod.Race
             UnitySpaceApp.StartJd = StartJd;
             while (!MainMenu.Showing && Bootstrap.App == null) yield return null;
             Cmd("sg.Race.NoteAge processToMenuMs");
+            // The menu up for 30 frames (its first frames end before New Game's galaxy is built), then New Game.
+            for (int i = 0; i < 30; i++) yield return null;
             var t = RaceProbe.Now();
             if (MainMenu.Showing)
             {
@@ -105,6 +107,18 @@ namespace Unity.SpaceGod.Race
             Note("solIdleEndJd", app.Clock.Jd);
             Note("solIdleShips", app.Fleet.Ships.Count);
             Cmd("memreport -full");
+
+            // Fifteen days at 1 month/s, the second-highest warp (every system stepped several times a frame). The highest warp,
+            // 1 yr/s, trips US-T59 on both tracks within a few months of game time, as does a longer stretch at 1 month/s.
+            Uncapped();
+            app.Clock.Paused = false;
+            app.Clock.SetWarp(SimClock.Levels.Length - 2);
+            Cmd("sg.Race.Phase month-warp");
+            yield return Frames(MaxWarpFrames);
+            Cmd("sg.Race.End");
+            app.Clock.SetWarp(SimClock.DefaultWarpIndex);
+            Note("monthWarpEndJd", app.Clock.Jd);
+            yield return Frames(30);
 
             // A staged battle (SceneTour's broadside showcase): 2 battleships + a cruiser each for Sol and Reach off
             // Uranus, watched at battle time, then 1 min/s.
@@ -136,6 +150,28 @@ namespace Unity.SpaceGod.Race
             app.Clock.SetWarp(SimClock.DefaultWarpIndex);
             yield return Frames(30);
 
+            // To Alpha Centauri (StarTravel: the jump between the stars, the system promoted), a while there, and home
+            // again (not timed).
+            var ac = app.Galaxy.Find("Alpha Centauri");
+            var sol = app.ActiveSystem;
+            if (ac != null)
+            {
+                // The view's own trip (a followed ship, the battle's flagship, would be sent on a crew course instead).
+                app.SpaceCamera.ExitFocus();
+                app.Select(Target.None);
+                Cmd("sg.Race.Phase galaxy-ftl");
+                app.TravelTo(ac);
+                int f = 0;
+                while (app.Travel.Active && f < 3000) { f++; yield return Frame(); }
+                Note("ftlTravelFrames", f);
+                yield return Frames(ArrivedFrames);
+                Cmd("sg.Race.End");
+                Note("ftlArrivedIn", app.ActiveSystem.Name == "Alpha Centauri" ? 1 : 0);
+                app.TravelTo(sol);
+                for (int g = 0; app.Travel.Active && g < 3000; g++) yield return null;
+                yield return Frames(30);
+            }
+
             // Saves and loads (Core/Persistence, the original's format), three of each, timed.
             double saveSum = 0, loadSum = 0, saveMin = double.MaxValue, loadMin = double.MaxValue;
             for (int k = 0; k < 3; k++)
@@ -158,31 +194,6 @@ namespace Unity.SpaceGod.Race
             Note("loadMinMs", loadMin);
             Note("saveMeanMs", saveSum / 3);
             Note("loadMeanMs", loadSum / 3);
-            Uncapped();
-
-            // A year at the highest warp (1 yr/s: every system stepped many times a frame).
-            app.Clock.Paused = false;
-            app.Clock.SetWarp(SimClock.Levels.Length - 1);
-            Cmd("sg.Race.Phase max-warp");
-            yield return Frames(MaxWarpFrames);
-            Cmd("sg.Race.End");
-            app.Clock.SetWarp(SimClock.DefaultWarpIndex);
-            Note("maxWarpEndJd", app.Clock.Jd);
-            yield return Frames(30);
-
-            // To Alpha Centauri (StarTravel: the jump between the stars, the system promoted), then a while there.
-            var ac = app.Galaxy.Find("Alpha Centauri");
-            if (ac != null)
-            {
-                Cmd("sg.Race.Phase galaxy-ftl");
-                app.TravelTo(ac);
-                int f = 0;
-                while (app.Travel.Active && f < 3000) { f++; yield return Frame(); }
-                Note("ftlTravelFrames", f);
-                yield return Frames(ArrivedFrames);
-                Cmd("sg.Race.End");
-                Note("ftlArrivedIn", app.ActiveSystem.Name == "Alpha Centauri" ? 1 : 0);
-            }
             Note("endJd", app.Clock.Jd);
             Cmd("sg.Race.Write " + results);
             UnrealLogger.Log(Log, "SpaceGodRace: done -> " + results);
