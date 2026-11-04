@@ -138,3 +138,34 @@ entries a C# save carries.
 - **Still to do:** the Shipping package, its co-op smoke and the `run.ps1 -Force` redeploy. The machine's low-memory
   guard stopped that run on 2026-11-04. `C:\Apps\SpaceGod.Unreal.Cpp` still holds `ad93e37`; its window title reads
   "SpaceGod - Unreal C++". Writing C# delegate names from C++ would add nothing a load uses.
+
+## Recording through MindAttic.Capture (US-T72)
+
+Per [docs/CAPTURE.md](CAPTURE.md), mirrored from SpaceGod.Unity.CSharp at `2158228`. This copy has what the Unity one has:
+- **Flags:** `-capture` (`video`, `screen N`, `hq`, a duration) and `-capture-config`.
+- **Tour shots:** with `-capture`, the `-demo` tour's screenshots go through MindAttic.Capture.
+- **Rules:** the shipped `SpaceGod.capture.json`.
+- **Events:** the 20-event catalogue, with the same names, fields and order, at the same code points.
+- **Log line:** the `[capture] event` line.
+- **Hotkeys:** Alt+F9/F10/F11 through `InputState`.
+- **Gating:** capture-enabled published builds.
+
+The engine side differs (Capture/README.md). MindAttic.Capture runs in a host process (`Capture/SpaceGod.Capture`,
+on the vendored library) that records the game window through Windows Graphics Capture. The game drives it over a pipe,
+where Unity runs the package inside the player and reads the GPU frame. The `[capture] event` lines also go to the
+session folder's `.game.log`, because a Shipping game writes no log.
+
+**Proof** at `e89d460`, from a Shipping package:
+
+| Check | Result |
+|---|---|
+| Bench | 5 of 5 digests identical |
+| Audit | 80 PASS, 0 FAIL, 5 INFO |
+| Co-op smoke | 15/15, 54 of 54 digests identical |
+| `-demo -capture video screen 10` | Exited by itself after 297 s. Its session holds the `.mkv` and `.mp4`, 47 PNGs (every tour stop, the 10 s shots, two `arrival` rule shots), a sidecar for each, and `session.json` with 6 events and 6 markers. `.game.log` has the `[capture] event` lines (`time-warp`, `system-arrival`). |
+| `coop-smoke -CaptureHost` | The host raised `coop-joined`, `coop-resync` x3, `time-warp` x2, `game-saved`, `trade`, `battle-started`, `system-arrival`, `game-loaded` and `coop-left`. |
+
+Notes on the demo run:
+- The 60 fps lossless tape fell behind on the loaded machine. MindAttic.Capture's valve (encoder lag over 60 s) stopped
+  recording 2:16 in, as designed, and the later tour shots were skipped. `hq` avoids that.
+- The smoke's `hail` comes from the client, so only the client raises it (section 3: the peer whose player hailed).
