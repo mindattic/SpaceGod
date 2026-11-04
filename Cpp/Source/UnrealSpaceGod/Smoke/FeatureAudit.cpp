@@ -1,6 +1,7 @@
 #include "Smoke/FeatureAudit.h"
 #include "Smoke/ScriptedDevice.h"
 #include "Smoke/FeatureAuditSettings.h"
+#include "Smoke/FeatureAuditEditing.h"
 
 #include "Target.h"
 #include "UnitySpaceApp.h"
@@ -404,6 +405,8 @@ namespace SpaceGod::Smoke::FeatureAudit
 		Probe("practice", PracticeProbes);
 		Probe("seats", SeatProbes);
 		Probe("diplomacy", DiplomacyProbes);
+		Probe("text", [] { TextEditProbes(Result); }); // US-T52
+		Probe("viewer", [] { ModelViewerProbes(Result, frames); }); // US-T53
 		Log(cs::Cat("AUDIT done: ", pass, " PASS, ", fail, " FAIL"));
 	}
 }
