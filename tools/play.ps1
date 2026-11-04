@@ -120,24 +120,38 @@ if ($Mode -eq 'coop-smoke') {
   # takes a station's seat through the picker, keeps it through a deliberate resync, flies a freighter's helm, trades at
   # Earth, takes a fighter's cockpit in a fight and uses its keys, takes the party to another star and has the host load
   # its quicksave (US-T43 on the C# track, US-T44 on the C++ track's), and says bye; both log a digest of the shared state every
-  # 60 frames and this script compares them. Logs: <Track>/Saved/Logs/CoopSmokeHost.log and CoopSmokeClient.log.
+  # 60 frames and this script compares them. Logs: <Track>/Saved/Logs/CoopSmokeHost-<run>.log and CoopSmokeClient-<run>.log.
+  # US-T47: each run has its own log names and a free UDP port of its own, and every instance it started is stopped on any
+  # way out (try/finally), so a host left over from an earlier run can neither be joined nor hold the logs.
   $cmd = Join-Path $engine 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
   $logs = Join-Path $project.DirectoryName 'Saved\Logs'
   New-Item -ItemType Directory -Force -Path $logs | Out-Null
-  $hostLog = Join-Path $logs 'CoopSmokeHost.log'
-  $clientLog = Join-Path $logs 'CoopSmokeClient.log'
-  Remove-Item -LiteralPath $hostLog, $clientLog -ErrorAction SilentlyContinue
+  $run = (Get-Date).ToString('yyyyMMdd-HHmmss') + '-' + $PID
+  $hostLog = Join-Path $logs "CoopSmokeHost-$run.log"
+  $clientLog = Join-Path $logs "CoopSmokeClient-$run.log"
+  # A free UDP port (Unreal's IpNetDriver): one no socket holds now, from a range away from the default 7777.
+  $port = $null
+  foreach ($candidate in (Get-Random -InputObject (17800..18799) -Count 50)) {
+    try { $u = New-Object System.Net.Sockets.UdpClient($candidate); $u.Close(); $port = $candidate; break } catch { }
+  }
+  if (-not $port) { throw 'co-op smoke: no free UDP port in 17800..18799' }
+  "co-op smoke: run $run on port $port; logs $hostLog, $clientLog"
+  $hostP = $null; $clientP = $null
+  $result = 1
+  try {
   $common = @('-game', '-nullrhi', '-nosound', '-unattended', '-nosplash', $coopNet)
-  $hostArgs = @("`"$($project.FullName)`"", '/Engine/Maps/Entry?listen') + $common + @('-SpaceGodCoopSmoke=host', "`"-abslog=$hostLog`"")
+  $hostArgs = @("`"$($project.FullName)`"", '/Engine/Maps/Entry?listen') + $common + @("-port=$port", '-SpaceGodCoopSmoke=host', "`"-abslog=$hostLog`"")
   # Not -WindowStyle (ShellExecute): CreateProcess, so the instances inherit the PATH with the private .NET SDK on it.
   $hostP = Start-Process -FilePath $cmd -PassThru -NoNewWindow -ArgumentList $hostArgs -RedirectStandardOutput "$hostLog.out"
   # The client starts once the host's app is up (two UnrealSharp startups at once contend for the managed build).
   $deadline = (Get-Date).AddMinutes(4)
   while (-not ((Test-Path -LiteralPath $hostLog) -and (Select-String -LiteralPath $hostLog -Pattern 'UnitySpaceApp up in' -Quiet))) {
-    if ($hostP.HasExited -or (Get-Date) -gt $deadline) { throw "The co-op host did not come up (see $hostLog)." }
+    if ($hostP.HasExited -or (Get-Date) -gt $deadline) {
+      throw "The co-op host did not come up (see $hostLog)."
+    }
     Start-Sleep -Seconds 2
   }
-  $clientArgs = @("`"$($project.FullName)`"", '127.0.0.1') + $common + @('-SpaceGodCoopSmoke=client', "`"-abslog=$clientLog`"")
+  $clientArgs = @("`"$($project.FullName)`"", "127.0.0.1:$port") + $common + @('-SpaceGodCoopSmoke=client', "`"-abslog=$clientLog`"")
   $clientP = Start-Process -FilePath $cmd -PassThru -NoNewWindow -ArgumentList $clientArgs -RedirectStandardOutput "$clientLog.out"
   $deadline = (Get-Date).AddMinutes(11)
   while (-not ($hostP.HasExited -and $clientP.HasExited)) {
@@ -188,8 +202,12 @@ if ($Mode -eq 'coop-smoke') {
   }
   "co-op smoke: syncs: $($syncs -join '; ')"
   foreach ($k in $checks.Keys) { "co-op smoke: $($k): $($checks[$k])" }
-  if (@($checks.Values | Where-Object { -not $_ }).Count -gt 0) { exit 1 }
-  exit 0
+  $result = if (@($checks.Values | Where-Object { -not $_ }).Count -gt 0) { 1 } else { 0 }
+  }
+  finally {
+    foreach ($p in @($hostP, $clientP)) { if ($p -and -not $p.HasExited) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } }
+  }
+  exit $result
 }
 
 if ($Mode -eq 'audit') {
