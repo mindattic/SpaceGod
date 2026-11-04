@@ -59,10 +59,10 @@ namespace
 		return Renderer ? static_cast<FRHIViewport*>(Renderer->GetViewportResource(*Window)) : nullptr;
 	}
 
-	FString GDisplayModes, GCurrentDisplayMode;
-	FAutoConsoleVariableRef GDisplayModesVar(TEXT("sg.DisplayModes"), GDisplayModes,
+	// Set through IConsoleVariable::Set (a string cvar's reference is not what GetString reads back).
+	FAutoConsoleVariable GDisplayModesVar(TEXT("sg.DisplayModes"), TEXT(""),
 		TEXT("The monitor's modes as sg.QueryDisplayModes last found them: \"W H NUM DEN\" per mode, ';' between (US-T56)"));
-	FAutoConsoleVariableRef GCurrentDisplayModeVar(TEXT("sg.CurrentDisplayMode"), GCurrentDisplayMode,
+	FAutoConsoleVariable GCurrentDisplayModeVar(TEXT("sg.CurrentDisplayMode"), TEXT(""),
 		TEXT("The monitor's desktop mode as sg.QueryDisplayModes last found it: \"W H NUM DEN\" (US-T56)"));
 
 	/// Screen.resolutions / Screen.currentResolution for the C# facade (UnityCompat/Imgui/Screen.cs): fills
@@ -70,9 +70,10 @@ namespace
 	void QueryDisplayModes()
 	{
 		void* Window = GameWindow();
-		GDisplayModes = SpaceGodDisplay::Format(SpaceGodDisplay::Modes(Window));
+		GDisplayModesVar->Set(*SpaceGodDisplay::Format(SpaceGodDisplay::Modes(Window)), ECVF_SetByCode);
 		FSpaceGodDisplayMode Current;
-		GCurrentDisplayMode = SpaceGodDisplay::CurrentMode(Window, Current) ? SpaceGodDisplay::Format({ Current }) : FString();
+		const FString Now = SpaceGodDisplay::CurrentMode(Window, Current) ? SpaceGodDisplay::Format({ Current }) : FString();
+		GCurrentDisplayModeVar->Set(*Now, ECVF_SetByCode);
 	}
 
 	FAutoConsoleCommand GQueryDisplayModesCmd(TEXT("sg.QueryDisplayModes"),
