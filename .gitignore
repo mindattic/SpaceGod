@@ -17,3 +17,9 @@ __pycache__/
 Builds/
 # Written by the cooker on every package.
 **/Build/Windows/FileOpenOrder/
+
+# .NET build output of the capture host and the vendored MindAttic.Capture (US-T72).
+Capture/**/bin/
+Capture/**/obj/
+Vendor/**/bin/
+Vendor/**/obj/

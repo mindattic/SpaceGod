@@ -6,7 +6,7 @@
 
 .DESCRIPTION
     1. git pull --rebase --autostash (skipped with -NoPull; a failed pull deploys the commit checked out).
-    2. Skips the rest when the deployed commit already matches every game source (Cpp, Shared; -Force rebuilds).
+    2. Skips the rest when the deployed commit already matches every game source (Cpp, Shared, Capture, Vendor; -Force rebuilds).
     3. Stops any running copy of the game.
     4. tools\package.ps1 -Configuration Shipping -> Builds\Cpp\Windows\SpaceGod.Unreal.Cpp.exe.
     5. Copies Builds\Cpp\Windows\* -> C:\Apps\SpaceGod.Unreal.Cpp\ and records the commit.
@@ -68,12 +68,12 @@ if (-not $NoPull) {
 $head = (git -C $repoDir rev-parse HEAD).Trim()
 
 # ── Up to date? ────────────────────────────────────────────────────────────────
-# Nothing the game is built from (Cpp, Shared) differs between the deployed commit and HEAD, and the tree has no
+# Nothing the game is built from (Cpp, Shared, Capture, Vendor) differs between the deployed commit and HEAD, and the tree has no
 # uncommitted change there: docs-only commits don't repackage. -Force skips this.
 $upToDate = $false
 if (-not $Force -and (Test-Path -LiteralPath (Join-Path $out $exeName)) -and (Test-Path -LiteralPath $marker)) {
     $deployed = (Get-Content -LiteralPath $marker -Raw).Trim()
-    git -C $repoDir diff --quiet $deployed -- Cpp Shared 2>$null
+    git -C $repoDir diff --quiet $deployed -- Cpp Shared Capture Vendor 2>$null
     $upToDate = $LASTEXITCODE -eq 0
 }
 if ($upToDate) {

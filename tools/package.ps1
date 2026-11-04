@@ -24,6 +24,7 @@ Steps:
  2. RunUAT BuildCookRun -platform=Win64 -clientconfig=<Configuration> -build -cook -stage -pak -archive.
     UBT runs with -WaitMutex (queued behind any other UE build) and -MaxParallelActions (default 4).
  3. Renames the launcher exe (see below).
+ 4. dotnet publish of the MindAttic.Capture host (Capture/SpaceGod.Capture) into <archive>/Capture/ (US-T72).
 
 Exe name. UE names a game exe after its target, and a target name is a C# class name, so it cannot contain dots:
 UAT writes <archive>/<Target>.exe, a small bootstrap launcher, plus the real game in
@@ -73,6 +74,15 @@ if (-not (Test-Path -LiteralPath $launcher)) { throw "BuildCookRun archived no l
 
 # 3. The exe name.
 Move-Item -LiteralPath $launcher -Destination $renamed -Force
+
+# 4. The MindAttic.Capture host (US-T72; Capture/README.md): built from Capture/SpaceGod.Capture and the vendored
+#    MindAttic.Capture sources, next to the package's Engine/ folder, where the game looks for Capture/capture.exe.
+#    Framework-dependent: it runs on the .NET 10 runtime the SDK that builds it installs.
+$captureProject = Join-Path $repo 'Capture\SpaceGod.Capture\SpaceGod.Capture.csproj'
+$captureOut = Join-Path $archive 'Capture'
+& dotnet publish $captureProject -c Release -r win-x64 --self-contained false -o $captureOut -nologo -v q '-p:GenerateDocumentationFile=false'
+if ($LASTEXITCODE) { throw "Publishing the capture host failed ($LASTEXITCODE)." }
+if (-not (Test-Path -LiteralPath (Join-Path $captureOut 'capture.exe'))) { throw "The capture host publish wrote no capture.exe in $captureOut." }
 }
 
 $size = (Get-ChildItem -LiteralPath $archive -Recurse -File | Measure-Object Length -Sum).Sum

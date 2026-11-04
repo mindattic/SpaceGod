@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The game's MindAttic.Capture host (US-T72). C++ can't load .NET, so on -capture the game starts this exe, hands it
+    its window and its command line, and drives it over stdin/stdout (Capture/README.md). It is built on the vendored
+    MindAttic.Capture sources (Vendor/MindAttic.Capture), so a fresh clone needs only the .NET SDK. tools/package.ps1
+    publishes it into the package's Capture/ folder; nothing built is committed.
+
+    AssemblyName "capture" and Product "MindAttic.Capture.Agent": the names MindAttic.Capture's internals and its
+    AgentLocator trust, so the engine hands a finished session to this same exe ("capture finalize") and the game
+    can exit at once, as with the installed agent.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <AssemblyName>capture</AssemblyName>
+    <RootNamespace>SpaceGod.Capture</RootNamespace>
+    <Product>MindAttic.Capture.Agent</Product>
+    <Version>1.0.0</Version>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Vendor\MindAttic.Capture\src\MindAttic.Capture.Windows\MindAttic.Capture.Windows.csproj" />
+  </ItemGroup>
+
+</Project>
