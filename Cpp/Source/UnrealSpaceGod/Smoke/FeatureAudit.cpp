@@ -1,5 +1,6 @@
 #include "Smoke/FeatureAudit.h"
 #include "Smoke/ScriptedDevice.h"
+#include "Smoke/FeatureAuditDisplay.h"
 #include "Smoke/FeatureAuditSettings.h"
 #include "Smoke/FeatureAuditEditing.h"
 
@@ -396,6 +397,7 @@ namespace SpaceGod::Smoke::FeatureAudit
 		pass = fail = 0;
 		Probe("audio", [] { AudioProbes(Result, frames); }); // US-T50
 		Probe("render", [] { RenderProbes(Result, frames); }); // US-T51
+		Probe("display", [] { MsaaProbes(Result, frames); DisplayModeProbes(Result, frames); }); // US-T55, US-T56
 		Probe("time", TimeProbes);
 		Probe("view", ViewProbes);
 		Probe("screens", ScreenProbes);

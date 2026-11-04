@@ -30,6 +30,7 @@ namespace Unity.SpaceGod.Audit
             pass = fail = 0;
             Probe("audio", () => SettingsAudit.Audio(Result, frames)); // US-T50
             Probe("render", () => SettingsAudit.Render(Result, frames)); // US-T51
+            Probe("display", () => { DisplayAudit.Msaa(Result, frames); DisplayAudit.Modes(Result, frames); }); // US-T55, US-T56
             Probe("time", Time);
             Probe("view", View);
             Probe("screens", Screens);

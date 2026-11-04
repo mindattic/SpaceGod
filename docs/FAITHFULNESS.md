@@ -72,6 +72,7 @@ then and had identical toasts.
 | helm.ftl-engage / lane-reenter / phasers / run-hot / lock (INFO) | Enter; Y; Insert; Shift+Insert; T | same on both | same on both |
 | seats.man-gun / back-to-command / take-charge | `/`; P; `'` | ✓R | ✓R |
 | diplomacy.hail | F12 | ✓R | ✓R |
+| render.msaa / display.modes / display.exclusive-rate (US-T55, US-T56) | Settings > MSAA off/on; Display page; Apply exclusive at the largest size | ✓R | ✓R |
 
 Before the audit settles on the camera's own pace, it can catch the camera mid-flight: in the first C++ run,
 nav.home and nav.number-focus read `Travel` because only 30 frames had passed. That was a probe artefact, not a port
@@ -206,9 +207,9 @@ Sources: **CH** = ControlsHelp binding, **GM** = GameManual chapter, **US** = U.
 | Feature | Source | C++ | C# | Notes |
 |---|---|---|---|---|
 | Settings registry and page (U.SPC-T431) | US, V | ✓R | ✓R | smoke: pause > Settings |
-| Display: aspect, resolution, window mode, VSync (U.SPC-T276, T284) | US | ≠ | ≠ | every mode listed at 60 Hz (**US-T56**) |
+| Display: aspect, resolution, window mode, VSync (U.SPC-T276, T284) | US | ✓R | ✓R | the monitor's modes at their real refresh rates (DXGI), exclusive fullscreen switched to the chosen rate (US-T56); audit display.modes, display.exclusive-rate |
 | Frame cap | GM "Settings" | ✓C | ✓C | t.MaxFPS on both |
-| MSAA setting | GM "Settings" | ≠ | ≠ | drives FXAA on both (**US-T55**) |
+| MSAA setting | GM "Settings" | ✓R | ✓R | 4x MSAA on the forward renderer, Unity's 1.4-px MSAA lines (US-T55); audit render.msaa; an orbit line's light per column: original 0.201, C++ 0.199, C# 0.198 (FXAA was 0.071) |
 | Render pipeline choice, HDRP options, URP post-processing (U.SPC-T429-T431, T451) | US | ≠ | ≠ | both: the same 20 settings in Settings > Render pipeline, kept per profile, the URP look on Unreal's post-process (exposure and the physical camera as a colour gain, bloom, the tone curve, grading, the star glare); the pipeline choice kept but restarting nothing and HDRP's options kept only, as Unreal has one renderer (US-T51); audit render.*: 21 rows, identical on both tracks |
 | Master volume | GM "Settings" | ✓R | ✓R | on Unreal's primary volume (US-T50); audit audio.volume |
 
@@ -250,8 +251,8 @@ The 88 rows of the checklist above (a row with two marks, such as `✓R / ✓C`,
 
 | Track | ✓R | ✓C | ✗ | ≠ |
 |---|---|---|---|---|
-| C++ | 64 | 19 | 0 | 5 |
-| C# | 71 | 14 | 0 | 3 |
+| C++ | 66 | 19 | 0 | 3 |
+| C# | 73 | 14 | 0 | 1 |
 
 Binding audit: 47 PASS, 0 FAIL on each track.
 
@@ -264,8 +265,8 @@ Binding audit: 47 PASS, 0 FAIL on each track.
 | US-T52 | C++ | GUI.TextField has no TextEditor (caret, selection, clipboard) |
 | US-T53 | C++ | the model viewer camera's depth and culling mask are not rendered |
 | US-T54 | C# | IMGUI text clipped by whole glyphs; icons without mips (fixed: Slate overlay, mip chain) |
-| US-T55 | both | MSAA setting is FXAA (deferred renderer) |
-| US-T56 | both | display modes all at 60 Hz |
+| US-T55 | both | MSAA setting is FXAA (deferred renderer) (fixed: forward renderer, 4x MSAA, MSAA line width) |
+| US-T56 | both | display modes all at 60 Hz (fixed: DXGI's modes and rates, the rate set in exclusive fullscreen) |
 | US-T57 | both | Light components data only, glTF without PBR, default skin approximated (fixed: Lights on URP Lit, M_Lit, Unity's GameSkin) |
 
 ## US-T57: the model viewer against the original player

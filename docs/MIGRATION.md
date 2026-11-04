@@ -430,7 +430,7 @@ three differences US-T38 left were all the C# track's:
 - *Two more found by the diff*: the C# lines drew dashed (UProceduralMeshComponent keeps UVs at half precision and
   M_Line's other end lives in TexCoord1/2, so an end millions of units out overflowed and its segment vanished; a line-only
   mesh is now divided by a power of two and its component scaled back up); and the C++ track used Unreal's default TSR,
-  which smeared the one-pixel stars into soft blobs, where the original and the C# track draw them crisp: both use FXAA.
+  which smeared the one-pixel stars into soft blobs: both used FXAA then, 4x MSAA since US-T55 (below).
 
 Pixels differing (> 24/255) between `cpp-*` and `csharp-*`, before (US-T38's shots, wall-clock) and after:
 
@@ -447,9 +447,26 @@ Pixels differing (> 24/255) between `cpp-*` and `csharp-*`, before (US-T38's sho
 Left after US-T45: text was drawn by Slate (C++) and by Canvas from a whole-point font (C#), so glyph edges and some
 advances differed by a pixel (C# ran about 1% narrower, which could move a wrap). US-T54 draws the C# GUI through the same
 Slate text, measure and clipping zones as the C++ track, so screens of GUI alone now match within a few hundred pixels;
-what remains in the HUD, market and pause shots is world labels and orbit lines over the scene. One-pixel lines are
-aliased on both tracks (FXAA; the original's MSAA would need the forward renderer).
+what remains in the HUD, market and pause shots is world labels and orbit lines over the scene.
 The C# asteroid belt and ship detail are US-T40's.
+
+**MSAA (US-T55).** The original draws with URP's 4x MSAA (`UnitySpace_URP.asset` `m_MSAA: 4`; `render.msaa` sets the
+camera's `allowMSAA`), which both tracks had as FXAA because Unreal's MSAA is the forward renderer's. Both projects now
+render forward (`Config/DefaultEngine.ini`: `r.ForwardShading`, `r.AntiAliasingMethod=3`, `r.MSAACount=4`): every
+SpaceGodRender material is unlit (M_Lit included: it lights itself from Unity's Light data), nothing reads the GBuffer, and
+the game uses no engine lights, fog, decals or Lumen, so nothing needed the deferred path; the shaders recompiled once and
+every shot draws as before apart from the edges. `render.msaa` on is `r.AntiAliasingMethod 3` with 4 samples, off is no
+anti-aliasing with 1 (both backends' `SetMsaa`). The original player's own capture (`Builds/Windows -capture`) shows
+what its MSAA does to Unity's hardware primitives: a point is a 1x1 quad whose coverage spreads over up to four pixels,
+and a line is Direct3D's MSAA line, a 1.4-pixel-wide quad (coverage in quarters over two or three pixels a column). The
+stars are already quads; M_Line's ribbon is now 1.4 px wide under MSAA and 1 px without (`ShaderBinding.LineWidthPx`,
+`_LineWidthPx` on every M_Line instance; the C# track through `sg.SetLineWidthPx`). The same orbit line in the HUD shot,
+its light per column (linear, background removed), averaged over 200 columns: original 0.201, C++ 0.199, C# 0.198; with
+FXAA it was 0.071 on both. Both tracks' shots after: views-sol identical (0 px), ui-hud 1.12%, ui-market-cargo 1.15%,
+ui-main-menu 0.45%, ui-pause-menu 0.22%, ui-galaxy-map 0.02%, ui-help 0.01%.
+Nothing else moves with the renderer: the C# fidelity shots of one build with `r.ForwardShading` on and off (an
+`-ini:Engine` override) draw the model viewer's backdrop at the same 38/41/47 (so the lift against the original's
+13/15/23 is not the renderer's), and the game view's sky is unchanged (median 19/19/16 in the HUD shot before and after).
 
 ## C# track
 
@@ -607,7 +624,8 @@ SliderHandler (the thumb is ThumbSize plus the visible part, inside the track's 
 The text field is Unity's TextEditor (US-T40): cursor and selection, click/double-click/triple-click/shift-click/drag,
 arrows, Home/End, Ctrl word moves and deletes, Ctrl+A/C/X/V on the Windows clipboard, the cursor kept in view, with
 OS-style key repeat; not ported: IME composition and undo (Unity's TextField has no undo either).
-Unreal reports no refresh rates, so every display mode lists as 60 Hz. Slate's Arial advances at fractional sizes
+The display modes are the monitor's own (DXGI, `SpaceGodDisplayModes`, US-T56), each at each of its refresh rates, and
+exclusive fullscreen switches the monitor to the rate chosen, as Unity's `Screen.SetResolution` does. Slate's Arial advances at fractional sizes
 can differ by a pixel from Unity's hinted ones, so a line that just fitted in Unity can wrap here (seen once, on the
 Opportunities card). Cargo, outfitting and the other piloting panels draw only once a hull is flown; the smoke opens
 them without one, so it proves they run, not their full content.
@@ -668,7 +686,7 @@ Core/Persistence, same `LocalSession` command path for seats (the co-op seam).
 ShipThumbnails}.cs` are the **original source**, byte for byte, except `AssetStreamer.cs` (its local `Object` alias is
 global in this port, `UnityCompat/GlobalUsings.cs`). `Rendering/RenderBackend.cs` keeps the original's interface and types;
 URP/HDRP (`Pipeline/`) become one `UnrealRenderBackend`: the game's LDR, no-post-process look as camera post-process
-settings (manual exposure 0 EV, ToneCurveAmount 0, ExpandGamut 0, no bloom/motion blur; FXAA, which keeps 1-px lines).
+settings (manual exposure 0 EV, ToneCurveAmount 0, ExpandGamut 0, no bloom/motion blur; 4x MSAA on the forward renderer, US-T55).
 The facade does the engine work (`UnityCompat/`):
 
 - **Renderers → primitives.** `UnityBridge.Sync` gives every enabled, active `MeshRenderer` a `UProceduralMeshComponent`

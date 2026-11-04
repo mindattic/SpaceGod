@@ -9,6 +9,7 @@
 #include "Materials/MaterialParameterCollection.h"
 #include "Materials/MaterialParameterCollectionInstance.h"
 #include "UObject/StrongObjectPtr.h"
+#include "UObject/UObjectIterator.h"
 
 #include <unordered_map>
 
@@ -133,9 +134,36 @@ namespace SpaceGod::UnityCompat
 		return Color(f(c.r), f(c.g), f(c.b), c.a);
 	}
 
+	namespace
+	{
+		float lineWidthPx = 1.0f;
+
+		UMaterialInterface* LineParent()
+		{
+			// Never destroyed, as Parents(): kept loaded, and not released in static destruction.
+			static auto& line = *new TStrongObjectPtr<UMaterialInterface>(LoadObject<UMaterialInterface>(nullptr,
+				*FString::Printf(TEXT("%s/M_Line.M_Line"), UTF8_TO_TCHAR(ShaderBinding::MaterialRoot)), nullptr, LOAD_NoWarn | LOAD_Quiet));
+			return line.Get();
+		}
+
+		const FName LineWidthParam(TEXT("_LineWidthPx"));
+	}
+
+	float ShaderBinding::LineWidthPx() { return lineWidthPx; }
+
+	void ShaderBinding::SetLineWidthPx(float width)
+	{
+		lineWidthPx = width;
+		UMaterialInterface* line = LineParent();
+		if (!line) return;
+		for (TObjectIterator<UMaterialInstanceDynamic> it; it; ++it)
+			if (it->Parent == line) it->SetScalarParameterValue(LineWidthParam, width);
+	}
+
 	void ShaderBinding::Push(const MaterialProperties& properties, UMaterialInstanceDynamic* mid)
 	{
 		if (!mid) return;
+		if (mid->Parent && mid->Parent == LineParent()) mid->SetScalarParameterValue(LineWidthParam, lineWidthPx); // US-T55
 		for (const auto& [name, v] : properties.All())
 		{
 			switch (v.kind)

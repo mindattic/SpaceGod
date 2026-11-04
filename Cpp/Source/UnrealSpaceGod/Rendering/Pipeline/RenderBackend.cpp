@@ -4,6 +4,7 @@
 #include "Rendering/RenderPipelineProfiles.h"
 #include "Settings/GameSetting.h"
 #include "UnityCompat/UnityScene.h"
+#include "UnityCompat/ShaderBinding.h"
 
 #include "Engine/PostProcessVolume.h"
 #include "HAL/IConsoleManager.h"
@@ -152,14 +153,15 @@ namespace SpaceGod::Rendering
 	void UnrealRenderBackend::SetupCamera(Camera* camera, CameraRole role)
 	{
 		NeutralRenderBackend::SetupCamera(camera, role);
-		// US-T45, the C# track's UnrealRenderBackend.SetCvars: FXAA, not the engine's default TSR, which smeared the
-		// one-pixel stars into soft blobs (the original's are crisp single pixels, as the C# track's are); the rest
-		// of the engine-wide look the C# track sets is the post-process volume's below.
+		// US-T45/T55, the C# track's UnrealRenderBackend.SetCvars: the original's 4x MSAA (the forward renderer's), not the
+		// engine's default TSR, which smeared the one-pixel stars into soft blobs; the rest of the engine-wide look the C#
+		// track sets is the post-process volume's below.
 		static bool cvarsSet = false;
 		if (!cvarsSet)
 		{
 			cvarsSet = true;
-			SetCVar(TEXT("r.AntiAliasingMethod"), 1);
+			SetCVar(TEXT("r.MSAACount"), 4);
+			SetCVar(TEXT("r.AntiAliasingMethod"), 3);
 		}
 		if (role != CameraRole::Main) return;
 		mainSetUp = true;
@@ -169,7 +171,12 @@ namespace SpaceGod::Rendering
 	void UnrealRenderBackend::SetMsaa(Camera* camera, bool on)
 	{
 		NeutralRenderBackend::SetMsaa(camera, on);
-		SetCVar(TEXT("r.AntiAliasingMethod"), on ? 1 : 0);
+		// US-T55: as the original's URP asset (m_MSAA: 4) with the camera's allowMSAA: 4x MSAA on, none off (MSAA is the
+		// forward renderer's: Config/DefaultEngine.ini r.ForwardShading). Unity's hardware lines are 1.4-pixel quads under
+		// MSAA, one pixel without (ShaderBinding::SetLineWidthPx); its points stay 1x1.
+		SetCVar(TEXT("r.MSAACount"), on ? 4 : 1);
+		SetCVar(TEXT("r.AntiAliasingMethod"), on ? 3 : 0);
+		UnityCompat::ShaderBinding::SetLineWidthPx(on ? 1.4f : 1.0f);
 	}
 
 	void UnrealRenderBackend::SetPostProcessing(Camera* camera, const PostProcessLook& value)

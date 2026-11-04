@@ -55,8 +55,15 @@ namespace SpaceGod::UnityCompat
 		/// Unreal draws nothing but triangles: how a sub-mesh of this topology is laid out.
 		static MeshLayout LayoutFor(MeshTopology topology);
 
-		/// Pushes Unity properties into a material instance by their Unity names.
+		/// Pushes Unity properties into a material instance by their Unity names (an M_Line instance also gets
+		/// LineWidthPx as _LineWidthPx).
 		static void Push(const MaterialProperties& properties, UMaterialInstanceDynamic* mid);
+
+		/// The width M_Line draws a line's ribbon at, in pixels (US-T55). Unity's lines are Direct3D hardware lines: with
+		/// MSAA on, Direct3D rasterises a line as a 1.4-pixel-wide quad sampled per sample; without it, one pixel per step
+		/// (the 1-pixel ribbon). SetLineWidthPx also sets it on every live M_Line instance.
+		static float LineWidthPx();
+		static void SetLineWidthPx(float width);
 
 		/// The globals collection (Shader.SetGlobalVector's), or null until the plugin has it.
 		static UMaterialParameterCollection* Globals();

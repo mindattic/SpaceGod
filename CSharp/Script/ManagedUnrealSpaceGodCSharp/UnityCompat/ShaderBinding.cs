@@ -104,9 +104,24 @@ namespace UnityEngine
             }
         }
 
+        /// <summary>
+        /// The width M_Line draws a line's ribbon at, in pixels (US-T55). Unity's lines are Direct3D hardware lines: with
+        /// MSAA on, Direct3D rasterises a line as a 1.4-pixel-wide quad sampled per sample; without it, one pixel per step
+        /// (the 1-pixel ribbon). <see cref="SetLineWidthPx"/> sets it for every live line instance as well.
+        /// </summary>
+        public static float LineWidthPx { get; private set; } = 1f;
+
+        public static void SetLineWidthPx(float width)
+        {
+            LineWidthPx = width;
+            try { SystemLibrary.ExecuteConsoleCommand("sg.SetLineWidthPx " + width.ToString("R", System.Globalization.CultureInfo.InvariantCulture)); }
+            catch (Exception) { } // no engine to ask
+        }
+
         /// <summary>Pushes <paramref name="m"/>'s values into its Unreal instance.</summary>
         internal static void Push(Material m, UMaterialInstanceDynamic mid)
         {
+            if (ShaderName(m.shader) == "Line") mid.SetScalarParameterValue(new FName("_LineWidthPx"), LineWidthPx);
             foreach (var kv in m.Floats) mid.SetScalarParameterValue(new FName(kv.Key), kv.Value);
             foreach (var kv in m.Vectors) mid.SetVectorParameterValue(new FName(kv.Key), ToUnreal(kv.Key, kv.Value, m.ColorNames.Contains(kv.Key)));
             foreach (var kv in m.Textures)

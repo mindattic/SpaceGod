@@ -213,7 +213,7 @@ namespace Unity.SpaceGod.Rendering
         {
             if (cvarsSet || !UnityBridge.HasHost) return;
             cvarsSet = true;
-            foreach (var cmd in new[] { "r.AntiAliasingMethod 1", "r.DefaultFeature.AutoExposure 0", "r.DefaultFeature.Bloom 0", "r.DefaultFeature.MotionBlur 0" })
+            foreach (var cmd in new[] { "r.MSAACount 4", "r.AntiAliasingMethod 3", "r.DefaultFeature.AutoExposure 0", "r.DefaultFeature.Bloom 0", "r.DefaultFeature.MotionBlur 0" })
             {
                 try { SystemLibrary.ExecuteConsoleCommand(cmd); }
                 catch (Exception e) { Debug.LogWarning("[Unity.SpaceGod] " + cmd + ": " + e.Message); }
@@ -232,9 +232,17 @@ namespace Unity.SpaceGod.Rendering
         public override void SetMsaa(Camera camera, bool on)
         {
             base.SetMsaa(camera, on);
-            // MSAA is a forward-renderer feature in Unreal; the deferred path's nearest is FXAA (on) or none (off).
-            if (UnityBridge.HasHost) SystemLibrary.ExecuteConsoleCommand(on ? "r.AntiAliasingMethod 1" : "r.AntiAliasingMethod 0");
+            // US-T55: as the original's URP asset (m_MSAA: 4) with the camera's allowMSAA: 4x MSAA on, none off. Unreal's
+            // MSAA is the forward renderer's (Config/DefaultEngine.ini r.ForwardShading). Unity's hardware lines are
+            // 1.4-pixel quads under MSAA, one pixel without (ShaderBinding.LineWidthPx); its points stay 1x1.
+            if (!UnityBridge.HasHost) return;
+            foreach (var cmd in MsaaCommands(on)) SystemLibrary.ExecuteConsoleCommand(cmd);
+            ShaderBinding.SetLineWidthPx(on ? 1.4f : 1f);
         }
+
+        /// <summary>The cvars render.msaa sets: r.AntiAliasingMethod 3 (MSAA) with r.MSAACount 4, or no anti-aliasing.</summary>
+        static string[] MsaaCommands(bool on) =>
+            on ? new[] { "r.MSAACount 4", "r.AntiAliasingMethod 3" } : new[] { "r.MSAACount 1", "r.AntiAliasingMethod 0" };
 
         public override void SetPostProcessing(Camera camera, PostProcessLook value)
         {
