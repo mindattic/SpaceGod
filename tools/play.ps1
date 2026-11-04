@@ -37,6 +37,7 @@ quits; the log is <Track>/Saved/Logs/<project>.log. Both tracks log the same lin
   ./tools/play.ps1 -Track CSharp -Mode coop-smoke # headless: a host and a client on localhost, their digests compared
   ./tools/play.ps1 -Track Cpp -Mode coop-smoke    # the C++ track's same co-op smoke (US-T44)
   ./tools/play.ps1 -Track Cpp -Mode coop-smoke -PackageDir Builds/Cpp/Windows # the same from a package, Shipping too (US-T64)
+  ./tools/play.ps1 -Track CSharp -Mode coop-smoke -PackageDir Builds/CSharp/Windows # the C# track's from a package (US-T67)
   ./tools/play.ps1 -Track CSharp -Mode audit     # headless: the smoke, then a probe per binding, PASS/FAIL each (US-T48)
 #>
 
@@ -133,8 +134,8 @@ if ($Mode -eq 'coop-smoke') {
   # way out (try/finally), so a host left over from an earlier run can neither be joined nor hold the logs.
   # US-T64: -PackageDir runs a package's own game exe (not its launcher, which returns at once) with no project argument.
   # A Shipping build logs nothing, so each instance also writes its co-op lines to a file of their own
-  # (-SpaceGodCoopLog=CoopSmoke<Host|Client>-<run>.coop.log, C++ track) and the checks read those. A Shipping build also
-  # ignores -ini: overrides; the C++ track's net rates are in Config/DefaultEngine.ini.
+  # (-SpaceGodCoopLog=CoopSmoke<Host|Client>-<run>.coop.log; the C# track's since US-T67) and the checks read those. A Shipping
+  # build also ignores -ini: overrides; both tracks' net rates are in <Track>/Config/DefaultEngine.ini.
   $cmd = Join-Path $engine 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
   $projectArg = @("`"$($project.FullName)`"")
   $logs = Join-Path $project.DirectoryName 'Saved\Logs'
@@ -198,8 +199,7 @@ if ($Mode -eq 'coop-smoke') {
     }
     Start-Sleep -Seconds 2
   }
-  # A package's lines are read from its co-op logs (a Shipping build writes no other; the C# track's package writes none, and
-  # keeps its full log).
+  # A package's lines are read from its co-op logs (a Shipping build writes no other; either track's, US-T67 for C#).
   if ($PackageDir) {
     if (Test-Path -LiteralPath $hostCoopLog) { $hostLog = $hostCoopLog }
     if (Test-Path -LiteralPath $clientCoopLog) { $clientLog = $clientCoopLog }

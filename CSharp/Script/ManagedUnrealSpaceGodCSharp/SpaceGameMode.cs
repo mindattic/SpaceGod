@@ -34,9 +34,31 @@ public partial class ASpaceGameMode : AGameModeBase
     UnrealHost? host;
     ScriptedInputDevice? script;
 
+    // US-T67 (the C++ track's US-T64): -CoopHost / -CoopJoin=<address> launch co-op once, from the first standalone start.
+    static bool coopLaunched;
+
     public override void BeginPlay()
     {
         base.BeginPlay();
+        // US-T67: co-op from the command line in every build. A Shipping game ignores a map URL on its command line
+        // (UGameInstance::StartGameInstance: no "?listen", no "<host ip>") and has no console for "open <host ip>", so
+        // -CoopHost reopens this project's one map (GameDefaultMap) as a listen server, as the URL's "?listen" does, and
+        // -CoopJoin=<address> connects to a host; each once (a client whose host has gone comes back here and stays).
+        if (!coopLaunched && SystemLibrary.IsStandalone())
+        {
+            coopLaunched = true;
+            string? joinAt = Bootstrap.CommandLineValue("-CoopJoin");
+            if (!string.IsNullOrEmpty(joinAt))
+            {
+                UGameplayStatics.OpenLevel(new UnrealSharp.Core.FName(joinAt), true);
+                return;
+            }
+            if (Bootstrap.HasCommandLineFlag("-CoopHost"))
+            {
+                UGameplayStatics.OpenLevel(new UnrealSharp.Core.FName("/Engine/Maps/Entry"), true, "listen");
+                return;
+            }
+        }
         // The views on their own (US-T27, tools/play.ps1 -Mode views / shot): Sol's views built without the app.
         if (Bootstrap.HasCommandLineFlag("-SpaceGodViews") || ShotPath() != null)
         {
@@ -87,6 +109,9 @@ public partial class ASpaceGameMode : AGameModeBase
             UnrealLogger.Log(Log, $"UnitySpaceApp up in {started.ElapsedMilliseconds} ms: {app.Galaxy.Systems.Count} systems, " +
                 $"{app.Catalog.Count} bodies in {app.ActiveSystem.Name}, {app.Fleet.Ships.Count} ships (.NET {Environment.Version})");
 
+        // US-T67: and in the co-op log, so a packaged host (-SpaceGodCoopLog; Shipping logs nothing) says it is up too.
+        if (CoopSmoke.Active && app != null && CoopPeer.Current?.IsHost == true)
+            CoopPeer.Log($"host app up: {app.Galaxy.Systems.Count} systems, {app.Fleet.Ships.Count} ships");
         if (CoopSmoke.Active && app != null) UnityEngine.Application.targetFrameRate = 60; // US-T39: the co-op smoke's pace
 
         if (smoke)

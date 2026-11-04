@@ -80,8 +80,56 @@ namespace Unity.SpaceGod.Coop
         /// <summary>The host reloads the save it sends (default), so every peer starts from the same loaded bytes.</summary>
         public bool HostReloads { get; set; } = true;
 
-        public static void Log(string message) => UnrealLogger.Log(LogCategory, "SpaceGodCoop: " + message);
-        public static void Warn(string message) => UnrealLogger.Log(LogCategory, "SpaceGodCoop: " + message, ELogVerbosity.Warning);
+        public static void Log(string message)
+        {
+            UnrealLogger.Log(LogCategory, "SpaceGodCoop: " + message);
+            ToCoopLog("Display", message);
+        }
+
+        public static void Warn(string message)
+        {
+            UnrealLogger.Log(LogCategory, "SpaceGodCoop: " + message, ELogVerbosity.Warning);
+            ToCoopLog("Warning", message);
+        }
+
+        // US-T67 (the C++ track's US-T64): -SpaceGodCoopLog=<file> writes every co-op line to a file of its own as well, in the
+        // log's own line format ([time][frame]LogSpaceGod: <verbosity>: SpaceGodCoop: ...). A Shipping build logs nothing
+        // (UE_LOG, which UnrealLogger calls, is compiled out), so this is how tools/play.ps1 -Mode coop-smoke -PackageDir reads
+        // a packaged host's and client's lines.
+        static readonly object coopLogLock = new object();
+        static System.IO.StreamWriter coopLog;
+        static bool coopLogOpened;
+
+        static void ToCoopLog(string verbosity, string message)
+        {
+            lock (coopLogLock)
+            {
+                if (!coopLogOpened)
+                {
+                    coopLogOpened = true;
+                    string path = Bootstrap.CommandLineValue("-SpaceGodCoopLog");
+                    if (!string.IsNullOrEmpty(path))
+                    {
+                        try
+                        {
+                            var dir = System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(path));
+                            if (!string.IsNullOrEmpty(dir)) System.IO.Directory.CreateDirectory(dir);
+                            var stream = new System.IO.FileStream(path, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.ReadWrite);
+                            coopLog = new System.IO.StreamWriter(stream, new System.Text.UTF8Encoding(false)) { AutoFlush = true, NewLine = "\r\n" };
+                        }
+                        catch (Exception e)
+                        {
+                            UnrealLogger.Log(LogCategory, "SpaceGodCoop: could not open -SpaceGodCoopLog=" + path + ": " + e.Message, ELogVerbosity.Warning);
+                        }
+                    }
+                }
+                if (coopLog == null) return;
+                int frame = 0;
+                try { frame = UnityEngine.Time.frameCount % 1000; } catch { }
+                coopLog.WriteLine("[" + DateTime.Now.ToString("yyyy.MM.dd-HH.mm.ss:fff", System.Globalization.CultureInfo.InvariantCulture) + "][" +
+                    frame.ToString(System.Globalization.CultureInfo.InvariantCulture).PadLeft(3) + "]LogSpaceGod: " + verbosity + ": SpaceGodCoop: " + message);
+            }
+        }
 
         CoopPeer(bool host, string name)
         {

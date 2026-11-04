@@ -39,6 +39,8 @@ namespace Unity.SpaceGod.Coop
         static string warpBefore;
         static long fighterFrom = -1, travelFrom = -1, loadFrom = -1;
         static FighterSeat fighter;
+        static bool fighterHeld;
+        static int fighterRetakes;
         static Faction speaker; // US-T47
         static Ship hailed;
         static string productionBefore;
@@ -137,6 +139,20 @@ namespace Unity.SpaceGod.Coop
             if (Waits(680, bodySelected, "the selection", peer)) return;
             if (Waits(1040, app.Piloted.IsNone, "the freighter's helm handed back", peer)) return;
             if (Waits(1340, app.Piloted.Ship != null, "the carrier's helm", peer)) return;
+            // US-T67: a fighter shot down under the client before its keys (a Shipping run: 44 frames after the take) leaves no
+            // cockpit to wait for; the client takes another, a few times at most.
+            if (fighter != null && replayed < fighterFrom + 100)
+            {
+                if (app.Seat is FighterSeat) fighterHeld = true;
+                else if (fighterHeld && fighterRetakes < 3)
+                {
+                    CoopPeer.Log("smoke: client lost the cockpit of " + fighter.Name + " before its keys at frame " + peer.Frame + "; takes another");
+                    fighter = null;
+                    fighterHeld = false;
+                    fighterRetakes++;
+                    fighterFrom = replayed + 1;
+                }
+            }
             if (fighter != null && Waits(fighterFrom + 60, app.Seat is FighterSeat, "the fighter's cockpit", peer)) return;
             if (Waits(1760, app.Seat == null, "the fighter's cockpit handed back", peer)) return;
             if (Waits(2050, travelTo == null || app.ActiveSystem == travelTo, "the party's trip", peer)) return;

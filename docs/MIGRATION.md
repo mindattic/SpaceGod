@@ -1128,6 +1128,20 @@ and `Cs.h` is compiled into `UnrealSpaceGod` too, which is not `/fp:precise`, wh
 folded it to false, so `SpaceCamera::FocusOn` took `FocusSelected`'s NaN ("no framing given") for a framing. `IsNaNFast`
 now tests the bits, as `IsInfFast` and `IsFiniteFast` already did (the Core, `/fp:precise`, gets the same answers).
 
+**US-T67: the C# track's package plays co-op too.** The same three Shipping gaps, closed in the C# track's own layers
+with the same names: `-CoopHost` and `-CoopJoin=<address>` host and join in every build (`ASpaceGameMode.BeginPlay`,
+once, from the first standalone start: `UGameplayStatics.OpenLevel` of the project's one map with `listen`, or of the
+host's address); the raised net rates are in `CSharp/Config/DefaultEngine.ini`; and `CoopPeer.Log` / `Warn` also write
+every co-op line to `-SpaceGodCoopLog=<file>` in the log's own line format (UnrealSharp's `UnrealLogger` is `UE_LOG`,
+compiled out of Shipping), where the smoke host also says `host app up` for `tools/play.ps1` to start the client on. The
+C# track had no NaN counterpart to fix (.NET's `double.IsNaN` is not folded). `tools/play.ps1 -Mode coop-smoke -Track
+CSharp -PackageDir <dir>` already read either track's package and logs; `/SpaceGodRender` is cooked since US-T61. One
+Shipping run passed 14 of 15: the interceptor whose cockpit the client took was shot down 44 frames later, before its
+keys at +60, so the script waited 3,600 frames for a cockpit that was gone (no co-op fault: every digest identical, the
+host had applied the take and the loss). The C# script now takes another fighter when the cockpit it held is lost before
+its keys (`smoke: client lost the cockpit of ...`, three times at most). Since then 15 of 15 in 3 Development and 3
+Shipping package runs (54-55 digests each, all identical; the client at most 163-198 frames behind the host).
+
 **Not co-op yet**, after this: nothing the player does writes the Core outside the frames that the smoke or a read of
 the ported app has found; seats in a fight retaken by position and `-CoopNoHostReload` stay as above.
 
