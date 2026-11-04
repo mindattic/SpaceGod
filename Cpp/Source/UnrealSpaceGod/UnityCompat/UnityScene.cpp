@@ -17,6 +17,8 @@
 #include "UObject/StrongObjectPtr.h"
 #include "UObject/WeakObjectPtrTemplates.h"
 
+#include <array>
+
 namespace SpaceGod::UnityCompat
 {
 	namespace US = SpaceGod::UnrealSpace;
@@ -61,7 +63,36 @@ namespace SpaceGod::UnityCompat
 		{
 			FDynamicMesh3 Mesh;
 			int Sections = 0;
+			/// US-T62: a mesh rebuilt every frame with the same triangles (the hyperlanes, the shield rings, the battle
+			/// effects) keeps its Unreal topology and only takes the new vertex values (Refill). Src is the Unity vertex
+			/// each Unreal vertex was made from (-1 / -2: the explicit bounds' min / max corner); the rest is what the
+			/// topology was built from.
+			std::vector<int> Src;
+			int SrcVertexCount = -1;
+			std::vector<UnityCompat::Mesh::SubMesh> SrcSubMeshes;
+			bool SrcExplicitBounds = false;
+			/// Only triangles and quads (points and lines make their own corners from the vertex values).
+			bool Refillable = false;
+			/// This conversion's topology, unique across meshes (a renderer's component holds the one it was given).
+			uint64_t Topology = 0;
+			/// Whether Mesh holds the values of the mesh's EngineVersion (a refill reaches it only when it is copied).
+			bool Current = false;
+			/// Against the version before (MaskFrom): whether the streams the normals and the uvs are made from are the
+			/// same (a component holding MaskFrom then keeps those as they are). The snapshot is the last version's.
+			uint64_t MaskFrom = 0;
+			bool NormalsSame = false, UvsSame = false;
+			std::vector<Vector3> SnapNormals;
+			std::vector<Vector4> SnapUv[4];
+			bool SnapRawUv0 = false;
+
+			void Snapshot(const UnityCompat::Mesh& mesh)
+			{
+				SnapNormals = mesh.Normals;
+				for (int l = 0; l < 4; l++) SnapUv[l] = mesh.Uv[l];
+				SnapRawUv0 = mesh.RawUv0;
+			}
 		};
+		uint64_t TopologySerial = 0;
 
 		/// A material's instance of its SpaceGodRender material.
 		struct MaterialHandle final : NativeHandle
@@ -78,6 +109,8 @@ namespace SpaceGod::UnityCompat
 			bool Imported = false;
 			const Mesh* Drawn = nullptr;
 			uint64_t DrawnVersion = 0;
+			/// The MeshHandle::Topology the component's mesh has (US-T62).
+			uint64_t DrawnTopology = 0;
 			bool Visible = false;
 			std::vector<ExitSafeStrong<UMaterialInstanceDynamic>> BlockMids;
 			std::vector<std::pair<const Material*, uint64_t>> BlockPushed;
@@ -121,6 +154,8 @@ namespace SpaceGod::UnityCompat
 				FVector3f N;
 				FVector4f C;
 				FVector2f Uv[4];
+				/// The Unity vertex it was made from (US-T62's refill).
+				int Src = -1;
 			};
 			std::vector<V> Vertices;
 
@@ -172,6 +207,25 @@ namespace SpaceGod::UnityCompat
 			}
 		};
 
+		/// Unity vertex i of a triangle or quad submesh, in Unreal's frame and layouts.
+		Builder::V TriangleVertex(const Mesh& mesh, int i, bool hasUv1)
+		{
+			Builder::V v;
+			v.Src = i;
+			v.P = Local(mesh.Vertices[i]);
+			FVector3d nn = i < static_cast<int>(mesh.Normals.size()) ? Local(mesh.Normals[i]) : FVector3d(0, 0, 1);
+			v.N = FVector3f(static_cast<float>(nn.X), static_cast<float>(nn.Y), static_cast<float>(nn.Z));
+			Color c = i < static_cast<int>(mesh.Colors.size()) ? mesh.Colors[i] : Color::white();
+			// Raw, as Unity's mesh colours reach the shader (no colour-space conversion).
+			v.C = FVector4f(c.r, c.g, c.b, c.a);
+			v.Uv[0] = Uv(mesh.Uv[0], i, !mesh.RawUv0);
+			if (hasUv1) v.Uv[1] = Uv(mesh.Uv[1], i, true);
+			else if (i < static_cast<int>(mesh.Uv[0].size())) v.Uv[1] = FVector2f(mesh.Uv[0][i].z, mesh.Uv[0][i].w); // Fx's shape slot
+			v.Uv[2] = Uv(mesh.Uv[2], i, true);
+			v.Uv[3] = Uv(mesh.Uv[3], i, true);
+			return v;
+		}
+
 		void BuildTriangles(Builder& b, const Mesh& mesh, const Mesh::SubMesh& sub, int material, std::vector<int>& map)
 		{
 			int n = mesh.vertexCount();
@@ -179,19 +233,7 @@ namespace SpaceGod::UnityCompat
 			auto vertex = [&](int i) -> int
 			{
 				if (map[i] >= 0) return map[i];
-				Builder::V v;
-				v.P = Local(mesh.Vertices[i]);
-				FVector3d nn = i < static_cast<int>(mesh.Normals.size()) ? Local(mesh.Normals[i]) : FVector3d(0, 0, 1);
-				v.N = FVector3f(static_cast<float>(nn.X), static_cast<float>(nn.Y), static_cast<float>(nn.Z));
-				Color c = i < static_cast<int>(mesh.Colors.size()) ? mesh.Colors[i] : Color::white();
-				// Raw, as Unity's mesh colours reach the shader (no colour-space conversion).
-				v.C = FVector4f(c.r, c.g, c.b, c.a);
-				v.Uv[0] = Uv(mesh.Uv[0], i, !mesh.RawUv0);
-				if (hasUv1) v.Uv[1] = Uv(mesh.Uv[1], i, true);
-				else if (i < static_cast<int>(mesh.Uv[0].size())) v.Uv[1] = FVector2f(mesh.Uv[0][i].z, mesh.Uv[0][i].w); // Fx's shape slot
-				v.Uv[2] = Uv(mesh.Uv[2], i, true);
-				v.Uv[3] = Uv(mesh.Uv[3], i, true);
-				return map[i] = b.Add(v);
+				return map[i] = b.Add(TriangleVertex(mesh, i, hasUv1));
 			};
 			const auto& idx = sub.Indices;
 			auto ok = [&](int i) { return i >= 0 && i < n; };
@@ -287,6 +329,8 @@ namespace SpaceGod::UnityCompat
 				material++;
 			}
 			out.Sections = FMath::Max(1, material);
+			out.Src.resize(b.Vertices.size());
+			for (size_t k = 0; k < b.Vertices.size(); k++) out.Src[k] = b.Vertices[k].Src;
 			if (mesh.ExplicitBounds)
 			{
 				// Unity culls by the bounds it was given (the sky, the starfield and the effects meshes give vast ones):
@@ -294,7 +338,72 @@ namespace SpaceGod::UnityCompat
 				Bounds bb = mesh.bounds();
 				out.Mesh.AppendVertex(Local(bb.min()));
 				out.Mesh.AppendVertex(Local(bb.max()));
+				out.Src.push_back(-1);
+				out.Src.push_back(-2);
 			}
+			// US-T62: what this topology was built from, for the frames that only move its vertices.
+			out.Refillable = true;
+			for (const auto& sub : mesh.SubMeshes)
+				if (ShaderBinding::LayoutFor(sub.Topology) != MeshLayout::Triangles) out.Refillable = false;
+			out.SrcVertexCount = mesh.vertexCount();
+			out.SrcExplicitBounds = mesh.ExplicitBounds;
+			if (out.Refillable) out.SrcSubMeshes = mesh.SubMeshes;
+			else out.SrcSubMeshes.clear();
+			out.Topology = ++TopologySerial;
+			out.Current = true;
+			out.MaskFrom = 0;
+			if (out.Refillable) out.Snapshot(mesh);
+		}
+
+		/// Whether the mesh still has the topology `h` was converted from: the same vertex count and the same triangles
+		/// (the Unreal mesh then differs only in its vertex values, which Refill writes).
+		bool SameTopology(const Mesh& mesh, const MeshHandle& h)
+		{
+			if (!h.Refillable || mesh.vertexCount() != h.SrcVertexCount || mesh.ExplicitBounds != h.SrcExplicitBounds
+				|| mesh.SubMeshes.size() != h.SrcSubMeshes.size())
+				return false;
+			for (size_t s = 0; s < mesh.SubMeshes.size(); s++)
+			{
+				const auto& a = mesh.SubMeshes[s];
+				const auto& b = h.SrcSubMeshes[s];
+				if (a.Topology != b.Topology || a.Indices != b.Indices) return false;
+			}
+			return true;
+		}
+
+		/// Writes the mesh's current vertex values into `m`, a conversion of the same topology (US-T62): every value
+		/// Convert would give it, so the result is the mesh a full conversion makes.
+		void Refill(const Mesh& mesh, const MeshHandle& h, FDynamicMesh3& m, bool writeNormals = true, bool writeUvs = true)
+		{
+			auto* attributes = m.Attributes();
+			if (!attributes) return;
+			UE::Geometry::FDynamicMeshUVOverlay* uv[4];
+			for (int l = 0; l < 4; l++) uv[l] = attributes->GetUVLayer(l);
+			auto* normals = attributes->PrimaryNormals();
+			auto* colors = attributes->PrimaryColors();
+			bool hasUv1 = !mesh.Uv[1].empty();
+			Bounds bb = mesh.bounds();
+			for (int k = 0; k < static_cast<int>(h.Src.size()); k++)
+			{
+				int s = h.Src[k];
+				if (s < 0)
+				{
+					m.SetVertex(k, Local(s == -1 ? bb.min() : bb.max()));
+					continue;
+				}
+				Builder::V v = TriangleVertex(mesh, s, hasUv1);
+				m.SetVertex(k, v.P);
+				if (writeUvs)
+					for (int l = 0; l < 4; l++) uv[l]->SetElement(k, v.Uv[l]);
+				if (writeNormals) normals->SetElement(k, v.N);
+				colors->SetElement(k, v.C);
+			}
+		}
+
+		/// Exactly the same values (Unity's Vector == is approximate, which would keep a value that moved a little).
+		template <class T> bool SameBits(const std::vector<T>& a, const std::vector<T>& b)
+		{
+			return a.size() == b.size() && (a.empty() || FMemory::Memcmp(a.data(), b.data(), a.size() * sizeof(T)) == 0);
 		}
 
 		MeshHandle* Converted(Mesh& mesh)
@@ -308,10 +417,37 @@ namespace SpaceGod::UnityCompat
 			}
 			if (mesh.EngineVersion != mesh.Version)
 			{
-				Convert(mesh, *h);
+				// The same triangles with new vertex values (a mesh rebuilt every frame): the topology stays, and the
+				// values reach the shared copy only when a component needs a full upload of it (US-T62).
+				if (SameTopology(mesh, *h))
+				{
+					h->Current = false;
+					h->MaskFrom = mesh.EngineVersion;
+					h->NormalsSame = SameBits(mesh.Normals, h->SnapNormals);
+					h->UvsSame = mesh.RawUv0 == h->SnapRawUv0;
+					for (int l = 0; l < 4 && h->UvsSame; l++) h->UvsSame = SameBits(mesh.Uv[l], h->SnapUv[l]);
+					if (!h->NormalsSame) h->SnapNormals = mesh.Normals;
+					if (!h->UvsSame)
+					{
+						for (int l = 0; l < 4; l++) h->SnapUv[l] = mesh.Uv[l];
+						h->SnapRawUv0 = mesh.RawUv0;
+					}
+				}
+				else Convert(mesh, *h);
 				mesh.EngineVersion = mesh.Version;
 			}
 			return h;
+		}
+
+		/// The shared copy with the mesh's current values (for a full upload).
+		const FDynamicMesh3& CurrentMesh(const Mesh& mesh, MeshHandle& h)
+		{
+			if (!h.Current)
+			{
+				Refill(mesh, h, h.Mesh);
+				h.Current = true;
+			}
+			return h.Mesh;
 		}
 
 		// ------------------------------------------------------------ materials
@@ -422,7 +558,8 @@ namespace SpaceGod::UnityCompat
 		};
 		std::vector<FrameLight> FrameLights;
 		constexpr int LitSlots = 3;
-		TMap<TWeakObjectPtr<UMaterialInstanceDynamic>, TArray<FLinearColor>> LitPushed;
+		using LitValues = std::array<FLinearColor, LitSlots * 2>;
+		TMap<TWeakObjectPtr<UMaterialInstanceDynamic>, LitValues> LitPushed;
 
 		const FName& LitParam(int i)
 		{
@@ -472,8 +609,9 @@ namespace SpaceGod::UnityCompat
 		void ApplyLights(UMaterialInstanceDynamic* mid, int layer)
 		{
 			if (!mid) return;
-			TArray<FLinearColor> v;
-			v.Init(FLinearColor(0, 0, 0, 0), LitSlots * 2);
+			// On the stack: this runs for every Lit renderer each frame (US-T62).
+			LitValues v;
+			v.fill(FLinearColor(0, 0, 0, 0));
 			int slot = 0;
 			for (const auto& l : FrameLights)
 			{
@@ -484,8 +622,8 @@ namespace SpaceGod::UnityCompat
 				slot++;
 			}
 			if (slot > 0) Building.KeyLit = true;
-			if (const TArray<FLinearColor>* old = LitPushed.Find(mid); old && *old == v) return;
-			for (int i = 0; i < v.Num(); i++) mid->SetVectorParameterValue(LitParam(i), v[i]);
+			if (const LitValues* old = LitPushed.Find(mid); old && *old == v) return;
+			for (int i = 0; i < static_cast<int>(v.size()); i++) mid->SetVectorParameterValue(LitParam(i), v[i]);
 			LitPushed.Add(mid, v);
 		}
 
@@ -518,6 +656,7 @@ namespace SpaceGod::UnityCompat
 				if (imported) h->Component = MakeComponent<UStaticMeshComponent>(host);
 				else h->Component = MakeComponent<UDynamicMeshComponent>(host);
 				h->Imported = imported;
+				h->DrawnTopology = 0; // a new component has no mesh yet (US-T62)
 			}
 			UMeshComponent* c = h->Component.Get();
 
@@ -542,8 +681,25 @@ namespace SpaceGod::UnityCompat
 				auto* converted = Converted(*mesh);
 				if (h->Drawn != mesh.get() || h->DrawnVersion != mesh->Version)
 				{
-					FDynamicMesh3 copy = converted->Mesh;
-					dm->SetMesh(MoveTemp(copy));
+					// US-T62: the component already has this topology (the same mesh, rebuilt with the same triangles):
+					// only its vertex values change, written in place and pushed to its render buffers, rather than a
+					// new mesh and a new scene proxy every frame.
+					FDynamicMesh3* drawn = dm->GetMesh();
+					if (h->Drawn == mesh.get() && h->DrawnTopology == converted->Topology && drawn
+						&& drawn->MaxVertexID() == static_cast<int>(converted->Src.size()))
+					{
+						// From the version just before, the streams that did not change stay as the component has them.
+						bool fromLast = h->DrawnVersion == converted->MaskFrom;
+						bool normals = !(fromLast && converted->NormalsSame), uvs = !(fromLast && converted->UvsSame);
+						Refill(*mesh, *converted, *drawn, normals, uvs);
+						dm->FastNotifyPositionsUpdated(normals, true, uvs);
+					}
+					else
+					{
+						FDynamicMesh3 copy = CurrentMesh(*mesh, *converted);
+						dm->SetMesh(MoveTemp(copy));
+						h->DrawnTopology = converted->Topology;
+					}
 					Building.MeshUploads++;
 					h->Drawn = mesh.get();
 					h->DrawnVersion = mesh->Version;

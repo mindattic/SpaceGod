@@ -21,6 +21,7 @@
 
 #include <functional>
 #include <memory>
+#include <type_traits>
 #include <unordered_map>
 #include <variant>
 #include <vector>
@@ -29,6 +30,8 @@ class UTexture;
 
 namespace SpaceGod::UnityCompat
 {
+	class ParticleSystem;
+
 	enum class MeshTopology : int { Triangles = 0, Quads = 2, Lines = 3, LineStrip = 4, Points = 5 };
 	enum class IndexFormat : int { UInt16 = 0, UInt32 = 1 };
 	enum class ShadowCastingMode : int { Off = 0, On = 1, TwoSided = 2, ShadowsOnly = 3 };
@@ -188,6 +191,16 @@ namespace SpaceGod::UnityCompat
 		static float GetGlobalFloat(const cs::String& name);
 		/// Every global set so far (UnityScene pushes them when their Version moves on).
 		static const class MaterialProperties& Globals();
+		/// ShaderBinding's answers for this shader, worked out from its name once (US-T62: they were asked per renderer
+		/// per frame, each time from a new copy of the name). A shader's name never changes after Find.
+		struct BindingCache
+		{
+			const void* Parent = nullptr;
+			int8_t Lit = -1;
+			bool SortKnown = false;
+			int Sort = 0;
+		};
+		mutable BindingCache Binding;
 	};
 
 	/// One material property, as Unity keeps them: a float, a vector (a colour set with SetColor is marked so its
@@ -346,6 +359,8 @@ namespace SpaceGod::UnityCompat
 		std::vector<cs::Ref<Material>> materials;
 		MaterialPropertyBlock block;
 		bool hasBlock = false;
+		/// DrawnMesh's MeshFilter, once found (US-T62).
+		mutable std::weak_ptr<MeshFilter> meshFilter;
 	};
 
 	class MeshRenderer final : public Renderer
@@ -376,13 +391,31 @@ namespace SpaceGod::UnityCompat
 		/// Every live component of type T (for the per-frame passes: particle simulation).
 		template <class T> void ForEach(const std::function<void(const cs::Ref<T>&)>& visit) const
 		{
-			for (auto& kv : bags)
-				for (auto& c : kv.second.Components)
-					if (auto t = std::dynamic_pointer_cast<T>(c)) visit(t);
+			if constexpr (std::is_same_v<T, ParticleSystem>)
+			{
+				// US-T62: the particle systems found once per change of the scene, not by a cast of every component
+				// each frame (the same ones, in the same order).
+				Refresh();
+				for (const auto& p : particleCache) visit(p);
+			}
+			else
+			{
+				for (auto& kv : bags)
+					for (auto& c : kv.second.Components)
+						if (auto t = std::dynamic_pointer_cast<T>(c)) visit(t);
+			}
 		}
 
 	private:
 		std::unordered_map<const GameObject*, ComponentBag> bags;
+		/// US-T62: every renderer (with its GameObject) and particle system in the order of `bags`, rebuilt when a
+		/// GameObject or component is added (BagOf) or the destroyed are purged.
+		void Refresh() const;
+		mutable bool cacheStale = true;
+		mutable std::vector<std::pair<const GameObject*, cs::Ref<Renderer>>> rendererCache;
+		mutable std::vector<cs::Ref<ParticleSystem>> particleCache;
+		/// GameObject::DestroyedCount at the last Purge.
+		uint64_t purgedAt = 0;
 	};
 
 	/// `new GameObject(name)`: made with its Transform and kept by the scene until destroyed.

@@ -40,7 +40,17 @@ namespace SpaceGod::UnityCompat
 			return parents;
 		}
 
+		const ParentEntry& ResolveByName(const Shader* shader);
+
 		const ParentEntry& Resolve(const Shader* shader)
+		{
+			// US-T62: once per shader (the entries live as long as the process, the shaders as long as Shader::Find's map).
+			if (!shader) return ResolveByName(shader);
+			if (!shader->Binding.Parent) shader->Binding.Parent = &ResolveByName(shader);
+			return *static_cast<const ParentEntry*>(shader->Binding.Parent);
+		}
+
+		const ParentEntry& ResolveByName(const Shader* shader)
 		{
 			cs::String name = ShaderBinding::IsLit(shader) ? cs::String("Lit") : ShaderBinding::ShaderName(shader);
 			auto& parents = Parents();
@@ -104,17 +114,30 @@ namespace SpaceGod::UnityCompat
 
 	bool ShaderBinding::IsLit(const Shader* shader)
 	{
-		return shader && (shader->name == "glTF/PbrMetallicRoughness" || ShaderName(shader) == "Lit");
+		if (!shader) return false;
+		if (shader->Binding.Lit < 0) // worked out once per shader (US-T62)
+			shader->Binding.Lit = (shader->name == "glTF/PbrMetallicRoughness" || ShaderName(shader) == "Lit") ? 1 : 0;
+		return shader->Binding.Lit == 1;
 	}
 
 	int ShaderBinding::SortPriority(const Shader* shader)
 	{
-		cs::String n = ShaderName(shader);
-		if (n == "Stars") return -1000;
-		if (n == "Line") return -10;
-		if (n == "Glow") return 10;
-		if (n == "Fx") return 20;
-		return 0;
+		auto of = [](const Shader* s)
+		{
+			cs::String n = ShaderName(s);
+			if (n == "Stars") return -1000;
+			if (n == "Line") return -10;
+			if (n == "Glow") return 10;
+			if (n == "Fx") return 20;
+			return 0;
+		};
+		if (!shader) return of(shader);
+		if (!shader->Binding.SortKnown) // worked out once per shader (US-T62)
+		{
+			shader->Binding.Sort = of(shader);
+			shader->Binding.SortKnown = true;
+		}
+		return shader->Binding.Sort;
 	}
 
 	MeshLayout ShaderBinding::LayoutFor(MeshTopology topology)

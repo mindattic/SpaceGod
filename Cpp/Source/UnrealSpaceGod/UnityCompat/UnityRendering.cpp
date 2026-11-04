@@ -1,4 +1,5 @@
 #include "UnityCompat/UnityRendering.h"
+#include "UnityCompat/UnityParticles.h"
 #include "UnrealSpace.h"
 #include "UnrealSpaceGodLog.h"
 
@@ -279,7 +280,14 @@ namespace SpaceGod::UnityCompat
 
 	cs::Ref<Mesh> Renderer::DrawnMesh() const
 	{
-		auto filter = GetComponent<MeshFilter>(gameObject());
+		// US-T62: the GameObject's first MeshFilter, found once: a bag only grows (its components go with its
+		// GameObject), so the first one found stays the first.
+		auto filter = meshFilter.lock();
+		if (!filter)
+		{
+			filter = GetComponent<MeshFilter>(gameObject());
+			meshFilter = filter;
+		}
 		return filter ? filter->sharedMesh : nullptr;
 	}
 
@@ -322,6 +330,8 @@ namespace SpaceGod::UnityCompat
 
 	ComponentBag& SceneRegistry::BagOf(const cs::Ref<GameObject>& go)
 	{
+		// The caller may add a component to the bag (AddComponent, Instantiate): the per-frame lists are rebuilt.
+		cacheStale = true;
 		auto& bag = bags[go.get()];
 		if (!bag.Owner) bag.Owner = go;
 		return bag;
@@ -333,18 +343,38 @@ namespace SpaceGod::UnityCompat
 		return it == bags.end() ? nullptr : &it->second;
 	}
 
+	void SceneRegistry::Refresh() const
+	{
+		if (!cacheStale) return;
+		cacheStale = false;
+		rendererCache.clear();
+		particleCache.clear();
+		for (auto& kv : bags)
+			for (auto& c : kv.second.Components)
+			{
+				if (auto r = std::dynamic_pointer_cast<Renderer>(c)) rendererCache.emplace_back(kv.first, std::move(r));
+				if (auto p = std::dynamic_pointer_cast<ParticleSystem>(c)) particleCache.push_back(std::move(p));
+			}
+	}
+
 	void SceneRegistry::ForEachRenderer(const std::function<void(const cs::Ref<Renderer>&)>& visit) const
 	{
-		for (auto& kv : bags)
+		// US-T62: the renderers in the order of `bags`, found once per change of the scene rather than by a cast of every
+		// component each frame; a GameObject destroyed since is still skipped until the next Purge.
+		Refresh();
+		for (const auto& [owner, r] : rendererCache)
 		{
-			if (kv.second.Owner->destroyed) continue;
-			for (auto& c : kv.second.Components)
-				if (auto r = std::dynamic_pointer_cast<Renderer>(c)) visit(r);
+			if (owner->destroyed) continue;
+			visit(r);
 		}
 	}
 
 	void SceneRegistry::Purge(const std::function<void(Renderer&)>& onDropped)
 	{
+		// US-T62: nothing destroyed since the last purge, nothing to look for.
+		if (GameObject::DestroyedCount == purgedAt) return;
+		purgedAt = GameObject::DestroyedCount;
+		cacheStale = true;
 		for (auto it = bags.begin(); it != bags.end();)
 		{
 			if (!it->second.Owner->destroyed)

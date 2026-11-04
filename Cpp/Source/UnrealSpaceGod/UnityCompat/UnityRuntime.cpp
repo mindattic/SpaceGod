@@ -120,6 +120,7 @@ namespace SpaceGod::UnityCompat
 	{
 		if (!go || go->destroyed) return;
 		go->destroyed = true;
+		DestroyedCount++;
 		if (go->transform)
 		{
 			if (auto p = go->transform->parent.lock())

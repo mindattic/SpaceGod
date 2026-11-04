@@ -119,6 +119,8 @@ namespace SpaceGod::UnityCompat
 		bool activeInHierarchy() const;
 		/// Object.Destroy(gameObject): it and its children leave the scene.
 		static void Destroy(const cs::Ref<GameObject>& go);
+		/// How many GameObjects Destroy has marked (the scene's Purge looks for them only when it moved on, US-T62).
+		static inline uint64_t DestroyedCount = 0;
 	};
 
 	enum class CameraClearFlags : int { Skybox = 1, SolidColor = 2, Depth = 3, Nothing = 4 };
