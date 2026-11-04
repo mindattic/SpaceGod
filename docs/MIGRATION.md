@@ -1100,6 +1100,34 @@ co-op smoke: every check True (the same fifteen)
 (The C++ host had been up a while when the client joined, hence its frame numbers; the client picked the first state
 with no ship there to be hailed, so the two runs speak for different states.)
 
+**US-T64: the script waits for its asks, not for a number of frames.** In the race run (docs/RACE.md, co-op) the C++
+smoke passed 10 of 15: no co-op bug (every digest identical, every ask carried out on the host), the script's timing. A
+client's ask reaches the host when the host is as far ahead as the client's backlog, and comes back to the client only
+once it has replayed that far. The C++ client replays the fight's frames more slowly than the host makes them (its view
+is in the cockpit, among the fight), so its backlog grew to about 15 s: the carrier's helm came back 170 frames after
+it was handed to the crew, the cockpit 180 frames after it was asked for, so the scripted keys 60 frames on were pressed
+in no cockpit ('client in nothing presses 7'); the trip came back 420 frames late, in the middle of the galaxy-map
+steps; and the host's load, asked for 250 frames after the gift, came 700 frames ahead of the client, so the sync's save
+replaced the frames carrying the speaker, the orders, the hail and the gift before the client replayed them. Both
+tracks' scripts now hold a step until what it follows has come back in a host frame (the seat before the resync and
+handed back before the freighter, the freighter's helm handed back before the carrier, the carrier's helm before its
+crew, the cockpit before its keys and handed back before the trip, the arrival before the galaxy map, the speaker before
+its orders, the orders and the gift before they are checked and so before the load); the script's frame count stands
+still meanwhile, giving up after 3,600 frames with a warning. Each wait logs `smoke: step <n> waited <k> frames for ...`,
+and the client's done line says how far behind the host it fell at most. `-PackageDir` runs the smoke from a package's
+game exe. Running it on Shipping found three things that kept a Shipping C++ build out of co-op altogether, now fixed:
+a Shipping game ignores the map URL on its command line (`UGameInstance::StartGameInstance`: no `?listen`, no
+`<host ip>`) and has no console for `Host` or `open`, so `-CoopHost` and `-CoopJoin=<address>` host and join in every
+build (`ASpaceGameMode::StartPlay`, once, from the first standalone start); it ignores `-ini:` overrides, so the raised
+net rates a resync's save needs are in `Cpp/Config/DefaultEngine.ini` (at the default 100 KB/s a 4.4 MB sync takes most
+of a minute, and the client then has more than `MaxBacklog` frames waiting and asks for another); and it logs nothing,
+so the C++ peers also write their co-op lines to `-SpaceGodCoopLog=<file>`, which the smoke reads from a package. And
+a packaged client's camera went NaN on its first focus (the freighter then spawned at NaN, no fight, no cockpit, no
+trip), in Development and Shipping packages alike but never from the editor binaries: `cs::Double::IsNaN` was `v != v`,
+and `Cs.h` is compiled into `UnrealSpaceGod` too, which is not `/fp:precise`, where the packaged build's optimizer
+folded it to false, so `SpaceCamera::FocusOn` took `FocusSelected`'s NaN ("no framing given") for a framing. `IsNaNFast`
+now tests the bits, as `IsInfFast` and `IsFiniteFast` already did (the Core, `/fp:precise`, gets the same answers).
+
 **Not co-op yet**, after this: nothing the player does writes the Core outside the frames that the smoke or a read of
 the ported app has found; seats in a fight retaken by position and `-CoopNoHostReload` stay as above.
 

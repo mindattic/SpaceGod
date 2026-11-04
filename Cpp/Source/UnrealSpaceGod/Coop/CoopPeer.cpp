@@ -14,8 +14,13 @@
 #include "Session/LocalSession.h"
 #include "Session/PlayerId.h"
 
+#include "HAL/FileManager.h"
 #include "HAL/PlatformProcess.h"
 #include "HAL/PlatformTime.h"
+#include "Misc/DateTime.h"
+#include "Misc/ScopeLock.h"
+#include "Serialization/Archive.h"
+#include "Templates/UniquePtr.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 
@@ -73,9 +78,43 @@ namespace SpaceGod::Coop
 
 	bool CoopPeer::SkipsMenu() { return (current && current->IsClient()) || CoopSmoke::Active(); }
 
-	void CoopPeer::Log(const cs::String& message) { UE_LOG(LogSpaceGod, Display, TEXT("SpaceGodCoop: %s"), *ToF(message)); }
+	namespace
+	{
+		// US-T64: -SpaceGodCoopLog=<file> writes every co-op line to a file of its own as well, in the log's own line format
+		// ([time][frame]LogSpaceGod: <verbosity>: SpaceGodCoop: ...). A Shipping build logs nothing (UE_LOG is compiled out),
+		// so this is how tools/play.ps1 -Mode coop-smoke -PackageDir reads a packaged host's and client's lines.
+		void ToCoopLog(const TCHAR* verbosity, const FString& message)
+		{
+			static FCriticalSection lock;
+			static TUniquePtr<FArchive> file = []
+			{
+				FString path;
+				if (!FParse::Value(FCommandLine::Get(), TEXT("-SpaceGodCoopLog="), path) || path.IsEmpty()) return TUniquePtr<FArchive>();
+				return TUniquePtr<FArchive>(IFileManager::Get().CreateFileWriter(*path, FILEWRITE_AllowRead));
+			}();
+			if (!file) return;
+			FString line = FString::Printf(TEXT("[%s][%3d]LogSpaceGod: %s: SpaceGodCoop: %s\r\n"), *FDateTime::Now().ToString(TEXT("%Y.%m.%d-%H.%M.%S:%s")),
+				static_cast<int>(GFrameCounter % 1000), verbosity, *message);
+			FTCHARToUTF8 utf8(*line);
+			FScopeLock scope(&lock);
+			file->Serialize(const_cast<ANSICHAR*>(utf8.Get()), utf8.Length());
+			file->Flush();
+		}
+	}
 
-	void CoopPeer::Warn(const cs::String& message) { UE_LOG(LogSpaceGod, Warning, TEXT("SpaceGodCoop: %s"), *ToF(message)); }
+	void CoopPeer::Log(const cs::String& message)
+	{
+		FString text = ToF(message);
+		UE_LOG(LogSpaceGod, Display, TEXT("SpaceGodCoop: %s"), *text);
+		ToCoopLog(TEXT("Display"), text);
+	}
+
+	void CoopPeer::Warn(const cs::String& message)
+	{
+		FString text = ToF(message);
+		UE_LOG(LogSpaceGod, Warning, TEXT("SpaceGodCoop: %s"), *text);
+		ToCoopLog(TEXT("Warning"), text);
+	}
 
 	// The C# peers prime Core/Persistence's statics snapshot at start (CoopPeer.PrimeSaveStatics): its walk took in what
 	// weak-table caches held at the first save. The C++ walk never takes those in (US-T41, StaticTables.cpp), so every

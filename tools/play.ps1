@@ -4,7 +4,10 @@ param(
   [string]$CaptureDir = '',
   [string]$Address = '127.0.0.1',
   [ValidateSet('Cpp', 'CSharp')][string]$Track = 'Cpp',
-  [string]$EngineVersion = '5.8'
+  [string]$EngineVersion = '5.8',
+  # -Mode coop-smoke only (US-T64): run a packaged game's exe (tools/package.ps1's folder, e.g. Builds/Cpp/Windows, Development or
+  # Shipping) instead of the editor binaries.
+  [string]$PackageDir = ''
 )
 
 <#
@@ -33,6 +36,7 @@ quits; the log is <Track>/Saved/Logs/<project>.log. Both tracks log the same lin
   ./tools/play.ps1 -Track CSharp -Mode join -Address 192.168.1.20
   ./tools/play.ps1 -Track CSharp -Mode coop-smoke # headless: a host and a client on localhost, their digests compared
   ./tools/play.ps1 -Track Cpp -Mode coop-smoke    # the C++ track's same co-op smoke (US-T44)
+  ./tools/play.ps1 -Track Cpp -Mode coop-smoke -PackageDir Builds/Cpp/Windows # the same from a package, Shipping too (US-T64)
   ./tools/play.ps1 -Track CSharp -Mode audit     # headless: the smoke, then a probe per binding, PASS/FAIL each (US-T48)
 #>
 
@@ -127,12 +131,28 @@ if ($Mode -eq 'coop-smoke') {
   # 60 frames and this script compares them. Logs: <Track>/Saved/Logs/CoopSmokeHost-<run>.log and CoopSmokeClient-<run>.log.
   # US-T47: each run has its own log names and a free UDP port of its own, and every instance it started is stopped on any
   # way out (try/finally), so a host left over from an earlier run can neither be joined nor hold the logs.
+  # US-T64: -PackageDir runs a package's own game exe (not its launcher, which returns at once) with no project argument.
+  # A Shipping build logs nothing, so each instance also writes its co-op lines to a file of their own
+  # (-SpaceGodCoopLog=CoopSmoke<Host|Client>-<run>.coop.log, C++ track) and the checks read those. A Shipping build also
+  # ignores -ini: overrides; the C++ track's net rates are in Config/DefaultEngine.ini.
   $cmd = Join-Path $engine 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
+  $projectArg = @("`"$($project.FullName)`"")
   $logs = Join-Path $project.DirectoryName 'Saved\Logs'
+  if ($PackageDir) {
+    $package = (Resolve-Path -LiteralPath $PackageDir).Path
+    $cmd = Get-ChildItem -LiteralPath (Join-Path $package "$($project.BaseName)\Binaries\Win64") -Filter "$($project.BaseName)*.exe" -ErrorAction SilentlyContinue |
+      Where-Object Name -match "^$([regex]::Escape($project.BaseName))(-Win64-(Shipping|Test|DebugGame))?\.exe$" | Select-Object -First 1 -ExpandProperty FullName
+    if (-not $cmd) { throw "No $($project.BaseName) game exe under $package." }
+    $projectArg = @()
+    $logs = Join-Path $package "$($project.BaseName)\Saved\Logs"
+    "co-op smoke: package $cmd"
+  }
   New-Item -ItemType Directory -Force -Path $logs | Out-Null
   $run = (Get-Date).ToString('yyyyMMdd-HHmmss') + '-' + $PID
   $hostLog = Join-Path $logs "CoopSmokeHost-$run.log"
   $clientLog = Join-Path $logs "CoopSmokeClient-$run.log"
+  $hostCoopLog = Join-Path $logs "CoopSmokeHost-$run.coop.log"
+  $clientCoopLog = Join-Path $logs "CoopSmokeClient-$run.coop.log"
   # A free UDP port (Unreal's IpNetDriver): one no socket holds now, from a range away from the default 7777.
   $port = $null
   foreach ($candidate in (Get-Random -InputObject (17800..18799) -Count 50)) {
@@ -150,18 +170,24 @@ if ($Mode -eq 'coop-smoke') {
   if ($env:SPACEGOD_RACE_DIR) {
     foreach ($side in 'host', 'client') { $race[$side] = @("`"-SpaceGodRaceAuto=$(Join-Path $env:SPACEGOD_RACE_DIR "$prefix-coop-$side-$run.json")`"") }
   }
-  $hostArgs = @("`"$($project.FullName)`"", '/Engine/Maps/Entry?listen') + $common + $race.host + @("-port=$port", '-SpaceGodCoopSmoke=host', "`"-abslog=$hostLog`"")
+  # US-T64: a package is told to host and join with -CoopHost / -CoopJoin=<address> (a Shipping game ignores the map URL).
+  $hostUrl = if ($PackageDir) { @('-CoopHost') } else { @('/Engine/Maps/Entry?listen') }
+  $clientUrl = if ($PackageDir) { @("-CoopJoin=127.0.0.1:$port") } else { @("127.0.0.1:$port") }
+  $hostArgs = $projectArg + $hostUrl + $common + $race.host + @("-port=$port", '-SpaceGodCoopSmoke=host', "`"-abslog=$hostLog`"",
+    "`"-SpaceGodCoopLog=$hostCoopLog`"")
   # Not -WindowStyle (ShellExecute): CreateProcess, so the instances inherit the PATH with the private .NET SDK on it.
   $hostP = Start-Process -FilePath $cmd -PassThru -NoNewWindow -ArgumentList $hostArgs -RedirectStandardOutput "$hostLog.out"
   # The client starts once the host's app is up (two UnrealSharp startups at once contend for the managed build).
   $deadline = (Get-Date).AddMinutes(4)
-  while (-not ((Test-Path -LiteralPath $hostLog) -and (Select-String -LiteralPath $hostLog -Pattern 'UnitySpaceApp up in' -Quiet))) {
+  function HostUp { foreach ($l in @($hostLog, $hostCoopLog)) { if ((Test-Path -LiteralPath $l) -and (Select-String -LiteralPath $l -Pattern 'UnitySpaceApp up in|host app up' -Quiet)) { return $true } }; $false }
+  while (-not (HostUp)) {
     if ($hostP.HasExited -or (Get-Date) -gt $deadline) {
       throw "The co-op host did not come up (see $hostLog)."
     }
     Start-Sleep -Seconds 2
   }
-  $clientArgs = @("`"$($project.FullName)`"", "127.0.0.1:$port") + $common + $race.client + @('-SpaceGodCoopSmoke=client', "`"-abslog=$clientLog`"")
+  $clientArgs = $projectArg + $clientUrl + $common + $race.client + @('-SpaceGodCoopSmoke=client', "`"-abslog=$clientLog`"",
+    "`"-SpaceGodCoopLog=$clientCoopLog`"")
   $clientP = Start-Process -FilePath $cmd -PassThru -NoNewWindow -ArgumentList $clientArgs -RedirectStandardOutput "$clientLog.out"
   $deadline = (Get-Date).AddMinutes(11)
   while (-not ($hostP.HasExited -and $clientP.HasExited)) {
@@ -171,6 +197,12 @@ if ($Mode -eq 'coop-smoke') {
       break
     }
     Start-Sleep -Seconds 2
+  }
+  # A package's lines are read from its co-op logs (a Shipping build writes no other; the C# track's package writes none, and
+  # keeps its full log).
+  if ($PackageDir) {
+    if (Test-Path -LiteralPath $hostCoopLog) { $hostLog = $hostCoopLog }
+    if (Test-Path -LiteralPath $clientCoopLog) { $clientLog = $clientCoopLog }
   }
   $digests = @{ host = @{}; client = @{} }
   foreach ($side in @(@{ Name = 'host'; Log = $hostLog }, @{ Name = 'client'; Log = $clientLog })) {

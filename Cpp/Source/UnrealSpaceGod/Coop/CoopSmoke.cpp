@@ -8,6 +8,7 @@
 
 #include "Coop/CoopPeer.h"
 #include "Coop/CoopSettings.h"
+#include "Camera/SpaceCamera.h"
 #include "Smoke/ScriptedDevice.h"
 #include "UnitySpaceApp.h"
 #include "UI/Hud.h"
@@ -71,13 +72,53 @@ namespace SpaceGod::Coop::CoopSmoke
 		int objectivesBefore = 0, recordBefore = 0;
 		double treasuryBefore = 0;
 		UnitySpaceApp* lastApp = nullptr;
+		cs::Ref<StarSystem> travelTo; // US-T64
+
+		// US-T64: a step that needs an earlier ask carried out waits for it to come back in a host frame. A client's ask
+		// reaches the host while the host is as far ahead as the client's backlog, so it comes back only once the client
+		// has replayed that far: on a client that replays more slowly than the host makes frames (the C++ client under
+		// load, its backlog growing to hundreds of frames), a fixed number of frames is no answer. The script's frame
+		// count stands still while it waits (as at 729 for the freighter's helm), so every later step keeps its place
+		// after the one it follows; a wait gives up after MaxWait replayed frames and the step goes on (its check then
+		// fails, with a warning naming the wait).
+		constexpr int MaxWait = 3600;
+		int waited = 0;
+		long long waitingAt = -1;
+		int mostBehind = 0; // the client's largest backlog, for the done line
+
+		/// US-T64: where the camera is (the spawns are at it): a packaged client's went NaN on its first focus (Cs.h IsNaNFast).
+		cs::String CameraText(UnitySpaceApp& app)
+		{
+			auto p = app.SpaceCamera->ScenePosition;
+			auto f = app.SpaceCamera->FocusTarget;
+			return cs::Cat("camera scene (", cs::Fmt(p.X, "G6"), ", ", cs::Fmt(p.Y, "G6"), ", ", cs::Fmt(p.Z, "G6"), ") ", Cameras::ToString(app.SpaceCamera->Mode), " on ",
+				app.CoopTargetKey(f), ", selected ", app.CoopTargetKey(app.Selected));
+		}
+
+		/// True while the script waits at step `at` for `ready`: the step is held.
+		bool Waits(long long at, bool ready, const char* what, CoopPeer& peer)
+		{
+			if (ready || replayed + 1 != at)
+			{
+				if (waitingAt == at && waited > 0)
+					CoopPeer::Log(cs::Cat("smoke: step ", at, " waited ", waited, " frames for ", what, " (to frame ", peer.Frame(), ")"));
+				if (waitingAt == at) { waitingAt = -1; waited = 0; }
+				return false;
+			}
+			if (waitingAt != at) { waitingAt = at; waited = 0; }
+			if (++waited <= MaxWait) return true;
+			CoopPeer::Warn(cs::Cat("smoke: step ", at, " gave up waiting for ", what, " after ", MaxWait, " frames (frame ", peer.Frame(), ", backlog ", peer.Backlog(), ")"));
+			waitingAt = -1;
+			waited = 0;
+			return false;
+		}
 
 		void Finish(const cs::String& why, CoopPeer& peer, UnitySpaceApp* app)
 		{
 			if (finished) return;
 			finished = true;
 			CoopPeer::Log(cs::Cat("smoke (", Role(), ") done: ", why, "; frame ", peer.Frame(), ", ",
-				peer.IsHost() ? cs::Cat(peer.DigestMatches, " digest matches, ", peer.Desyncs, " desyncs") : cs::Cat(peer.ClockCorrections, " clock corrections"),
+				peer.IsHost() ? cs::Cat(peer.DigestMatches, " digest matches, ", peer.Desyncs, " desyncs") : cs::Cat(peer.ClockCorrections, " clock corrections, at most ", mostBehind, " frames behind the host"),
 				app != nullptr ? cs::Cat(", ", app->CoopPilotFrames, " helm frames made here, ", peer.PilotSent, " helm inputs sent, ", app->CoopCockpitKeys, " cockpit keys, ",
 					app->CoopActions, " actions, ", peer.Retakes, " seats kept through syncs, ", CoopSettings::Applied(), " settings taken") : cs::String(),
 				", ", cs::Fmt(Since(), "F0"), " s; quitting"));
@@ -140,11 +181,36 @@ namespace SpaceGod::Coop::CoopSmoke
 	{
 		lastApp = &app;
 		if (Role() != "client" || finished || !script) return;
+		if (peer.Backlog() > mostBehind) mostBehind = peer.Backlog();
 		// The flying (from 730 on: W, X, F) waits until the spawned freighter's helm has come back in a host frame: the C++
 		// client replays the host's backlog more slowly than the C# one, so the helm can still be in flight at 730, and X
 		// (roll at the helm) would then open the news panel in command (InputState: X is also ToggleNews), which keeps the
 		// cockpit's keys off later on. The C# run reaches the helm a frame before its X; the steps after are unchanged.
 		if (replayed == 729 && app.Piloted.IsNone()) return;
+		// US-T64: the other steps that follow an ask (see Waits): the selection (applied with the frames) before the camera
+		// goes to it; the seat held before the resync that must keep it, and handed back before Earth is picked again; the freighter's helm handed back before the carrier; the carrier's helm held
+		// before it goes to its crew; the fighter's cockpit held before its keys, and handed back before the trip; the
+		// party arrived before the galaxy map's screens; the speaker carried before the orders given as it; the orders and
+		// the gift carried before they are checked, and so before the load (whose sync would skip the frames that carry
+		// them on this client).
+		auto strategy = app.Galaxy->Polities->Command;
+		bool bodySelected = Wire::StartsWith(app.CoopTargetKey(app.Selected), "b ");
+		if (Waits(200, bodySelected, "the selection", peer)) return;
+		if (Waits(480, app.Seat() != nullptr, "the station's seat", peer)) return;
+		if (Waits(670, app.Seat() == nullptr, "the station's seat handed back", peer)) return;
+		if (Waits(680, bodySelected, "the selection", peer)) return;
+		if (Waits(1040, app.Piloted.IsNone(), "the freighter's helm handed back", peer)) return;
+		if (Waits(1340, app.Piloted.Ship != nullptr, "the carrier's helm", peer)) return;
+		if (fighter != nullptr && Waits(fighterFrom + 60, cs::Is<FighterSeat>(app.Seat()), "the fighter's cockpit", peer)) return;
+		if (Waits(1760, app.Seat() == nullptr, "the fighter's cockpit handed back", peer)) return;
+		if (Waits(2050, travelTo == nullptr || app.ActiveSystem == travelTo, "the party's trip", peer)) return;
+		if (Waits(2080, speaker == nullptr || strategy->Player == speaker, "the speaker", peer)) return;
+		if (speaker != nullptr && hailed != nullptr)
+		{
+			auto directives = strategy->Find(speaker);
+			bool carried = directives != nullptr && directives->Production->Name != productionBefore && app.Galaxy->Polities->Statecraft->Record().Count() > recordBefore;
+			if (Waits(2320, carried, "the orders and the gift", peer)) return;
+		}
 		long long n = ++replayed;
 		// The stick at the helm: throttle up, the mouse swinging the nose, a roll.
 		if (n >= 740 && n < 800) script->mouseDelta = Vector2(4.0f, 2.0f);
@@ -217,7 +283,7 @@ namespace SpaceGod::Coop::CoopSmoke
 				app.FocusSelected();
 				break;
 			case 700:
-				CoopPeer::Log(cs::Cat("smoke: client spawns a freighter at its camera (the spawn grid's call) at frame ", peer.Frame()));
+				CoopPeer::Log(cs::Cat("smoke: client spawns a freighter at its camera (the spawn grid's call) at frame ", peer.Frame(), "; ", CameraText(app)));
 				app.SpawnShip(ShipClass::Freighter, false);
 				break;
 			case 730:
@@ -284,6 +350,7 @@ namespace SpaceGod::Coop::CoopSmoke
 					app.ActiveSystem->Name, ")"));
 				if (to != nullptr) app.TravelTo(to);
 				travelFrom = n;
+				travelTo = to;
 				break;
 			}
 			// US-T47: the galaxy map's strategy and envoy screens and a hail (F12), from the client.

@@ -281,7 +281,7 @@ byte totals (`SPACEGOD_RACE_DIR`). Headless there is no game-thread or GPU split
 | Resync on the host: capture / its own reload | 329–434 ms / 307–454 ms | | 257–362 ms / 239–330 ms | |
 | Resync on the client: load the host's save | | 389–472 ms | | 283–463 ms |
 | Digests compared, identical | 59 / 59 | | 55 / 55 | |
-| The smoke's 15 checks | 10 passed | | 15 passed | |
+| The smoke's 15 checks | 10 passed (15 since US-T64) | | 15 passed | |
 | Peak working set | 2.2 GB | 2.2 GB | 4.5 GB | 3.2 GB |
 
 Both tracks keep the lockstep exact (every digest identical, no DESYNC) at the same cost on the wire; the frames are a
@@ -289,10 +289,15 @@ few hundred bytes each and a resync is the save, 4–5 MB, about a second end to
 15% larger (5.0 vs 4.4 MB for the same scenario). Resyncs are a little faster on
 C#, as single-player saves and loads are. The C++ client's long p95 is its catch-up after each load (it replays the
 130–145 frames that arrived meanwhile in fewer, longer ticks; the C# client takes more, shorter ticks). In this run the
-C++ smoke missed five of its fifteen checks (the fighter's cockpit was not taken in time, so the cockpit keys and the
-four galaxy-map statecraft checks that follow it did not carry); the digests still matched throughout. The C++ co-op
-smoke passed all fifteen when US-T47 closed, so this is a timing-sensitive step of the script under the evening's load,
-noted here rather than re-run.
+C++ smoke missed five of its fifteen checks; the digests still matched throughout, and the host carried out every ask.
+US-T64 found the cause in the script: it pressed each step a fixed number of frames after the ask it follows, but an ask
+comes back only once the client has replayed as far as the host was when it arrived, and in the fight this client fell
+up to about 15 s behind, so the cockpit's keys were pressed in no cockpit and the host's load, 700 frames ahead of the
+client, replaced the frames that carried the statecraft. The script now waits for each ask to come back (docs/MIGRATION.md,
+Co-op, US-T64). Since then the C++ smoke passes 15 of 15 in every run: 3 of 3 from the editor binaries (as here), 3 of 3
+from a Shipping package and 3 of 3 from a Development package (`-PackageDir`; a Shipping game could not host or join
+from its command line before, and a packaged client's camera went NaN on its first focus, both fixed there too), and 2
+of 2 with the client pinned to one or two cores (299 and 173 frames behind at most).
 
 ## 4. Developer side
 

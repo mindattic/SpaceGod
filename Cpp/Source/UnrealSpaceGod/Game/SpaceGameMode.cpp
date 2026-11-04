@@ -25,6 +25,8 @@
 #include "HAL/FileManager.h"
 #include "HAL/PlatformTime.h"
 #include "Kismet/GameplayStatics.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "Misc/Paths.h"
 
 using SpaceGod::Coop::CoopPeer;
@@ -48,6 +50,28 @@ void ASpaceGameMode::InitGame(const FString& MapName, const FString& Options, FS
 void ASpaceGameMode::StartPlay()
 {
 	Super::StartPlay();
+
+	// US-T64: co-op from the command line in every build. A Shipping game ignores a map URL on its command line
+	// (UGameInstance::StartGameInstance: no "?listen", no "<host ip>"), and has no console for Host or "open <host ip>",
+	// so -CoopHost reopens this map as a listen server (as the URL's "?listen" does) and -CoopJoin=<address> connects to
+	// a host; each once, from the first standalone start (a client whose host has gone comes back here and stays).
+	static bool bCoopLaunched = false;
+	if (!bCoopLaunched && GetNetMode() == NM_Standalone)
+	{
+		bCoopLaunched = true;
+		FString JoinAt;
+		const FString Map = UWorld::RemovePIEPrefix(GetWorld()->GetOutermost()->GetName());
+		if (FParse::Value(FCommandLine::Get(), TEXT("-CoopJoin="), JoinAt) && !JoinAt.IsEmpty())
+		{
+			UGameplayStatics::OpenLevel(this, FName(*JoinAt), true);
+			return;
+		}
+		if (FParse::Param(FCommandLine::Get(), TEXT("CoopHost")))
+		{
+			UGameplayStatics::OpenLevel(this, FName(*Map), true, TEXT("listen"));
+			return;
+		}
+	}
 
 	// SceneManager.LoadScene: reopen this (empty) map for the other scene; a listen server keeps listening, and takes
 	// its co-op clients along (ServerTravel) when it has any (US-T44).
@@ -99,6 +123,8 @@ void ASpaceGameMode::StartPlay()
 			UE_LOG(LogSpaceGod, Display, TEXT("UnitySpaceApp up in %lld ms: %d systems, %d bodies in %s, %d ships (C++)"),
 				static_cast<long long>((FPlatformTime::Seconds() - Started) * 1000.0), App->Galaxy->Systems.Count(), App->Catalog()->Count(),
 				*SpaceGod::UnrealSpace::ToFString(App->ActiveSystem->Name), App->Fleet()->Ships().Count());
+			// US-T64: and in the co-op log, so a packaged host (-SpaceGodCoopLog; Shipping logs nothing) says it is up too.
+			if (CoopSmoke::Active()) CoopPeer::Log(cs::Cat("host app up: ", App->Galaxy->Systems.Count(), " systems, ", App->Fleet()->Ships().Count(), " ships"));
 			if (CoopSmoke::Active()) SpaceGod::UnityCompat::Application::SetTargetFrameRate(60); // the co-op smoke's pace
 		}
 	}

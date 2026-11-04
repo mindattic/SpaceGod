@@ -44,13 +44,44 @@ namespace Unity.SpaceGod.Coop
         static string productionBefore;
         static int objectivesBefore, recordBefore;
         static double treasuryBefore;
+        static StarSystem travelTo; // US-T64
+
+        // US-T64 (both tracks, the C++ script's): a step that needs an earlier ask carried out waits for it to come back
+        // in a host frame. A client's ask reaches the host while the host is as far ahead as the client's backlog, so it
+        // comes back only once the client has replayed that far: on a client that replays more slowly than the host makes
+        // frames (its backlog growing to hundreds of frames), a fixed number of frames is no answer. The script's frame
+        // count stands still while it waits (as at 729 for the freighter's helm), so every later step keeps its place
+        // after the one it follows; a wait gives up after MaxWait replayed frames and the step goes on (its check then
+        // fails, with a warning naming the wait).
+        const int MaxWait = 3600;
+        static int waited;
+        static long waitingAt = -1;
+        static int mostBehind; // the client's largest backlog, for the done line
+
+        /// <summary>True while the script waits at step <paramref name="at"/> for <paramref name="ready"/>: the step is held.</summary>
+        static bool Waits(long at, bool ready, string what, CoopPeer peer)
+        {
+            if (ready || replayed + 1 != at)
+            {
+                if (waitingAt == at && waited > 0)
+                    CoopPeer.Log("smoke: step " + at + " waited " + waited + " frames for " + what + " (to frame " + peer.Frame + ")");
+                if (waitingAt == at) { waitingAt = -1; waited = 0; }
+                return false;
+            }
+            if (waitingAt != at) { waitingAt = at; waited = 0; }
+            if (++waited <= MaxWait) return true;
+            CoopPeer.Warn("smoke: step " + at + " gave up waiting for " + what + " after " + MaxWait + " frames (frame " + peer.Frame + ", backlog " + peer.Backlog + ")");
+            waitingAt = -1;
+            waited = 0;
+            return false;
+        }
 
         static void Finish(string why, CoopPeer peer, UnitySpaceApp app)
         {
             if (finished) return;
             finished = true;
             CoopPeer.Log("smoke (" + Role + ") done: " + why + "; frame " + peer.Frame + ", " +
-                         (peer.IsHost ? peer.DigestMatches + " digest matches, " + peer.Desyncs + " desyncs" : peer.ClockCorrections + " clock corrections") +
+                         (peer.IsHost ? peer.DigestMatches + " digest matches, " + peer.Desyncs + " desyncs" : peer.ClockCorrections + " clock corrections, at most " + mostBehind + " frames behind the host") +
                          (app != null ? ", " + app.CoopPilotFrames + " helm frames made here, " + peer.PilotSent + " helm inputs sent, " + app.CoopCockpitKeys + " cockpit keys, " +
                                         app.CoopActions + " actions, " + peer.Retakes + " seats kept through syncs, " + CoopSettings.Applied + " settings taken" : "") +
                          ", " + Since.Elapsed.TotalSeconds.ToString("F0") + " s; quitting");
@@ -86,11 +117,35 @@ namespace Unity.SpaceGod.Coop
         public static void ClientFrame(CoopPeer peer, UnitySpaceApp app)
         {
             if (Role != "client" || finished || Script == null) return;
+            if (peer.Backlog > mostBehind) mostBehind = peer.Backlog;
             // US-T47: the flying (from 730 on: W, X, F) waits until the spawned freighter's helm has come back in a host frame,
             // as the C++ script has since US-T44: on a busy machine the helm can still be in flight at 730 here too, and X
             // (roll at the helm) then opens the news panel in command (X is also ToggleNews), which keeps the cockpit's keys
             // off later on (a run with 0 cockpit keys: the helm came 39 frames after 730).
             if (replayed == 729 && app.Piloted.IsNone) return;
+            // US-T64: the other steps that follow an ask (see Waits): the selection (applied with the frames) before the camera
+            // goes to it; the seat held before the resync that must keep it, and handed back before Earth is picked again; the freighter's helm handed back before the carrier; the carrier's helm held
+            // before it goes to its crew; the fighter's cockpit held before its keys, and handed back before the trip; the
+            // party arrived before the galaxy map's screens; the speaker carried before the orders given as it; the orders and
+            // the gift carried before they are checked, and so before the load (whose sync would skip the frames that carry
+            // them on this client).
+            var strategy = app.Galaxy.Polities.Command;
+            bool bodySelected = app.CoopTargetKey(app.Selected).StartsWith("b ");
+            if (Waits(200, bodySelected, "the selection", peer)) return;
+            if (Waits(480, app.Seat != null, "the station's seat", peer)) return;
+            if (Waits(670, app.Seat == null, "the station's seat handed back", peer)) return;
+            if (Waits(680, bodySelected, "the selection", peer)) return;
+            if (Waits(1040, app.Piloted.IsNone, "the freighter's helm handed back", peer)) return;
+            if (Waits(1340, app.Piloted.Ship != null, "the carrier's helm", peer)) return;
+            if (fighter != null && Waits(fighterFrom + 60, app.Seat is FighterSeat, "the fighter's cockpit", peer)) return;
+            if (Waits(1760, app.Seat == null, "the fighter's cockpit handed back", peer)) return;
+            if (Waits(2050, travelTo == null || app.ActiveSystem == travelTo, "the party's trip", peer)) return;
+            if (Waits(2080, speaker == null || strategy.Player == speaker, "the speaker", peer)) return;
+            if (speaker != null && hailed != null)
+            {
+                bool carried = strategy.Find(speaker) is { } d && d.Production.Name != productionBefore && app.Galaxy.Polities.Statecraft.Record.Count > recordBefore;
+                if (Waits(2320, carried, "the orders and the gift", peer)) return;
+            }
             long n = ++replayed;
             // The stick at the helm: throttle up, the mouse swinging the nose, a roll.
             if (n >= 740 && n < 800) Script.MouseDelta = new UnityEngine.Vector2(4f, 2f);
@@ -207,6 +262,7 @@ namespace Unity.SpaceGod.Coop
                     CoopPeer.Log("smoke: client asks for the party's trip to " + to?.Name + " at frame " + peer.Frame + " (from " + app.ActiveSystem.Name + ")");
                     if (to != null) app.TravelTo(to);
                     travelFrom = n;
+                    travelTo = to;
                     break;
                 }
                 // US-T47: the galaxy map's strategy and envoy screens and a hail (F12), from the client.
