@@ -22,8 +22,8 @@ the same machine. The page version: https://claude.ai/artifact/9FPW33Y1uUubSXkZH
 | Simulation memory (headless peak working set) | **C++** | 30–60 MB vs 90–150 MB | signal |
 | In game, simulation time per frame at 1 week/s | **C++** | 35 ms vs 82 ms p50 (2.4×) | signal (every run) |
 | In game, simulation time per frame at the default warp | **C++** | 1.0 ms vs 1.5 ms p50 | signal |
-| In game, the rest of the frame (views, facade, push to Unreal) | **C#** | ≈6.9 ms vs ≈10.8 ms at Sol idle (whole Unity frame 8.4 vs 11.8 ms p50, minus the simulation) | signal: a C++ facade cost (US-T62), not the language |
-| In game, frame time at Sol idle | **C#** | 12.2 ms vs 15.0 ms p50 | signal, from the line above |
+| In game, the rest of the frame (views, facade, push to Unreal) | **C#** in the race; **C++** since US-T62 | race: ≈6.9 ms vs ≈10.8 ms at Sol idle (whole Unity frame 8.4 vs 11.8 ms p50, minus the simulation). After US-T62's facade fix: C++ whole Unity frame 3.7 ms p50 at Sol idle (10.3 before, same machine, interleaved) | signal: it was a C++ facade cost, not the language (see "After US-T62" in section 2) |
+| In game, frame time at Sol idle | **C#** in the race; **C++** since US-T62 | race: 12.2 ms vs 15.0 ms p50; C++ after US-T62: 6.3 ms (12.8 before) | signal, from the line above |
 | In game, frame time in a battle | **C++** | p95 27 ms vs 226 ms; GPU 2.5 ms vs 116 ms | signal: a C# rendering defect (US-T61) |
 | In game, frame time at 1 week/s | **C++** | 53 ms vs 97 ms p50 | signal |
 | Startup: launch to the main menu / to playable | **C++** | 2.4 s vs 4.1 s / 8.8 s vs 20.5 s | signal |
@@ -38,7 +38,7 @@ the same machine. The page version: https://claude.ai/artifact/9FPW33Y1uUubSXkZH
 knows only C# write the game. That does not apply here: the author of both tracks is an AI that writes C++ as fluently
 as C#, and Unreal is a C++ engine, whose own API, samples, debugger, profilers, Live Coding and packaging all assume C++.
 The measurements show no real C# win that would outweigh that. Where C# is ahead, the cause is fixable in the C++ code
-(the engine-side frame, US-T62) or small (save/load by 50–130 ms, the lighter headless tick). Where C++ is ahead it is
+(the engine-side frame, since fixed by US-T62) or small (save/load by 50–130 ms, the lighter headless tick). Where C++ is ahead it is
 large and structural: startup 2.3× faster, half the memory, the in-game simulation 1.5–2.4× faster, no 150 MB runtime to
 ship, no young binding layer (UnrealSharp is pre-1.0, pinned by commit) with its build-time and packaging workarounds.
 
@@ -218,7 +218,30 @@ How to read it:
 - **The rest of the frame is cheaper in C#.** The whole Unity frame minus the simulation is about 10.8 ms (C++) against
   6.9 ms (C#) at Sol idle. Both run the same original Runtime code over a facade, so this is the C++ facade's cost
   (views pushed into `UDynamicMeshComponent`s, the scene sync), not C++ itself: US-T62. It is what makes the C# idle
-  frame 2.8 ms shorter.
+  frame 2.8 ms shorter. Fixed since: see "After US-T62" below.
+
+**After US-T62** (the C++ facade fix, `ff65b0e`; measured later on the same machine, not part of the race above). The cost
+was `UnityScene`'s, not the views': LaneView's hyperlanes mesh (12,296 vertices, rebuilt every frame) was converted to a
+new `FDynamicMesh3`, copied and `SetMesh`'d every frame, which also rebuilds its scene proxy (in battle also the shield
+rings and battle effects), and the scene's renderers and particle systems were found each frame by casting every
+component of every GameObject. A mesh rebuilt with the same triangles now has its vertex values written in place and
+pushed to its render buffers (`FastNotifyPositionsUpdated`), and the lists are kept between changes of the scene. The
+race's C++ Shipping package (`3689308`) against one with the fix, three runs each, interleaved, same tour (271 ships after
+Sol idle, the battle over with 7 units, the trip 268 frames); medians, ms, the range of the three in brackets; every run
+of the fix beats every run without it:
+
+| | C++ before | C++ after US-T62 | C# (the race's runs) |
+|---|---|---|---|
+| Sol idle: whole Unity frame p50 / p95 | 10.3 [8.9–10.8] / 20.3 | **3.7** [3.3–3.7] / 14.3 | 8.4 / 18.0 |
+| Sol idle: frame p50 / p95 | 12.8 [11.4–13.6] / 24.8 | **6.3** [5.5–6.3] / 18.6 | 12.2 / 23.3 |
+| Battle: whole Unity frame p50 | 11.0 [9.2–12.1] | **3.4** [3.4–3.6] | 7.9 |
+| Battle: frame p50 / p95 | 13.3 / 24.6 | **5.2** / 14.6 | 16.7 / 225.5 |
+| Trip: whole Unity frame p50 | 5.3 [5.3–5.4] | **1.5** [1.4–1.5] | 4.0 |
+| Trip: frame p50 | 7.0 | **2.6** | 6.3 |
+| Simulation per frame p50 (Sol idle / battle) | 0.88 / 0.92 | 0.93 / 0.87 | 1.5 / 1.4 |
+
+The p95s keep the frames on which the hyperlanes' triangles change (a ship joins or leaves a lane, a ring passes the
+2.5-pixel cut-off): those still convert in full. At 1 week/s the frame is the simulation's (41 ms p50 both).
 - **The C# battle is GPU-bound** at ~116 ms a frame for a stretch of the fight on every run (C++: 2.5 ms on the same
   frames), which makes its p95 eight times the C++ one. Something the C# battle view draws or waits on: US-T61.
 - **Startup and memory are C++'s by a wide margin.** The C# game JIT-compiles the Core on first use (UnrealSharp ships no
