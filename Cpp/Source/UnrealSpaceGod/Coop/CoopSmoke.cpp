@@ -58,6 +58,7 @@ namespace SpaceGod::Coop::CoopSmoke
 
 		std::unique_ptr<Smoke::ScriptedDevice> script;
 		long long byeAt = -1;
+		double byeSeconds = 0; // US-T47
 		long long replayed = 0;
 		int quitIn = -1;
 		bool finished = false, hostSaved = false;
@@ -121,8 +122,10 @@ namespace SpaceGod::Coop::CoopSmoke
 			bool saved = app->SaveTo(SaveSlots::Quick, "Quicksave");
 			CoopPeer::Log(cs::Cat("smoke: host quicksaves at frame ", rec.Frame, ": ", saved ? "True" : "False"));
 		}
-		if (peer.AnyBye() && byeAt < 0) byeAt = rec.Frame;
-		if (byeAt >= 0 && rec.Frame >= byeAt + 30) Finish("the client said bye", peer, app);
+		if (peer.AnyBye() && byeAt < 0) { byeAt = rec.Frame; byeSeconds = Since(); }
+		// US-T47: and 5 s, so the client (30 of its own ticks, slower than the host's frames when catching up) quits first:
+		// a client whose host has gone goes back to the start map, which is no end for the smoke.
+		if (byeAt >= 0 && rec.Frame >= byeAt + 30 && Since() - byeSeconds >= 5) Finish("the client said bye", peer, app);
 		else if (Since() > TimeoutSeconds) Finish("TIMEOUT", peer, app);
 	}
 

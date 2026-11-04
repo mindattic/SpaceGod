@@ -41,7 +41,10 @@ namespace SpaceGod::Views
 			int texels = packed.Count() / 4;
 			constexpr int width = 2048;
 			int height = FMath::Max(1, (texels + width - 1) / width);
-			UTexture2D* tex = NewObject<UTexture2D>(GetTransientPackage(), TEXT("Asteroids"), RF_Transient);
+			// US-T47: a name of its own each time. A second app in the same process (a co-op client back at the start map after
+			// its host left) made another "Asteroids" while the first's wrapper still held it, and NewObject replacing a
+			// referenced object asserts (UObjectArray: GetRefCount() == 0).
+			UTexture2D* tex = NewObject<UTexture2D>(GetTransientPackage(), MakeUniqueObjectName(GetTransientPackage(), UTexture2D::StaticClass(), TEXT("Asteroids")), RF_Transient);
 			auto* data = new FTexturePlatformData();
 			data->SizeX = width;
 			data->SizeY = height;
