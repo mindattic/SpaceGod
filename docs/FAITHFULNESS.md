@@ -222,7 +222,7 @@ Sources: **CH** = ControlsHelp binding, **GM** = GameManual chapter, **US** = U.
 | Pause menu: Resume, Help, Save/Load, Settings > Display, Main Menu, Quit | CH, US-T276 | ✓R | ✓R | |
 | Text fields (profile and save names) | US-T327 | ≠ | ✓C | C++: append and backspace only (**US-T52**) |
 | Text clipped at scroll and clip edges | (IMGUI) | ✓C | ✓R | C#: drawn through a Slate overlay with clipping zones, glyphs cut at the edge; icons with Unity's mip chain (US-T54; shots: the clipped panels match the C++ shot, 22% → 0.04% of pixels) |
-| Unity default skin (ModelViewer, asteroid labels) | (IMGUI) | ≠ | ≠ | approximated greys (**US-T57**) |
+| Unity default skin (ModelViewer, asteroid labels, default scrollbars and sliders) | (IMGUI) | ✓R | ✓R | Unity's own GameSkin, read from the original player (`tools/unity_extract.py`); model viewer panel 4.76% (C++) / 4.87% (C#) of pixels differing from the original player's, all text rasterisation (US-T57) |
 
 ### Rendering features
 
@@ -233,7 +233,7 @@ Sources: **CH** = ControlsHelp binding, **GM** = GameManual chapter, **US** = U.
 | Kenney craft and procedural hulls, LOD, far icons (U.SPC-T376, T415) | US | ✓R | ✓R | views check |
 | Model viewer (F9 / `-modelviewer`) | US-T24, T111 | ≠ | ✓R | C++: camera depth and culling mask not rendered (**US-T53**) |
 | Ship thumbnails (offscreen capture) | US-T24 | ✓C | ✓R | |
-| Lights, PBR for imported glTF | (URP) | ≠ | ≠ | Light components are data only; the viewer's glTF uses M_Ship (**US-T57**) |
+| Lights, PBR for imported glTF | (URP) | ✓R | ✓R | Lights light only URP Lit (as under URP); the glTF hulls draw with M_Lit, URP 17's PBR; C# hull 2.05% of pixels from the original's (US-T57; C++: lit and shaded alike, seen from the other side, US-T53) |
 | Scene tour (`-demo`) and capture (`-capture`) | US-T10, T15 | ✓C | ✓R | C#: all 55 stops; `play.ps1 -Mode demo` accepts only CSharp, so the C++ tour has not been run |
 
 ### Audio
@@ -249,8 +249,8 @@ The 88 rows of the checklist above (a row with two marks, such as `✓R / ✓C`,
 
 | Track | ✓R | ✓C | ✗ | ≠ |
 |---|---|---|---|---|
-| C++ | 60 | 21 | 0 | 7 |
-| C# | 67 | 14 | 3 | 4 |
+| C++ | 62 | 21 | 0 | 5 |
+| C# | 69 | 14 | 3 | 2 |
 
 Binding audit: 47 PASS, 0 FAIL on each track.
 
@@ -265,7 +265,30 @@ Binding audit: 47 PASS, 0 FAIL on each track.
 | US-T54 | C# | IMGUI text clipped by whole glyphs; icons without mips (fixed: Slate overlay, mip chain) |
 | US-T55 | both | MSAA setting is FXAA (deferred renderer) |
 | US-T56 | both | display modes all at 60 Hz |
-| US-T57 | both | Light components data only, glTF without PBR, default skin approximated |
+| US-T57 | both | Light components data only, glTF without PBR, default skin approximated (fixed: Lights on URP Lit, M_Lit, Unity's GameSkin) |
+
+## US-T57: the model viewer against the original player
+
+`Unity.SpaceGod/Builds/Windows/Unity.SpaceGod.exe -screen-width 1600 -screen-height 900 -screen-fullscreen 0 -capture
+-modelviewer craft_cargoA` (the window's client area captured) against each track's `tools/play.ps1 -Mode fidelity`
+model viewer shot (the same model, orbit and zoom), `tools/imgdiff.py` (any channel > 24/255), by region:
+
+| Region | C# before | C# after | C++ after |
+|---|---|---|---|
+| hull (pixels the original draws off the backdrop) | 96.70% | 2.05% | 80.26% (seen from the other side: US-T53) |
+| panel (box, label box, buttons, scroll view) | 8.05% | 4.87% | 4.76% |
+| whole frame | 4.64% | 64.96% | 67.85% |
+
+The hull's faces now match the original's within 1-2 levels (e.g. (100, 113, 134) → (99, 113, 133), (254, 215, 141) →
+(253, 215, 140)); before, M_Ship drew it near black. What is left in the panel is text rasterisation. The whole-frame
+figure is the camera's SolidColor backdrop, not US-T57: the uncommitted exposure work in the shared tree (US-T51/T55)
+lifts it from Unity's flat (13, 15, 23) to about (40, 43, 50) on both tracks (noted on US-T51).
+
+| Original player | C# | C++ |
+|---|---|---|
+| ![](images/us-t57-unity-model-viewer.png) | ![](images/us-t57-csharp-model-viewer.png) | ![](images/us-t57-cpp-model-viewer.png) |
+
+![The default skin, original (left) and C# (right)](images/us-t57-skin-panel-unity-vs-csharp.png)
 
 ## Not covered by a run yet
 

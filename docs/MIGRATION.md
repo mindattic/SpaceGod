@@ -598,8 +598,12 @@ Canvas only if the binder is missing. Before / after against the C++ shot, the i
 
 ![clip edge: C++, C# before, C# after](images/csharp-ui-clip-compare.png)
 
-**Not faithful yet (UI).** Unity's default-skin look (only `ModelViewer` and AsteroidBelt's labels use `GUI.skin`) is
-approximated with generated greys.
+**Unity's default skin (US-T57).** `GUI.skin` (ModelViewer, AsteroidBelt's labels, every default scrollbar and slider) is
+Unity's own: `tools/unity_extract.py` reads the runtime "GameSkin" out of the original player's `unity default resources`
+into `UnityCompat/Imgui/BuiltinSkin.cs` (and the C++ `UnityBuiltinSkin.inl`): every style's states, border, margin,
+padding, overflow, alignment, clipping and fixed sizes, and its 7-27 px textures pixel for pixel (linear textures, which
+the linear-space original shows sRGB-encoded: the generator bakes that in); scrollbars and sliders lay out as Unity's
+SliderHandler (the thumb is ThumbSize plus the visible part, inside the track's padding).
 The text field is Unity's TextEditor (US-T40): cursor and selection, click/double-click/triple-click/shift-click/drag,
 arrows, Home/End, Ctrl word moves and deletes, Ctrl+A/C/X/V on the Windows clipboard, the cursor kept in view, with
 OS-style key repeat; not ported: IME composition and undo (Unity's TextField has no undo either).
@@ -726,10 +730,21 @@ the tour, the screenshot runs and the menus' Quit left the game running):
 | Model viewer (F9) | ![](images/csharp-fidelity-before-model-viewer.png) | ![](images/csharp-fidelity-model-viewer.png) | |
 | Spawn grid thumbnails | ![](images/csharp-fidelity-before-spawn-thumbnails.png) | ![](images/csharp-fidelity-spawn-thumbnails.png) | |
 
-Not exact yet: `Light` components are data only (the shaders light themselves; a camera's own key light is the one
-exception above); one Unreal component per Unity renderer, no instancing of shared meshes; the backdrop colour is matched
+Not exact yet: one Unreal component per Unity renderer, no instancing of shared meshes; the backdrop colour is matched
 through a measured transfer (M_Sky's texel does not reach the screen as Unity's clear colour does), so it is within a few
-levels, not exact; the viewer's glTF materials are the game's Ship shader in the glTF base colour, not URP Lit's PBR.
+levels, not exact.
+
+**US-T57 (lights, URP Lit, the default skin; both tracks).** Unity's `Light` components now light what they lit under
+URP: only URP Lit materials (the game's shaders are unlit and light themselves from the Sun globals, which no Light
+touches any more). The original makes two lights, both `RenderBackend.AddKeyLight` (directional, 1.2, white, culling mask
+= the ModelViewer layer): ModelViewer's and ShipThumbnails'. Each frame `UnityLights` (C#) / `UnityScene::GatherLights`
+(C++) takes the enabled directional Lights the screen camera can see, the brightest as URP's main light, and gives a Lit
+renderer on layer L those whose mask has L, as direction and `color.linear × intensity`. The imported glTF hulls
+(glTFast's `glTF-pbrMetallicRoughness`, a URP Lit target) draw with SpaceGodRender's new `M_Lit` (URP 17's forward PBR,
+`Shaders/Lit.ush`) in their glTF base colour, metallic, smoothness = 1 − roughness and emission (`ShipModels.json` now
+carries them), lit by the viewer's key light and the scenes' own environment (ambient probe and skybox reflection, read
+from the original player). Proof against the original player (`-capture -modelviewer craft_cargoA`, 1600×900):
+see FAITHFULNESS.md "US-T57".
 
 ## Co-op (US-T39, C# track; the C++ track mirrors it)
 
