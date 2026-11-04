@@ -708,6 +708,9 @@ namespace SpaceGod::UnityCompat
 		{
 			FString Mesh, Material;
 			FLinearColor BaseColor = FLinearColor::White;
+			// glTF metallicFactor / roughnessFactor / emissiveFactor (US-T57; glTF's defaults when absent).
+			float Metallic = 1, Roughness = 1;
+			FLinearColor Emissive = FLinearColor::Black;
 		};
 
 		struct ModelSpec
@@ -748,6 +751,12 @@ namespace SpaceGod::UnityCompat
 							const TArray<TSharedPtr<FJsonValue>>* c = nullptr;
 							if (po->TryGetArrayField(TEXT("baseColor"), c) && c->Num() == 4)
 								part.BaseColor = FLinearColor((*c)[0]->AsNumber(), (*c)[1]->AsNumber(), (*c)[2]->AsNumber(), (*c)[3]->AsNumber());
+							double metallic = 1, roughness = 1;
+							if (po->TryGetNumberField(TEXT("metallic"), metallic)) part.Metallic = static_cast<float>(metallic);
+							if (po->TryGetNumberField(TEXT("roughness"), roughness)) part.Roughness = static_cast<float>(roughness);
+							const TArray<TSharedPtr<FJsonValue>>* e = nullptr;
+							if (po->TryGetArrayField(TEXT("emissive"), e) && e->Num() == 3)
+								part.Emissive = FLinearColor((*e)[0]->AsNumber(), (*e)[1]->AsNumber(), (*e)[2]->AsNumber(), 1);
 							spec.Parts.push_back(part);
 						}
 					out[FromF(FString(kv.Key))] = spec;
@@ -799,6 +808,11 @@ namespace SpaceGod::UnityCompat
 				AddComponent<MeshFilter>(go)->sharedMesh = mesh;
 				auto material = cs::New<Material>(shader, FromF(part.Material));
 				material->SetColor("_BaseColor", Color(LinearToSrgb(part.BaseColor.R), LinearToSrgb(part.BaseColor.G), LinearToSrgb(part.BaseColor.B), part.BaseColor.A));
+				// The rest of glTFast's glTF-pbrMetallicRoughness (a URP Lit target) in URP Lit's terms, drawn by M_Lit
+				// (US-T57): smoothness = 1 - roughness, the emissive factor (linear) as a colour like the base colour.
+				material->SetFloat("_Metallic", part.Metallic);
+				material->SetFloat("_Smoothness", 1.0f - part.Roughness);
+				material->SetColor("_EmissionColor", Color(LinearToSrgb(part.Emissive.R), LinearToSrgb(part.Emissive.G), LinearToSrgb(part.Emissive.B), 1));
 				AddComponent<MeshRenderer>(go)->SetSharedMaterial(material);
 			}
 			return root;

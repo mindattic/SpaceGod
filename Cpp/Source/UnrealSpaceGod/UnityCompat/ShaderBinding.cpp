@@ -41,7 +41,7 @@ namespace SpaceGod::UnityCompat
 
 		const ParentEntry& Resolve(const Shader* shader)
 		{
-			cs::String name = ShaderBinding::ShaderName(shader);
+			cs::String name = ShaderBinding::IsLit(shader) ? cs::String("Lit") : ShaderBinding::ShaderName(shader);
 			auto& parents = Parents();
 			auto it = parents.find(name);
 			if (it != parents.end()) return it->second;
@@ -51,8 +51,7 @@ namespace SpaceGod::UnityCompat
 			e.Real = m != nullptr;
 			if (!m)
 			{
-				// The placeholder until SpaceGodRender has it (and for shaders it never will: the imported models' glTF
-				// shader, which ShipModels replaces with Ship anyway).
+				// The placeholder until SpaceGodRender has it.
 				m = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/EngineMaterials/DefaultMaterial.DefaultMaterial"));
 				UE_LOG(LogSpaceGod, Display, TEXT("ShaderBinding: %s has no %s yet; drawn with the placeholder"), UTF8_TO_TCHAR(name.c_str()), *path);
 			}
@@ -103,6 +102,11 @@ namespace SpaceGod::UnityCompat
 	bool ShaderBinding::IsReal(const Shader* shader) { return Resolve(shader).Real; }
 
 	int ShaderBinding::SortPriority(const Shader* shader)
+	bool ShaderBinding::IsLit(const Shader* shader)
+	{
+		return shader && (shader->name == "glTF/PbrMetallicRoughness" || ShaderName(shader) == "Lit");
+	}
+
 	{
 		cs::String n = ShaderName(shader);
 		if (n == "Stars") return -1000;

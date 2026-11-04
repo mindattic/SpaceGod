@@ -45,6 +45,10 @@ namespace SpaceGod::UnityCompat
 		/// Whether the shader is drawn with its real SpaceGodRender material.
 		static bool IsReal(const Shader* shader);
 
+		/// Drawn with URP Lit (M_Lit, the one material Unity's Light components reach, US-T57): the glTF import's
+		/// material (glTFast's glTF-pbrMetallicRoughness shader graph, a URP Lit target) and URP's own Lit shader.
+		static bool IsLit(const Shader* shader);
+
 		/// The plugin's draw order for a translucent shader (Unity's render queue order).
 		static int SortPriority(const Shader* shader);
 
