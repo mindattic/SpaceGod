@@ -28,6 +28,8 @@ namespace Unity.SpaceGod.Audit
             kb = device;
             frames = stepFrames;
             pass = fail = 0;
+            Probe("audio", () => SettingsAudit.Audio(Result, frames)); // US-T50
+            Probe("render", () => SettingsAudit.Render(Result, frames)); // US-T51
             Probe("time", Time);
             Probe("view", View);
             Probe("screens", Screens);

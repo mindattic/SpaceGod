@@ -185,6 +185,10 @@ namespace SpaceGod::Rendering
 		/// <summary>The Unreal backend made last (null before the first), which the settings menu's choices reach.</summary>
 		static UnrealRenderBackend* Existing();
 
+		/// <summary>The post-process Unreal draws the game's camera with, read back from the volume, and the star glare
+		/// the shaders read (the audit's render probes, US-T51; the C# track's UnrealRenderBackend.Describe, same text).</summary>
+		cs::String Describe();
+
 	private:
 		Core::CameraLook look;
 		PostProcessLook game;

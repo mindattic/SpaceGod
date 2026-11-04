@@ -1,5 +1,6 @@
 #include "Smoke/FeatureAudit.h"
 #include "Smoke/ScriptedDevice.h"
+#include "Smoke/FeatureAuditSettings.h"
 
 #include "Target.h"
 #include "UnitySpaceApp.h"
@@ -392,6 +393,8 @@ namespace SpaceGod::Smoke::FeatureAudit
 		kb = &script;
 		frames = stepFrames;
 		pass = fail = 0;
+		Probe("audio", [] { AudioProbes(Result, frames); }); // US-T50
+		Probe("render", [] { RenderProbes(Result, frames); }); // US-T51
 		Probe("time", TimeProbes);
 		Probe("view", ViewProbes);
 		Probe("screens", ScreenProbes);

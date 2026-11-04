@@ -244,6 +244,17 @@ namespace SpaceGod::Rendering
 		s.ToneCurveAmount = stack && look.Tonemapping != ToneCurve::None ? 1.0f : 0.0f;
 	}
 
+	cs::String UnrealRenderBackend::Describe()
+	{
+		APostProcessVolume* volume = Volume();
+		if (!volume) return "no post-process";
+		const FPostProcessSettings& s = volume->Settings;
+		return cs::Cat("gain ", cs::Fmt(s.ColorGain.X, "0.###"), ", contrast ", cs::Fmt(s.ColorContrast.X, "0.###"),
+			", saturation ", cs::Fmt(s.ColorSaturation.X, "0.###"), ", white ", cs::Fmt(s.WhiteTemp, "0.#"), " K, bloom ",
+			cs::Fmt(s.BloomIntensity, "0.###"), " over ", cs::Fmt(s.BloomThreshold, "0.###"), ", tone curve ", cs::Fmt(s.ToneCurveAmount, "0.#"),
+			", glare ", cs::Fmt(Shader::GetGlobalFloat(RenderGlobals::SunBrightness), "0.#"));
+	}
+
 	// ---------------------------------------------------------------- RenderPipelineSettings
 
 	namespace

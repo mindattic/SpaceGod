@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using Unity.SpaceGod.Core;
+using Unity.SpaceGod.Rendering.Urp;
 using UnityEngine;
 using UnrealSharp.CoreUObject;
 using UnrealSharp.Engine;
@@ -168,17 +170,41 @@ namespace Unity.SpaceGod.Rendering
     }
 
     /// <summary>
-    /// Unity.SpaceGod's render-pipeline intent on Unreal's renderer. The hand-written shaders draw straight to the
-    /// display's range, as the game's URP camera rendered LDR with no post-processing (<see cref="PostProcessLook.None"/>):
-    /// so the main camera gets a fixed exposure (manual metering at 0 EV; SpaceGodRender's SG_Expose divides by Unreal's
+    /// Unity.SpaceGod's URP backend (UrpRenderBackend.cs) on Unreal's renderer, as the C++ track's UnrealRenderBackend
+    /// (Rendering/Pipeline/RenderBackend.cpp, US-T51): the game's camera sees through one post-process (here the
+    /// camera component's, there an unbound volume: the same settings) that carries the settings menu's look
+    /// (<see cref="UrpPostProcessSettings"/>, <see cref="SetLook"/>) plus what the game asks of it
+    /// (<see cref="SetPostProcessing"/>), as URP's Volume stack does. With the look off the image is drawn exactly as the
+    /// shaders draw it: a fixed exposure (manual metering at 0 EV; SpaceGodRender's SG_Expose divides by Unreal's
     /// exposure anyway), a linear tone curve (ToneCurveAmount 0, ExpandGamut 0, as SpaceGodRender's README asks), no
-    /// bloom, no motion blur, and FXAA instead of TAA/TSR, which smear one-pixel points and lines. A
-    /// <see cref="PostProcessLook"/> that is enabled (URP's Volume stack) maps to exposure compensation, bloom
-    /// intensity/threshold and colour contrast/saturation.
+    /// bloom, no motion blur, and FXAA instead of TAA/TSR, which smear one-pixel points and lines. Exposure stops are a
+    /// colour gain (URP's post-exposure): the shaders cancel Unreal's eye adaptation, so the adapting meters keep their
+    /// compensation only.
     /// </summary>
     public sealed class UnrealRenderBackend : NeutralRenderBackend
     {
-        public UnrealRenderBackend(RenderPipelineProfile profile) : base(profile) { }
+        static readonly int SunBrightnessId = Shader.PropertyToID(RenderGlobals.SunBrightness);
+        static UnrealRenderBackend? live;
+
+        CameraLook look;
+        PostProcessLook game;
+        bool mainSetUp;
+        UCameraComponent? target;
+
+        public UnrealRenderBackend(RenderPipelineProfile profile) : base(profile)
+        {
+            live = this;
+            look = UrpPostProcessSettings.Current;
+            Shader.SetGlobalFloat(SunBrightnessId, StarGlare);
+        }
+
+        /// <summary>The Unreal backend made last (null before the first), which the settings menu's choices reach.</summary>
+        internal static UnrealRenderBackend? Existing => live;
+
+        /// <summary>The settings menu's look as it was last put into effect.</summary>
+        public CameraLook Look => look;
+
+        float StarGlare => look.Enabled ? (float)Math.Max(1.0, look.SunBrightness) : 1f;
 
         bool cvarsSet;
 
@@ -198,7 +224,9 @@ namespace Unity.SpaceGod.Rendering
         {
             SetCvars();
             if (role == CameraRole.Offscreen) return;
-            Apply(camera, PostProcessLook.None);
+            if (camera?.Unreal != null) target = camera.Unreal;
+            if (role == CameraRole.Main) mainSetUp = true;
+            Apply();
         }
 
         public override void SetMsaa(Camera camera, bool on)
@@ -208,37 +236,85 @@ namespace Unity.SpaceGod.Rendering
             if (UnityBridge.HasHost) SystemLibrary.ExecuteConsoleCommand(on ? "r.AntiAliasingMethod 1" : "r.AntiAliasingMethod 0");
         }
 
-        public override void SetPostProcessing(Camera camera, PostProcessLook look) => Apply(camera, look);
-
-        static void Apply(Camera camera, PostProcessLook look)
+        public override void SetPostProcessing(Camera camera, PostProcessLook value)
         {
-            var cam = camera?.Unreal;
-            if (cam == null) return;
-            var pp = cam.PostProcessSettings;
-            pp.Override_ToneCurveAmount = true;
-            pp.ToneCurveAmount = 0f;
-            pp.Override_ExpandGamut = true;
-            pp.ExpandGamut = 0f;
-            pp.Override_AutoExposureMethod = true;
-            pp.MeteringMode = EAutoExposureMethod.AEM_Manual;
-            pp.Override_AutoExposureBias = true;
-            pp.ExposureCompensation = look.Enabled ? look.ExposureEv : 0f;
-            pp.Override_AutoExposureApplyPhysicalCameraExposure = true;
-            pp.ApplyPhysicalCameraExposure = false;
-            pp.Override_BloomIntensity = true;
-            pp.BloomIntensity = look.Enabled ? look.BloomIntensity : 0f;
-            pp.Override_BloomThreshold = true;
-            pp.BloomThreshold = look.Enabled ? look.BloomThreshold : -1f;
-            pp.Override_MotionBlurAmount = true;
-            pp.Amount = 0f;
-            pp.Override_ColorContrast = true;
-            float contrast = look.Enabled ? 1f + look.Contrast / 100f : 1f;
-            pp.ColorContrast = new FVector4(contrast, contrast, contrast, 1);
-            pp.Override_ColorSaturation = true;
-            float saturation = look.Enabled ? 1f + look.Saturation / 100f : 1f;
-            pp.ColorSaturation = new FVector4(saturation, saturation, saturation, 1);
-            cam.PostProcessSettings = pp;
+            if (camera == null) return;
+            game = value;
+            Apply();
+        }
+
+        /// <summary>Puts <paramref name="value"/> into effect on the game's own camera (the settings menu's choice).</summary>
+        internal void SetLook(CameraLook value)
+        {
+            look = value;
+            Shader.SetGlobalFloat(SunBrightnessId, StarGlare);
+            Apply();
+        }
+
+        void Apply()
+        {
+            var cam = target;
+            if (cam == null || !cam.IsValid()) return;
+            var s = cam.PostProcessSettings;
+            bool stack = mainSetUp && look.Enabled;
+
+            // Always: the shaders' own exposure (SG_Expose cancels the eye adaptation), so a fixed, neutral exposure.
+            s.Override_AutoExposureMethod = true;
+            s.MeteringMode = EAutoExposureMethod.AEM_Manual;
+            s.Override_AutoExposureBias = true;
+            s.ExposureCompensation = 0f;
+            s.Override_AutoExposureApplyPhysicalCameraExposure = true;
+            s.ApplyPhysicalCameraExposure = false;
+            s.Override_ExpandGamut = true;
+            s.ExpandGamut = 0f;
+            s.Override_MotionBlurAmount = true;
+            s.Amount = 0f;
+
+            float gameEv = game.Enabled ? game.ExposureEv : 0f;
+            float contrast = (game.Enabled ? game.Contrast : 0f) + (stack ? (float)look.Contrast : 0f);
+            float saturation = (game.Enabled ? game.Saturation : 0f) + (stack ? (float)look.Saturation : 0f);
+            float bloomIntensity = stack ? (float)look.Bloom + (game.Enabled ? game.BloomIntensity : 0f) : game.BloomIntensity;
+            float bloomThreshold = stack ? (float)look.BloomThreshold : game.BloomThreshold;
+            // Adapting meters cannot read Unreal's eye adaptation (cancelled by the shaders): their compensation stands.
+            double stops = stack ? (look.Adapts ? look.Compensation : CameraExposure.FixedStops(look)) : 0.0;
+
+            // URP's post-exposure is a gain in linear light before the tone curve.
+            float gain = (float)Math.Pow(2.0, stops + gameEv);
+            s.Override_ColorGain = true;
+            s.ColorGain = new FVector4(gain, gain, gain, 1);
+            s.Override_ColorContrast = true;
+            float c = 1f + Math.Clamp(contrast, -100f, 100f) / 100f;
+            s.ColorContrast = new FVector4(c, c, c, 1);
+            s.Override_ColorSaturation = true;
+            float sat = 1f + Math.Clamp(saturation, -100f, 100f) / 100f;
+            s.ColorSaturation = new FVector4(sat, sat, sat, 1);
+            s.Override_WhiteTemp = true;
+            // URP's temperature runs -100 (cool) to 100 (warm); Unreal's white point is in kelvin (warmer = lower).
+            s.Temp = 6500f - 30f * (stack ? Math.Clamp((float)look.Temperature, -100f, 100f) : 0f);
+            s.Override_BloomIntensity = true;
+            s.BloomIntensity = Math.Max(0f, bloomIntensity);
+            s.Override_BloomThreshold = true;
+            s.BloomThreshold = Math.Max(0f, bloomThreshold);
+            // None draws the image as the shaders do (clipping above white); Neutral and ACES take Unreal's filmic curve.
+            s.Override_ToneCurveAmount = true;
+            s.ToneCurveAmount = stack && look.Tonemapping != ToneCurve.None ? 1f : 0f;
+            cam.PostProcessSettings = s;
             cam.PostProcessBlendWeight = 1f;
+        }
+
+        /// <summary>
+        /// The post-process Unreal draws the game's camera with, read back from the camera component, and the star glare
+        /// the shaders read (the audit's render probes, US-T51; the C++ track's UnrealRenderBackend::Describe, same text).
+        /// </summary>
+        public string Describe()
+        {
+            var cam = target;
+            if (cam == null || !cam.IsValid()) return "no post-process";
+            var s = cam.PostProcessSettings;
+            var inv = CultureInfo.InvariantCulture;
+            return string.Format(inv, "gain {0:0.###}, contrast {1:0.###}, saturation {2:0.###}, white {3:0.#} K, bloom {4:0.###} over {5:0.###}, tone curve {6:0.#}, glare {7:0.#}",
+                s.ColorGain.X, s.ColorContrast.X, s.ColorSaturation.X, s.Temp, s.BloomIntensity, s.BloomThreshold, s.ToneCurveAmount,
+                Shader.GetGlobalFloat(SunBrightnessId));
         }
     }
 }
