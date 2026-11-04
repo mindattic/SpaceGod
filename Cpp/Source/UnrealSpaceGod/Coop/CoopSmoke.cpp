@@ -66,6 +66,8 @@ namespace SpaceGod::Coop::CoopSmoke
 		cs::String warpBefore;
 		long long fighterFrom = -1, travelFrom = -1, loadFrom = -1;
 		cs::Ref<FighterSeat> fighter;
+		bool fighterHeld = false; // US-T68
+		int fighterRetakes = 0;
 		cs::Ref<Faction> speaker; // US-T47
 		cs::Ref<Ship> hailed;
 		cs::String productionBefore;
@@ -201,6 +203,20 @@ namespace SpaceGod::Coop::CoopSmoke
 		if (Waits(680, bodySelected, "the selection", peer)) return;
 		if (Waits(1040, app.Piloted.IsNone(), "the freighter's helm handed back", peer)) return;
 		if (Waits(1340, app.Piloted.Ship != nullptr, "the carrier's helm", peer)) return;
+		// US-T68 (CoopSmoke.cs's US-T67): a fighter shot down under the client before its keys (a Shipping run: 44 frames
+		// after the take) leaves no cockpit to wait for; the client takes another, a few times at most.
+		if (fighter != nullptr && replayed < fighterFrom + 100)
+		{
+			if (cs::Is<FighterSeat>(app.Seat())) fighterHeld = true;
+			else if (fighterHeld && fighterRetakes < 3)
+			{
+				CoopPeer::Log(cs::Cat("smoke: client lost the cockpit of ", fighter->Name(), " before its keys at frame ", peer.Frame(), "; takes another"));
+				fighter = nullptr;
+				fighterHeld = false;
+				fighterRetakes++;
+				fighterFrom = replayed + 1;
+			}
+		}
 		if (fighter != nullptr && Waits(fighterFrom + 60, cs::Is<FighterSeat>(app.Seat()), "the fighter's cockpit", peer)) return;
 		if (Waits(1760, app.Seat() == nullptr, "the fighter's cockpit handed back", peer)) return;
 		if (Waits(2050, travelTo == nullptr || app.ActiveSystem == travelTo, "the party's trip", peer)) return;
