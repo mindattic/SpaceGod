@@ -73,6 +73,45 @@ then and had identical toasts.
 | seats.man-gun / back-to-command / take-charge | `/`; P; `'` | ✓R | ✓R |
 | diplomacy.hail | F12 | ✓R | ✓R |
 | render.msaa / display.modes / display.exclusive-rate (US-T55, US-T56) | Settings > MSAA off/on; Display page; Apply exclusive at the largest size | ✓R | ✓R |
+| combat.mouse-aim / combat.mouse-fire (US-T58) | the mouse swinging the crosshair; T; the left button held | ✓R | ✓R |
+| transit.lane-enter / transit.lane-ride (US-T58) | W held into an on-ramp's ring; the ride | ✓R | ✓R |
+| transit.gate (US-T58) | W held into a gate's range; Y | ✓R | ✓R |
+| transit.ftl-engage / transit.ftl-arrive (US-T58) | PgDn; End; the crossing | ✓R | ✓R |
+
+US-T58 added the last four rows, the parts of play the binding probes left code-present (2026-11-04: **C#: 80 PASS,
+0 FAIL; C++: 91 PASS, 0 FAIL** in all, the difference being other tickets' probes; the US-T58 rows are 7 PASS on each,
+the same text on both). Each stages a hull where the probe needs it (Fleet.SpawnAt, as Shift+V and the spawn grid make
+theirs, then selected and taken with P) and from there flies it on the scripted keys and mouse only:
+
+- **combat.mouse-aim**: the practice fighter (Shift+V) with a pirate freighter 1.5 km out, 16° off the nose; one frame
+  of each mouse axis finds which way it swings the free-aim crosshair, then mouse deltas bring it onto the target:
+  16.2° to 0.26° in 6 frames on both.
+- **combat.mouse-fire**: the target selected (a left-click's selection) and locked with T, the left button opens fire
+  (the original's "Weapons free on the Audit Target", War.TryStartPlayerAttack). The fight puts the two sides at their
+  stations 13-14 km apart, so the fighter runs in on W, under cruise (J) while more than 3 km out, and inside the guns'
+  reach fires in bursts (held until the guns run hot, let go until they cool), the mouse keeping the crosshair on the
+  lead (the target's relative velocity over the guns' muzzle speed). Passed when the freighter's hull, shields and
+  subsystems lose integrity and this side's rounds reach its hull: on both, 12180 to 12012, rounds 11-12 m from it,
+  0.71 km off. The run-in's length differs by run (13.32-14.38 km: the clock starts at the real now, so the stations
+  differ a little run to run on either track).
+- **transit.lane-enter / lane-ride**: a fighter 0.5 km outside the Venus ramp's ring, flown in on W (256 frames on
+  both): "Into the Venus-Earth lane", ridden at the compressed clock (714 frames) to "Off the Venus-Earth lane at Earth",
+  within 1 km of Earth's ramp.
+- **transit.gate**: a fighter 0.5 km outside the Centauri Gate's activation range, across its spur so as not to thread
+  the spur's ring, flown in on W ("In range of CENTAURI GATE to ALPHA CENTAURI (Y to activate)") and through on Y: in
+  Alpha Centauri at the helm of the hull that came out, in that system's fleet ("Jumped to ALPHA CENTAURI through the
+  gate", then the Sol Gate beside it in range).
+- **transit.ftl-engage / ftl-arrive**: an explorer beside that hull; PgDn plots Luhman 16 (3.58 ly), End engages the
+  autopilot, the drive spools and the crossing starts 281 frames on; 2650 frames later it drops out "at the edge of
+  LUHMAN 16, 2.00 AU from its star (in from Alpha Centauri)", the helm back in hand.
+
+**Fixed on both tracks (an original bug):** the player's own gate transit threw on every frame from the jump on, in
+the original as in both ports (the C# track's Runtime is the original's file; the C++ track translates it). Activate
+on the far system runs Galaxy.Promote, which steps that system's fleet; the hull GateTransit.TryPerform had just parked
+there (DestinationBody -1, its phase already over) was not yet the far world's piloted ship, so it departed for body -1
+and BodyCatalog's indexer threw (ArgumentOutOfRange / cs::List "index"), leaving the switch half done. UpdateGateActivation
+now makes it the far world's piloted ship before Activate (UnitySpaceApp.Helm.cs and UnitySpaceApp.Main2.cpp, one line
+marked US-T58); the rest of the original's code path is unchanged.
 
 Before the audit settles on the camera's own pace, it can catch the camera mid-flight: in the first C++ run,
 nav.home and nav.number-focus read `Travel` because only 30 frames had passed. That was a probe artefact, not a port
@@ -138,13 +177,13 @@ Sources: **CH** = ControlsHelp binding, **GM** = GameManual chapter, **US** = U.
 | Feature | Source | C++ | C# | Notes |
 |---|---|---|---|---|
 | Battles, kinetic travel time, beams, shields by emitter, armour angling | US-T38, T501, T533, T534 | ✓R | ✓R | Bench `battle` scenario bit-identical |
-| Guns down the crosshair, T lock, missiles, EMP, mines | CH, GM "Combat and boarding" | ✓R | ✓R | coop-smoke: a fighter's cockpit keys (7, F, Ctrl) on both |
+| Guns down the crosshair, T lock, missiles, EMP, mines | CH, GM "Combat and boarding" | ✓R | ✓R | audit combat.mouse-aim / mouse-fire: the crosshair on the mouse, T, the left button, hits (US-T58); coop-smoke: a fighter's cockpit keys (7, F, Ctrl) on both |
 | Phasers (Insert), run hot (Shift+Insert), roll weak patches (Shift+Del) | CH | ✓C | ✓C | audit INFO: a fighter has none; silent on both |
 | Capital broadside and captain's orders (1-0) (U.SPC-T272, T425) | CH, US | ✓C | ✓C | |
 | Boarding: shuttles, Breacher rounds, compartments, B panel (BOARDING.md) | CH, US | ✓R / ✓C | ✓R / ✓C | Core in the battle scenario; the B panel not scripted |
 | Surrender, ransom, escape pods, prisoners (U.SPC-T46, T63, T64) | US | ✓R | ✓R | Core parity (high-warp) |
-| Wrecks, debris fields, salvage (U.SPC-T39, T45) | US | ✓C | ✓R | C#: demo tour; C++ DebrisFields present |
-| Battle FX, shield bubbles, muzzle flash (U.SPC-T38, T40) | US | ✓C | ✓R | C#: demo tour combat showcase |
+| Wrecks, debris fields, salvage (U.SPC-T39, T45) | US | ✓R | ✓R | demo tour on both (the C++ tour since US-T58) |
+| Battle FX, shield bubbles, muzzle flash (U.SPC-T38, T40) | US | ✓R | ✓R | demo tour combat showcase on both (the C++ tour since US-T58) |
 
 ### Embodiment seats (take charge)
 
@@ -160,9 +199,9 @@ Sources: **CH** = ControlsHelp binding, **GM** = GameManual chapter, **US** = U.
 
 | Feature | Source | C++ | C# | Notes |
 |---|---|---|---|---|
-| Jump gates (Y), gate network, construction (U.SPC-T8, T55, T97) | CH, US | ✓R / ✓C | ✓R / ✓C | network in Core parity; the player's Y transit not scripted |
-| Hyperlanes ridden by the player, interdiction (U.SPC-T41, T42) | CH, US | ✓C | ✓C | |
-| Own-power FTL: plot (PgDn/PgUp), clear (Del), autopilot (End), engage (Enter) (U.SPC-T417-T420) | CH, US | ✓R | ✓R | audit: the original's refusals for a fighter, identical text |
+| Jump gates (Y), gate network, construction (U.SPC-T8, T55, T97) | CH, US | ✓R / ✓C | ✓R / ✓C | network in Core parity; audit transit.gate: flown into range, Y to Alpha Centauri (US-T58, with the original's crash on arrival fixed on both); construction not scripted |
+| Hyperlanes ridden by the player, interdiction (U.SPC-T41, T42) | CH, US | ✓R / ✓C | ✓R / ✓C | audit transit.lane-enter / lane-ride: in through the Venus ramp's ring on W, ridden to Earth (US-T58); interdiction not scripted |
+| Own-power FTL: plot (PgDn/PgUp), clear (Del), autopilot (End), engage (Enter) (U.SPC-T417-T420) | CH, US | ✓R | ✓R | audit transit.ftl-engage / ftl-arrive: an explorer, PgDn and End, out, spooled, across to Luhman 16 and dropped out (US-T58); helm.*: the original's refusals for a fighter, identical text |
 | Interstellar traffic, war and piracy across gates | US-T92, T94 | ✓R | ✓R | Bench galaxy-ftl and high-warp |
 
 ### Economy, trade, colonies and mining
@@ -236,7 +275,7 @@ Sources: **CH** = ControlsHelp binding, **GM** = GameManual chapter, **US** = U.
 | Model viewer (F9 / `-modelviewer`) | US-T24, T111 | ≠ | ✓R | C++: camera depth and culling mask not rendered (**US-T53**) |
 | Ship thumbnails (offscreen capture) | US-T24 | ✓C | ✓R | |
 | Lights, PBR for imported glTF | (URP) | ✓R | ✓R | Lights light only URP Lit (as under URP); the glTF hulls draw with M_Lit, URP 17's PBR; C# hull 2.05% of pixels from the original's (US-T57; C++: lit and shaded alike, seen from the other side, US-T53) |
-| Scene tour (`-demo`) and capture (`-capture`) | US-T10, T15 | ✓C | ✓R | C#: all 55 stops; `play.ps1 -Mode demo` accepts only CSharp, so the C++ tour has not been run |
+| Scene tour (`-demo`) and capture (`-capture`) | US-T10, T15 | ✓R | ✓R | all 55 stops captured on both (`play.ps1 -Mode demo -Track Cpp` since US-T58, which counts the stops; the C++ runner now takes `-capturedir` as the C# one does). The C++ tour's first stop is shot while the engine is still compiling shaders ("Preparing Shaders"), so Earth is not yet drawn in it |
 
 ### Audio
 
@@ -251,8 +290,8 @@ The 88 rows of the checklist above (a row with two marks, such as `✓R / ✓C`,
 
 | Track | ✓R | ✓C | ✗ | ≠ |
 |---|---|---|---|---|
-| C++ | 66 | 19 | 0 | 3 |
-| C# | 73 | 14 | 0 | 1 |
+| C++ | 71 | 14 | 0 | 3 |
+| C# | 74 | 13 | 0 | 1 |
 
 Binding audit: 47 PASS, 0 FAIL on each track.
 
@@ -294,7 +333,7 @@ lifts it from Unity's flat (13, 15, 23) to about (40, 43, 50) on both tracks (no
 
 ## Not covered by a run yet
 
-Mouse-driven world picking, combat at the controls (firing, broadsides, boarding orders), the player's own gate, lane
-and FTL transits, and the C++ `-demo` tour are still code-present only. They are the next probes worth scripting:
-`FeatureAudit` already has the scripted mouse (HoldButton, MouseDelta) and a way to stage a fight (the coop-smoke's
-carrier spawn).
+US-T58 ran the mouse-driven fight at the helm, the player's own lane, gate and FTL transits and the C++ `-demo` tour
+(above). Still code-present only: mouse-driven world picking (a left-click on a hull or a world; the combat probe
+selects its target as that click does), a capital's broadsides and captain's orders, boarding orders, lane
+interdiction, gate construction.
