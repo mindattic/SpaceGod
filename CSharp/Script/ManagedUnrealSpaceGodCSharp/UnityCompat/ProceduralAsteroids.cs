@@ -131,9 +131,13 @@ namespace UnityEngine
                 for (int c = 0; c < 6; c++)
                 {
                     int k = i * 6 + c;
-                    // Positions are ignored (WPO places every vertex); the eight corners of a huge box give the bounds.
-                    vertices.Add(new FVector((k & 1) != 0 ? BoundsExtent : -BoundsExtent,
-                        (k & 2) != 0 ? BoundsExtent : -BoundsExtent, (k & 4) != 0 ? BoundsExtent : -BoundsExtent));
+                    // Positions are ignored (WPO places every vertex). Each triangle's three corners are one corner of a
+                    // unit box (eight in turn, so the box still gives the bounds): zero area, so a draw without M_Asteroids'
+                    // WPO rasterises nothing, as the C++ track's all-zero vertices (US-T61: with the engine's default material
+                    // the triangles spanning the box covered the screen once the near plane fell inside it, 55 x 4096 of them).
+                    int box = (k / 3) & 7;
+                    vertices.Add(new FVector((box & 1) != 0 ? BoundsExtent : -BoundsExtent,
+                        (box & 2) != 0 ? BoundsExtent : -BoundsExtent, (box & 4) != 0 ? BoundsExtent : -BoundsExtent));
                     // README: Asteroids' TexCoord0 = (index, corner 0..5), not flipped.
                     uv0.Add(new FVector2D(i, c));
                     triangles.Add(k);

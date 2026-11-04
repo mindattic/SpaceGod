@@ -24,7 +24,7 @@ the same machine. The page version: https://claude.ai/artifact/9FPW33Y1uUubSXkZH
 | In game, simulation time per frame at the default warp | **C++** | 1.0 ms vs 1.5 ms p50 | signal |
 | In game, the rest of the frame (views, facade, push to Unreal) | **C#** in the race; **C++** since US-T62 | race: ≈6.9 ms vs ≈10.8 ms at Sol idle (whole Unity frame 8.4 vs 11.8 ms p50, minus the simulation). After US-T62's facade fix: C++ whole Unity frame 3.7 ms p50 at Sol idle (10.3 before, same machine, interleaved) | signal: it was a C++ facade cost, not the language (see "After US-T62" in section 2) |
 | In game, frame time at Sol idle | **C#** in the race; **C++** since US-T62 | race: 12.2 ms vs 15.0 ms p50; C++ after US-T62: 6.3 ms (12.8 before) | signal, from the line above |
-| In game, frame time in a battle | **C++** | p95 27 ms vs 226 ms; GPU 2.5 ms vs 116 ms | signal: a C# rendering defect (US-T61) |
+| In game, frame time in a battle | **C++** | race: p95 27 ms vs 226 ms, GPU 2.5 vs 116 ms (a C# packaging defect, US-T61). After US-T61: C# 11.4 / 21.4 ms p50 / p95, GPU 0.9 ms; C++ after US-T62: 5.2 / 14.6 ms | signal (see the battle notes) |
 | In game, frame time at 1 week/s | **C++** | 53 ms vs 97 ms p50 | signal |
 | Startup: launch to the main menu / to playable | **C++** | 2.4 s vs 4.1 s / 8.8 s vs 20.5 s | signal |
 | Memory in game (peak working set) | **C++** | 2.3 GB vs 5.4 GB | signal |
@@ -184,11 +184,11 @@ Medians of three runs per track (the range of the three in brackets where it mat
 
 | | C++ | C# |
 |---|---|---|
-| Frame, p50 / p95 / p99 / mean | 15.1 / **27.2** / 32.7 / 16.5 | 16.7 / **225.5** / 228.8 / 77.9 |
-| Game thread p50 / p95 | 15.2 / 25.7 | 11.6 / 21.7 |
-| GPU p50 / p95 | **2.5** / 5.0 | **115.6** / 120.2 |
-| Simulation per frame p50 / p95 | 1.0 / 1.4 | 1.4 / 2.8 |
-| Whole Unity frame p50 | 12.4 | 7.9 |
+| Frame, p50 / p95 / p99 / mean | 15.1 / **27.2** / 32.7 / 16.5 | 11.4 / **21.4** / 27.9 / 13.2 (US-T61; was 16.7 / 225.5 / 228.8 / 77.9) |
+| Game thread p50 / p95 | 15.2 / 25.7 | 11.7 / 20.2 |
+| GPU p50 / p95 | **2.5** / 5.0 | **0.9** / 4.9 (was 115.6 / 120.2) |
+| Simulation per frame p50 / p95 | 1.0 / 1.4 | 1.4 / 2.5 |
+| Whole Unity frame p50 | 12.4 | 8.2 |
 
 **The trip to Alpha Centauri** (567 frames):
 
@@ -242,8 +242,19 @@ of the fix beats every run without it:
 
 The p95s keep the frames on which the hyperlanes' triangles change (a ship joins or leaves a lane, a ring passes the
 2.5-pixel cut-off): those still convert in full. At 1 week/s the frame is the simulation's (41 ms p50 both).
-- **The C# battle is GPU-bound** at ~116 ms a frame for a stretch of the fight on every run (C++: 2.5 ms on the same
-  frames), which makes its p95 eight times the C++ one. Something the C# battle view draws or waits on: US-T61.
+
+- **The C# battle was GPU-bound** at ~116 ms a frame from the battle's end on (C++: 2.5 ms on the same frames): a
+  packaging defect, not the battle view (US-T61). The C# package cooked none of the SpaceGodRender plugin's content
+  (the facade loads it by path only), so every renderer drew with the engine's default material: lit, hence black
+  under no lights, and without World Position Offset, so the asteroid belt's 55 chunks rasterised their raw
+  placeholder triangles around the camera, which covered the screen 225,000 times over once the near plane, hugging
+  the flagship after the fight, fell inside them (`ProfileGPU` in a Development package: 120 of the frame's 134 ms in
+  those draws). `CSharp/Config/DefaultGame.ini` now cooks `/SpaceGodRender`, and the chunks' placeholder triangles
+  have zero area, as the C++ track's. Re-measured, three Shipping runs (same ships, dates and battle outcome): frame
+  11.4 / 21.4 ms p50 / p95, GPU 0.9 / 4.9 ms; battle frames at 300 and 600 match the editor's pixel for pixel (0 of
+  1,440,000 pixels over threshold 24). The race's C# in-game numbers above were all taken on that black, default-material
+  scene. The C++ package (`Builds/Cpp`, rebuilt 2026-11-04) has no `/SpaceGodRender` assets in its container either
+  (its ShaderBinding loads them by path too), so its in-game numbers are open to the same question.
 - **Startup and memory are C++'s by a wide margin.** The C# game JIT-compiles the Core on first use (UnrealSharp ships no
   ReadyToRun or Native AOT) and builds the galaxy on a cold JIT: New Game takes 16 s against 6 s.
 - **Saves and loads are faster in C#**, by 50 ms (save) and 130 ms (load): the original's serializer on .NET against its
