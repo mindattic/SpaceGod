@@ -898,10 +898,8 @@ originals change only at lines marked `US-T43`, each the original's behaviour in
   replays several host frames in one tick; the helm's and the cockpit's edges are sent once a tick (the smoke run's
   scripted device clears its own after each Update).
 
-**Not co-op yet.** The galaxy map's strategy and envoy screens (production, build and research priorities, orders to
-groups, proposals, gifts, answers, broken pacts, declarations of war) and a polity hail (F12) still write the Core on the
-machine that clicks: the digest catches it and the host's save puts it right, so the host's own choices stand and a
-client's are lost. Seats in a fight are retaken by position (battle and unit index), so one lost in the very frame of a
+**Not co-op yet.** (The galaxy map's strategy and envoy screens and the polity hail went through the frames in US-T47,
+below.) Seats in a fight are retaken by position (battle and unit index), so one lost in the very frame of a
 resync is not retaken. HostReloads off (`-CoopNoHostReload`, a debugging switch) keeps the host's session as it was, so
 seats are not retaken there.
 
@@ -1010,7 +1008,80 @@ co-op smoke: every digest identical / no DESYNC / syncs only the join, the asked
              helm taken in the frames / helm flown on the client's input / trade / cockpit keys / party trip / client load: all True
 ```
 
-(The checks `play.ps1` adds for US-T47, the galaxy map's screens and the hail, are not part of this port.)
+### The galaxy map's screens and hails (US-T47, both tracks)
+
+The last of the Core's writers outside the frames: the galaxy map's COMMAND panel (production, build and research
+priorities, objectives to a squadron, a system or the whole navy, standing down), its DIPLOMACY panel (answers to
+proposals, broken pacts, proposals, gifts, declarations of war) and F12's hail. Each button goes out as an `x` entry by
+what it acts on, as the HUD's do (a polity by its place in `Polities.Factions`, a world by its place in `Polities.Worlds`,
+a fleet group as `<world>:<index in its fleet>`, a pact or a proposal by its place in `Statecraft.Pacts` / `Inbox`, a deal
+by its place in `Deal.All`, a priority by its place in its `All` list, an amount as IEEE bits): `speak`, `production`,
+`build`, `research`, `objective`, `standdown`, `answer`, `breakpact`, `propose`, `gift`, `declare`, `hail`. Every peer
+does at that frame what the button does (`GalaxyMapScreen.CoopExecute`: the original's call, its toast the asker's).
+Code: `Runtime/UI/GalaxyMapScreen.Coop.cs` and `Cpp/Source/UnrealSpaceGod/UI/GalaxyMapScreen.Coop.cpp`, member for member;
+the ported screen changes only at lines marked `US-T47`, each the original's line in single-player.
+
+- **One speaker for the party.** `StrategicCommand.Player` (the polity the player commands and speaks for) is read
+  across the Core: the AI leaves it alone, proposals to it wait in the inbox for an answer, a hail speaks in its name.
+  The Core has one, so the party has one, as it has one helm. The original's screens write it at every draw (DIPLOMACY)
+  or whenever they pick a polity; in co-op a change is a `speak` entry, sent once (and again only after 120 frames
+  without it coming back), and an envoy screen open on another peer adopts the party's speaker instead of writing its own
+  pick back each frame.
+- **Viewing writes nothing.** COMMAND read its polity's directives through `StrategicCommand.Of`, which makes them the
+  first time; on one peer only that is a write (a directives entry that starts research accrual). In co-op the panel
+  reads `Find` (or a fresh, unattached object); the directives are made by the entries that set them, on every peer.
+- **The hail.** `Statecraft.Hail` itself only reads, but what follows it (the speaker, the envoy screen opened on the
+  hailed polity) does not: F12 goes out as `hail <from> <to>`, every peer logs the answer, and the hailer's machine opens
+  its envoy screen.
+- **The digest** now also covers the strategy layer and statecraft: the speaker, every polity's directives (priorities,
+  research and its points, every track's level), the objectives, pacts, proposals waiting and the record, and between
+  every two states their relation and each one's opinion of the other (the same text on both tracks).
+
+**Proof (2026-11-03).** The coop-smoke's client, after the party's trip to Alpha Centauri, speaks for a state (the
+COMMAND panel's arrows), cycles its production, orders its whole navy to EXPLORE the system, selects a ship of another
+state and presses F12, and sends that state a gift from the envoy screen; `play.ps1` checks each on both peers.
+`play.ps1` now gives each run its own log names and a free UDP port of its own and stops every instance it started on
+any way out (a host slow to come up had kept the port and the log name, so the next run's client joined it). Two
+timing fixes on the way, on both tracks' scripts: the host ends 5 s after the client's bye as well as 30 frames (the
+client, counting 30 of its own ticks, used to lose its host first, go back to the start map and never say done; the
+C++ client then also tripped `UObjectArray`'s `GetRefCount() == 0` assertion making a second "Asteroids" texture while
+the first's wrapper held it, now a unique name each time), and the client's flying waits for the freighter's helm to
+come back (the C# run's guard of the C++ script's).
+
+`tools/play.ps1 -Track CSharp -Mode coop-smoke`:
+
+```
+[host]   Client (player 2) action 'speak 0' at frame 3007
+[host]   Client (player 2) action 'production 0 1' at frame 3038
+[host]   Client (player 2) action 'objective 0 2 - -1 4 1 -' at frame 3068
+[host]   hail: The Centauri Accord (indifferent, at peace): "We are listening."
+[host]   Client (player 2) action 'gift 0 5 4184C69A80000000' at frame 3198
+[client] smoke: statecraft at frame 3071: speaker Sol Federation, production Balanced -> War industry, objectives 0 -> 14, record 0 -> 1, the Centauri Accord's treasury 904,352,807 -> 947,602,811; carried out: True
+co-op smoke: 54 frames with both digests, 54 identical (frames 717..3780)
+co-op smoke: syncs: #1 at 717: Client joined; #2 at 1200: Client asked: a deliberate resync (smoke; #3 at 3254: the host loaded a save
+co-op smoke: every check True (digests, no DESYNC, syncs, seat kept, helm, helm input, trade, cockpit keys, trip, load,
+             speaker, strategy orders, hail, diplomacy action, statecraft carried out)
+```
+
+`tools/play.ps1 -Track Cpp -Mode coop-smoke`:
+
+```
+[host]   Client (player 2) action 'speak 1' at frame 24820
+[host]   Client (player 2) action 'production 1 1' at frame 24850
+[host]   Client (player 2) action 'objective 1 2 - -1 4 1 -' at frame 24861
+[host]   hail: The Sol Federation (indifferent, at peace): "We are listening."
+[host]   Client (player 2) action 'gift 1 0 4178519600000000' at frame 24918
+[client] smoke: statecraft at frame 24996: speaker Belt Consortium, production Balanced -> War industry, objectives 0 -> 7, record 50 -> 51; carried out: True
+co-op smoke: 59 frames with both digests, 59 identical (frames 22561..25920)
+co-op smoke: syncs: #1 at 22561: Client joined; #2 at 23089: Client asked: a deliberate resync (smoke; #3 at 25179: the host loaded a save
+co-op smoke: every check True (the same fifteen)
+```
+
+(The C++ host had been up a while when the client joined, hence its frame numbers; the client picked the first state
+with no ship there to be hailed, so the two runs speak for different states.)
+
+**Not co-op yet**, after this: nothing the player does writes the Core outside the frames that the smoke or a read of
+the ported app has found; seats in a fight retaken by position and `-CoopNoHostReload` stay as above.
 
 ## Packaging (US-T25)
 
