@@ -171,7 +171,15 @@ namespace SpaceGod::Input
 		/// <summary>F5 saves to the quicksave slot, F8 loads it, F6 opens the save slots.</summary>
 		bool QuickSave = false, QuickLoad = false, ToggleSaves = false;
 
+		/// <summary>While capture runs (US-T72, docs/CAPTURE.md section 5): Alt+F9 a screenshot, Alt+F10 toggles an
+		/// on-demand recording, Alt+F11 saves the replay. Local to this machine: never sent to co-op peers (they are
+		/// read-only properties, which PilotFrame's field list leaves out, as Unity's PilotFrame skips properties).</summary>
+		bool CaptureScreenshot() const { return captureScreenshot; }
+		bool CaptureToggleRecording() const { return captureToggleRecording; }
+		bool CaptureSaveReplay() const { return captureSaveReplay; }
+
 	private:
+		bool captureScreenshot = false, captureToggleRecording = false, captureSaveReplay = false;
 		Vector2 pressPosition;
 		float lastClickTime = -10.0f;
 		Vector2 lastClickPosition;

@@ -11,7 +11,11 @@ param(
   [string]$PackageDir = '',
   # -Mode audit only (US-T70): also run this copy's own facade probes (text.*, viewer.*: US-T52, US-T53), which the C#
   # copies have no counterpart of; without it the audit is the 85 probes every copy runs, row for row.
-  [switch]$AuditFacade
+  [switch]$AuditFacade,
+  # -Mode coop-smoke only (US-T72, docs/CAPTURE.md section 7): the host also runs with "-capture video" (in a 960x540
+  # window, not headless: MindAttic.Capture records the game's window), so the smoke's join, resync, trade, hail, party
+  # trip and load raise their capture events; the script lists the [capture] event lines the host wrote.
+  [switch]$CaptureHost
 )
 
 <#
@@ -158,7 +162,10 @@ if ($Mode -eq 'coop-smoke') {
   # US-T64: a package is told to host and join with -CoopHost / -CoopJoin=<address> (a Shipping game ignores the map URL).
   $hostUrl = if ($PackageDir) { @('-CoopHost') } else { @('/Engine/Maps/Entry?listen') }
   $clientUrl = if ($PackageDir) { @("-CoopJoin=127.0.0.1:$port") } else { @("127.0.0.1:$port") }
-  $hostArgs = $projectArg + $hostUrl + $common + $race.host + @("-port=$port", '-SpaceGodCoopSmoke=host', "`"-abslog=$hostLog`"",
+  $hostCommon = $common
+  $captureStart = Get-Date
+  if ($CaptureHost) { $hostCommon = @($common | Where-Object { $_ -ne '-nullrhi' }) + @('-windowed', '-ResX=960', '-ResY=540', '-capture', 'video') }
+  $hostArgs = $projectArg + $hostUrl + $hostCommon + $race.host + @("-port=$port", '-SpaceGodCoopSmoke=host', "`"-abslog=$hostLog`"",
     "`"-SpaceGodCoopLog=$hostCoopLog`"")
   # Not -WindowStyle (ShellExecute): CreateProcess, so the instances inherit the PATH with the private .NET SDK on it.
   $hostP = Start-Process -FilePath $cmd -PassThru -NoNewWindow -ArgumentList $hostArgs -RedirectStandardOutput "$hostLog.out"
@@ -228,6 +235,22 @@ if ($Mode -eq 'coop-smoke') {
   }
   "co-op smoke: syncs: $($syncs -join '; ')"
   foreach ($k in $checks.Keys) { "co-op smoke: $($k): $($checks[$k])" }
+  if ($CaptureHost) {
+    # US-T72: the host's [capture] event lines, from its log or (a Shipping game logs nothing) its session's .game.log.
+    $events = @([regex]::Matches($hostText, '\[capture\] event (\S+)') | ForEach-Object { $_.Groups[1].Value })
+    $where = 'the host log'
+    if ($events.Count -eq 0) {
+      $roots = @('R:\MindAttic\Capture\SpaceGod.Unreal.Cpp', (Join-Path ([Environment]::GetFolderPath('MyVideos')) 'MindAttic\Capture\SpaceGod.Unreal.Cpp'))
+      $gameLog = Get-ChildItem -LiteralPath $roots -Recurse -Filter '*.game.log' -ErrorAction SilentlyContinue |
+        Where-Object LastWriteTime -ge $captureStart | Sort-Object LastWriteTime | Select-Object -Last 1
+      if ($gameLog) {
+        $events = @(Select-String -LiteralPath $gameLog.FullName -Pattern '\[capture\] event (\S+)' | ForEach-Object { $_.Matches[0].Groups[1].Value })
+        $where = $gameLog.FullName
+      }
+    }
+    $counts = $events | Group-Object | ForEach-Object { "$($_.Name) x$($_.Count)" }
+    "co-op smoke: capture events ($where): $($events.Count): $($counts -join ', ')"
+  }
   $result = if (@($checks.Values | Where-Object { -not $_ }).Count -gt 0) { 1 } else { 0 }
   }
   finally {

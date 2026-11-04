@@ -3,6 +3,7 @@
 #include "Bootstrap.h"
 #include "UnitySpaceApp.h"
 #include "Camera/SpaceCamera.h"
+#include "Capture/MindAtticCapture.h"
 
 #include "Misc/CommandLine.h"
 #include "Misc/DateTime.h"
@@ -17,17 +18,39 @@ namespace SpaceGod
 {
 	namespace
 	{
-		// MindAttic.Capture's CaptureUnity, as far as the runner reads it.
+		// MindAttic.Capture's CaptureUnity, as far as the runner reads it (US-T72: Capture/MindAtticCapture.h).
+		// -capturedir=<dir> (tools/play.ps1 -Mode demo, US-T58) keeps the tour's shots as Unreal screenshots in that
+		// folder, with no capture host: a tooling switch of this repo's, not one of the game's.
 
-		/// `CaptureUnity.Args != null && CaptureUnity.Args.Any`: -capture was asked for.
-		bool CaptureRequested() { return Bootstrap::HasCommandLineFlag("-capture"); }
+		bool LegacyShots()
+		{
+			static const bool legacy = []
+			{
+				FString dir;
+				return FParse::Value(FCommandLine::Get(), TEXT("-capturedir="), dir) && !dir.IsEmpty();
+			}();
+			return legacy;
+		}
 
-		/// `CaptureUnity.Engine.Enabled`: Unreal's screenshot needs nothing started first, so it is ready at once.
-		bool CaptureEnabled() { return true; }
+		/// `CaptureUnity.Args != null && CaptureUnity.Args.Any`: -capture was asked for (the host says whether as a mode,
+		/// so a run that asked waits for it, as Unity's runner waits for the engine).
+		bool CaptureRequested() { return LegacyShots() ? Bootstrap::HasCommandLineFlag("-capture") : MindAtticCapture::Requested(); }
 
-		/// `CaptureUnity.Engine.SessionFolder`: this run's folder of shots (Saved/Capture/<when the run first asked>).
+		/// `CaptureUnity.Engine.Enabled`.
+		bool CaptureEnabled() { return LegacyShots() || (MindAtticCapture::Ready() && MindAtticCapture::Any() && MindAtticCapture::Enabled()); }
+
+		/// The host has answered (or there is none to wait for).
+		bool CaptureSettled() { return LegacyShots() || MindAtticCapture::Ready(); }
+
+		/// `CaptureUnity.Engine.SessionFolder`; for the -capturedir= shots, that folder.
 		const cs::String& CaptureSessionFolder()
 		{
+			if (!LegacyShots())
+			{
+				static cs::String session;
+				session = cs::String(TCHAR_TO_UTF8(*MindAtticCapture::SessionFolder()));
+				return session;
+			}
 			static const cs::String folder = []
 			{
 				// US-T58: -capturedir=<dir> (tools/play.ps1 -Mode demo) puts the shots there, as the C# track's runner does.
@@ -88,13 +111,24 @@ namespace SpaceGod
 		if (capturing)
 		{
 			auto wait = 0.0f;
-			while (!CaptureEnabled() && wait < 15.0f)
+			// Here the host answers first (Unity knows Args.Any at once, then waits on Enabled).
+			while (!CaptureSettled() && wait < 15.0f)
 			{
 				wait += Time::unscaledDeltaTime;
 				co_yield nullptr;
 			}
-			capturing = CaptureEnabled();
-			if (!capturing) Debug::LogError("[Unity.SpaceGod] MindAttic.Capture did not start; the tour will not be captured.");
+			// -capture with no mode after it (Args.Any false): not capturing, and nothing to complain about.
+			if (CaptureSettled() && !LegacyShots() && !MindAtticCapture::Any()) capturing = false;
+			else
+			{
+				while (!CaptureEnabled() && wait < 15.0f)
+				{
+					wait += Time::unscaledDeltaTime;
+					co_yield nullptr;
+				}
+				capturing = CaptureEnabled();
+				if (!capturing) Debug::LogError("[Unity.SpaceGod] MindAttic.Capture did not start; the tour will not be captured.");
+			}
 		}
 
 		// A time reset rebuilds the galaxy under the tour (its ships, bodies and battles are gone):
@@ -134,11 +168,23 @@ namespace SpaceGod
 
 	SceneTour::Routine CaptureRunner::Shot(cs::String name)
 	{
-		// ScreenshotAsync(name): one shot of the frame, the UI in it, named for its stop.
-		auto path = cs::Cat(CaptureSessionFolder(), "/", name, ".png");
-		CaptureBackend::Screenshot(path);
-		// while (!shot.IsCompleted) yield return null: the shot is written at the end of this frame.
-		co_yield nullptr;
-		Debug::Log(cs::Cat("[Unity.SpaceGod] Captured ", path));
+		if (LegacyShots())
+		{
+			// -capturedir=: one Unreal shot of the frame, the UI in it, named for its stop.
+			auto path = cs::Cat(CaptureSessionFolder(), "/", name, ".png");
+			CaptureBackend::Screenshot(path);
+			// The shot is written at the end of this frame.
+			co_yield nullptr;
+			Debug::Log(cs::Cat("[Unity.SpaceGod] Captured ", path));
+			co_return;
+		}
+		// var shot = CaptureUnity.Engine.ScreenshotAsync(name);
+		const int32 shot = MindAtticCapture::Screenshot(FString(UTF8_TO_TCHAR(name.c_str())));
+		// while (!shot.IsCompleted) yield return null;
+		bool ok = false;
+		FString detail;
+		while (!MindAtticCapture::ScreenshotResult(shot, ok, detail)) co_yield nullptr;
+		if (ok) Debug::Log(cs::Cat("[Unity.SpaceGod] Captured ", cs::String(TCHAR_TO_UTF8(*detail))));
+		else Debug::LogError(cs::Cat("[Unity.SpaceGod] Screenshot ", name, " failed: ", cs::String(TCHAR_TO_UTF8(*detail))));
 	}
 }

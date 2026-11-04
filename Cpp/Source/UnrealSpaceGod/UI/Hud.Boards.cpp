@@ -1,6 +1,7 @@
 // Port of Unity.SpaceGod's Runtime/UI/Hud.cs lines 2383-3745 (see UI/Hud.Boards.inl for the declarations).
 
 #include "UI/Hud.h"
+#include "CaptureEvents.h" // US-T72
 
 #include "UnitySpaceApp.h"
 #include "Camera/SpaceCamera.h"
@@ -491,6 +492,7 @@ namespace SpaceGod::UI
 		int bought = 0;
 		Economy::TradeOutcome stoppedBy{};
 		auto outcome = app->Economy()->BuyIntoHold(ship, market, good, tradeCrates, bought, stoppedBy);
+		if (bought > 0) CaptureEvents::Trade("buy", GoodInfo::Of(good)->Name, bought, market->Name); // US-T72
 		if (bought > 0)
 		{
 			cs::String why;
@@ -552,6 +554,7 @@ namespace SpaceGod::UI
 		auto ship = app->World()->PilotedShip;
 		int sold = 0;
 		auto outcome = app->Economy()->SellFromHold(ship, market, good, tradeCrates, sold);
+		if (sold > 0) CaptureEvents::Trade("sell", GoodInfo::Of(good)->Name, sold, market->Name); // US-T72
 		if (sold > 0)
 			app->ShowToast(cs::Cat("Sold ", sold, " crate", sold == 1 ? "" : "s", " of ", GoodInfo::Of(good)->Name));
 		else

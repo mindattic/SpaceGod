@@ -7,6 +7,8 @@
 #include "UnityCompat/GuiHost.h"
 #include "UnityCompat/UnityScene.h"
 #include "CaptureRunner.h"
+#include "Capture/MindAtticCapture.h"
+#include "CaptureEvents.h"
 #include "Views/AsteroidBelt.h"
 #include "Coop/CoopPeer.h"
 #include "Smoke/SpaceGodRace.h"
@@ -100,6 +102,7 @@ void AUnitySpaceAppActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 			Capture->OnDestroy();
 			Capture.reset();
 		}
+		CaptureEvents::Detach(App.get()); // US-T72
 		GuiHost::Unregister(App.get());
 		GuiHost::Unregister(&App->AsteroidBelt);
 		GuiHost::Unregister(&App->Clock); // US-T44
@@ -114,6 +117,8 @@ void AUnitySpaceAppActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void AUnitySpaceAppActor::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	// US-T72: MindAttic.Capture lives for the whole run, as CaptureUnity's runner does (every scene, the menu's too).
+	MindAtticCapture::Tick();
 	if ((!App && !bSceneHost) || bExternallyStepped) return;
 	// US-T44: a co-op client replays the host's frames: its link actor (ASpaceCoopLink) steps the app, one Step per frame.
 	if (GetNetMode() == NM_Client) return;
@@ -155,6 +160,8 @@ void AUnitySpaceAppActor::Step(float RealDelta)
 	// US-T44: the host's frame to its clients (the C# track's game mode Step: CoopPeer.HostEndUpdate after the Update).
 	if (Coop::CoopPeer* Peer = Coop::CoopPeer::Current(); Peer && Peer->IsHost()) Peer->HostEndUpdate(App.get());
 	if (Capture) Capture->Update();
+	// US-T72: the polled capture events, after every frame's update (Unity: UnitySpaceApp.LateUpdate).
+	CaptureEvents::Tick(App.get());
 	// End of the frame (Unity's render): every renderer the views placed to its Unreal component.
 	UnityScene::Sync();
 	ApplyCamera();

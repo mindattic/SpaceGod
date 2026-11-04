@@ -2,6 +2,7 @@
 
 #include "Input/InputState.h"
 #include "Input/InputDevice.h"
+#include "CaptureEvents.h"
 
 namespace SpaceGod::Input
 {
@@ -110,6 +111,15 @@ namespace SpaceGod::Input
 		ManGun = kb[Key::Slash].wasPressedThisFrame;
 		MoveToHost = kb[Key::Backspace].wasPressedThisFrame;
 		TogglePicker = kb[Key::F9].wasPressedThisFrame;
+		// US-T72 (docs/CAPTURE.md section 5): while capture runs, Alt+F9 / Alt+F10 / Alt+F11 are its screenshot, toggle
+		// recording and save replay instead of the picker, fleet and clear screen. Without capture Alt changes nothing.
+		if (CaptureEvents::Running() && (kb[Key::LeftAlt].isPressed || kb[Key::RightAlt].isPressed))
+		{
+			captureScreenshot = TogglePicker;
+			captureToggleRecording = ToggleFleet;
+			captureSaveReplay = ClearScreen;
+			TogglePicker = ToggleFleet = ClearScreen = false;
+		}
 		bool shifted = kb[Key::LeftShift].isPressed || kb[Key::RightShift].isPressed;
 		TunePhasers = kb[Key::Insert].wasPressedThisFrame && !shifted;
 		ToggleBoarding = kb[Key::B].wasPressedThisFrame;
@@ -165,6 +175,9 @@ namespace SpaceGod::Input
 		ToggleRollPatches = false;
 		NumberKey = -1;
 		HailPolity = false; // US-T70: as Unity's Reset; without it a suspended frame kept F12's last edge and hailed again
+		captureScreenshot = false; // US-T72
+		captureToggleRecording = false;
+		captureSaveReplay = false;
 	}
 
 	float InputState::Axis(const ButtonControl& positive, const ButtonControl& negative)

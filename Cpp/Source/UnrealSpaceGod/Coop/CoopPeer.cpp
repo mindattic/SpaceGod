@@ -2,6 +2,7 @@
 // the C# track's, so the two tracks' co-op behaves (and logs) the same.
 
 #include "Coop/CoopPeer.h"
+#include "CaptureEvents.h" // US-T72
 
 #include "Coop/CoopSmoke.h"
 #include "Coop/CoopSettings.h"
@@ -392,6 +393,7 @@ namespace SpaceGod::Coop
 			" chunks to ", sent, " player(s); captured in ", captured, " ms",
 			HostReloads ? cs::Cat(", host reloaded it in ", reloaded - captured, " ms") : cs::String(),
 			"; digest frame ", syncFrame, " = ", digest, " (", localName, ", player 1)"));
+		CaptureEvents::CoopResync(syncId, syncFrame, syncReason); // US-T72
 	}
 
 	void CoopPeer::PumpChunks()
@@ -437,6 +439,7 @@ namespace SpaceGod::Coop
 			pending.push_back(cs::Cat("l ", seat));
 			ForgetPilot(seat);
 			Log(cs::Cat(NameOf(seat), " (player ", seat + 1, ") left"));
+			CaptureEvents::CoopLeft(NameOf(seat), seat + 1); // US-T72
 		}
 	}
 
@@ -549,6 +552,7 @@ namespace SpaceGod::Coop
 		p->Name = name;
 		Players[seat] = p;
 		Log(cs::Cat(name, " joined as player ", seat + 1));
+		CaptureEvents::CoopJoined(name, seat + 1); // US-T72
 		RequestSync(cs::Cat(name, " joined"));
 	}
 
@@ -786,6 +790,7 @@ namespace SpaceGod::Coop
 		if (hostLink) hostLink->Send(cs::Cat("synced ", clientSyncId));
 		Log(cs::Cat("loaded sync #", clientSyncId, " at frame ", clientSyncFrame, ": save ", save.Count() / 1024, " KB in ", Ms(t0), " ms, ",
 			static_cast<int>(queue.size()), " frames already waiting"));
+		CaptureEvents::CoopResync(clientSyncId, clientSyncFrame, cs::String()); // US-T72
 		SendDigest(app, clientSyncFrame);
 		return true;
 	}

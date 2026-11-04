@@ -4,6 +4,7 @@
 // ToString: type, message and stack) logs e.what(), and e.Message is e.what().
 
 #include "UnitySpaceApp.h"
+#include "CaptureEvents.h" // US-T72
 
 #include <exception>
 
@@ -145,6 +146,7 @@ namespace SpaceGod
 			cs::Ref<SaveData> data = CaptureSave();
 			cs::Ref<SaveHeader> h = Saves->Save(slot, data, !label.empty() ? label : SlotName(slot));
 			ShowToast(cs::Cat("Saved to ", SlotName(slot), "  (", DescribeSave(h), ")"));
+			CaptureEvents::GameSaved(SlotName(slot)); // US-T72
 			return true;
 		}
 		catch (const std::exception& e)
@@ -180,6 +182,7 @@ namespace SpaceGod
 		CoopLoadingHere([this, &data] { ApplyLoaded(data); }); // US-T44 (US-T43): ApplyLoaded(data); the loaded helm is everyone's in co-op
 		ShowSaves = false;
 		ShowToast(cs::Cat("Loaded ", SlotName(slot), "  (", DescribeSave(header), ")"));
+		CaptureEvents::GameLoaded(SlotName(slot)); // US-T72
 		return true;
 	}
 
