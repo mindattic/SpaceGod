@@ -55,6 +55,7 @@ then and had identical toasts.
 
 | Probe | Binding | C++ | C# |
 |---|---|---|---|
+| audio.volume / audio.mute; render.settings, render.pipeline, render.hdrp.* (6), render.urp.* (13) (US-T50, US-T51) | Settings > Master volume and the `-muted` mute; Settings > Render pipeline, each setting moved and put back | ✓R | ✓R |
 | time.pause / time.warp / time.warp-alt / time.reset | Space; `.` `,`; `=` `-`; T | ✓R | ✓R |
 | view.scale | G, `` ` `` | ✓R | ✓R |
 | view.orbits / labels / lanes / satellites / reorient | O L N K R | ✓R | ✓R |
@@ -208,8 +209,8 @@ Sources: **CH** = ControlsHelp binding, **GM** = GameManual chapter, **US** = U.
 | Display: aspect, resolution, window mode, VSync (U.SPC-T276, T284) | US | ≠ | ≠ | every mode listed at 60 Hz (**US-T56**) |
 | Frame cap | GM "Settings" | ✓C | ✓C | t.MaxFPS on both |
 | MSAA setting | GM "Settings" | ≠ | ≠ | drives FXAA on both (**US-T55**) |
-| Render pipeline choice, HDRP options, URP post-processing (U.SPC-T429-T431, T451) | US | ≠ | ✗ | C++: present and applied to Unreal post-process, the pipeline choice kept but restarting nothing (one renderer); C#: none of these settings exist (**US-T51**) |
-| Master volume | GM "Settings" | ✓C | ✗ | C#: never applied to Unreal (**US-T50**) |
+| Render pipeline choice, HDRP options, URP post-processing (U.SPC-T429-T431, T451) | US | ≠ | ≠ | both: the same 20 settings in Settings > Render pipeline, kept per profile, the URP look on Unreal's post-process (exposure and the physical camera as a colour gain, bloom, the tone curve, grading, the star glare); the pipeline choice kept but restarting nothing and HDRP's options kept only, as Unreal has one renderer (US-T51); audit render.*: 21 rows, identical on both tracks |
+| Master volume | GM "Settings" | ✓R | ✓R | on Unreal's primary volume (US-T50); audit audio.volume |
 
 ### UI screens
 
@@ -241,7 +242,7 @@ Sources: **CH** = ControlsHelp binding, **GM** = GameManual chapter, **US** = U.
 | Feature | Source | C++ | C# | Notes |
 |---|---|---|---|---|
 | Sound playback | (Runtime) | ✓C | ✓C | the original has no clips and no AudioSource: nothing is played in any of the three |
-| AudioListener master volume and the `-muted` CLI mute (U.SPC-T536) | US | ✓C | ✗ | C++ sets Unreal's primary volume; C# keeps it as a static nobody reads (**US-T50**) |
+| AudioListener master volume and the `-muted` CLI mute (U.SPC-T536) | US | ✓R | ✓R | both set Unreal's primary volume, 0 under the mute whatever the setting (C#: UnrealHost through sg.SetPrimaryVolume, US-T50); audit audio.volume, audio.mute |
 
 ## Totals
 
@@ -249,8 +250,8 @@ The 88 rows of the checklist above (a row with two marks, such as `✓R / ✓C`,
 
 | Track | ✓R | ✓C | ✗ | ≠ |
 |---|---|---|---|---|
-| C++ | 62 | 21 | 0 | 5 |
-| C# | 69 | 14 | 3 | 2 |
+| C++ | 64 | 19 | 0 | 5 |
+| C# | 71 | 14 | 0 | 3 |
 
 Binding audit: 47 PASS, 0 FAIL on each track.
 
@@ -258,8 +259,8 @@ Binding audit: 47 PASS, 0 FAIL on each track.
 
 | Ticket | Track | Gap |
 |---|---|---|
-| US-T50 | C# | the master volume and `-muted` never reach Unreal |
-| US-T51 | C# | Render Pipeline and Post-processing settings missing |
+| US-T50 | C# | the master volume and `-muted` never reach Unreal (fixed: UnrealHost applies AudioListener.volume, sg.SetPrimaryVolume) |
+| US-T51 | C# | Render Pipeline and Post-processing settings missing (fixed: ported, on Unreal's post-process as on the C++ track) |
 | US-T52 | C++ | GUI.TextField has no TextEditor (caret, selection, clipboard) |
 | US-T53 | C++ | the model viewer camera's depth and culling mask are not rendered |
 | US-T54 | C# | IMGUI text clipped by whole glyphs; icons without mips (fixed: Slate overlay, mip chain) |
