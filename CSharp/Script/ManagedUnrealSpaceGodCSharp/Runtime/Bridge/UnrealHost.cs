@@ -24,6 +24,7 @@ namespace Unity.SpaceGod.Bridge
         UnrealInputDevice device;
         float appliedNear = -1;
         int appliedFrameCap = int.MinValue;
+        float appliedVolume = -1;
 
         public UnrealHost(AActor owner) => this.owner = owner;
 
@@ -60,7 +61,7 @@ namespace Unity.SpaceGod.Bridge
             if (app != null) app.Input.Device = Override ?? (NoPlayerInput ? null : (IInputDevice)device) ?? NoInputDevice.Instance;
         }
 
-        /// <summary>After the app's Update: camera, cursor, frame cap.</summary>
+        /// <summary>After the app's Update: camera, cursor, frame cap, master volume.</summary>
         public void AfterUpdate()
         {
             ApplyCamera();
@@ -70,7 +71,24 @@ namespace Unity.SpaceGod.Bridge
                 appliedFrameCap = Application.targetFrameRate;
                 SystemLibrary.ExecuteConsoleCommand("t.MaxFPS " + Math.Max(0, appliedFrameCap));
             }
+            ApplyAudio();
         }
+
+        /// <summary>
+        /// US-T50: AudioListener.volume (the master volume setting, 0 under the -muted CLI mute) onto Unreal's main audio
+        /// device whenever it changes, as the C++ track's UnitySpaceAppActor::ApplyAudio (SetTransientPrimaryVolume),
+        /// through the primary module's sg.SetPrimaryVolume.
+        /// </summary>
+        void ApplyAudio()
+        {
+            float volume = AudioListener.volume;
+            if (volume == appliedVolume) return;
+            appliedVolume = volume;
+            SystemLibrary.ExecuteConsoleCommand("sg.SetPrimaryVolume " + volume.ToString("R", System.Globalization.CultureInfo.InvariantCulture));
+        }
+
+        /// <summary>The main audio device's primary volume as it took the last one applied (-1: no audio device).</summary>
+        public static float UnrealPrimaryVolume => SystemLibrary.GetConsoleVariableFloatValue("sg.AppliedPrimaryVolume");
 
         void ApplyCamera()
         {

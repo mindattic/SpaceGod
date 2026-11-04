@@ -214,8 +214,10 @@ if ($Mode -eq 'audit') {
   # -Mode audit (either track, US-T48): the smoke, then FeatureAudit's probes (Runtime/Audit/FeatureAudit.cs, C++
   # Smoke/FeatureAudit.cpp): each presses one of the original's bindings on the scripted device and checks the state the
   # original's code changes, logging 'AUDIT <id> PASS|FAIL: ...'. Same ids on both tracks; docs/FAITHFULNESS.md records them.
+  # No -nosound (US-T50): the audio probes read the master volume back from Unreal's main audio device (the game plays
+  # no clips, so nothing is heard).
   $cmd = Join-Path $engine 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
-  $lines = & $cmd $project.FullName '/Engine/Maps/Entry' -game -nullrhi -nosound -unattended -nosplash -stdout -FullStdOutLogOutput -SpaceGodSmoke -SpaceGodAudit |
+  $lines = & $cmd $project.FullName '/Engine/Maps/Entry' -game -nullrhi -unattended -nosplash -stdout -FullStdOutLogOutput -SpaceGodSmoke -SpaceGodAudit |
     Select-String -Pattern 'AUDIT |Error:|Fatal' | ForEach-Object Line
   $lines
   $pass = @($lines | Where-Object { $_ -match 'AUDIT \S+ PASS' }).Count
