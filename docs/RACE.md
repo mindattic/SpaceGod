@@ -94,8 +94,9 @@ cap are off, so a frame takes as long as its work. Window 1600×900, no sound. `
 Shipping game three times per track.
 
 The highest warps are not in the in-game tour: at 1 year/s, and at 1 month/s for more than a couple of weeks, both
-tracks reach a parked ship that has no parking orbit (US-T59, in the original Core; most likely a ring captured
-mid-queue, which leaves `Orbit` null), where the C++ game crashes and the C# game throws every frame. The headless Bench does not reach it
+tracks reach a parked ship that has no parking orbit (US-T59, in the original Core: an escort's marker or a paid-off
+hired escort left leaderless with no motion of its own, read as Parked with a null `Orbit`; fixed on the C++ track in
+`eacc7d4` after these runs, U.SPC-T602 in Unity.SpaceGod for the C# track), where the C++ game crashes and the C# game throws every frame. The headless Bench does not reach it
 (it never asks every ship's position each frame) and covers those warps instead.
 
 ## 1. Headless simulation (the Bench)
