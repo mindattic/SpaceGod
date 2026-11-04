@@ -12,24 +12,30 @@ the same machine. The page version: https://claude.ai/artifact/9FPW33Y1uUubSXkZH
 
 ## Verdict
 
-**Neither track is faster across the board. The differences that hold up across runs:**
+**Neither track is faster across the board. The differences that hold up across runs** (since US-T60: the
+quiet-machine statistics, five Shipping runs a side with every fix in, medians, C++ against C#; "signal" is a
+Mann-Whitney U test at p < 0.05, or non-overlapping ranges for the three-run co-op cells; the race's earlier figure,
+superseded, in brackets where it changed):
 
 | Where | Winner | By how much | Signal or noise |
 |---|---|---|---|
-| Headless simulation, heavy ticks (a year at 1 yr/s, a year of Sol's economy) | level | within the spread of the runs | noise |
-| Headless simulation, light ticks (Sol idle, a battle): median tick | **.NET** | 0.6 ms vs 1.1 ms (about 1.7×) | signal (every run) |
-| Building the galaxy (New Game's `Galaxy.CreateDefault`, headless) | **C++** | 3.9–4.0 s vs 6.1–6.5 s | signal |
-| Simulation memory (headless peak working set) | **C++** | 30–60 MB vs 90–150 MB | signal |
-| In game, simulation time per frame at 1 week/s | **C++** | 35 ms vs 82 ms p50 (2.4×) | signal (every run) |
-| In game, simulation time per frame at the default warp | **C++** | 1.0 ms vs 1.5 ms p50 | signal |
-| In game, the rest of the frame (views, facade, push to Unreal) | **C#** in the race; **C++** since US-T62 | race: ≈6.9 ms vs ≈10.8 ms at Sol idle (whole Unity frame 8.4 vs 11.8 ms p50, minus the simulation). After US-T62's facade fix: C++ whole Unity frame 3.7 ms p50 at Sol idle (10.3 before, same machine, interleaved) | signal: it was a C++ facade cost, not the language (see "After US-T62" in section 2) |
-| In game, frame time at Sol idle | **C#** in the race; **C++** since US-T62 | race: 12.2 ms vs 15.0 ms p50; C++ after US-T62: 6.3 ms (12.8 before) | signal, from the line above |
-| In game, frame time in a battle | **C++** | race: p95 27 ms vs 226 ms, GPU 2.5 vs 116 ms (a C# packaging defect, US-T61). After US-T61: C# 11.4 / 21.4 ms p50 / p95, GPU 0.9 ms; C++ after US-T62: 5.2 / 14.6 ms; C++ with its plugin content cooked (US-T65): 5.3 / 14.5 ms, GPU 1.0 ms | signal (see the battle notes) |
-| In game, frame time at 1 week/s | **C++** | 53 ms vs 97 ms p50 | signal |
-| Startup: launch to the main menu / to playable | **C++** | 2.4 s vs 4.1 s / 8.8 s vs 20.5 s | signal |
-| Memory in game (peak working set) | **C++** | 2.3 GB vs 5.4 GB | signal |
-| Save / load (the original's format, 4 MB) | **C#** | 282 / 254 ms vs 332 / 387 ms (means) | signal |
-| Shipping package without symbols | **C++** | 411 MB vs 483 MB (both without the plugin's cooked content; C++ with it: 479 MB, US-T65) | the .NET runtime (150 MB) |
+| Headless simulation, heavy ticks (a year at 1 yr/s, a year of Sol's economy) | **.NET**, slightly | 1,201 vs 1,259 ms and 106 vs 112 ms mean, 5–6% (was "level", within the spread of three busy rounds) | signal (p = 0.008, every run) |
+| Headless simulation, light ticks (Sol idle, a battle): median tick | **.NET** | 0.60 / 0.65 ms vs 1.00 / 1.19 ms (1.7–1.8×) | signal (every run) |
+| Headless simulation, the tail (p99) | **C++** | battle 11.4 vs 34.6 ms, high-warp 1,621 vs 1,893 ms (.NET 10; .NET 8 level) | signal |
+| Building the galaxy (New Game's `Galaxy.CreateDefault`, headless) | **C++** | 4.1–4.2 s vs 6.2–6.4 s | signal |
+| Simulation memory (headless peak working set) | **C++** | 31–65 MB vs 95–159 MB | signal |
+| In game, simulation time per frame at 1 week/s | **C++** | 28.3 ms vs 68.3 ms p50, 2.4× (was 35 vs 82) | signal (every run) |
+| In game, simulation time per frame at the default warp | **C++** | 0.87 ms vs 1.32 ms p50 (was 1.0 vs 1.5) | signal |
+| In game, the rest of the frame (views, facade, push to Unreal) | **C++** (was C#, before US-T62) | whole Unity frame 3.36 vs 6.46 ms p50 at Sol idle (was 11.8 vs 8.4 ms) | signal: the race's C# lead was a C++ facade cost, fixed in US-T62 |
+| In game, frame time at Sol idle | **C++** (was C#) | 5.5 ms vs 9.5 ms p50, 1.7× (was 15.0 vs 12.2 ms, the C# scene then black, US-T61) | signal (every run) |
+| In game, frame time in a battle | **C++** | 5.1 / 13.9 ms vs 9.9 / 18.5 ms p50 / p95 (was p95 27 vs 226 ms, the C# GPU stall of US-T61); GPU level at the median (0.96 vs 0.83 ms), C# p95 twice C++'s | signal |
+| In game, frame time at 1 week/s | **C++** | 39 ms vs 79 ms p50 (was 53 vs 97) | signal |
+| Startup: launch to the main menu | level (was C++) | 1.38 s vs 1.80 s median, ranges overlap (was 2.4 vs 4.1 s) | **noise** (p = 0.15) |
+| Startup: launch to playable | **C++** | 6.9 s vs 16.0 s (was 8.8 vs 20.5 s) | signal |
+| Memory in game (peak working set) | **C++** | 2.45 GB vs 6.27 GB (was 2.3 vs 5.4) | signal |
+| Save / load (the original's format, 4 MB) | **C#** | 238 / 237 ms vs 272 / 285 ms (means; was 282 / 254 vs 332 / 387) | signal |
+| Co-op resync (capture, host reload, client load) | **C#** | 710 ms vs 1,086 ms end to end; both 15 / 15 checks, every digest identical | signal (ranges) |
+| Shipping package without symbols | **C++** | 479 MB vs 551 MB, both with the plugin's cooked content (was 411 vs 483 MB, both without) | the .NET runtime (150 MB) |
 | Lines of code written | **C#** | ≈15,100 vs ≈138,000 | the C# track runs the original's 87,600 lines as they are |
 | Iterating on the code | mixed | Runtime file 4.9 s vs 11.6 s; a build with nothing changed 149 s vs 1.7 s | signal |
 | Faithfulness to the original | level | both 0 missing; 1 divergence each (the one renderer); simulation bit-identical | — |
@@ -38,15 +44,167 @@ the same machine. The page version: https://claude.ai/artifact/9FPW33Y1uUubSXkZH
 knows only C# write the game. That does not apply here: the author of both tracks is an AI that writes C++ as fluently
 as C#, and Unreal is a C++ engine, whose own API, samples, debugger, profilers, Live Coding and packaging all assume C++.
 The measurements show no real C# win that would outweigh that. Where C# is ahead, the cause is fixable in the C++ code
-(the engine-side frame, since fixed by US-T62) or small (save/load by 50–130 ms, the lighter headless tick). Where C++ is ahead it is
-large and structural: startup 2.3× faster, half the memory, the in-game simulation 1.5–2.4× faster, no 150 MB runtime to
-ship, no young binding layer (UnrealSharp is pre-1.0, pinned by commit) with its build-time and packaging workarounds.
+(the engine-side frame, since fixed by US-T62) or small (save/load by 35–50 ms, a co-op resync by 0.4 s, the lighter
+headless tick, the heavy headless ticks by 5%). Where C++ is ahead it is large and structural (US-T60's quiet-machine
+runs): every in-game phase's frame 1.7–2.2× shorter at the median, launch to playable 2.3× faster, 40% of the memory,
+the in-game simulation 1.5–2.4× cheaper, no 150 MB runtime to ship, no young binding layer (UnrealSharp is pre-1.0,
+pinned by commit) with its build-time and packaging workarounds.
 
 **What the C# track is still worth.** It runs Unity.SpaceGod's own Core (184 files, 67,469 lines) and most of its
 Runtime unchanged, so it is the reference the C++ translation is checked against: the Bench's five digests compare the
 C++ Core with the original's own code bit for bit, and the C# game shows what the original's Runtime does on Unreal
 whenever the C++ track's behaviour is in doubt. Keep it building as that parity check (it needs no translation, only its facade kept in step),
 not as a second game to finish features in.
+
+## Quiet-machine statistics (US-T60)
+
+Re-measured on 2026-11-04 with every fix in: US-T59, US-T61 to US-T68 and both tracks' SpaceGodRender content cooked, so
+both packages draw the real 3D scene. The race below this section was taken before those fixes, on a busy machine and
+with three runs a side; where this section's numbers differ, **they supersede it** (see "What changed" below).
+
+**What ran.** Fresh Shipping packages of `30a963b` (the C++ one copied aside before the C# one was packaged), whose
+UI shots match the editor's (`tools/imgdiff.py`, threshold 24: HUD 2.09% C++ / 1.57% C#, market 2.9 / 2.8%, pause
+1.2 / 1.2%, main menu 0.26 / 0.00%, Help and galaxy map 0.00–0.05%, all of it labels and log lines a game minute apart;
+none of the 3D scene black). Bench.Cpp and Bench.CSharp (.NET 10 and .NET 8) built once from the same commit. Then, one
+process at a time, never two at once, in five rounds:
+
+| What | Runs | Order |
+|---|---|---|
+| Headless Bench, all 5 scenarios (`tools/bench.ps1 -Track Cpp` / `-Track CSharp -DotNet net10.0|net8.0`) | 5 per runner (75 scenario runs) | the three runners rotated each round |
+| In-game race tour (`tools/race.ps1 -Runs 1 -PackageDir <package> -Out <absolute>`) | 5 per track | C++ first in odd rounds, C# first in even ones |
+| Co-op smoke from the packages (`tools/play.ps1 -Mode coop-smoke -PackageDir`, `SPACEGOD_RACE_DIR` set) | 3 per track | as the race |
+
+The tour's warp phase stays at 1 week/s on both tracks (the C# track still has US-T59 at the highest warps, U.SPC-T602
+in Unity.SpaceGod), as in the race.
+
+**A quiet machine for every run.** Before each of the 31 measurements the harness waited for one quiet minute: six
+consecutive 10-second windows in which every process other than the harness and the agent's own CLI chain together
+used under 10% of the 24 logical CPUs on average, and no window over 15% (the measure is `tools/race.ps1`'s: process
+CPU-time deltas over all logical CPUs). It records the rest of the machine's CPU over that minute and again over the
+run itself, with the top processes; all of it is in `Builds/Race/quiet/runs.jsonl`.
+
+- Every run settled; none needed the 30-minute fallback. Waits were 61–113 s (one minute is the floor).
+- The rest of the machine before a run: 4.2–9.6% of the CPUs (mean 6.5%); during a run: 4.4–11.3% (mean 7.0%). Bench
+  runs 4.4–7.5%, race runs 6.1–10.4%, co-op runs 6.5–11.3%.
+- What was running: the desktop's resident apps only, no build, compiler, shader worker or other game. Task Manager
+  (≈1.5%), MindAttic.Orchestrator.Desktop (≈1.3%), Unity Hub (0.3–4.5%, in bursts), EpicGamesLauncher and its overlay
+  (≈0.5%), SQL Server (0.3–1.5%), other repos' idle Claude CLIs (≤0.7%), early on Jellyfin (up to 3%) and a background
+  download (up to 1.7%).
+- One pattern: SQL Server rose to 2–4% during most C# game and co-op runs (and not during C++ runs or between runs),
+  which is why the three runs above 10% during the run are all C# ones (co-op r1 10.2%, race r3 10.4%, co-op r3 11.3%).
+  It is a reaction to something the C# game does, about one core's tenth; no run's result stands out from its track's
+  others for it.
+
+**Statistics.** Per metric and track: median, mean, standard deviation, min, max and the 95% confidence interval of
+the mean (Student's t, n − 1 degrees of freedom). The C++/C# ratio is of the medians (below 1: C++ lower). The
+significance call: with five runs a side, a two-sided **Mann-Whitney U test** at p < 0.05 (with 5 against 5 the
+smallest possible p is 0.008, which means every run of one track beats every run of the other); with three a side (the
+co-op runs, where U cannot go below p = 0.10), **non-overlapping ranges**. Raw data: `Builds/Race/quiet/` (gitignored:
+bench, game, coop, shots, runs.jsonl, stats.csv, compare.csv); every metric's row, both sides, is in
+[`race-quiet-stats.csv`](race-quiet-stats.csv). Percentiles inside a run are the sampler's nearest-rank ones.
+
+Every run was the same game: all 75 Bench runs digest-identical (sol-idle `B30509691F52C9E0`, battle
+`ABD80179E1D7F1AC`, galaxy-ftl `F1E614170D1B1960`, economy-year `7F6533416B74D14D`, high-warp `A8A790EC13FD23C8`, the
+same as US-T49's), all ten tours with 271 ships after Sol idle, the battle over with 7 units, a 268-frame trip and the
+same end date, and all six co-op runs 15 of 15 with every digest identical (54–55 compared per run).
+
+### In game (Shipping packages, 5 runs a side)
+
+Median [min–max]; mean ± sd (95% CI of the mean); ms unless marked.
+
+| Metric | C++ | C# | C++/C# | U test |
+|---|---|---|---|---|
+| Sol idle: frame p50 | **5.53** [5.46–5.70]; 5.57 ± 0.10 (5.45–5.69) | 9.51 [9.06–9.79]; 9.45 ± 0.35 (9.02–9.88) | 0.58 | p = 0.008, signal |
+| Sol idle: frame p95 / p99 | **16.1** / **20.5** [19.6–21.8] | 17.5 / 27.1 [25.5–32.4] | 0.92 / 0.76 | 0.008 / 0.008, signal |
+| Sol idle: frame mean | **7.54** ± 0.11 | 11.1 ± 0.46 | 0.68 | 0.008, signal |
+| Sol idle: GPU p50 / p95 | 1.11 / **2.05** | **0.84** / 4.35 | 1.31 / 0.47 | 0.008 / 0.008, signal both ways |
+| Sol idle: simulation p50 / p95 | **0.87** / **1.73** | 1.32 / 3.73 | 0.66 / 0.46 | 0.008, signal |
+| Sol idle: whole Unity frame p50 | **3.36** [3.28–3.40] | 6.46 [6.12–6.66] | 0.52 | 0.008, signal |
+| 1 week/s: frame p50 | **39.4** [37.5–41.3]; 39.2 ± 1.4 (37.4–41.0) | 79.3 [76.1–85.8]; 80.2 ± 3.8 (75.5–84.9) | 0.50 | 0.008, signal |
+| 1 week/s: frame p95 / p99 | **58.2** / **113** | 145 / 331 | 0.40 / 0.34 | 0.008, signal |
+| 1 week/s: simulation p50 / p95 | **28.3** / **48.2** | 68.3 / 137 | 0.41 / 0.35 | 0.008, signal |
+| Battle: frame p50 | **5.11** [4.95–5.19]; 5.09 ± 0.09 (4.98–5.20) | 9.88 [9.04–10.1]; 9.77 ± 0.43 (9.24–10.3) | 0.52 | 0.008, signal |
+| Battle: frame p95 / p99 | **13.9** / **17.1** | 18.5 / 21.9 | 0.75 / 0.78 | 0.008, signal |
+| Battle: GPU p50 / p95 | 0.96 / **1.91** | 0.83 / 4.07 | 1.16 / 0.47 | p50 0.095 noise; p95 0.008 signal |
+| Battle: simulation p50 | **0.86** | 1.27 | 0.67 | 0.012, signal |
+| Trip: frame p50 / p99 | **2.69** / **16.5** | 5.92 / 41.2 | 0.45 / 0.40 | 0.008, signal |
+| Trip: simulation mean | **0.46** | 0.97 | 0.48 | 0.008, signal |
+| Launch to the main menu, s | 1.38 [1.36–2.06]; 1.58 ± 0.31 | 1.80 [1.58–2.62]; 2.00 ± 0.48 | 0.77 | 0.151, **noise** |
+| New Game to playable, s | **5.03** [4.93–5.16] | 13.8 [13.7–14.1] | 0.36 | 0.008, signal |
+| Launch to playable, s | **6.88** [6.86–7.68]; 7.08 ± 0.35 (6.64–7.52) | 16.0 [15.8–17.0]; 16.3 ± 0.60 (15.6–17.1) | 0.43 | 0.008, signal |
+| Peak working set, GB | **2.45** [2.44–2.47] | 6.27 [5.68–7.04] | 0.39 | 0.008, signal |
+| Save, mean of 3 per run | 272 [268–291]; 274 ± 9.6 (263–286) | **238** [220–248]; 234 ± 12 (219–249) | 1.14 | 0.008, signal |
+| Load, mean of 3 per run | 285 [278–300]; 288 ± 9.0 (277–299) | **237** [233–251]; 239 ± 7.5 (230–248) | 1.20 | 0.008, signal |
+
+### Headless Bench (5 runs per runner)
+
+Median [min–max] of each run's own figure; ms per tick. U tests against C++.
+
+| Scenario, metric | C++ | .NET 10 | .NET 8 | C++/.NET 10 | .NET 10 call | .NET 8 call |
+|---|---|---|---|---|---|---|
+| Galaxy build (all scenarios), s | **4.14–4.19** [4.04–4.56] | 6.20–6.36 [6.02–7.08] | 6.12–6.27 [5.78–6.60] | 0.65–0.67 | signal (0.008) | signal (0.008) |
+| sol-idle: tick p50 | 1.00 [0.99–1.03] | **0.60** [0.58–0.60] | 0.61 [0.60–0.63] | 1.67 | signal | signal |
+| sol-idle: tick mean | 1.97 [1.95–2.00] | 1.91 [1.69–2.05] | **1.70** [1.65–1.76] | 1.03 | noise (0.55) | signal (.NET 8 faster) |
+| sol-idle: tick p99 | 4.33 | 4.48 | 4.07 | 0.97 | noise | noise |
+| battle: tick p50 | 1.19 [1.09–1.26] | **0.65** [0.61–0.71] | 0.61 | 1.83 | signal | signal |
+| battle: tick mean | 1.78 [1.76–1.88] | 2.00 [1.94–2.17] | **1.65** [1.64–1.76] | 0.89 | signal (C++ faster) | signal (.NET 8 faster) |
+| battle: tick p99 | **11.4** [11.3–11.6] | 34.6 [32.1–45.6] | 29.9 [10.9–33.8] | 0.33 | signal | noise (0.15) |
+| galaxy-ftl: tick p50 / mean | 2.99 / **7.60** | **2.47** / 7.94 | 2.54 / 7.77 | 1.21 / 0.96 | signal / signal | signal / noise |
+| galaxy-ftl: tick p99 | **48.6** | 53.9 [51.9–64.3] | 49.1 | 0.90 | signal | noise |
+| economy-year: tick mean | 112 [109–113] | **106** [104–107] | 106 [104–109] | 1.06 | signal | signal |
+| economy-year: tick p99 | 187 | 187 | 184 | 1.00 | noise | noise |
+| high-warp: tick mean | 1,259 [1,242–1,268] | **1,201** [1,177–1,218] | 1,203 [1,185–1,234] | 1.05 | signal | signal |
+| high-warp: tick p99 | **1,621** [1,616–1,645] | 1,893 [1,726–1,921] | 1,591 | 0.86 | signal | noise |
+| Peak working set, MB | **31–65** | 95–159 | 95–154 | 0.31–0.45 | signal | signal |
+| Allocated during the run, MB | 284–4,661 | **228–4,040** | 264–4,211 | 1.10–1.53 | signal | signal |
+
+### Co-op from the Shipping packages (3 runs a side; call by ranges)
+
+| Metric | C++ | C# | C++/C# | Ranges |
+|---|---|---|---|---|
+| Smoke checks passed | 15 / 15 every run | 15 / 15 every run | — | — |
+| Digests compared, differing | 54–55, 0 | 55, 0 | — | — |
+| Resync, host capture | 320 [306–333] | **215** [212–218] | 1.49 | separate, signal |
+| Resync, host's own reload | 373 [341–373] | **218** [217–227] | 1.71 | separate, signal |
+| Resync, client load | 393 [389–398] | **275** [274–275] | 1.43 | separate, signal |
+| Resync, capture + reload + client load | 1,086 [1,036–1,104] | **710** [704–717] | 1.53 | separate, signal |
+| Sync save, KB | **4,325** [4,207–4,373] | 5,015 [4,930–5,055] | 0.86 | separate, signal |
+| Host bytes sent over the session, MB | **19.4** [18.9–19.6] | 22.4 [22.0–22.5] | 0.87 | separate, signal |
+| Host KB/s sent outside the syncs (session mean, the syncs' base64 taken off) | 22.8 [22.6–22.9] | **20.4** [20.4–21.1] | 1.12 | separate, signal |
+| Client bytes sent, MB | 0.38 [0.35–0.38] | **0.34** [0.34–0.34] | 1.11 | separate |
+| Host frame p50 / p95 (paced at 60 fps) | 16.7 / 27.2 | 16.7 / 25.7 | 1.00 / 1.06 | p95 separate |
+| Client at most frames behind the host | 201 [177–223] | 184 [181–185] | 1.09 | overlap, noise |
+| Session length (host), s | **74.4** | 88.3 | 0.84 | separate |
+| Peak working set host / client, GB | **1.52** / **1.32** | 5.35 / 2.67 | 0.28 / 0.49 | separate, signal |
+
+### What changed from the earlier numbers
+
+- **Sol idle now goes to C++, by 1.7×** (frame p50 5.53 against 9.51 ms). The race had C# ahead (15.0 against 12.2 ms):
+  the C++ figure predates US-T62's facade fix, and the C# one was taken on a black, default-material scene (before
+  US-T61). Supersedes the race's Sol idle table and the "rest of the frame is cheaper in C#" reading: the whole Unity
+  frame is now 3.36 against 6.46 ms.
+- **The battle goes to C++ at every percentile**: 5.1 / 13.9 ms p50 / p95 against 9.9 / 18.5 (supersedes the race's
+  15.1 / 27.2 against 16.7 / 225.5, and US-T61's 11.4 / 21.4 for C#). The C# GPU stall is gone; at the median the GPUs
+  are level (0.96 against 0.83 ms, noise) and the C# GPU p95 is twice C++'s (4.1 against 1.9 ms).
+- **1 week/s**: 39.4 against 79.3 ms (the race: 53.4 against 97.2), simulation 28.3 against 68.3 ms p50, still 2.4×.
+- **Startup**: launch to playable 6.9 against 16.0 s (the race: 8.8 against 20.5). Launch to the main menu is now
+  **not a significant difference** (1.38 against 1.80 s median, ranges overlapping, p = 0.15); the race called it a
+  signal (2.4 against 4.1 s).
+- **Memory in game**: 2.45 against 6.27 GB peak (the race: 2.3 against 5.4; the C# game now loads the real materials and
+  textures).
+- **Package size**: with the plugin content cooked on both, the Shipping packages are 479 MB (C++) against 551 MB (C#)
+  without .pdb, 903 against 795 MB with (the race: 411 against 483 MB, 835 against 732 MB, both without that content).
+- **Saves and loads**: C# still faster, by less: 238 / 237 ms against 272 / 285 ms (the race: 282 / 254 against
+  332 / 387).
+- **Headless heavy ticks are no longer "level"**: with five quiet runs a side, .NET 10 is 5–6% faster on economy-year
+  (106 against 112 ms mean) and high-warp (1,201 against 1,259 ms), on every run (p = 0.008). The race's three busy
+  rounds could not resolve a gap that small. C++ keeps the shorter tail (high-warp p99 1,621 against 1,893 ms on
+  .NET 10; battle p99 11.4 against 34.6 ms).
+- **.NET 8 against .NET 10** (the race: "no consistent difference"): .NET 8 is faster on the light-tick means (sol-idle
+  1.70 against 1.91 ms, battle 1.65 against 2.00 ms) and has a shorter p99 than .NET 10 in the battle, trip and
+  high-warp; the heavy scenarios are level. The C# game runs .NET 10.
+- **Co-op from packages**: both tracks 15 of 15 (the race: C++ 10 of 15 from editor binaries, fixed in US-T64 / US-T68).
+  Resyncs are 1.5× faster on C# (710 against 1,086 ms end to end); the C# save is 16% larger (5.0 against 4.3 MB).
 
 ## Method
 
@@ -100,6 +258,8 @@ hired escort left leaderless with no motion of its own, read as Parked with a nu
 (it never asks every ship's position each frame) and covers those warps instead.
 
 ## 1. Headless simulation (the Bench)
+
+*Superseded by "Quiet-machine statistics (US-T60)" above (five quiet rounds); kept as the race's record.*
 
 `Bench.Cpp` (the C++ Core, Release: `/O2 /GL /arch:AVX`, LTCG) against `Bench.CSharp` on .NET 10 (the C# game's runtime)
 and .NET 8, the five scenarios of Bench/README.md, interleaved (each scenario: C++, .NET 10, .NET 8 back to back), three
@@ -157,6 +317,10 @@ How to read it:
   machine.
 
 ## 2. In game (Shipping packages)
+
+*Superseded by "Quiet-machine statistics (US-T60)" above. The race's C++ numbers below predate US-T62 (the facade's
+frame cost) and US-T65 (no plugin content), and its C# numbers were taken on a black, default-material scene before
+US-T61; the notes after the tables follow those fixes one at a time.*
 
 Medians of three runs per track (the range of the three in brackets where it matters). ms per frame.
 
@@ -290,6 +454,9 @@ The p95s keep the frames on which the hyperlanes' triangles change (a ship joins
 A Development package of each was also built (sizes below); the in-game numbers are the Shipping packages'.
 
 ## 3. Co-op (host and client on localhost)
+
+*From editor binaries in the race; the Shipping packages' figures (three runs a side, both 15 of 15) are in
+"Quiet-machine statistics (US-T60)" above and supersede the resync and traffic rows here.*
 
 `tools/play.ps1 -Mode coop-smoke` on each track from the snapshot's editor binaries: two headless instances (`-nullrhi`,
 Development), a listen server and a client, the same script on both tracks (the client joins and loads the host's save,
@@ -472,7 +639,7 @@ stops updating the rest of the frame.
 tools/bench.ps1 -Track Both                                # headless (Bench/README.md); interleave rounds by hand
 tools/package.ps1 -Track Cpp -Configuration Shipping       # Builds/Cpp/Windows/Unreal.SpaceGod.Cpp.exe
 tools/package.ps1 -Track CSharp -Configuration Shipping    # Builds/CSharp/Windows/Unreal.SpaceGod.CSharp.exe
-tools/race.ps1 -Track Cpp -Runs 3                          # Builds/Race/game/cpp-N.json
+tools/race.ps1 -Track Cpp -Runs 3                          # Builds/Race/game/cpp-N.json (-Out is made absolute, US-T60)
 tools/race.ps1 -Track CSharp -Runs 3
 $env:SPACEGOD_RACE_DIR = 'Builds/Race/coop'; tools/play.ps1 -Track Cpp -Mode coop-smoke   # and -Track CSharp
 ```
