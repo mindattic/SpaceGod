@@ -760,6 +760,12 @@ namespace SpaceGod::Core
 		/// </summary>
 		cs::Ref<Ship> Tombstone() const; // internal
 
+		/// <summary>
+		/// The motion War.Detach hands an escort leaving its group: its leader's, field for field. For a hull gone from the
+		/// fleet as an escort (its marker, or a hired fighter paid off), so it reads where it last was (US-T59).
+		/// </summary>
+		void TakeMotionOf(const cs::Ref<Ship>& lead); // internal
+
 		cs::String ToString() const { return Name; }
 		SG_SERIALIZABLE(Ship); // ObjectGraph registration (Persistence/Registrations)
 	};

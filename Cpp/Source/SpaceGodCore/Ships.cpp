@@ -323,6 +323,10 @@ namespace SpaceGod::Core
 		// MemberwiseClone: a shallow copy. (The C# clone shares the readonly Salvage list with the original; here it is
 		// copied by value. A tombstone is gone and nothing touches its salvage, so the difference is never seen.)
 		auto t = cs::New<Ship>(*this);
+		// An escort flies its leader's motion (Controller) and has none of its own (it may never have had an Orbit):
+		// its marker, leaderless, takes the group's motion as War.Detach gives an escort leaving its group, so it reads
+		// where the hull last was rather than parked with no orbit (Fleet.StateOf threw on it every frame, US-T59).
+		if (Leader != nullptr) t->TakeMotionOf(Leader);
 		t->Destroyed = true;
 		t->GateDeparted = true;
 		t->Leader = nullptr;
@@ -330,5 +334,40 @@ namespace SpaceGod::Core
 		t->Voyage = nullptr;
 		t->GateKm.reset();
 		return t;
+	}
+
+	void Ship::TakeMotionOf(const cs::Ref<Ship>& lead)
+	{
+		Phase = lead->Phase;
+		Orbit = lead->Orbit;
+		DepartureOrbit = lead->DepartureOrbit;
+		DestinationBody = lead->DestinationBody;
+		OriginBody = lead->OriginBody;
+		PhaseStartJd = lead->PhaseStartJd;
+		PhaseEndJd = lead->PhaseEndJd;
+		FrameBody = lead->FrameBody;
+		Path = lead->Path;
+		PathCumulative = lead->PathCumulative;
+		PathLength = lead->PathLength;
+		AccelKmPerDay2 = lead->AccelKmPerDay2;
+		Conic = lead->Conic;
+		GravityLossKmS = lead->GravityLossKmS;
+		DepartureVelocity = lead->DepartureVelocity;
+		ArrivalVelocity = lead->ArrivalVelocity;
+		Journey = lead->Journey;
+		JourneyIndex = lead->JourneyIndex;
+		FinalBody = lead->FinalBody;
+		LaneLeg = lead->LaneLeg;
+		LaneFromOffset = lead->LaneFromOffset;
+		LaneToOffset = lead->LaneToOffset;
+		LaneLengthKm = lead->LaneLengthKm;
+		LaneStartProgress = lead->LaneStartProgress;
+		LaneEndProgress = lead->LaneEndProgress;
+		LaneHold = lead->LaneHold;
+		LaneHoldSide = lead->LaneHoldSide;
+		LaneStar = lead->LaneStar;
+		LaneShape = lead->LaneShape;
+		Ring = lead->Ring;
+		HoldPoint = lead->HoldPoint;
 	}
 }

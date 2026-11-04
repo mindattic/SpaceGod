@@ -129,6 +129,8 @@ namespace SpaceGod::Core
 			gone.Add(s);
 			s->Destroyed = true;
 			s->GateDeparted = true;
+			// Gone where its wing lay, not parked with no orbit of its own (an escort has none, US-T59).
+			if (s->Leader != nullptr) s->TakeMotionOf(s->Leader);
 			s->Leader = nullptr;
 		}
 		for (const auto& s : gone) hired.Remove(s);
