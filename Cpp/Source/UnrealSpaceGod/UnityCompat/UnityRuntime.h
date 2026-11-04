@@ -105,6 +105,12 @@ namespace SpaceGod::UnityCompat
 		HideFlags hideFlags = HideFlags::None;
 		bool destroyed = false;
 		cs::Ref<Transform> transform;
+		/// Unity's GameObject.layer (0..31, Default 0): a camera draws the renderers whose layer is in its cullingMask
+		/// (US-T53; LayerMask.NameToLayer is ModelViewerBackend's).
+		int layer = 0;
+		/// A loaded asset (Resources' model prototypes, US-T53): never in the scene itself (not active in the hierarchy),
+		/// only its Instantiate copies are, which Object.Instantiate does not mark (the C# facade's GameObject.isAsset).
+		bool isAsset = false;
 
 		explicit GameObject(const cs::String& name_ = "GameObject");
 		/// new GameObject(name): made with its Transform.
@@ -117,9 +123,11 @@ namespace SpaceGod::UnityCompat
 
 	enum class CameraClearFlags : int { Skybox = 1, SolidColor = 2, Depth = 3, Nothing = 4 };
 
-	/// The game's one camera (Unity's Camera.main): pose (always at the origin, see the floating origin), vertical
-	/// field of view in degrees and clip planes in scene units. The host actor applies it to the player's camera
-	/// manager each frame through UnrealSpace (vertical -> horizontal fov, metres -> cm).
+	/// A Unity camera: the game's (Camera.main: pose always at the origin, see the floating origin) or one added to a
+	/// GameObject (Camera::Add, `go.AddComponent<Camera>()`: the model viewer's). Vertical field of view in degrees,
+	/// clip planes in scene units. The screen shows the screen camera (UnityScene::ScreenCamera: the enabled one of the
+	/// highest depth, US-T53), whose pose the host actor applies to the player's camera through UnrealSpace (vertical ->
+	/// horizontal fov, metres -> cm), drawing only the renderers on its cullingMask's layers over its clear colour.
 	class Camera final
 	{
 	public:
@@ -130,9 +138,20 @@ namespace SpaceGod::UnityCompat
 		float nearClipPlane = 0.3f;
 		float farClipPlane = 1000.0f;
 		bool enabled = true;
+		/// Unity's Camera.depth: of the cameras drawing to the screen, the highest draws last (over the others).
+		float depth = 0;
+		/// Unity's Camera.cullingMask: the layers (bit per GameObject.layer) whose renderers and lights it draws.
+		int cullingMask = -1;
+		/// The GameObject an added camera sits on (none for Camera.main): it draws only while that is active.
+		std::weak_ptr<GameObject> Owner;
 
 		static Camera* main();
+		/// Camera.main, then every camera added (and not destroyed with its GameObject), enabled or not.
 		static cs::List<Camera*> allCameras();
+		/// `go.AddComponent<Camera>()`: a camera whose transform is `go`'s; it lives as long as `go` does.
+		static Camera* Add(const cs::Ref<GameObject>& go);
+		/// enabled, and (an added camera) its GameObject alive and active in the hierarchy: Unity's isActiveAndEnabled.
+		bool isActiveAndEnabled() const;
 		float aspect() const { return Screen::height > 0 ? static_cast<float>(Screen::width) / Screen::height : 1.0f; }
 		/// A ray direction (Unity axes) through a screen point (pixels, origin bottom-left as Unity's).
 		Vector3 ScreenPointToRayDirection(Vector2 screen) const;

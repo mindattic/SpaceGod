@@ -69,6 +69,17 @@ namespace SpaceGod
 		/// whichever of the two components updates first).
 		static bool CapturesInput() { return isOpen || closedFrame == Time::frameCount; }
 
+		/// C++ only, for the checks (the C# track's FidelityShots reaches Open/Close by reflection; US-T53): opens the
+		/// viewer on model `index` as F9 does (false without a viewer or models), closes it, its camera (null until
+		/// first opened), its layer, the name of model `index`.
+		static bool OpenForCheck(int index);
+		static void CloseForCheck();
+		static Camera* CheckCamera();
+		static int CheckLayer() { return ModelViewerLayer(); }
+		static cs::String CheckModelName();
+		/// Each renderer of the model shown: its GameObject's name and layer, active, enabled, mesh, material.
+		static cs::String CheckDescribe();
+
 		// ---- Unity messages (private in C#; public here for the host).
 		void Awake();
 		void Start();

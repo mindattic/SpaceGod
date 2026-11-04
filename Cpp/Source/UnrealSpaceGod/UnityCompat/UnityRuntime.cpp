@@ -6,6 +6,10 @@
 #include "Kismet/KismetSystemLibrary.h"
 #include "Engine/Engine.h"
 
+#include <algorithm>
+#include <utility>
+#include <vector>
+
 namespace SpaceGod::UnityCompat
 {
 	static FString ToF(const cs::String& s) { return FString(UTF8_TO_TCHAR(s.c_str())); }
@@ -105,9 +109,10 @@ namespace SpaceGod::UnityCompat
 
 	bool GameObject::activeInHierarchy() const
 	{
-		if (!activeSelf || destroyed) return false;
+		// A loaded asset (isAsset, US-T53) is never in the scene itself, only its Instantiate copies are (the C# facade's).
+		if (!activeSelf || destroyed || isAsset) return false;
 		for (auto p = transform ? transform->parent.lock() : nullptr; p; p = p->parent.lock())
-			if (auto go = p->gameObject(); go && (!go->activeSelf || go->destroyed)) return false;
+			if (auto go = p->gameObject(); go && (!go->activeSelf || go->destroyed || go->isAsset)) return false;
 		return true;
 	}
 
@@ -140,11 +145,54 @@ namespace SpaceGod::UnityCompat
 
 	Camera* Camera::main() { return &MainCamera(); }
 
+	namespace
+	{
+		/// The cameras added to GameObjects (US-T53), each kept while its GameObject lives.
+		std::vector<std::pair<std::weak_ptr<GameObject>, cs::Ref<Camera>>>& AddedCameras()
+		{
+			static std::vector<std::pair<std::weak_ptr<GameObject>, cs::Ref<Camera>>> cameras;
+			return cameras;
+		}
+
+		void PurgeCameras()
+		{
+			auto& cameras = AddedCameras();
+			cameras.erase(std::remove_if(cameras.begin(), cameras.end(), [](const auto& c)
+			{
+				auto go = c.first.lock();
+				return !go || go->destroyed;
+			}), cameras.end());
+		}
+	}
+
 	cs::List<Camera*> Camera::allCameras()
 	{
+		PurgeCameras();
 		cs::List<Camera*> all;
 		all.Add(&MainCamera());
+		for (const auto& c : AddedCameras()) all.Add(c.second.get());
 		return all;
+	}
+
+	Camera* Camera::Add(const cs::Ref<GameObject>& go)
+	{
+		PurgeCameras();
+		auto camera = cs::New<Camera>();
+		if (go)
+		{
+			camera->transform = go->transform;
+			camera->Owner = go;
+		}
+		AddedCameras().emplace_back(go, camera);
+		return camera.get();
+	}
+
+	bool Camera::isActiveAndEnabled() const
+	{
+		if (!enabled) return false;
+		if (this == &MainCamera()) return true;
+		auto go = Owner.lock();
+		return go && !go->destroyed && go->activeInHierarchy();
 	}
 
 	Vector3 Camera::ScreenPointToRayDirection(Vector2 screen) const

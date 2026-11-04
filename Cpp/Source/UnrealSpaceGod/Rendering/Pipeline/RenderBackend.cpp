@@ -89,12 +89,19 @@ namespace SpaceGod::Rendering
 		// Unreal's deferred renderer takes its anti-aliasing from r.AntiAliasingMethod, not per camera.
 	}
 
-	cs::Ref<Light> NeutralRenderBackend::AddKeyLight(const cs::Ref<Transform>&, const cs::String&, Quaternion rotation, float intensity, int, HideFlags)
+	cs::Ref<Light> NeutralRenderBackend::AddKeyLight(const cs::Ref<Transform>& parent, const cs::String&, Quaternion rotation, float intensity, int cullingMask,
+		HideFlags)
 	{
 		auto light = cs::New<Light>();
 		light->type = LightType::Directional;
 		light->direction = rotation * Vector3::forward();
 		light->intensity = intensity;
+		// US-T53: a light under that transform, lighting only `cullingMask`, kept by the scene host (UnityScene::KeyLightOf:
+		// the model viewer's key light under its camera, the C# UnityBridge.KeyLightOf).
+		light->Parent = parent;
+		light->localRotation = rotation;
+		light->cullingMask = cullingMask;
+		UnityCompat::UnityScene::AddLight(light);
 		return light;
 	}
 

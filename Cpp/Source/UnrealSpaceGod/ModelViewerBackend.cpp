@@ -1,8 +1,11 @@
 // ModelViewerBackend (declared in ModelViewer.h, US-T31): what the model viewer needs of Unity beyond the facade.
-// As the C# track's facade does (US-T28/US-T27: LayerMask, Camera.cullingMask / depth kept as data), layers, culling
-// masks and camera depth are recorded, not rendered: the viewer's camera does not yet draw on its own over the game's
-// (that isolation belongs to the Rendering side). Resources.LoadAll("Ships") lists the ship models the shared
-// plugin's import made (Data/ShipModels.json), each loaded through Resources::LoadModel, as the C# LoadAll does.
+// LayerMask.NameToLayer names layers as the C# track's LayerMask does; `go.layer`, `go.AddComponent<Camera>()`,
+// `camera.depth` and `camera.cullingMask` are the facade's GameObject::layer, Camera::Add, Camera::depth and
+// Camera::cullingMask, which the scene host renders (US-T53, the C# track's UnityBridge.ScreenCamera since US-T40):
+// the screen shows the enabled camera of the highest depth (the viewer's, 1000), only the renderers on its mask's
+// layers, over its SolidColor backdrop, lit by its own key light (UnityScene::SyncNow). Resources.LoadAll("Ships")
+// lists the ship models the shared plugin's import made (Data/ShipModels.json), each loaded through
+// Resources::LoadModel, as the C# LoadAll does.
 
 #include "ModelViewer.h"
 
@@ -27,26 +30,6 @@ namespace SpaceGod::ModelViewerBackend
 		{
 			static cs::List<cs::String> names{ "Default", "TransparentFX", "Ignore Raycast", "", "Water", "UI" };
 			return names;
-		}
-
-		std::unordered_map<const GameObject*, int>& Layers()
-		{
-			static std::unordered_map<const GameObject*, int> layers;
-			return layers;
-		}
-
-		struct CameraData
-		{
-			std::weak_ptr<GameObject> owner;
-			cs::Ref<Camera> camera;
-			float depth = 0;
-			int cullingMask = -1;
-		};
-
-		std::vector<CameraData>& Cameras()
-		{
-			static std::vector<CameraData> cameras;
-			return cameras;
 		}
 	}
 
@@ -84,31 +67,18 @@ namespace SpaceGod::ModelViewerBackend
 
 	void SetLayer(const cs::Ref<GameObject>& go, int layer)
 	{
-		if (go) Layers()[go.get()] = layer;
+		if (go) go->layer = layer & 31;
 	}
 
-	Camera* AddCamera(const cs::Ref<GameObject>& go)
-	{
-		auto& cameras = Cameras();
-		// Cameras whose GameObject is gone go with it.
-		cameras.erase(std::remove_if(cameras.begin(), cameras.end(), [](const CameraData& c) { return c.owner.expired(); }), cameras.end());
-		CameraData data;
-		data.owner = go;
-		data.camera = cs::New<Camera>();
-		if (go) data.camera->transform = go->transform;
-		cameras.push_back(data);
-		return cameras.back().camera.get();
-	}
+	Camera* AddCamera(const cs::Ref<GameObject>& go) { return Camera::Add(go); }
 
 	void SetDepth(Camera* camera, float depth)
 	{
-		for (auto& c : Cameras())
-			if (c.camera.get() == camera) c.depth = depth;
+		if (camera) camera->depth = depth;
 	}
 
 	void SetCullingMask(Camera* camera, int mask)
 	{
-		for (auto& c : Cameras())
-			if (c.camera.get() == camera) c.cullingMask = mask;
+		if (camera) camera->cullingMask = mask;
 	}
 }

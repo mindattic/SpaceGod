@@ -13,6 +13,7 @@
 #include "Input/InputDevice.h"
 #include "Rendering/Pipeline/RenderBackend.h"
 #include "Rendering/ShipModels.h"
+#include "ModelViewer.h"
 #include "UI/MainMenu.h"
 #include "UI/PauseMenu.h"
 #include "UnityCompat/GuiHost.h"
@@ -48,6 +49,7 @@
 #include "Misc/CoreDelegates.h"
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
+#include "ShaderCompiler.h"
 #include "UnrealClient.h"
 
 #include <set>
@@ -101,7 +103,7 @@ namespace SpaceGod::Smoke
 
 		struct Run
 		{
-			enum class Mode { None, Smoke, Shots, Views };
+			enum class Mode { None, Smoke, Shots, Views, Fidelity };
 			Mode mode = Mode::None;
 			int phase = 0;
 			int waited = 0;
@@ -524,6 +526,64 @@ namespace SpaceGod::Smoke
 			}
 		}
 
+		// ---------------------------------------------------------------- the fidelity shot (US-T53)
+
+		/// -SpaceGodFidelityShots (tools/play.ps1 -Track Cpp -Mode fidelity): the C# track's FidelityShots' model viewer
+		/// step: a new game, the viewer opened on its first model as F9 opens it, 20 frames, the shot
+		/// (cpp-fidelity-model-viewer.png, next to csharp-fidelity-model-viewer.png); then quits.
+		void FidelityTick(UWorld* world)
+		{
+			AUnitySpaceAppActor* a = AUnitySpaceAppActor::Find(world);
+			if (!a || !a->HasActorBegunPlay()) return;
+			UnitySpaceApp* app = a->GetApp();
+			run.waited++;
+			switch (run.phase)
+			{
+				case 0:
+					if (app) { run.phase = 1; run.waited = 0; }
+					else if (UI::MainMenu::Showing() && run.waited >= 60) { run.phase = 1; run.waited = 0; GameLaunch::NewGame(); }
+					return;
+				case 1:
+					if (!app) { run.waited = 0; return; }
+					if (run.waited < 120) return;
+					run.waited = 0;
+					run.phase = 2;
+					if (!ModelViewer::OpenForCheck(0))
+					{
+						LogError("Fidelity shots: no model viewer, or no models");
+						Quit(world);
+						run.phase = 4;
+					}
+					return;
+				case 2:
+					// Not while shaders are still compiling (the model's and the backdrop's materials would not draw yet).
+					if (GShaderCompilingManager && GShaderCompilingManager->IsCompiling()) run.waited = 0;
+					if (run.waited < 20) return;
+					{
+						Camera* screen = UnityScene::ScreenCamera();
+						auto owner = screen ? screen->Owner.lock() : nullptr;
+						const auto& s = UnityScene::Last();
+						Log(cs::Cat("Fidelity shots: model viewer open on '", ModelViewer::CheckModelName(), "', screen camera ",
+							owner ? owner->name : cs::String("Main Camera"), " (depth ", cs::Str(screen ? screen->depth : 0.0f), "), ", s.Visible,
+							" drawn, ", s.Masked, " left out by its culling mask, backdrop ", s.Backdrop ? "True" : "False", ", key light ",
+							UnityScene::KeyLightOf(screen) ? "True" : "False"));
+					}
+					Shot("cpp-fidelity-model-viewer");
+					run.waited = 0;
+					run.phase = 3;
+					return;
+				case 3:
+					if (run.waited < 10) return;
+					ModelViewer::CloseForCheck();
+					Log(cs::Cat("Fidelity shots: done, in ", ShotFolder()));
+					Quit(world);
+					run.phase = 4;
+					return;
+				default:
+					return;
+			}
+		}
+
 		// ---------------------------------------------------------------- the views check (ViewsSmoke)
 
 		Vector3 ToV3(const DVec3& d) { return Vector3(static_cast<float>(d.X), static_cast<float>(d.Y), static_cast<float>(d.Z)); }
@@ -723,6 +783,7 @@ namespace SpaceGod::Smoke
 				case Run::Mode::Smoke: if (run.phase < 3) SmokeTick(world); break;
 				case Run::Mode::Shots: ShotsTick(world); break;
 				case Run::Mode::Views: ViewsTick(world); break;
+				case Run::Mode::Fidelity: FidelityTick(world); break;
 				default: break;
 			}
 			return true;
@@ -737,6 +798,7 @@ namespace SpaceGod::Smoke
 			started = true;
 			if (Bootstrap::HasCommandLineFlag("-SpaceGodSmoke")) run.mode = Run::Mode::Smoke;
 			else if (Bootstrap::HasCommandLineFlag("-SpaceGodUiShots")) run.mode = Run::Mode::Shots;
+			else if (Bootstrap::HasCommandLineFlag("-SpaceGodFidelityShots")) run.mode = Run::Mode::Fidelity; // US-T53
 			else if (Bootstrap::HasCommandLineFlag("-SpaceGodViews") || !CommandLineValue(TEXT("-SpaceGodShot=")).empty()) run.mode = Run::Mode::Views;
 			if (run.mode == Run::Mode::None) return false;
 

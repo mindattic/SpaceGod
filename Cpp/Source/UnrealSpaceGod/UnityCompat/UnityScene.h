@@ -11,6 +11,8 @@
 
 #include "CoreMinimal.h"
 #include "UnityCompat/UnityRendering.h"
+#include "UnityCompat/UnityObjects.h"
+#include "UnityCompat/UnityRuntime.h"
 
 class AActor;
 class UPrimitiveComponent;
@@ -28,9 +30,26 @@ namespace SpaceGod::UnityCompat
 		{
 			int Renderers = 0, Primitives = 0, Visible = 0, MeshUploads = 0, MaterialInstances = 0;
 			int64_t Triangles = 0;
+			/// US-T53 (not in ToString, which the smoke compares with the C# track's): renderers left out by the screen
+			/// camera's culling mask, the layers (a bit each) of the renderers drawn (the backdrop aside), whether its
+			/// SolidColor backdrop was drawn and whether a Light lit a material (US-T57).
+			int Masked = 0, VisibleLayers = 0;
+			bool Backdrop = false, KeyLit = false;
 			cs::String ToString() const;
 		};
 		static const Stats& Last();
+
+		/// The camera that draws the screen, as Unity picks it (the C# track's UnityBridge.ScreenCamera, US-T53): of the
+		/// active, enabled cameras, the one with the highest depth (the model viewer's, depth 1000, over the game's;
+		/// Camera.main on a tie); Camera.main if none is enabled.
+		static Camera* ScreenCamera();
+
+		/// A light on a GameObject (RenderBackend::AddKeyLight), kept while the transform it sits under lives.
+		static void AddLight(const cs::Ref<Light>& light);
+
+		/// The enabled directional light under `camera` whose culling mask overlaps the camera's (the model viewer's key
+		/// light), or null: the C# track's UnityBridge.KeyLightOf.
+		static Light* KeyLightOf(Camera* camera);
 
 		/// The actor whose components draw the scene (and whose world it is in).
 		static void Attach(AActor* host);

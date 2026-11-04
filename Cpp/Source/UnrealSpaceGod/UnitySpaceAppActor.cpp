@@ -201,7 +201,8 @@ void AUnitySpaceAppActor::RefreshUnityStatics(float RealDeltaSeconds)
 
 void AUnitySpaceAppActor::ApplyCamera()
 {
-	Camera* Cam = Camera::main();
+	// US-T53: the screen's camera as Unity picks it (the model viewer's over the game's), not only Camera.main.
+	Camera* Cam = UnityScene::ScreenCamera();
 	if (!Cam || !MainCamera) return;
 	// The app keeps the camera at the origin and rotates it (floating origin); everything else is placed at
 	// scene - camera, so the camera component only ever turns. Unity's fov is vertical, Unreal's horizontal.

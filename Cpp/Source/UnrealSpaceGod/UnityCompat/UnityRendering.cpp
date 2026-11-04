@@ -430,6 +430,7 @@ namespace SpaceGod::UnityCompat
 		auto copy = NewGameObject(src->name);
 		copy->tag = src->tag;
 		copy->activeSelf = src->activeSelf;
+		copy->layer = src->layer; // US-T53: Object.Instantiate keeps each GameObject's layer
 		copy->transform->localPosition = src->transform->localPosition;
 		copy->transform->localRotation = src->transform->localRotation;
 		copy->transform->localScale = src->transform->localScale;
@@ -777,13 +778,15 @@ namespace SpaceGod::UnityCompat
 
 		float LinearToSrgb(float c) { return c <= 0.0031308f ? c * 12.92f : 1.055f * Mathf::Pow(c, 1.0f / 2.4f) - 0.055f; }
 
-		/// The model as Unity's glTF import makes it: an inactive root with one child renderer per node, in node order,
+		/// The model as Unity's glTF import makes it: an asset root with one child renderer per node, in node order,
 		/// each with its glTF material (the base colour as the sRGB value Material.GetColor("_BaseColor") gives there).
 		cs::Ref<GameObject> BuildModel(const cs::String& path, const ModelSpec& spec)
 		{
 			namespace US = SpaceGod::UnrealSpace;
 			auto root = NewGameObject(Leaf(path));
-			root->SetActive(false);
+			// An asset, as Unity's prefab: active, but never in the scene itself, only its Instantiate copies (US-T53; it was
+			// an inactive root, so a copy came out inactive: the model viewer's showed nothing).
+			root->isAsset = true;
 			auto shader = Shader::Find("glTF/PbrMetallicRoughness");
 			for (const auto& part : spec.Parts)
 			{

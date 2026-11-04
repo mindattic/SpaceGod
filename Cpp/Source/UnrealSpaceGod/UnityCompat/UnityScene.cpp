@@ -30,6 +30,9 @@ namespace SpaceGod::UnityCompat
 		int MaterialInstancesMade = 0;
 		uint64_t PushedGlobals = 0;
 		int64_t Frame = 0;
+		/// US-T53: the screen camera's culling mask this Sync, and the renderer of its clear colour (always drawn).
+		int ScreenMask = -1;
+		const Renderer* BackdropRenderer = nullptr;
 
 		/// A strong UObject reference that is left alone when it is destroyed after the object system (a static
 		/// material's instance at exit): releasing it then touches freed engine state.
@@ -390,7 +393,16 @@ namespace SpaceGod::UnityCompat
 			auto go = r.gameObject();
 			if (!go || !go->activeInHierarchy()) return false;
 			auto m = r.sharedMaterial();
-			return m && !m->destroyed;
+			if (!m || m->destroyed) return false;
+			// US-T53: the screen camera draws the layers in its culling mask (the model viewer's sees only its own), and
+			// its clear colour (the backdrop), as the C# track's UnityBridge.Sync.
+			if (&r != BackdropRenderer && ((ScreenMask >> (go->layer & 31)) & 1) == 0)
+			{
+				Building.Masked++;
+				return false;
+			}
+			if (&r != BackdropRenderer) Building.VisibleLayers |= 1 << (go->layer & 31);
+			return true;
 		}
 
 		void SyncRenderer(AActor* host, Renderer& r)
@@ -512,6 +524,124 @@ namespace SpaceGod::UnityCompat
 		}
 	}
 
+	// ---------------------------------------------------------------- the screen camera (US-T53)
+
+	namespace
+	{
+		std::vector<cs::Ref<Light>>& Lights()
+		{
+			static std::vector<cs::Ref<Light>> lights;
+			return lights;
+		}
+
+		/// A camera's clear colour (CameraClearFlags.SolidColor, not black, which is what Unreal clears to): a Sky cube
+		/// on a 1x1 texture of that colour around the camera, the C# track's UnityBridge.Backdrop.
+		struct Backdrop
+		{
+			cs::Ref<GameObject> go;
+			cs::Ref<MeshRenderer> renderer;
+			cs::Ref<Material> material;
+			Color shown = Color(-1, -1, -1, -1);
+
+			static float Encode(float c) { return c <= 0.0031308f ? c * 12.92f : 1.055f * Mathf::Pow(c, 1.0f / 2.4f) - 0.055f; }
+
+			void Update(Camera* cam)
+			{
+				Color c = cam && cam->clearFlags == CameraClearFlags::SolidColor ? cam->backgroundColor : Color::black();
+				bool want = HostActor.IsValid() && c.r + c.g + c.b > 0;
+				if (!want)
+				{
+					if (renderer) renderer->enabled = false;
+					BackdropRenderer = renderer.get();
+					return;
+				}
+				if (!go || go->destroyed)
+				{
+					go = NewGameObject("Camera backdrop");
+					go->hideFlags = HideFlags::HideAndDontSave;
+					std::vector<Vector3> v(8);
+					for (int i = 0; i < 8; i++) v[i] = Vector3((i & 1) == 0 ? -1.0f : 1.0f, (i & 2) == 0 ? -1.0f : 1.0f, (i & 4) == 0 ? -1.0f : 1.0f);
+					std::vector<int> t{ 0, 2, 1, 1, 2, 3, 4, 5, 6, 5, 7, 6, 0, 1, 4, 1, 5, 4, 2, 6, 3, 3, 6, 7, 0, 4, 2, 2, 4, 6, 1, 3, 5, 3, 7, 5 };
+					auto mesh = cs::New<Mesh>("Backdrop");
+					mesh->hideFlags = HideFlags::DontSave;
+					mesh->SetVertices(v);
+					mesh->SetTriangles(t, 0);
+					mesh->SetBounds(Bounds(Vector3::zero(), Vector3::one() * 1e9f));
+					AddComponent<MeshFilter>(go)->sharedMesh = mesh;
+					renderer = AddComponent<MeshRenderer>(go);
+					material = cs::New<Material>(Shader::Find("Unity.SpaceGod/Sky"), "Backdrop");
+					material->renderQueue = 999;
+					material->SetFloat("_Brightness", 1.0f);
+					material->SetVector("_AxisX", Vector4(1, 0, 0, 0));
+					material->SetVector("_AxisY", Vector4(0, 1, 0, 0));
+					material->SetVector("_AxisZ", Vector4(0, 0, 1, 0));
+					renderer->SetSharedMaterial(material);
+					shown = Color(-1, -1, -1, -1);
+				}
+				go->transform->localPosition = cam->transform->position();
+				// Inside the near plane it would be clipped: a cube well beyond it (the Sky material draws it as the sky).
+				float s = Mathf::Max(1.0f, cam->nearClipPlane * 10.0f);
+				go->transform->localScale = Vector3(s, s, s);
+				if (shown.r != c.r || shown.g != c.g || shown.b != c.b)
+				{
+					shown = c;
+					// M_Sky's texel does not reach the screen as Unity's clear colour does: measured on this track
+					// (docs/images/cpp-fidelity-model-viewer.png), the screen's linear value is 0.66 of the texel's (the
+					// C# track's camera, set up differently, measured a * decoded^g, US-T40). The texel is chosen for
+					// the screen to show Unity's value (its gamma colour).
+					constexpr float gain = 0.66f;
+					auto texel = [](float value)
+					{
+						float v = Mathf::Max(value, 0.0f);
+						float linear = v <= 0.04045f ? v / 12.92f : Mathf::Pow((v + 0.055f) / 1.055f, 2.4f);
+						return Encode(Mathf::Min(1.0f, linear / gain));
+					};
+					auto tex = cs::New<Texture2D>(1, 1);
+					tex->name = "Backdrop";
+					tex->SetPixel(0, 0, Color(texel(c.r), texel(c.g), texel(c.b), 1));
+					tex->Apply();
+					material->SetTexture("_MainTex", tex);
+				}
+				renderer->enabled = true;
+				BackdropRenderer = renderer.get();
+				Building.Backdrop = true;
+			}
+		};
+
+		Backdrop TheBackdrop;
+	}
+
+	Camera* UnityScene::ScreenCamera()
+	{
+		Camera* best = nullptr;
+		Camera* main = Camera::main();
+		for (Camera* c : Camera::allCameras())
+		{
+			if (!c->isActiveAndEnabled()) continue;
+			if (!best || c->depth > best->depth || (c->depth == best->depth && c == main)) best = c;
+		}
+		return best ? best : main;
+	}
+
+	void UnityScene::AddLight(const cs::Ref<Light>& light)
+	{
+		if (light) Lights().push_back(light);
+	}
+
+	Light* UnityScene::KeyLightOf(Camera* camera)
+	{
+		if (!camera) return nullptr;
+		for (const auto& l : Lights())
+		{
+			if (!l->enabled || l->type != LightType::Directional || (l->cullingMask & camera->cullingMask) == 0) continue;
+			auto go = l->Parent.lock() ? l->Parent.lock()->gameObject() : nullptr;
+			if (go && go->destroyed) continue;
+			for (auto t = l->Parent.lock(); t; t = t->parent.lock())
+				if (t == camera->transform) return l.get();
+		}
+		return nullptr;
+	}
+
 	void UnityScene::Attach(AActor* host) { HostActor = host; }
 
 	void UnityScene::Detach()
@@ -557,6 +687,11 @@ namespace SpaceGod::UnityCompat
 		// What was destroyed since the last frame leaves the screen now (its component goes with its handle).
 		SceneRegistry::Get().Purge([](Renderer& r) { r.Engine.reset(); });
 		Building = UnityScene::Stats();
+		// US-T53: what the screen shows is what its camera renders (the C# UnityBridge.Sync): the layers in its culling
+		// mask over its clear colour.
+		Camera* screen = ScreenCamera();
+		ScreenMask = screen ? screen->cullingMask : -1;
+		TheBackdrop.Update(screen);
 		SceneRegistry::Get().ForEachRenderer([host](const cs::Ref<Renderer>& r)
 		{
 			SyncRenderer(host, *r);

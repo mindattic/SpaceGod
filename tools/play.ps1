@@ -70,12 +70,12 @@ if ($Mode -eq 'shots') {
 if ($Mode -eq 'fidelity') {
   # -Mode fidelity (CSharp, US-T40): a window and FidelityShots (asteroid belt, Kenney craft, model viewer, spawn-grid
   # thumbnails), each saved as docs/images/csharp-fidelity-*.png (or -CaptureDir), frame times logged; then quits.
-  if ($Track -ne 'CSharp') { throw '-Mode fidelity is the C# track''s check: use -Track CSharp.' }
+  # -Track Cpp (US-T53): the model viewer's shot, docs/images/cpp-fidelity-model-viewer.png (Smoke/SpaceGodSmoke.cpp).
   $editor = Join-Path $engine 'Engine\Binaries\Win64\UnrealEditor.exe'
   if (-not $CaptureDir) { $CaptureDir = Join-Path $repo 'docs\images' }
   $p = Start-Process -FilePath $editor -PassThru -Wait -ArgumentList @("`"$($project.FullName)`"", '/Engine/Maps/Entry', '-game',
     '-windowed', '-ResX=1600', '-ResY=900', '-nosound', '-unattended', '-log', '-SpaceGodFidelityShots', "`"-capturedir=$CaptureDir`"")
-  Get-ChildItem -LiteralPath $CaptureDir -Filter 'csharp-fidelity-*.png' -ErrorAction SilentlyContinue | ForEach-Object FullName
+  Get-ChildItem -LiteralPath $CaptureDir -Filter "$prefix-fidelity-*.png" -ErrorAction SilentlyContinue | ForEach-Object FullName
   exit $p.ExitCode
 }
 

@@ -468,7 +468,7 @@ namespace SpaceGod::UnityCompat
 		cs::List<uint8_t> bytes;
 	};
 
-	/// What a Resources load can give: a texture, a model (a GameObject prototype, inactive) or a data file.
+	/// What a Resources load can give: a texture, a model (a GameObject prototype, an asset: isAsset) or a data file.
 	using ResourceAsset = std::variant<std::monostate, cs::Ref<Texture2D>, cs::Ref<GameObject>, cs::Ref<TextAsset>>;
 
 	enum class ResourceType : int { Texture2D, GameObject, TextAsset };

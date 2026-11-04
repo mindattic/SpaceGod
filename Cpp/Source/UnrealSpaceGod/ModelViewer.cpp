@@ -53,6 +53,48 @@ namespace SpaceGod
 		Instance() = nullptr;
 	}
 
+	bool ModelViewer::OpenForCheck(int index)
+	{
+		const cs::Ref<ModelViewer> viewer = Instance();
+		if (!viewer || viewer->modelNames.Count() == 0) return false;
+		viewer->Open(index);
+		return viewer->open;
+	}
+
+	void ModelViewer::CloseForCheck()
+	{
+		if (const cs::Ref<ModelViewer> viewer = Instance(); viewer && viewer->open) viewer->Close();
+	}
+
+	Camera* ModelViewer::CheckCamera()
+	{
+		const cs::Ref<ModelViewer> viewer = Instance();
+		return viewer ? viewer->viewCamera : nullptr;
+	}
+
+	cs::String ModelViewer::CheckModelName()
+	{
+		const cs::Ref<ModelViewer> viewer = Instance();
+		if (!viewer || viewer->selectedIndex < 0 || viewer->selectedIndex >= viewer->modelNames.Count()) return cs::String();
+		return viewer->modelNames[viewer->selectedIndex];
+	}
+
+	cs::String ModelViewer::CheckDescribe()
+	{
+		const cs::Ref<ModelViewer> viewer = Instance();
+		if (!viewer || !viewer->instance) return "no model";
+		cs::String s;
+		for (const auto& r : GetComponentsInChildren<Renderer>(viewer->instance, true))
+		{
+			auto go = r->gameObject();
+			auto mesh = r->DrawnMesh();
+			s += cs::Cat(s.empty() ? "" : "; ", go ? go->name : cs::String("?"), " layer ", go ? go->layer : -1, " active ", go && go->activeInHierarchy() ? "True" : "False",
+				" enabled ", r->enabled ? "True" : "False", " mesh ", mesh ? cs::Cat(mesh->vertexCount(), " v '", mesh->ImportedAsset, "'") : cs::String("none"),
+				" material ", r->sharedMaterial() ? "yes" : "no");
+		}
+		return s.empty() ? cs::String("no renderers") : s;
+	}
+
 	void ModelViewer::Awake()
 	{
 		cs::List<cs::String> names;

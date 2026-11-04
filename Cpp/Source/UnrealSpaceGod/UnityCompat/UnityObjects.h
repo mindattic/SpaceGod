@@ -23,5 +23,10 @@ namespace SpaceGod::UnityCompat
 		bool enabled = true;
 		Vector3 direction = Vector3::forward();
 		void* Native = nullptr;
+		/// A light on a GameObject (a camera's key light, RenderBackend::AddKeyLight, US-T53): the transform it sits
+		/// under, its rotation there, and Unity's Light.cullingMask (the layers it lights). Unset for the stars.
+		std::weak_ptr<Transform> Parent;
+		Quaternion localRotation = Quaternion::identity();
+		int cullingMask = -1;
 	};
 }
