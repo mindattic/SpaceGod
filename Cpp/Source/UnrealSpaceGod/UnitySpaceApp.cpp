@@ -576,8 +576,7 @@ namespace SpaceGod
 	{
 		// US-T70: the pointer through Input's device (the real mouse, or the co-op smoke's / the audit's script), as both C#
 		// copies read it (SpaceGod.Unity.CSharp ad968a1). It was the GUI host's Slate mouse, so a scripted run tested the
-		// scripted pointer's clicks against wherever the real cursor was: the audit's held fire was refused whenever that sat
-		// over a HUD rect (combat.mouse-fire failed about one run in three, gun heat 0 with the button held).
+		// scripted pointer's clicks against wherever the real cursor was.
 		const Input::InputDevice& mouse = Input::InputDevice::current();
 		if (!mouse.present) return false;
 		auto p = mouse.position;

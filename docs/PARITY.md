@@ -73,7 +73,68 @@ anything. The scripts were throwaway, and every flagged item is accounted for be
 
 ## Found on the Unity side
 
-Nothing is missing there. One note for whoever freezes the copies: SpaceGod.Unity.CSharp's
-`Core/Persistence/ObjectGraph.cs` carries the US-T41 weak-table guard, which Unity.SpaceGod
-`45dc06b` lacks. SpaceGod.Unreal.CSharp's vendored Core came from `45dc06b`, so it should be
-checked for the same guard. Its own SaveCompat may cover it.
+Nothing is missing there. The weak-table guard noted here first is now in both C# copies: SpaceGod.Unreal.CSharp
+re-vendored `ObjectGraph.cs` from the Unity copy (`13bf391`), so the two C# Cores are byte-identical.
+
+## Follow-ups from the C# copies' audits (US-T70)
+
+| Change | Commit | Why |
+|---|---|---|
+| The Render pipeline page lists URP's post-processing rows first, then `render.msaa`, then `render.pipeline` and HDRP's 6 | `87982ca` | The original's order: in Unity, URP's settings assembly declares them before the game's own (Unreal C# `57c111a`). Here `GameSettingsHost::RegisterRuntimeSources` declares `UrpPostProcessSettings` first; nothing touches a setting before that discovery. The `render.settings` probe expects this order. |
+| The pointer-over-UI test reads `Input::InputDevice::current()` | `87982ca` | Both C# copies read Input's device (Unity `ad968a1`). It read the GUI host's Slate mouse, so a scripted run (the audit, the co-op smoke's client) tested its clicks against wherever the real cursor was. In play the device is the real mouse, so nothing changes. |
+| The facade probes (`text.*`, `viewer.*`, US-T52/T53) are opt-in: `-SpaceGodAuditFacade`, `tools/play.ps1 -Mode audit -AuditFacade` | `87982ca` | They check this copy's own GUI facade, which the C# copies have no counterpart of. Without them the audit is the 85 probes every copy runs. |
+
+### The audit, row for row
+
+`tools/play.ps1 -Mode audit` here, `tools/play.ps1 -Mode audit` in SpaceGod.Unreal.CSharp (a fresh clone of `57c111a`)
+and `tools/audit.ps1` in SpaceGod.Unity.CSharp. All three give **85 rows, the same ids in the same order**. A clean run
+of each gives the same result on every row: **80 PASS, 0 FAIL, 5 INFO**. The INFO keys are the same on all three:
+helm.ftl-engage, lane-reenter, phasers, run-hot and lock. `render.settings` reads 20/20 in order on all three.
+
+Two probes depend on the live galaxy, whose battles and placements differ from run to run, so a run can fail them on
+any copy:
+
+- **`combat.mouse-fire`:** a chase from 10-17 km to inside 1.5 km. It fails when the target outruns the fighter, or
+  when the fight it opens draws in other ships.
+  - C++: 7 of 13 runs on 2026-11-04 passed.
+  - Unity: 3 of 4 of this session's runs passed (`tools/audit.ps1`, player of `e5efa29`).
+- **`transit.lane-enter`:** the audit fighter is sometimes caught by a battle at Venus. Unity: 2 of 4 runs failed it
+  for that reason ("SECOND BATTLE OF VENUS has begun", "has been destroyed").
+
+These are the probes' own exposure to a random world, shared by all three copies. They are not a difference between
+them.
+
+### Saves: every copy loads every copy's
+
+The C# copies' harness, here with SaveCompat wired as the game wires it (`SaveStatics.EnsureFixed` before the first
+read, `SaveWiring.RewireIfNeeded` after it), and the same steps on the C++ Bench and Core:
+
+1. The Bench's galaxy at JD 2461348.0, seed 1.
+2. 600 ticks of 1/60 s at 1 month/s.
+3. A save.
+
+A load then prints the whole-game digest at the save and 600 ticks on.
+
+| Written by → loaded by | C++ | Unreal C# | Unity |
+|---|---|---|---|
+| **C++** | `36421EA0A26852F4` → `3CFE5E6B204D5740` | `36421EA0A26852F4` → `3CFE5E6B204D5740` (rewired) | `36421EA0A26852F4` → `3CFE5E6B204D5740` (rewired) |
+| **Unreal C#** | `36421EA0A26852F4` → `3CFE5E6B204D5740` | `36421EA0A26852F4` → `3CFE5E6B204D5740` | `36421EA0A26852F4` → `3CFE5E6B204D5740` |
+| **Unity** | `36421EA0A26852F4` → `3CFE5E6B204D5740` | `36421EA0A26852F4` → `3CFE5E6B204D5740` | `36421EA0A26852F4` → `3CFE5E6B204D5740` |
+
+Each writer's own run gave the same two digests before it saved.
+
+The one format difference is at the source, and it stays. A C++ save carries no delegate fields: C++ has no C# method
+to name, so the file is 10.4 MB against the C# copies' 11.7 MB (the two C# saves are byte-identical). A C# copy
+rebuilds them on load (`rewired`, only for C++ saves). The C++ copy wires every galaxy it loads again, its own
+saves and the C# copies' (`Persistence/Registrations/Wiring.cpp`, Galaxy's load hook), and ignores the delegate
+entries a C# save carries.
+
+### Proof after these changes
+
+- **Editor build:** clean.
+- **Audit:** 85 rows; clean runs are 80 / 0 / 5 INFO (above).
+- **Bench:** sol-idle and high-warp re-checked identical. These changes leave the Core untouched, and the 5 digests
+  were identical at `ad93e37`.
+- **Still to do:** the Shipping package, its co-op smoke and the `run.ps1 -Force` redeploy. The machine's low-memory
+  guard stopped that run on 2026-11-04. `C:\Apps\SpaceGod.Unreal.Cpp` still holds `ad93e37`; its window title reads
+  "SpaceGod - Unreal C++". Writing C# delegate names from C++ would add nothing a load uses.
