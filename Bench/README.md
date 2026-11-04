@@ -132,7 +132,7 @@ scenario give the same `digestHash` (checked for sol-idle, high-warp, battle and
 track, scenario, description, runtime, digestVersion, startJd, seed, warp, thenWarp, fps, dtSeconds,
 ticksRun, stopReason (ticks | simDays | battle-over | course-arrived | course-ended), endJd, simDaysAdvanced, endWarp,
 buildDigestHash, digestHash, digestBytes, digestFile,
-timings { buildMs, tickMeanMs, tickP50Ms, tickP95Ms, tickMaxMs, ticksTotalMs, totalMs },
+timings { buildMs, tickMeanMs, tickP50Ms, tickP95Ms, tickP99Ms, tickMaxMs, ticksTotalMs, totalMs },
 memory  { allocatedBuildBytes, allocatedRunBytes, peakWorkingSetBytes }
 ```
 
@@ -208,3 +208,8 @@ The heavy scenarios are now level (within noise) with .NET 10, and the galaxy bu
 lighter median frame (sol-idle, battle). Interleaving matters: run back to back, the untuned C++ was 1.1–1.9× behind,
 not the 2–2.5× of the first table above, where the two tracks were timed at different moments of a shared machine.
 Concurrent GC (`DOTNET_gcConcurrent=1`, UnrealSharp's host default) measured within noise of the Bench's setting.
+
+## The race (US-T46)
+
+The final interleaved comparison of the three runners (after US-T49), with p99, allocations, peak memory and the
+machine's background load per run, is in docs/RACE.md, section 1, beside the in-game, co-op and build numbers.
