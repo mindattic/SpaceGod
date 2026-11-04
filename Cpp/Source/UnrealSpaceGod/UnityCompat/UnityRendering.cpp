@@ -644,12 +644,13 @@ namespace SpaceGod::UnityCompat
 
 	// ---------------------------------------------------------------- Resources
 
-	FTransform ImportedCorrection(float scale)
+	FTransform ImportedCorrection(float scale, Quaternion rotation)
 	{
-		// Unity's glTF import is glTF with x negated, (-x, y, z); Unreal's Interchange import is (x, z, y) times its unit
-		// scale. Through UnrealSpace's (Unity.z, Unity.x, Unity.y) the Unity mesh is (z, -x, y): from the import that is
-		// X' = Y, Y' = -X, a quarter turn about Z (yaw -90), and the scale back to the glTF's units.
-		return FTransform(FRotator(0, -90, 0), FVector::ZeroVector, FVector(scale));
+		// US-T53: the import's own correction (ShipModels.json: correctionEuler, correctionScale), applied as the C#
+		// facade applies its Mesh.Correction (rotation * correction in Unity space, the scale back to the glTF's units),
+		// which matches the original's glTF import (US-T57's model-viewer diff). The fixed quarter turn (yaw -90) this
+		// used before showed every Kenney craft turned from the original's: the model viewer saw the other side.
+		return FTransform(SpaceGod::UnrealSpace::ToUnreal(rotation), FVector::ZeroVector, FVector(scale));
 	}
 
 	cs::String Resources::ObjectPath(const cs::String& path)
@@ -718,6 +719,7 @@ namespace SpaceGod::UnityCompat
 		{
 			std::vector<ModelPart> Parts;
 			float Scale = 1;
+			Quaternion Rotation = Quaternion::identity();
 		};
 
 		const std::unordered_map<cs::String, ModelSpec>& ModelSpecs()
@@ -741,6 +743,10 @@ namespace SpaceGod::UnityCompat
 					ModelSpec spec;
 					double scale = 1;
 					if (o->TryGetNumberField(TEXT("correctionScale"), scale)) spec.Scale = static_cast<float>(scale);
+					const TArray<TSharedPtr<FJsonValue>>* euler = nullptr;
+					if (o->TryGetArrayField(TEXT("correctionEuler"), euler) && euler->Num() == 3)
+						spec.Rotation = Quaternion::Euler(static_cast<float>((*euler)[0]->AsNumber()), static_cast<float>((*euler)[1]->AsNumber()),
+							static_cast<float>((*euler)[2]->AsNumber()));
 					const TArray<TSharedPtr<FJsonValue>>* parts = nullptr;
 					if (o->TryGetArrayField(TEXT("parts"), parts))
 						for (const auto& pv : *parts)
@@ -774,7 +780,7 @@ namespace SpaceGod::UnityCompat
 		}
 
 		/// An imported part's vertex as it is drawn in Unreal's local frame of its Unity transform, in Unity units.
-		FVector ImportedToLocal(const FVector& imported, float scale) { return ImportedCorrection(scale).TransformPosition(imported); }
+		FVector ImportedToLocal(const FVector& imported, float scale, Quaternion rotation) { return ImportedCorrection(scale, rotation).TransformPosition(imported); }
 
 		float LinearToSrgb(float c) { return c <= 0.0031308f ? c * 12.92f : 1.055f * Mathf::Pow(c, 1.0f / 2.4f) - 0.055f; }
 
@@ -797,13 +803,14 @@ namespace SpaceGod::UnityCompat
 				auto mesh = cs::New<Mesh>(go->name);
 				mesh->ImportedAsset = FromF(part.Mesh);
 				mesh->ImportedScale = spec.Scale;
+				mesh->ImportedRotation = spec.Rotation;
 				// Its bounds in Unity's frame: the asset's box through the same correction UnityScene draws it with.
 				FBox box = asset->GetBoundingBox();
 				Bounds b;
 				for (int i = 0; i < 8; i++)
 				{
 					FVector corner((i & 1) ? box.Max.X : box.Min.X, (i & 2) ? box.Max.Y : box.Min.Y, (i & 4) ? box.Max.Z : box.Min.Z);
-					Vector3 u = ToVector3(US::FromUnreal(ImportedToLocal(corner, spec.Scale) * US::CmPerUnit));
+					Vector3 u = ToVector3(US::FromUnreal(ImportedToLocal(corner, spec.Scale, spec.Rotation) * US::CmPerUnit));
 					if (i == 0) b = Bounds(u, Vector3());
 					else b.Encapsulate(u);
 				}

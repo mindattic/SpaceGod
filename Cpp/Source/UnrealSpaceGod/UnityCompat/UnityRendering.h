@@ -121,6 +121,9 @@ namespace SpaceGod::UnityCompat
 		/// The streams are left empty; bounds() is set from the asset.
 		cs::String ImportedAsset;
 		float ImportedScale = 1;
+		/// The import's Unity-space correction (ShipModels.json's correctionEuler, US-T53), as the C# facade's
+		/// Mesh.Correction: the part is drawn turned by it in its Unity frame.
+		Quaternion ImportedRotation = Quaternion::identity();
 		/// Engine-side converted copy (UnityScene), rebuilt when Version moves on.
 		std::unique_ptr<NativeHandle> Engine;
 		uint64_t EngineVersion = 0;
@@ -509,8 +512,8 @@ namespace SpaceGod::UnityCompat
 	};
 
 	/// Unreal's transform from an imported model part (Mesh::ImportedAsset) to the Unreal local frame of its Unity
-	/// transform, in Unity units (see UnityScene).
-	FTransform ImportedCorrection(float scale);
+	/// transform, in Unity units (see UnityScene): the import's correction rotation (Unity axes) and scale.
+	FTransform ImportedCorrection(float scale, Quaternion rotation);
 
 	/// A texture made from a decoded image (or from raw RGBA8 mip levels), wrapped as a Unity Texture2D.
 	struct TextureFactory
