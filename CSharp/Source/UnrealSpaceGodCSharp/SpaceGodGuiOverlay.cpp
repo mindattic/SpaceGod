@@ -11,7 +11,7 @@
 //   OnPaint: boxes with UV regions, text in Arial at Unity's pixel em, each under its FSlateClippingZone, a new layer
 //   whenever the kind of element changes (GuiHost.cpp's FSlateGuiRenderer, element for element).
 //
-// Also UploadTexture: a Texture2D's pixels as the UTexture2D's mips, with Unity's mip chain (box-filtered down to 1x1,
+// Also CreateTexture: a Texture2D's pixels as a new UTexture2D's mips, with Unity's mip chain (box-filtered down to 1x1,
 // as Unity's Apply(updateMipmaps) and the C++ track's GuiHost::Upload make it), filter, wrap and sRGB, so small icons
 // minify trilinearly as the original's do.
 
@@ -302,15 +302,24 @@ DECLARE_UNREALSHARP_BINDER(SpaceGodGui)
 		return static_cast<float>(M->GetMaxCharacterHeight(FontFor(Size, Style), 1.0f));
 	}
 
-	/// Replaces a UTexture2D's mips with RGBA pixels (Unity's Color32 rows, bottom row first): mip 0, and with MipChain
+	/// A new transient UTexture2D made from RGBA pixels (Unity's Color32 rows, bottom row first): mip 0, and with MipChain
 	/// the box-filtered levels down to 1x1 (Unity's chain); Filter 0 point, 1 bilinear, 2 trilinear; Wrap 0 repeat,
-	/// 1 clamp, 2 mirror; Linear: not sRGB. Returns 1 when done.
-	int32 UploadTexture(UObject* Object, const uint8* Rgba, int32 Width, int32 Height, int32 MipChain, int32 Filter, int32 Wrap, int32 Linear)
+	/// 1 clamp, 2 mirror; Linear: not sRGB. Returns the texture, or null.
+	///
+	/// US-T66: the texture is made here and filled before its one UpdateResource, as the C++ track's GuiHost::Upload
+	/// makes it. This used to rewrite the mips of the texture RenderingLibrary.ImportBufferAsTexture2D had just made, but
+	/// the import already called UpdateResource, and that resource's InitRHI (render thread) reads the platform data's
+	/// mips live (FTexture2DResource::GetData -> GetPlatformMip); adding the chain's levels here reallocated the Mips
+	/// array under it, so now and then it read a stale mip and asserted "DataSize [16384] doesn't match calculated size"
+	/// for a 64x64 icon. A texture nobody else has a resource for cannot race.
+	UObject* CreateTexture(const uint8* Rgba, int32 Width, int32 Height, int32 MipChain, int32 Filter, int32 Wrap, int32 Linear)
 	{
-		UTexture2D* Tex = Cast<UTexture2D>(Object);
-		if (Tex == nullptr || Rgba == nullptr || Width <= 0 || Height <= 0) return 0;
+		if (Rgba == nullptr || Width <= 0 || Height <= 0) return nullptr;
+		// No image data: CreateTransient then makes no render resource yet (it calls UpdateResource only with data).
+		UTexture2D* Tex = UTexture2D::CreateTransient(Width, Height, PF_B8G8R8A8, NAME_None);
+		if (Tex == nullptr) return nullptr;
 		FTexturePlatformData* Data = Tex->GetPlatformData();
-		if (Data == nullptr || Data->Mips.Num() == 0) return 0;
+		if (Data == nullptr || Data->Mips.Num() == 0) return nullptr;
 
 		Tex->SRGB = Linear == 0;
 		Tex->Filter = Filter == 0 ? TF_Nearest : Filter == 2 ? TF_Trilinear : TF_Bilinear;
@@ -333,12 +342,7 @@ DECLARE_UNREALSHARP_BINDER(SpaceGodGui)
 				P[2] = S[0];
 				P[3] = S[3];
 			}
-		Data->SizeX = Width;
-		Data->SizeY = Height;
-		Data->PixelFormat = PF_B8G8R8A8;
-		while (Data->Mips.Num() > 1) Data->Mips.RemoveAt(Data->Mips.Num() - 1);
-		Data->Mips[0].SizeX = Width;
-		Data->Mips[0].SizeY = Height;
+		// CreateTransient made the platform data Width x Height, B8G8R8A8, with this one level.
 		WriteMip(Data->Mips[0], Level);
 
 		if (MipChain)
@@ -371,7 +375,7 @@ DECLARE_UNREALSHARP_BINDER(SpaceGodGui)
 			}
 		}
 		Tex->UpdateResource();
-		return 1;
+		return Tex;
 	}
 
 	BIND_UNREALSHARP_FUNCTION(Begin)
@@ -381,5 +385,5 @@ DECLARE_UNREALSHARP_BINDER(SpaceGodGui)
 	BIND_UNREALSHARP_FUNCTION(Text)
 	BIND_UNREALSHARP_FUNCTION(Measure)
 	BIND_UNREALSHARP_FUNCTION(LineHeight)
-	BIND_UNREALSHARP_FUNCTION(UploadTexture)
+	BIND_UNREALSHARP_FUNCTION(CreateTexture)
 }

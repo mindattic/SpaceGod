@@ -22,7 +22,7 @@ namespace UnityEngine
         static delegate* unmanaged[Cdecl]<char*, int, float, float, float, float, int, int, float, float, float, float, void> text;
         static delegate* unmanaged[Cdecl]<char*, int, int, int, float> measure;
         static delegate* unmanaged[Cdecl]<int, int, float> lineHeight;
-        static delegate* unmanaged[Cdecl]<IntPtr, byte*, int, int, int, int, int, int, int> upload;
+        static delegate* unmanaged[Cdecl]<byte*, int, int, int, int, int, int, IntPtr> create;
 
         static bool? available;
 
@@ -43,7 +43,7 @@ namespace UnityEngine
                     NativeBinds.TryGetBoundFunction(Binder, "Text", 8 + 4 + 4 * 4 + 2 * 4 + 4 * 4);
                 measure = (delegate* unmanaged[Cdecl]<char*, int, int, int, float>)NativeBinds.TryGetBoundFunction(Binder, "Measure", 4 + 8 + 3 * 4);
                 lineHeight = (delegate* unmanaged[Cdecl]<int, int, float>)NativeBinds.TryGetBoundFunction(Binder, "LineHeight", 4 + 2 * 4);
-                upload = (delegate* unmanaged[Cdecl]<IntPtr, byte*, int, int, int, int, int, int, int>)NativeBinds.TryGetBoundFunction(Binder, "UploadTexture", 4 + 8 + 8 + 6 * 4);
+                create = (delegate* unmanaged[Cdecl]<byte*, int, int, int, int, int, int, IntPtr>)NativeBinds.TryGetBoundFunction(Binder, "CreateTexture", 8 + 8 + 6 * 4);
                 return true;
             }
             catch (Exception e)
@@ -76,14 +76,19 @@ namespace UnityEngine
 
         public static float LineHeight(int size, FontStyle style) => lineHeight(size, (int)style);
 
-        /// <summary>A texture made from pixels, re-uploaded with Unity's mip chain, filter, wrap and colour space
-        /// (<see cref="Texture2D.Apply()"/>).</summary>
-        public static bool Upload(IntPtr native, Color32[] pixels, int width, int height, bool mipChain, FilterMode filter, TextureWrapMode wrap, bool linear)
+        /// <summary>A new Unreal texture made from pixels with Unity's mip chain, filter, wrap and colour space
+        /// (<see cref="Texture2D.Apply()"/>), or null. US-T66: made and filled natively before its first render resource,
+        /// not by rewriting an imported texture's mips while the import's resource still initialises.</summary>
+        public static UnrealSharp.Engine.UTexture2D? Create(Color32[] pixels, int width, int height, bool mipChain, FilterMode filter, TextureWrapMode wrap, bool linear)
         {
-            if (native == IntPtr.Zero || pixels.Length < width * height) return false;
+            if (width <= 0 || height <= 0 || pixels.Length < width * height) return null;
             var bytes = MemoryMarshal.AsBytes(pixels.AsSpan());
             int w = wrap == TextureWrapMode.Clamp ? 1 : wrap == TextureWrapMode.Mirror || wrap == TextureWrapMode.MirrorOnce ? 2 : 0;
-            fixed (byte* p = bytes) return upload(native, p, width, height, mipChain ? 1 : 0, (int)filter, w, linear ? 1 : 0) != 0;
+            IntPtr native;
+            fixed (byte* p = bytes) native = create(p, width, height, mipChain ? 1 : 0, (int)filter, w, linear ? 1 : 0);
+            if (native == IntPtr.Zero) return null;
+            // The UObject* to its managed wrapper, as UnrealSharp marshals an object return.
+            return UnrealSharp.Core.Marshallers.ObjectMarshaller<UnrealSharp.Engine.UTexture2D>.FromNative((IntPtr)(&native), 0);
         }
     }
 }

@@ -155,13 +155,16 @@ namespace UnityEngine
         public void Apply(bool updateMipmaps, bool makeNoLongerReadable = false)
         {
             if (pixels == null) return;
-            var made = UnityBridge.TextureFromPixels(width, height, pixels);
-            Unreal = made;
             // US-T54: the import makes one level with the default sampler; a texture with Unity's mip chain (the icons,
-            // drawn at 10-30 px from 64, the skin) or point filtering is re-uploaded as Unity's Apply makes it -- the box-filtered
+            // drawn at 10-30 px from 64, the skin) or point filtering is made as Unity's Apply makes it -- the box-filtered
             // chain down to 1x1, its filter and wrap -- as the C++ track's GuiHost uploads it, so it minifies as the original.
-            if (made != null && width * height > 1 && (mipChain || filterMode == FilterMode.Point) && SlateGui.Available)
-                SlateGui.Upload(made.NativeObject, pixels, width, height, mipChain, filterMode, wrapMode, linear);
+            // US-T66: made natively in one go (SlateGui.Create), not imported and then re-uploaded: rewriting the import's
+            // mips raced the render thread still initialising the import's resource (Texture2DResource.cpp's DataSize assert).
+            UTexture2D? made = null;
+            if (UnityBridge.HasHost && width * height > 1 && (mipChain || filterMode == FilterMode.Point) && SlateGui.Available)
+                made = SlateGui.Create(pixels, width, height, mipChain, filterMode, wrapMode, linear);
+            made ??= UnityBridge.TextureFromPixels(width, height, pixels);
+            Unreal = made;
             if (makeNoLongerReadable) pixels = null;
         }
     }
