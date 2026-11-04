@@ -31,6 +31,8 @@ namespace SpaceGod::UnityCompat
 		bool held[3] = {}, pressed[3] = {}, released[3] = {};
 		float wheelNotches = 0;
 		std::vector<std::pair<KeyCode, char32_t>> keysDown;
+		/// The modifier keys held (the C# GuiInput.Modifiers), on every event of the frame; kept until changed (US-T52).
+		EventModifiers modifiers = EventModifiers::None;
 		/// This frame's edges cleared (after the frame ran); held buttons and the pointer stay.
 		void Clear();
 	};

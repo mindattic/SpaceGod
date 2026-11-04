@@ -13,7 +13,9 @@
 #include "Engine/World.h"
 #include "Fonts/CompositeFont.h"
 #include "Fonts/FontMeasure.h"
+#include "HAL/PlatformApplicationMisc.h"
 #include "HAL/PlatformMisc.h"
+#include "HAL/PlatformTime.h"
 #include "Misc/Paths.h"
 #include "Framework/Application/IInputProcessor.h"
 #include "Framework/Application/SlateApplication.h"
@@ -326,10 +328,25 @@ namespace SpaceGod::UnityCompat
 				input.haveMouse = true;
 				input.buttons[b] = down;
 				if (down) input.mousePressedSince[b] = true;
+				// Unity counts on past two (a triple click selects a text field's line, US-T52): Slate reports the second
+				// press as a double click and the third as a plain press, which counts on here when it comes as soon
+				// and as near as a double click's second press.
+				static double lastDown = -10;
+				static FVector2f lastAt = FVector2f::ZeroVector;
+				static int count = 0;
+				if (down)
+				{
+					double now = FPlatformTime::Seconds();
+					FVector2f at(m.GetScreenSpacePosition());
+					if (clicks == 2) count = 2;
+					else count = count >= 2 && now - lastDown < 0.5 && FVector2f::Distance(at, lastAt) < 5 ? count + 1 : 1;
+					lastDown = now;
+					lastAt = at;
+				}
 				Event e;
 				e.type = e.rawType = down ? EventType::MouseDown : EventType::MouseUp;
 				e.button = b;
-				e.clickCount = clicks;
+				e.clickCount = count > 0 ? count : clicks;
 				FillModifiers(e, m.GetModifierKeys());
 				Enqueue(e, input.absMouse);
 				return false;
@@ -880,6 +897,13 @@ namespace SpaceGod::UnityCompat
 			Event e;
 			e.type = e.rawType = type;
 			e.mousePosition = in.mouse;
+			// US-T52: the held modifiers (Shift-click, Ctrl+A ...), as the C# track's GuiInput.Modifiers.
+			int mods = static_cast<int>(in.modifiers);
+			e.modifiers = in.modifiers;
+			e.shift = (mods & static_cast<int>(EventModifiers::Shift)) != 0;
+			e.control = (mods & static_cast<int>(EventModifiers::Control)) != 0;
+			e.alt = (mods & static_cast<int>(EventModifiers::Alt)) != 0;
+			e.command = (mods & static_cast<int>(EventModifiers::Command)) != 0;
 			return e;
 		};
 		std::vector<Event> events;
@@ -941,6 +965,21 @@ namespace SpaceGod::UnityCompat
 		Event repaint = make(EventType::Repaint);
 		RunPass(repaint);
 		inFrame = false;
+	}
+
+	// ---------------------------------------------------------------- GUIUtility.systemCopyBuffer (US-T52)
+
+	cs::String GUIUtility::systemCopyBuffer()
+	{
+		// Unity's systemCopyBuffer is the system clipboard (the C# track's Clipboard: the Windows clipboard).
+		FString text;
+		FPlatformApplicationMisc::ClipboardPaste(text);
+		return cs::String(TCHAR_TO_UTF8(*text));
+	}
+
+	void GUIUtility::SetSystemCopyBuffer(const cs::String& text)
+	{
+		FPlatformApplicationMisc::ClipboardCopy(*ToF(text));
 	}
 
 	void GuiHost::ReleaseNativeTexture(void* native)

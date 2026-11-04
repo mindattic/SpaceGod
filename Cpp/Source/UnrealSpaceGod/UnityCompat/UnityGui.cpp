@@ -461,6 +461,287 @@ namespace SpaceGod::UnityCompat
 			}
 			return value;
 		}
+
+		// ------------------------------------------------------------ TextEditor (US-T52)
+
+		/// The UTF-8 text as C#'s string sees it: UTF-16 code units, so cursor and selection indices are C#'s.
+		std::u16string ToUtf16(const cs::String& s)
+		{
+			std::u16string out;
+			out.reserve(s.size());
+			cs::ForEachUtf16(s, [&](uint32_t u) { out.push_back(static_cast<char16_t>(u)); });
+			return out;
+		}
+
+		cs::String ToUtf8(const std::u16string& s, size_t from = 0, size_t to = std::u16string::npos)
+		{
+			cs::String out;
+			if (to > s.size()) to = s.size();
+			for (size_t i = from; i < to; i++)
+			{
+				uint32_t c = s[i];
+				if (c >= 0xD800 && c < 0xDC00 && i + 1 < to && s[i + 1] >= 0xDC00 && s[i + 1] < 0xE000)
+				{
+					c = 0x10000 + ((c - 0xD800) << 10) + (static_cast<uint32_t>(s[i + 1]) - 0xDC00);
+					i++;
+				}
+				cs::Char::Append(out, c);
+			}
+			return out;
+		}
+
+		std::u16string ToUtf16(char32_t c)
+		{
+			std::u16string out;
+			if (c >= 0x10000)
+			{
+				uint32_t v = static_cast<uint32_t>(c) - 0x10000;
+				out.push_back(static_cast<char16_t>(0xD800 + (v >> 10)));
+				out.push_back(static_cast<char16_t>(0xDC00 + (v & 0x3FF)));
+			}
+			else out.push_back(static_cast<char16_t>(c));
+			return out;
+		}
+
+		/// Unity's TextEditor selection colour (the default skin's settings.selectionColor), as the C# track's.
+		const Color SelectionColor(61 / 255.0f, 128 / 255.0f, 223 / 255.0f, 166 / 255.0f);
+
+		/// Unity's TextEditor for the single-line GUI.TextField, the C# track's GUI.TextEditing (US-T40) line for line:
+		/// a cursor and a selection anchor (select) per focused control, a scroll offset keeping the cursor in view, and
+		/// its Windows key map: Left/Right (Ctrl: by word), Home/End (Up/Down in one line likewise), Shift extends the
+		/// selection, Backspace/Delete (Ctrl: a word), Ctrl+A/C/X/V; typing replaces the selection; a field gaining
+		/// focus selects all. Indices are UTF-16 units (C#'s string indices).
+		struct TextEditing
+		{
+			int Id = -1, Cursor = 0, Select = 0;
+			float Scroll = 0;
+			bool DragWords = false, Changed = false;
+
+			bool HasSelection() const { return Cursor != Select; }
+			int Min() const { return Cursor < Select ? Cursor : Select; }
+			int Max() const { return Cursor > Select ? Cursor : Select; }
+
+			void SelectAll(const std::u16string& t) { Select = 0; Cursor = static_cast<int>(t.size()); }
+
+			/// char.IsLetterOrDigit(c) || c == '_'.
+			static bool IsWord(char16_t c) { return (c >= u'0' && c <= u'9') || c == u'_' || cs::Char::IsLetter(c); }
+
+			static int WordStart(const std::u16string& t, int i)
+			{
+				while (i > 0 && !IsWord(t[i - 1])) i--;
+				while (i > 0 && IsWord(t[i - 1])) i--;
+				return i;
+			}
+
+			static int WordEnd(const std::u16string& t, int i)
+			{
+				int n = static_cast<int>(t.size());
+				while (i < n && !IsWord(t[i])) i++;
+				while (i < n && IsWord(t[i])) i++;
+				return i;
+			}
+
+			void SelectWord(const std::u16string& t, int at)
+			{
+				int n = static_cast<int>(t.size());
+				int s = at, e = at;
+				if ((at < n && IsWord(t[at])) || (at > 0 && IsWord(t[at - 1])))
+				{
+					while (s > 0 && IsWord(t[s - 1])) s--;
+					while (e < n && IsWord(t[e])) e++;
+				}
+				else if (at < n) e = at + 1;
+				Select = s;
+				Cursor = e;
+			}
+
+			void ExtendToWord(const std::u16string& t, int at)
+			{
+				int anchor = Select;
+				int n = static_cast<int>(t.size());
+				if (at >= anchor) Cursor = at < n && IsWord(t[at - 1 > 0 ? at - 1 : 0]) ? WordEnd(t, at) : at;
+				else Cursor = WordStart(t, at);
+			}
+
+			void Delete(std::u16string& t, int from, int to)
+			{
+				Changed = true;
+				Cursor = Select = from;
+				t.erase(static_cast<size_t>(from), static_cast<size_t>(to - from));
+			}
+
+			void Insert(std::u16string& t, std::u16string s, int maxLength)
+			{
+				if (HasSelection()) Delete(t, Min(), Max());
+				if (maxLength >= 0 && static_cast<int>(t.size() + s.size()) > maxLength)
+					s = s.substr(0, static_cast<size_t>(maxLength - static_cast<int>(t.size()) > 0 ? maxLength - static_cast<int>(t.size()) : 0));
+				if (s.empty()) return;
+				Changed = true;
+				t.insert(static_cast<size_t>(Cursor), s);
+				Cursor = Select = Cursor + static_cast<int>(s.size());
+			}
+
+			/// Whether the key was the field's (the event is then used).
+			bool HandleKey(const Event& e, std::u16string& text, int maxLength)
+			{
+				Changed = false;
+				bool shift = e.shift, ctrl = e.control || e.command;
+				int n = static_cast<int>(text.size());
+				auto move = [&](int to) { Cursor = to; if (!shift) Select = to; };
+				switch (e.keyCode)
+				{
+					case KeyCode::LeftArrow:
+						if (!shift && !ctrl && HasSelection()) move(Min());
+						else move(ctrl ? WordStart(text, Cursor) : (Cursor - 1 > 0 ? Cursor - 1 : 0));
+						return true;
+					case KeyCode::RightArrow:
+						if (!shift && !ctrl && HasSelection()) move(Max());
+						else move(ctrl ? WordEnd(text, Cursor) : (Cursor + 1 < n ? Cursor + 1 : n));
+						return true;
+					case KeyCode::Home:
+					case KeyCode::UpArrow:
+						move(0);
+						return true;
+					case KeyCode::End:
+					case KeyCode::DownArrow:
+						move(n);
+						return true;
+					case KeyCode::Backspace:
+						if (HasSelection()) Delete(text, Min(), Max());
+						else if (Cursor > 0) Delete(text, ctrl ? WordStart(text, Cursor) : Cursor - 1, Cursor);
+						return true;
+					case KeyCode::Delete:
+						if (HasSelection()) Delete(text, Min(), Max());
+						else if (Cursor < n) Delete(text, Cursor, ctrl ? WordEnd(text, Cursor) : Cursor + 1);
+						return true;
+					default:
+						break;
+				}
+				if (ctrl)
+				{
+					switch (e.keyCode)
+					{
+						case KeyCode::A: SelectAll(text); return true;
+						case KeyCode::C:
+							if (HasSelection()) GUIUtility::SetSystemCopyBuffer(ToUtf8(text, static_cast<size_t>(Min()), static_cast<size_t>(Max())));
+							return true;
+						case KeyCode::X:
+							if (HasSelection())
+							{
+								GUIUtility::SetSystemCopyBuffer(ToUtf8(text, static_cast<size_t>(Min()), static_cast<size_t>(Max())));
+								Delete(text, Min(), Max());
+							}
+							return true;
+						case KeyCode::V:
+						{
+							std::u16string paste;
+							for (char16_t c : ToUtf16(GUIUtility::systemCopyBuffer()))
+								if (c != u'\r' && c != u'\n') paste.push_back(c);
+							Insert(text, paste, maxLength);
+							return true;
+						}
+						default:
+							return false;
+					}
+				}
+				// Single line: Return and Tab are not typed (the game sees them).
+				if (e.character >= U' ' && e.character != 0x7F)
+				{
+					Insert(text, ToUtf16(e.character), maxLength);
+					return true;
+				}
+				return false;
+			}
+		};
+
+		TextEditing currentEditor;
+		TextEditing scratchEditor;
+
+		/// The focused field's editor (made, selecting all, when a field first has the focus), or a scratch one.
+		TextEditing& EditorFor(int id, const std::u16string& text, bool focused)
+		{
+			if (currentEditor.Id != id)
+			{
+				if (!focused)
+				{
+					scratchEditor = TextEditing();
+					return scratchEditor;
+				}
+				currentEditor = TextEditing();
+				currentEditor.Id = id;
+				currentEditor.SelectAll(text); // TextEditor.OnFocus (single line): select all
+			}
+			int n = static_cast<int>(text.size());
+			currentEditor.Cursor = currentEditor.Cursor < 0 ? 0 : currentEditor.Cursor > n ? n : currentEditor.Cursor;
+			currentEditor.Select = currentEditor.Select < 0 ? 0 : currentEditor.Select > n ? n : currentEditor.Select;
+			return currentEditor;
+		}
+
+		/// Where a single-line field's text starts (x, y) inside `position`, before scrolling (the C# FieldOrigin).
+		Vector2 FieldOrigin(const GUIStyle& style, const Rect& position)
+		{
+			Rect area = style.padding.Remove(position);
+			area.x += style.contentOffset.x;
+			area.y += style.contentOffset.y;
+			float lh = style.lineHeight();
+			int v = static_cast<int>(style.alignment) / 3;
+			float y = v == 1 ? area.y + (area.height - lh) * 0.5f : v == 2 ? area.yMax() - lh : area.y;
+			return Vector2(area.x, Mathf::Round(y));
+		}
+
+		/// The character boundary nearest `mouseX` (local) in a single-line field.
+		int TextFieldIndexAt(const GUIStyle& style, const Rect& position, const std::u16string& text, float scroll, float mouseX)
+		{
+			float x = mouseX - (FieldOrigin(style, position).x - scroll);
+			int best = 0;
+			float prev = 0;
+			int size = style.EffectiveFontSize();
+			for (size_t i = 1; i <= text.size(); i++)
+			{
+				float w = MeasureWidth(ToUtf8(text, 0, i), size, style.fontStyle);
+				if (x < (prev + w) * 0.5f) return static_cast<int>(i) - 1;
+				prev = w;
+				best = static_cast<int>(i);
+			}
+			return best;
+		}
+
+		/// A focused single-line field as Unity's TextEditor draws it: the text scrolled so the cursor stays in view and
+		/// clipped to the padded area, the selection highlighted behind it, the cursor a 1-px line (blinking).
+		void DrawTextFieldContent(const GUIStyle& style, const Rect& position, const std::u16string& text, Color textColor, TextEditing& ed)
+		{
+			if (!renderer) return;
+			Rect area = style.padding.Remove(position);
+			Vector2 origin = FieldOrigin(style, position);
+			float lh = style.lineHeight();
+			int size = style.EffectiveFontSize();
+			float cursorX = MeasureWidth(ToUtf8(text, 0, static_cast<size_t>(ed.Cursor)), size, style.fontStyle);
+			// TextEditor.UpdateScrollOffset: keep the cursor inside the visible width.
+			float view = Mathf::Max(1.0f, area.xMax() - origin.x);
+			if (cursorX - ed.Scroll > view - 1) ed.Scroll = cursorX - view + 1;
+			if (cursorX - ed.Scroll < 0) ed.Scroll = cursorX;
+			cs::String full = ToUtf8(text);
+			float fullW = MeasureWidth(full, size, style.fontStyle);
+			if (fullW - ed.Scroll < view - 1) ed.Scroll = Mathf::Max(0.0f, fullW - view + 1);
+			float x0 = Mathf::Round(origin.x - ed.Scroll);
+			GUI::BeginClip(area);
+			Vector2 local(x0 - area.x, origin.y - area.y);
+			if (ed.HasSelection())
+			{
+				float sx = MeasureWidth(ToUtf8(text, 0, static_cast<size_t>(ed.Min())), size, style.fontStyle);
+				float ex = MeasureWidth(ToUtf8(text, 0, static_cast<size_t>(ed.Max())), size, style.fontStyle);
+				renderer->DrawTexture(ToScreen(Rect(local.x + sx, local.y, ex - sx, lh)), Texture2D::whiteTexture().get(), Rect(0, 0, 1, 1),
+					SelectionColor, RectOffset(), GUI::matrix);
+			}
+			Vector2 o = Origin();
+			if (!full.empty())
+				renderer->DrawText(Vector2(Mathf::Floor(local.x + o.x + 0.5f), Mathf::Floor(local.y + o.y + 0.5f)), full, size, style.fontStyle, textColor, GUI::matrix);
+			// GUI.DrawCaret: settings.cursorColor (white), on for half of each second.
+			if ((static_cast<int>(Time::unscaledTime * 2.0f) & 1) == 0)
+				renderer->DrawTexture(ToScreen(Rect(local.x + cursorX, local.y + 1, 1, lh - 2)), Texture2D::whiteTexture().get(), Rect(0, 0, 1, 1),
+					Color(1, 1, 1, GUI::color.a), RectOffset(), GUI::matrix);
+			GUI::EndClip();
+		}
 	}
 
 	// ---------------------------------------------------------------- GuiMatrix
@@ -861,10 +1142,13 @@ namespace SpaceGod::UnityCompat
 
 	cs::String GUI::TextField(const Rect& position, const cs::String& text, int maxLength, const GUIStyle& style)
 	{
+		// US-T52: Unity's TextEditor, as the C# track's GUI.TextField (US-T40): the cursor and the selection by mouse
+		// (click, Shift+click, drag, double click a word, triple click all) and keyboard (TextEditing::HandleKey).
 		int id = GUIUtility::GetControlID(FocusType::Keyboard);
 		Event& e = Event::current();
-		cs::String result = text;
+		std::u16string edited = ToUtf16(text);
 		bool focused = GUIUtility::keyboardControl == id;
+		TextEditing& ed = EditorFor(id, edited, focused);
 		switch (e.type)
 		{
 			case EventType::MouseDown:
@@ -872,9 +1156,28 @@ namespace SpaceGod::UnityCompat
 				{
 					GUIUtility::keyboardControl = id;
 					GUIUtility::hotControl = id;
+					// Unity's TextEditor: the click puts the cursor at the nearest character boundary; a double click
+					// selects the word, a triple click the whole line; shift-click extends the selection. A field not
+					// focused before the click gets its editor on the next pass, which selects all (OnFocus), as the
+					// C# track's: the first click into a field selects its text.
+					int at = TextFieldIndexAt(style, position, edited, ed.Scroll, e.mousePosition.x);
+					if (e.clickCount == 2) ed.SelectWord(edited, at);
+					else if (e.clickCount >= 3) ed.SelectAll(edited);
+					else if (e.shift) ed.Cursor = at;
+					else ed.Cursor = ed.Select = at;
+					ed.DragWords = e.clickCount == 2;
 					e.Use();
 				}
 				else if (focused) GUIUtility::keyboardControl = 0; // a click elsewhere takes the focus away
+				break;
+			case EventType::MouseDrag:
+				if (GUIUtility::hotControl == id)
+				{
+					int at = TextFieldIndexAt(style, position, edited, ed.Scroll, e.mousePosition.x);
+					if (ed.DragWords) ed.ExtendToWord(edited, at);
+					else ed.Cursor = at;
+					e.Use();
+				}
 				break;
 			case EventType::MouseUp:
 				if (GUIUtility::hotControl == id)
@@ -885,71 +1188,46 @@ namespace SpaceGod::UnityCompat
 				break;
 			case EventType::KeyDown:
 				if (!focused || !enabled) break;
-				if (e.keyCode == KeyCode::Backspace)
+				if (ed.HandleKey(e, edited, maxLength))
 				{
-					if (!result.empty())
-					{
-						// Remove the last UTF-8 code point.
-						size_t i = result.size() - 1;
-						while (i > 0 && (static_cast<unsigned char>(result[i]) & 0xC0) == 0x80) i--;
-						result.erase(i);
-						changed = true;
-					}
 					e.Use();
-				}
-				else if (e.character >= 32 && e.character != 127)
-				{
-					// A single-line field takes printable characters up to maxLength (in UTF-16 units, as C#'s).
-					int length = 0;
-					cs::ForEachUtf16(result, [&](uint32_t) { length++; });
-					int add = e.character > 0xFFFF ? 2 : 1;
-					if (maxLength < 0 || length + add <= maxLength)
+					if (ed.Changed)
 					{
-						char32_t c = e.character;
-						if (c < 0x80) result += static_cast<char>(c);
-						else if (c < 0x800)
-						{
-							result += static_cast<char>(0xC0 | (c >> 6));
-							result += static_cast<char>(0x80 | (c & 0x3F));
-						}
-						else if (c < 0x10000)
-						{
-							result += static_cast<char>(0xE0 | (c >> 12));
-							result += static_cast<char>(0x80 | ((c >> 6) & 0x3F));
-							result += static_cast<char>(0x80 | (c & 0x3F));
-						}
-						else
-						{
-							result += static_cast<char>(0xF0 | (c >> 18));
-							result += static_cast<char>(0x80 | ((c >> 12) & 0x3F));
-							result += static_cast<char>(0x80 | ((c >> 6) & 0x3F));
-							result += static_cast<char>(0x80 | (c & 0x3F));
-						}
 						changed = true;
+						return ToUtf8(edited);
 					}
-					e.Use();
 				}
 				break;
 			case EventType::Repaint:
-			{
-				style.Draw(position, GUIContent(result), id, false);
-				if (focused && renderer && Mathf::Repeat(Time::unscaledTime, 1.0f) < 0.5f)
+				if (focused)
 				{
-					// The caret after the text.
-					Rect content = style.padding.Remove(position);
-					float w = MeasureWidth(result, style.EffectiveFontSize(), style.fontStyle);
-					float lh = style.lineHeight();
-					float y = content.y + (content.height - lh) * 0.5f;
-					Color c = DisabledFade(Tint(Tint(style.focused.textColor, color), contentColor));
-					renderer->DrawTexture(ToScreen(Rect(Mathf::Min(content.x + w + 1, content.xMax() - 1), y, 1, lh)),
-						Texture2D::whiteTexture().get(), Rect(0, 0, 1, 1), c, RectOffset(), matrix);
+					// The style's focused background, then the text as the editor draws it.
+					style.Draw(position, GUIContent::none(), id, false);
+					Vector2 m = e.mousePosition;
+					bool active = GUIUtility::hotControl == id;
+					bool hover = enabled && position.Contains(m) && (GUIUtility::hotControl == 0 || active);
+					const GUIStyleState& state = ChooseState(style, hover, active, false, true);
+					Color c = DisabledFade(Tint(Tint(state.textColor, color), contentColor));
+					DrawTextFieldContent(style, position, edited, c, ed);
 				}
+				else style.Draw(position, GUIContent(text), id, false);
 				break;
-			}
 			default:
 				break;
 		}
-		return result;
+		return text;
+	}
+
+	GUI::TextEditorState GUI::FocusedTextEditor()
+	{
+		TextEditorState s;
+		if (currentEditor.Id > 0 && currentEditor.Id == GUIUtility::keyboardControl)
+		{
+			s.id = currentEditor.Id;
+			s.cursor = currentEditor.Cursor;
+			s.select = currentEditor.Select;
+		}
+		return s;
 	}
 
 	float GUI::HorizontalSlider(const Rect& position, float value, float leftValue, float rightValue)

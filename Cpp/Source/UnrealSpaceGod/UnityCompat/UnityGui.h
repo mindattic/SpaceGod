@@ -237,6 +237,10 @@ namespace SpaceGod::UnityCompat
 		/// A point in the current group's coordinates -> screen pixels (top-left origin), and back.
 		static Vector2 GUIToScreenPoint(Vector2 guiPoint);
 		static Vector2 ScreenToGUIPoint(Vector2 screenPoint);
+		/// GUIUtility.systemCopyBuffer (US-T52): the system clipboard (the host's, GuiHost.cpp), else a process-local
+		/// one. `GUIUtility.systemCopyBuffer = s` -> GUIUtility::SetSystemCopyBuffer(s).
+		static cs::String systemCopyBuffer();
+		static void SetSystemCopyBuffer(const cs::String& text);
 	};
 
 	/// What GUI hands the host to draw (in screen pixels, top-left origin, before GUI.matrix).
@@ -365,6 +369,11 @@ namespace SpaceGod::UnityCompat
 		/// Where each enabled button with text was drawn in the last Repaint (screen pixels, cut to its clip), by its
 		/// label (the first of a label wins), so a scripted run can click it.
 		static std::unordered_map<cs::String, Rect>& DrawnButtons();
+
+		/// The focused TextField's editor state (Unity's TextEditor, US-T52): its control id (0: none), the cursor and
+		/// the selection anchor in UTF-16 units of its text, as C#'s string indices. For a scripted check.
+		struct TextEditorState { int id = 0, cursor = 0, select = 0; };
+		static TextEditorState FocusedTextEditor();
 	};
 }
 
