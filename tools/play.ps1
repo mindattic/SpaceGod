@@ -8,7 +8,10 @@ param(
   [string]$EngineVersion = '5.8',
   # -Mode coop-smoke only (US-T64): run a packaged game's exe (tools/package.ps1's folder, e.g. Builds/Cpp/Windows, Development or
   # Shipping) instead of the editor binaries.
-  [string]$PackageDir = ''
+  [string]$PackageDir = '',
+  # -Mode audit only (US-T70): also run this copy's own facade probes (text.*, viewer.*: US-T52, US-T53), which the C#
+  # copies have no counterpart of; without it the audit is the 85 probes every copy runs, row for row.
+  [switch]$AuditFacade
 )
 
 <#
@@ -240,7 +243,8 @@ if ($Mode -eq 'audit') {
   # No -nosound (US-T50): the audio probes read the master volume back from Unreal's main audio device (the game plays
   # no clips, so nothing is heard).
   $cmd = Join-Path $engine 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
-  $lines = & $cmd $project.FullName '/Engine/Maps/Entry' -game -nullrhi -unattended -nosplash -stdout -FullStdOutLogOutput -SpaceGodSmoke -SpaceGodAudit |
+  $facade = @(if ($AuditFacade) { '-SpaceGodAuditFacade' })
+  $lines = & $cmd $project.FullName '/Engine/Maps/Entry' -game -nullrhi -unattended -nosplash -stdout -FullStdOutLogOutput -SpaceGodSmoke -SpaceGodAudit @facade |
     Select-String -Pattern 'AUDIT |Error:|Fatal' | ForEach-Object Line
   $lines
   $pass = @($lines | Where-Object { $_ -match 'AUDIT \S+ PASS' }).Count

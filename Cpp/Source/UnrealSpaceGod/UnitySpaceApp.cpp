@@ -6,6 +6,7 @@
 #include "Camera/SpaceCamera.h"
 #include "Camera/StarTravel.h"
 #include "Input/InputState.h"
+#include "Input/InputDevice.h"
 #include "EngineSettings.h"
 #include "GameSettingsHost.h"
 #include "ModelViewer.h"
@@ -573,9 +574,13 @@ namespace SpaceGod
 
 	bool UnitySpaceApp::IsPointerOverUi()
 	{
-		// C#: UnityEngine.InputSystem.Mouse.current (null without a mouse), read before InputState.Poll this frame.
-		if (!UI::UiInput::present()) return false;
-		auto p = UI::UiInput::MousePosition();
+		// US-T70: the pointer through Input's device (the real mouse, or the co-op smoke's / the audit's script), as both C#
+		// copies read it (SpaceGod.Unity.CSharp ad968a1). It was the GUI host's Slate mouse, so a scripted run tested the
+		// scripted pointer's clicks against wherever the real cursor was: the audit's held fire was refused whenever that sat
+		// over a HUD rect (combat.mouse-fire failed about one run in three, gun heat 0 with the button held).
+		const Input::InputDevice& mouse = Input::InputDevice::current();
+		if (!mouse.present) return false;
+		auto p = mouse.position;
 		auto gui = Vector2(p.x, Screen::height - p.y);
 		for (const auto& r : UiRects)
 			if (r.Contains(gui)) return true;

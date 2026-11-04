@@ -4,6 +4,7 @@
 #include "Smoke/FeatureAuditSettings.h"
 #include "Smoke/FeatureAuditEditing.h"
 
+#include "Bootstrap.h"
 #include "Target.h"
 #include "UnitySpaceApp.h"
 #include "UnrealSpaceGodLog.h"
@@ -725,8 +726,14 @@ namespace SpaceGod::Smoke::FeatureAudit
 		Probe("practice", PracticeProbes);
 		Probe("seats", SeatProbes);
 		Probe("diplomacy", DiplomacyProbes);
-		Probe("text", [] { TextEditProbes(Result); }); // US-T52
-		Probe("viewer", [] { ModelViewerProbes(Result, frames); }); // US-T53
+		// US-T52, US-T53: checks of this copy's own GUI facade (UnityCompat's TextEditor) and model viewer camera, which the
+		// C# copies get from Unity or the C# facade. US-T70: opt-in (-SpaceGodAuditFacade), so the default audit is the 85
+		// probes every copy runs, in the same order, and its log compares row for row with the C# copies'.
+		if (Bootstrap::HasCommandLineFlag("-SpaceGodAuditFacade"))
+		{
+			Probe("text", [] { TextEditProbes(Result); });
+			Probe("viewer", [] { ModelViewerProbes(Result, frames); });
+		}
 		// US-T58: what the binding probes left code-present: combat at the controls with the mouse, and the player's own
 		// transits (a hyperlane ridden, a jump gate gone through, an FTL crossing to another star). The last two leave Sol,
 		// so they come last.

@@ -59,15 +59,17 @@ namespace SpaceGod::Smoke::FeatureAudit
 			return volume;
 		}
 
-		/// RenderPipelineSelection.cs's and UrpPostProcessSettings.cs's settings, in declaration order.
+		/// UrpPostProcessSettings.cs's and RenderPipelineSelection.cs's settings, in the order the original's Render pipeline page
+		/// lists them (US-T70, SpaceGod.Unity.CSharp's audit): URP's post-processing rows first (in Unity their own assembly
+		/// declares them before the game's; here GameSettingsHost::RegisterRuntimeSources), then the pipeline and HDRP's.
 		const cs::List<cs::String>& RenderKeys()
 		{
 			static cs::List<cs::String> keys{
-				"render.pipeline", "render.hdrp.sky", "render.hdrp.volumetrics", "render.hdrp.exposure", "render.hdrp.exposureCompensation",
-				"render.hdrp.sunBrightness", "render.hdrp.rayTracing",
 				"render.urp.post", "render.urp.exposure", "render.urp.exposureCompensation", "render.urp.camera.iso", "render.urp.camera.shutter",
 				"render.urp.camera.aperture", "render.urp.bloom", "render.urp.bloomThreshold", "render.urp.sunBrightness", "render.urp.tonemapping",
 				"render.urp.contrast", "render.urp.saturation", "render.urp.temperature",
+				"render.pipeline", "render.hdrp.sky", "render.hdrp.volumetrics", "render.hdrp.exposure", "render.hdrp.exposureCompensation",
+				"render.hdrp.sunBrightness", "render.hdrp.rayTracing",
 			};
 			return keys;
 		}

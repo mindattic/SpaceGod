@@ -18,6 +18,19 @@ namespace SpaceGod
 
 	void GameSettingsHost::RegisterRuntimeSources()
 	{
+		// US-T70: URP's post-processing settings first. In Unity they live in an assembly of their own
+		// (Unity.SpaceGod.Rendering.Urp) that declares them before the game's Runtime does, so the original's Render pipeline
+		// page reads URP's rows, then render.msaa, then the pipeline and HDRP's (SpaceGod.Unity.CSharp's audit; the Unreal C#
+		// copy's Bootstrap.MatchSettingsOrder, 57c111a). Nothing touches these settings before this discovery (GameSettingsHost::Bind).
+		SettingsRegistry::AddDeclarationSource([]
+		{
+			using Rendering::UrpPostProcessSettings;
+			UrpPostProcessSettings::Enabled(); UrpPostProcessSettings::Metering(); UrpPostProcessSettings::Compensation();
+			UrpPostProcessSettings::Iso(); UrpPostProcessSettings::Shutter(); UrpPostProcessSettings::Aperture();
+			UrpPostProcessSettings::Bloom(); UrpPostProcessSettings::BloomThreshold(); UrpPostProcessSettings::SunBrightness();
+			UrpPostProcessSettings::Tonemapping(); UrpPostProcessSettings::Contrast(); UrpPostProcessSettings::Saturation();
+			UrpPostProcessSettings::Temperature();
+		});
 		// The Runtime assembly's [SettingsSource] classes, each accessor touched in C# field order.
 		SettingsRegistry::AddDeclarationSource([] { EngineSettings::FrameRateCap(); EngineSettings::Msaa(); EngineSettings::MasterVolume(); });
 		SettingsRegistry::AddDeclarationSource([] { UnitySpaceApp::AutoReorientSetting(); });
@@ -28,15 +41,6 @@ namespace SpaceGod
 			RenderPipelineSettings::Pipeline(); RenderPipelineSettings::PhysicalSky(); RenderPipelineSettings::Volumetrics();
 			RenderPipelineSettings::Exposure(); RenderPipelineSettings::ExposureCompensation(); RenderPipelineSettings::SunBrightness();
 			RenderPipelineSettings::RayTracing();
-		});
-		SettingsRegistry::AddDeclarationSource([]
-		{
-			using Rendering::UrpPostProcessSettings;
-			UrpPostProcessSettings::Enabled(); UrpPostProcessSettings::Metering(); UrpPostProcessSettings::Compensation();
-			UrpPostProcessSettings::Iso(); UrpPostProcessSettings::Shutter(); UrpPostProcessSettings::Aperture();
-			UrpPostProcessSettings::Bloom(); UrpPostProcessSettings::BloomThreshold(); UrpPostProcessSettings::SunBrightness();
-			UrpPostProcessSettings::Tonemapping(); UrpPostProcessSettings::Contrast(); UrpPostProcessSettings::Saturation();
-			UrpPostProcessSettings::Temperature();
 		});
 		SettingsRegistry::AddDeclarationSource([] { Views::BattleFx::EffectsBudget(); });
 	}
