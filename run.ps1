@@ -40,7 +40,7 @@ $repoDir   = $PSScriptRoot
 $out       = 'C:\Apps\SpaceGod.Unreal.Cpp'
 $exeName   = 'SpaceGod.Unreal.Cpp.exe'
 $buildDir  = Join-Path $repoDir 'Builds\Cpp\Windows'
-$deployBat = Join-Path $repoDir 'deploy.bat'
+$shortcutBat = Join-Path $repoDir 'run.bat'   # the Desktop shortcut's target: deploy, then run (US-T71)
 $marker    = Join-Path $out '.deploy-commit'
 # "SpaceGod – Unreal C++" (en dash), spelled with [char] so this file reads the same in any code page.
 $title     = "SpaceGod $([char]0x2013) Unreal C++"
@@ -49,7 +49,7 @@ $title     = "SpaceGod $([char]0x2013) Unreal C++"
 function Set-Shortcut([string]$exe) {
     $shortcut = Join-Path ([Environment]::GetFolderPath('Desktop')) "$title.lnk"
     $link = (New-Object -ComObject WScript.Shell).CreateShortcut($shortcut)
-    $link.TargetPath       = $deployBat
+    $link.TargetPath       = $shortcutBat
     $link.WorkingDirectory = $repoDir
     if (Test-Path -LiteralPath $exe) { $link.IconLocation = "$exe,0" }
     $link.Description      = "${title}: 1) Deploy & Run or 2) Run"

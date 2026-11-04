@@ -20,12 +20,14 @@ runs with only Unreal Engine 5.8 and Visual Studio's C++ tools.
 
 | Script | What it does |
 |---|---|
-| `deploy.bat` | The Desktop shortcut's target. Asks **1) Deploy & Run** (runs `run.ps1 -Launch -Force`) or **2) Run** (starts the published copy; deploys first if there is none). |
+| `run.bat` | The Desktop shortcut's target. No menu: runs `run.ps1 -Launch` (deploys only when something changed, then starts the game). |
+| `deploy.bat` | The menu. Asks **1) Deploy & Run** (runs `run.ps1 -Launch -Force`) or **2) Run** (starts the published copy; deploys first if there is none). |
 | `run.ps1` | Non-interactive: `git pull`, package Shipping (`tools/package.ps1`), publish to `C:\Apps\SpaceGod.Unreal.Cpp\`, refresh the Desktop shortcut `SpaceGod – Unreal C++`. `-Launch` starts the game; `-Force` packages even when nothing changed; `-NoPull` skips the pull. |
 
 ```powershell
 ./run.ps1 -Launch          # deploy and play
-./deploy.bat               # the shortcut's menu
+./run.bat                  # what the Desktop shortcut runs: deploy, then play
+./deploy.bat               # the menu
 ```
 
 ## Requirements
