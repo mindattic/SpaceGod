@@ -32,6 +32,7 @@ namespace Unity.SpaceGod.Coop
         public static ScriptedInputDevice Script;
 
         static long byeAt = -1;
+        static double byeSeconds; // US-T47
         static long replayed;
         static int quitIn = -1;
         static bool finished, hostSaved;
@@ -66,8 +67,10 @@ namespace Unity.SpaceGod.Coop
                 bool saved = app.SaveTo(SaveSlots.Quick, "Quicksave");
                 CoopPeer.Log("smoke: host quicksaves at frame " + rec.Frame + ": " + saved);
             }
-            if (peer.AnyBye && byeAt < 0) byeAt = rec.Frame;
-            if (byeAt >= 0 && rec.Frame >= byeAt + 30) Finish("the client said bye", peer, app);
+            if (peer.AnyBye && byeAt < 0) { byeAt = rec.Frame; byeSeconds = Since.Elapsed.TotalSeconds; }
+            // US-T47: and 5 s, so the client (30 of its own ticks, slower than the host's frames when catching up) quits first:
+            // a client whose host has gone goes back to the start map, which is no end for the smoke.
+            if (byeAt >= 0 && rec.Frame >= byeAt + 30 && Since.Elapsed.TotalSeconds - byeSeconds >= 5) Finish("the client said bye", peer, app);
             else if (Since.Elapsed > Timeout) Finish("TIMEOUT", peer, app);
         }
 
@@ -83,6 +86,11 @@ namespace Unity.SpaceGod.Coop
         public static void ClientFrame(CoopPeer peer, UnitySpaceApp app)
         {
             if (Role != "client" || finished || Script == null) return;
+            // US-T47: the flying (from 730 on: W, X, F) waits until the spawned freighter's helm has come back in a host frame,
+            // as the C++ script has since US-T44: on a busy machine the helm can still be in flight at 730 here too, and X
+            // (roll at the helm) then opens the news panel in command (X is also ToggleNews), which keeps the cockpit's keys
+            // off later on (a run with 0 cockpit keys: the helm came 39 frames after 730).
+            if (replayed == 729 && app.Piloted.IsNone) return;
             long n = ++replayed;
             // The stick at the helm: throttle up, the mouse swinging the nose, a roll.
             if (n >= 740 && n < 800) Script.MouseDelta = new UnityEngine.Vector2(4f, 2f);
