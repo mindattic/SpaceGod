@@ -169,3 +169,5 @@ Notes on the demo run:
 - The 60 fps lossless tape fell behind on the loaded machine. MindAttic.Capture's valve (encoder lag over 60 s) stopped
   recording 2:16 in, as designed, and the later tour shots were skipped. `hq` avoids that.
 - The smoke's `hail` comes from the client, so only the client raises it (section 3: the peer whose player hailed).
+- `run.ps1 -Force` (the C:\Apps republish) was stopped by the machine's low-memory guard on 2026-11-04;
+  C:\Apps\SpaceGod.Unreal.Cpp still holds `f2daceb`. The next Deploy & Run publishes this.
