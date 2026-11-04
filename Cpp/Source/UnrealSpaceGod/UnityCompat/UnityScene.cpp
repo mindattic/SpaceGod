@@ -405,6 +405,90 @@ namespace SpaceGod::UnityCompat
 			return true;
 		}
 
+		// ------------------------------------------------------------ lights (US-T57)
+
+		std::vector<cs::Ref<Light>>& Lights();
+
+		/// Unity's Light components as URP's forward renderer applies them, the C# track's UnityLights: in Unity.SpaceGod
+		/// only URP Lit materials take lights (the imported glTF craft, M_Lit); the game's own shaders are unlit and light
+		/// themselves from the Sun globals, so a Light touches nothing else. Per frame: the enabled directional Lights the
+		/// screen camera can see (Light.cullingMask overlapping the camera's), the brightest first (URP's main light;
+		/// RenderSettings.sun is never set); a renderer on layer L takes those whose culling mask has L, into M_Lit's
+		/// slots: the direction towards the light and Light.color.linear * intensity.
+		struct FrameLight
+		{
+			FLinearColor Direction, Color;
+			int Mask = 0;
+		};
+		std::vector<FrameLight> FrameLights;
+		constexpr int LitSlots = 3;
+		TMap<TWeakObjectPtr<UMaterialInstanceDynamic>, TArray<FLinearColor>> LitPushed;
+
+		const FName& LitParam(int i)
+		{
+			static const FName names[LitSlots * 2] = {
+				FName(TEXT("_MainLightDirection")), FName(TEXT("_MainLightColor")),
+				FName(TEXT("_AdditionalLight0Direction")), FName(TEXT("_AdditionalLight0Color")),
+				FName(TEXT("_AdditionalLight1Direction")), FName(TEXT("_AdditionalLight1Color")),
+			};
+			return names[i];
+		}
+
+		void GatherLights(Camera* screen)
+		{
+			FrameLights.clear();
+			auto& lights = Lights();
+			lights.erase(std::remove_if(lights.begin(), lights.end(), [](const cs::Ref<Light>& l)
+			{
+				auto t = l->Parent.lock();
+				auto go = t ? t->gameObject() : nullptr;
+				return !t || (go && go->destroyed);
+			}), lights.end());
+			int cameraMask = screen ? screen->cullingMask : -1;
+			std::vector<const Light*> seen;
+			for (const auto& l : lights)
+			{
+				if (!l->enabled || l->type != LightType::Directional || l->intensity <= 0 || (l->cullingMask & cameraMask) == 0) continue;
+				seen.push_back(l.get());
+			}
+			// URP's GetMainLightIndex: the brightest directional light (the first of equals) is the main light.
+			std::stable_sort(seen.begin(), seen.end(), [](const Light* a, const Light* b) { return a->intensity > b->intensity; });
+			for (const Light* l : seen)
+			{
+				auto t = l->Parent.lock();
+				Quaternion rotation = t ? t->rotation() * l->localRotation : l->localRotation;
+				// Towards the light: a directional light shines along its transform's forward.
+				FVector d = US::DirectionToUnreal(-(rotation * Vector3::forward()));
+				Color c = ShaderBinding::Linear(l->color);
+				FrameLight f;
+				f.Direction = FLinearColor(static_cast<float>(d.X), static_cast<float>(d.Y), static_cast<float>(d.Z), 0);
+				f.Color = FLinearColor(c.r * l->intensity, c.g * l->intensity, c.b * l->intensity, 1);
+				f.Mask = l->cullingMask;
+				FrameLights.push_back(f);
+			}
+		}
+
+		/// Puts the lights of `layer` into a Lit material instance (only when they changed).
+		void ApplyLights(UMaterialInstanceDynamic* mid, int layer)
+		{
+			if (!mid) return;
+			TArray<FLinearColor> v;
+			v.Init(FLinearColor(0, 0, 0, 0), LitSlots * 2);
+			int slot = 0;
+			for (const auto& l : FrameLights)
+			{
+				if (((l.Mask >> (layer & 31)) & 1) == 0) continue;
+				if (slot >= LitSlots) break;
+				v[slot * 2] = l.Direction;
+				v[slot * 2 + 1] = l.Color;
+				slot++;
+			}
+			if (slot > 0) Building.KeyLit = true;
+			if (const TArray<FLinearColor>* old = LitPushed.Find(mid); old && *old == v) return;
+			for (int i = 0; i < v.Num(); i++) mid->SetVectorParameterValue(LitParam(i), v[i]);
+			LitPushed.Add(mid, v);
+		}
+
 		void SyncRenderer(AActor* host, Renderer& r)
 		{
 			auto mesh = r.DrawnMesh();
@@ -503,6 +587,7 @@ namespace SpaceGod::UnityCompat
 					bind = mid.Get();
 				}
 				else bind = SharedInstance(*m);
+				if (ShaderBinding::IsLit(m->shader.get())) ApplyLights(Cast<UMaterialInstanceDynamic>(bind), r.gameObject()->layer);
 				if (h->Bound[i] != bind)
 				{
 					c->SetMaterial(i, bind);
@@ -516,7 +601,7 @@ namespace SpaceGod::UnityCompat
 			{
 				FTransform world = ToUnreal(WorldMatrix::Of(*t));
 				// An imported part is drawn in its import's frame: corrected to the Unity mesh first.
-				c->SetWorldTransform(imported ? ImportedCorrection(mesh->ImportedScale) * world : world);
+				c->SetWorldTransform(imported ? ImportedCorrection(mesh->ImportedScale, mesh->ImportedRotation) * world : world);
 			}
 			if (!h->Visible) c->SetVisibility(true);
 			h->Visible = true;
@@ -692,6 +777,8 @@ namespace SpaceGod::UnityCompat
 		Camera* screen = ScreenCamera();
 		ScreenMask = screen ? screen->cullingMask : -1;
 		TheBackdrop.Update(screen);
+		// US-T57: Unity's Light components reach only URP Lit materials (M_Lit), per renderer layer.
+		GatherLights(screen);
 		SceneRegistry::Get().ForEachRenderer([host](const cs::Ref<Renderer>& r)
 		{
 			SyncRenderer(host, *r);
@@ -699,13 +786,14 @@ namespace SpaceGod::UnityCompat
 			if (auto* h = static_cast<RendererHandle*>(r->Engine.get()); h && h->Component.IsValid()) Building.Primitives++;
 		});
 		Building.MaterialInstances = MaterialInstancesMade;
-		LastStats = Building;
+		// The shader globals are the game's own: Unity's Lights never touch them (US-T57).
 		const auto& globals = Shader::Globals();
 		if (globals.Version != PushedGlobals)
 		{
 			ShaderBinding::PushGlobals(host->GetWorld(), globals);
 			PushedGlobals = globals.Version;
 		}
+		LastStats = Building;
 	}
 
 	TArray<UPrimitiveComponent*> UnityScene::ComponentsUnder(const cs::Ref<Transform>& root)
