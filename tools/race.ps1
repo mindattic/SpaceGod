@@ -31,6 +31,9 @@ $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot/engine.ps1"
 $repo = Split-Path -Parent $PSScriptRoot
 if (-not $Out) { $Out = Join-Path $repo 'Builds\Race\game' }
+# US-T60: the game writes -SpaceGodRaceOut relative to its own exe folder, so a relative -Out recorded nothing; resolve it
+# against this shell's current directory first.
+$Out = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Out)
 New-Item -ItemType Directory -Force $Out | Out-Null
 $heavy = '^(cl|link|UnrealEditor.*|UnrealBuildTool|ShaderCompileWorker|MSBuild|UnrealPak|UnrealSpaceGod.*|Unreal\.SpaceGod.*|Bench\..*)$'
 $gameArgs = @('-windowed', "-ResX=$ResX", "-ResY=$ResY", '-nosound', '-unattended', '-nosplash', '-UseFixedTimeStep', '-FPS=60', '-SpaceGodRace')
