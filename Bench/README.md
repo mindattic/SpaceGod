@@ -1,23 +1,25 @@
 # Bench
 
-Headless runners over the two simulation Cores, driven by the same scenarios with the same seed, so the C++ port
-(`Cpp/Source/SpaceGodCore`) can be checked **bit for bit** against Unity.SpaceGod's own C# Core and the two raced.
+A headless runner over the C++ simulation Core (`Cpp/Source/SpaceGodCore`), driven by fixed scenarios with a fixed
+seed, so the Core can be checked **bit for bit** against the original game.
 
-| Runner | Status | Core |
-|---|---|---|
-| `Bench/CSharp/` (`Bench.CSharp.exe`, .NET 10 and .NET 8) | done (US-T23; net10.0, the C# game track's runtime, added in US-T42) | `../Unity.SpaceGod/Assets/UnitySpace/Core/**/*.cs` + `../Unity.Shared/.../Runtime/Core`, linked **in place** by `CSharp/Lib/*.csproj` (netstandard2.1, C# 9, as Unity.SpaceGod's `Tests/UnitySpace.Core` does). Nothing is copied. `UnitySpaceGodDir` / `UnitySharedDir` override the checkouts. |
-| `Bench/Cpp/` (`Bench.Cpp.exe`) | done (US-T37) | `Cpp/Source/SpaceGodCore` (the standalone `SpaceGodCore.lib` from `tools/build-core.ps1`); `src/` is a line-for-line port of `CSharp/src` (Program, Simulation, Digest), built by `tools/build-bench-cpp.ps1` into `Cpp/Intermediate/CoreStandalone/Release/Bench.Cpp.exe` |
+In SpaceGod.Unreal.Cpp only the C++ runner is kept: `Bench/Cpp/` (`Bench.Cpp.exe`, US-T37), linked against the
+standalone `SpaceGodCore.lib` from `tools/build-core.ps1` and built by `tools/build-bench-cpp.ps1` into
+`Cpp/Intermediate/CoreStandalone/Release/Bench.Cpp.exe`. The C# runner it was ported from (`Bench.CSharp`, over
+Unity.SpaceGod's own Core) needs the Unity repos and lives on in SpaceGod.Unreal.CSharp; the digests it produced are
+recorded in `Bench/expected-digests.json`, and `tools/bench.ps1` checks every run against them (US-T69).
 
 ```powershell
-tools/bench.ps1                         # dotnet build -c Release, then every scenario, one process each (~2 min)
+tools/bench.ps1                         # build the Core lib + Bench.Cpp, every scenario one process each, check digests
 tools/bench.ps1 -Scenario battle -NoBuild
-tools/bench.ps1 -DotNet net8.0          # Bench.CSharp on .NET 8 (default net10.0, what UnrealSharp runs)
-Bench/CSharp/bin/Release/net10.0/Bench.CSharp.exe --list
-Bench/CSharp/bin/Release/net10.0/Bench.CSharp.exe --scenario sol-idle [--ticks N] [--scenarios path] [--out dir]
+Cpp/Intermediate/CoreStandalone/Release/Bench.Cpp.exe --scenario sol-idle [--ticks N] [--scenarios path] [--out dir]
 ```
 
-Output, per scenario (gitignored): `Bench/results/csharp-<scenario>.json` (hashes, timings, memory) and
-`Bench/results/csharp-<scenario>.digest.txt` (the full digest text). Bench.Cpp writes `cpp-<scenario>.*` beside them.
+Output, per scenario (gitignored): `Bench/results/cpp-<scenario>.json` (hashes, timings, memory) and
+`Bench/results/cpp-<scenario>.digest.txt` (the full digest text).
+
+The rest of this file is the spec both runners were written to, and the history of the comparison (it names the C#
+runner's sources, `CSharp/src/*.cs`, of which `Cpp/src/*.cpp` is a line-for-line port).
 
 ## How the simulation is built (`CSharp/src/Simulation.cs`)
 

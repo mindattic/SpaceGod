@@ -1,13 +1,14 @@
 [CmdletBinding()]
 param(
-  [ValidateSet('Cpp', 'CSharp')][string]$Track = 'Cpp',
+  # Kept for the old command lines; the C++ game is the only track in this repo.
+  [ValidateSet('Cpp')][string]$Track = 'Cpp',
   # How many runs (each a fresh process); the write-up takes medians.
   [int]$Runs = 3,
-  # Where the results go: <Out>/<track>-<n>.json.
+  # Where the results go: <Out>/cpp-<n>.json.
   [string]$Out = '',
-  # Run the editor binaries (UnrealEditor -game) instead of the package in Builds/<Track>.
+  # Run the editor binaries (UnrealEditor -game) instead of the package in Builds/Cpp.
   [switch]$Editor,
-  # The packaged game's folder (default Builds/<Track>/Windows, the last tools/package.ps1 output).
+  # The packaged game's folder (default Builds/Cpp/Windows, the last tools/package.ps1 output).
   [string]$PackageDir = '',
   [int]$ResX = 1600, [int]$ResY = 900,
   [string]$EngineVersion = '5.8'
@@ -15,7 +16,7 @@ param(
 
 <#
 .SYNOPSIS
-The race's in-game run (US-T46, docs/RACE.md): starts the packaged game (Builds/<Track>/Windows/Unreal.SpaceGod.<Track>.exe)
+The race's in-game run (US-T46, docs/RACE.md): starts the packaged game (Builds/Cpp/Windows/SpaceGod.Unreal.Cpp.exe)
 with -SpaceGodRace, a scripted tour at a fixed start and seed (New Game, Sol idle, a staged battle, three saves and loads,
 a year at the highest warp, the trip to Alpha Centauri), every frame 1/60 s of game time (-UseFixedTimeStep -FPS=60)
 with no frame cap or VSync, and the shared frame sampler (SpaceGodRender's SpaceGodRace.cpp) writing one JSON per run.
@@ -23,8 +24,7 @@ The script waits for a quiet machine (no compiler, UE build or other UE game run
 else was running, and the time from launching the exe to the process ending.
 
 .EXAMPLE
-  ./tools/race.ps1 -Track Cpp -Runs 3
-  ./tools/race.ps1 -Track CSharp -Runs 3 -Out Builds/Race/game
+  ./tools/race.ps1 -Runs 3
 #>
 
 $ErrorActionPreference = 'Stop'
@@ -35,7 +35,7 @@ if (-not $Out) { $Out = Join-Path $repo 'Builds\Race\game' }
 # against this shell's current directory first.
 $Out = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Out)
 New-Item -ItemType Directory -Force $Out | Out-Null
-$heavy = '^(cl|link|UnrealEditor.*|UnrealBuildTool|ShaderCompileWorker|MSBuild|UnrealPak|UnrealSpaceGod.*|Unreal\.SpaceGod.*|Bench\..*)$'
+$heavy = '^(cl|link|UnrealEditor.*|UnrealBuildTool|ShaderCompileWorker|MSBuild|UnrealPak|UnrealSpaceGod.*|SpaceGod\..*|Unreal\.SpaceGod.*|Bench\..*)$'
 $gameArgs = @('-windowed', "-ResX=$ResX", "-ResY=$ResY", '-nosound', '-unattended', '-nosplash', '-UseFixedTimeStep', '-FPS=60', '-SpaceGodRace')
 
 # The rest of the machine's CPU over a few seconds, % of all logical CPUs (other agents share this machine).
@@ -53,20 +53,16 @@ for ($n = 1; $n -le $Runs; $n++) {
   do { $others = Get-OthersCpuPct } while ($others -ge 8 -and ((Get-Date) - $t0).TotalMinutes -lt 10)
   $busy = "others $others% after $([int]((Get-Date) - $t0).TotalSeconds) s; " + ((Get-Process | Where-Object { $_.ProcessName -match $heavy } | ForEach-Object ProcessName | Sort-Object -Unique) -join ',')
   $t0 = Get-Date
-  $file = Join-Path $Out ("{0}-{1}{2}.json" -f $Track.ToLowerInvariant(), $(if ($Editor) { 'editor-' } else { '' }), $n)
+  $file = Join-Path $Out ("cpp-{0}{1}.json" -f $(if ($Editor) { 'editor-' } else { '' }), $n)
   Remove-Item -LiteralPath $file -ErrorAction SilentlyContinue
   $runArgs = $gameArgs + @("-SpaceGodRaceOut=$file")
   if ($Editor) {
-    $project = Get-ChildItem -LiteralPath (Join-Path $repo $Track) -Filter '*.uproject' | Select-Object -First 1
+    $project = Get-ChildItem -LiteralPath (Join-Path $repo 'Cpp') -Filter '*.uproject' | Select-Object -First 1
     $exe = Join-Path (Find-UnrealEngine $EngineVersion) 'Engine\Binaries\Win64\UnrealEditor.exe'
     $runArgs = @("`"$($project.FullName)`"", '/Engine/Maps/Entry', '-game', '-log') + $runArgs
   } else {
-    $dir = if ($PackageDir) { $PackageDir } else { Join-Path $repo "Builds\$Track\Windows" }
-    $exe = Join-Path $dir "Unreal.SpaceGod.$Track.exe"
-  }
-  if ($Track -eq 'CSharp' -and $Editor) {
-    . "$PSScriptRoot/dotnet-sdk.ps1"
-    Use-UnrealSharpDotNet -PrivateRoot (Join-Path $project.DirectoryName 'Intermediate\DotNet')
+    $dir = if ($PackageDir) { $PackageDir } else { Join-Path $repo 'Builds\Cpp\Windows' }
+    $exe = Join-Path $dir 'SpaceGod.Unreal.Cpp.exe'
   }
   $sw = [Diagnostics.Stopwatch]::StartNew()
   $p = Start-Process -FilePath $exe -ArgumentList $runArgs -PassThru
@@ -76,7 +72,7 @@ for ($n = 1; $n -le $Runs; $n++) {
   [long]$peakWs = 0
   do {
     Start-Sleep -Milliseconds 500
-    $game = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -match '^(UnrealSpaceGod|UnrealSpaceGodCSharp)(-Win64-Shipping)?$|^UnrealEditor$' -and $_.StartTime -ge $t0 })
+    $game = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -match '^UnrealSpaceGod(-Win64-Shipping)?$|^UnrealEditor$' -and $_.StartTime -ge $t0 })
     foreach ($g in $game) { $peakWs = [Math]::Max($peakWs, $g.PeakWorkingSet64) }
   } while (($game.Count -gt 0 -or -not $p.HasExited) -and (Get-Date) -lt $deadline)
   $wall = $sw.Elapsed.TotalSeconds
@@ -85,5 +81,5 @@ for ($n = 1; $n -le $Runs; $n++) {
   $j | Add-Member -NotePropertyName harness -NotePropertyValue ([ordered]@{
       launchToExitSeconds = [Math]::Round($wall, 2); busyBefore = $busy; peakWorkingSetBytesExternal = $peakWs; startedUtc = $t0.ToUniversalTime().ToString('o') })
   $j | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $file -Encoding utf8
-  "{0} run {1}: {2:N1} s, {3} phases -> {4}" -f $Track, $n, $wall, @($j.phases).Count, $file
+  "cpp run {0}: {1:N1} s, {2} phases -> {3}" -f $n, $wall, @($j.phases).Count, $file
 }

@@ -1,5 +1,8 @@
 """Reads Unity's own built-ins out of Unity.SpaceGod's built player, so both tracks reproduce them exactly (US-T57).
 
+OPTIONAL, one-time import tool. Nothing in the build or the game runs it: its output (UnityBuiltinSkin.inl) is
+committed. It needs the original Unity player, which is not part of this repo; pass its _Data folder as the argument.
+
     python -m pip install UnityPy          (once; any recent version)
     python tools/unity_extract.py [<player>/Unity.SpaceGod_Data]   (default: ../Unity.SpaceGod/Builds/Windows/...)
 
@@ -377,8 +380,10 @@ def lighting(roughness=0.9):
 
 if __name__ == "__main__":
     skin, textures = load_skin()
-    write_cs(skin, textures)
+    # SpaceGod.Unreal.Cpp has no C# track; its BuiltinSkin.cs is written only where that folder exists.
+    if os.path.isdir(os.path.dirname(CS_OUT)):
+        write_cs(skin, textures)
+        print("wrote", CS_OUT)
     write_cpp(skin, textures)
-    print("wrote", CS_OUT)
     print("wrote", CPP_OUT)
     lighting()

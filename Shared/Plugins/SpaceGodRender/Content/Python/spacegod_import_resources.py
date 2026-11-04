@@ -1,5 +1,8 @@
 """Imports what Unity.SpaceGod's views load from Resources into the shared plugin's content (US-T27).
 
+OPTIONAL, one-time import tool: its output (Content/Resources/...) is committed, so neither the build nor the game
+runs it. It needs the original Unity project, which is not part of this repo (point UNITY_SPACEGOD_DIR at one).
+
 Unity.SpaceGod/Assets/UnitySpace/Resources (read-only source) -> /SpaceGodRender/Resources/..., where the C# track's
 Unity facade (CSharp/Script/.../UnityCompat/UnityResources.cs, Resources.Roots) finds "Textures/earth_color" as
 /SpaceGodRender/Resources/Textures/earth_color:
