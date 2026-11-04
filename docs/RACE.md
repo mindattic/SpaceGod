@@ -24,12 +24,12 @@ the same machine. The page version: https://claude.ai/artifact/9FPW33Y1uUubSXkZH
 | In game, simulation time per frame at the default warp | **C++** | 1.0 ms vs 1.5 ms p50 | signal |
 | In game, the rest of the frame (views, facade, push to Unreal) | **C#** in the race; **C++** since US-T62 | race: ≈6.9 ms vs ≈10.8 ms at Sol idle (whole Unity frame 8.4 vs 11.8 ms p50, minus the simulation). After US-T62's facade fix: C++ whole Unity frame 3.7 ms p50 at Sol idle (10.3 before, same machine, interleaved) | signal: it was a C++ facade cost, not the language (see "After US-T62" in section 2) |
 | In game, frame time at Sol idle | **C#** in the race; **C++** since US-T62 | race: 12.2 ms vs 15.0 ms p50; C++ after US-T62: 6.3 ms (12.8 before) | signal, from the line above |
-| In game, frame time in a battle | **C++** | race: p95 27 ms vs 226 ms, GPU 2.5 vs 116 ms (a C# packaging defect, US-T61). After US-T61: C# 11.4 / 21.4 ms p50 / p95, GPU 0.9 ms; C++ after US-T62: 5.2 / 14.6 ms | signal (see the battle notes) |
+| In game, frame time in a battle | **C++** | race: p95 27 ms vs 226 ms, GPU 2.5 vs 116 ms (a C# packaging defect, US-T61). After US-T61: C# 11.4 / 21.4 ms p50 / p95, GPU 0.9 ms; C++ after US-T62: 5.2 / 14.6 ms; C++ with its plugin content cooked (US-T65): 5.3 / 14.5 ms, GPU 1.0 ms | signal (see the battle notes) |
 | In game, frame time at 1 week/s | **C++** | 53 ms vs 97 ms p50 | signal |
 | Startup: launch to the main menu / to playable | **C++** | 2.4 s vs 4.1 s / 8.8 s vs 20.5 s | signal |
 | Memory in game (peak working set) | **C++** | 2.3 GB vs 5.4 GB | signal |
 | Save / load (the original's format, 4 MB) | **C#** | 282 / 254 ms vs 332 / 387 ms (means) | signal |
-| Shipping package without symbols | **C++** | 411 MB vs 483 MB | the .NET runtime (150 MB) |
+| Shipping package without symbols | **C++** | 411 MB vs 483 MB (both without the plugin's cooked content; C++ with it: 479 MB, US-T65) | the .NET runtime (150 MB) |
 | Lines of code written | **C#** | ≈15,100 vs ≈138,000 | the C# track runs the original's 87,600 lines as they are |
 | Iterating on the code | mixed | Runtime file 4.9 s vs 11.6 s; a build with nothing changed 149 s vs 1.7 s | signal |
 | Faithfulness to the original | level | both 0 missing; 1 divergence each (the one renderer); simulation bit-identical | — |
@@ -253,8 +253,35 @@ The p95s keep the frames on which the hyperlanes' triangles change (a ship joins
   have zero area, as the C++ track's. Re-measured, three Shipping runs (same ships, dates and battle outcome): frame
   11.4 / 21.4 ms p50 / p95, GPU 0.9 / 4.9 ms; battle frames at 300 and 600 match the editor's pixel for pixel (0 of
   1,440,000 pixels over threshold 24). The race's C# in-game numbers above were all taken on that black, default-material
-  scene. The C++ package (`Builds/Cpp`, rebuilt 2026-11-04) has no `/SpaceGodRender` assets in its container either
-  (its ShaderBinding loads them by path too), so its in-game numbers are open to the same question.
+  scene.
+- **The C++ packages had the same gap, without the cost** (US-T65). Every C++ package measured here (the race's
+  `3689308` and both of "After US-T62") staged no `/SpaceGodRender` asset either: only `SpaceGodRender.uplugin`, 0 of
+  the plugin's 91 assets in the container, since `UnityCompat`'s ShaderBinding and Resources load them by path. Its
+  3D scene was black: no planets, skybox, hyperlanes or ships, only the UI (the HUD shot differs from the editor's on
+  29% of its pixels). `Cpp/Config/DefaultGame.ini` now cooks `/SpaceGodRender` too (91 of 91 assets; the package
+  grows 411 → 479 MB without symbols), and the package's UI shots match the editor's: HUD 1.8%, market 2.8%, pause
+  menu 1.3%, Help and galaxy map 0–0.05% of pixels over threshold 24, all of it labels and log lines one game minute
+  apart (the package's HUD shot lands at 16:01, the editor's at 16:00), none in the 3D scene. Unlike the C# package it
+  lost no frame time to it (its belt chunks already had zero-area triangles): the fixed package against the US-T62
+  one, three Shipping runs each, interleaved, same tour (271 ships, battle over with 7 units, trip 268 frames),
+  medians [range]:
+
+  | | C++ after US-T62 (no plugin content) | C++ with `/SpaceGodRender` cooked |
+  |---|---|---|
+  | Sol idle: frame p50 / p95 | 5.7 [5.6–5.9] / 16.5 | 5.8 [5.8–5.9] / 16.7 |
+  | Sol idle: GPU p50 / p95 | 0.9 / 2.8 | 1.2 / 2.3 |
+  | Sol idle: whole Unity frame p50 | 3.3 | 3.5 |
+  | 1 week/s: frame p50 / simulation p50 | 38.9 / 29.1 | 39.0 / 27.8 |
+  | Battle: frame p50 / p95 | 5.3 / 14.5 | 5.3 / 14.5 |
+  | Battle: GPU p50 / p95 | 0.7 / 2.4 | 1.0 / 1.9 |
+  | Trip: frame p50 / p99 | 2.8 / 16.8 | 2.8 / 18.7 |
+  | Launch to the main menu / to playable | 1.4 s / 7.0 s | 1.4 s / 7.1 s |
+  | Peak working set | 2.27 GB | 2.28 GB |
+  | Save / load (mean of 3, median run) | 287 / 308 ms | 279 / 309 ms |
+
+  So the C++ in-game numbers above stand: drawing the real materials adds about 0.3 ms of GPU at the median, under a
+  frame that is game-thread bound. (These six runs are faster at Sol idle than "After US-T62"'s 6.3 ms: another day's
+  machine state, which is why only interleaved runs are compared.)
 - **Startup and memory are C++'s by a wide margin.** The C# game JIT-compiles the Core on first use (UnrealSharp ships no
   ReadyToRun or Native AOT) and builds the galaxy on a cold JIT: New Game takes 16 s against 6 s.
 - **Saves and loads are faster in C#**, by 50 ms (save) and 130 ms (load): the original's serializer on .NET against its
@@ -332,6 +359,9 @@ forward renderer's shaders and the others did not, and the C# Shipping packages 
 | of which the game exe (Shipping) | 175 MB | 159 MB |
 | of which cooked content (.pak/.utoc/.ucas) | 170 MB | 132 MB |
 | of which the managed folder (.NET 10 runtime, UnrealSharp, the game's assemblies) | — | 150 MB (223 files) |
+
+Both snapshot packages lack the SpaceGodRender plugin's cooked content (US-T61, US-T65). With it, the C++ Shipping
+package is 479 MB without .pdb (904 MB with), 68 MB more.
 
 The C# game is 72 MB bigger without symbols (the .NET runtime) and 103 MB smaller with them (fewer native symbols:
 its game code is managed). The cooked content differs by what each project's own `Content/` holds.
