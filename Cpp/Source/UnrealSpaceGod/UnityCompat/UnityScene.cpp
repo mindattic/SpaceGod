@@ -670,11 +670,10 @@ namespace SpaceGod::UnityCompat
 				if (shown.r != c.r || shown.g != c.g || shown.b != c.b)
 				{
 					shown = c;
-					// M_Sky's texel does not reach the screen as Unity's clear colour does: measured on this track
-					// (docs/images/cpp-fidelity-model-viewer.png), the screen's linear value is 0.66 of the texel's (the
-					// C# track's camera, set up differently, measured a * decoded^g, US-T40). The texel is chosen for
-					// the screen to show Unity's value (its gamma colour).
-					constexpr float gain = 0.66f;
+					// The texel is chosen for the screen to show Unity's value (its gamma colour). With the look's
+					// manual exposure (cancelled by SG_Expose), no tone curve and no vignette (US-T57), M_Sky reaches the
+					// screen as drawn: the gain is 1 (0.66 was measured under Unreal's default 0.4 vignette).
+					constexpr float gain = 1.0f;
 					auto texel = [](float value)
 					{
 						float v = Mathf::Max(value, 0.0f);

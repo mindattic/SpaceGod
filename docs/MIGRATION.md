@@ -762,7 +762,9 @@ renderer on layer L those whose mask has L, as direction and `color.linear × in
 `Shaders/Lit.ush`) in their glTF base colour, metallic, smoothness = 1 − roughness and emission (`ShipModels.json` now
 carries them), lit by the viewer's key light and the scenes' own environment (ambient probe and skybox reflection, read
 from the original player). Proof against the original player (`-capture -modelviewer craft_cargoA`, 1600×900):
-see FAITHFULNESS.md "US-T57".
+see FAITHFULNESS.md "US-T57" (whole frame 0.37% C#, 0.35% C++). The same check found the camera's clear colour lifted on both
+tracks: Unreal's default vignette (0.4; the original's URP volume has 0) is now off in both looks, and the C# backdrop
+texel transfer (measured under the filmic curve before US-T45) is gone: on screen M_Sky draws its texel as it is.
 
 ## Co-op (US-T39, C# track; the C++ track mirrors it)
 

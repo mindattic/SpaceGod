@@ -275,6 +275,10 @@ namespace Unity.SpaceGod.Rendering
             s.ApplyPhysicalCameraExposure = false;
             s.Override_ExpandGamut = true;
             s.ExpandGamut = 0f;
+            // The original's URP volume (DefaultVolumeProfile: Vignette intensity 0) has no vignette; Unreal's default is 0.4,
+            // which darkened every edge, the model viewer's flat clear colour most visibly (US-T57).
+            s.Override_VignetteIntensity = true;
+            s.VignetteIntensity = 0f;
             s.Override_MotionBlurAmount = true;
             s.Amount = 0f;
 

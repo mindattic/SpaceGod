@@ -265,7 +265,7 @@ Sources: **CH** = ControlsHelp binding, **GM** = GameManual chapter, **US** = U.
 | Pause menu: Resume, Help, Save/Load, Settings > Display, Main Menu, Quit | CH, US-T276 | ✓R | ✓R | |
 | Text fields (profile and save names) | US-T327 | ✓R | ✓C | C++: Unity's TextEditor as the C# track's: caret, mouse and Shift selection, Home/End, Ctrl word moves and deletes, Ctrl+A/C/X/V on the system clipboard, the OS's key repeat; audit text.* (US-T52) |
 | Text clipped at scroll and clip edges | (IMGUI) | ✓C | ✓R | C#: drawn through a Slate overlay with clipping zones, glyphs cut at the edge; icons with Unity's mip chain (US-T54; shots: the clipped panels match the C++ shot, 22% → 0.04% of pixels) |
-| Unity default skin (ModelViewer, asteroid labels, default scrollbars and sliders) | (IMGUI) | ✓R | ✓R | Unity's own GameSkin, read from the original player (`tools/unity_extract.py`); model viewer panel 4.76% (C++) / 4.87% (C#) of pixels differing from the original player's, all text rasterisation (US-T57) |
+| Unity default skin (ModelViewer, asteroid labels, default scrollbars and sliders) | (IMGUI) | ✓R | ✓R | Unity's own GameSkin, read from the original player (`tools/unity_extract.py`); model viewer panel 1.76% (C++) / 1.86% (C#) of pixels differing from the original player's, all text rasterisation (US-T57) |
 
 ### Rendering features
 
@@ -276,7 +276,7 @@ Sources: **CH** = ControlsHelp binding, **GM** = GameManual chapter, **US** = U.
 | Kenney craft and procedural hulls, LOD, far icons (U.SPC-T376, T415) | US | ✓R | ✓R | views check |
 | Model viewer (F9 / `-modelviewer`) | US-T24, T111 | ✓R | ✓R | C++: the highest-depth camera draws the screen, only its culling mask's layer over its SolidColor backdrop, its own key light; Kenney models turned by the import's correction; audit viewer.*, `-Mode fidelity` ([cpp-fidelity-model-viewer.png](images/cpp-fidelity-model-viewer.png), next to the C# track's [csharp-fidelity-model-viewer.png](images/csharp-fidelity-model-viewer.png)): 0.33% of pixels more than 24 levels from the original player's (US-T53) |
 | Ship thumbnails (offscreen capture) | US-T24 | ✓C | ✓R | |
-| Lights, PBR for imported glTF | (URP) | ✓R | ✓R | Lights light only URP Lit (as under URP); the glTF hulls draw with M_Lit, URP 17's PBR; C# hull 2.05% of pixels from the original's (US-T57; C++: lit and shaded alike, turned as the original's since US-T53) |
+| Lights, PBR for imported glTF | (URP) | ✓R | ✓R | Lights light only URP Lit (as under URP); the glTF hulls draw with M_Lit, URP 17's PBR; the hull 2.11% (C++) / 2.10% (C#) of pixels from the original player's (US-T57) |
 | Scene tour (`-demo`) and capture (`-capture`) | US-T10, T15 | ✓R | ✓R | all 55 stops captured on both (`play.ps1 -Mode demo -Track Cpp` since US-T58, which counts the stops; the C++ runner now takes `-capturedir` as the C# one does). The C++ tour's first stop is shot while the engine is still compiling shaders ("Preparing Shaders"), so Earth is not yet drawn in it |
 
 ### Audio
@@ -318,14 +318,25 @@ model viewer shot (the same model, orbit and zoom), `tools/imgdiff.py` (any chan
 
 | Region | C# before | C# after | C++ after |
 |---|---|---|---|
-| hull (pixels the original draws off the backdrop) | 96.70% | 2.05% | 80.26% (seen from the other side before US-T53's import correction; after it 0.33% of the C++ frame's pixels differ by more than 24 levels) |
-| panel (box, label box, buttons, scroll view) | 8.05% | 4.87% | 4.76% |
-| whole frame | 4.64% | 64.96% | 67.85% |
+| whole frame | 4.64% | **0.37%** | **0.35%** |
+| hull (pixels the original draws off the backdrop) | 96.70% | 2.10% | 2.11% |
+| panel (box, label box, buttons, scroll view) | 8.05% | 1.86% | 1.76% |
 
-The hull's faces now match the original's within 1-2 levels (e.g. (100, 113, 134) → (99, 113, 133), (254, 215, 141) →
-(253, 215, 140)); before, M_Ship drew it near black. What is left in the panel is text rasterisation. The whole-frame
-figure is the camera's SolidColor backdrop, not US-T57: the uncommitted exposure work in the shared tree (US-T51/T55)
-lifts it from Unity's flat (13, 15, 23) to about (40, 43, 50) on both tracks (noted on US-T51).
+The hull's faces match the original's within 1-2 levels on both tracks (e.g. (100, 113, 134) → (99, 113, 133),
+(254, 215, 141) → (254, 216, 141)); before, M_Ship drew it near black. What is left is anti-aliased edges and text
+rasterisation.
+
+The clear colour (the backdrop): both tracks drew it lifted to about (40, 43, 50) with darker corners, where Unity's is a
+flat (13, 15, 23). Two causes, both fixed here: Unreal's default vignette (0.4; the original's URP volume,
+`DefaultVolumeProfile.asset`, has Vignette intensity 0), now 0 in both render backends' look; and the C# backdrop's
+texel transfer, measured in US-T40 under Unreal's filmic curve before US-T45 bound the look to the camera (a 3x lift
+since); on screen M_Sky now draws its texel as it is on both tracks (the C++ track's 0.66 gain had been measured under
+the vignette).
+
+The original player in `Builds/Windows` was built on 2026-10-24, before the skyboxes (U.SPC-T595, 2026-11-02): its game
+view shows the old black sky with point stars, where both tracks (ported from the current source) draw Sol's panorama.
+That is the build's age, not a divergence; the model viewer, its key light, the glTF import and the scenes' lighting
+have not changed since the build.
 
 | Original player | C# | C++ |
 |---|---|---|

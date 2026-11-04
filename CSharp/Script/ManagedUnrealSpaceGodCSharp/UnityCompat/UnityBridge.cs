@@ -285,12 +285,14 @@ namespace UnityEngine
                 {
                     shown = (c, captureCamera != null);
                     var t = new Texture2D(1, 1) { name = "Backdrop" };
-                    // Measured (US-T40): M_Sky's texel does not reach the screen as Unity's clear colour does (a 13/15/23
-                    // texel showed as 1/1/2 on screen and 1/1/1 in a capture; 63 as 37 and 22): the screen value is
-                    // close to a * decoded^g. The texel is chosen so the screen shows Unity's value (its gamma colour).
+                    // The texel is chosen so the screen shows Unity's value (its gamma colour). On screen, under the
+                    // render backend's look (manual exposure cancelled by SG_Expose, no tone curve, no vignette), M_Sky
+                    // draws its texel as it is (US-T57; the transfer US-T40 measured, a * decoded^g with a 10.57, g 1.432,
+                    // was Unreal's filmic curve before US-T45 bound the look, and lifted the clear colour ~3x since). A
+                    // capture still goes through the measured transfer (a 13/15/23 texel showed as 1/1/1; 63 as 22).
                     bool capture = captureCamera != null;
-                    float a = capture ? 3.36f : 10.57f, g = capture ? 1.224f : 1.432f;
-                    float Texel(float v) => Encode(Mathf.Pow(Mathf.Max(v, 0f) / a, 1f / g));
+                    const float a = 3.36f, g = 1.224f;
+                    float Texel(float v) => capture ? Encode(Mathf.Pow(Mathf.Max(v, 0f) / a, 1f / g)) : Mathf.Max(v, 0f);
                     t.SetPixel(0, 0, new Color(Texel(c.r), Texel(c.g), Texel(c.b), 1));
                     t.Apply();
                     material!.SetTexture("_MainTex", t);

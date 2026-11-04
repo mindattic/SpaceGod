@@ -227,6 +227,10 @@ namespace SpaceGod::Rendering
 		s.AutoExposureApplyPhysicalCameraExposure = false;
 		s.bOverride_ExpandGamut = true;
 		s.ExpandGamut = 0;
+		// The original's URP volume (DefaultVolumeProfile: Vignette intensity 0) has no vignette; Unreal's default is 0.4,
+		// which darkened every edge, the model viewer's flat clear colour most visibly (US-T57).
+		s.bOverride_VignetteIntensity = true;
+		s.VignetteIntensity = 0;
 
 		float gameEv = game.Enabled ? game.ExposureEv : 0.0f;
 		float contrast = (game.Enabled ? game.Contrast : 0.0f) + (stack ? static_cast<float>(look.Contrast) : 0.0f);
