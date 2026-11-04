@@ -4,7 +4,9 @@
 #include "UnitySpaceApp.h"
 #include "Camera/SpaceCamera.h"
 
+#include "Misc/CommandLine.h"
 #include "Misc/DateTime.h"
+#include "Misc/Parse.h"
 #include "Misc/Paths.h"
 
 #include <memory>
@@ -28,7 +30,11 @@ namespace SpaceGod
 		{
 			static const cs::String folder = []
 			{
-				FString dir = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Capture"), FDateTime::Now().ToString(TEXT("%Y%m%d-%H%M%S")));
+				// US-T58: -capturedir=<dir> (tools/play.ps1 -Mode demo) puts the shots there, as the C# track's runner does.
+				FString dir;
+				if (FParse::Value(FCommandLine::Get(), TEXT("-capturedir="), dir) && !dir.IsEmpty())
+					return cs::String(TCHAR_TO_UTF8(*FPaths::ConvertRelativePathToFull(dir)));
+				dir = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Capture"), FDateTime::Now().ToString(TEXT("%Y%m%d-%H%M%S")));
 				return cs::String(TCHAR_TO_UTF8(*FPaths::ConvertRelativePathToFull(dir)));
 			}();
 			return folder;

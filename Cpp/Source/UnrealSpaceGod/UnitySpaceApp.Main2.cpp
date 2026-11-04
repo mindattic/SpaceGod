@@ -240,6 +240,10 @@ namespace SpaceGod
 		if (World()->Law) World()->Law->UpdatePilot(nullptr, 0, Core::DVec3(), Core::DVec3(), Clock->Jd);
 		// Through the gate, the chase is left behind in the system the ship has left.
 		if (World()->Pursuit) World()->Pursuit->ReleaseAll(Clock->Jd);
+		// US-T58: the far system's world holds the hull before Activate brings that system up to date (Galaxy.Promote
+		// steps its fleet): left unheld, the arrival GateTransit parked with no destination (DestinationBody -1, its phase
+		// already over) departs for body -1 there, and the catalogue lookup throws every frame from then on.
+		destination->World->PilotedShip = arrived;
 		Activate(destination);
 		// The far side streams in behind the gate's own flare and fold (U.SPC-T414).
 		BeginHelmGateCover();

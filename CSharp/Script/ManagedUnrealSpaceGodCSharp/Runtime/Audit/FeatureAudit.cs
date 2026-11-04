@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using Unity.SpaceGod.Core;
 using Unity.SpaceGod.Input;
 using UnrealSharp.Log;
@@ -40,6 +41,13 @@ namespace Unity.SpaceGod.Audit
             Probe("practice", Practice);
             Probe("seats", Seats);
             Probe("diplomacy", Diplomacy);
+            // US-T58: what the binding probes left code-present: combat at the controls with the mouse, and the player's
+            // own transits (a hyperlane ridden, a jump gate gone through, an FTL crossing to another star). The last two
+            // leave Sol, so they come last.
+            Probe("combat", Combat);
+            Probe("lane", LaneRide);
+            Probe("gate", GateJump);
+            Probe("ftl", FtlCrossing);
             UnrealLogger.Log(Log, $"AUDIT done: {pass} PASS, {fail} FAIL");
         }
 
@@ -360,6 +368,312 @@ namespace Unity.SpaceGod.Audit
             CloseEverything();
             Tap(Key.Escape);
             CloseEverything();
+        }
+
+        // ---------------------------------------------------------------- US-T58: staging
+
+        static string F(double v, string f) => v.ToString(f, CultureInfo.InvariantCulture);
+
+        /// <summary>Releases whatever is at the controls (P), so the next probe starts from command.</summary>
+        static void ToCommand()
+        {
+            for (int i = 0; i < 3 && app.AtControls; i++) { Tap(Key.P); frames(3); }
+            CloseEverything();
+        }
+
+        /// <summary>
+        /// Stages a hull for a probe: a home-side <paramref name="cls"/> parked at <paramref name="offsetKm"/> from
+        /// <paramref name="body"/>, nose on <paramref name="forward"/> (Fleet.SpawnAt, as Shift+V and the spawn grid make
+        /// theirs), then selected and taken with P. The flying from there is the player's keys.
+        /// </summary>
+        static Ship StageAtHelm(string name, ShipClass cls, int body, DVec3 offsetKm, DVec3 forward)
+        {
+            ToCommand();
+            var ship = app.Fleet.SpawnAt(name, cls, app.World.Sol, body, offsetKm, forward, app.Clock.Jd);
+            ship.Ports = app.World.FreeShipPorts();
+            app.Select(Target.OfShip(ship));
+            Tap(Key.P);
+            frames(2);
+            return app.IsPiloting && PilotedShip == ship ? ship : null;
+        }
+
+        static bool BattleAt(int body)
+        {
+            foreach (var b in app.World.War.Battles)
+                if (!b.Over && b.Body == body) return true;
+            return false;
+        }
+
+        // ---------------------------------------------------------------- US-T58: combat at the controls
+
+        /// <summary>The helm's crosshair (where the mouse has swung the free aim; what the guns fire down).</summary>
+        static DVec3 PilotAim => app.PilotAimDirection;
+
+        /// <summary>A hull's whole fight left in it: hull, shields and every subsystem's hit points.</summary>
+        static double Integrity(ShipCombat c)
+        {
+            double t = c.Hull + c.Shield;
+            foreach (var s in c.Subsystems) t += Math.Max(0, s.Hp);
+            return t;
+        }
+
+        /// <summary>From the piloted hull to <paramref name="t"/>, unit: in the fight's frame once there is one.</summary>
+        static DVec3 DirectionTo(Ship me, Ship t)
+        {
+            var b = me.Battle;
+            var mu = b?.UnitOf(me);
+            var tu = b?.UnitOf(t);
+            if (mu != null && tu != null && tu.Present)
+            {
+                // Led as a pilot leads a crossing target: where it will be when a round at the guns' muzzle speed gets there.
+                double muzzle = 0;
+                foreach (var s in mu.Combat.Subsystems)
+                    if (s.Def.Weapon != null && !s.Def.Weapon.Missile) muzzle = Math.Max(muzzle, s.Def.Weapon.MuzzleSpeedKmS);
+                var to = tu.Pos - mu.Pos;
+                if (muzzle > 0) to += (tu.Vel - mu.Vel) * (to.Length / muzzle);
+                return to.Normalized;
+            }
+            return (app.Fleet.StateOf(t, app.Clock.Jd).HelioKm - app.PlayerHelioKm()).Normalized;
+        }
+
+        static double AngleDeg(DVec3 a, DVec3 b) => Math.Acos(Math.Max(-1, Math.Min(1, DVec3.Dot(a.Normalized, b.Normalized)))) * 180 / Math.PI;
+
+        /// <summary>
+        /// One frame of the mouse swinging the crosshair toward <paramref name="want"/>: the error across the aim's right and
+        /// up axes, turned into pixels at the look sensitivity (half of it a frame), the signs those the calibration found.
+        /// </summary>
+        static void SteerMouse(DVec3 want, int signX, int signY)
+        {
+            var aim = PilotAim.Normalized;
+            var right = DVec3.Cross(aim, app.PilotUp).Normalized;
+            var up = DVec3.Cross(right, aim).Normalized;
+            double perPx = Cameras.SpaceCamera.LookSensitivity * Math.PI / 180;
+            double x = Math.Max(-120, Math.Min(120, 0.5 * DVec3.Dot(want, right) / perPx));
+            double y = Math.Max(-120, Math.Min(120, 0.5 * DVec3.Dot(want, up) / perPx));
+            kb.MouseDelta = new UnityEngine.Vector2((float)(signX * x), (float)(signY * y));
+            frames(1);
+        }
+
+        static void Combat()
+        {
+            ToCommand();
+            Tap(Key.V, Key.LeftShift);
+            frames(3);
+            var me = app.IsPiloting ? PilotedShip : null;
+            if (me == null) { Result("combat.mouse-aim", false, "Shift+V: no practice fighter at the helm"); return; }
+            // A pirate freighter 1.5 km out, some 18 degrees off the nose (spawned as the spawn grid's call does).
+            double jd = app.Clock.Jd;
+            var fwd = app.PilotForward;
+            var side = DVec3.Cross(fwd, app.PilotUp).Normalized;
+            var target = app.Fleet.SpawnAt("Audit Target", ShipClass.Freighter, app.World.Pirates, app.PilotFrameBody, app.PilotOffsetKm + fwd * 1.5 + side * 0.5, fwd, jd);
+            target.Ports = app.World.FreeShipPorts();
+            frames(2);
+
+            // Which way the mouse swings the crosshair: one frame of each axis.
+            var a0 = PilotAim.Normalized;
+            var r0 = DVec3.Cross(a0, app.PilotUp).Normalized;
+            var u0 = DVec3.Cross(r0, a0).Normalized;
+            kb.MouseDelta = new UnityEngine.Vector2(20, 0);
+            frames(1);
+            int signX = DVec3.Dot(PilotAim - a0, r0) >= 0 ? 1 : -1;
+            var a1 = PilotAim.Normalized;
+            kb.MouseDelta = new UnityEngine.Vector2(0, 20);
+            frames(1);
+            int signY = DVec3.Dot(PilotAim - a1, u0) >= 0 ? 1 : -1;
+
+            double before = AngleDeg(PilotAim, DirectionTo(me, target));
+            int steps = 0;
+            while (steps < 180 && AngleDeg(PilotAim, DirectionTo(me, target)) > 0.5) { SteerMouse(DirectionTo(me, target), signX, signY); steps++; }
+            double after = AngleDeg(PilotAim, DirectionTo(me, target));
+            Result("combat.mouse-aim", after < 1, $"mouse: crosshair {F(before, "F1")} -> {F(after, "F2")} deg off the {target.Name} in {steps} frames");
+
+            // The target selected (what a left-click on it does in the god view), T locks it; the left button opens fire
+            // (weapons free on a lone merchant), and held down the guns fire down the crosshair, the mouse keeping it on the target.
+            app.Select(Target.OfShip(target));
+            Tap(Key.T);
+            string locked = Describe(app.SpaceCamera.PilotLockTarget);
+            double whole = Integrity(target.Combat), least = whole, heat = 0, worst = 0, range = 0;
+            string fireToast = "";
+            int held = 0, frame = 0;
+            bool trigger = false;
+            // The click opens the fight, which puts the two sides at their stations some km apart (War.TryStartPlayerAttack):
+            // the player runs in on W, under cruise (J) while far out, and inside the guns' reach fires in bursts, as a
+            // player does: held until the guns run hot, let go until they cool, the mouse keeping the crosshair on the lead.
+            kb.Hold(Key.W);
+            double nearest = double.MaxValue, closest = double.MaxValue, first = -1;
+            bool cruising = false;
+            for (; frame < 3600; frame++)
+            {
+                var unit = me.Battle?.UnitOf(me);
+                var tu = me.Battle?.UnitOf(target);
+                double to = unit != null && tu != null ? (tu.Pos - unit.Pos).Length : 0;
+                bool far = to > 3, inReach = unit != null && to < 1.5;
+                if (far != cruising) { if (far) kb.Hold(Key.J); else kb.Release(Key.J); cruising = far; }
+                bool hot = unit != null && (unit.Overheated || unit.Heat > 0.8);
+                bool cool = unit == null || unit.Heat < 0.3;
+                bool want = unit == null ? frame < 2 : inReach && (trigger ? !hot : cool);
+                if (trigger && !want) { kb.ReleaseButton(MouseButton.Left); trigger = false; }
+                else if (!trigger && want) { kb.HoldButton(MouseButton.Left); trigger = true; }
+                SteerMouse(DirectionTo(me, target), signX, signY);
+                if (trigger) held++;
+                if (fireToast.Length == 0 && me.Battle != null) fireToast = Toast;
+                unit = me.Battle?.UnitOf(me);
+                tu = me.Battle?.UnitOf(target);
+                if (unit != null)
+                {
+                    heat = Math.Max(heat, unit.Heat);
+                    if (trigger && inReach) worst = Math.Max(worst, AngleDeg(unit.PlayerAim, DirectionTo(me, target)));
+                    if (tu != null) { range = (tu.Pos - unit.Pos).Length; nearest = Math.Min(nearest, range); if (first < 0) first = range; }
+                    // The guns' rounds (this side's, in flight): how close any came to the target's hull.
+                    if (tu != null)
+                        foreach (var r in me.Battle.Rounds)
+                            if (r.Side == unit.Side && !r.Gone) closest = Math.Min(closest, Math.Max(0, (r.Pos - tu.Pos).Length - tu.Radius));
+                }
+                least = Math.Min(least, Integrity(tu?.Combat ?? target.Combat));
+                if (target.Destroyed || (held > 120 && least < whole && closest < 0.1)) break;
+                if (me.Destroyed || !app.IsPiloting) break;
+            }
+            kb.Release(Key.J);            if (trigger) kb.ReleaseButton(MouseButton.Left);
+            kb.Release(Key.W);
+            frames(1);
+            Result("combat.mouse-fire", me.Battle != null && heat > 0 && least < whole && closest < 0.1,
+                $"T: locked {locked}; left button held {held} of {Math.Min(frame + 1, 3600)} frames: fight {(me.Battle != null ? "on" : "none")}, gun heat {F(heat, "F2")}, " +
+                $"crosshair within {F(worst, "F2")} deg of the lead, {F(nearest == double.MaxValue ? 0 : nearest, "F2")} to {F(range, "F2")} km off, first {F(first, "F2")} km, rounds to {F(closest == double.MaxValue ? -1 : closest, "F3")} km of its hull, the {target.Name} {F(whole, "F0")} -> {F(least, "F0")}{(target.Destroyed ? " (destroyed)" : "")}; toast '{fireToast}'");
+            ToCommand();
+        }
+
+        // ---------------------------------------------------------------- US-T58: the player's own transits
+
+        /// <summary>
+        /// A hyperlane (U.SPC-T41): the practice fighter staged just outside a lane's on-ramp ring, flown in on W, rides it
+        /// (Fleet.JoinLane, the clock compressed) to the far ramp and comes off there.
+        /// </summary>
+        static void LaneRide()
+        {
+            ToCommand();
+            var lanes = app.Fleet.Lanes;
+            double jd = app.Clock.Jd;
+            Lane lane = null;
+            foreach (var l in lanes.Lanes)
+                if (lanes.Carries(l) && !l.IsGateSpur && !BattleAt(l.A) && !BattleAt(l.B)) { lane = l; break; }
+            if (lane == null) { Result("transit.lane-enter", false, "no lane carrying traffic, clear of a fight"); return; }
+            int at = lane.A, to = lane.B;
+            var dir = lanes.RampDirection(lane, at, jd);
+            var ramp = lanes.RampOffset(lane, at, jd);
+            var ship = StageAtHelm("Audit Lane Fighter", ShipClass.Fighter, at, ramp + dir * (Hyperlanes.GateRadiusKm + 0.5), -dir);
+            if (ship == null)
+            {
+                Result("transit.lane-enter", false, $"P on the staged fighter: piloting {app.IsPiloting}");
+                return;
+            }
+            kb.Hold(Key.W);
+            int f = 0;
+            for (; f < 1800 && !app.RidingLane; f++) frames(1);
+            kb.Release(Key.W);
+            frames(1);
+            bool riding = app.RidingLane;
+            Result("transit.lane-enter", riding,
+                $"W held {f} frames from {F(Hyperlanes.GateRadiusKm + 0.5, "F1")} km off the {app.Catalog[at].Name} ramp: riding {riding}; toast '{Toast}'");
+            if (!riding) { ToCommand(); return; }
+
+            int ride = 0;
+            for (; ride < 9000 && app.RidingLane; ride++) frames(1);
+            double off = (app.PlayerHelioKm() - lanes.RampHelio(lane, to, app.Clock.Jd)).Length;
+            Result("transit.lane-ride", !app.RidingLane && app.IsPiloting && off < Hyperlanes.GateRadiusKm * 2 && Toast.StartsWith("Off the"),
+                $"the {lane.Name} lane ridden {ride} frames to {app.Catalog[to].Name}: {F(off, "F0")} km from its ramp, piloting {app.IsPiloting}; toast '{Toast}'");
+            ToCommand();
+        }
+
+        /// <summary>
+        /// A jump gate (U.SPC-T8): the practice fighter staged just outside a gate's activation range, across its spur
+        /// (so it is not swept into the spur's ring), flown in on W ("In range of ... Y to activate") and through on Y
+        /// (GateTransit.TryPerform, Activate on the far system, the helm taken again on the hull that came out).
+        /// </summary>
+        static void GateJump()
+        {
+            ToCommand();
+            double jd = app.Clock.Jd;
+            var here = app.ActiveSystem;
+            JumpGate gate = null;
+            foreach (var g in here.Gates)
+                if (g.Destination != null && g.Link != null && g.Link.Open(here, app.World.Sol, jd)) { gate = g; break; }
+            if (gate == null) { Result("transit.gate", false, $"no gate open to the {app.World.Sol.Name} in {here.Name}"); return; }
+            var lanes = app.Fleet.Lanes;
+            var along = DVec3.UnitX;
+            foreach (var s in lanes.GateSpurs)
+                if (s.Gate == gate) along = lanes.RampDirection(s, s.B, jd);
+            var across = DVec3.Cross(along, Math.Abs(along.Z) < 0.9 ? DVec3.UnitZ : DVec3.UnitX).Normalized;
+            int root = app.Catalog.Root.Index;
+            var start = gate.PositionKm - app.Ephemeris.Helio(root) + across * (JumpGate.ActivationRangeKm + 0.5);
+            var ship = StageAtHelm("Audit Gate Fighter", ShipClass.Fighter, root, start, -across);
+            if (ship == null)
+            {
+                Result("transit.gate", false, $"P on the staged fighter: piloting {app.IsPiloting}");
+                return;
+            }
+            kb.Hold(Key.W);
+            int f = 0;
+            for (; f < 1800 && !Toast.StartsWith("In range of"); f++) frames(1);
+            kb.Release(Key.W);
+            frames(1);
+            string range = Toast;
+            var destination = gate.Destination;
+            // Y; the toast read after the jump's own frame (the next one says the far gate is in range, as the hull comes out beside it).
+            kb.Tap(Key.Y);
+            frames(1);
+            string jumped = Toast;
+            frames(5);
+            bool there = app.ActiveSystem == destination && app.IsPiloting && destination.World.Fleet.IsPresent(PilotedShip);
+            Result("transit.gate", there && jumped.StartsWith("Jumped to"),
+                $"W held {f} frames: '{range}'; Y: in {app.ActiveSystem.Name} (bound for {destination.Name}), piloting {app.IsPiloting} " +
+                $"({PilotedShip?.Name}, in its fleet {there}); toast '{jumped}', then '{Toast}'");
+            // Left at the helm: the FTL probe stages its hull beside where this one came out.
+        }
+
+        /// <summary>
+        /// The helm's own FTL drive (U.SPC-T417, T420): an explorer at the helm, Page Down to plot the nearest star,
+        /// End for the autopilot (out past the rim, onto the star, spooled and engaged), the crossing, and the drop-out at
+        /// the far star with the helm back in hand.
+        /// </summary>
+        static void FtlCrossing()
+        {
+            // Beside the hull at the helm (the one the gate probe brought out), 50 km off; else 1 AU out from the star.
+            var from = app.ActiveSystem;
+            int body = app.Catalog.Root.Index;
+            var at = new DVec3(0, Astro.AuKm, 0);
+            var fwd = DVec3.UnitY;
+            if (app.IsPiloting)
+            {
+                body = app.PilotFrameBody;
+                fwd = app.PilotForward;
+                at = app.PilotOffsetKm + DVec3.Cross(fwd, app.PilotUp).Normalized * 50;
+            }
+            var ship = StageAtHelm("Audit Explorer", ShipClass.Explorer, body, at, fwd);
+            if (ship == null) { Result("transit.ftl-engage", false, $"P on the staged explorer: piloting {app.IsPiloting}"); return; }
+            for (int i = 0; i < 12; i++)
+            {
+                Tap(Key.PageDown);
+                var t = app.PlottedCourse?.Target;
+                if (t != null && t.System != null && !t.IsBeacon && app.PlottedCourse.Flyable) break;
+            }
+            var course = app.PlottedCourse;
+            string plotted = Toast;
+            var bound = course?.Target?.System;
+            Tap(Key.End);
+            string engaged = Toast;
+            int f = 0;
+            for (; f < 12000 && !app.InFtlCruise && app.IsPiloting; f++) frames(1);
+            bool cruising = app.InFtlCruise;
+            Result("transit.ftl-engage", cruising && bound != null,
+                $"PgDn: '{plotted}'; End: '{engaged}'; {f} frames on: crossing {cruising}; toast '{Toast}'");
+            if (!cruising) { ToCommand(); return; }
+
+            int c = 0;
+            for (; c < 12000 && app.InFtlCruise; c++) frames(1);
+            frames(5);
+            Result("transit.ftl-arrive", !app.InFtlCruise && app.ActiveSystem == bound && app.IsPiloting && PilotedShip == ship && Toast.StartsWith("Dropped out of FTL"),
+                $"{c} frames between the stars from {from.Name}: in {app.ActiveSystem.Name} (bound for {bound?.Name}), piloting {app.IsPiloting} ({PilotedShip?.Name}); toast '{Toast}'");
+            ToCommand();
         }
     }
 }

@@ -27,6 +27,7 @@ quits; the log is <Track>/Saved/Logs/<project>.log. Both tracks log the same lin
   ./tools/play.ps1 -Track CSharp -Mode shots   # windowed: the UI's screenshots into docs/images
   ./tools/play.ps1 -Track CSharp -Mode views   # headless: Sol's views (US-T27) built for a frame, counts logged
   ./tools/play.ps1 -Track CSharp -Mode demo     # windowed: the -demo scene tour, every stop captured (US-T40)
+  ./tools/play.ps1 -Track Cpp -Mode demo        # the C++ track's same tour (US-T58)
   ./tools/play.ps1 -Track CSharp -Mode viewshot # windowed: those views on screen, docs/images/csharp-views-sol.png
   ./tools/play.ps1 -Track CSharp -Mode host      # co-op (US-T39): a listen server, player 1
   ./tools/play.ps1 -Track CSharp -Mode join -Address 192.168.1.20
@@ -80,14 +81,17 @@ if ($Mode -eq 'fidelity') {
 }
 
 if ($Mode -eq 'demo') {
-  # -Mode demo (CSharp, US-T40): Unity.SpaceGod's -demo SceneTour (CaptureRunner) end to end in a window, -capture
-  # saving every stop as Saved/Screenshots/Tour/<stop>.png (or -CaptureDir); the game quits when the tour ends.
-  if ($Track -ne 'CSharp') { throw '-Mode demo is the C# track''s scene tour: use -Track CSharp.' }
+  # -Mode demo (either track: US-T40 C#, US-T58 C++): Unity.SpaceGod's -demo SceneTour (CaptureRunner) end to end in a
+  # window, -capture saving every stop as <Track>/Saved/Screenshots/Tour/<stop>.png (or -CaptureDir); the game quits
+  # when the tour ends.
   $editor = Join-Path $engine 'Engine\Binaries\Win64\UnrealEditor.exe'
   if (-not $CaptureDir) { $CaptureDir = Join-Path $project.DirectoryName 'Saved\Screenshots\Tour' }
+  $t0 = Get-Date
   $p = Start-Process -FilePath $editor -PassThru -Wait -ArgumentList @("`"$($project.FullName)`"", '/Engine/Maps/Entry', '-game',
     '-windowed', '-ResX=1600', '-ResY=900', '-nosound', '-unattended', '-log', '-demo', '-capture', "`"-capturedir=$CaptureDir`"")
-  Get-ChildItem -LiteralPath $CaptureDir -Filter '*.png' -ErrorAction SilentlyContinue | ForEach-Object FullName
+  $shots = @(Get-ChildItem -LiteralPath $CaptureDir -Filter '*.png' -ErrorAction SilentlyContinue | Where-Object LastWriteTime -ge $t0)
+  $shots | ForEach-Object FullName
+  "demo ($Track): $($shots.Count) tour stops captured"
   exit $p.ExitCode
 }
 
