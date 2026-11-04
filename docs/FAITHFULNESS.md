@@ -51,7 +51,7 @@ line by line.
 Result (2026-11-03): **C#: 47 PASS, 0 FAIL, 5 INFO. C++: 47 PASS, 0 FAIL, 5 INFO.** The two logs match probe for
 probe: same states, same toasts, same ships (SFS Resolute, then SFS Vanguard on Tab; SFS Practice Fighter on Shift+V).
 The C++ figure is from the run just before `KeyToast` learned to log INFO; those same 5 probes were counted as FAIL
-then and had identical toasts.
+then and had identical toasts. The C++ track also runs 11 facade probes (text.*, viewer.*, US-T52/T53): 11 PASS.
 
 | Probe | Binding | C++ | C# |
 |---|---|---|---|
@@ -72,6 +72,8 @@ then and had identical toasts.
 | helm.ftl-engage / lane-reenter / phasers / run-hot / lock (INFO) | Enter; Y; Insert; Shift+Insert; T | same on both | same on both |
 | seats.man-gun / back-to-command / take-charge | `/`; P; `'` | ✓R | ✓R |
 | diplomacy.hail | F12 | ✓R | ✓R |
+| text.click-focus / caret-keys / shift-select / clipboard / delete / mouse (US-T52) | a probe GUI.TextField: click; Home, End, arrows (Ctrl: by word); Shift; Ctrl+A/C/X/V; Backspace/Delete (Ctrl: a word); drag, double, triple and Shift+click | ✓R | C++ facade only |
+| viewer.screen-camera / culling-mask / backdrop / key-light / close (US-T53) | F9's model viewer opened and closed: the screen camera, what it draws, its backdrop and light | ✓R | C++ facade only |
 | render.msaa / display.modes / display.exclusive-rate (US-T55, US-T56) | Settings > MSAA off/on; Display page; Apply exclusive at the largest size | ✓R | ✓R |
 | combat.mouse-aim / combat.mouse-fire (US-T58) | the mouse swinging the crosshair; T; the left button held | ✓R | ✓R |
 | transit.lane-enter / transit.lane-ride (US-T58) | W held into an on-ramp's ring; the ride | ✓R | ✓R |
@@ -261,7 +263,7 @@ Sources: **CH** = ControlsHelp binding, **GM** = GameManual chapter, **US** = U.
 | HUD on/off (U), clear the screen (F11) (U.SPC-T496) | CH | ✓R | ✓R | |
 | Navigator collapsed by default, marquee lines (U.SPC-T328, T495) | US | ✓R | ✓R | HUD drawn in smoke and shots |
 | Pause menu: Resume, Help, Save/Load, Settings > Display, Main Menu, Quit | CH, US-T276 | ✓R | ✓R | |
-| Text fields (profile and save names) | US-T327 | ≠ | ✓C | C++: append and backspace only (**US-T52**) |
+| Text fields (profile and save names) | US-T327 | ✓R | ✓C | C++: Unity's TextEditor as the C# track's: caret, mouse and Shift selection, Home/End, Ctrl word moves and deletes, Ctrl+A/C/X/V on the system clipboard, the OS's key repeat; audit text.* (US-T52) |
 | Text clipped at scroll and clip edges | (IMGUI) | ✓C | ✓R | C#: drawn through a Slate overlay with clipping zones, glyphs cut at the edge; icons with Unity's mip chain (US-T54; shots: the clipped panels match the C++ shot, 22% → 0.04% of pixels) |
 | Unity default skin (ModelViewer, asteroid labels, default scrollbars and sliders) | (IMGUI) | ✓R | ✓R | Unity's own GameSkin, read from the original player (`tools/unity_extract.py`); model viewer panel 4.76% (C++) / 4.87% (C#) of pixels differing from the original player's, all text rasterisation (US-T57) |
 
@@ -272,9 +274,9 @@ Sources: **CH** = ControlsHelp binding, **GM** = GameManual chapter, **US** = U.
 | Bodies, rings, atmospheres, the 26 shaders as M_* materials | US | ✓R | ✓R | views check; shots |
 | Line strips (orbits, lanes), 1-px stars | US | ✓R | ✓R | US-T45 fixes; views diff 2 px in 1.44 M |
 | Kenney craft and procedural hulls, LOD, far icons (U.SPC-T376, T415) | US | ✓R | ✓R | views check |
-| Model viewer (F9 / `-modelviewer`) | US-T24, T111 | ≠ | ✓R | C++: camera depth and culling mask not rendered (**US-T53**) |
+| Model viewer (F9 / `-modelviewer`) | US-T24, T111 | ✓R | ✓R | C++: the highest-depth camera draws the screen, only its culling mask's layer over its SolidColor backdrop, its own key light; Kenney models turned by the import's correction; audit viewer.*, `-Mode fidelity` ([cpp-fidelity-model-viewer.png](images/cpp-fidelity-model-viewer.png), next to the C# track's [csharp-fidelity-model-viewer.png](images/csharp-fidelity-model-viewer.png)): 0.33% of pixels more than 24 levels from the original player's (US-T53) |
 | Ship thumbnails (offscreen capture) | US-T24 | ✓C | ✓R | |
-| Lights, PBR for imported glTF | (URP) | ✓R | ✓R | Lights light only URP Lit (as under URP); the glTF hulls draw with M_Lit, URP 17's PBR; C# hull 2.05% of pixels from the original's (US-T57; C++: lit and shaded alike, seen from the other side, US-T53) |
+| Lights, PBR for imported glTF | (URP) | ✓R | ✓R | Lights light only URP Lit (as under URP); the glTF hulls draw with M_Lit, URP 17's PBR; C# hull 2.05% of pixels from the original's (US-T57; C++: lit and shaded alike, turned as the original's since US-T53) |
 | Scene tour (`-demo`) and capture (`-capture`) | US-T10, T15 | ✓R | ✓R | all 55 stops captured on both (`play.ps1 -Mode demo -Track Cpp` since US-T58, which counts the stops; the C++ runner now takes `-capturedir` as the C# one does). The C++ tour's first stop is shot while the engine is still compiling shaders ("Preparing Shaders"), so Earth is not yet drawn in it |
 
 ### Audio
@@ -290,7 +292,7 @@ The 88 rows of the checklist above (a row with two marks, such as `✓R / ✓C`,
 
 | Track | ✓R | ✓C | ✗ | ≠ |
 |---|---|---|---|---|
-| C++ | 71 | 14 | 0 | 3 |
+| C++ | 73 | 14 | 0 | 1 |
 | C# | 74 | 13 | 0 | 1 |
 
 Binding audit: 47 PASS, 0 FAIL on each track.
@@ -301,8 +303,8 @@ Binding audit: 47 PASS, 0 FAIL on each track.
 |---|---|---|
 | US-T50 | C# | the master volume and `-muted` never reach Unreal (fixed: UnrealHost applies AudioListener.volume, sg.SetPrimaryVolume) |
 | US-T51 | C# | Render Pipeline and Post-processing settings missing (fixed: ported, on Unreal's post-process as on the C++ track) |
-| US-T52 | C++ | GUI.TextField has no TextEditor (caret, selection, clipboard) |
-| US-T53 | C++ | the model viewer camera's depth and culling mask are not rendered |
+| US-T52 | C++ | GUI.TextField has no TextEditor (caret, selection, clipboard) (fixed: Unity's TextEditor, audit text.*) |
+| US-T53 | C++ | the model viewer camera's depth and culling mask are not rendered (fixed: the screen camera by depth and culling mask, its backdrop and key light; the import's correction) |
 | US-T54 | C# | IMGUI text clipped by whole glyphs; icons without mips (fixed: Slate overlay, mip chain) |
 | US-T55 | both | MSAA setting is FXAA (deferred renderer) (fixed: forward renderer, 4x MSAA, MSAA line width) |
 | US-T56 | both | display modes all at 60 Hz (fixed: DXGI's modes and rates, the rate set in exclusive fullscreen) |
@@ -316,7 +318,7 @@ model viewer shot (the same model, orbit and zoom), `tools/imgdiff.py` (any chan
 
 | Region | C# before | C# after | C++ after |
 |---|---|---|---|
-| hull (pixels the original draws off the backdrop) | 96.70% | 2.05% | 80.26% (seen from the other side: US-T53) |
+| hull (pixels the original draws off the backdrop) | 96.70% | 2.05% | 80.26% (seen from the other side before US-T53's import correction; after it 0.33% of the C++ frame's pixels differ by more than 24 levels) |
 | panel (box, label box, buttons, scroll view) | 8.05% | 4.87% | 4.76% |
 | whole frame | 4.64% | 64.96% | 67.85% |
 
