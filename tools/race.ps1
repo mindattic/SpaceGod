@@ -7,6 +7,8 @@ param(
   [string]$Out = '',
   # Run the editor binaries (UnrealEditor -game) instead of the package in Builds/<Track>.
   [switch]$Editor,
+  # The packaged game's folder (default Builds/<Track>/Windows, the last tools/package.ps1 output).
+  [string]$PackageDir = '',
   [int]$ResX = 1600, [int]$ResY = 900,
   [string]$EngineVersion = '5.8'
 )
@@ -56,7 +58,8 @@ for ($n = 1; $n -le $Runs; $n++) {
     $exe = Join-Path (Find-UnrealEngine $EngineVersion) 'Engine\Binaries\Win64\UnrealEditor.exe'
     $runArgs = @("`"$($project.FullName)`"", '/Engine/Maps/Entry', '-game', '-log') + $runArgs
   } else {
-    $exe = Join-Path $repo "Builds\$Track\Windows\Unreal.SpaceGod.$Track.exe"
+    $dir = if ($PackageDir) { $PackageDir } else { Join-Path $repo "Builds\$Track\Windows" }
+    $exe = Join-Path $dir "Unreal.SpaceGod.$Track.exe"
   }
   if ($Track -eq 'CSharp' -and $Editor) {
     . "$PSScriptRoot/dotnet-sdk.ps1"

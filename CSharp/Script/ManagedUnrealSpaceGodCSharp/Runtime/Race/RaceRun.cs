@@ -35,7 +35,7 @@ namespace Unity.SpaceGod.Race
         const string Log = "LogSpaceGod";
         public const double StartJd = 2461348.0; // 2026-11-03 12:00 UTC, the screenshots' (US-T45)
         public const int Seed = 1;
-        public const int Warm = 120, IdleFrames = 1200, BattleWarm = 60, BattleFrames = 1200, MaxWarpFrames = 60, ArrivedFrames = 300;
+        public const int Warm = 120, IdleFrames = 1200, BattleWarm = 60, BattleFrames = 1200, MaxWarpFrames = 30, ArrivedFrames = 300;
 
         static void Cmd(string c) => SystemLibrary.ExecuteConsoleCommand(c);
         static string F(double v) => v.ToString("0.###", CultureInfo.InvariantCulture);
@@ -108,16 +108,16 @@ namespace Unity.SpaceGod.Race
             Note("solIdleShips", app.Fleet.Ships.Count);
             Cmd("memreport -full");
 
-            // Fifteen days at 1 month/s, the second-highest warp (every system stepped several times a frame). The highest warp,
-            // 1 yr/s, trips US-T59 on both tracks within a few months of game time, as does a longer stretch at 1 month/s.
+            // Three and a half days at 1 week/s (each frame 2.8 hours of game time; every system stepped every frame). The two highest
+            // warps, 1 yr/s and 1 month/s, trip US-T59 on both tracks within weeks of game time (a ring captured mid-queue).
             Uncapped();
             app.Clock.Paused = false;
-            app.Clock.SetWarp(SimClock.Levels.Length - 2);
-            Cmd("sg.Race.Phase month-warp");
+            app.Clock.SetWarp(SimClock.Levels.Length - 3);
+            Cmd("sg.Race.Phase week-warp");
             yield return Frames(MaxWarpFrames);
             Cmd("sg.Race.End");
             app.Clock.SetWarp(SimClock.DefaultWarpIndex);
-            Note("monthWarpEndJd", app.Clock.Jd);
+            Note("weekWarpEndJd", app.Clock.Jd);
             yield return Frames(30);
 
             // A staged battle (SceneTour's broadside showcase): 2 battleships + a cruiser each for Sol and Reach off

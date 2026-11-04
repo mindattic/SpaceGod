@@ -51,7 +51,7 @@ namespace SpaceGod::Race
 	{
 		constexpr double StartJd = 2461348.0; // 2026-11-03 12:00 UTC, the screenshots' (US-T45)
 		constexpr int Seed = 1;
-		constexpr int Warm = 120, IdleFrames = 1200, BattleWarm = 60, BattleFrames = 1200, MaxWarpFrames = 60, ArrivedFrames = 300;
+		constexpr int Warm = 120, IdleFrames = 1200, BattleWarm = 60, BattleFrames = 1200, MaxWarpFrames = 30, ArrivedFrames = 300;
 
 		UWorld* GameWorld()
 		{
@@ -148,17 +148,17 @@ namespace SpaceGod::Race
 			Note(TEXT("solIdleShips"), app->Fleet()->Ships().Count());
 			Cmd(TEXT("memreport -full"));
 
-			// Fifteen days at 1 month/s, the second-highest warp (every system stepped several times a frame). The highest warp,
-			// 1 yr/s, trips US-T59 on both tracks within a few months of game time, as does a longer stretch at 1 month/s.
+			// Three and a half days at 1 week/s (each frame 2.8 hours of game time; every system stepped every frame). The two highest
+			// warps, 1 yr/s and 1 month/s, trip US-T59 on both tracks within weeks of game time (a ring captured mid-queue).
 			app = App();
 			app->Clock->SetPaused(false);
-			app->Clock->SetWarp(SimClock::Levels().Count() - 2);
-			Cmd(TEXT("sg.Race.Phase month-warp"));
+			app->Clock->SetWarp(SimClock::Levels().Count() - 3);
+			Cmd(TEXT("sg.Race.Phase week-warp"));
 			co_yield Frames(MaxWarpFrames);
 			Cmd(TEXT("sg.Race.End"));
 			app = App();
 			app->Clock->SetWarp(SimClock::DefaultWarpIndex);
-			Note(TEXT("monthWarpEndJd"), app->Clock->Jd);
+			Note(TEXT("weekWarpEndJd"), app->Clock->Jd);
 			co_yield Frames(30);
 
 			// A staged battle (SceneTour's broadside showcase): 2 battleships + a cruiser each for Sol and Reach off
