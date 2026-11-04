@@ -164,6 +164,7 @@ namespace SpaceGod::Input
 		ToggleRunHot = false;
 		ToggleRollPatches = false;
 		NumberKey = -1;
+		HailPolity = false; // US-T70: as Unity's Reset; without it a suspended frame kept F12's last edge and hailed again
 	}
 
 	float InputState::Axis(const ButtonControl& positive, const ButtonControl& negative)
