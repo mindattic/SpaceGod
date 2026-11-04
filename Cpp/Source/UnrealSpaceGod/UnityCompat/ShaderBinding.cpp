@@ -102,12 +102,12 @@ namespace SpaceGod::UnityCompat
 
 	bool ShaderBinding::IsReal(const Shader* shader) { return Resolve(shader).Real; }
 
-	int ShaderBinding::SortPriority(const Shader* shader)
 	bool ShaderBinding::IsLit(const Shader* shader)
 	{
 		return shader && (shader->name == "glTF/PbrMetallicRoughness" || ShaderName(shader) == "Lit");
 	}
 
+	int ShaderBinding::SortPriority(const Shader* shader)
 	{
 		cs::String n = ShaderName(shader);
 		if (n == "Stars") return -1000;
