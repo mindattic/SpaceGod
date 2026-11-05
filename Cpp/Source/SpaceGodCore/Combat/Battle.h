@@ -285,6 +285,11 @@ namespace SpaceGod::Core
 		/// Null for anything smaller (see <see cref="Broadsides.Of"/>).</summary>
 		cs::Ref<BroadsideCommand> Broadside;
 
+		/// <summary>US-T135: the damage control teams out on the plating as EVA workers the player holds (a bit per team,
+		/// <see cref="RepairWorker"/>): out of the pool damage control works with while held. 0 whenever no player holds one
+		/// (every crew, the AI and the Bench); not saved, as no seat is held across a load.</summary>
+		int EvaHeldTeams = 0;
+
 		/// <summary>The roof of a hull flown at the helm, rolled however its captain has rolled it (U.SPC-T499: capitals fight
 		/// in full 3D, rolling a broadside onto a ship above or below); read only while <see cref="PlayerControlled"/>.
 		/// Zero is held level, roof toward ecliptic north; a hull flown by the battle takes its captain's <see cref="Roof"/> instead.</summary>

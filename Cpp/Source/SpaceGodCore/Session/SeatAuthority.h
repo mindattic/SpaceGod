@@ -47,6 +47,10 @@ namespace SpaceGod::Core
 
 		PlayerId HolderOf(int seat) const override;
 
+		PlayerId HolderOf(const cs::Ref<IEmbodiable>& seat) const override;
+
+		cs::List<HeldSeat> Held() const override;
+
 		cs::Ref<IEmbodiable> Seat(int seat) const override;
 
 		cs::String EndedBecause(PlayerId player) const override;

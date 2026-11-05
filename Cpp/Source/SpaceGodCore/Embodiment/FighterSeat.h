@@ -65,6 +65,12 @@ namespace SpaceGod::Core
 		/// <summary>Its pilot takes the stick back and flies a run of its own from here.</summary>
 		void HandBack() override;
 
+		/// US-T135: the universal embody contract (<see cref="IEmbodiable"/>; bodies in EmbodimentRoles.cpp).
+		EmbodimentInputProfile InputProfile() const override;
+		EmbodimentCameraRig CameraRig() const override;
+		EmbodimentRolePanel RolePanel() override;
+		EmbodimentSubject Subject() const override;
+
 	private:
 		cs::Ref<FighterControl> Stick() const;
 

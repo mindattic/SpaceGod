@@ -355,6 +355,8 @@ namespace SpaceGod::Core
 		if (cmd == nullptr || u->Captured || u->Surrendering || u->Dead || u->Stunned > 0) return;
 		double rate = DamageControlRate()->Value;
 		int teams = Teams(u);
+		// US-T135: a team the player has out on the plating as an EVA worker welds there instead (RepairWorker).
+		for (int bits = u->EvaHeldTeams; bits != 0; bits &= bits - 1) teams--;
 		if (rate <= 0 || teams <= 0) return;
 		auto c = u->Combat;
 		double budget = teams * RepairHpPerTeamS * rate * c->Readiness * dt;

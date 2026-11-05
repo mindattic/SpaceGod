@@ -14,6 +14,14 @@ namespace SpaceGod::Core
 	class IGameCommand;
 	class IGameEvent;
 
+	/// <summary>One seat held (US-T135): by whom, its session id, and the seat.</summary>
+	struct HeldSeat
+	{
+		PlayerId Player = PlayerId::None();
+		int SeatId = 0;
+		cs::Ref<IEmbodiable> Seat;
+	};
+
 	/// <summary>
 	/// The read-only view of the session's state that presentation reads (U.SPC-T410): who holds which seat. Everything in
 	/// it is keyed by <see cref="PlayerId"/> or by a seat's id, never by "the player".
@@ -37,6 +45,19 @@ namespace SpaceGod::Core
 
 		/// <summary>Who holds the seat with this id, or <see cref="PlayerId.None"/>.</summary>
 		virtual PlayerId HolderOf(int seat) const = 0;
+
+		/// <summary>Who holds <paramref name="seat"/> (by the seats' own Equals, so any wrapper round the same thing), or
+		/// <see cref="PlayerId.None"/> (US-T135).</summary>
+		virtual PlayerId HolderOf(const cs::Ref<IEmbodiable>& seat) const = 0;
+
+		/// <summary>
+		/// Every seat held now and who holds it (US-T135), in player order: what a view reads to mark the units other players
+		/// embody (a co-op or PvP glint, later), each seat's <see cref="IEmbodiable.Subject"/> naming its hull and part. The
+		/// authority's own state, identical on every lockstep peer (it changes only on the command stream: TakeSeat,
+		/// MoveToHost, ReleaseSeat, a seat lost on a tick). A ship's helm flown by the app's pilot loop is the app's to add
+		/// (<see cref="UnitySpaceApp.EmbodiedNow"/>). Transient: nothing here is saved or credited to a player.
+		/// </summary>
+		virtual cs::List<HeldSeat> Held() const = 0;
 
 		/// <summary>The seat with this id, or null for one the session was never told of.</summary>
 		virtual cs::Ref<IEmbodiable> Seat(int seat) const = 0;

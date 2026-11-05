@@ -137,6 +137,12 @@ namespace SpaceGod::Core
 		/// <summary>The crew takes every gun back and picks its own targets again; the guns point where they were left.</summary>
 		void HandBack() override;
 
+		/// US-T135: the universal embody contract (<see cref="IEmbodiable"/>; bodies in EmbodimentRoles.cpp).
+		EmbodimentInputProfile InputProfile() const override;
+		EmbodimentCameraRig CameraRig() const override;
+		EmbodimentRolePanel RolePanel() override;
+		EmbodimentSubject Subject() const override;
+
 		bool Equals(const cs::Ref<IEmbodiable>& obj) const override;
 		size_t GetHashCode() const override;
 	};

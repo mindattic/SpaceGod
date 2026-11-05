@@ -2,6 +2,7 @@
 
 #include "Session/SeatAuthority.h"
 #include "Embodiment/CraftPower.h"
+#include "Embodiment/Embodiables.h" // US-T135: the embody gate
 #include "Embodiment/EmbodimentSession.h"
 #include "Embodiment/HelmAbilities.h"
 #include "Embodiment/SelfDestruct.h"
@@ -39,6 +40,30 @@ namespace SpaceGod::Core
 		for (const auto& p : players)
 			if (EmbodiableEquals(seats.At(p)->Current, s)) return p;
 		return PlayerId::None();
+	}
+
+	PlayerId SeatAuthority::HolderOf(const cs::Ref<IEmbodiable>& seat) const
+	{
+		if (seat == nullptr) return PlayerId::None();
+		for (const auto& p : players)
+			if (EmbodiableEquals(seats.At(p)->Current, seat)) return p;
+		return PlayerId::None();
+	}
+
+	cs::List<HeldSeat> SeatAuthority::Held() const
+	{
+		cs::List<HeldSeat> list;
+		for (const auto& p : players)
+		{
+			auto held = seats.At(p)->Current;
+			if (held == nullptr) continue;
+			HeldSeat h;
+			h.Player = p;
+			h.SeatId = SeatIdOf(p);
+			h.Seat = held;
+			list.Add(h);
+		}
+		return list;
 	}
 
 	cs::Ref<IEmbodiable> SeatAuthority::Seat(int seat) const
@@ -134,6 +159,13 @@ namespace SpaceGod::Core
 		if (!holder.IsNone() && holder != p)
 		{
 			raise(cs::New<CommandRefused>(command, cs::Cat(next->Name(), " is held by ", holder)));
+			return;
+		}
+		// US-T135: the one embody gate (US-T140's rules go there), on every peer alike.
+		auto verdict = Embodiables::MayEmbody(next);
+		if (!verdict.Ok)
+		{
+			raise(cs::New<CommandRefused>(command, cs::Cat("can't take ", next->Name(), ": ", verdict.Reason)));
 			return;
 		}
 		int was = SeatIdOf(p);

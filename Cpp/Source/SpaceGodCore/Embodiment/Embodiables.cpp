@@ -3,6 +3,7 @@
 #include "Embodiment/Embodiables.h"
 #include "Embodiment/FighterSeat.h"
 #include "Embodiment/MountedTurret.h"
+#include "Embodiment/RepairWorker.h"
 #include "Embodiment/ShipHelm.h"
 #include "Embodiment/StationSeat.h"
 #include "BodyCatalog.h"
@@ -141,6 +142,8 @@ namespace SpaceGod::Core
 			{
 				Add(SeatOf(world, unitBattle, onUnit));
 				for (const auto& gun : TurretsOn(world, unitBattle, onUnit)) Add(gun);
+				for (const auto& crew : CrewOn(world, unitBattle, onUnit)) Add(crew); // US-T135: its EVA workers
+				for (const auto& walker : WalkersIn(world, unitBattle)) Add(walker); // US-T83: none until the mech lands
 			}
 		}
 		else if (onShip != nullptr && world != nullptr) Add(HelmOf(world, onShip));
@@ -149,6 +152,46 @@ namespace SpaceGod::Core
 			for (const auto& ship : nearby)
 				if (ship != nullptr) Add(HelmOf(world, ship));
 		return list;
+	}
+
+	EmbodyVerdict Embodiables::MayEmbody(const cs::Ref<IEmbodiable>& next)
+	{
+		if (next == nullptr) return EmbodyVerdict::Refuse("nothing there to take");
+		// US-T140 adds its rules here (in battle, Influence); until then the SpaceGod may take anything it can reach.
+		return EmbodyVerdict::Allow();
+	}
+
+	// ------------------------------------------------------------ crews out on a hull (US-T135)
+
+	cs::List<cs::Ref<RepairWorker>> Embodiables::WorkersOn(const cs::Ref<World>& world, const cs::Ref<Battle>& battle, const cs::Ref<BattleUnit>& unit)
+	{
+		cs::List<cs::Ref<RepairWorker>> list;
+		if (battle == nullptr || battle->Over || unit == nullptr) return list;
+		int teams = RepairWorker::TeamsOn(unit);
+		if (teams <= 0) return list;
+		cs::Ref<IEmbodiable> host = unit->Ship != nullptr && world != nullptr
+			? cs::Ref<IEmbodiable>(HelmOf(world, unit->Ship))
+			: cs::Ref<IEmbodiable>(StationOf(world, battle, unit));
+		for (int i = 0; i < teams; i++)
+		{
+			auto w = cs::New<RepairWorker>(battle, unit, i, host);
+			if (w->CanEmbody()) list.Add(w);
+		}
+		return list;
+	}
+
+	cs::List<cs::Ref<IEmbodiable>> Embodiables::CrewOn(const cs::Ref<World>& world, const cs::Ref<Battle>& battle, const cs::Ref<BattleUnit>& unit)
+	{
+		cs::List<cs::Ref<IEmbodiable>> list;
+		for (const auto& w : WorkersOn(world, battle, unit)) list.Add(w);
+		// US-T82: a hull's boarding marines and power-suited crews are added here.
+		return list;
+	}
+
+	cs::List<cs::Ref<IEmbodiable>> Embodiables::WalkersIn(const cs::Ref<World>& /*world*/, const cs::Ref<Battle>& /*battle*/)
+	{
+		// US-T83: the mech is not ported yet (see the declaration); it is listed here once it is.
+		return cs::List<cs::Ref<IEmbodiable>>();
 	}
 
 	cs::Ref<IEmbodiable> Embodiables::SeatOf(const cs::Ref<World>& world, const cs::Ref<Battle>& battle, const cs::Ref<BattleUnit>& unit)

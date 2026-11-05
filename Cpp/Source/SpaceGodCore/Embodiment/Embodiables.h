@@ -11,6 +11,7 @@ namespace SpaceGod::Core
 	class FighterSeat;
 	class JumpGate;
 	class MountedTurret;
+	class RepairWorker;
 	class Settlement;
 	class Ship;
 	class ShipCombat;
@@ -22,9 +23,29 @@ namespace SpaceGod::Core
 	/// Where the things the player can embody are found (U.SPC-T18): a picker lists from here rather than
 	/// building its own lists, so a new kind registers once and every picker sees it.
 	/// </summary>
+	/// <summary>What the one embody gate (<see cref="Embodiables.MayEmbody"/>) says: allowed, or why not, for the player.</summary>
+	struct EmbodyVerdict
+	{
+		bool Ok = true;
+		cs::String Reason;
+
+		static EmbodyVerdict Allow() { return EmbodyVerdict(); }
+		static EmbodyVerdict Refuse(cs::String why) { EmbodyVerdict v; v.Ok = false; v.Reason = std::move(why); return v; }
+	};
+
 	class SPACEGODCORE_API Embodiables
 	{
 	public:
+		/// <summary>
+		/// The one gate every attempt to embody anything goes through (US-T135), wherever it comes from (the embody key, the
+		/// picker, cycling, co-op's <see cref="SeatAuthority"/>), after the kind's own <see cref="IEmbodiable.CanEmbody"/>: the
+		/// SpaceGod's own rules on what it may take. The place US-T140 puts them (no hull marked in battle taken out from
+		/// under its side; bigger hulls and named Epic units needing enough SpaceGod Influence); today it allows everything.
+		/// Rules here read the thing's <see cref="IEmbodiable.Subject"/> and the world, never a player identity: the player is
+		/// no one ship or pilot, and whatever it does is credited to the unit it holds.
+		/// </summary>
+		static EmbodyVerdict MayEmbody(const cs::Ref<IEmbodiable>& next);
+
 		/// <summary>A ship's helm.</summary>
 		static cs::Ref<ShipHelm> HelmOf(const cs::Ref<World>& world, const cs::Ref<Ship>& ship);
 
@@ -95,6 +116,28 @@ namespace SpaceGod::Core
 		/// (C#'s null <paramref name="nearby"/> is an empty list here: the same, nothing to add.)
 		static cs::List<cs::Ref<IEmbodiable>> Pickable(const cs::Ref<World>& world, const cs::Ref<Battle>& battle, cs::Ref<BattleUnit> onUnit = nullptr,
 			const cs::Ref<Ship>& onShip = nullptr, const cs::List<cs::Ref<Ship>>& nearby = cs::List<cs::Ref<Ship>>());
+
+		// ------------------------------------------------------------ crews out on a hull (US-T135)
+
+		/// <summary>Every EVA repair worker <paramref name="unit"/> can send out on its plating now (one per damage control team,
+		/// <see cref="RepairWorker"/>), hosted by its helm (a ship) or its station.</summary>
+		static cs::List<cs::Ref<RepairWorker>> WorkersOn(const cs::Ref<World>& world, const cs::Ref<Battle>& battle, const cs::Ref<BattleUnit>& unit);
+
+		/// <summary>
+		/// Every person on or in <paramref name="unit"/> the player can take (US-T135): today its EVA repair workers. The hook
+		/// for US-T82: its boarding marines and power-suited crews register here as kinds of their own (on
+		/// <see cref="EmbodimentInputProfile.Walker"/> or <see cref="EmbodimentInputProfile.HullWalker"/>), and every picker,
+		/// the HUD and co-op see them with no change of their own.
+		/// </summary>
+		static cs::List<cs::Ref<IEmbodiable>> CrewOn(const cs::Ref<World>& world, const cs::Ref<Battle>& battle, const cs::Ref<BattleUnit>& unit);
+
+		/// <summary>
+		/// Every walker in <paramref name="battle"/> the player could take (US-T135): none yet. The mech of Unreal.Soulslike
+		/// (US-T83) is not ported; when it is, it is an <see cref="IEmbodiable"/> of <see cref="EmbodimentKind.Mech"/> on
+		/// <see cref="EmbodimentInputProfile.Walker"/> (walk, run, look, its arms on the triggers) with a
+		/// <see cref="EmbodimentCameraKind.Shoulder"/> or chase rig, listed here; nothing else needs to change.
+		/// </summary>
+		static cs::List<cs::Ref<IEmbodiable>> WalkersIn(const cs::Ref<World>& world, const cs::Ref<Battle>& battle);
 
 		/// <summary>The seat that flies <paramref name="unit"/> itself (a ship's helm, a fighter's cockpit), or null for a
 		/// unit nobody flies (a defence platform, a fort: their guns are reached through <see cref="TurretsOn(World, Battle, BattleUnit)"/>,
