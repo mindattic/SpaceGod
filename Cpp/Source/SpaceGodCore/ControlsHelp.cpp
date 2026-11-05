@@ -150,6 +150,7 @@ namespace SpaceGod::Core
 			cs::New<HelpSection>("SCREENS AND PANELS",
 				L("H  or  F1", "this help screen"),
 				L("Shift+F1", "dev menu, pulled down over the view: spawn any hull beside you (friendly or neutral), enemies (pirates small, medium and large, a hostile navy, Bio Mass), the cruise drive and Cruise to, teleports to a world, station or star, helms and seats, the dogfight demo, time warp and the two scales; type to filter, Enter or click runs, Tab steps the categories, Esc closes. The game runs on; the craft holds its heading"), // US-T126
+				L("Showcase tour", "every feature in turn, chapter by chapter (main menu, dev menu > Showcase, or sg.Tour): Right / N next, Left / B previous, S skip the chapter, Space pause, 1-9 a chapter, O also each stop at the other scale, Esc ends it where it is"), // US-T147
 				L("Esc", "pause menu (straight away at the helm): Resume, Help, Save / Load, Settings > Display (resolution, window mode, VSync), Main Menu, Quit"),
 				L("[", "galaxy map: every system, who holds it, gate traffic, war fronts, blockades and raiders, as far as the news goes; click a star to inspect, double-click to travel"),
 				L("U", "HUD panels and readouts on / off (the names and markers on the view stay)"),

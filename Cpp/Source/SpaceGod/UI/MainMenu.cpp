@@ -1,5 +1,6 @@
 #include "UI/MainMenu.h"
 
+#include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "UObject/WeakObjectPtrTemplates.h"
 
@@ -214,7 +215,7 @@ namespace SpaceGod::UI
 
 	void MainMenu::DrawMain()
 	{
-		const float w = 380, h = 516;
+		const float w = 380, h = 564;
 		auto r = Centred(w, h);
 		GUI::Label(Rect(r.x, r.y - 70, w, 48), "UNITYSPACE", heading);
 		GUI::Box(r, GUIContent::none(), panel);
@@ -239,7 +240,9 @@ namespace SpaceGod::UI
 		float half = (bw - 10) * 0.5f;
 		if (GUI::Button(Rect(r.x + 20, y + 336, half, 38), "Dogfight Demo", button)) GameLaunch::DogfightDemo(false);
 		if (GUI::Button(Rect(r.x + 30 + half, y + 336, half, 38), "Dogfight (Heavy)", button)) GameLaunch::DogfightDemo(true);
-		if (GUI::Button(Rect(r.x + 20, y + 384, bw, 38), "Quit", button)) Quit();
+		// US-T147: a new game straight into the showcase tour, every feature in turn (sg.Tour waits for the game it starts).
+		if (GUI::Button(Rect(r.x + 20, y + 384, bw, 38), "Showcase Tour", button) && GEngine) GEngine->Exec(nullptr, TEXT("sg.Tour"));
+		if (GUI::Button(Rect(r.x + 20, y + 432, bw, 38), "Quit", button)) Quit();
 	}
 
 	void MainMenu::DrawLoad()

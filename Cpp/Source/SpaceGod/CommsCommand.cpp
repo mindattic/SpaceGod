@@ -6,6 +6,7 @@
 
 #include "GameLaunch.h"
 #include "SpaceGodLog.h"
+#include "Tour/ShowcaseTour.h"
 #include "UnitySpaceAppActor.h"
 
 #include "Containers/Ticker.h"
@@ -16,6 +17,7 @@
 #include "UnrealClient.h"
 
 #include <memory>
+#include <stdexcept>
 
 namespace
 {
@@ -95,4 +97,32 @@ namespace
 		TEXT("sg.Comms"),
 		TEXT("US-T137: take a helm with ships near it, open comms, hail the nearest and ask about the area: sg.Comms [shot <file>] [quit]."),
 		FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& args) { CommsStart(args); }));
+
+	/// US-T147: the showcase tour's stop, set up by sg.Comms's own showcase steps.
+	SpaceGod::Tour::TourRegistration GCommsTourStop([]
+	{
+		auto hailed = std::make_shared<bool>(false);
+		SpaceGod::Tour::TourRegistry::Add(SpaceGod::Tour::TourStop::Make("Embodiment", "comms-hail", "Hailing a ship",
+			"Shift+H at any controls: pick who to hail, then what to say; the answers come from the simulation as it stands, the pilot's own name and story too")
+			.At(30)
+			.WithSetup([hailed](SpaceGod::UnitySpaceApp& app)
+			{
+				*hailed = false;
+				cs::String failed;
+				app.CommsShowcase(0, failed);
+				return failed;
+			})
+			.Until([hailed](SpaceGod::UnitySpaceApp& app, double t)
+			{
+				if (t < 3) return false;
+				if (!*hailed)
+				{
+					*hailed = true;
+					cs::String failed;
+					if (!app.CommsShowcase(1, failed)) throw std::runtime_error(failed.c_str());
+				}
+				return t > 5;
+			}, 20)
+			.For(10));
+	});
 }

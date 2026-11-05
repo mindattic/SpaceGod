@@ -650,6 +650,14 @@ namespace SpaceGod::Core
 				  "Up and Down pick, Enter or a click runs, Right opens a submenu, Left backs out, Tab steps the categories, "
 				  "Esc closes. While it is open it has the keys and the mouse; the game runs on and the craft holds its "
 				  "heading. The console's sg.Cheat runs any entry by its path."),
+				T("The showcase tour", // US-T147
+				  "One guided run through every feature, so nothing has to be launched as a demo of its own: Showcase Tour on "
+				  "the main menu, the dev menu's Showcase category, or sg.Tour in the console. It plays in chapters (Flight and "
+				  "combat, Embodiment, Places, Threats, Presentation, Ships, Travel), each stop set up for you (the trip, the "
+				  "helm, the fight, the scale) with a line at the bottom saying what to look at. Right or N goes on, Left or B "
+				  "back, S skips the rest of the chapter, Space pauses, 1 to 9 jump to a chapter, O shows every stop again at "
+				  "the other scale, and Esc ends it, leaving the game as the stop left it. sg.Tour auto shots <folder> plays it "
+				  "unattended and screenshots every stop, then writes a contact sheet."),
 				T("Saving",
 				  "The whole simulation saves and resumes exactly where it was. F5 quicksaves and F8 loads it; F6 opens the "
 				  "save slots, where you can make as many saves as you like. The game autosaves every five minutes and on "

@@ -28,6 +28,7 @@
 #include "Coop/CoopPeer.h"
 #include "GameLaunch.h"
 #include "SpaceGodLog.h"
+#include "Tour/ShowcaseTour.h"
 #include "UnitySpaceAppActor.h"
 #include "HAL/IConsoleManager.h"
 
@@ -59,6 +60,20 @@ namespace
 			}
 			app->StartDogfightDemo(heavy, kit);
 		}));
+
+	/// US-T147: the dogfight demo's showcase tour stops, a light fighter's and a heavy fighter's.
+	SpaceGod::Tour::TourRegistration GDogfightTourStops([]
+	{
+		using SpaceGod::Tour::TourRegistry;
+		using SpaceGod::Tour::TourStop;
+		auto atHelm = [](SpaceGod::UnitySpaceApp& app, double t) { return app.IsPiloting() && t > 4; };
+		TourRegistry::Add(TourStop::Make("Flight and combat", "dogfight-cockpit", "Dogfight from the helm",
+			"A light fighter against four pirates: the lead reticle on the target ahead, and arrows at the screen's edge pointing to the rest")
+			.At(10).WithSetup([](SpaceGod::UnitySpaceApp& app) { app.StartDogfightDemo(false); return cs::String(); }).Until(atHelm, 30).For(10).AtBothScales());
+		TourRegistry::Add(TourStop::Make("Flight and combat", "dogfight-heavy", "Heavy fighter",
+			"The same fight at a heavy fighter's helm with the full arsenal: slower to turn, harder hitting, vulcans and hive missiles")
+			.At(20).WithSetup([](SpaceGod::UnitySpaceApp& app) { app.StartDogfightDemo(true, "arsenal"); return cs::String(); }).Until(atHelm, 30).For(10));
+	});
 }
 
 namespace SpaceGod

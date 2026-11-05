@@ -14,6 +14,7 @@
 #include "Systems/Biomes.h"
 #include "Systems/Galaxy.h"
 #include "Target.h"
+#include "Tour/ShowcaseTour.h"
 #include "UnitySpaceAppActor.h"
 #include "Views/BodyView.h"
 #include "World.h"
@@ -122,6 +123,77 @@ namespace
 		return nullptr;
 	}
 
+	/// The view turned to the painted sky's bright heart, with the ship (or the star) off-centre in front of it.
+	void FaceSkyHeart(SpaceGod::UnitySpaceApp& app, const cs::Ref<StarSystem>& system, const cs::Ref<Ship>& ship)
+	{
+		auto layout = SpaceGod::Rendering::SystemSkyBake::Layout(Biomes::For(system->Name));
+		Vector3 heart = SpaceGod::Views::BodyView::ToUnity(DVec3(layout.Heart.X, layout.Heart.Y, layout.Heart.Z));
+		DVec3 dir(heart.x, heart.y, heart.z);
+		DVec3 subject = ship ? app.ShipScene(ship) : app.BodyScene(0);
+		double d = (app.SpaceCamera->ScenePosition - subject).Length();
+		Vector3 sideU = Vector3::Cross(Vector3::up(), heart).normalized();
+		DVec3 side(sideU.x, sideU.y, sideU.z);
+		app.SpaceCamera->ExitFocus();
+		app.SpaceCamera->SetPose(subject - dir * d + side * (d * 0.35) + DVec3(0, d * 0.15, 0), Quaternion::LookRotation(heart, Vector3::up()));
+	}
+
+	/// US-T147: the showcase tour's stops, one per biome: the nearest system of it, a ship in frame, the view on its sky's heart.
+	SpaceGod::Tour::TourRegistration GSkyboxTourStops([]
+	{
+		using SpaceGod::Tour::TourStop;
+		for (int k = 1; k < static_cast<int>(BiomeKind::Count); k++)
+		{
+			auto kind = static_cast<BiomeKind>(k);
+			cs::String biome = Biomes::ToString(kind);
+			auto system = std::make_shared<cs::Ref<StarSystem>>();
+			auto ship = std::make_shared<cs::Ref<Ship>>();
+			auto focusedOn = std::make_shared<cs::Ref<StarSystem>>();
+			SpaceGod::Tour::TourRegistry::Add(TourStop::Make("Places", cs::Cat("sky-", cs::Strings::ToLowerInvariant(biome)), cs::Cat("Biome sky: ", biome),
+				"Every system beyond Sol is painted into its biome's sky: its nebula, star clouds and colour, here with a ship in front of it")
+				.At(10).In(cs::String())
+				.WithSetup([kind, system, focusedOn](SpaceGod::UnitySpaceApp& app) -> cs::String
+				{
+					*system = nullptr;
+					*focusedOn = nullptr;
+					auto here = app.ActiveSystem != nullptr ? app.ActiveSystem->PositionLy : DVec3::Zero;
+					double best = cs::Double::PositiveInfinity;
+					cs::String name;
+					for (const auto& s : app.Galaxy->Systems)
+					{
+						if (!SpaceGod::Rendering::SystemSkies::IsWild(s->Name) || Biomes::KindOf(s->Name) != kind) continue;
+						double d = (s->PositionLy - here).LengthSquared();
+						if (d < best) { best = d; name = s->Name; }
+					}
+					if (name.empty()) return "no system of this biome near enough";
+					SpaceGod::Rendering::SystemSkies::Prefetch(name);
+					*system = app.Galaxy->Realize(name, app.Clock->Jd);
+					if (*system == nullptr) return "the system could not be built";
+					if (app.ActiveSystem != *system) app.TravelTo(*system);
+					return cs::String();
+				})
+				.Until([system, ship, focusedOn](SpaceGod::UnitySpaceApp& app, double t)
+				{
+					if (app.ActiveSystem != *system || app.Travel->Active)
+					{
+						if (!app.Travel->Active && t > 5) app.TravelTo(*system);
+						return false;
+					}
+					if (*focusedOn != *system)
+					{
+						*focusedOn = *system;
+						*ship = AShip(app);
+						app.SpaceCamera->FocusOn(*ship ? SpaceGod::Target::OfShip(*ship) : SpaceGod::Target::OfBody(0), *ship ? 3.0 : 40.0);
+					}
+					return t > 4 && SpaceGod::Rendering::SystemSkies::IsReady((*system)->Name);
+				}, 120)
+				.WithCamera([system, ship](SpaceGod::UnitySpaceApp& app, double t)
+				{
+					if (t == 0 && *system != nullptr) FaceSkyHeart(app, *system, *ship);
+				})
+				.For(7));
+		}
+	});
+
 	void Start(const TArray<FString>& args)
 	{
 		int count = 4;
@@ -184,16 +256,7 @@ namespace
 			run->steps.push_back({ TEXT("turned toward the sky's heart"), [system, ship](SpaceGod::UnitySpaceApp& app, double)
 			{
 				if (*system == nullptr) return true;
-				// The view turned to the sky's bright heart, with the ship (or the star) off-centre in front of it.
-				auto layout = SpaceGod::Rendering::SystemSkyBake::Layout(Biomes::For((*system)->Name));
-				Vector3 heart = SpaceGod::Views::BodyView::ToUnity(DVec3(layout.Heart.X, layout.Heart.Y, layout.Heart.Z));
-				DVec3 dir(heart.x, heart.y, heart.z);
-				DVec3 subject = *ship ? app.ShipScene(*ship) : app.BodyScene(0);
-				double d = (app.SpaceCamera->ScenePosition - subject).Length();
-				Vector3 sideU = Vector3::Cross(Vector3::up(), heart).normalized();
-				DVec3 side(sideU.x, sideU.y, sideU.z);
-				app.SpaceCamera->ExitFocus();
-				app.SpaceCamera->SetPose(subject - dir * d + side * (d * 0.35) + DVec3(0, d * 0.15, 0), Quaternion::LookRotation(heart, Vector3::up()));
+				FaceSkyHeart(app, *system, *ship);
 				return true;
 			} });
 			run->steps.push_back({ TEXT("held"), wait(0.4) });

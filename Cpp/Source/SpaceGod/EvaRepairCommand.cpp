@@ -19,6 +19,7 @@
 #include "SimClock.h"
 #include "SpaceGodLog.h"
 #include "Target.h"
+#include "Tour/ShowcaseTour.h"
 #include "UnitySpaceAppActor.h"
 #include "World.h"
 
@@ -249,4 +250,12 @@ namespace
 		TEXT("US-T135: out on a capital ship's hull as an EVA repair worker at a damaged shield generator: sg.EvaRepair [game|real]; "
 			"sg.EvaRepair shots <dir> [quit] screenshots it at both scales."),
 		FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& args) { Start(args); }));
+
+	/// US-T147: the showcase tour's stop, set up by this command.
+	SpaceGod::Tour::TourRegistration GEvaRepairTourStop([]
+	{
+		SpaceGod::Tour::TourRegistry::Add(SpaceGod::Tour::TourStop::Console("Embodiment", "eva-repair", "EVA repair worker",
+			"Out on a battleship's hull mid-fight as one of its repair crew, welding a damaged shield generator: keep the weld in the green", "sg.EvaRepair game")
+			.At(20).Until([](SpaceGod::UnitySpaceApp& app, double t) { return HeldWorker(app) != nullptr && t > 4; }, 40).For(9).AtBothScales());
+	});
 }

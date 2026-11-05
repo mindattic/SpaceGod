@@ -133,6 +133,11 @@ namespace SpaceGod
 
 		static Routine Wait(float seconds);
 
+		/// Spawns <paramref name="classes"/> for each side parked near <paramref name="body"/>, already hostile, and starts the
+		/// fight at once (the combat showcase's; public for the showcase tour's stops, US-T147). Null if no battle started.
+		static cs::Ref<Core::Battle> TriggerSkirmish(UnitySpaceApp& app, int body, const cs::Ref<Core::Faction>& aggressor,
+			const cs::Ref<Core::Faction>& defender, const cs::List<Core::ShipClass>& classes);
+
 	private:
 		// ---------------------------------------------------------------- what is in orbit
 		static Routine InfrastructureTour(UnitySpaceApp& app, StopFunc stop);
@@ -145,8 +150,6 @@ namespace SpaceGod
 		static Routine BroadsideShowcase(UnitySpaceApp& app, StopFunc stop);
 		static Routine DogfightShowcase(UnitySpaceApp& app, StopFunc stop, cs::String bodyName, cs::Ref<Core::Faction> aggressor,
 			cs::Ref<Core::Faction> defender, Core::ShipClass cls, cs::String stopId);
-		static cs::Ref<Core::Battle> TriggerSkirmish(UnitySpaceApp& app, int body, const cs::Ref<Core::Faction>& aggressor,
-			const cs::Ref<Core::Faction>& defender, const cs::List<Core::ShipClass>& classes);
 		// ---------------------------------------------------------------- surfaces, weather, asteroids
 		static Routine SurfaceTour(UnitySpaceApp& app, StopFunc stop);
 

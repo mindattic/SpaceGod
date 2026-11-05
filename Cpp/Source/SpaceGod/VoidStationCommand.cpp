@@ -10,6 +10,7 @@
 #include "Systems/Galaxy.h"
 #include "Systems/VoidStations.h"
 #include "Target.h"
+#include "Tour/ShowcaseTour.h"
 #include "UnitySpaceAppActor.h"
 
 #include "Containers/Ticker.h"
@@ -198,4 +199,15 @@ namespace
 		TEXT("US-T84: travel to a void station and focus it: sg.VoidStation [n] [game|real] [radii=R]; "
 			"sg.VoidStation [n] shots <dir> [quit] screenshots it at both scales."),
 		FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& args) { Start(args); }));
+
+	/// US-T147: the showcase tour's stop, set up by this command (the trip, the scale, the generator in view).
+	SpaceGod::Tour::TourRegistration GVoidStationTourStop([]
+	{
+		SpaceGod::Tour::TourRegistry::Add(SpaceGod::Tour::TourStop::Console("Places", "void-station", "Void station",
+			"A relay out in the dark between the stars: its gravity generator and tiny suns, the asteroid drift, the shattered planetoid, a sight worth the detour",
+			"sg.VoidStation 1 game")
+			.At(20).In(cs::String())
+			.Until([](SpaceGod::UnitySpaceApp& app, double t) { return app.ActiveSystem != nullptr && app.ActiveSystem->IsVoidBase && !app.Travel->Active && t > 9; }, 120)
+			.For(8).AtBothScales());
+	});
 }

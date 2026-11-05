@@ -7,6 +7,7 @@
 #include "SimClock.h"
 #include "SpaceGodLog.h"
 #include "Target.h"
+#include "Tour/ShowcaseTour.h"
 #include "UnitySpaceAppActor.h"
 
 #include "BodyCatalog.h"
@@ -14,6 +15,7 @@
 #include "Fleet.h"
 #include "ScaleModel.h"
 #include "Ships.h"
+#include "Systems/JumpGate.h"
 #include "World.h"
 
 #include "Containers/Ticker.h"
@@ -137,6 +139,73 @@ namespace
 		g->GoalGate = g->GoalBody = -1;
 		return g;
 	}
+
+	/// <summary>US-T147: a showcase tour stop: a big globule set down beside <paramref name="where"/>'s guns (a world's, or a jump
+	/// gate's), held whole while it is shown, the camera on it with what is firing behind.</summary>
+	SpaceGod::Tour::TourStop GunsStop(const cs::String& id, const cs::String& title, const cs::String& caption, bool gate)
+	{
+		auto globule = std::make_shared<cs::Ref<BioGlobule>>();
+		auto frame = std::make_shared<int>(0);
+		return SpaceGod::Tour::TourStop::Make("Threats", id, title, caption)
+			.WithSetup([globule, frame, gate](SpaceGod::UnitySpaceApp& app) -> cs::String
+			{
+				auto world = app.World();
+				double jd = app.Clock->Jd;
+				auto bio = world->EnsureBioMass(jd);
+				DVec3 anchor;
+				int body = 0;
+				if (gate)
+				{
+					if (world->Gates.Count() == 0) return "no jump gate in this system";
+					auto g = world->Gates[0];
+					// Just outside the gate's guns' reach, creeping in on it.
+					anchor = g->PositionKm + DVec3(1, 0.3, 0.2).Normalized() * (BioMass::GateGunRangeKm * 0.6);
+				}
+				else
+				{
+					auto earth = (*app.Catalog())["Earth"];
+					if (earth == nullptr) return "no Earth here";
+					body = earth->Index;
+					DVec3 outward;
+					app.BodyStandoffKm(body, outward);
+					anchor = outward * (earth->RadiusKm + BioMass::BodyGunReachKm * 0.4);
+				}
+				*frame = body;
+				*globule = bio->Spawn(body, anchor, DVec3::Zero, 8e5, jd);
+				(*globule)->GoalBody = -1;
+				(*globule)->GoalGate = gate ? 0 : -1;
+				app.Clock->WarpIndex = 0; // real time, so the guns' work can be watched
+				return cs::String();
+			})
+			.Until([](SpaceGod::UnitySpaceApp&, double t) { return t > 1; })
+			.WithCamera([globule, frame](SpaceGod::UnitySpaceApp& app, double)
+			{
+				auto g = *globule;
+				if (g == nullptr || app.World()->BioMass == nullptr) return;
+				g->Hp = g->MaxHp(); // held whole while it is shown
+				double jd = app.Clock->Jd;
+				DVec3 scene = app.Scale()->MapNear(app.Ephemeris(), app.BodyScenes(), *frame, app.World()->BioMass->Helio(g, jd));
+				double r = std::max(g->RadiusKm() * app.BattleKmScale(), app.Scale()->ShipLength(g->RadiusKm()));
+				// From beyond it, looking back past it at the world or the gate that is firing.
+				DVec3 from = (scene - app.BodyScene(*frame));
+				from = from.LengthSquared() > 1e-12 ? from.Normalized() : DVec3::UnitX;
+				DVec3 side = DVec3::Cross(from, DVec3::UnitY);
+				side = side.LengthSquared() > 1e-12 ? side.Normalized() : DVec3::UnitZ;
+				DVec3 eye = scene + (from * 0.8 + side * 0.5 + DVec3(0, 0.3, 0)).Normalized() * (r * 9);
+				auto look = (scene - eye).Normalized();
+				if (!app.SpaceCamera->FocusTarget.IsNone()) app.SpaceCamera->ExitFocus();
+				app.SpaceCamera->SetPose(eye, SpaceGod::Quaternion::LookRotation(SpaceGod::Vector3(static_cast<float>(look.X), static_cast<float>(look.Y), static_cast<float>(look.Z)), SpaceGod::Vector3::up()));
+			})
+			.For(9).AtBothScales();
+	}
+
+	SpaceGod::Tour::TourRegistration GBioMassTourStops([]
+	{
+		SpaceGod::Tour::TourRegistry::Add(GunsStop("biomass-planet-guns", "Bio Mass under a world's guns",
+			"A globule of living meat drifting in on Earth: the planet's embedded batteries and gun satellites open up on it", false).At(10));
+		SpaceGod::Tour::TourRegistry::Add(GunsStop("biomass-gate-guns", "Bio Mass at a jump gate",
+			"Creeping in on a jump gate to spread to the next system: the gate's guns and forts fire on it", true).At(20));
+	});
 
 	void Start(const TArray<FString>& args)
 	{
