@@ -45,6 +45,9 @@ namespace SpaceGod::Views
 		/// screen's height), and given up again below the second, so it does not flicker at the edge.</summary>
 		constexpr float NearDetailOn = 0.05f;
 		constexpr float NearDetailOff = 0.035f;
+
+		/// <summary>US-T150: how much of a Void Base Ember's drawn radius it keeps (a lamp beside the station, not a sun).</summary>
+		constexpr float EmberScale = 0.3f;
 	}
 
 	cs::Ref<Mesh>& BodyView::sphereMesh()
@@ -218,6 +221,10 @@ namespace SpaceGod::Views
 	{
 		auto t = Root->transform;
 		t->localPosition = relative;
+		// US-T150: a Void Base's Ember (VoidBaseBuilder's tiny sun, Gm 1e-9) is a lamp, not a sun: drawn at a fraction of the
+		// game layer's inflated star radius, so the station it rings stays the thing in view.
+		bool ember = Body->IsStar() && !Body->Singularity && Body->Gm < 1e-6;
+		if (ember) radius *= EmberScale;
 		t->localScale = Vector3::one() * radius;
 		if (station)
 		{
@@ -252,7 +259,9 @@ namespace SpaceGod::Views
 			// Corona: at least ~4% of the view so the Sun reads as a star from anywhere in the system;
 			// dimmer stars (K and M dwarfs) a little less.
 			float presence = Mathf::Clamp(Mathf::Pow(static_cast<float>(Body->LuminositySolar), 0.12f), 0.45f, 1.1f);
-			float size = Mathf::Max(radius * 7.0f, distance * 0.07f * presence * CoronaPresence) * (1 + flare * 0.8f);
+			// An Ember's corona is a tight halo of its own size, with no floor in view size (that floor keeps a real sun reading
+			// as a star from across its system, and blew an Ember up into a second sun).
+			float size = ember ? radius * 2.6f : Mathf::Max(radius * 7.0f, distance * 0.07f * presence * CoronaPresence) * (1 + flare * 0.8f);
 			Vector3 toCamera = distance > 0 ? -relative / distance : -cameraForward;
 			glow->localPosition = relative + toCamera * Mathf::Min(radius * 1.05f, distance * 0.5f);
 			glow->localRotation = Quaternion::LookRotation(-toCamera, Vector3::up());
