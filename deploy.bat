@@ -1,13 +1,13 @@
 @echo off
-rem Desktop shortcut target ("SpaceGod - Unreal C++"). Asks first: 1) Deploy & Run pulls latest, packages even when
-rem nothing changed (-Force), publishes to C:\Apps\SpaceGod.Unreal.Cpp, refreshes the shortcut and launches it
+rem Desktop shortcut target ("SpaceGod"). Asks first: 1) Deploy & Run pulls latest, packages even when
+rem nothing changed (-Force), publishes to C:\Apps\SpaceGod, refreshes the shortcut and launches it
 rem (run.ps1 does the work); 2) Run starts the published copy without deploying (deploying first if there is none).
 rem "deploy.bat --deploy [flags]" skips the menu and deploys without -Force (the /deploy hook); any other arguments
 rem pass through to run.ps1 when deploying.
 setlocal
-title SpaceGod - Unreal C++
-set "APP=C:\Apps\SpaceGod.Unreal.Cpp"
-set "EXE=%APP%\SpaceGod.Unreal.Cpp.exe"
+title SpaceGod
+set "APP=C:\Apps\SpaceGod"
+set "EXE=%APP%\SpaceGod.exe"
 set "FORCE=-Force"
 set "ARGS=%*"
 if /i not "%~1"=="--deploy" goto menu
@@ -22,7 +22,7 @@ goto collect
 
 :menu
 echo.
-echo   SpaceGod - Unreal C++
+echo   SpaceGod
 echo     1^) Deploy ^& Run
 echo     2^) Run
 echo.
@@ -43,7 +43,7 @@ exit /b 0
 :run
 if not exist "%EXE%" (
     echo.
-    echo   SpaceGod - Unreal C++ is not deployed yet ^(%EXE% is missing^) - deploying first.
+    echo   SpaceGod is not deployed yet ^(%EXE% is missing^) - deploying first.
     set "FORCE="
     goto deploy
 )

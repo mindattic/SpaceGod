@@ -2,14 +2,14 @@
 <#
 .SYNOPSIS
     Pulls the latest commit, packages the C++ game (Unreal Engine 5.8, Shipping) and publishes a standalone copy
-    to C:\Apps\SpaceGod.Unreal.Cpp\, then refreshes the Desktop shortcut "SpaceGod – Unreal C++".
+    to C:\Apps\SpaceGod\, then refreshes the Desktop shortcut "SpaceGod".
 
 .DESCRIPTION
     1. git pull --rebase --autostash (skipped with -NoPull; a failed pull deploys the commit checked out).
     2. Skips the rest when the deployed commit already matches every game source (Cpp, Shared, Capture, Vendor; -Force rebuilds).
     3. Stops any running copy of the game.
-    4. tools\package.ps1 -Configuration Shipping -> Builds\Cpp\Windows\SpaceGod.Unreal.Cpp.exe.
-    5. Copies Builds\Cpp\Windows\* -> C:\Apps\SpaceGod.Unreal.Cpp\ and records the commit.
+    4. tools\package.ps1 -Configuration Shipping -> Builds\Cpp\Windows\SpaceGod.exe.
+    5. Copies Builds\Cpp\Windows\* -> C:\Apps\SpaceGod\ and records the commit.
     6. Refreshes the Desktop shortcut (target: deploy.bat in this repo, icon: the published exe).
 
 .PARAMETER Launch
@@ -37,15 +37,14 @@ param([switch]$Launch, [switch]$Force, [switch]$NoPull, [switch]$LauncherOnly, [
 $ErrorActionPreference = 'Stop'
 
 $repoDir   = $PSScriptRoot
-$out       = 'C:\Apps\SpaceGod.Unreal.Cpp'
-$exeName   = 'SpaceGod.Unreal.Cpp.exe'
+$out       = 'C:\Apps\SpaceGod'
+$exeName   = 'SpaceGod.exe'
 $buildDir  = Join-Path $repoDir 'Builds\Cpp\Windows'
 $shortcutBat = Join-Path $repoDir 'run.bat'   # the Desktop shortcut's target: 1) Deploy or 2) Deploy & Run (US-T73)
 $marker    = Join-Path $out '.deploy-commit'
 # US-T74: every launch records (docs/CAPTURE.md); hq, as lossless video falls behind on this machine.
 $captureArgs = @('-capture', 'video', 'hq')
-# "SpaceGod – Unreal C++" (en dash), spelled with [char] so this file reads the same in any code page.
-$title     = "SpaceGod $([char]0x2013) Unreal C++"
+$title     = 'SpaceGod'
 
 # GetFolderPath, not $HOME\Desktop: OneDrive may have moved the Desktop folder.
 function Set-Shortcut([string]$exe) {

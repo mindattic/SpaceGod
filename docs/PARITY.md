@@ -1,10 +1,10 @@
 # Parity with SpaceGod.Unity.CSharp (US-T70)
 
-SpaceGod.Unreal.Cpp is meant to be the same game as SpaceGod.Unity.CSharp, the reference, and
+SpaceGod is meant to be the same game as SpaceGod.Unity.CSharp, the reference, and
 SpaceGod.Unreal.CSharp, so that any one of the three can be frozen and the others archived. The
 simulation (`Cpp/Source/SpaceGodCore`, from Unity's `Assets/UnitySpace/Core`) is proven by the
 Bench: the five scenario digests are byte-identical in all three repos. This page covers the layer
-above it, from Unity's `Assets/UnitySpace/Runtime/` (72 files) to `Cpp/Source/UnrealSpaceGod/` (the
+above it, from Unity's `Assets/UnitySpace/Runtime/` (72 files) to `Cpp/Source/SpaceGod/` (the
 same files, file for file, plus the `UnityCompat` shims and the Unreal `Game/` and `Smoke/` glue).
 The audit was run on 2026-11-04 against SpaceGod.Unity.CSharp `7c81c68`.
 
@@ -136,8 +136,8 @@ entries a C# save carries.
 - **Bench:** sol-idle and high-warp re-checked identical. These changes leave the Core untouched, and the 5 digests
   were identical at `ad93e37`.
 - **Still to do:** the Shipping package, its co-op smoke and the `run.ps1 -Force` redeploy. The machine's low-memory
-  guard stopped that run on 2026-11-04. `C:\Apps\SpaceGod.Unreal.Cpp` still holds `ad93e37`; its window title reads
-  "SpaceGod - Unreal C++". Writing C# delegate names from C++ would add nothing a load uses.
+  guard stopped that run on 2026-11-04. `C:\Apps\SpaceGod` still holds `ad93e37`; its window title reads
+  "SpaceGod". Writing C# delegate names from C++ would add nothing a load uses.
 
 ## Recording through MindAttic.Capture (US-T72)
 
@@ -170,4 +170,4 @@ Notes on the demo run:
   recording 2:16 in, as designed, and the later tour shots were skipped. `hq` avoids that.
 - The smoke's `hail` comes from the client, so only the client raises it (section 3: the peer whose player hailed).
 - `run.ps1 -Force` (the C:\Apps republish) was stopped by the machine's low-memory guard on 2026-11-04;
-  C:\Apps\SpaceGod.Unreal.Cpp still holds `f2daceb`. The next Deploy & Run publishes this.
+  C:\Apps\SpaceGod still holds `f2daceb`. The next Deploy & Run publishes this.

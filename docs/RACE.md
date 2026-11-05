@@ -1,5 +1,8 @@
 # The race: C++ against C# (US-T46)
 
+> **Concluded (US-T69):** the recommendation below was followed. The C++ track was promoted to this repo, `SpaceGod`;
+> the C# and original-Unity copies are kept archived, unchanged, as the losing candidates.
+
 Unreal.SpaceGod is Unity.SpaceGod remade in Unreal Engine 5.8 twice (docs/MIGRATION.md):
 
 - **C++** (`Cpp/`): the original's Core translated file for file into C++20 and kept bit-identical to it, the Runtime
@@ -505,7 +508,7 @@ were running an Unreal game and test suites for part of the evening, which is no
 
 | Step | C++ | C# | Rest of machine |
 |---|---|---|---|
-| Clean build, Development editor target (all modules, from an empty Intermediate) | **355 s** (329 actions: SpaceGodCore + UnrealSpaceGod + plugin) | **293 s** (245 actions: UnrealSharp's C++ + glue, then the managed publish) | 3–5% |
+| Clean build, Development editor target (all modules, from an empty Intermediate) | **355 s** (329 actions: SpaceGodCore + SpaceGod + plugin) | **293 s** (245 actions: UnrealSharp's C++ + glue, then the managed publish) | 3–5% |
 | Build with nothing changed | **1.7 s** | **149 s** (UHT 133 s: UnrealSharp's glue generator found the engine glue changed and rebuilt its C# bindings) | 2–5% |
 | One Core file touched (`Fleet.cpp` / the original's `Fleet.cs`) | **7.8 s** (compile + relink SpaceGodCore) | **8.1 s** (managed rebuild, `BuildUserSolution`) | 2–5% |
 | One Runtime file touched (`UnitySpaceApp.Hauler.cpp` / `.cs`) | **11.6 s** | **4.9 s** (managed rebuild) | 3–8% |
@@ -594,7 +597,7 @@ stops updating the rest of the frame.
 
 - **Translation volume.** The original's 184 Core files (67,469 non-blank lines of C#) became 407 C++ files and 96,191
   lines (1.43×; headers and the `Cs/` compatibility runtime, 2,865 lines, account for most of the growth). The 61 Runtime
-  files (21,028 lines) became the 40,948-line `UnrealSpaceGod` module, which also holds the Unity facade (6,993 lines),
+  files (21,028 lines) became the 40,948-line `SpaceGod` module, which also holds the Unity facade (6,993 lines),
   co-op (2,322) and the checks.
 - **Rules the translation needed** (docs/MIGRATION.md, "The C++ Core: translation rules" and "Integration decisions"):
   C#'s left-to-right evaluation order kept by hoisting side-effecting operands into locals; .NET's Dictionary

@@ -8,7 +8,7 @@ param(
 
 <#
 .SYNOPSIS
-Build the game's editor target (Cpp/UnrealSpaceGod.uproject) with UnrealBuildTool (no editor needed). Close any
+Build the game's editor target (Cpp/SpaceGod.uproject) with UnrealBuildTool (no editor needed). Close any
 editor holding the project first: UBT refuses while Live Coding is active. MaxParallelActions is kept low so the
 build leaves memory free; -WaitMutex queues this build behind any other UE build running on the machine.
 #>

@@ -7,7 +7,7 @@
 //
 // Unity -> Unreal conventions (see README.md):
 //  - Axes. Unity is left-handed Y-up, Unreal left-handed Z-up. The tracks map ecliptic (x, y, z) to Unity (x, z, y)
-//    and to Unreal (x, -y, z) (Cpp/Source/UnrealSpaceGod/Game/SolSystem.cpp), so Unity (x, y, z) == Unreal (x, -z, y):
+//    and to Unreal (x, -y, z) (Cpp/Source/SpaceGod/Game/SolSystem.cpp), so Unity (x, y, z) == Unreal (x, -z, y):
 //    a proper rotation. Dot products, lengths and cross products need nothing; only code that names an object-space
 //    axis (the pole, a triplanar projection, the noise lattice) converts with SG_UnityFromUnreal first.
 //  - Texture V. Unity's v = 0 is the bottom row of an image, Unreal's V = 0 the top row: meshes carry V = 1 - v, and a

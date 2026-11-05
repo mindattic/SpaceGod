@@ -8,7 +8,7 @@ committed. It needs the original Unity player, which is not part of this repo; p
 
 Writes:
   * CSharp/Script/ManagedUnrealSpaceGodCSharp/UnityCompat/Imgui/BuiltinSkin.cs and
-    Cpp/Source/UnrealSpaceGod/UnityCompat/UnityBuiltinSkin.inl: Unity's runtime default skin (GUI.skin, the
+    Cpp/Source/SpaceGod/UnityCompat/UnityBuiltinSkin.inl: Unity's runtime default skin (GUI.skin, the
     "GameSkin" in Resources/unity default resources): every style's states (background texture, text colour),
     border, margin, padding, overflow, alignment, wrapping, clipping, image position, offsets, fixed sizes, and the
     skin's textures pixel for pixel (RGBA, bilinear, sRGB, as Unity keeps them).
@@ -29,7 +29,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
     os.path.dirname(REPO), "Unity.SpaceGod", "Builds", "Windows", "Unity.SpaceGod_Data")
 CS_OUT = os.path.join(REPO, "CSharp", "Script", "ManagedUnrealSpaceGodCSharp", "UnityCompat", "Imgui", "BuiltinSkin.cs")
-CPP_OUT = os.path.join(REPO, "Cpp", "Source", "UnrealSpaceGod", "UnityCompat", "UnityBuiltinSkin.inl")
+CPP_OUT = os.path.join(REPO, "Cpp", "Source", "SpaceGod", "UnityCompat", "UnityBuiltinSkin.inl")
 
 # GUISkin's serialized styles, in order (UnityEngine.GUISkin).
 STYLE_ORDER = ["box", "button", "toggle", "label", "textField", "textArea", "window", "horizontalSlider",

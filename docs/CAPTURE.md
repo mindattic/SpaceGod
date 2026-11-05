@@ -4,7 +4,7 @@
 
 
 The one spec all three copies follow: SpaceGod.Unity.CSharp (the reference, written here first),
-SpaceGod.Unreal.CSharp and SpaceGod.Unreal.Cpp. A copy that differs from this file is wrong. Change it here first,
+SpaceGod.Unreal.CSharp and SpaceGod. A copy that differs from this file is wrong. Change it here first,
 then in the other two.
 
 Capture is a development tool for footage (trailers, devlogs, bug repro). It is **off unless `-capture` is literally
@@ -30,7 +30,7 @@ Anything after `-capture` that is not a capture word is left for the game, as Mi
 ## 2. Output
 
 - Root: `R:\MindAttic\Capture\{RepoName}\`. If `R:` is missing: `%USERPROFILE%\Videos\MindAttic\Capture\{RepoName}\`.
-- `{RepoName}` is the copy's own repo name: `SpaceGod.Unity.CSharp`, `SpaceGod.Unreal.CSharp`, `SpaceGod.Unreal.Cpp`,
+- `{RepoName}` is the copy's own repo name: `SpaceGod.Unity.CSharp`, `SpaceGod.Unreal.CSharp`, `SpaceGod`,
   so the three never write into one folder. Unity stamps it into `StreamingAssets/mindattic-capture-app.txt` at build time.
 - Per session, MindAttic.Capture's standard layout: the session video (`.mkv`, `.mp4`), every screenshot, clip and
   replay (`.png`, `.mp4`), a `.json` sidecar beside each file, `session.json` (the manifest, with every marker as a

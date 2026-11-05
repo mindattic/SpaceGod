@@ -5,7 +5,7 @@ once in C# — both **co-op**, then raced against each other to see whether eith
 
 | Track | Folder | Packaged exe | Core simulation | Engine side |
 |---|---|---|---|---|
-| C++ | `Cpp/` | `Unreal.SpaceGod.Cpp.exe` | `Cpp/Source/SpaceGodCore/`: Unity.SpaceGod's Core translated file-for-file to C++20 against `Cs/Cs.h` | `Cpp/Source/UnrealSpaceGod/`: UE C++ (rendering, HUD, input, camera, co-op) |
+| C++ | `Cpp/` | `Unreal.SpaceGod.Cpp.exe` | `Cpp/Source/SpaceGodCore/`: Unity.SpaceGod's Core translated file-for-file to C++20 against `Cs/Cs.h` | `Cpp/Source/SpaceGod/`: UE C++ (rendering, HUD, input, camera, co-op) |
 | C# | `CSharp/` | `Unreal.SpaceGod.CSharp.exe` | Unity.SpaceGod's own `Assets/UnitySpace/Core/**/*.cs`, compiled unchanged (as its `Tests/UnitySpace.Core` csproj does) | UnrealSharp (C# in UE5): the Runtime layer rewritten for Unreal in C# |
 | Bench | `Bench/` | `Bench.Cpp.exe`, `Bench.CSharp.exe` | Headless runners over the two Cores | Same scenarios, same seeds; compare state hashes and timings |
 
@@ -161,7 +161,7 @@ against the committed `expected.txt`, plus self-checks of List<bool>, Delegate, 
 Result: 0 mismatches. Regenerate `expected.txt` with `dotnet run -c Release --project
 Cpp/Source/SpaceGodCore/Tests/CsParity/DotNet > Cpp/Source/SpaceGodCore/Tests/CsParity/expected.txt`.
 
-**UE module while porting.** `SpaceGodCore` is a Runtime module in `UnrealSpaceGod.uproject` and a public
+**UE module while porting.** `SpaceGodCore` is a Runtime module in `SpaceGod.uproject` and a public
 dependency of the game module (C++20, exceptions, RTTI, no unity, no PCH so Core never sees Unreal macros,
 `/fp:precise`). `Module/SpaceGodCoreModule.cpp` is its one Unreal file. UBT has no per-module source filter, so
 `SpaceGodCore.Build.cs` keeps a `PortingAllowList` (`Module`, `Cs`, `Shared`): it points the module's source
@@ -384,7 +384,7 @@ single-threaded simulation, which is a large change and would need care for the 
 
 ## C++ Runtime: first compile and smoke (US-T38)
 
-`tools/build.ps1 -Track Cpp` builds the editor target with 0 errors and 0 warnings, the Runtime (`Cpp/Source/UnrealSpaceGod`:
+`tools/build.ps1 -Track Cpp` builds the editor target with 0 errors and 0 warnings, the Runtime (`Cpp/Source/SpaceGod`:
 app, camera, input, views, rendering facade, the IMGUI layer and every screen) included. What it took beyond include and
 namespace fixes:
 - **Non-unity module** (`bUseUnity = false`): the ported files keep file-local helpers as the C# files keep private members
@@ -959,7 +959,7 @@ co-op smoke: party trip (both peers), arrival: True
 The digest now also covers the helm (holder, hull, frame body, position, velocity, facing, tanks, hold, flight assist,
 the courses). Single-player is unchanged: every hook is the original's line when `CoopPeer.Current` is null. The C++ track mirrors all of it (US-T44, below).
 
-**The C++ track (US-T44).** `Cpp/Source/UnrealSpaceGod/Coop/` (`CoopWire`, `CoopPeer`, `SpaceCoopLink`, `CoopSmoke`) and
+**The C++ track (US-T44).** `Cpp/Source/SpaceGod/Coop/` (`CoopWire`, `CoopPeer`, `SpaceCoopLink`, `CoopSmoke`) and
 the app partial `UnitySpaceApp.Coop.{inl,cpp}` are the C# files member for member: the same frame record and message
 texts (`frame`, `hello`/`welcome`/`full`, `cmd`, `warp`/`pause`, `select`, `sync`/`chunk`/`ack`/`synced`, `digest`,
 `roster`/`pres`, `resync`, `bye`), the same CommandCodec lines with seat keys, the same digest text over the same fields
@@ -1038,7 +1038,7 @@ a fleet group as `<world>:<index in its fleet>`, a pact or a proposal by its pla
 by its place in `Deal.All`, a priority by its place in its `All` list, an amount as IEEE bits): `speak`, `production`,
 `build`, `research`, `objective`, `standdown`, `answer`, `breakpact`, `propose`, `gift`, `declare`, `hail`. Every peer
 does at that frame what the button does (`GalaxyMapScreen.CoopExecute`: the original's call, its toast the asker's).
-Code: `Runtime/UI/GalaxyMapScreen.Coop.cs` and `Cpp/Source/UnrealSpaceGod/UI/GalaxyMapScreen.Coop.cpp`, member for member;
+Code: `Runtime/UI/GalaxyMapScreen.Coop.cs` and `Cpp/Source/SpaceGod/UI/GalaxyMapScreen.Coop.cpp`, member for member;
 the ported screen changes only at lines marked `US-T47`, each the original's line in single-player.
 
 - **One speaker for the party.** `StrategicCommand.Player` (the polity the player commands and speaks for) is read
@@ -1124,7 +1124,7 @@ of a minute, and the client then has more than `MaxBacklog` frames waiting and a
 so the C++ peers also write their co-op lines to `-SpaceGodCoopLog=<file>`, which the smoke reads from a package. And
 a packaged client's camera went NaN on its first focus (the freighter then spawned at NaN, no fight, no cockpit, no
 trip), in Development and Shipping packages alike but never from the editor binaries: `cs::Double::IsNaN` was `v != v`,
-and `Cs.h` is compiled into `UnrealSpaceGod` too, which is not `/fp:precise`, where the packaged build's optimizer
+and `Cs.h` is compiled into `SpaceGod` too, which is not `/fp:precise`, where the packaged build's optimizer
 folded it to false, so `SpaceCamera::FocusOn` took `FocusSelected`'s NaN ("no framing given") for a framing. `IsNaNFast`
 now tests the bits, as `IsInfFast` and `IsFiniteFast` already did (the Core, `/fp:precise`, gets the same answers).
 

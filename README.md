@@ -1,20 +1,14 @@
-# SpaceGod.Unreal.Cpp
+# SpaceGod
 
 The real Sol system in Unreal Engine 5, played co-op, written in **C++**. The planets, dwarf planets, moons and
 asteroids sit where they really are for today's date, placed from JPL orbital elements, and you and your friends fly
 around them together on one shared clock.
 
-This is one of three self-contained copies of the same game (US-T69), each with every feature of the others:
-
-| Repo | Engine / language | Desktop shortcut |
-|---|---|---|
-| **SpaceGod.Unreal.Cpp** (this one) | Unreal Engine 5.8, C++ | `SpaceGod – Unreal C++` |
-| SpaceGod.Unreal.CSharp | Unreal Engine 5.8, C# (UnrealSharp) | `SpaceGod – Unreal C#` |
-| SpaceGod.Unity.CSharp | Unity, C# (the original) | `SpaceGod – Unity C#` |
-
-It was split out of `Unreal.SpaceGod` (its full history is kept here), where the game was ported twice from
-`Unity.SpaceGod` and the two ports raced (docs/RACE.md). Nothing here reads a sibling repo: a fresh clone builds and
-runs with only Unreal Engine 5.8 and Visual Studio's C++ tools.
+This repo was ported twice from `Unity.SpaceGod`, once in C++ and once in C# (UnrealSharp), and the two ports raced
+head to head (docs/RACE.md, US-T60/US-T69). The C++ track won on nearly every measure that mattered and was promoted
+to be the one `SpaceGod` project going forward; the C# and original-Unity copies are kept only as historical
+reference. Nothing here reads a sibling repo: a fresh clone builds and runs with only Unreal Engine 5.8 and Visual
+Studio's C++ tools.
 
 ## Deploy and play
 
@@ -22,7 +16,7 @@ runs with only Unreal Engine 5.8 and Visual Studio's C++ tools.
 |---|---|
 | `run.bat` | The Desktop shortcut's target. Asks **1) Deploy** (`run.ps1`) or **2) Deploy & Run** (`run.ps1 -Launch`); both repackage only when something changed. Arguments skip the menu (`run.bat -Force` deploys, rebuilding anyway, and plays). |
 | `deploy.bat` | Asks **1) Deploy & Run** (runs `run.ps1 -Launch -Force`) or **2) Run** (starts the published copy; deploys first if there is none). |
-| `run.ps1` | Non-interactive: `git pull`, package Shipping (`tools/package.ps1`), publish to `C:\Apps\SpaceGod.Unreal.Cpp\`, refresh the Desktop shortcut `SpaceGod – Unreal C++`. `-Launch` starts the game; `-Force` packages even when nothing changed; `-NoPull` skips the pull. |
+| `run.ps1` | Non-interactive: `git pull`, package Shipping (`tools/package.ps1`), publish to `C:\Apps\SpaceGod\`, refresh the Desktop shortcut `SpaceGod`. `-Launch` starts the game; `-Force` packages even when nothing changed; `-NoPull` skips the pull. |
 
 Every game these scripts start records: they pass `-capture video hq` (see Recording below).
 
@@ -47,12 +41,12 @@ Every game these scripts start records: they pass `-capture video hq` (see Recor
 ./tools/play.ps1                                    # a game window from the editor binaries
 ./tools/play.ps1 -Mode host                         # host on UDP 7777
 ./tools/play.ps1 -Mode join -Address 192.168.1.20   # join a host
-./tools/package.ps1 -Configuration Shipping         # Builds/Cpp/Windows/SpaceGod.Unreal.Cpp.exe
+./tools/package.ps1 -Configuration Shipping         # Builds/Cpp/Windows/SpaceGod.exe
 ./tools/bench.ps1                                   # the headless Bench: 5 scenarios, digests checked
 ./tools/play.ps1 -Mode coop-smoke -PackageDir Builds/Cpp/Windows   # two packaged instances, co-op checked
 ```
 
-Opening `Cpp/UnrealSpaceGod.uproject` in the editor works too; `Cpp/Content/Python/init_unreal.py` imports the
+Opening `Cpp/SpaceGod.uproject` in the editor works too; `Cpp/Content/Python/init_unreal.py` imports the
 colour maps from `Cpp/SourceArt/Textures/` on first open (the results are committed under `Cpp/Content/`).
 
 A packaged game hosts with `-CoopHost` and joins with `-CoopJoin=<address>`. In game, `Host` in the `` ` `` console
@@ -74,16 +68,16 @@ The scale switch, orbits and labels are your own and don't affect anyone else.
 
 ## Recording (MindAttic.Capture)
 
-Off unless asked, exactly as in the other two copies ([docs/CAPTURE.md](docs/CAPTURE.md)):
+Off unless asked ([docs/CAPTURE.md](docs/CAPTURE.md)):
 
 ```powershell
-SpaceGod.Unreal.Cpp.exe -capture video              # record the whole run (.mkv + .mp4 on exit)
-SpaceGod.Unreal.Cpp.exe -capture video screen 10    # and a PNG every 10 s
-SpaceGod.Unreal.Cpp.exe -demo -capture video        # the scripted tour, each stop a screenshot
-SpaceGod.Unreal.Cpp.exe -capture -capture-config my.json   # your own rules instead of the shipped ones
+SpaceGod.exe -capture video              # record the whole run (.mkv + .mp4 on exit)
+SpaceGod.exe -capture video screen 10    # and a PNG every 10 s
+SpaceGod.exe -demo -capture video        # the scripted tour, each stop a screenshot
+SpaceGod.exe -capture -capture-config my.json   # your own rules instead of the shipped ones
 ```
 
-Output goes to `R:\MindAttic\Capture\SpaceGod.Unreal.Cpp\`. The game raises its gameplay events (battles, arrivals,
+Output goes to `R:\MindAttic\Capture\SpaceGod\`. The game raises its gameplay events (battles, arrivals,
 gate jumps, trades, hails, saves, co-op joins...) so the shipped rules save replays of victories, defeats and a lost
 ship, and screenshots of arrivals and discoveries. While capturing, **Alt+F9** takes a screenshot, **Alt+F10** starts or
 stops a recording and **Alt+F11** saves the last 30 s. How the C++ game drives MindAttic.Capture: [Capture/README.md](Capture/README.md).
@@ -96,7 +90,7 @@ Unity.SpaceGod's own bindings, unchanged (in game, H / F1 shows them all).
 
 - `Cpp/Source/SpaceGodCore/`: the engine-independent simulation (pure C++20 on `Cs/Cs.h`, no Unreal types), a file
   for file port of Unity.SpaceGod's `Core/`.
-- `Cpp/Source/UnrealSpaceGod/`: the Runtime port. `UnitySpaceApp` (+ one `.cpp` per C# partial) drives the Core each
+- `Cpp/Source/SpaceGod/`: the Runtime port. `UnitySpaceApp` (+ one `.cpp` per C# partial) drives the Core each
   frame; `Camera/`, `Input/`, `UnityCompat/` (Unity's value types and statics in C++), `Coop/`, `Game/` (the Unreal
   framework classes).
 - `Shared/Plugins/SpaceGodRender/`: the original's shaders ported to Unreal, the materials built on them, and the
@@ -113,5 +107,7 @@ Unity.SpaceGod's own bindings, unchanged (in game, H / F1 shows them all).
 ## History
 
 docs/MIGRATION.md (how the port was made), docs/FAITHFULNESS.md, docs/PERSISTENCE.md and docs/RACE.md (the C++ vs C#
-race) are kept as the record of `Unreal.SpaceGod`; they still describe the C# track, which now lives in
-SpaceGod.Unreal.CSharp. docs/USER_STORIES.md is Unreal.SpaceGod's ticket log as of the split.
+race that this repo won) are kept as the record of `Unreal.SpaceGod`, the pre-split project this repo was promoted
+from; some of them still describe the C# track, which lived in the repo's own history before the split and now lives
+on only in the archived candidate repos. docs/USER_STORIES.md is this repo's ticket log, carried over unbroken from
+`Unreal.SpaceGod` through the split and the promotion.

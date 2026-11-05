@@ -84,7 +84,7 @@ namespace cs
 	// ---------------------------------------------------------------- IEEE tests --------------------------------
 	// MSVC's std::isnan / isinf / isfinite / signbit on a double are out-of-line UCRT calls (_dclass, _dtest, _dsign);
 	// these are the same tests inline. Hot: every Math.Max/Min. US-T64: NaN by its bits, not by v != v: the header is also
-	// compiled into UnrealSpaceGod, which is not /fp:precise (UE's default floating-point model), and there the optimizer
+	// compiled into SpaceGod, which is not /fp:precise (UE's default floating-point model), and there the optimizer
 	// may fold v != v to false. A packaged build did: double.IsNaN(NaN) was false, so SpaceCamera::FocusOn took FocusSelected's
 	// NaN "no framing given" for a framing and a packaged co-op client's camera went NaN on its first focus.
 	inline bool IsNaNFast(double v) { return (std::bit_cast<uint64_t>(v) & 0x7FFFFFFFFFFFFFFFull) > 0x7FF0000000000000ull; }

@@ -9,5 +9,5 @@ import init_unreal
 init_unreal.import_textures()
 init_unreal.build_body_material()
 init_unreal.build_ring_material()
-unreal.EditorAssetLibrary.save_directory("/Game/UnrealSpaceGod", only_if_is_dirty=True, recursive=True)
-unreal.log("Unreal.SpaceGod: headless asset setup done")
+unreal.EditorAssetLibrary.save_directory("/Game/SpaceGod", only_if_is_dirty=True, recursive=True)
+unreal.log("SpaceGod: headless asset setup done")

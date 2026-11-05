@@ -35,7 +35,7 @@ if (-not $Out) { $Out = Join-Path $repo 'Builds\Race\game' }
 # against this shell's current directory first.
 $Out = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Out)
 New-Item -ItemType Directory -Force $Out | Out-Null
-$heavy = '^(cl|link|UnrealEditor.*|UnrealBuildTool|ShaderCompileWorker|MSBuild|UnrealPak|UnrealSpaceGod.*|SpaceGod\..*|Unreal\.SpaceGod.*|Bench\..*)$'
+$heavy = '^(cl|link|UnrealEditor.*|UnrealBuildTool|ShaderCompileWorker|MSBuild|UnrealPak|SpaceGod.*|Bench\..*)$'
 $gameArgs = @('-windowed', "-ResX=$ResX", "-ResY=$ResY", '-nosound', '-unattended', '-nosplash', '-UseFixedTimeStep', '-FPS=60', '-SpaceGodRace')
 
 # The rest of the machine's CPU over a few seconds, % of all logical CPUs (other agents share this machine).
@@ -72,7 +72,7 @@ for ($n = 1; $n -le $Runs; $n++) {
   [long]$peakWs = 0
   do {
     Start-Sleep -Milliseconds 500
-    $game = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -match '^UnrealSpaceGod(-Win64-Shipping)?$|^UnrealEditor$' -and $_.StartTime -ge $t0 })
+    $game = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -match '^SpaceGod(-Win64-Shipping)?$|^UnrealEditor$' -and $_.StartTime -ge $t0 })
     foreach ($g in $game) { $peakWs = [Math]::Max($peakWs, $g.PeakWorkingSet64) }
   } while (($game.Count -gt 0 -or -not $p.HasExited) -and (Get-Date) -lt $deadline)
   $wall = $sw.Elapsed.TotalSeconds

@@ -16,7 +16,7 @@ param(
 <#
 .SYNOPSIS
 Package the game as a standalone Win64 game: UAT BuildCookRun (build, cook, stage, pak, archive) into
-Builds/Cpp/Windows/ (gitignored), with the game exe named SpaceGod.Unreal.Cpp.exe.
+Builds/Cpp/Windows/ (gitignored), with the game exe named SpaceGod.exe.
 
 .DESCRIPTION
 Steps:
@@ -31,7 +31,7 @@ UAT writes <archive>/<Target>.exe, a small bootstrap launcher, plus the real gam
 <archive>/<Target>/Binaries/Win64/<Target>[-Win64-Shipping].exe. The launcher does not derive anything from its own
 file name: it carries the relative path of the real exe as an embedded resource (BootstrapPackagedGame), and the real
 exe finds its content from its own folder and the compiled-in project name. So the launcher is renamed to
-SpaceGod.Unreal.Cpp.exe and the inner exe keeps the target name; -Verify boots the renamed launcher to prove it.
+SpaceGod.exe and the inner exe keeps the target name; -Verify boots the renamed launcher to prove it.
 
 .EXAMPLE
   ./tools/package.ps1
@@ -48,7 +48,7 @@ $uat = Join-Path $engine 'Engine\Build\BatchFiles\RunUAT.bat'
 $target = $project.BaseName                       # the Game target: Source/<Target>.Target.cs
 $archiveRoot = Join-Path $repo 'Builds\Cpp'
 $archive = Join-Path $archiveRoot 'Windows'       # UAT appends the cooked platform folder
-$exeName = 'SpaceGod.Unreal.Cpp.exe'
+$exeName = 'SpaceGod.exe'
 $renamed = Join-Path $archive $exeName
 if ($VerifyOnly) {
   if (-not (Test-Path -LiteralPath $renamed)) { throw "No package at ${renamed}: run without -VerifyOnly first." }

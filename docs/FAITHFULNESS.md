@@ -30,7 +30,7 @@ wire it?), and by running it headless wherever a script can drive it.
 - **C++ track.** The Core is a file-for-file C++20 translation, **bit-identical to C#** on all five Bench scenarios
   (sol-idle, high-warp, economy-year, battle, galaxy-ftl; MIGRATION.md "Parity findings"). The Runtime is a translation
   of every original Runtime file. A method-level check (every method declared in the original's 56 Runtime files,
-  768 in all, looked up by name in `Cpp/Source/UnrealSpaceGod`) finds **all 768 present**.
+  768 in all, looked up by name in `Cpp/Source/SpaceGod`) finds **all 768 present**.
 - **Both tracks** run the same UI tour (`-Mode smoke`: every main-menu page, New Game, the HUD and every HUD panel,
   galaxy map Diplomacy/Command, the pause menu's Settings/Display pages, Help with a chapter turn, each clicked by label)
   and the same views check (`-Mode views`: identical renderer, primitive and triangle counts). Deterministic
@@ -41,7 +41,7 @@ wire it?), and by running it headless wherever a script can drive it.
 ## The binding audit (`tools/play.ps1 -Track <Cpp|CSharp> -Mode audit`)
 
 `-SpaceGodAudit` runs after the smoke. `CSharp/Script/.../Runtime/Audit/FeatureAudit.cs` and
-`Cpp/Source/UnrealSpaceGod/Smoke/FeatureAudit.cpp` run the same probes, in the same order, with the same ids. Each
+`Cpp/Source/SpaceGod/Smoke/FeatureAudit.cpp` run the same probes, in the same order, with the same ids. Each
 probe presses one of the original's bindings on the scripted device the smoke already uses, then checks the state that
 the original's handler changes. A probe also puts back what it changed, so one failure cannot cascade into the next.
 `PASS` / `FAIL` count toward the result. `INFO` marks a key the original's handler answers silently for that hull (a

@@ -2,8 +2,8 @@
 
 Unreal runs this file whenever the editor opens the project (Python Editor Script Plugin). It waits until the
 asset registry has finished scanning, then, only for what is missing:
-  - imports SourceArt/Textures/*.jpg into /Game/UnrealSpaceGod/Textures (mipmapped; normal maps flagged as such),
-  - creates /Game/UnrealSpaceGod/Materials/M_Body (unlit, lit per body from the Sun by the SunDir parameter,
+  - imports SourceArt/Textures/*.jpg into /Game/SpaceGod/Textures (mipmapped; normal maps flagged as such),
+  - creates /Game/SpaceGod/Materials/M_Body (unlit, lit per body from the Sun by the SunDir parameter,
     with map tint, haze and an atmosphere rim) and M_Ring (translucent, vertex-colour opacity).
 Commit the generated .uasset files so a packaged build has them.
 """
@@ -12,7 +12,7 @@ import os
 
 import unreal
 
-ROOT = "/Game/UnrealSpaceGod"
+ROOT = "/Game/SpaceGod"
 MATERIALS = ROOT + "/Materials"
 TEXTURES = ROOT + "/Textures"
 
@@ -131,7 +131,7 @@ def build_body_material():
 
     mel.recompile_material(mat)
     eal.save_asset(path)
-    unreal.log(f"Unreal.SpaceGod: created {path}")
+    unreal.log(f"SpaceGod: created {path}")
 
 
 def build_ring_material():
@@ -149,7 +149,7 @@ def build_ring_material():
 
     mel.recompile_material(mat)
     eal.save_asset(path)
-    unreal.log(f"Unreal.SpaceGod: created {path}")
+    unreal.log(f"SpaceGod: created {path}")
 
 
 def import_textures():
@@ -183,7 +183,7 @@ def import_textures():
             texture.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_NORMALMAP)
             texture.set_editor_property("srgb", False)
             eal.save_asset(path)
-    unreal.log(f"Unreal.SpaceGod: imported {len(tasks)} texture(s)")
+    unreal.log(f"SpaceGod: imported {len(tasks)} texture(s)")
 
 
 _handle = None
@@ -200,7 +200,7 @@ def _when_ready(_delta):
         build_body_material()
         build_ring_material()
     except Exception as error:  # an editor startup script must never stop the editor opening
-        unreal.log_error(f"Unreal.SpaceGod asset setup failed: {error}")
+        unreal.log_error(f"SpaceGod asset setup failed: {error}")
 
 
 def _is_game():

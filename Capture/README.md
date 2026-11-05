@@ -46,5 +46,5 @@ One JSON object a line. Game to host (stdin):
 Host to game (stdout): `ready` (`any`, `enabled`, `folder`, `session`, or `error`), `result` (`id`, `ok`, `files`,
 `error`), `log` (`level`, `message`; written to the game's log as `[MindAttic.Capture] ...`), `stopped`.
 
-Game side: `Cpp/Source/UnrealSpaceGod/Capture/MindAtticCapture.h` (CaptureUnity's surface) and `CaptureEvents.h` (the
+Game side: `Cpp/Source/SpaceGod/Capture/MindAtticCapture.h` (CaptureUnity's surface) and `CaptureEvents.h` (the
 event catalogue).
