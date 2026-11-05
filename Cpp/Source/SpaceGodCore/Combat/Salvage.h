@@ -14,6 +14,7 @@ namespace SpaceGod::Core
 	class Interior;
 	class Subsystem;
 	class Fleet;
+	class CargoHold;
 
 	/// <summary>How the piloted ship stands toward a hulk it wants to latch on to.</summary>
 	enum class LatchState : int
@@ -191,6 +192,14 @@ namespace SpaceGod::Core
 		void RescueSurvivors();
 
 	public:
+		/// <summary>
+		/// The crate loader every salvager shares (latch-and-salvage here, the tractor beam's pods, US-T95): crates of
+		/// <paramref name="stack"/>'s good into <paramref name="hold"/>, first fit, while half a crate's worth or more is left
+		/// and the hold has room (<paramref name="full"/> when it ran out). The tonnes taken come off the stack; returns the
+		/// crates moved. <paramref name="stolen"/> marks them stolen goods.
+		/// </summary>
+		static int LoadCrates(const cs::Ref<CargoHold>& hold, SalvageStack& stack, bool stolen, bool& full);
+
 		/// <summary>
 		/// Moves crates from the hulk into the player's grid hold until it runs out or the hold is full;
 		/// what is taken comes off the manifest, so the next salvager finds less. Returns the crates moved.

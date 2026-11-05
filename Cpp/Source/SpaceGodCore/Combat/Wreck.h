@@ -16,6 +16,7 @@ namespace SpaceGod::Core
 	class LaneSite;
 	class BattleUnit;
 	class WreckPiece;
+	class CargoPods;
 	struct CollisionVolume;
 
 	/// <summary>One good and how many tonnes of it a wreck's hold still carries for whoever salvages it.</summary>
@@ -131,6 +132,12 @@ namespace SpaceGod::Core
 		double DefaultLifetimeDays = 21;
 
 		cs::List<cs::Ref<Wreck>> Items;
+
+		/// <summary>The cargo pods dead hulls spilled and threatened ones jettisoned (US-T95); null until the first one
+		/// (and in older saves): <see cref="SpilledPods"/> makes it.</summary>
+		cs::Ref<CargoPods> Pods;
+
+		cs::Ref<CargoPods> SpilledPods();
 
 	private:
 		int nextId = 0;

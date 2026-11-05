@@ -69,6 +69,7 @@ namespace SpaceGod::Core
 		case LifeEventKind::Met: return "Met";
 		case LifeEventKind::OwnedAct: return "OwnedAct";
 		case LifeEventKind::CrownedKing: return "CrownedKing";
+		case LifeEventKind::Salvaged: return "Salvaged";
 		}
 		return "?";
 	}
@@ -778,7 +779,8 @@ namespace SpaceGod::Core
 		SG_F(ShipName), SG_F(Courage), SG_F(Greed), SG_F(Honour), SG_F(Warmth), SG_F(Spite), SG_F(Chatter), SG_F(Track), SG_F(Rank),
 		SG_F(Renown), SG_F(RankJd), SG_F(DetainedJd), SG_F(Ashore), SG_F(Betrayed), SG_F(ShipsFlown), SG_F(BattlesSurvived),
 		SG_F(Robberies), SG_F(TimesRobbed), SG_F(Surrenders), SG_F(Grudges), SG_F(Story), SG_F(FirstMet), SG_F(MetJd),
-		SG_F(TimesHailed), SG_F(TimesEmbodied), SG_F(Held))
+		SG_F(TimesHailed), SG_F(TimesEmbodied), SG_F(Held),
+		SG_OPT(PodsSalvaged), SG_OPT(TonnesSalvaged)) // US-T95: cargo pods tractored, absent from older saves
 
 	SG_SERIALIZE(Characters, "SpaceGod.Core.Characters",
 		SG_F(All), SG_F(ByShip), SG_F(NextId), SG_F(Grievance))

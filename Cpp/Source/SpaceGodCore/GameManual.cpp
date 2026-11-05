@@ -196,7 +196,18 @@ namespace SpaceGod::Core
 				T("Derelicts and wrecks",
 				  "Come alongside a derelict or wreck, match velocity (within about a kilometre and 20 m/s) and press 1 to "
 				  "latch on. Fight off any raiders aboard, then salvage cargo, strip a component or claim the hull with a "
-				  "prize crew.")),
+				  "prize crew."),
+				T("Tractor beam and cargo pods",
+				  "Blow a laden ship open and most of the cargo it carried spills as drifting pods (amber canisters with a "
+				  "faint blinking marker; red, stolen goods), the rest staying in the wreck's hold for latching. Cargo a "
+				  "threatened ship drops to you over comms floats out the same way. At any helm, Shift+T locks the tractor "
+				  "beam on the nearest pod in reach and hauls it in; alongside, its crates go into your own hold, the haul "
+				  "goes on the record of the pilot you are flying, and the beam takes the next pod in reach by itself. "
+				  "Shift+T again lets go; it slips if you run off past half again its reach, and stops for a full hold. "
+				  "Reach and pull go by hull class: a strike craft about 3 km, light hulls 5, freighters and destroyers 7-8, "
+				  "capital ships 12, the tugs 15 and hardest; heavy pods come in slower. Pirates who win a fight tractor in "
+				  "their share of the dead hulls' pods. The dev menu's Spawn > Cargo-laden wreck (or console sg.Tractor wreck) "
+				  "blows a laden freighter apart just ahead of you.")),
 
 			cs::New<ManualChapter>("Ships: strike craft", "Fighters, interceptors, bombers, heavy fighters, recon and boarding craft", Keys(),
 				T("Space superiority fighter",

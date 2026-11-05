@@ -130,6 +130,11 @@ namespace SpaceGod::Core
 				{ "{name} was hailed {title} by the clans.", "The clans bent the knee to {name}, {title}.", "{name} rules the dark rocks now: {title}.",
 				  "Every raider in the system answers to {name}, {title}." },
 				{ "The clans call me {title}.", "{title}. They kneel, or they float.", "I rule the dark rocks now." } };
+			static const BeatPools salvaged{
+				{ "{name} tractored {tonnes} t of {good} out of the drift where the {victim} died.", "{name} hauled the {victim}'s spilled {good} aboard.",
+				  "{name} swept the {victim}'s cargo pods into {their} hold.", "{name} picked {good} out of the wreckage of the {victim}." },
+				{ "I tractored the {victim}'s {good} aboard. Finders keepers.", "{tonnes} t of {good}, drifting free. Not anymore.",
+				  "The {victim} won't miss its {good}. I pulled it in.", "Dead ships don't need cargo." } };
 
 			switch (k)
 			{
@@ -157,6 +162,7 @@ namespace SpaceGod::Core
 			case LifeEventKind::Met: return met;
 			case LifeEventKind::OwnedAct: return owned;
 			case LifeEventKind::CrownedKing: return crowned;
+			case LifeEventKind::Salvaged: return salvaged;
 			}
 			return owned;
 		}
@@ -305,7 +311,7 @@ namespace SpaceGod::Core
 	int TemplateStoryTeller::PoolSize()
 	{
 		int n = 0;
-		for (int k = 0; k <= static_cast<int>(LifeEventKind::CrownedKing); k++)
+		for (int k = 0; k <= static_cast<int>(LifeEventKind::Salvaged); k++)
 		{
 			const auto& pools = PoolsFor(static_cast<LifeEventKind>(k));
 			n += static_cast<int>(pools.Third.size() + pools.First.size());

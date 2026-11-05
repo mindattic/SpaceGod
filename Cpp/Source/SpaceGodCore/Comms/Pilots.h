@@ -86,6 +86,8 @@ namespace SpaceGod::Core
 		/// <summary>An act done in their body, owned and justified afterwards (the rationalization rule).</summary>
 		OwnedAct,
 		CrownedKing,
+		/// <summary>Tractored a drifting cargo pod aboard (US-T95): spilled from a wreck, or dropped under threat.</summary>
+		Salvaged,
 	};
 	SPACEGODCORE_API const char* ToString(LifeEventKind v);
 
@@ -171,6 +173,10 @@ namespace SpaceGod::Core
 		/// <summary>Hulls flown, oldest first (names), battles lived through, and robberies done.</summary>
 		cs::List<cs::String> ShipsFlown;
 		int BattlesSurvived = 0, Robberies = 0, TimesRobbed = 0, Surrenders = 0;
+
+		/// <summary>Cargo pods tractored aboard and the tonnes in them (US-T95).</summary>
+		int PodsSalvaged = 0;
+		double TonnesSalvaged = 0;
 
 		/// <summary>Who they hold a grudge against, by name (a pilot, a ship, a faction), newest last.</summary>
 		cs::List<cs::String> Grudges;

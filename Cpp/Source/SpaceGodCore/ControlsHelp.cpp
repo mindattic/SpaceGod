@@ -72,7 +72,8 @@ namespace SpaceGod::Core
 				More("your sensors are passive: they hear what others give off, as far as your scanners reach their signature; planets, moons and big rocks block the line of sight both ways"),
 				L("Tab", "active ping: for 3 s your scanners reach three times as far and resolve twice as fine -- but you are LIT UP for 15 s, heard by every sensor in reach (hostiles hold you, witnesses see you); again after 20 s"),
 				L("Shift+F3", "go dark: the reactor to minimum -- guns, shields and drive offline, transponder off, drifting on your momentum, your heat cooling toward nothing (hide behind a rock); Shift+F3 again powers up: a timed restart (8 s a fighter to a minute a capital), nothing online until it is done and your heat climbing back"),
-				L("1, then 1-4", "derelicts and wrecks: match velocity alongside, 1 latch on, then 1-4 as the panel shows")),
+				L("1, then 1-4", "derelicts and wrecks: match velocity alongside, 1 latch on, then 1-4 as the panel shows"),
+				L("Shift+T", "tractor beam: locks on the nearest drifting cargo pod in reach (a blown-open ship's cargo, or what a threatened ship drops) and hauls it into your hold, then takes the next; again lets go. Reach and pull by hull class, about 3 km a strike craft to 15 a tug")), // US-T95
 
 			cs::New<HelpSection>("COMBAT",
 				L("Left mouse", "guns, down the crosshair (watch the heat)"),

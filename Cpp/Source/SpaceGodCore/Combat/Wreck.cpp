@@ -4,6 +4,7 @@
 
 #include "Ships.h"
 #include "Combat/Battle.h"
+#include "Combat/CargoPods.h"
 #include "Combat/Collisions.h"
 #include "Combat/CombatState.h"
 #include "Combat/ModularHull.h"
@@ -92,6 +93,8 @@ namespace SpaceGod::Core
 		if (unit->Ship != nullptr && unit->Ship->HasCargo && unit->Ship->CargoTonnes > 0)
 			w->Salvage.Add(SalvageStack(unit->Ship->CargoGood, unit->Ship->CargoTonnes));
 		w->BreakUp();
+		// US-T95: most of what it carried spills as drifting pods; the rest stays in its hold for latch-and-salvage.
+		SpilledPods()->Spill(w, jd);
 		Items.Add(w);
 		return w;
 	}
@@ -112,6 +115,8 @@ namespace SpaceGod::Core
 		w->LifetimeDays = lifetimeDays > 0 ? lifetimeDays : DefaultLifetimeDays;
 		if (ship->HasCargo && ship->CargoTonnes > 0) w->Salvage.Add(SalvageStack(ship->CargoGood, ship->CargoTonnes));
 		w->BreakUp();
+		// US-T95: most of what it carried spills as drifting pods; the rest stays in its hold for latch-and-salvage.
+		SpilledPods()->Spill(w, jd);
 		Items.Add(w);
 		return w;
 	}
@@ -121,8 +126,15 @@ namespace SpaceGod::Core
 		return Items.Find([&](const cs::Ref<Wreck>& w) { return w->Ship == ship; });
 	}
 
+	cs::Ref<CargoPods> Wrecks::SpilledPods()
+	{
+		if (Pods == nullptr) Pods = cs::New<CargoPods>();
+		return Pods;
+	}
+
 	void Wrecks::AdvanceTo(double jd)
 	{
+		if (Pods != nullptr) Pods->AdvanceTo(jd);
 		for (int i = Items.Count() - 1; i >= 0; i--)
 			if (Items[i]->Expired(jd)) Items.RemoveAt(i);
 	}

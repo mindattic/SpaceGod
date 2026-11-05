@@ -38,6 +38,7 @@
 #include "Combat/Salvage.h"
 #include "Combat/StrandedWings.h"
 #include "Combat/Wreck.h"
+#include "Combat/CargoPods.h" // US-T95
 #include "Economy/Economy.h"
 #include "Embodiment/SelfDestruct.h"
 #include "Sensors/SensorPosture.h"
@@ -1572,14 +1573,21 @@ namespace SpaceGod::Core
 					if (b->SideLeaders[1 - u->Side] != nullptr && b->SideLeaders[1 - u->Side]->IsPirate)
 					{
 						lootClan = b->SideLeaders[1 - u->Side];
-						lootTonnes += ship->CargoTonnes * 0.6;
-						lootValue += ship->CargoTonnes * 0.6 * GoodInfo::Of(ship->CargoGood)->BasePrice;
-						DeliverLoot(lootClan, ship->CargoGood, ship->CargoTonnes * 0.6, b);
-						// What they hauled off is no longer in the wreck to salvage.
+						double share = ship->CargoTonnes * 0.6;
+						// US-T95: the winners tractor their share in from the pods the hull spilled, then strip its hold; what
+						// they hauled off is no longer there to salvage. A pilot who swept the pods first left them less.
 						if (auto wreck = Wrecks->Of(ship))
-							for (int i = 0; i < wreck->Salvage.Count(); i++)
-								if (wreck->Salvage[i].Good == ship->CargoGood)
-									wreck->Salvage[i] = SalvageStack(ship->CargoGood, wreck->Salvage[i].Tonnes * 0.4);
+						{
+							auto spilledPods = Wrecks->SpilledPods();
+							double there = spilledPods->SpilledFrom(wreck, ship->CargoGood);
+							for (const auto& keptStack : wreck->Salvage)
+								if (keptStack.Good == ship->CargoGood) there += keptStack.Tonnes;
+							if (there < share) share = cs::Math::Max(0.0, there);
+							spilledPods->Haul(wreck, ship->CargoGood, share);
+						}
+						lootTonnes += share;
+						lootValue += share * GoodInfo::Of(ship->CargoGood)->BasePrice;
+						DeliverLoot(lootClan, ship->CargoGood, share, b);
 					}
 					ship->HasCargo = false;
 				}

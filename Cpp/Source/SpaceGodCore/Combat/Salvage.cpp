@@ -154,6 +154,26 @@ namespace SpaceGod::Core
 		Note(cs::Cat(cs::Fmt(n, "0"), " survivors found sealed in and brought into the airlock"));
 	}
 
+	int SalvageSession::LoadCrates(const cs::Ref<CargoHold>& hold, SalvageStack& stack, bool stolen, bool& full)
+	{
+		full = false;
+		if (hold == nullptr) return 0;
+		double crate = CargoFootprint::Of(stack.Good).Tonnes;
+		double left = stack.Tonnes;
+		int moved = 0;
+		// Half a crate's worth or more fills a crate; less is not worth the space.
+		while (left >= crate * 0.5)
+		{
+			auto item = hold->AddFirstFit(stack.Good);
+			if (item == nullptr) { full = true; break; }
+			if (stolen) item->Stolen = true;
+			left -= crate;
+			moved++;
+		}
+		stack.Tonnes = left;
+		return moved;
+	}
+
 	int SalvageSession::SalvageCargo()
 	{
 		if (Ended || Hostile()) return 0;
@@ -163,20 +183,12 @@ namespace SpaceGod::Core
 		for (int i = 0; i < manifest.Count();)
 		{
 			auto stack = manifest[i];
-			double crate = CargoFootprint::Of(stack.Good).Tonnes;
-			double left = stack.Tonnes;
 			bool full = false;
-			// Half a crate's worth or more fills a crate; less is not worth the space.
-			while (left >= crate * 0.5)
-			{
-				if (hold->AddFirstFit(stack.Good) == nullptr) { full = true; break; }
-				left -= crate;
-				moved++;
-			}
-			if (left < crate * 0.5) manifest.RemoveAt(i);
+			moved += LoadCrates(hold, stack, false, full);
+			if (stack.Tonnes < CargoFootprint::Of(stack.Good).Tonnes * 0.5) manifest.RemoveAt(i);
 			else
 			{
-				manifest[i] = SalvageStack(stack.Good, left);
+				manifest[i] = stack;
 				i++;
 			}
 			if (full) break;

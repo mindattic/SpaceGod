@@ -277,6 +277,7 @@ namespace SpaceGod
 
 	void UnitySpaceApp::UpdatePilotBattle(const cs::Ref<Core::Ship>& ship, float dt)
 	{
+		UpdateTractor(ship, dt); // US-T95: the tractor beam works in a fight too
 		if (ship->Battle != nullptr && Salvage != nullptr) EndSalvage("Clamps released: battle stations");
 		if (ship->Battle != nullptr) SalvageApproach = cs::String();
 		if (ship->Battle == nullptr)
@@ -1346,6 +1347,7 @@ namespace SpaceGod
 		debrisFields->Update();
 		podBeacons->Update();
 		bioMassView->Update();
+		UpdateCargoPodsView(); // US-T95: cargo pods and the tractor beam
 		if (embodiedShine) embodiedShine->Update(); // US-T136: other players' units shine
 		Structures->Update(true);
 		swarm->Update(ShowSatellites);

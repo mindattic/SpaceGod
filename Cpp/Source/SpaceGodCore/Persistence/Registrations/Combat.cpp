@@ -10,6 +10,7 @@
 #include "Combat/Boarding.h"
 #include "Combat/BoardingCommand.h"
 #include "Combat/Broadsides.h"
+#include "Combat/CargoPods.h"
 #include "Combat/CarrierWings.h"
 #include "Combat/CombatSpecs.h"
 #include "Combat/CombatState.h"
@@ -381,7 +382,8 @@ namespace SpaceGod::Core
 		SG_F(Fragment), SG_F(Index), SG_F(Scrap))
 
 	SG_SERIALIZE(Wrecks, "Unity.SpaceGod.Core.Wrecks",
-		SG_F(DefaultLifetimeDays), SG_F(Items), SG_F(nextId))
+		SG_F(DefaultLifetimeDays), SG_F(Items), SG_F(nextId),
+		SG_OPT(Pods)) // US-T95: the drifting cargo pods, absent from older saves
 
 	// (US-T41) Bill and Categories: the static walk names each facility's bill and category arrays through them, as C#'s does.
 	SG_SERIALIZE_ABSTRACT(FacilityKind, "Unity.SpaceGod.Core.FacilityKind",
