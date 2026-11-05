@@ -8,6 +8,8 @@
 #include "Rendering/Photoreal.h"
 #include "Rendering/CameraExposure.h"
 
+#include <optional>
+
 namespace SpaceGod::Core
 {
 	class RenderPipelineProfile;
@@ -91,6 +93,14 @@ namespace SpaceGod::Rendering
 		virtual StarLighting Lighting() const = 0;
 		virtual void SetLighting(const StarLighting& value) = 0;
 
+		/// <summary>
+		/// US-T116: a fixed light that wins over <see cref="SetLighting"/> until cleared (an empty value), for snapshots of
+		/// the game's own hulls (the ship thumbnails, the US-T110 lineup) lit from a known direction whatever the game's
+		/// star does meanwhile. The game's lighting set while it holds is kept and comes back when it is cleared.
+		/// </summary>
+		virtual void OverrideLighting(const std::optional<StarLighting>& value) = 0;
+		virtual std::optional<StarLighting> LightingOverride() const = 0;
+
 		/// <summary>Applies <paramref name="look"/> to what <paramref name="camera"/> draws (<see cref="PostProcessLook.None"/> turns it off).</summary>
 		virtual void SetPostProcessing(Camera* camera, const PostProcessLook& look) = 0;
 
@@ -148,6 +158,8 @@ namespace SpaceGod::Rendering
 			HideFlags hideFlags = HideFlags::None) override;
 		StarLighting Lighting() const override;
 		void SetLighting(const StarLighting& value) override;
+		void OverrideLighting(const std::optional<StarLighting>& value) override;
+		std::optional<StarLighting> LightingOverride() const override { return lightingOverride; }
 		void SetPostProcessing(Camera* camera, const PostProcessLook& look) override {}
 		cs::List<cs::String> RenderFeatures() const override { return cs::List<cs::String>(); }
 		Core::PhotorealOptions Photoreal() const override { return photoreal; }
@@ -157,6 +169,12 @@ namespace SpaceGod::Rendering
 	protected:
 		cs::Ref<Core::RenderPipelineProfile> profile;
 		Core::PhotorealOptions photoreal = Core::PhotorealOptions::Default();
+
+	private:
+		void ApplyLighting(const StarLighting& value);
+		std::optional<StarLighting> lightingOverride;
+		/// What the game last asked for while an override held.
+		StarLighting gameLighting;
 	};
 
 	/// <summary>

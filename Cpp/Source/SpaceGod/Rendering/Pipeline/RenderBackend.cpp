@@ -118,6 +118,24 @@ namespace SpaceGod::Rendering
 
 	void NeutralRenderBackend::SetLighting(const StarLighting& value)
 	{
+		if (lightingOverride)
+		{
+			gameLighting = value;
+			return;
+		}
+		ApplyLighting(value);
+	}
+
+	void NeutralRenderBackend::OverrideLighting(const std::optional<StarLighting>& value)
+	{
+		// Unset to set: what the game shows now is what comes back when the override ends.
+		if (!lightingOverride && value) gameLighting = Lighting();
+		lightingOverride = value;
+		ApplyLighting(value ? *value : gameLighting);
+	}
+
+	void NeutralRenderBackend::ApplyLighting(const StarLighting& value)
+	{
 		Shader::SetGlobalVector(RenderGlobals::SunPosition, value.SunPosition);
 		Shader::SetGlobalVector(RenderGlobals::SunColor, value.SunColor);
 		Shader::SetGlobalVector(RenderGlobals::Sun2Position, value.Sun2Position);

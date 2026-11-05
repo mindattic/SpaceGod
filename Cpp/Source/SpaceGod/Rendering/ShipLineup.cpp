@@ -7,11 +7,15 @@
 //
 // Sheets: kit-pieces (the 8 modules then fighters 1..40, row by row), classes-<livery> (every hull class in LineupOrder,
 // row by row, as its ShipView draws it: hull, turrets and all), detail-small/-large (the navy's, larger), classes-top,
-// classes-side and capitals-to-scale. They are screenshots of the game's view rather than an off-screen scene capture:
-// the game's materials expose themselves against the view's own exposure (SG_Expose), which a capture does not
-// reproduce (it came out black, as ShipThumbnails' does today).
+// classes-side and capitals-to-scale, screenshots of the game's view; then thumbnails-<livery>, the spawn screen's
+// ShipThumbnails (an off-screen scene capture) of every class side by side (US-T116).
+// US-T116: the sheets came out too dark: a dim key light (the ship materials' sun, 1.3) set with SetLighting, which the
+// game's own star lighting (UnitySpaceApp::UpdateLights, every frame) also sets, and no second light, so whatever faced
+// away showed only the materials' faint night-side fill. Now a brighter key over the viewer's shoulder and a cool fill
+// from the lower left are held as a lighting override for the whole run, whatever the game's star does meanwhile.
 #include "ModelViewer.h"
 #include "Rendering/Pipeline/RenderBackend.h"
+#include "Rendering/ShipThumbnails.h"
 #include "Rendering/StarSparrowKit.h"
 #include "UnityCompat/UnityScene.h"
 #include "Views/ShipView.h"
@@ -266,6 +270,7 @@ namespace SpaceGod::Rendering
 			Camera* camera = nullptr;
 			cs::List<Camera*> disabled;
 			cs::List<cs::Ref<Views::ShipView>> views;
+			TArray<FString> savedThumbnails;
 			FTSTicker::FDelegateHandle handle;
 
 			static int Layer()
@@ -312,23 +317,61 @@ namespace SpaceGod::Rendering
 				cameraObject->transform->localPosition = Vector3(0, 0, -distance);
 				cameraObject->transform->localRotation = Quaternion::identity();
 				root->transform->localPosition = Vector3::zero();
-				// Lit from over the viewer's right shoulder.
+				// Lit from over the viewer's right shoulder (in the camera's frame: the camera's world position plus the
+				// direction), held over the game's own star light while the lineup runs.
 				StarLighting light;
-				Vector3 key = Vector3(1.2f, 1.4f, -1.0f).normalized() * (distance * 1000.0f);
+				Vector3 key = cameraObject->transform->position() + Vector3(1.2f, 1.4f, -1.0f).normalized() * (distance * 1000.0f);
 				light.SunPosition = Vector4(key.x, key.y, key.z, 0);
-				light.SunColor = Vector4(1.3f, 1.27f, 1.22f, 1.0f);
-				light.Sun2Position = light.SunPosition;
-				light.Sun2Color = Vector4::zero();
-				RenderBackend::Active()->SetLighting(light);
+				light.SunColor = Vector4(2.4f, 2.36f, 2.3f, 1.0f);
+				// A dim cool second light from the lower left, so the shadow side still reads.
+				Vector3 fill = cameraObject->transform->position() + Vector3(-1.0f, -0.6f, -0.4f).normalized() * (distance * 1000.0f);
+				light.Sun2Position = Vector4(fill.x, fill.y, fill.z, 0);
+				light.Sun2Color = Vector4(0.3f, 0.36f, 0.48f, 0.4f);
+				RenderBackend::Active()->OverrideLighting(light);
+			}
+
+			/// The spawn screen's thumbnails (ShipThumbnails, a scene capture of its own) of every hull class, per livery. They
+			/// take a few frames: true once every sheet is saved.
+			bool SaveThumbnails()
+			{
+				cs::List<ShipClass> classes;
+				for (const auto& e : LineupOrder())
+					if (e.Civil == CivilCraft::None && !classes.Contains(e.Class)) classes.Add(e.Class);
+				const struct { const TCHAR* Name; cs::Ref<Faction> F; } liveries[] = {
+					{ TEXT("sol-navy"), MakeFaction("Sol Federation", "SFS", Rgb(0.35f, 0.65f, 1.0f), true, false) },
+					{ TEXT("pirate"), MakeFaction("Red Knives", "RK", Rgb(0.85f, 0.2f, 0.25f), false, true) },
+				};
+				bool done = true;
+				for (const auto& l : liveries)
+				{
+					FString file = Dir / FString::Printf(TEXT("thumbnails-%s.png"), l.Name);
+					if (savedThumbnails.Contains(file)) continue;
+					if (!ShipThumbnails::SaveSheet(classes, l.F, file, 8))
+					{
+						done = false;
+						continue;
+					}
+					savedThumbnails.Add(file);
+					UE_LOG(LogSpaceGod, Display, TEXT("ShipLineup: %s"), *file);
+				}
+				return done;
 			}
 
 			bool Tick(float)
 			{
 				if (index >= sheets.Count())
 				{
-					if (camera) camera->enabled = false;
-					for (Camera* cam : disabled) if (cam) cam->enabled = true;
-					disabled.Clear();
+					if (camera && camera->enabled)
+					{
+						RenderBackend::Active()->OverrideLighting(std::nullopt);
+						camera->enabled = false;
+						for (Camera* cam : disabled) if (cam) cam->enabled = true;
+						disabled.Clear();
+					}
+					// With the game's cameras back (the lineup camera sees only the lineup's layer, and UnityScene hides
+					// whatever the screen camera does not see).
+					if (!SaveThumbnails()) return true;
+					savedThumbnails.Reset();
 					UE_LOG(LogSpaceGod, Display, TEXT("ShipLineup: done (%s)"), *Dir);
 					if (Quit) FPlatformMisc::RequestExit(false);
 					return false;

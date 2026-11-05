@@ -21,7 +21,8 @@ namespace SpaceGod::Rendering
 	/// each one is built and rendered once, not every frame.
 	/// </summary>
 	/// <remarks>Unreal: the capture shows only the preview's components (Unity's ModelViewer layer); the texture is a
-	/// UTextureRenderTarget2D wrapped as a Texture2D (its Native).</remarks>
+	/// UTextureRenderTarget2D wrapped as a Texture2D (its Native). US-T116: drawn a few frames after it is first asked for
+	/// (the texture shows the backdrop until then), since a capture in the frame its preview is built draws it black.</remarks>
 	class ShipThumbnails
 	{
 	public:
@@ -30,6 +31,14 @@ namespace SpaceGod::Rendering
 
 		/// <summary>Drops every cached snapshot (e.g. if a faction's livery colour could change later).</summary>
 		static void Clear();
+
+		/// <summary>US-T116: whether snapshots asked for are still on their way (they take a few frames).</summary>
+		static bool Pending();
+
+		/// <summary>US-T116: the thumbnails of <paramref name="classes"/> side by side, <paramref name="columns"/> to a row,
+		/// saved to the image <paramref name="file"/> (the lineup's thumbnails sheet). Asks for any not made yet and returns
+		/// false until they are all drawn; then saves and returns true.</summary>
+		static bool SaveSheet(const cs::List<Core::ShipClass>& classes, const cs::Ref<Core::Faction>& faction, const FString& file, int columns);
 
 	private:
 		static constexpr int Size = 192;
