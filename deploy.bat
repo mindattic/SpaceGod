@@ -47,5 +47,5 @@ if not exist "%EXE%" (
     set "FORCE="
     goto deploy
 )
-start "" /d "%APP%" "%EXE%"
+start "" /d "%APP%" "%EXE%" -capture video hq
 exit /b 0

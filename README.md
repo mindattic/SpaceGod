@@ -20,13 +20,15 @@ runs with only Unreal Engine 5.8 and Visual Studio's C++ tools.
 
 | Script | What it does |
 |---|---|
-| `run.bat` | The Desktop shortcut's target. No menu: runs `run.ps1 -Launch` (deploys only when something changed, then starts the game). |
-| `deploy.bat` | The menu. Asks **1) Deploy & Run** (runs `run.ps1 -Launch -Force`) or **2) Run** (starts the published copy; deploys first if there is none). |
+| `run.bat` | The Desktop shortcut's target. Asks **1) Deploy** (`run.ps1`) or **2) Deploy & Run** (`run.ps1 -Launch`); both repackage only when something changed. Arguments skip the menu (`run.bat -Force` deploys, rebuilding anyway, and plays). |
+| `deploy.bat` | Asks **1) Deploy & Run** (runs `run.ps1 -Launch -Force`) or **2) Run** (starts the published copy; deploys first if there is none). |
 | `run.ps1` | Non-interactive: `git pull`, package Shipping (`tools/package.ps1`), publish to `C:\Apps\SpaceGod.Unreal.Cpp\`, refresh the Desktop shortcut `SpaceGod – Unreal C++`. `-Launch` starts the game; `-Force` packages even when nothing changed; `-NoPull` skips the pull. |
+
+Every game these scripts start records: they pass `-capture video hq` (see Recording below).
 
 ```powershell
 ./run.ps1 -Launch          # deploy and play
-./run.bat                  # what the Desktop shortcut runs: deploy, then play
+./run.bat                  # what the Desktop shortcut runs: the 1) Deploy / 2) Deploy & Run menu
 ./deploy.bat               # the menu
 ```
 

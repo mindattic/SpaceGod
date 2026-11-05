@@ -40,8 +40,10 @@ $repoDir   = $PSScriptRoot
 $out       = 'C:\Apps\SpaceGod.Unreal.Cpp'
 $exeName   = 'SpaceGod.Unreal.Cpp.exe'
 $buildDir  = Join-Path $repoDir 'Builds\Cpp\Windows'
-$shortcutBat = Join-Path $repoDir 'run.bat'   # the Desktop shortcut's target: deploy, then run (US-T71)
+$shortcutBat = Join-Path $repoDir 'run.bat'   # the Desktop shortcut's target: 1) Deploy or 2) Deploy & Run (US-T73)
 $marker    = Join-Path $out '.deploy-commit'
+# US-T74: every launch records (docs/CAPTURE.md); hq, as lossless video falls behind on this machine.
+$captureArgs = @('-capture', 'video', 'hq')
 # "SpaceGod – Unreal C++" (en dash), spelled with [char] so this file reads the same in any code page.
 $title     = "SpaceGod $([char]0x2013) Unreal C++"
 
@@ -52,7 +54,7 @@ function Set-Shortcut([string]$exe) {
     $link.TargetPath       = $shortcutBat
     $link.WorkingDirectory = $repoDir
     if (Test-Path -LiteralPath $exe) { $link.IconLocation = "$exe,0" }
-    $link.Description      = "${title}: 1) Deploy & Run or 2) Run"
+    $link.Description      = "${title}: 1) Deploy or 2) Deploy & Run"
     $link.Save()
     Write-Host "    Shortcut -> $shortcut" -ForegroundColor Gray
 }
@@ -78,7 +80,7 @@ if (-not $Force -and (Test-Path -LiteralPath (Join-Path $out $exeName)) -and (Te
 }
 if ($upToDate) {
     Write-Host "  Already deployed at $head (no game source changed) - skipping the package." -ForegroundColor Green
-    if ($Launch) { Start-Process -FilePath (Join-Path $out $exeName) -WorkingDirectory $out }
+    if ($Launch) { Start-Process -FilePath (Join-Path $out $exeName) -WorkingDirectory $out -ArgumentList $captureArgs }
     exit 0
 }
 
@@ -115,6 +117,6 @@ Write-Host "  Published $title at $head." -ForegroundColor Green
 Write-Host "    Exe : $exe" -ForegroundColor Gray
 if ($Launch) {
     Write-Host '  Launching...' -ForegroundColor Cyan
-    Start-Process -FilePath $exe -WorkingDirectory $out
+    Start-Process -FilePath $exe -WorkingDirectory $out -ArgumentList $captureArgs
 }
 exit 0
