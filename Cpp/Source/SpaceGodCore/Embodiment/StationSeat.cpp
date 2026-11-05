@@ -2,6 +2,7 @@
 
 #include "Embodiment/StationSeat.h"
 #include "Embodiment/MountedTurret.h"
+#include "Embodiment/SelfDestruct.h"
 #include "Astro.h"
 #include "BodyCatalog.h"
 #include "BodyDefinition.h"
@@ -68,12 +69,12 @@ namespace SpaceGod::Core
 		auto u = Unit(unusedBattle);
 		if (u != nullptr)
 		{
-			if (u->Dead || !Combat->Alive()) return "destroyed";
+			if (u->Dead || !Combat->Alive()) return Combat->SelfDestructed ? "self-destructed" : "destroyed";
 			if (u->Captured) return "taken as a prize";
 			if (!u->Present()) return "gone";
 			return cs::String();
 		}
-		if (!Combat->Alive() || Index() < 0) return "destroyed";
+		if (!Combat->Alive() || Index() < 0) return Combat->SelfDestructed ? "self-destructed" : "destroyed";
 		return cs::String();
 	}
 
@@ -187,6 +188,12 @@ namespace SpaceGod::Core
 		if (!Embodied()) return;
 		cs::Ref<Battle> b;
 		auto u = Unit(b);
+		// The self-destruct (US-T97): a station's scuttle, the longest fuse and the biggest blast.
+		if (SelfDestruct::Tick(Combat, input.SelfDestruct, SelfDestruct::FuseSeconds(Combat, false, true), dt))
+		{
+			SetOff(b, u);
+			return;
+		}
 		if (u != nullptr)
 		{
 			auto hand = Man(b, u);
@@ -196,6 +203,22 @@ namespace SpaceGod::Core
 		}
 		else if (input.Aim.LengthSquared() > 1e-12) TrainGuns(input.Aim.Normalized(), dt);
 		secondaryWas = input.Secondary;
+	}
+
+	void StationSeat::SetOff(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& u)
+	{
+		// In a fight it goes as a platform shot to pieces does (struck off its settlement's or gate's list when the fight is
+		// settled); out of one it is struck off here, where it stood.
+		if (u != nullptr && u->Present())
+		{
+			SelfDestruct::InBattle(b, u);
+			return;
+		}
+		auto pose = PoseAt(0);
+		auto name = Name();
+		SelfDestruct::Outside(WorldOf(), Combat, name, Faction(), nullptr, pose.FrameBody, pose.OffsetKm, pose.Forward);
+		if (Settlement != nullptr) Settlement->Platforms.Remove(Combat);
+		if (Gate != nullptr) Gate->Forts.Remove(Combat);
 	}
 
 	void StationSeat::TrainGuns(DVec3 aim, double dt)
@@ -229,6 +252,7 @@ namespace SpaceGod::Core
 	void StationSeat::HandBack()
 	{
 		if (Combat == nullptr) return;
+		SelfDestruct::Disarm(Combat); // US-T97: its crew carries no countdown on
 		Combat->StationHeld = false;
 		secondaryWas = false;
 		cs::Ref<Battle> b;

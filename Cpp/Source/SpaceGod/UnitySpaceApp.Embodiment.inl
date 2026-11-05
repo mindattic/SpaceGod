@@ -205,6 +205,27 @@ private:
 
 	void OrderWing(const cs::Ref<Core::FighterSeat>& f, Core::WingOrder order);
 
+	// ---------------------------------------------------------------- the self-destruct (US-T97)
+
+	/// <summary>Shift+Backspace at any controls as a <see cref="Core.SelfDestructKey"/> for <paramref name="held"/>: the press
+	/// aborts a countdown under way, held a second it arms one (not on a press that has just aborted). Toasts what it did,
+	/// and keeps where the craft is while a countdown runs, for <see cref="NoteSelfDestruct"/>.</summary>
+	int SelfDestructCommand(const cs::Ref<Core::IEmbodiable>& held);
+
+	/// <summary>Once the craft the local player armed has gone off and they are back in command: what the blast did, and the
+	/// camera (free where the chase left it) backed out to a safe distance, looking at it.</summary>
+	void NoteSelfDestruct();
+
+	bool selfDestructWatching = false, selfDestructAborted = false;
+	int selfDestructSeq = 0;
+	Core::DVec3 selfDestructScene;
+
+public:
+	/// <summary>The self-destruct key held now is the press that aborted a countdown: it arms nothing (the HUD's arming bar).</summary>
+	bool SelfDestructHoldSpent() const { return selfDestructAborted; }
+
+private:
+
 public:
 	/// <summary>The HUD's line at a non-helm seat (null when none is held): what is held, its state, and the keys out.</summary>
 	/// (Empty stands for C#'s null.)

@@ -2,6 +2,7 @@
 
 #include "Embodiment/ShipHelm.h"
 #include "Embodiment/HelmFlight.h"
+#include "Embodiment/SelfDestruct.h"
 #include "Ephemeris.h"
 #include "Fleet.h"
 #include "Ships.h"
@@ -38,7 +39,7 @@ namespace SpaceGod::Core
 	cs::String ShipHelm::BlockerOf(const cs::Ref<Core::Ship>& ship)
 	{
 		if (ship == nullptr) return "nothing there";
-		if (ship->Destroyed) return "destroyed";
+		if (ship->Destroyed) return ship->Combat != nullptr && ship->Combat->SelfDestructed ? "self-destructed" : "destroyed";
 		if (ship->Derelict) return "derelict";
 		// C#: ship.Battle?.UnitOf(ship)?.Captured ?? false
 		if (ship->Battle != nullptr)
@@ -104,6 +105,12 @@ namespace SpaceGod::Core
 			if (Ship->Combat->Reactor == nullptr) Ship->Combat->Reactor = cs::New<PowerDistribution>();
 			Ship->Combat->Reactor->SetCode(input.PowerSplit);
 		}
+		// The self-destruct (US-T97): armed or aborted here, counted down while the helm is held, and at zero the hull goes.
+		if (!Ship->Destroyed && SelfDestruct::Tick(Ship->Combat, input.SelfDestruct, SelfDestruct::FuseSeconds(Ship->Combat, false, false), dt))
+		{
+			SetOff();
+			return;
+		}
 		auto unit = Unit();
 		if (unit != nullptr && unit->PlayerControlled())
 		{
@@ -112,6 +119,27 @@ namespace SpaceGod::Core
 			unit->PlayerAim = input.Aim;
 		}
 		if (Flight != nullptr && !Ship->Destroyed) Fly(Flight, input, dt);
+	}
+
+	void ShipHelm::SetOff()
+	{
+		auto unit = Unit();
+		if (unit != nullptr && unit->Present())
+		{
+			SelfDestruct::InBattle(Ship->Battle, unit);
+			return;
+		}
+		// Out of any fight: where the helm has flown it, else where its schedule has it.
+		auto pose = PoseAt(world->Ephemeris->Jd);
+		int body = pose.FrameBody;
+		DVec3 at = pose.OffsetKm, forward = pose.Forward;
+		if (Flight != nullptr && Flight->FrameBody >= 0)
+		{
+			body = Flight->FrameBody;
+			at = Flight->State.Pos;
+			forward = Flight->State.Forward;
+		}
+		SelfDestruct::Outside(world, Ship->Combat, Ship->Name, Ship->Faction, Ship, body, at, forward);
 	}
 
 	void ShipHelm::Fly(const cs::Ref<HelmFlight>& f, const EmbodimentInput& e, double dt)
@@ -220,6 +248,8 @@ namespace SpaceGod::Core
 
 	void ShipHelm::HandBack()
 	{
+		// Leaving the helm stops a self-destruct under way (US-T97): no crew carries one on.
+		if (Ship != nullptr) SelfDestruct::Disarm(Ship->Combat);
 		if (world->PilotedShip == Ship) world->PilotedShip = nullptr;
 		if (Ship->Destroyed) return;
 		auto unit = Unit();

@@ -207,6 +207,11 @@ private:
 	/// and realistic scales.
 	void DrawReactor();
 
+	/// At any controls (US-T97, <see cref="Core::SelfDestruct"/>): the arming bar while Shift+Backspace is held, then the
+	/// countdown, big, in the middle of the screen, and the key to abort it. Screen space, so it reads the same at the
+	/// gameplay and realistic scales; drawn with the HUD hidden too, as a warning should be.
+	void DrawSelfDestruct();
+
 	/// At a capital ship's helm (U.SPC-T272): how many guns bear where the player is looking (their fire cones take that
 	/// line in, U.SPC-T533) and how many of them are loaded, the volley building while the trigger is held, and the hull
 	/// it will be fired at.

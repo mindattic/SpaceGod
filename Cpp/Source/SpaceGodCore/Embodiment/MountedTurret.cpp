@@ -8,6 +8,7 @@
 #include "Combat/Gunnery.h"
 #include "Combat/PilotFlight.h"
 #include "Combat/SpinalMounts.h"
+#include "Embodiment/SelfDestruct.h"
 
 namespace SpaceGod::Core
 {
@@ -36,7 +37,7 @@ namespace SpaceGod::Core
 	{
 		if (!IsMannable(Mount->Def)) return "not a gun mount";
 		if (Battle->Over) return "the fight is over";
-		if (!Unit->Present()) return "gone";
+		if (!Unit->Present()) return Unit->Combat != nullptr && Unit->Combat->SelfDestructed ? "self-destructed" : "gone";
 		if (Unit->Captured) return "taken as a prize";
 		if (Mount->Destroyed()) return "shot away";
 		return cs::String();
@@ -105,15 +106,26 @@ namespace SpaceGod::Core
 		Battle->Manned[Mount] = control;
 	}
 
-	void MountedTurret::Control(const EmbodimentInput& input, double /*dt*/)
+	void MountedTurret::Control(const EmbodimentInput& input, double dt)
 	{
 		cs::Ref<MountControl> m;
 		if (!Battle->Manned.TryGetValue(Mount, m)) return;
+		// The self-destruct from a gun (US-T97) sets off the hull or station it is mounted on: the gunner is aboard.
+		if (SelfDestruct::Tick(Unit->Combat, input.SelfDestruct,
+			SelfDestruct::FuseSeconds(Unit->Combat, Unit->Kind == UnitKind::Fighter, Unit->Kind == UnitKind::Platform), dt))
+		{
+			SelfDestruct::InBattle(Battle, Unit);
+			return;
+		}
 		if (input.Aim.LengthSquared() > 1e-12) m->Aim = input.Aim.Normalized();
 		m->Trigger = input.Primary;
 	}
 
-	void MountedTurret::HandBack() { Battle->Manned.Remove(Mount); }
+	void MountedTurret::HandBack()
+	{
+		SelfDestruct::Disarm(Unit->Combat); // US-T97: leaving the gun stops a countdown begun at it
+		Battle->Manned.Remove(Mount);
+	}
 
 	bool MountedTurret::Equals(const cs::Ref<IEmbodiable>& obj) const
 	{

@@ -15,8 +15,9 @@ namespace SpaceGod::Core
 			const auto& i = c->Input;
 			// 8: the manoeuvre key (US-T87), a turn-and-burn in a fighter seat.
 			// 16 and up: the reactor split asked for plus one (US-T94, 0 for no change), so older lines read as no change.
+			// 2048 and 4096: the self-destruct asked for (US-T97, 1 arm, 2 abort), above the split's seven bits.
 			int flags = (i.Primary ? 1 : 0) | (i.Secondary ? 2 : 0) | (i.Boost ? 4 : 0) | (i.Manoeuvre ? 8 : 0)
-				| ((i.PowerSplit >= 0 ? i.PowerSplit + 1 : 0) << 4);
+				| ((i.PowerSplit >= 0 ? i.PowerSplit + 1 : 0) << 4) | ((i.SelfDestruct & 3) << 11);
 			return cs::Cat("control ", Int(c->Player().Seat), " ", Num(i.Aim.X), " ", Num(i.Aim.Y), " ", Num(i.Aim.Z), " ",
 				Num(i.Throttle), " ", Num(i.StrafeRight), " ", Num(i.StrafeUp), " ", Num(i.Roll), " ", Int(flags));
 		}
@@ -57,7 +58,9 @@ namespace SpaceGod::Core
 			input.Secondary = (flags & 2) != 0;
 			input.Boost = (flags & 4) != 0;
 			input.Manoeuvre = (flags & 8) != 0;
-			input.PowerSplit = (flags >> 4) - 1;
+			input.PowerSplit = ((flags >> 4) & 0x7F) - 1;
+			input.SelfDestruct = (flags >> 11) & 3; // US-T97
+
 			return cs::New<SeatControlCommand>(p, input);
 		}
 		throw cs::FormatException(cs::Cat("Unknown command '", f[0], "'"));

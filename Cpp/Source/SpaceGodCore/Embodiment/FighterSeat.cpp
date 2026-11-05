@@ -8,6 +8,7 @@
 #include "Combat/Dogfighting.h"
 #include "Combat/Fighters.h"
 #include "Combat/FlightDecks.h"
+#include "Embodiment/SelfDestruct.h"
 
 namespace SpaceGod::Core
 {
@@ -41,7 +42,7 @@ namespace SpaceGod::Core
 	{
 		if (Unit->Kind != UnitKind::Fighter || Unit->Fighter == nullptr) return "not a launched craft";
 		if (Battle->Over) return "the fight is over";
-		if (Unit->Dead) return "shot down";
+		if (Unit->Dead) return Unit->Combat != nullptr && Unit->Combat->SelfDestructed ? "self-destructed" : "shot down";
 		// Down on a flight deck being turned round to launch again, it is still the player's (U.SPC-T518).
 		if (Unit->Docked && !FlightDecks::TurningRound(Unit)) return "back aboard its carrier";
 		if (!Unit->Present()) return "gone";
@@ -89,6 +90,12 @@ namespace SpaceGod::Core
 	{
 		cs::Ref<FighterControl> stick;
 		if (!Battle->Flown.TryGetValue(Unit, stick)) return;
+		// The self-destruct (US-T97): counted down while the craft is flown, and at zero it goes up where it is.
+		if (SelfDestruct::Tick(Unit->Combat, input.SelfDestruct, SelfDestruct::FuseSeconds(Unit->Combat, true, false), dt))
+		{
+			SelfDestruct::InBattle(Battle, Unit);
+			return;
+		}
 		if (input.Aim.LengthSquared() > 1e-12) stick->Aim = input.Aim.Normalized();
 		stick->Throttle = cs::Math::Max(0.0, cs::Math::Min(1.0, stick->Throttle + input.Throttle * ThrottlePerSecond * dt));
 		// With assist off the same keys are raw thrust (US-T87): the lever only matters to the flight computer.
@@ -105,6 +112,7 @@ namespace SpaceGod::Core
 
 	void FighterSeat::HandBack()
 	{
+		SelfDestruct::Disarm(Unit->Combat); // US-T97: its pilot carries no countdown on
 		Battle->Flown.Remove(Unit);
 		Unit->SetPlayerControlled(false);
 		Unit->PlayerFireHeld = false;

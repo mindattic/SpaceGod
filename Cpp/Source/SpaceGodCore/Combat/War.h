@@ -349,6 +349,10 @@ namespace SpaceGod::Core
 		/// </summary>
 		bool LoseInCollision(const cs::Ref<Ship>& ship, int body, DVec3 offsetKm, double jd, const cs::String& what);
 
+		/// <summary>US-T97: <see cref="LoseInCollision"/> for any cause (a self-destruct's blast, <see cref="SelfDestruct"/>), the
+		/// log saying <paramref name="logLine"/>.</summary>
+		bool LoseOutsideBattle(const cs::Ref<Ship>& ship, int body, DVec3 offsetKm, double jd, const cs::String& logLine);
+
 	private:
 		/// <summary>
 		/// Sends a hull to the bottom. Given the battle and its unit there, whoever is still aboard is put off in

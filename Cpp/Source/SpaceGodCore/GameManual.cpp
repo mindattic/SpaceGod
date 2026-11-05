@@ -379,7 +379,19 @@ namespace SpaceGod::Core
 				  "(a heavy gun swings slowly, and only within its arc) and the left button fires it. / again steps to the next "
 				  "gun, Backspace moves up to the hull's helm (or the whole station), and P hands it back to its crew. Past the "
 				  "last gun / goes back to the helm or station, and / there starts on the first gun again, so every gun on a "
-				  "capital ship or a station is a few presses away for a better angle.")),
+				  "capital ship or a station is a few presses away for a better angle."),
+				T("Self-destruct",
+				  "Whatever you hold -- a fighter, a ship's helm, a station, or a gun, which sets off the hull or station it is "
+				  "mounted on -- can be made to blow itself up. Hold Shift+Backspace for a second to arm it: a countdown starts, "
+				  "big in the middle of the screen (5 seconds in a fighter, 8 in a light hull, 15 in a capital ship, 20 on a "
+				  "station), and Shift+Backspace again aborts it, as does leaving the seat. At zero the reactor goes: the craft is "
+				  "destroyed as any kill is, leaving its wreck, and everyone aboard dies with it. The blast reaches everything "
+				  "near, friend or foe, worst on whatever it is touching and falling off fast with the gap: a fighter is a big "
+				  "grenade (a third of a kilometre), a corvette reaches about a kilometre, a cruiser four, a carrier eight, and a "
+				  "hull whose reactor is shot up blows weaker. It strikes as a hit does -- the shield over that patch takes it "
+				  "first, then the armour and the hardpoints on that side, and a small craft's blast finds an open weak point -- "
+				  "so a hull flown up against a capital's bow and set off guts the bow. You simply leave: the view backs off to a "
+				  "safe distance. The deed is the craft's own: its faction and its captain answer for it, never you.")),
 
 			cs::New<ManualChapter>("The galaxy and travel", "Star systems, gates, lanes, FTL and the galaxy map", Keys(),
 				T("The systems",

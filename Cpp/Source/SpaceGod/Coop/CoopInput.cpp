@@ -59,7 +59,9 @@ namespace SpaceGod::Coop
 				SG_FIELD(Manoeuvre), SG_FIELD(MouseDelta), SG_FIELD(MousePosition), SG_FIELD(Move), SG_FIELD(MoveToHost), SG_FIELD(NumberKey), SG_FIELD(Pilot),
 				SG_FIELD(PowerKey), // US-T94: the reactor split's arrow keys, an edge
 				SG_FIELD(QuickLoad), SG_FIELD(QuickSave), SG_FIELD(ResetTime), SG_FIELD(RightClicked), SG_FIELD(Roll), SG_FIELD(Scroll),
-				SG_FIELD(SelectClicked), SG_FIELD(SelectDoubleClicked), SG_FIELD(Slow), SG_FIELD(SpawnPractice), SG_FIELD(ThrottleStep),
+				SG_FIELD(SelectClicked), SG_FIELD(SelectDoubleClicked),
+				SG_FIELD(SelfDestructArm), SG_FIELD(SelfDestructHoldS), SG_FIELD(SelfDestructTap), // US-T97: the self-destruct's key
+				SG_FIELD(Slow), SG_FIELD(SpawnPractice), SG_FIELD(ThrottleStep),
 				SG_FIELD(TimeFaster), SG_FIELD(TimeSlower), SG_FIELD(ToggleBoarding), SG_FIELD(ToggleBounties), SG_FIELD(ToggleCargo),
 				SG_FIELD(ToggleContracts), SG_FIELD(ToggleFleet), SG_FIELD(ToggleFlightAssist), SG_FIELD(ToggleFtlAutopilot),
 				SG_FIELD(ToggleGalaxyMap), SG_FIELD(ToggleHelp), SG_FIELD(ToggleHud), SG_FIELD(ToggleLabels), SG_FIELD(ToggleLanes),

@@ -29,6 +29,7 @@
 #include "Combat/Diplomacy.h"
 #include "Combat/Dogfighting.h"
 #include "Embodiment/CraftPower.h"
+#include "Embodiment/SelfDestruct.h"
 #include "Combat/EnergyWeapons.h"
 #include "Combat/FireCones.h"
 #include "Combat/FlightModels.h"
@@ -144,6 +145,7 @@ namespace SpaceGod::UI
 			}
 		}
 		DrawLaneEffects();
+		DrawSelfDestruct(); // US-T97: shown with the HUD off too
 		if (!app->ShowHud)
 		{
 			if (app->ShowSaves) DrawSaves();
@@ -944,6 +946,68 @@ namespace SpaceGod::UI
 			DrawLabel(cs::Cat("x", cs::Fmt(p.Factor(s), "0.00")), Vector2(x, base + 18), Dim, true);
 		}
 		DrawLabel("arrows: L/U/R a pip, Down even, Shift all", Vector2(r.x + 10, r.y + h - 20), Dim, true);
+	}
+
+	// ---------------------------------------------------------------- the self-destruct (US-T97)
+
+	void Hud::DrawSelfDestruct()
+	{
+		if (Event::current().type != EventType::Repaint || app->Travel->Active) return;
+		auto seat = app->HeldSeat();
+		if (seat == nullptr || !SelfDestruct::Can(seat)) return;
+		double left = SelfDestruct::Remaining(seat);
+		float hold = app->SelfDestructHoldSpent() ? 0.0f : app->Input.SelfDestructHoldS;
+		if (left < 0 && hold <= 0) return;
+		static cs::Ref<GUIStyle> big, sub;
+		if (big == nullptr)
+		{
+			big = cs::New<GUIStyle>();
+			big->fontSize = 40;
+			big->fontStyle = FontStyle::Bold;
+			big->alignment = TextAnchor::MiddleCenter;
+			sub = cs::New<GUIStyle>();
+			sub->fontSize = 15;
+			sub->fontStyle = FontStyle::Bold;
+			sub->alignment = TextAnchor::MiddleCenter;
+		}
+		auto red = Color(1.0f, 0.22f, 0.15f);
+		auto old = GUI::contentColor;
+		auto oldColor = GUI::color;
+		float w = 520, y = Mathf::Max(Screen::height * 0.22f, 120.0f);
+		auto r = Rect((Screen::width - w) * 0.5f, y, w, 118);
+		GUI::Box(r, GUIContent::none(), panel);
+		if (left >= 0)
+		{
+			// The count, pulsing faster as it runs out.
+			float rate = left < 3 ? 8.0f : 3.0f;
+			float pulse = 0.65f + 0.35f * Mathf::Abs(Mathf::Sin(Time::unscaledTime * rate));
+			GUI::contentColor = Color(red.r, red.g, red.b, pulse);
+			GUI::Label(Rect(r.x, r.y + 6, w, 30), "SELF-DESTRUCT", sub);
+			GUI::Label(Rect(r.x, r.y + 30, w, 50), cs::Fmt(cs::Math::Ceiling(left * 10) / 10, "0.0"), big);
+			double fuse = SelfDestruct::FuseSeconds(seat);
+			GUI::color = Color(0, 0, 0, 0.5f);
+			GUI::DrawTexture(Rect(r.x + 20, r.y + 84, w - 40, 6), Icons::White());
+			GUI::color = red;
+			GUI::DrawTexture(Rect(r.x + 20, r.y + 84, (w - 40) * static_cast<float>(fuse > 0 ? left / fuse : 0), 6), Icons::White());
+			GUI::color = oldColor;
+			GUI::contentColor = Dim;
+			GUI::Label(Rect(r.x, r.y + 94, w, 20), cs::Cat(seat->Name(), "  \xC2\xB7  everyone aboard dies  \xC2\xB7  Shift+Backspace aborts"), sub);
+		}
+		else
+		{
+			// Held, not yet armed: the bar fills over the second it takes.
+			float f = Mathf::Clamp01(hold / static_cast<float>(SelfDestruct::ArmHoldS));
+			GUI::contentColor = red;
+			GUI::Label(Rect(r.x, r.y + 14, w, 30), "ARMING SELF-DESTRUCT", sub);
+			GUI::color = Color(0, 0, 0, 0.5f);
+			GUI::DrawTexture(Rect(r.x + 20, r.y + 54, w - 40, 12), Icons::White());
+			GUI::color = red;
+			GUI::DrawTexture(Rect(r.x + 20, r.y + 54, (w - 40) * f, 12), Icons::White());
+			GUI::color = oldColor;
+			GUI::contentColor = Dim;
+			GUI::Label(Rect(r.x, r.y + 80, w, 20), cs::Cat("keep holding Shift+Backspace to arm the ", seat->Name(), "'s self-destruct"), sub);
+		}
+		GUI::contentColor = old;
 	}
 
 	void Hud::DrawBroadside(const cs::Ref<Battle>& battle, const cs::Ref<BattleUnit>& me, float x, float y)

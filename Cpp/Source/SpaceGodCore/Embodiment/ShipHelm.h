@@ -93,6 +93,10 @@ namespace SpaceGod::Core
 	private:
 		static double Clamp1(double v);
 
+		/// <summary>The self-destruct's countdown has run out (US-T97, <see cref="SelfDestruct"/>): the hull blows, in its
+		/// fight or, out of one, where the helm has flown it.</summary>
+		void SetOff();
+
 		/// <summary>A capital's broadside stance (US-T81): beam-on to the hull locked in its fight, or the heading held with
 		/// none; <paramref name="note"/> gets the HUD line naming the flank that bears.</summary>
 		DVec3 BroadsideAim(const PilotState& s, cs::String& note) const;

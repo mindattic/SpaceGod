@@ -84,6 +84,10 @@ namespace SpaceGod::Core
 		/// <summary>The reactor split asked for this frame (US-T94, <see cref="PowerDistribution.Code"/>), -1 for no change:
 		/// whole, not a step, so a command carried twice (co-op, a replay) lands the same. See <see cref="CraftPower"/>.</summary>
 		int PowerSplit = -1;
+
+		/// <summary>The self-destruct asked for this frame (US-T97, a <see cref="SelfDestructKey"/>): 0 nothing, 1 arm, 2 abort.
+		/// A command, not a toggle, so one carried twice (co-op, a replay) lands the same. See <see cref="SelfDestruct"/>.</summary>
+		int SelfDestruct = 0;
 	};
 
 	/// <summary>

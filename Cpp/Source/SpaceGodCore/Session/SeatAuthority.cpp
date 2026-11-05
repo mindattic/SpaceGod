@@ -3,6 +3,7 @@
 #include "Session/SeatAuthority.h"
 #include "Embodiment/CraftPower.h"
 #include "Embodiment/EmbodimentSession.h"
+#include "Embodiment/SelfDestruct.h"
 #include "Session/Commands.h"
 #include "Session/SessionEvents.h"
 
@@ -113,6 +114,9 @@ namespace SpaceGod::Core
 			auto input = control->Input;
 			if (input.PowerSplit >= 0) CraftPower::Apply(session->Current, input.PowerSplit);
 			input.PowerSplit = -1;
+			// So does the self-destruct's arm or abort (US-T97); the seat counts it down as it is stepped.
+			if (input.SelfDestruct != 0) SelfDestruct::Command(session->Current, input.SelfDestruct);
+			input.SelfDestruct = 0;
 			controls[p] = input;
 			return;
 		}

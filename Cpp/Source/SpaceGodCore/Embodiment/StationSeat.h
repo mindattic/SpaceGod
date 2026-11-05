@@ -122,6 +122,10 @@ namespace SpaceGod::Core
 		/// cone, reckoned from where the station holds station; nothing is fired at.</summary>
 		void TrainGuns(DVec3 aim, double dt);
 
+		/// <summary>The self-destruct's countdown has run out (US-T97, <see cref="SelfDestruct"/>): the station blows, as its
+		/// unit <paramref name="u"/> in <paramref name="b"/>, or where it stands out of a fight.</summary>
+		void SetOff(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& u);
+
 	public:
 		/// <summary>
 		/// Puts every craft fit to fly in its hangars out into the fight round it (the same launch a carrier makes,

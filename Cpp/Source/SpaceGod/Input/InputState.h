@@ -49,6 +49,13 @@ namespace SpaceGod::Input
 		/// to weapons, Up to shields, Right to engines, Down an even share; with Shift, all it can spare to that one. -1 none.</summary>
 		int PowerKey = -1;
 
+		/// <summary>At the controls (US-T97), Shift+Backspace, the self-destruct: <see cref="SelfDestructTap"/> the press (an
+		/// edge: aborts a countdown under way), <see cref="SelfDestructArm"/> the moment it has been held for
+		/// <see cref="Core.SelfDestruct.ArmHoldS"/> (an edge, once a press: arms it), and <see cref="SelfDestructHoldS"/> how
+		/// long it has been held (the HUD's arming bar; 0 when it is not).</summary>
+		bool SelfDestructTap = false, SelfDestructArm = false;
+		float SelfDestructHoldS = 0;
+
 		/// <summary>Held, not click-edged: while piloting, fires the ship's forward-mount weapons.
 		/// Left click still selects normally outside piloting, via the click-edged <see cref="SelectClicked"/>
 		/// below (gated off while piloting, so holding the trigger down and releasing it never also selects).</summary>
@@ -193,6 +200,9 @@ namespace SpaceGod::Input
 		Vector2 lastClickPosition;
 		bool rightDragged = false;
 		Vector2 rightPressPosition;
+		/// US-T97: when Shift+Backspace went down (-1 while it is not held) and whether this press has armed already.
+		float selfDestructDownAt = -1.0f;
+		bool selfDestructArmed = false;
 
 	public:
 		/// <summary>True on the frame the right button was released without dragging (a "right click").</summary>

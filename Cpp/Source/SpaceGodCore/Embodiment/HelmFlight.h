@@ -22,6 +22,10 @@ namespace SpaceGod::Core
 		/// body's frame, km and km/s, ecliptic axes.</summary>
 		PilotState State;
 
+		/// <summary>The body whose frame <see cref="State"/> is in (set by the host with the rest of the world's part), or -1
+		/// when unknown: where a self-destruct out of any battle goes off (US-T97).</summary>
+		int FrameBody = -1;
+
 		/// <summary>The pull of every body near the hull this frame, km/s^2 (see <see cref="PilotFlight.Gravity"/>).</summary>
 		DVec3 Gravity;
 

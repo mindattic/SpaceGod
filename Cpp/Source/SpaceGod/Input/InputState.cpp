@@ -3,6 +3,7 @@
 #include "Input/InputState.h"
 #include "Input/InputDevice.h"
 #include "CaptureEvents.h"
+#include "Embodiment/SelfDestruct.h"
 
 namespace SpaceGod::Input
 {
@@ -114,11 +115,33 @@ namespace SpaceGod::Input
 		ToggleReorient = kb[Key::R].wasPressedThisFrame;
 		CycleShips = kb[Key::Tab].wasPressedThisFrame;
 		CycleBackward = CycleShips && Boost;
-		Home = kb[Key::Home].wasPressedThisFrame || kb[Key::Backspace].wasPressedThisFrame;
+		// US-T97: Shift+Backspace is the self-destruct's, never home or up to the host.
+		bool backspaceAlone = kb[Key::Backspace].wasPressedThisFrame && !Boost;
+		Home = kb[Key::Home].wasPressedThisFrame || backspaceAlone;
 		Pilot = kb[Key::P].wasPressedThisFrame;
 		CycleSeat = kb[Key::Quote].wasPressedThisFrame ? 1 : kb[Key::Semicolon].wasPressedThisFrame ? -1 : 0;
 		ManGun = kb[Key::Slash].wasPressedThisFrame;
-		MoveToHost = kb[Key::Backspace].wasPressedThisFrame;
+		MoveToHost = backspaceAlone;
+		// US-T97, the self-destruct, two steps so it never goes off by accident: the press is a tap (it aborts a countdown
+		// under way), and held a second (Core::SelfDestruct::ArmHoldS) it arms, once a press. Let go of either key and the
+		// hold starts again.
+		{
+			bool held = Boost && kb[Key::Backspace].isPressed;
+			float now = Time::unscaledTime;
+			SelfDestructTap = Boost && kb[Key::Backspace].wasPressedThisFrame;
+			if (SelfDestructTap || (held && selfDestructDownAt < 0))
+			{
+				selfDestructDownAt = now;
+				selfDestructArmed = false;
+			}
+			if (!held) selfDestructDownAt = -1.0f;
+			SelfDestructHoldS = selfDestructDownAt >= 0 ? now - selfDestructDownAt : 0.0f;
+			if (selfDestructDownAt >= 0 && !selfDestructArmed && SelfDestructHoldS >= static_cast<float>(Core::SelfDestruct::ArmHoldS))
+			{
+				SelfDestructArm = true;
+				selfDestructArmed = true;
+			}
+		}
 		TogglePicker = kb[Key::F9].wasPressedThisFrame;
 		// US-T72 (docs/CAPTURE.md section 5): while capture runs, Alt+F9 / Alt+F10 / Alt+F11 are its screenshot, toggle
 		// recording and save replay instead of the picker, fleet and clear screen. Without capture Alt changes nothing.
@@ -167,6 +190,8 @@ namespace SpaceGod::Input
 		// In command nothing is flown: F focuses, T resets time, Backspace goes home, B watches a battle.
 		ToggleFlightAssist = LockTarget = MoveToHost = ToggleBoarding = Manoeuvre = false;
 		PowerKey = -1; // US-T94: nothing to share a reactor of in command
+		SelfDestructTap = SelfDestructArm = false; // US-T97: nothing to set off in command
+		SelfDestructHoldS = 0;
 		ThrottleStep = 0;
 		Roll = 0;
 	}
@@ -208,6 +233,8 @@ namespace SpaceGod::Input
 		ToggleFlightAssist = false;
 		Manoeuvre = false;
 		PowerKey = -1;
+		SelfDestructTap = SelfDestructArm = false;
+		SelfDestructHoldS = 0;
 		Boost = Slow = Fire = Cruise = FireEmp = DropMine = false;
 		SelectClicked = SelectDoubleClicked = RightClicked = false;
 		Focus = Escape = ToggleScale = TimeFaster = TimeSlower = TogglePause = ResetTime = false;

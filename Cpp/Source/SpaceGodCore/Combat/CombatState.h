@@ -110,6 +110,12 @@ namespace SpaceGod::Core
 		/// A small craft shares its own reactor through <see cref="BattleUnit.Power"/> instead.</summary>
 		cs::Ref<PowerDistribution> Reactor;
 
+		/// <summary>US-T97: seconds left on the self-destruct the player has armed aboard (<see cref="SelfDestruct"/>), below 0
+		/// when none is; and set once it has gone off. Only the player ever arms one (no crew does), and neither is saved: a
+		/// countdown under way when the game is saved is not one when it is loaded.</summary>
+		double SelfDestructS = -1;
+		bool SelfDestructed = false;
+
 		/// <summary>Boost charge, 0-1: drains over <see cref="CombatSpec.BoostDurationS"/> while held and
 		/// recharges (twice as slowly) otherwise. Shared by AI and player flight so boost behaves the same
 		/// whoever is flying.</summary>

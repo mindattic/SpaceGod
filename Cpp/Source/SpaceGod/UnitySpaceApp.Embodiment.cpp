@@ -13,6 +13,7 @@
 #include "Embodiment/FighterSeat.h"
 #include "Embodiment/MountedTurret.h"
 #include "Embodiment/ShipHelm.h"
+#include "Embodiment/SelfDestruct.h"
 #include "Embodiment/StationSeat.h"
 #include "Fleet.h"
 #include "Infrastructure/Infrastructure.h"
@@ -140,11 +141,11 @@ namespace SpaceGod
 
 	cs::String UnitySpaceApp::SeatKeys(const cs::Ref<IEmbodiable>& s)
 	{
-		if (cs::Is<StationSeat>(s)) return cs::String("  (mouse lays its guns, left mouse fires, / man one of its guns, ' ; next seat in the fight, P back to command)");
+		if (cs::Is<StationSeat>(s)) return cs::String("  (mouse lays its guns, left mouse fires, / man one of its guns, ' ; next seat in the fight, Shift+Backspace (hold) self-destruct, P back to command)");
 		return cs::Is<FighterSeat>(s)
 			? cs::String("  (mouse aims, W/S throttle, A/D Q/E strafe, Z/X roll, Shift boost (with A/D Q/E a lateral boost), F flight assist (off: W/S raw thrust), Alt flip for a turn and burn, left mouse guns, right mouse "
 				"weapon group, 1 next group, T lock, 6 next weak point, Ctrl flares, 2 attack my target, 3 cover me, 4 form up, "
-				"5 engage at will, 7/8/9 power to weapons/shields/engines, 0 even power, ' ; next seat, P back to command)")
+				"5 engage at will, 7/8/9 power to weapons/shields/engines, 0 even power, ' ; next seat, Shift+Backspace (hold) self-destruct, P back to command)")
 			: cs::String("  (mouse lays it, left mouse fires, / next gun, Backspace up to the helm, P back to command)");
 	}
 
@@ -484,6 +485,7 @@ namespace SpaceGod
 
 	void UnitySpaceApp::UpdateSeat(float dt)
 	{
+		NoteSelfDestruct(); // US-T97: a seat lost to its own self-destruct (in co-op, or a helm's) is told of here
 		if (Coop::CoopPeer::Active()) { CoopUpdateSeat(dt); return; } // US-T44: every player's seat, stepped on every peer
 		auto held = HeldNonHelm();
 		if (held == nullptr) return;
@@ -505,6 +507,8 @@ namespace SpaceGod
 		input.Secondary = Input.LookHeld && !ClickPanelOpen();
 		// The arrows share the reactor the seat draws on (US-T94): a craft's own, a gun's hull's, a station's.
 		input.PowerSplit = CraftPower::After(held, Input.PowerKey);
+		// Shift+Backspace, the self-destruct (US-T97): held a second it arms, pressed again it aborts.
+		input.SelfDestruct = SelfDestructCommand(held);
 		if (auto cockpit = cs::As<FighterSeat>(held))
 			if (!ClickPanelOpen()) UpdateCockpit(cockpit, input.Aim);
 		// On the sim clock's time, so a fight run faster is flown faster too.
@@ -516,6 +520,7 @@ namespace SpaceGod
 		{
 			cs::String why = session->State()->EndedBecause(session->LocalPlayer());
 			ReturnToCommand(!why.empty() ? why : cs::String("lost"), held->Name());
+			NoteSelfDestruct(); // US-T97
 			return;
 		}
 		auto pose = held->PoseAt(Clock->Jd);
@@ -565,6 +570,61 @@ namespace SpaceGod
 	{
 		int heard = f->OrderWing(order);
 		ShowToast(heard == 0 ? cs::String("No wingmen left to order") : cs::Cat("Wing (", heard, "): ", Wing::Label(order)));
+	}
+
+	// ---------------------------------------------------------------- the self-destruct (US-T97)
+
+	int UnitySpaceApp::SelfDestructCommand(const cs::Ref<IEmbodiable>& held)
+	{
+		if (held == nullptr || !SelfDestruct::Can(held))
+		{
+			selfDestructAborted = false;
+			return 0;
+		}
+		bool armed = SelfDestruct::Armed(held);
+		int key = 0;
+		if (Input.SelfDestructTap && armed)
+		{
+			key = static_cast<int>(SelfDestructKey::Abort);
+			selfDestructAborted = true; // the same press held on does not arm it again
+			ShowToast(cs::Cat("Self-destruct aborted: the ", held->Name(), " stands down"));
+		}
+		else if (Input.SelfDestructArm && !armed && !selfDestructAborted)
+		{
+			key = static_cast<int>(SelfDestructKey::Arm);
+			double fuse = SelfDestruct::FuseSeconds(held);
+			ShowToast(cs::Cat("SELF-DESTRUCT ARMED: the ", held->Name(), " goes up in ", cs::Fmt(fuse, "0"), " s, with everyone aboard  (Shift+Backspace aborts)"));
+		}
+		if (Input.SelfDestructHoldS <= 0) selfDestructAborted = false;
+		// Watch it from the moment it is armed, and keep where it is, so the camera can be set clear of it after.
+		if (armed || key == static_cast<int>(SelfDestructKey::Arm))
+		{
+			if (!selfDestructWatching) selfDestructSeq = SelfDestruct::Last().Seq;
+			selfDestructWatching = true;
+			selfDestructScene = SeatScene(held);
+		}
+		else selfDestructWatching = false;
+		return key;
+	}
+
+	void UnitySpaceApp::NoteSelfDestruct()
+	{
+		const auto& r = SelfDestruct::Last();
+		if (!selfDestructWatching || r.Seq == selfDestructSeq || AtControls()) return;
+		selfDestructWatching = false;
+		selfDestructSeq = r.Seq;
+		ShowToast(cs::Cat("The ", r.Name, " self-destructs: a ", cs::Fmt(r.RadiusKm, "0.0"), " km blast",
+			r.Hit > 0 ? cs::Cat(", ", r.Hit, r.Hit == 1 ? " hull" : " hulls", " caught", r.Destroyed > 0 ? cs::Cat(", ", r.Destroyed, " destroyed") : cs::String()) : cs::String(),
+			r.CrewLost >= 1 ? cs::Cat(", ", cs::Fmt(r.CrewLost, "N0"), " aboard lost") : cs::String(),
+			"  --  the deed is its crew's. Back in command, ", Clock->Warp().Label));
+		// The chase left the camera on the hull: back it out clear of the blast, looking at where it was.
+		if (SpaceCamera->Mode != Cameras::SpaceCamera::CameraMode::Free) return;
+		double safe = cs::Math::Max(r.RadiusKm * BattleKmScale() * 2.5, 1e-6);
+		auto away = SpaceCamera->ScenePosition - selfDestructScene;
+		double d = away.Length();
+		if (d >= safe) return;
+		auto dir = d > 1e-12 ? away / d : DVec3(0, 0.3, -1).Normalized();
+		SpaceCamera->SetPose(selfDestructScene + dir * safe, Quaternion::LookRotation(ToVector(dir * -1.0), Vector3::up()));
 	}
 
 	cs::String UnitySpaceApp::SeatLine()

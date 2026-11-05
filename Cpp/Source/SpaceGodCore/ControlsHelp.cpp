@@ -110,6 +110,7 @@ namespace SpaceGod::Core
 				L("'  ;", "take charge, any time: jump into the next seat in the fight in view (a ship's helm, a fighter or bomber, a station), straight from the one you hold"),
 				L("/", "man the next gun on the hull or station you hold (or have selected): the view sits on the mount, down the barrel; past the last gun, back to the helm or station"),
 				L("Backspace", "at a gun: up to the helm of the hull it is on (or the whole station)"),
+				L("Shift+Backspace (hold)", "self-destruct, at any controls: held a second it arms a countdown (5 s a fighter, 8 s a light hull, 15 s a capital, 20 s a station; a gun sets off its hull), pressed again it aborts; at zero the craft blows with everyone aboard, the blast worst on whatever it is touching"),
 				L("F9", "take-charge picker: every seat on the hull in hand and around the camera (helms, fighters, stations, gun mounts), click one to jump in"),
 				More("in a fighter: mouse aims, W/S throttle (assist off: raw thrust), Alt flip, left mouse guns, right mouse torpedoes"),
 				More("at any seat the craft has the keys and mouse, the camera only follows it (the wheel zooms the chase); keys held through a switch wait to be let go"),

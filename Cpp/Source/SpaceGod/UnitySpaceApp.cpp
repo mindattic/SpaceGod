@@ -1195,7 +1195,16 @@ namespace SpaceGod
 		stick.Secondary = Input.LookHeld && !ClickPanelOpen();
 		// The arrows share the hull's reactor (US-T94): the whole split asked for goes in with the stick.
 		stick.PowerSplit = CraftPower::After(pilotHelm, Input.PowerKey);
+		// Shift+Backspace, the self-destruct (US-T97): the helm counts it down, and out of a fight blows where it has flown.
+		stick.SelfDestruct = SelfDestructCommand(pilotHelm);
+		helmFlight->FrameBody = pilotFrameBody;
 		pilotHelm->Control(stick, dt);
+		if (ship->Destroyed)
+		{
+			// Gone up under the helm: the player is out of it at once (UpdateSeat then says what the blast did).
+			ExitPiloting();
+			return;
+		}
 		// The camera's FOV kick below, and the HUD's readouts.
 		pilotBoosting = helmFlight->Boosting;
 		HaulerReadout(helmFlight->Model, helmFlight->Hull, helmFlight->Input);

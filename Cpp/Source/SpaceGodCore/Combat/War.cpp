@@ -707,11 +707,17 @@ namespace SpaceGod::Core
 
 	bool War::LoseInCollision(const cs::Ref<Ship>& ship, int body, DVec3 offsetKm, double jd, const cs::String& what)
 	{
+		if (ship == nullptr) return false;
+		return LoseOutsideBattle(ship, body, offsetKm, jd, cs::Cat("The ", ship->Name, " breaks up in a collision with ", what));
+	}
+
+	bool War::LoseOutsideBattle(const cs::Ref<Ship>& ship, int body, DVec3 offsetKm, double jd, const cs::String& logLine)
+	{
 		if (ship == nullptr || ship->Destroyed || ship->Battle != nullptr) return false;
 		auto wreck = Wrecks->Add(ship, body, offsetKm, jd);
 		(void)wreck;
 		Scuttle(ship);
-		world->Log(jd, cs::Cat("The ", ship->Name, " breaks up in a collision with ", what), WorldEventKind::Loss, body);
+		world->Log(jd, logLine, WorldEventKind::Loss, body);
 		return true;
 	}
 

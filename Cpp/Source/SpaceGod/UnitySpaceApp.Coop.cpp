@@ -305,6 +305,7 @@ namespace SpaceGod
 			input.Primary = Input.Fire && !ClickPanelOpen();
 			input.Secondary = Input.LookHeld && !ClickPanelOpen();
 			input.PowerSplit = CraftPower::After(held, Input.PowerKey); // US-T94: the arrows' reactor split, whole
+			input.SelfDestruct = SelfDestructCommand(held); // US-T97: arm or abort, landed once on every peer
 			cs::String line = CommandCodec::Write(cs::New<SeatControlCommand>(session->LocalPlayer(), input));
 			if (line != coopLastControl)
 			{
