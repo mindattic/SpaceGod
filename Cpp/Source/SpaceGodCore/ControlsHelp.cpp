@@ -116,6 +116,15 @@ namespace SpaceGod::Core
 				L("1", "pay a fine when hailed"),
 				L("F4", "bounty board of the port in view: outlaws wanted there, their records, where last seen, who hunts them")),
 
+			cs::New<HelpSection>("COMMS AND PILOTS",
+				L("Shift+H", "comms (at any controls): hail any ship or station in range, as the unit you hold; Shift+H again closes"),
+				L("Up / Down, Enter", "pick who to hail (colour: their stance toward you) and open the channel"),
+				L("1-9", "say it: hail, ask about the area (threats by range and bearing off your nose), the news, to trade, buy a crate, ask about them, threaten"),
+				More("threaten a ship for its cargo: by its pilot's nerve, its load and the odds it complies (the cargo comes aboard as stolen crates), runs or fights"),
+				More("a hull that strikes its colours to your side hails you: 1-4 accept, plunder, let it go, or refuse quarter; a pirate taken alive by a lawful hull is turned in"),
+				More("you are no one pilot: bounties, grudges and the story land on the pilot of the body you hold, who owns it all once you leave"),
+				L("Esc / Left", "back to the contacts, then close")),
+
 			cs::New<HelpSection>("FLEET AND COMMAND",
 				L("F10", "your fleet: buy hulls, warehouses, station shares and claims; hire captains and give them standing orders"),
 				L("'  ;", "take charge, any time: jump into the next seat in the fight in view (a ship's helm, a fighter or bomber, a station), straight from the one you hold"),

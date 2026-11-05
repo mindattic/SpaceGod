@@ -403,6 +403,38 @@ namespace SpaceGod::Core
 				  "and who hunts them. A bounty pays in full alive (board the flagship and hand the captain over) and half "
 				  "dead, on proof from close to the wreck. Bounty hunters come for you too once your price is high enough.")),
 
+			cs::New<ManualChapter>("Comms and pilots", "Hailing ships and stations, piracy by radio, and the people you meet", Keys("COMMS AND PILOTS"),
+				T("Hailing",
+				  "Shift+H opens comms at any controls. The contacts are every hull your sensors hold in hailing range, and the "
+				  "stations near you, nearest first, coloured by how they feel about you: green friendly, white neutral, amber "
+				  "wary, red hostile. Pick one and open the channel; then say something with 1-9 or a click. A raider lying "
+				  "dark may answer with nothing but static."),
+				T("What you can say",
+				  "Ask about the area and they tell you what their own side's sensors hold that would go for you, with the "
+				  "range and the bearing off your own nose (\"pirates, 12 klicks out at bearing 104 mark 12\"), any fight on "
+				  "nearby, or the nearest friendly patrol. Ranges are true at realistic scale and as drawn at game scale. Ask "
+				  "the news for the latest the system's log carries. Ask to trade: a freighter names a price for what is in "
+				  "its hold (its pilot's greed and how it feels about you set it) and sells you a crate at a time; a station "
+				  "tells you what it is long on and what it pays well for. Ask about them and they tell you their life."),
+				T("Piracy by radio",
+				  "Threaten a ship for its cargo and its pilot decides, by their nerve and greed, what they carry and the real "
+				  "strength of both groups: they dump it (it comes aboard as stolen crates, as far as your hold has room), "
+				  "they run (and you can run them down), or they turn to fight. Robbery is piracy, booked by whoever saw it. "
+				  "A hull losing a fight strikes its colours and hails you: accept what it offers, plunder it, let it go, or "
+				  "refuse quarter. A pirate taken alive by a lawful hull is turned in."),
+				T("You are no one",
+				  "The SpaceGod is never one pilot. Whatever you say and do is said and done by the unit you hold, and the "
+				  "consequences land on that pilot, that hull and that faction: the bounty, the grudges, the bad blood between "
+				  "factions. Leave the body and the pilot is left holding it all, and believes every bit of it was their own "
+				  "idea. Nobody out there knows you exist."),
+				T("Named pilots",
+				  "Anyone you hail, fly, fight or rescue becomes a named character with a past read from the system's own "
+				  "history: where they were born, who they work for, the hulls they flew and lost, the battles they lived "
+				  "through, their grudges. Their careers move on what they do: a pirate fighter rises by renown, to lieutenant "
+				  "only by betrayal, to captain, warlord and pirate king; one taken alive goes to a detention centre, then "
+				  "rehabilitation, fighter school, a pilot's posting, officer, and at last captain of a capital ship of their "
+				  "own. The comms panel shows their age, home and next step.")),
+
 			cs::New<ManualChapter>("Fleets and command", "Your house, your fleet, and commanding a polity", Keys("FLEET AND COMMAND"),
 				T("Your house",
 				  "F10 opens your fleet: buy hulls at a lawful yard or take the one you fly, hire captains and give them "

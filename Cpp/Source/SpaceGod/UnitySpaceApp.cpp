@@ -435,6 +435,7 @@ namespace SpaceGod
 		Rendering::Materials::DestroyAllOwned();
 		if (hud != nullptr) hud->DestroyOwnedTextures();
 		pauseMenu->DestroyOwnedTextures();
+		DestroyCommsTextures(); // US-T137
 		cheatMenu->DestroyOwnedTextures(); // US-T126
 	}
 
@@ -456,6 +457,7 @@ namespace SpaceGod
 		// US-T126: the dev menu (Shift+F1) comes next in the order: while it is open the keys and the mouse are its, and the
 		// craft and the camera get an idle frame (the simulation runs on).
 		if (UpdateCheatMenu()) Input.Handover();
+		if (UpdateComms()) Input.Handover(); // US-T137: the comms panel (Shift+H) has the keys while open; US-T138: the held pilot
 		ArbitrateInput(true); // US-T90: one owner per input this frame (the craft held, else the command view)
 		int screensOpen = OpenScreens();
 		HandleCommands();
@@ -519,6 +521,7 @@ namespace SpaceGod
 
 		ToastAge += dt;
 		bool lockCursor = (Input.LookHeld || (AtControls() && !ClickPanelOpen())) && !ModelViewer::CapturesInput() && !cheatMenu->IsOpen; // US-T126
+		if (commsOpen) lockCursor = false; // US-T137: the comms panel takes clicks
 		Cursor::lockState = lockCursor ? CursorLockMode::Locked : CursorLockMode::None;
 		Cursor::visible = !lockCursor;
 	}
@@ -595,6 +598,7 @@ namespace SpaceGod
 		bool menu = pauseMenu->IsOpen;
 		if (menu) GUI::enabled = false;
 		hud->Draw();
+		DrawComms(); // US-T137: the comms panel, over the HUD
 		DrawSystemCruise(); // US-T127: the cruise drive's readout
 		cheatMenu->Draw(*this); // US-T126: the dev menu, or the HUD's hint for its key
 		GUI::enabled = true;
