@@ -64,6 +64,7 @@ namespace SpaceGod::Views
 	class BioMassView;
 	class DiscView;
 	class GraveyardView;
+	class HarvesterView;
 	class SpaceFeaturesView;
 	class FighterViews;
 	class LaneView;

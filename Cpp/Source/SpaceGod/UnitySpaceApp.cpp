@@ -27,6 +27,7 @@
 #include "Views/DebrisFields.h"
 #include "Views/DiscView.h"
 #include "Views/GraveyardView.h"
+#include "Views/HarvesterView.h"
 #include "Systems/Graveyards.h"
 #include "Views/SpaceFeaturesView.h"
 #include "Views/EmbeddedPods.h"
@@ -303,6 +304,7 @@ namespace SpaceGod
 		embodiedShine = cs::New<Views::EmbodiedShine>(this, systemRoot); // US-T136
 		discView = cs::New<Views::DiscView>(this, systemRoot);
 		graveyardView = cs::New<Views::GraveyardView>(this, systemRoot); // US-T131
+		harvesterView = cs::New<Views::HarvesterView>(this, systemRoot); // US-T146
 		spaceFeaturesView = cs::New<Views::SpaceFeaturesView>(this, systemRoot); // US-T130
 		fighterViews = cs::New<Views::FighterViews>(this, systemRoot);
 		laneView = cs::New<Views::LaneView>(this, systemRoot);

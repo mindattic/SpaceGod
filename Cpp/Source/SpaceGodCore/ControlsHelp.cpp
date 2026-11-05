@@ -108,6 +108,8 @@ namespace SpaceGod::Core
 				L("I", "cargo hold (while piloting): click a crate, then a cell, to move it"),
 				L("\\", "trade desk: runs from your price intelligence, brokers, trade news, charters, insurance, warehouses, the back door"),
 				L("F7", "contracts board of the port in view: freight, passengers, colonists, escorts, patrols, surveys, bounties"),
+				L("Home  (at a gas giant)", "at a helm by a giant's gas works: take its protection contract -- guard a skimmer platform for some orbits and beat off the raiders that come; pay and standing to the hull you hold and its pilot"), // US-T146
+				L("Shift+Home  (by a skimmer)", "raid the nearest gas skimmer's tanks: its helium-3 and volatiles come aboard as stolen crates, and its owner's fuel supply is cut (piracy)"), // US-T146
 				L("F2", "outfitting at a shipyard (or Outfit on the market): guns, shields and drives on the hardpoints; plate, racks, scanners, a brig in the internal space"),
 				L("X", "news feed: shocks, price spikes, embargoes, battles and captures as they happen")),
 

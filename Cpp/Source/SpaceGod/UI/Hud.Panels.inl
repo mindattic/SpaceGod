@@ -80,6 +80,13 @@ private:
 	void DrawBioMassMarkers();
 	static constexpr double BioMassWarnKm = 2e6;
 
+	// ---------------------------------------------------------------- the gas works (US-T146, Hud.Harvest.cpp)
+
+	/// <summary>The skimmer platforms of the giant nearest the camera bracketed with their works and tanks; at a helm by a
+	/// giant, the keys for its protection contract and for raiding a skimmer; the contract under way, its orbits, the
+	/// platform's hull and the waves.</summary>
+	void DrawHarvest();
+
 	cs::Ref<GUIStyle> opportunityHook;
 
 	void DrawBrackets(Rect r, Color color, float thickness);

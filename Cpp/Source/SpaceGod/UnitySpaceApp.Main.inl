@@ -319,6 +319,8 @@ private:
 	cs::Ref<Views::DiscView> discView;
 	/// <summary>US-T131: the place's graveyards.</summary>
 	cs::Ref<Views::GraveyardView> graveyardView;
+	/// <summary>US-T146: the gas giants' works (skimmer platforms, their plumes and skimmers, the tankers).</summary>
+	cs::Ref<Views::HarvesterView> harvesterView;
 	/// <summary>US-T130: the place's nebulae and ice fields.</summary>
 	cs::Ref<Views::SpaceFeaturesView> spaceFeaturesView;
 	cs::Ref<Views::FighterViews> fighterViews;

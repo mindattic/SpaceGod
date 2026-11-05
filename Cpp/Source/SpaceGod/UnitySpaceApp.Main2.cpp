@@ -71,6 +71,7 @@
 #include "Views/DebrisFields.h"
 #include "Views/DiscView.h"
 #include "Views/GraveyardView.h"
+#include "Views/HarvesterView.h"
 #include "Views/SpaceFeaturesView.h"
 #include "Views/EmbeddedPods.h"
 #include "Views/FighterViews.h"
@@ -1354,6 +1355,7 @@ namespace SpaceGod
 		UpdateOrbitLines(dt);
 		discView->Update(ShowOrbits, orbitBattleFade);
 		if (graveyardView) graveyardView->Update(); // US-T131: graveyards
+		if (harvesterView) harvesterView->Update(); // US-T146: the gas works, and the player's contract with them
 		if (spaceFeaturesView) spaceFeaturesView->Update(); // US-T130: nebulae and ice fields
 		UpdatePathLine();
 	}

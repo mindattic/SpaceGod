@@ -408,6 +408,22 @@ namespace SpaceGod::Core
 				T("Contracts",
 				  "Every lawful port posts jobs from what the system needs: freight, passengers and colonists, escorts, "
 				  "patrols, surveys and bounties (F7). Completing one pays and raises standing with the patron; failing one costs it."),
+				T("Gas giant harvesting", // US-T146
+				  "Every gas giant has a gas works: three to six skimmer platforms in low orbit, each a tank farm whose skimmers "
+				  "dive into the cloud tops and climb back laden (a plume of glowing gas runs from each platform down to the "
+				  "clouds), and a tanker for each platform that carries a full tank to the port that wants it most, the owner's "
+				  "own first. They scoop helium-3, the fusion fuel every port sells for drives and navies' supply ships draw, and "
+				  "hydrocarbons and nitrogen, the volatiles: a Jupiter-like giant more helium-3, an ice giant more volatiles. "
+				  "Raiders prey on them: pirates, the Bio Mass where it drifts near, ghost ships at the outermost giant beyond Sol, "
+				  "a power at war with the owner. A platform raided loses its tanks and is down for days, a tanker taken loses its "
+				  "load; either cuts the owner's fuel supply and prices climb where the gas no longer comes. Each works posts "
+				  "protection contracts: at a helm by the giant, Home takes the best one, to guard a platform for a number of its "
+				  "orbits (a few hours each). Waves come during it, raiders, ghosts, warships or Bio Mass, beside you: beat them "
+				  "off before they gut the platform, and stay at the giant, for a wave that finds the platform unguarded fails the "
+				  "contract. The pay goes into the purse of the hull you hold and the deed into its pilot's story, the standing to "
+				  "that pilot's own record and goodwill to their colours, never to you. Shift+Home raids the nearest skimmer "
+				  "instead: its gas comes aboard as stolen crates, and it is piracy on the pilot's record. The dev menu (Shift+F1) "
+				  "has Travel > Go to a harvester, and Combat > Start a protection contract, Harvester wave now and Raid a harvester."),
 				T("The trade desk",
 				  "The backslash key opens it: the runs your known prices add up to (prices you saw, your captains report or a "
 				  "broker sells, each ageing), trade news, time charters of your hulls to the companies, insurance, warehouses "

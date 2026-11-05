@@ -36,6 +36,7 @@
 #include "Economy/Settlement.h"
 #include "Economy/TradeDesk.h"
 #include "Combat/BioMass.h"
+#include "Economy/GasHarvest.h"
 #include "Events/EventDirector.h"
 #include "Events/EventSources.h"
 #include "Events/Opportunity.h"
@@ -144,6 +145,7 @@ namespace SpaceGod::Core
 		Holdings->Update(jd);
 		if (Trade) Trade->Update(jd);
 		if (Mining) Mining->Update(jd);
+		EnsureHarvest(jd)->Update(jd); // US-T146: the gas giants' works
 		ReplaceWorksEscorts(jd);
 		if (jd >= nextRecountJd)
 		{
@@ -164,6 +166,20 @@ namespace SpaceGod::Core
 			BioMass = cs::New<::SpaceGod::Core::BioMass>(shared_from_this(), static_cast<int>(h & 0x7FFFFFFF) ^ 0x6B10, jd);
 		}
 		return BioMass;
+	}
+
+	cs::Ref<::SpaceGod::Core::GasHarvest> World::EnsureHarvest(double jd)
+	{
+		if (Harvest == nullptr)
+		{
+			// Its own stream (US-T146), never one of the subsystems' seed offsets: FNV-1a of the root body's name.
+			uint32_t h = 2166136261u;
+			auto cat = Catalog();
+			if (cat != nullptr && cat->Count() > 0)
+				for (unsigned char c : cat->Root()->Name) { h ^= c; h *= 16777619u; }
+			Harvest = cs::New<::SpaceGod::Core::GasHarvest>(shared_from_this(), static_cast<int>(h & 0x7FFFFFFF) ^ 0x6A5E, jd);
+		}
+		return Harvest;
 	}
 
 	void World::UpdateAdventures(double jd, DVec3 playerHelioKm)

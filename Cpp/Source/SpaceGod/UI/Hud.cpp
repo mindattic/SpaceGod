@@ -655,6 +655,7 @@ namespace SpaceGod::UI
 		DrawTargetMarker(app->Selected, true);
 		DrawOpportunityMarkers();
 		DrawBioMassMarkers(); // US-T125
+		DrawHarvest(); // US-T146
 
 		app->ShipNameRects.Clear();
 		if (app->ShowLabels)

@@ -55,6 +55,7 @@ namespace SpaceGod::Core
 	class SocietySpec;
 	class Facility;
 	class BioMass;
+	class GasHarvest;
 	struct TugDanger;
 	struct HeavyLanePath;
 	enum class PodState : int;
@@ -197,6 +198,12 @@ namespace SpaceGod::Core
 
 		/// <summary>This system's Bio Mass, made now (with its own random stream, seeded from the system's name) if it has none.</summary>
 		cs::Ref<::SpaceGod::Core::BioMass> EnsureBioMass(double jd);
+
+		/// <summary>This system's gas giant works (US-T146): made on first use, so older saves load without it.</summary>
+		cs::Ref<::SpaceGod::Core::GasHarvest> Harvest;
+
+		/// <summary>This system's gas giant works, planned now (with its own random stream, seeded from the system's name) if it has none.</summary>
+		cs::Ref<::SpaceGod::Core::GasHarvest> EnsureHarvest(double jd);
 
 		/// <summary>The most bounty hunter groups the free traders keep in service.</summary>
 		int HunterCap = 3;
