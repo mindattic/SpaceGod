@@ -80,6 +80,10 @@ public:
 	/// null for any other hull.</summary>
 	cs::Nullable<Core::EngineTelegraph> PilotTelegraph;
 
+	/// <summary>The helm's own flight line for the HUD (US-T87, <see cref="HelmFlight.Note"/>): with flight assist off,
+	/// what stopping costs; empty otherwise.</summary>
+	cs::String PilotFlightNote;
+
 private:
 	int pilotFrameBody = 0;
 

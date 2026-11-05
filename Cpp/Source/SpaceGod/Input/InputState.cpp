@@ -24,6 +24,9 @@ namespace SpaceGod::Input
 		Cruise = kb[Key::J].isPressed;
 		ThrottleStep = kb[Key::W].wasPressedThisFrame ? 1 : kb[Key::S].wasPressedThisFrame ? -1 : 0;
 		Roll = Axis(kb[Key::X], kb[Key::Z]);
+		// US-T87: Alt held is the manoeuvre key at the controls (a turn-and-burn's flip); with F9-F11 under capture, and
+		// Shift+Alt+K, Alt keeps its other meanings, which only read it with another key.
+		Manoeuvre = kb[Key::LeftAlt].isPressed || kb[Key::RightAlt].isPressed;
 
 		MousePosition = mouse.position;
 		MouseDelta = mouse.delta;
@@ -155,6 +158,7 @@ namespace SpaceGod::Input
 		Scroll = 0;
 		Roll = 0;
 		ToggleFlightAssist = false;
+		Manoeuvre = false;
 		Boost = Slow = Fire = Cruise = FireEmp = DropMine = false;
 		SelectClicked = SelectDoubleClicked = RightClicked = false;
 		Focus = Escape = ToggleScale = TimeFaster = TimeSlower = TogglePause = ResetTime = false;

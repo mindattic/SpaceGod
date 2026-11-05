@@ -787,7 +787,8 @@ namespace SpaceGod::UI
 		cs::String readout = cs::Cat(assist ? "FLIGHT ASSIST ON" : "FLIGHT ASSIST OFF",
 			telegraph.has_value() ? cs::Cat("   ENGINES ", TelegraphText(*telegraph), " (W/S)") : cs::String(),
 			app->PilotDocking ? cs::String("   DOCKING") : app->PilotStop.has_value() && app->PilotInPortApproach ? cs::String("   hold Ctrl to dock") : cs::String(), "   ", SpeedText(speed), stopText,
-			speed > 1e-6 ? cs::Cat("   track ", cs::Fmt(driftDeg, "0"), "° off the nose") : cs::String(), "   (F)");
+			speed > 1e-6 ? cs::Cat("   track ", cs::Fmt(driftDeg, "0"), "° off the nose") : cs::String(),
+			app->PilotFlightNote.empty() ? cs::String() : cs::Cat("   ", app->PilotFlightNote), "   (F)"); // US-T87: the brake plan
 		auto content = GUIContent(readout);
 		auto size = small->CalcSize(content);
 		auto p = Vector2((Screen::width - size.x) * 0.5f, static_cast<float>(Screen::height - 66));

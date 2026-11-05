@@ -100,6 +100,17 @@ namespace SpaceGod::Core
 
 		/// <summary>The craft's roof and spin, carried from step to step by its flight model (U.SPC-T424).</summary>
 		DVec3 Up, AngularVelocity;
+
+		/// <summary>This step's raw burn, -1..1 (US-T87): W the main drive, S the retros. With flight assist off it is the
+		/// thrust, as the throttle lever has no meaning when nothing holds a speed; with assist on the lever flies.
+		/// A per-step input, like the triggers, so not saved.</summary>
+		double Burn = 0;
+
+		/// <summary>The turn-and-burn key held this step (US-T87, <see cref="PilotFlight.FlipAim"/>). Not saved.</summary>
+		bool Flip = false;
+
+		/// <summary>The seat's flight line for the readout (US-T87): with assist off, what stopping costs. Not saved.</summary>
+		cs::String Note;
 	};
 
 	/// <summary>

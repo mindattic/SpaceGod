@@ -265,6 +265,62 @@ namespace SpaceGod::Core
 		return v * c + DVec3::Cross(k, v) * sn + k * (DVec3::Dot(k, v) * (1 - c));
 	}
 
+	DVec3 PilotFlight::FlipAim(const PilotState& s)
+	{
+		double v = s.Vel.Length();
+		return v > RestKmS ? s.Vel * (-1.0 / v) : s.Forward;
+	}
+
+	BrakePlan PilotFlight::Brake(const PilotState& s, const HullDynamics& hull, double turnRateDegS)
+	{
+		BrakePlan p;
+		double v = s.Vel.Length();
+		if (v <= RestKmS) return p;
+		p.Moving = true;
+		// The flip: the angle from the nose to the retrograde, swung at most at the turn rate, spun up and braked at
+		// the hull's own angular acceleration (a short flip never reaches the full rate: 2·sqrt(θ/α)).
+		double theta = cs::Math::Acos(Max(-1.0, Min(1.0, DVec3::Dot(s.Forward, s.Vel * (-1.0 / v)))));
+		double rate = turnRateDegS * Astro::Deg2Rad, alpha = hull.PitchYawAngularAccel;
+		if (theta <= 1e-9) p.FlipS = 0;
+		else if (alpha <= 0 || rate <= 0) p.FlipS = cs::Double::PositiveInfinity;
+		else p.FlipS = theta <= rate * rate / alpha ? 2 * cs::Math::Sqrt(theta / alpha) : theta / rate + rate / alpha;
+		if (hull.MainAccel > 0 && p.FlipS < cs::Double::PositiveInfinity)
+		{
+			p.BurnS = v / hull.MainAccel;
+			p.BurnKm = v * p.FlipS + v * v / (2 * hull.MainAccel);
+		}
+		else p.BurnS = p.BurnKm = cs::Double::PositiveInfinity;
+		if (hull.RetroAccel > 0)
+		{
+			p.RetroS = v / hull.RetroAccel;
+			p.RetroKm = v * v / (2 * hull.RetroAccel);
+		}
+		else p.RetroS = p.RetroKm = cs::Double::PositiveInfinity;
+		return p;
+	}
+
+	namespace
+	{
+		cs::String BrakeTime(double s) { return s >= 99.5 ? cs::Cat(cs::Fmt(s / 60, "0.0"), " min") : cs::Cat(cs::Fmt(s, "0"), " s"); }
+
+		cs::String BrakeRange(double km)
+		{
+			if (km < 1) return cs::Cat(cs::Fmt(km * 1000, "0"), " m");
+			if (km < 100) return cs::Cat(cs::Fmt(km, "0.0"), " km");
+			return cs::Cat(cs::Fmt(km, "N0"), " km");
+		}
+	}
+
+	cs::String BrakePlan::Text() const
+	{
+		if (!Moving) return "";
+		cs::String burn = BurnS < cs::Double::PositiveInfinity
+			? cs::Cat("flip+burn ", BrakeTime(FlipS + BurnS), " / ", BrakeRange(BurnKm))
+			: cs::String("no main drive");
+		cs::String retro = HasRetros() ? cs::Cat("retros ", BrakeTime(RetroS), " / ", BrakeRange(RetroKm)) : cs::String("no retros: flip and burn");
+		return cs::Cat("BRAKE ", burn, "  ", retro);
+	}
+
 	double PilotFlight::Clamp(double x) { return Max(-1.0, Min(1.0, x)); }
 
 	double PilotFlight::Limit(double x, double max) { return Max(-max, Min(max, x)); }

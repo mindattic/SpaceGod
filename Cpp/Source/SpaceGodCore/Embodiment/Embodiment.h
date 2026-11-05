@@ -74,6 +74,10 @@ namespace SpaceGod::Core
 		/// hauler's docking mode in a port's approach), and the engine telegraph rung this frame (+1 ahead, -1 astern).</summary>
 		bool Cruise = false, Fine = false;
 		int TelegraphStep = 0;
+
+		/// <summary>The manoeuvre key held (Alt, US-T87): the hull swings its nose onto the retrograde for a turn-and-burn
+		/// (<see cref="PilotFlight.FlipAim"/>), sliding on along its track as it turns.</summary>
+		bool Manoeuvre = false;
 	};
 
 	/// <summary>

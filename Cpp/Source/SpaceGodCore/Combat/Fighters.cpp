@@ -514,7 +514,14 @@ namespace SpaceGod::Core
 		input.Boost = stick->Boost;
 		input.InCombat = true;
 		input.FlightAssistOff = stick->FlightAssistOff;
-		craft->Model()->Step(state, u->Combat, hull, craft->Tuning(engines), input, DVec3::Zero, dt);
+		// The player's own hands (US-T87): the player-facing handling, never a crew's. With assist off W and S are raw
+		// thrust on the main drive and the retros, and the flip key swings the nose onto the retrograde.
+		input.Piloted = true;
+		if (stick->FlightAssistOff) input.Throttle = Max(-1.0, Min(1.0, stick->Burn));
+		if (stick->Flip) input.DesiredForward = PilotFlight::FlipAim(state);
+		auto tuning = craft->Tuning(engines);
+		craft->Model()->Step(state, u->Combat, hull, tuning, input, DVec3::Zero, dt);
+		stick->Note = stick->FlightAssistOff ? PilotFlight::Brake(state, hull, tuning.TurnRateDegS).Text() : cs::String();
 		u->Pos = state.Pos;
 		u->Vel = state.Vel;
 		u->Forward = state.Forward;

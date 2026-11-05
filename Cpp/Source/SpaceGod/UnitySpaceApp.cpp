@@ -1140,7 +1140,9 @@ namespace SpaceGod
 		if (Input.ToggleFlightAssist)
 		{
 			pilotFlightAssistOff = !pilotFlightAssistOff;
-			ShowToast(pilotFlightAssistOff ? "FLIGHT ASSIST OFF: the hull drifts on its momentum  (F to turn it back on)" : "FLIGHT ASSIST ON");
+			ShowToast(pilotFlightAssistOff
+				? "FLIGHT ASSIST OFF: the hull drifts on its momentum and turns free of its track; W/S raw thrust, Alt flips for a turn and burn  (F to turn it back on)"
+				: "FLIGHT ASSIST ON: the thrusters cancel drift and it flies where it points");
 		}
 
 		if (Input.ToggleSilent)
@@ -1173,6 +1175,8 @@ namespace SpaceGod
 		stick.Boost = Input.Boost;
 		stick.Cruise = Input.Cruise;
 		stick.Fine = Input.Slow;
+		// Alt, the manoeuvre key (US-T87): the turn-and-burn's flip onto the retrograde.
+		stick.Manoeuvre = Input.Manoeuvre;
 		// W and S ring a capital's engine telegraph a step at a time (U.SPC-T499).
 		stick.TelegraphStep = Input.ThrottleStep;
 		// The trigger and the crosshair; UpdatePilotBattle below gates them on what the hull can fire right now.
@@ -1183,6 +1187,7 @@ namespace SpaceGod
 		pilotBoosting = helmFlight->Boosting;
 		HaulerReadout(helmFlight->Model, helmFlight->Hull, helmFlight->Input);
 		PilotTelegraph = capital != nullptr ? pilot().Telegraph : cs::Nullable<EngineTelegraph>();
+		PilotFlightNote = helmFlight->Note;
 		SpaceCamera->PilotView = PilotViewRotation(control);
 		auto posBefore = helmFlight->PosBefore;
 		// Hulls, stations, rocks and wreckage have volume: what the hull flies into, it hits (U.SPC-T60).

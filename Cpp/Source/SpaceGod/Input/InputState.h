@@ -41,6 +41,10 @@ namespace SpaceGod::Input
 		/// which is gated off while piloting, so the two never fire together).</summary>
 		bool ToggleFlightAssist = false;
 
+		/// <summary>Held, while piloting or in a fighter seat (US-T87): Alt, the manoeuvre key. The hull swings its nose onto
+		/// the retrograde for a turn-and-burn (see <see cref="Unity.SpaceGod.Core.PilotFlight.FlipAim"/>).</summary>
+		bool Manoeuvre = false;
+
 		/// <summary>Held, not click-edged: while piloting, fires the ship's forward-mount weapons.
 		/// Left click still selects normally outside piloting, via the click-edged <see cref="SelectClicked"/>
 		/// below (gated off while piloting, so holding the trigger down and releasing it never also selects).</summary>

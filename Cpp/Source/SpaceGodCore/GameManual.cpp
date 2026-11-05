@@ -95,8 +95,13 @@ namespace SpaceGod::Core
 				T("Newtonian flight",
 				  "Every hull has mass, a main drive, weaker retro thrusters and manoeuvre thrusters, so it carries its "
 				  "momentum. The mouse steers, W and S thrust, A D Q E strafe, Z and X roll, Shift is the afterburner. Flight "
-				  "assist (on by default) counter-thrusts to hold the velocity you ask for; F turns it off for raw thrust, "
-				  "sliding past a target or flipping end for end to brake. Near a world its gravity pulls on the hull."),
+				  "assist (on by default) is the compensated mode: the thrusters cancel drift and hold the velocity you ask "
+				  "for, so the hull flies where it points, like a dogfighter in air. F turns it off for true Newtonian flight, "
+				  "in a helm or a fighter seat alike: the hull keeps its momentum and turns free of its track, so you can "
+				  "spin to fire behind you while sliding on, and W and S are raw thrust. To stop, turn and burn: hold Alt "
+				  "and the nose swings onto the retrograde, then W burns the speed off; or brake on S, the retro thrusters, "
+				  "slower but without turning. With assist off the HUD shows what each would cost, in seconds and km, the "
+				  "same at either scale. Near a world its gravity pulls on the hull."),
 				T("A flight model per family",
 				  "Light fighters carve their track after the nose and turn tightest at their corner speed; interceptors push "
 				  "that further (their grip, strafe, corner speed and boost turn penalty, by speed or only while boosting, are "

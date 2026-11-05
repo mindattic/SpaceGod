@@ -51,6 +51,10 @@ namespace SpaceGod::Core
 		/// on others' scanners (U.SPC-T66).</summary>
 		bool Burning = false;
 
+		/// <summary>The helm's own HUD line for the last frame (US-T87): with flight assist off, what stopping costs
+		/// (<see cref="BrakePlan"/>); empty when there is nothing to say.</summary>
+		cs::String Note;
+
 		/// <summary>Thrust, km/s^2, above which the drive shows as a burn (about 0.01 g).</summary>
 		static constexpr double BurnKmS2 = 1e-4;
 	};

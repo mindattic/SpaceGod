@@ -111,7 +111,7 @@ namespace SpaceGod
 	cs::String UnitySpaceApp::SeatKeys(const cs::Ref<IEmbodiable>& s)
 	{
 		return cs::Is<FighterSeat>(s)
-			? cs::String("  (mouse aims, W/S throttle, A/D Q/E strafe, Z/X roll, Shift boost, F flight assist, left mouse guns, right mouse "
+			? cs::String("  (mouse aims, W/S throttle, A/D Q/E strafe, Z/X roll, Shift boost, F flight assist (off: W/S raw thrust), Alt flip for a turn and burn, left mouse guns, right mouse "
 				"weapon group, 1 next group, T lock, 6 next weak point, Ctrl flares, 2 attack my target, 3 cover me, 4 form up, "
 				"5 engage at will, 7/8/9 power to weapons/shields/engines, 0 even power, ' ; next seat, P back to command)")
 			: cs::String("  (mouse lays it, left mouse fires, / next gun, Backspace up to the helm, P back to command)");
@@ -431,6 +431,7 @@ namespace SpaceGod
 		input.StrafeUp = Mathf::Clamp(Input.Move.y, -1.0f, 1.0f);
 		input.Roll = Mathf::Clamp(Input.Roll, -1.0f, 1.0f);
 		input.Boost = Input.Boost;
+		input.Manoeuvre = Input.Manoeuvre; // US-T87: the turn-and-burn's flip
 		input.Primary = Input.Fire && !ClickPanelOpen();
 		input.Secondary = Input.LookHeld && !ClickPanelOpen();
 		if (auto cockpit = cs::As<FighterSeat>(held))
@@ -453,7 +454,10 @@ namespace SpaceGod
 
 	void UnitySpaceApp::UpdateCockpit(const cs::Ref<FighterSeat>& f, DVec3 aim)
 	{
-		if (Input.ToggleFlightAssist) ShowToast(f->ToggleFlightAssist() ? "Flight assist off: it drifts on its momentum" : "Flight assist on");
+		if (Input.ToggleFlightAssist)
+			ShowToast(f->ToggleFlightAssist()
+				? "Flight assist off: it drifts on its momentum, W/S are raw thrust, Alt flips for a turn and burn"
+				: "Flight assist on: the thrusters cancel drift and it flies where it points");
 		if (Input.LockTarget)
 		{
 			auto locked = f->CycleLock(aim);

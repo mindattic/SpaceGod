@@ -130,6 +130,10 @@ namespace SpaceGod::Core
 		input.MassRatio = HaulerFlightModel::LadenRatio(ship);
 		input.Fine = e.Fine;
 		input.DockingApproach = f->DockingApproach;
+		// The player's own hands (US-T87): the models' player-facing handling applies, never a crew's.
+		input.Piloted = true;
+		// The turn-and-burn (US-T87): held, the nose swings onto the retrograde while the hull slides on along its track.
+		if (e.Manoeuvre) input.DesiredForward = PilotFlight::FlipAim(f->State);
 		if (f->DrivesDown)
 		{
 			input.DesiredForward = f->State.Forward;
@@ -168,6 +172,9 @@ namespace SpaceGod::Core
 		f->PosBefore = posBefore;
 		f->VelBefore = velBefore;
 		f->Burning = dt > 0 && (vel - (velBefore + gravity * dt)).Length() / dt > HelmFlight::BurnKmS2;
+		// With assist off nothing brakes for the pilot (US-T87): what stopping costs, a flip and a burn or the retros.
+		// Assist off, every model flies the Newtonian rules on the class's own turn rate, so that is the flip's rate.
+		f->Note = input.FlightAssistOff && !f->DrivesDown ? PilotFlight::Brake(f->State, hull, tuning.TurnRateDegS).Text() : cs::String();
 	}
 
 	double ShipHelm::Clamp1(double v) { return cs::Math::Max(-1.0, cs::Math::Min(1.0, v)); }

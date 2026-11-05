@@ -56,7 +56,7 @@ namespace SpaceGod::Coop
 				SG_FIELD(CycleBackward), SG_FIELD(CycleFtlTarget), SG_FIELD(CycleSeat), SG_FIELD(CycleShips), SG_FIELD(CycleSky),
 				SG_FIELD(DropMine), SG_FIELD(EngageFtl), SG_FIELD(Escape), SG_FIELD(Fire), SG_FIELD(FireEmp), SG_FIELD(Focus),
 				SG_FIELD(HailPolity), SG_FIELD(Home), SG_FIELD(LockTarget), SG_FIELD(LookDelta), SG_FIELD(LookHeld), SG_FIELD(ManGun),
-				SG_FIELD(MouseDelta), SG_FIELD(MousePosition), SG_FIELD(Move), SG_FIELD(MoveToHost), SG_FIELD(NumberKey), SG_FIELD(Pilot),
+				SG_FIELD(Manoeuvre), SG_FIELD(MouseDelta), SG_FIELD(MousePosition), SG_FIELD(Move), SG_FIELD(MoveToHost), SG_FIELD(NumberKey), SG_FIELD(Pilot),
 				SG_FIELD(QuickLoad), SG_FIELD(QuickSave), SG_FIELD(ResetTime), SG_FIELD(RightClicked), SG_FIELD(Roll), SG_FIELD(Scroll),
 				SG_FIELD(SelectClicked), SG_FIELD(SelectDoubleClicked), SG_FIELD(Slow), SG_FIELD(SpawnPractice), SG_FIELD(ThrottleStep),
 				SG_FIELD(TimeFaster), SG_FIELD(TimeSlower), SG_FIELD(ToggleBoarding), SG_FIELD(ToggleBounties), SG_FIELD(ToggleCargo),
@@ -74,7 +74,7 @@ namespace SpaceGod::Coop
 		/// Held from one message to the next, as a stick stays where it is put (the rest are edges, deltas or picks).
 		bool Held(const char* n)
 		{
-			for (const char* h : { "Move", "Roll", "Boost", "Slow", "Cruise", "Fire", "FireEmp", "LookHeld", "MousePosition" })
+			for (const char* h : { "Move", "Roll", "Boost", "Slow", "Cruise", "Manoeuvre", "Fire", "FireEmp", "LookHeld", "MousePosition" })
 				if (std::strcmp(n, h) == 0) return true;
 			return false;
 		}

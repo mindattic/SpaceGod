@@ -300,6 +300,7 @@ namespace SpaceGod
 			input.StrafeUp = Mathf::Clamp(Input.Move.y, -1.0f, 1.0f);
 			input.Roll = Mathf::Clamp(Input.Roll, -1.0f, 1.0f);
 			input.Boost = Input.Boost;
+			input.Manoeuvre = Input.Manoeuvre; // US-T87: the turn-and-burn's flip
 			input.Primary = Input.Fire && !ClickPanelOpen();
 			input.Secondary = Input.LookHeld && !ClickPanelOpen();
 			cs::String line = CommandCodec::Write(cs::New<SeatControlCommand>(session->LocalPlayer(), input));

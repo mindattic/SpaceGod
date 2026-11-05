@@ -59,6 +59,35 @@ namespace SpaceGod::Core
 
 		/// <summary>The hull is inside a port's approach (set by the Runtime layer), where <see cref="Fine"/> is docking mode.</summary>
 		bool DockingApproach = false;
+
+		/// <summary>A player's hands are on this stick (US-T87): set only by the player's helm (<see cref="ShipHelm"/>) and
+		/// the player's fighter seat (<see cref="FighterAI.FlyManned"/>). The models' player-facing handling (the light
+		/// fighter's snap and lateral dash, US-T79; the heavy fighter's weight and surge, US-T80; the capital's broadside
+		/// translation, US-T81) reads it. Crews never set it, so AI flight, and with it the Bench, flies exactly as before.</summary>
+		bool Piloted = false;
+	};
+
+	/// <summary>
+	/// What stopping costs a hull right now (US-T87), for the HUD with flight assist off: a turn-and-burn (swing the nose
+	/// onto the retrograde, then fire the main drive) against braking on the retro thrusters without turning, which is
+	/// slower but needs no flip. Seconds and km, so it reads the same at true scale and game scale.
+	/// </summary>
+	struct SPACEGODCORE_API BrakePlan
+	{
+		/// <summary>Seconds to swing the nose onto the retrograde, then to burn the speed off on the main drive, and the
+		/// distance covered meanwhile (km).</summary>
+		double FlipS = 0, BurnS = 0, BurnKm = 0;
+
+		/// <summary>Seconds and km to stop on the retro thrusters alone, nose kept where it is; infinite with none fitted.</summary>
+		double RetroS = 0, RetroKm = 0;
+
+		/// <summary>The hull is moving at all.</summary>
+		bool Moving = false;
+
+		bool HasRetros() const { return RetroS < cs::Double::PositiveInfinity; }
+
+		/// <summary>One HUD line: "BRAKE flip+burn 6 s / 12 km  retros 9 s / 18 km".</summary>
+		cs::String Text() const;
 	};
 
 	/// <summary>
@@ -313,6 +342,23 @@ namespace SpaceGod::Core
 
 		/// <summary>Rodrigues' rotation of <paramref name="v"/> by <paramref name="angle"/> radians about unit axis <paramref name="k"/>.</summary>
 		static DVec3 RotateAbout(DVec3 v, DVec3 k, double angle);
+
+		/// <summary>Below this speed, km/s, a hull counts as at rest: nothing to flip onto or brake.</summary>
+		static constexpr double RestKmS = 1e-6;
+
+		/// <summary>
+		/// The turn-and-burn's heading (US-T87): the retrograde, so the main drive fires against the way the hull is
+		/// going. The hull's own nose when it is at rest. The helm and the fighter seat steer onto it while the flip key
+		/// is held; the hull swings round on its attitude thrusters and keeps sliding along its track meanwhile.
+		/// </summary>
+		static DVec3 FlipAim(const PilotState& s);
+
+		/// <summary>
+		/// What stopping costs right now (US-T87, see <see cref="BrakePlan"/>): the flip at <paramref name="turnRateDegS"/>
+		/// with the hull's own angular acceleration (spin up, swing, brake), then the burn at the main drive's push; or
+		/// the retro thrusters' push with no flip at all.
+		/// </summary>
+		static BrakePlan Brake(const PilotState& s, const HullDynamics& hull, double turnRateDegS);
 
 	private:
 		static double Clamp(double x);

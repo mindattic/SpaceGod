@@ -91,6 +91,9 @@ namespace SpaceGod::Core
 		if (!Battle->Flown.TryGetValue(Unit, stick)) return;
 		if (input.Aim.LengthSquared() > 1e-12) stick->Aim = input.Aim.Normalized();
 		stick->Throttle = cs::Math::Max(0.0, cs::Math::Min(1.0, stick->Throttle + input.Throttle * ThrottlePerSecond * dt));
+		// With assist off the same keys are raw thrust (US-T87): the lever only matters to the flight computer.
+		stick->Burn = input.Throttle;
+		stick->Flip = input.Manoeuvre;
 		stick->StrafeRight = input.StrafeRight;
 		stick->StrafeUp = input.StrafeUp;
 		stick->Roll = input.Roll;
@@ -250,7 +253,12 @@ namespace SpaceGod::Core
 		sb.Append("  shields ").Append(Pct(spec->Shield > 0 ? c->Shield() / spec->Shield : 0));
 		if (stick != nullptr) sb.Append("  ·  throttle ").Append(Pct(stick->Throttle));
 		sb.Append("  boost ").Append(Pct(c->BoostFraction));
-		if (stick != nullptr && stick->FlightAssistOff) sb.Append("  ASSIST OFF");
+		// The flight-assist mode, always shown (US-T87): ON flies to the lever, OFF is raw thrust and drift.
+		if (stick != nullptr)
+		{
+			sb.Append(stick->FlightAssistOff ? "  ASSIST OFF (F)" : "  ASSIST ON (F)");
+			if (!stick->Note.empty()) sb.Append("  ").Append(stick->Note);
+		}
 		if (u->Power != nullptr) sb.Append("  ·  power ").Append(u->Power);
 		if (stick != nullptr && WeaponGroups::Secondaries(u).Count() > 0)
 			sb.Append("  ·  ").Append(WeaponGroups::Label(stick->SecondaryGroup)).Append(' ').Append(WeaponGroups::Ammo(u, stick->SecondaryGroup));
