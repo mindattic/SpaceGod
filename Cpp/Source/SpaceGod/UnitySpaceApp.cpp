@@ -1027,7 +1027,13 @@ namespace SpaceGod
 			auto trade = World()->Trade->TakeNotices();
 			all.AddRange(trade);
 		}
-		if (all.Count() > 0) ShowToast(cs::Strings::Join("   \xC2\xB7   ", all)); // "   ·   "
+		if (all.Count() == 0) return;
+		// US-T121: nor overwrites a toast raised earlier this same frame (it has not aged yet). A gate jump's
+		// "Jumped to ..." is raised in UpdatePiloting, and Activate's Galaxy.Promote steps the far system's world up to
+		// the moment (its trade desk reckoning the house's rank, its law's books) just before this drains them: the
+		// jump's own line was replaced before it was ever drawn. It leads; the news follows it in the one slot.
+		if (!Toast.empty() && ToastAge <= 0) all.Insert(0, Toast);
+		ShowToast(cs::Strings::Join("   \xC2\xB7   ", all)); // "   ·   "
 	}
 
 	bool UnitySpaceApp::UpdateLawHail(const cs::Ref<Ship>& ship)
