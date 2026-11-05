@@ -259,6 +259,10 @@ namespace SpaceGod
 			GameObject::Destroy(systemRoot->gameObject());
 		}
 		ActiveSystem = system;
+		// The view to go back to on leaving the helm (RememberCommand) was the old system's: its body and ship indices mean
+		// nothing here (US-T113: released after a gate jump or an FTL drop-out it focused out of range). Only a hull that
+		// came along, now in this system's fleet, is still there to look at.
+		if (!(commandFocus.IsShip() && commandFocus.Ship && Fleet()->IsPresent(commandFocus.Ship))) commandFocus = Target::None();
 		// The system the player is in runs at full detail, the rest at coarse (U.SPC-T104): this one is brought
 		// up to the moment from its last coarse step before anything of it is drawn.
 		Galaxy->Promote(system, Clock->Jd);
