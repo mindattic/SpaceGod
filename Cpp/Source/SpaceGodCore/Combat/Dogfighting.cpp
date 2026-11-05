@@ -36,6 +36,8 @@ namespace SpaceGod::Core
 			case WeaponGroup::Guns: return "Guns";
 			case WeaponGroup::Missiles: return "Missiles";
 			case WeaponGroup::Torpedoes: return "Torpedoes";
+			case WeaponGroup::Rockets: return "Rockets";
+			case WeaponGroup::Hive: return "Hive";
 		}
 		return "";
 	}
@@ -275,6 +277,10 @@ namespace SpaceGod::Core
 			d[SubsystemKind::LightRailgun] = WeaponGroup::Guns;
 			d[SubsystemKind::MissileLauncher] = WeaponGroup::Missiles;
 			d[SubsystemKind::Torpedo] = WeaponGroup::Torpedoes;
+			// The full arsenal (US-T101).
+			d[SubsystemKind::VulcanCannon] = WeaponGroup::Guns;
+			d[SubsystemKind::RocketPod] = WeaponGroup::Rockets;
+			d[SubsystemKind::HiveLauncher] = WeaponGroup::Hive;
 			return d;
 		}();
 		return byKind;
@@ -285,14 +291,22 @@ namespace SpaceGod::Core
 	cs::Nullable<WeaponGroup> WeaponGroups::Of(SubsystemKind kind)
 	{
 		WeaponGroup g{};
-		return ByKind().TryGetValue(kind, g) ? cs::Nullable<WeaponGroup>(g) : cs::Nullable<WeaponGroup>();
+		if (ByKind().TryGetValue(kind, g)) return g;
+		// A save from before the full arsenal (US-T101) restores the table without its mounts: they keep their groups.
+		switch (kind)
+		{
+			case SubsystemKind::VulcanCannon: return WeaponGroup::Guns;
+			case SubsystemKind::RocketPod: return WeaponGroup::Rockets;
+			case SubsystemKind::HiveLauncher: return WeaponGroup::Hive;
+			default: return std::nullopt;
+		}
 	}
 
 	cs::List<WeaponGroup> WeaponGroups::Secondaries(const cs::Ref<BattleUnit>& u)
 	{
 		cs::List<WeaponGroup> list;
 		// Enum.GetValues(typeof(WeaponGroup)), in value order.
-		for (WeaponGroup g : { WeaponGroup::Guns, WeaponGroup::Missiles, WeaponGroup::Torpedoes })
+		for (WeaponGroup g : { WeaponGroup::Guns, WeaponGroup::Missiles, WeaponGroup::Torpedoes, WeaponGroup::Rockets, WeaponGroup::Hive })
 		{
 			if (g == WeaponGroup::Guns) continue;
 			for (const auto& s : u->Combat->Subsystems)
@@ -314,7 +328,18 @@ namespace SpaceGod::Core
 		return n;
 	}
 
-	cs::String WeaponGroups::Label(WeaponGroup g) { return g == WeaponGroup::Guns ? "guns" : g == WeaponGroup::Missiles ? "missiles" : "torpedoes"; }
+	cs::String WeaponGroups::Label(WeaponGroup g)
+	{
+		// The homing missiles named as such, beside the dumb-fire rockets (US-T101).
+		switch (g)
+		{
+			case WeaponGroup::Guns: return "guns";
+			case WeaponGroup::Missiles: return "homing missiles";
+			case WeaponGroup::Rockets: return "dumb-fire rockets";
+			case WeaponGroup::Hive: return "hive missiles";
+			default: return "torpedoes";
+		}
+	}
 
 	// ---------------------------------------------------------------- energy
 
@@ -388,7 +413,8 @@ namespace SpaceGod::Core
 
 	double Countermeasures::SeduceChance(MissileKind kind)
 	{
-		return kind == MissileKind::Missile || kind == MissileKind::Interceptor ? Effectiveness()->Value
+		// A hive round and its seekers are fooled as a missile is; a dumb-fire rocket has no seeker to fool (US-T101).
+		return kind == MissileKind::Missile || kind == MissileKind::Interceptor || kind == MissileKind::Hive || kind == MissileKind::HiveMicro ? Effectiveness()->Value
 			: kind == MissileKind::Torpedo || kind == MissileKind::Antimatter ? Effectiveness()->Value * TorpedoShare : 0;
 	}
 

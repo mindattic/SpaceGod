@@ -297,7 +297,8 @@ namespace SpaceGod::Core
 
 	SG_SERIALIZE(KineticRound, "Unity.SpaceGod.Core.KineticRound",
 		SG_F(Aimed), SG_F(ArriveIn), SG_F(Damage), SG_F(Gone), SG_F(Hit), SG_F(Life), SG_F(Pos), SG_F(Railgun),
-		SG_F(Side), SG_F(SmallCraft), SG_F(Target), SG_F(TargetSub), SG_F(Vel))
+		SG_F(Side), SG_F(SmallCraft), SG_F(Target), SG_F(TargetSub), SG_F(Vel),
+		SG_OPT(Tracer)) // US-T101: a vulcan's tracer, absent from older saves
 
 	SG_SERIALIZE(LaneSite, "Unity.SpaceGod.Core.LaneSite",
 		SG_F(FromOffset), SG_F(Hop), SG_F(Progress), SG_F(Side), SG_F(ToOffset))
@@ -313,7 +314,8 @@ namespace SpaceGod::Core
 	SG_SERIALIZE(Missile, "Unity.SpaceGod.Core.Missile",
 		SG_F(Adrift), SG_F(Damage), SG_F(Decoy), SG_F(EmpRadiusKm), SG_F(EmpSeconds), SG_F(Gone), SG_F(Hp),
 		SG_F(Kind), SG_F(Life), SG_F(Marines), SG_F(Owner), SG_F(Pos), SG_F(Prey), SG_F(Side), SG_F(SmallCraft),
-		SG_F(Source), SG_F(Speed), SG_F(Target), SG_F(TargetSub), SG_F(Torpedo), SG_F(Vel))
+		SG_F(Source), SG_F(Speed), SG_F(Target), SG_F(TargetSub), SG_F(Torpedo), SG_F(Vel),
+		SG_OPT(SplitIn), SG_OPT(SplitInto)) // US-T101: a hive round's split, absent from older saves
 
 	SG_SERIALIZE(ModularHull, "Unity.SpaceGod.Core.ModularHull",
 		SG_F(Joints), SG_F(Modules), SG_F(Root))
@@ -341,7 +343,8 @@ namespace SpaceGod::Core
 
 	SG_SERIALIZE(Subsystem, "Unity.SpaceGod.Core.Subsystem",
 		SG_F(Aim), SG_F(Ammo), SG_F(Cooldown), SG_F(Def), SG_F(Hp), SG_F(Index), SG_F(LastHitSeconds),
-		SG_F(MaxShield), SG_F(Restoring), SG_F(Shield))
+		SG_F(MaxShield), SG_F(Restoring), SG_F(Shield),
+		SG_OPT(Spin)) // US-T101: a rotary gun's spin, absent from older saves
 
 	SG_SERIALIZE(SubsystemDef, "Unity.SpaceGod.Core.SubsystemDef",
 		SG_F(Buried), SG_F(ConeAxis), SG_F(ConeHalfDeg), SG_F(FacesAft), SG_F(Kind), SG_F(MaxHp), SG_F(Rating),
@@ -362,7 +365,8 @@ namespace SpaceGod::Core
 	SG_SERIALIZE(WeaponSpec, "Unity.SpaceGod.Core.WeaponSpec",
 		SG_F(Accuracy), SG_F(Ammo), SG_F(AntiSmall), SG_F(BurstKm), SG_F(Cooldown), SG_F(Damage), SG_F(Deploy),
 		SG_F(EmpRadiusKm), SG_F(EmpSeconds), SG_F(FalloffEdgeShare), SG_F(Lance), SG_F(Missile),
-		SG_F(MissileSpeedKmS), SG_F(MuzzleSpeedKmS), SG_F(RangeKm), SG_F(Salvo), SG_F(SeeksSmallCraft))
+		SG_F(MissileSpeedKmS), SG_F(MuzzleSpeedKmS), SG_F(RangeKm), SG_F(Salvo), SG_F(SeeksSmallCraft),
+		SG_OPT(SpinUpS), SG_OPT(SplitAfterS), SG_OPT(SplitInto), SG_OPT(Unguided)) // US-T101, absent from older saves
 
 	SG_SERIALIZE(WingCraft, "Unity.SpaceGod.Core.WingCraft",
 		SG_F(Berth), SG_F(Carrier), SG_F(Pilot), SG_F(Role))

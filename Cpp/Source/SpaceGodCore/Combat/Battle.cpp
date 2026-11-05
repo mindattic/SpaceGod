@@ -5,6 +5,7 @@
 #include "Astro.h"
 #include "Combat/AlphaStrike.h"
 #include "Combat/ArmourAngling.h"
+#include "Combat/Arsenal.h"
 #include "Combat/Boarding.h"
 #include "Combat/BoardingShuttles.h"
 #include "Combat/BreacherBays.h"
@@ -86,6 +87,9 @@ namespace SpaceGod::Core
 			case MissileKind::Antimatter: return "Antimatter";
 			case MissileKind::Interceptor: return "Interceptor";
 			case MissileKind::Breacher: return "Breacher";
+			case MissileKind::Rocket: return "Rocket";
+			case MissileKind::Hive: return "Hive";
+			case MissileKind::HiveMicro: return "HiveMicro";
 		}
 		return "";
 	}
@@ -122,6 +126,8 @@ namespace SpaceGod::Core
 			case FxKind::Plasma: return "Plasma";
 			case FxKind::PlasmaMiss: return "PlasmaMiss";
 			case FxKind::FlakBurst: return "FlakBurst";
+			case FxKind::Vulcan: return "Vulcan";
+			case FxKind::HiveSplit: return "HiveSplit";
 		}
 		return "";
 	}
@@ -1052,6 +1058,8 @@ namespace SpaceGod::Core
 			if (s->Def->Weapon != nullptr && !s->Destroyed()) s->Cooldown -= dt * c->Readiness * weaponPower * SpinalMounts::ChargeRate(c, s);
 		}
 		// A braced crew is holding on, not working its guns: they load, but only point defence fires (U.SPC-T425).
+			// A rotary gun left idle winds down (US-T101).
+			if (s->Spin > 0) Arsenal::SpinDown(s, s->Def->Weapon, dt);
 		bool braced = !Broadsides::Fires(u);
 		// The volleys are worked out afresh this step, now every gun is as loaded as it will be (U.SPC-T425).
 		Broadsides::BeginVolleys(u);
@@ -1136,7 +1144,19 @@ namespace SpaceGod::Core
 					else s->Aim = DVec3::Zero;
 					continue;
 				}
-				else target = u->PlayerSecondaryHeld && u->LockProgress >= 1 ? PlayerLockedTarget(u, w, origin) : nullptr;
+				else if (Arsenal::IsRocket(w))
+				{
+					// Dumb-fire rockets (US-T101): no lock, the salvo goes straight down the nose on the second trigger.
+					if (u->PlayerSecondaryHeld && s->Ammo > 0 && SecondaryFires(u, s))
+					{
+						s->Cooldown = w->Cooldown;
+						FireRockets(u, s, origin, u->Forward, w);
+					}
+					else s->Aim = DVec3::Zero;
+					continue;
+				}
+				// Homing and hive missiles go once the lock is made, those of the group picked at a carrier craft's stick (US-T101).
+				else target = u->PlayerSecondaryHeld && u->LockProgress >= 1 && SecondaryFires(u, s) ? PlayerLockedTarget(u, w, origin) : nullptr;
 			}
 			else
 			{
@@ -1197,6 +1217,24 @@ namespace SpaceGod::Core
 			bool small = WeakPoints::IsSmallCraft(u);
 
 			if (w->Missile)
+			// A rotary gun's crew fires as fast as its barrels have spun up (US-T101), and in a coarse step the burst the
+			// step stands for.
+			double burst = 1;
+			if (Arsenal::IsRotary(w))
+			{
+				burst = Arsenal::RoundsPerShot(s, w, dt);
+				s->Cooldown = Arsenal::FireRotary(s, w, s->Cooldown / w->Cooldown);
+			}
+
+			// Dumb-fire rockets (US-T101): the salvo goes down the lead line onto the target, unguided.
+			if (Arsenal::IsRocket(w))
+			{
+				if (s->Ammo <= 0) continue;
+				auto lead = Gunnery::LeadPoint(origin, u->Vel, aimPoint, target->Vel, w->MissileSpeedKmS);
+				auto line = lead - origin;
+				FireRockets(u, s, origin, line.LengthSquared() > 1e-12 ? line.Normalized() : u->Forward, w);
+				continue;
+			}
 			{
 				if (s->Ammo <= 0) continue;
 				// A capital torpedo tube's round flies as a torpedo: tougher for point defence to stop (U.SPC-T377); an
@@ -1229,6 +1267,12 @@ namespace SpaceGod::Core
 					m->SmallCraft = small;
 					Missiles.Add(m);
 				}
+					// A hive round flies whole a moment, then splits into its swarm (US-T101, StepMissiles).
+					if (Arsenal::IsHive(w))
+					{
+						m->SplitIn = w->SplitAfterS;
+						m->SplitInto = w->SplitInto;
+					}
 				Emit(FxKind::MissileLaunch, origin, origin + s->Aim, 0, u->Side, u, s->Index);
 				continue;
 			}
@@ -1239,7 +1283,7 @@ namespace SpaceGod::Core
 				// crossing the gunner's sights and scattered by his skill, it hits only if it meets the hull.
 				auto dir = AimAt(u, origin, target, aimPoint, w, accuracyScale * (volley > 1 ? 1 + Broadsides::CrewVolleyAccuracyBonus : 1));
 				s->Aim = dir;
-				ResolveShot(u, s, origin, dir, w, volley);
+				ResolveShot(u, s, origin, dir, w, volley * burst);
 				continue;
 			}
 
@@ -1254,6 +1298,7 @@ namespace SpaceGod::Core
 			auto kind = energy.has_value() ? *energy
 				: s->Kind() == SubsystemKind::FighterGuns || s->Kind() == SubsystemKind::Autocannon || s->Kind() == SubsystemKind::AutoTurret ? FxKind::Guns
 				: w->AntiSmall ? FxKind::PointDefense
+				: Arsenal::IsRotary(w) ? FxKind::Vulcan
 				: w->Lance ? (hit ? FxKind::TachyonLance : FxKind::TachyonLanceMiss)
 				: SpinalMounts::IsSlug(s->Kind()) ? (hit ? FxKind::Railgun : FxKind::RailgunMiss)
 				: hit ? FxKind::Beam : FxKind::BeamMiss;
@@ -1262,7 +1307,7 @@ namespace SpaceGod::Core
 			{
 				// A dumb kinetic round, not a hitscan: it takes real time to cross the range, so
 				// fire it off and let FireKineticRound/StepRounds decide what it actually hits.
-				FireKineticRound(u, s, origin, aimPoint, target, sub, w, hit, dist, kind, volley);
+				FireKineticRound(u, s, origin, aimPoint, target, sub, w, hit, dist, kind, volley * burst);
 				continue;
 			}
 
@@ -1319,6 +1364,7 @@ namespace SpaceGod::Core
 		r->Railgun = SpinalMounts::IsSlug(mount->Kind());
 		r->SmallCraft = WeakPoints::IsSmallCraft(u);
 		Rounds.Add(r);
+		r->Tracer = Arsenal::IsRotary(w);
 	}
 
 	void Battle::StepRounds(double dt)
@@ -1371,8 +1417,10 @@ namespace SpaceGod::Core
 		double scatter = w->MuzzleSpeedKmS > 0 && !SpinalMounts::IsSlug(s->Kind()) ? Gunnery::AutocannonScatterDeg : Gunnery::BeamScatterDeg;
 		dir = Gunnery::Scatter(dir, scatter * Astro::Deg2Rad, rng);
 		s->Aim = dir;
-		// The player's trigger keeps the gun's own rhythm, not a crew's jittered one.
-		s->Cooldown = w->Cooldown;
+		// A rotary gun hoses its rounds wider (US-T101).
+		if (Arsenal::IsRotary(w)) scatter *= Arsenal::RotaryScatter;
+		// The player's trigger keeps the gun's own rhythm, not a crew's jittered one; a rotary gun's as its barrels have spun up.
+		s->Cooldown = Arsenal::IsRotary(w) ? Arsenal::FireRotary(s, w) : w->Cooldown;
 		// A tachyon lance is fed by the reactor and held back by its recharge, not by the guns' heat (U.SPC-T487).
 		// Nor is a spinal mount, which its own power plant feeds (U.SPC-T490).
 		if (!w->Lance && !s->Def->Spinal) u->Heat += w->Damage * Gunnery::HeatPerDamage;
@@ -1390,11 +1438,13 @@ namespace SpaceGod::Core
 		auto want = m->Aim.LengthSquared() > 1e-12 ? MountedTurret::Bound(u, s->Def, m->Aim.Normalized()) : current;
 		s->Aim = PilotFlight::ClampAim(want, current, MountedTurret::TraverseDegS(s->Kind()) * Astro::Deg2Rad * dt);
 		if (!m->Trigger || s->Cooldown > 0) return;
-		s->Cooldown = w->Cooldown;
+		// A manned rotary gun fires as fast as its barrels have spun up (US-T101).
+		s->Cooldown = Arsenal::IsRotary(w) ? Arsenal::FireRotary(s, w) : w->Cooldown;
 		bool slug = SpinalMounts::IsSlug(s->Kind());
 		double scatter = (w->MuzzleSpeedKmS > 0 && !slug ? Gunnery::AutocannonScatterDeg : Gunnery::BeamScatterDeg) / cs::Math::Max(accuracyScale, 0.1);
 		auto origin = u->PointOf(s->Def);
 		auto dir = Gunnery::Scatter(s->Aim, scatter * Astro::Deg2Rad, rng);
+		if (Arsenal::IsRotary(w)) scatter *= Arsenal::RotaryScatter;
 		ResolveShot(u, s, origin, dir, w);
 	}
 
@@ -1418,7 +1468,8 @@ namespace SpaceGod::Core
 		if (!beam)
 		{
 			bool slug = SpinalMounts::IsSlug(s->Kind());
-			Emit(slug ? FxKind::Railgun : FxKind::Guns, origin, origin + dir * w->RangeKm, 0, u->Side, nullptr, -1);
+			bool rotary = Arsenal::IsRotary(w);
+			Emit(slug ? FxKind::Railgun : rotary ? FxKind::Vulcan : FxKind::Guns, origin, origin + dir * w->RangeKm, 0, u->Side, nullptr, -1);
 			auto r = cs::New<KineticRound>();
 			r->Pos = origin;
 			r->Vel = u->Vel + dir * w->MuzzleSpeedKmS;
@@ -1428,6 +1479,7 @@ namespace SpaceGod::Core
 			r->Railgun = slug;
 			r->Aimed = true;
 			r->SmallCraft = WeakPoints::IsSmallCraft(u);
+			r->Tracer = rotary;
 			Rounds.Add(r);
 			return;
 		}
@@ -2051,6 +2103,9 @@ namespace SpaceGod::Core
 				case SubsystemKind::AntimatterTorpedo:
 				case SubsystemKind::MissileLauncher: w = 3; break;
 				// The gun that outranges them all is the one gunners most want silenced (U.SPC-T487).
+				case SubsystemKind::VulcanCannon:
+				case SubsystemKind::HiveLauncher:
+				case SubsystemKind::RocketPod:
 				case SubsystemKind::TachyonLance:
 				// As are a dreadnought's spinal guns (U.SPC-T490).
 				case SubsystemKind::Coilgun: w = 4; break;
@@ -2179,10 +2234,28 @@ namespace SpaceGod::Core
 	{
 		for (const auto& m : Missiles)
 		{
+		// The micro-missiles of hive rounds that split this step, added once the step is done (US-T101).
+		cs::List<cs::Ref<Missile>> swarm;
 			if (m->Gone) continue;
 			m->Life -= dt;
 			// An interceptor after a round flies its own hunt (U.SPC-T489).
 			if (m->Kind == MissileKind::Interceptor && m->Target == nullptr)
+			// A dumb-fire rocket flies straight and hits what it meets (US-T101).
+			if (m->Kind == MissileKind::Rocket)
+			{
+				StepRocket(m, dt);
+				continue;
+			}
+			// A hive round homes a moment, then splits into its swarm on the way to a target still there to hit (US-T101).
+			if (m->SplitInto > 0 && m->Decoy == nullptr)
+			{
+				m->SplitIn -= dt;
+				if (m->SplitIn <= 0 && m->Target != nullptr && m->Target->Present() && m->Target->Side != m->Side && !m->Target->Surrendering)
+				{
+					SplitHive(m, swarm);
+					continue;
+				}
+			}
 			{
 				StepInterceptor(m, dt);
 				continue;
@@ -2250,8 +2323,99 @@ namespace SpaceGod::Core
 		}
 		Missiles.RemoveAll([](const cs::Ref<Missile>& m) { return m->Gone; });
 	}
+		if (swarm.Count() > 0) Missiles.AddRange(swarm);
 
 	// ---------------------------------------------------------------- boarding
+
+	// ---------------------------------------------------------------- the full arsenal (US-T101)
+
+	void Battle::FireRockets(const cs::Ref<BattleUnit>& u, const cs::Ref<Subsystem>& s, DVec3 origin, DVec3 dir, const cs::Ref<WeaponSpec>& w)
+	{
+		s->Aim = dir;
+		double speed = cs::Math::Max(w->MissileSpeedKmS, 1e-3);
+		bool small = WeakPoints::IsSmallCraft(u);
+		for (int k = 0; k < w->Salvo && s->Ammo > 0; k++)
+		{
+			s->Ammo--;
+			auto line = Gunnery::Scatter(dir, Arsenal::RocketSpreadDeg * Astro::Deg2Rad, rng);
+			auto m = cs::New<Missile>();
+			// Rippled off the rail one behind another, not all from one point.
+			m->Pos = origin - line * (k * 0.004);
+			m->Vel = u->Vel + line * speed;
+			m->Damage = w->Damage;
+			m->Speed = speed;
+			m->Hp = Arsenal::RocketHp;
+			m->Life = w->RangeKm / speed;
+			m->Side = u->Side;
+			m->Kind = MissileKind::Rocket;
+			m->SmallCraft = small;
+			Missiles.Add(m);
+		}
+		Emit(FxKind::MissileLaunch, origin, origin + dir, 0, u->Side, u, s->Index);
+	}
+
+	void Battle::StepRocket(const cs::Ref<Missile>& m, double dt)
+	{
+		auto step = m->Vel * dt;
+		double len = step.Length();
+		if (len > 1e-12)
+		{
+			cs::Ref<BattleUnit> hit;
+			double t = FirstHostileAlong(m->Side, m->Pos, step / len, len, hit);
+			if (hit != nullptr)
+			{
+				auto at = m->Pos + step / len * t;
+				m->Gone = true;
+				auto sub = SubsystemNear(hit, at);
+				ApplyDamage(hit, sub, m->Damage, at, at, m->SmallCraft ? WeakPoints::Factor(hit, sub, m->Vel - hit->Vel) : 1, m->Vel - hit->Vel);
+				return;
+			}
+		}
+		m->Pos = m->Pos + step;
+		if (m->Life <= 0)
+		{
+			// Out of motor and reach: it bursts harmlessly where it is.
+			m->Gone = true;
+			Emit(FxKind::MissileKill, m->Pos, m->Pos, 0.03, m->Side, nullptr, -1);
+		}
+	}
+
+	void Battle::SplitHive(const cs::Ref<Missile>& m, cs::List<cs::Ref<Missile>>& swarm)
+	{
+		m->Gone = true;
+		auto t = m->Target;
+		auto heading = m->Vel.LengthSquared() > 1e-12 ? m->Vel.Normalized() : (t->Pos - m->Pos).Normalized();
+		Emit(FxKind::HiveSplit, m->Pos, m->Pos + heading * 0.15, m->SplitInto, m->Side, nullptr, -1);
+		double speed = m->Speed * Arsenal::MicroSpeedFactor;
+		for (int i = 0; i < m->SplitInto; i++)
+		{
+			auto line = Gunnery::Scatter(heading, Arsenal::SplitSpreadDeg * Astro::Deg2Rad, rng);
+			auto micro = cs::New<Missile>();
+			micro->Pos = m->Pos;
+			// Kicked out of the casing across its line, the seekers then turn in onto the target on their own.
+			micro->Vel = m->Vel * 0.6 + line * (speed * 0.5);
+			micro->Target = t;
+			// A weak point picked for the round stays every seeker's; else each finds its own mark on a hull.
+			micro->TargetSub = m->TargetSub != nullptr && !m->TargetSub->Destroyed() ? m->TargetSub
+				: t->Kind == UnitKind::Fighter ? nullptr : PickSubsystem(t);
+			micro->Damage = m->Damage;
+			micro->Speed = speed;
+			micro->Hp = Arsenal::MicroHp;
+			micro->Life = Arsenal::MicroLifeS;
+			micro->Side = m->Side;
+			micro->Kind = MissileKind::HiveMicro;
+			micro->SmallCraft = m->SmallCraft;
+			swarm.Add(micro);
+		}
+	}
+
+	bool Battle::SecondaryFires(const cs::Ref<BattleUnit>& u, const cs::Ref<Subsystem>& s)
+	{
+		cs::Ref<FighterControl> stick;
+		if (Flown.Count() == 0 || !Flown.TryGetValue(u, stick)) return true;
+		auto group = WeaponGroups::Of(s->Kind());
+		return group.has_value() && *group == stick->SecondaryGroup;
+	}
 
 	void Battle::FirePods(const cs::Ref<BattleUnit>& u, const cs::Ref<Subsystem>& s)
 	{

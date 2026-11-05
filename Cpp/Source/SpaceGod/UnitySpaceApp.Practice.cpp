@@ -6,8 +6,10 @@
 #include "BodyDefinition.h"
 #include "Camera/SpaceCamera.h"
 #include "Camera/StarTravel.h"
+#include "Combat/Arsenal.h"
 #include "Combat/Battle.h"
 #include "Combat/CombatSpecs.h"
+#include "Combat/Outfitting.h"
 #include "Combat/CombatState.h"
 #include "Combat/War.h"
 #include "Combat/Wreck.h"
@@ -33,10 +35,12 @@ using namespace SpaceGod::Core;
 
 namespace
 {
-	/// US-T88: <c>sg.DogfightDemo [heavy]</c> in the console (~): the dogfight demo, from wherever the game is.
+	/// US-T88: <c>sg.DogfightDemo [heavy] [vulcan|rockets|hive|arsenal]</c> in the console (~): the dogfight demo, from
+	/// wherever the game is, the craft rearmed with the kit named (US-T101).
 	FAutoConsoleCommandWithWorldAndArgs GDogfightDemoCommand(
 		TEXT("sg.DogfightDemo"),
-		TEXT("US-T88: drop into the dogfight demo, at a light fighter's helm against four pirates (sg.DogfightDemo heavy: a heavy fighter's)."),
+		TEXT("US-T88: drop into the dogfight demo, at a light fighter's helm against four pirates (sg.DogfightDemo heavy: a heavy fighter's). "
+			"US-T101: add vulcan, rockets, hive or arsenal to rearm the craft (e.g. sg.DogfightDemo heavy arsenal)."),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& args, UWorld* world)
 		{
 			auto* actor = AUnitySpaceAppActor::Find(world);
@@ -46,7 +50,14 @@ namespace
 				UE_LOG(LogSpaceGod, Warning, TEXT("sg.DogfightDemo: no game running (start one first, or launch with -dogfight)"));
 				return;
 			}
-			app->StartDogfightDemo(args.Num() > 0 && args[0].Equals(TEXT("heavy"), ESearchCase::IgnoreCase));
+			bool heavy = false;
+			cs::String kit;
+			for (const auto& a : args)
+			{
+				if (a.Equals(TEXT("heavy"), ESearchCase::IgnoreCase)) heavy = true;
+				else kit = TCHAR_TO_UTF8(*a.ToLower());
+			}
+			app->StartDogfightDemo(heavy, kit);
 		}));
 }
 
@@ -199,7 +210,7 @@ namespace SpaceGod
 		return best;
 	}
 
-	void UnitySpaceApp::StartDogfightDemo(bool heavy)
+	void UnitySpaceApp::StartDogfightDemo(bool heavy, const cs::String& kit)
 	{
 		if (Coop::CoopPeer::Current() != nullptr)
 		{
@@ -244,6 +255,15 @@ namespace SpaceGod
 		auto cls = heavy ? ShipClass::Gunship : ShipClass::Fighter;
 		auto ship = Fleet()->SpawnAt(heavy ? "Demo Heavy Fighter" : "Demo Fighter", cls, World()->Sol, body, at, forward, jd);
 		ship->Ports = World()->FreeShipPorts(); // not a hidden haven's rock, as for every free ship
+		// The kit asked for (US-T101): the craft's guns and missile mounts rearmed, as a yard would fit them.
+		cs::String armed;
+		if (kit == "vulcan" || kit == "arsenal")
+			if (Arsenal::FitAll(ship, ModuleKind::VulcanCannon) > 0) armed = "vulcan cannons";
+		if (kit == "hive" || kit == "arsenal")
+			if (Arsenal::FitAll(ship, ModuleKind::HiveLauncher) > 0) armed = armed.empty() ? cs::String("hive missiles") : armed + " and hive missiles";
+		if (kit == "rockets" && Arsenal::FitAll(ship, ModuleKind::RocketPod) > 0) armed = "dumb-fire rockets";
+		if (!kit.empty() && armed.empty())
+			UE_LOG(LogSpaceGod, Warning, TEXT("sg.DogfightDemo: no kit '%s' (vulcan, rockets, hive or arsenal), the craft flies as built"), UTF8_TO_TCHAR(kit.c_str()));
 
 		// Small, medium and large raiders, km ahead (along the nose), right and up of the player, all closing.
 		struct Slot { ShipClass Class; const char* Name; double Ahead, Right, Up; };
@@ -285,7 +305,8 @@ namespace SpaceGod
 		UE_LOG(LogSpaceGod, Log, TEXT("Dogfight demo (US-T88): %s at the helm of the %s off %s (%.0f km out), fight %s, %d of %d pirates in it"),
 			IsPiloting() ? TEXT("piloting") : TEXT("NOT piloting"), UTF8_TO_TCHAR(ship->Name.c_str()), UTF8_TO_TCHAR(def->Name.c_str()), rangeKm,
 			battle != nullptr ? UTF8_TO_TCHAR(battle->Name.c_str()) : TEXT("not started"), seated, pirates.Count());
-		ShowToast(cs::Cat("DOGFIGHT DEMO off ", def->Name, ": ", heavy ? "heavy" : "light", " fighter vs a pirate interceptor, fighter, corvette and destroyer",
-			"  (Left-click fires, T locks, F flight assist, Alt flip, Shift+strafe dash, P to release)"));
+		ShowToast(cs::Cat("DOGFIGHT DEMO off ", def->Name, ": ", heavy ? "heavy" : "light", " fighter", armed.empty() ? cs::String() : cs::Cat(" with ", armed),
+			" vs a pirate interceptor, fighter, corvette and destroyer",
+			"  (Left-click fires, right-click the missiles or rockets, T locks, F flight assist, Alt flip, Shift+strafe dash, P to release)"));
 	}
 }

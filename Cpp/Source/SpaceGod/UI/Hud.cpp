@@ -22,6 +22,7 @@
 #include "Ships.h"
 #include "SimClock.h"
 #include "World.h"
+#include "Combat/Arsenal.h"
 #include "Combat/Battle.h"
 #include "Combat/Broadsides.h"
 #include "Combat/CombatSpecs.h"
@@ -898,11 +899,27 @@ namespace SpaceGod::UI
 		for (const auto& s : c->Subsystems) shieldSum += s->Shield;
 		DrawGauge(Rect(x0 + 2 * (w + 14), y, w, 6), static_cast<float>(shieldSum / maxShield), Color(0.45f, 0.7f, 1.0f), "SHIELDS");
 		DrawGauge(Rect(x0 + 3 * (w + 14), y, w, 6), static_cast<float>(c->Hull / cs::Math::Max(1e-9, c->Spec->Hull)), ProgradeColor, "HULL");
-		int missiles = 0; // c.Subsystems.Where(...).Sum(s => s.Ammo)
+		// The guided rounds, homing and hive, apart from the dumb-fire rockets, which need no lock (US-T101).
+		int missiles = 0, hive = 0, rockets = 0; // c.Subsystems.Where(...).Sum(s => s.Ammo)
 		for (const auto& s : c->Subsystems)
-			if (!s->Destroyed() && s->Def->Weapon != nullptr && s->Def->Weapon->Missile && s->Kind() != SubsystemKind::Torpedo) missiles += s->Ammo;
+		{
+			if (s->Destroyed() || s->Def->Weapon == nullptr || !s->Def->Weapon->Missile || s->Kind() == SubsystemKind::Torpedo) continue;
+			if (Arsenal::IsRocket(s->Def->Weapon)) rockets += s->Ammo;
+			else if (Arsenal::IsHive(s->Def->Weapon)) hive += s->Ammo;
+			else missiles += s->Ammo;
+		}
 		cs::List<cs::String> line;
-		if (missiles > 0) line.Add(cs::Cat("MISSILES ", missiles, me->LockProgress >= 1 ? " (right mouse)" : " (T lock, hold the crosshair on it)"));
+		const char* lockHint = me->LockProgress >= 1 ? " (right mouse)" : " (T lock, hold the crosshair on it)";
+		if (missiles > 0) line.Add(cs::Cat("HOMING MISSILES ", missiles, lockHint));
+		if (hive > 0) line.Add(cs::Cat("HIVE ", hive, lockHint));
+		if (rockets > 0) line.Add(cs::Cat("ROCKETS ", rockets, " (right mouse, dumb-fire)"));
+		// A rotary gun's barrels (US-T101): how far they have spun up.
+		for (const auto& s : c->Subsystems)
+			if (!s->Destroyed() && Arsenal::IsRotary(s->Def->Weapon))
+			{
+				line.Add(cs::Cat("VULCAN SPIN ", Mathf::RoundToInt(static_cast<float>(s->Spin) * 100), "%"));
+				break;
+			}
 		// The rest of the arsenal (U.SPC-T271): rounds left, and whether the mount is ready.
 		AddMount(line, c, SubsystemKind::EmpLauncher, "EMP", "middle mouse");
 		AddMount(line, c, SubsystemKind::MineLayer, "MINES", "Ctrl");

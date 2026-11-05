@@ -91,6 +91,21 @@ namespace SpaceGod::Core
 		/// engines and guns build. Thin and spread out to the sky, so it is a weak point: a hull that loses its radiators
 		/// must throttle down or cook.</summary>
 		Radiator,
+
+		// The full arsenal (US-T101). Appended, so every saved value above keeps its number. The homing missile is the
+		// MissileLauncher above (its rounds steer onto a locked target); the three below are the kinds it lacked.
+
+		/// <summary>A vulcan rotary cannon (US-T101, see <see cref="Arsenal"/>): a gatling for a fighter's nose or a small
+		/// turret that spins up from a quarter of its rate to a torrent of tracers, short-ranged and hot.</summary>
+		VulcanCannon,
+
+		/// <summary>A hive missile launcher (US-T101): one round that flies a moment and splits into a swarm of homing
+		/// micro-missiles, each light enough for point defence to pick off.</summary>
+		HiveLauncher,
+
+		/// <summary>A dumb-fire rocket pod (US-T101): an unguided salvo along the nose, fast and cheap, that hits whatever
+		/// hostile hull it flies into and nothing it does not.</summary>
+		RocketPod,
 	};
 	SPACEGODCORE_API const char* ToString(SubsystemKind v);
 
@@ -213,6 +228,28 @@ namespace SpaceGod::Core
 
 		/// <summary>Boarding pods: slow, few, and stopped by shields; each carries a squad of marines.</summary>
 		static const cs::Ref<WeaponSpec>& Pods();
+
+		/// <summary>A rotary gun's spin-up (US-T101), seconds from rest to its full rate: a cold gun fires at a fraction of
+		/// it (<see cref="Arsenal.SpinStartFactor"/>) and gains speed with every round. Zero for every other gun.</summary>
+		double SpinUpS = 0;
+
+		/// <summary>A hive round (US-T101): the micro-missiles it splits into, and after how many seconds of flight. Zero for
+		/// a round that stays whole. <see cref="Damage"/> is then each micro-missile's warhead.</summary>
+		int SplitInto = 0;
+		double SplitAfterS = 0;
+
+		/// <summary>A dumb-fire rocket (US-T101): no seeker and no lock, it flies straight down the line it was fired on.</summary>
+		bool Unguided = false;
+
+		/// <summary>The vulcan rotary cannon (US-T101): under an autocannon's reach, a lighter round, and at full spin over
+		/// three times its rate, so it shreds what it reaches and overheats fast.</summary>
+		static const cs::Ref<WeaponSpec>& Vulcan();
+
+		/// <summary>A hive missile (US-T101): four rounds, each splitting after a second into eight micro-missiles.</summary>
+		static const cs::Ref<WeaponSpec>& HiveMissile();
+
+		/// <summary>Dumb-fire rockets (US-T101): salvos of four, quick and hard-hitting at short range, twenty-four to a pod.</summary>
+		static const cs::Ref<WeaponSpec>& Rockets();
 
 		/// <summary>Marines per boarding pod.</summary>
 		static constexpr double PodMarines = 12;

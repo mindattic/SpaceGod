@@ -90,6 +90,17 @@ namespace SpaceGod::Core
 
 		/// <summary>A spinal coilgun (U.SPC-T490, see <see cref="SpinalMounts"/>): only a spinal mount takes one.</summary>
 		Coilgun,
+
+		// The full arsenal (US-T101), appended so the catalogue's indices and saved values keep theirs.
+
+		/// <summary>A vulcan rotary cannon: any ballistic mount takes one, a fighter's nose gun included.</summary>
+		VulcanCannon,
+
+		/// <summary>A hive missile launcher, with its first four rounds: any missile mount takes one.</summary>
+		HiveLauncher,
+
+		/// <summary>A dumb-fire rocket pod, with its first twenty-four rockets: any missile mount takes one.</summary>
+		RocketPod,
 	};
 	SPACEGODCORE_API const char* ToString(ModuleKind v);
 

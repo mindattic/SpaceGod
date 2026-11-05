@@ -153,8 +153,16 @@ namespace SpaceGod::Core
 	enum class WeaponGroup : int
 	{
 		Guns,
+
+		/// <summary>The homing missiles: they go once the lock is made and steer onto it.</summary>
 		Missiles,
 		Torpedoes,
+
+		/// <summary>Dumb-fire rockets (US-T101): no lock, straight down the nose.</summary>
+		Rockets,
+
+		/// <summary>Hive missiles (US-T101): on the lock, each round splitting into a swarm.</summary>
+		Hive,
 	};
 	SPACEGODCORE_API const char* ToString(WeaponGroup v);
 

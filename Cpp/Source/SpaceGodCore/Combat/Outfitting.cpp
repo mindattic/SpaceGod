@@ -52,6 +52,9 @@ namespace SpaceGod::Core
 			case ModuleKind::FlakCannon: return "FlakCannon";
 			case ModuleKind::InterceptorMissile: return "InterceptorMissile";
 			case ModuleKind::Coilgun: return "Coilgun";
+			case ModuleKind::VulcanCannon: return "VulcanCannon";
+			case ModuleKind::HiveLauncher: return "HiveLauncher";
+			case ModuleKind::RocketPod: return "RocketPod";
 		}
 		return "";
 	}
@@ -157,6 +160,11 @@ namespace SpaceGod::Core
 			// A spinal coilgun (U.SPC-T490): the coils and their capacitors down a battleship's keel, a little cheaper than a
 			// spinal railgun's rails. Only a spinal mount takes one.
 			cs::New<ModuleSpec>(ModuleKind::Coilgun, "Coilgun", 1400, false, B, L, true, 10, cs::List<std::pair<Good, double>>{ { Good::Alloys, 380 }, { Good::Electronics, 90 }, { Good::Machinery, 110 } }),
+			// The full arsenal (US-T101): a vulcan's six barrels, motor and belt feed, a little dearer than an autocannon; a
+			// hive launcher's four rounds at 2 t a round (eight seekers in each); a rocket pod's twenty-four at a quarter tonne.
+			cs::New<ModuleSpec>(ModuleKind::VulcanCannon, "Vulcan cannon", 28, false, B, S, false, 100, cs::List<std::pair<Good, double>>{ { Good::Alloys, 10 }, { Good::Machinery, 6 }, { Good::Munitions, 4 } }),
+			cs::New<ModuleSpec>(ModuleKind::HiveLauncher, "Hive missiles", 45, false, Mi, S, false, 110, cs::List<std::pair<Good, double>>{ { Good::Alloys, 12 }, { Good::Electronics, 14 }, { Good::Machinery, 3 }, { Good::Munitions, 8 } }),
+			cs::New<ModuleSpec>(ModuleKind::RocketPod, "Rocket pod", 30, false, Mi, S, false, 110, cs::List<std::pair<Good, double>>{ { Good::Alloys, 8 }, { Good::Machinery, 2 }, { Good::Munitions, 6 } }),
 		};
 		return all;
 	}
@@ -205,6 +213,9 @@ namespace SpaceGod::Core
 			case ModuleKind::FlakCannon: return SubsystemKind::FlakCannon;
 			case ModuleKind::InterceptorMissile: return SubsystemKind::InterceptorMissile;
 			case ModuleKind::Coilgun: return SubsystemKind::Coilgun;
+			case ModuleKind::VulcanCannon: return SubsystemKind::VulcanCannon;
+			case ModuleKind::HiveLauncher: return SubsystemKind::HiveLauncher;
+			case ModuleKind::RocketPod: return SubsystemKind::RocketPod;
 			case ModuleKind::ShieldGenerator:
 			case ModuleKind::HardenedShield: return SubsystemKind::ShieldGenerator;
 			default: return SubsystemKind::Engine;
@@ -310,6 +321,9 @@ namespace SpaceGod::Core
 			case SubsystemKind::FlakCannon: return ModuleKind::FlakCannon;
 			case SubsystemKind::InterceptorMissile: return ModuleKind::InterceptorMissile;
 			case SubsystemKind::Coilgun: return ModuleKind::Coilgun;
+			case SubsystemKind::VulcanCannon: return ModuleKind::VulcanCannon;
+			case SubsystemKind::HiveLauncher: return ModuleKind::HiveLauncher;
+			case SubsystemKind::RocketPod: return ModuleKind::RocketPod;
 			default: return std::nullopt;
 		}
 	}

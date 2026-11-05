@@ -2,6 +2,7 @@
 
 #include "Embodiment/FighterSeat.h"
 #include "Astro.h"
+#include "Combat/Arsenal.h"
 #include "Combat/Battle.h"
 #include "Combat/CombatSpecs.h"
 #include "Combat/CombatState.h"
@@ -271,6 +272,13 @@ namespace SpaceGod::Core
 		if (stick != nullptr && WeaponGroups::Secondaries(u).Count() > 0)
 			sb.Append("  ·  ").Append(WeaponGroups::Label(stick->SecondaryGroup)).Append(' ').Append(WeaponGroups::Ammo(u, stick->SecondaryGroup));
 		sb.Append("  flares ").Append(Countermeasures());
+		// A rotary gun's barrels (US-T101): how far they have spun up towards the full rate.
+		for (const auto& s : c->Subsystems)
+			if (!s->Destroyed() && Arsenal::IsRotary(s->Def->Weapon))
+			{
+				sb.Append("  ·  vulcan spin ").Append(Pct(s->Spin));
+				break;
+			}
 		auto t = u->PlayerLockTarget;
 		if (t != nullptr && t->Present())
 		{

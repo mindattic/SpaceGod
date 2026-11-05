@@ -2,6 +2,7 @@
 
 #include "Combat/ScreenWeapons.h"
 
+#include "Combat/Arsenal.h"
 #include "Combat/Battle.h"
 #include "Combat/CombatSpecs.h"
 #include "Combat/CombatState.h"
@@ -102,6 +103,9 @@ namespace SpaceGod::Core
 		{
 			case SubsystemKind::AntimatterTorpedo: return MissileKind::Antimatter;
 			case SubsystemKind::InterceptorMissile: return MissileKind::Interceptor;
+			// The full arsenal (US-T101).
+			case SubsystemKind::HiveLauncher: return MissileKind::Hive;
+			case SubsystemKind::RocketPod: return MissileKind::Rocket;
 			case SubsystemKind::Torpedo:
 			case SubsystemKind::TorpedoTube: return MissileKind::Torpedo;
 			default: return MissileKind::Missile;
@@ -116,6 +120,9 @@ namespace SpaceGod::Core
 			case SubsystemKind::TorpedoTube: return 40;
 			case SubsystemKind::Torpedo: return 25;
 			case SubsystemKind::InterceptorMissile: return InterceptorHp;
+			// The full arsenal (US-T101).
+			case SubsystemKind::HiveLauncher: return Arsenal::HiveHp;
+			case SubsystemKind::RocketPod: return Arsenal::RocketHp;
 			default: return 12;
 		}
 	}

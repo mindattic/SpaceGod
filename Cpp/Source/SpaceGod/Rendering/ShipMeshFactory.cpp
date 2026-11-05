@@ -456,6 +456,40 @@ namespace SpaceGod::Rendering
 				}
 				else b.Box(Vector3(0, 0.006f, 0), Vector3(0.024f, 0.014f, 0.024f), b.Hull);
 				break;
+			case SubsystemKind::VulcanCannon:
+				// A vulcan rotary cannon (US-T101): a small turret and a long six-barrel cluster round a hub, the drum
+				// feed behind it.
+				if (barrels)
+				{
+					b.Cylinder(Vector3(0, 0, 0.008f), 0.0045f, 0.016f, b.Accent);
+					for (int k = 0; k < 6; k++)
+					{
+						float a = Mathf::PI * 2 * k / 6;
+						b.Cylinder(Vector3(Mathf::Cos(a) * 0.0035f, Mathf::Sin(a) * 0.0035f, 0.03f), 0.0011f, 0.046f, b.Dark);
+					}
+				}
+				else
+				{
+					b.Box(Vector3(0, 0.006f, 0), Vector3(0.022f, 0.013f, 0.024f), b.Hull);
+					b.Box(Vector3(0, 0.008f, -0.016f), Vector3(0.016f, 0.012f, 0.01f), b.Dark);
+				}
+				break;
+			case SubsystemKind::HiveLauncher:
+				// A hive launcher (US-T101): a squat box with four big cells, their hatches lit amber.
+				b.Box(Vector3(0, 0.008f, 0), Vector3(0.03f, 0.016f, 0.036f), b.Hull);
+				for (int r = 0; r < 2; r++)
+					for (int c = 0; c < 2; c++)
+						b.Box(Vector3(-0.007f + c * 0.014f, 0.0165f, -0.008f + r * 0.016f), Vector3(0.011f, 0.002f, 0.012f), b.Glow(Color(1.0f, 0.72f, 0.28f)));
+				break;
+			case SubsystemKind::RocketPod:
+				// A rocket pod (US-T101): a short round pod, its face a honeycomb of tubes.
+				b.Cylinder(Vector3(0, 0.008f, 0), 0.008f, 0.034f, b.Hull);
+				for (int k = 0; k < 6; k++)
+				{
+					float a = Mathf::PI * 2 * k / 6;
+					b.Box(Vector3(Mathf::Cos(a) * 0.0045f, 0.008f + Mathf::Sin(a) * 0.0045f, 0.0175f), Vector3(0.0025f, 0.0025f, 0.002f), b.Dark);
+				}
+				break;
 			case SubsystemKind::InterceptorMissile:
 				// An interceptor launcher (U.SPC-T489): a box of vertical cells, their hatches lit pale blue.
 				b.Box(Vector3(0, 0.006f, 0), Vector3(0.026f, 0.012f, 0.026f), b.Hull);

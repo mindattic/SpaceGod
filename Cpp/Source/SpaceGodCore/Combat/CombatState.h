@@ -42,6 +42,10 @@ namespace SpaceGod::Core
 		/// <summary>World direction (ecliptic) the mount is aimed, for turret rendering; zero when idle.</summary>
 		DVec3 Aim;
 
+		/// <summary>A rotary gun's barrels (US-T101, see <see cref="Arsenal"/>): 0 at rest, 1 at full spin. Zero for every
+		/// other mount.</summary>
+		double Spin = 0;
+
 		Subsystem(const cs::Ref<SubsystemDef>& def, int index);
 
 		SubsystemKind Kind() const;

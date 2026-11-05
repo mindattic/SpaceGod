@@ -227,6 +227,16 @@ namespace SpaceGod::Views
 				e.Color = Color(1.0f, 0.7f, 0.35f);
 				e.Life = 0.6f;
 				break;
+			case FxKind::Vulcan:
+				// A vulcan's burst (US-T101): hot orange-red tracers, brighter and redder than a gun's, gone in a blink.
+				e.Color = Color::Lerp(Color(1.0f, 0.45f, 0.15f), faction, 0.15f) * 1.6f;
+				e.Life = 0.07f;
+				break;
+			case FxKind::HiveSplit:
+				// A hive round splitting (US-T101): an amber flash and its seekers' streaks fanning out.
+				e.Color = Color(1.0f, 0.75f, 0.3f) * 1.8f;
+				e.Life = 0.5f;
+				break;
 			default:
 				return;
 		}
@@ -240,6 +250,40 @@ namespace SpaceGod::Views
 		float fade = 1 - t;
 		switch (e.Kind)
 		{
+			case FxKind::Vulcan:
+			{
+				// A vulcan's burst (US-T101): a short, thick tracer dash flying out from the muzzle down the line, with a
+				// ragged muzzle flare that flickers as the barrels turn.
+				auto a = Point(e.Battle, e.A);
+				auto bFull = Point(e.Battle, e.B);
+				float fly = Mathf::Clamp01(t);
+				auto head = Vector3::Lerp(a, bFull, Mathf::Min(1.0f, fly * 1.2f));
+				auto tail = Vector3::Lerp(a, bFull, Mathf::Max(0.0f, fly * 1.2f - 0.25f));
+				Ribbon(tail, head, 2.2f, e.Color * fade);
+				Ribbon(tail, head, 0.8f, Color(1.0f, 0.95f, 0.8f) * fade);
+				float flick = 0.7f + 0.3f * Mathf::Sin(age * 140.0f);
+				Sprite(a, PixelSize(a, 9.0f) * flick * fade, Color(1.0f, 0.7f, 0.35f) * fade, Shape::Radial);
+				break;
+			}
+			case FxKind::HiveSplit:
+			{
+				// A hive round splitting (US-T101): a hot flash where the casing opened, a ring racing out, and a fan of
+				// short streaks round its heading, one per seeker.
+				auto c = Point(e.Battle, e.A);
+				auto ahead = Point(e.Battle, e.B) - c;
+				if (age < 0.12f) Sprite(c, PixelSize(c, 22.0f) * (1 - age / 0.12f), Color::white() * 1.5f, Shape::Radial);
+				Sprite(c, PixelSize(c, 8.0f + 26.0f * t), e.Color * fade, Shape::Ring);
+				int n = Mathf::Max(1, static_cast<int>(e.Size));
+				auto cam = app->UnityCamera->transform;
+				for (int k = 0; k < n; k++)
+				{
+					float ang = Mathf::PI * 2 * k / n;
+					auto across = (cam->right() * Mathf::Cos(ang) + cam->up() * Mathf::Sin(ang)) * ahead.magnitude() * 0.6f;
+					auto tip = c + (ahead + across) * (0.4f + 1.4f * t);
+					Ribbon(c + (ahead + across) * (0.2f + 1.2f * t), tip, 1.2f, e.Color * fade);
+				}
+				break;
+			}
 			case FxKind::Beam:
 			case FxKind::BeamMiss:
 			case FxKind::PointDefense:
@@ -533,6 +577,38 @@ namespace SpaceGod::Views
 				Ribbon(Point(b, m->Pos - m->Vel * 0.8), p, 1.0f, ice * 0.6f);
 				continue;
 			}
+			if (m->Kind == MissileKind::Rocket)
+			{
+				// A dumb-fire rocket (US-T101): a small hot motor flame on a long, widening grey smoke trail that thins
+				// to nothing behind it.
+				Sprite(p, PixelSize(p, 3.0f), Color(1.0f, 0.8f, 0.45f) * 1.8f, Shape::Radial);
+				auto smoke = Color(0.62f, 0.6f, 0.58f);
+				auto prev = p;
+				for (int k = 1; k <= 4; k++)
+				{
+					auto next = Point(b, m->Pos - m->Vel * (0.12 * k));
+					Ribbon(next, prev, 1.4f + 1.1f * k, smoke * (0.55f - 0.12f * k));
+					prev = next;
+				}
+				continue;
+			}
+			if (m->Kind == MissileKind::Hive)
+			{
+				// A hive round before it splits (US-T101): a fat amber casing, its seekers' lights winking along it.
+				auto amber = Color::Lerp(Color(1.0f, 0.7f, 0.25f), c, 0.2f);
+				float wink = Mathf::Sin(Time::unscaledTime * 22.0f) > 0 ? 1.0f : 0.6f;
+				Sprite(p, PixelSize(p, 7.0f), amber * 1.5f * wink, Shape::Radial);
+				Ribbon(Point(b, m->Pos - m->Vel * 2.0), p, 2.0f, amber * 0.5f);
+				continue;
+			}
+			if (m->Kind == MissileKind::HiveMicro)
+			{
+				// A hive seeker (US-T101): a tiny amber spark on a short, thin streak, one of a swarm.
+				auto amber = Color(1.0f, 0.75f, 0.3f);
+				Sprite(p, PixelSize(p, 2.5f), amber * 1.6f, Shape::Radial);
+				Ribbon(Point(b, m->Pos - m->Vel * 0.6), p, 0.8f, amber * 0.55f);
+				continue;
+			}
 			Sprite(p, PixelSize(p, pod ? 8.0f : m->Torpedo ? 7.0f : 5.0f), c * 1.4f, Shape::Radial);
 			auto tail = Point(b, m->Pos - m->Vel * (pod ? 4.0 : m->Torpedo ? 3.0 : 2.0));
 			Ribbon(tail, p, pod ? 2.2f : 1.4f, c * 0.5f);
@@ -547,6 +623,14 @@ namespace SpaceGod::Views
 			auto p = Point(b, r->Pos);
 			auto side = r->Side >= 0 && r->Side < 2 ? b->SideLeaders[r->Side] : nullptr;
 			auto faction = side != nullptr ? Color(side->Color.R, side->Color.G, side->Color.B) : Color::white();
+			if (r->Tracer)
+			{
+				// A vulcan's round (US-T101): every one a tracer, a long hot orange-red streak.
+				auto hot = Color(1.0f, 0.5f, 0.2f) * 2.0f;
+				Sprite(p, PixelSize(p, 2.2f), hot, Shape::Radial);
+				Ribbon(Point(b, r->Pos - r->Vel * 0.12), p, 1.6f, hot * 0.7f);
+				continue;
+			}
 			auto c = r->Railgun ? Color::Lerp(Color::white(), Color(0.75f, 0.85f, 1.0f), 0.3f) * 2.2f
 				: Color::Lerp(faction, Color(1.0f, 0.9f, 0.6f), 0.5f);
 			Sprite(p, PixelSize(p, r->Railgun ? 3.0f : 2.0f), c * 1.2f, Shape::Radial);

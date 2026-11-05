@@ -56,6 +56,7 @@ namespace SpaceGod::Core
 		case SubsystemKind::AutoTurret: return 120;
 		case SubsystemKind::FlakCannon: return 100;
 		case SubsystemKind::Autocannon:
+		case SubsystemKind::VulcanCannon: // US-T101
 		case SubsystemKind::FighterGuns: return 90;
 		case SubsystemKind::LaserTurret:
 		case SubsystemKind::PhaserArray: return 45;

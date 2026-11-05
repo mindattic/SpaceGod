@@ -186,7 +186,8 @@ namespace SpaceGod::Core
 				  "the glide path in through the stern, are refuelled, rearmed and repaired, and launch again. At the stick "
 				  "you can land on a friendly deck the same way; the HUD gives the guidance."),
 				T("Dogfighting keys",
-				  "Left mouse guns, right mouse the second trigger's missiles or torpedoes (1 cycles them), T locks the hostile "
+				  "Left mouse guns, right mouse the second trigger's weapon group -- homing missiles, hive missiles, dumb-fire "
+				  "rockets or torpedoes (1 cycles them; the readout names the group and its rounds) -- T locks the hostile "
 				  "nearest the crosshair, Ctrl throws flares and chaff, 7 / 8 / 9 move reactor power to weapons, shields or "
 				  "engines and 0 evens it (the arrows too, as at any controls), 2-5 order your wingmen, and 6 picks a capital's next weak point."),
 				T("Reactor power",
@@ -274,7 +275,11 @@ namespace SpaceGod::Core
 				  "Railgun and gun rounds fly a lead-compensated line and land only when they arrive; beams sweep onto their "
 				  "target; missiles and torpedoes home. Phaser arrays tune between a lance for hulls and a sweep for fighters "
 				  "and missiles; plasma cannons hit hardest close in; the tachyon lance lands the instant it fires. Point "
-				  "defence shoots down missiles and fighters. Every weapon aims within a fire cone in full 3D."),
+				  "defence shoots down missiles and fighters. Every weapon aims within a fire cone in full 3D. A yard also fits "
+				  "a vulcan rotary cannon (a short-ranged gatling that spins up from a quarter of its rate to a torrent of "
+				  "tracers, and runs hot), hive missiles (on the lock, each round splits after a second into eight homing "
+				  "seekers that point defence can thin) and dumb-fire rocket pods (salvos of four straight down the nose, no "
+				  "lock, hitting only what they fly into); the homing missile is the missile launcher every warship carries."),
 				T("Shields and armour",
 				  "Shields come from emitters on the hull, each covering the patch around it; a patch shot down is holed while "
 				  "the rest stays covered, so gunners go for the weak spot. Shots that meet the plate slanted glance off, so "

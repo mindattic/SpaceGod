@@ -353,6 +353,17 @@ namespace SpaceGod::Core
 	/// its layer comes within its trigger, hurting everything hostile within its blast.
 	/// </summary>
 	class Mine final
+
+		// The full arsenal (US-T101), appended. Missile above is the homing missile: it steers onto its target.
+
+		/// <summary>A dumb-fire rocket: no target and no seeker, it flies straight and hits the first hostile hull it meets.</summary>
+		Rocket,
+
+		/// <summary>A hive round in its first moment of flight, before it splits into its swarm (<see cref="Missile.SplitIn"/>).</summary>
+		Hive,
+
+		/// <summary>One of a hive round's micro-missiles: a small, frail homing seeker.</summary>
+		HiveMicro,
 	{
 	public:
 		DVec3 Pos, Vel;
@@ -432,6 +443,11 @@ namespace SpaceGod::Core
 	/// landing the instant the trigger was pulled. <see cref="Hit"/> is decided at the muzzle, same as a
 	/// beam's accuracy roll; a round that "hit" only actually calls <see cref="Battle.ApplyDamage"/> once
 	/// it arrives, so a target that dies or peels off first takes nothing. A round that missed keeps
+
+		/// <summary>A hive round (US-T101): seconds of flight left before it splits, and the micro-missiles it splits into
+		/// (0 for a round that stays whole).</summary>
+		double SplitIn = 0;
+		int SplitInto = 0;
 	/// flying past its aim point and fades, rather than never having existed.
 	/// </summary>
 	class KineticRound final
@@ -471,6 +487,9 @@ namespace SpaceGod::Core
 		BeamMiss,
 
 		/// <summary>A railgun's hypervelocity kinetic round -- a harder, thinner, whiter streak than a
+
+		/// <summary>A vulcan's round (US-T101): drawn as a hot tracer rather than a plain gun round -- cosmetic only.</summary>
+		bool Tracer = false;
 		/// laser <see cref="Beam"/>.</summary>
 		Railgun,
 		RailgunMiss,
@@ -528,6 +547,14 @@ namespace SpaceGod::Core
 	{
 		int Seq = 0;
 		FxKind Kind = FxKind::Beam;
+
+		// The full arsenal (US-T101), appended.
+
+		/// <summary>A vulcan's burst of tracers, from the muzzle (A) down the line it was fired on (B).</summary>
+		Vulcan,
+
+		/// <summary>A hive round splitting (A, heading towards B): a flash and its swarm fanning out, Size the micro-missiles.</summary>
+		HiveSplit,
 		DVec3 A, B;
 		double Size = 0;
 		int Side = 0;
@@ -1099,6 +1126,24 @@ namespace SpaceGod::Core
 		/// squad. A ship keeps a reserve of marines aboard to defend itself.
 		/// </summary>
 		void FirePods(const cs::Ref<BattleUnit>& u, const cs::Ref<Subsystem>& s);
+
+		// ---------------------------------------------------------------- the full arsenal (US-T101)
+
+		/// <summary>A salvo of dumb-fire rockets away from mount <paramref name="s"/> down <paramref name="dir"/> (unit), each
+		/// scattered a little off it. The caller has set the mount's reload.</summary>
+		void FireRockets(const cs::Ref<BattleUnit>& u, const cs::Ref<Subsystem>& s, DVec3 origin, DVec3 dir, const cs::Ref<WeaponSpec>& w);
+
+		/// <summary>A rocket's step: straight on, swept against every hostile hull, burst on the first it meets.</summary>
+		void StepRocket(const cs::Ref<Missile>& m, double dt);
+
+		/// <summary>A hive round splits: it is gone and its micro-missiles, fanned out round its heading, go on after its
+		/// target (into <paramref name="swarm"/>, added once the step is done).</summary>
+		void SplitHive(const cs::Ref<Missile>& m, cs::List<cs::Ref<Missile>>& swarm);
+
+		/// <summary>Whether the second trigger fires mount <paramref name="s"/>: on a craft the player flies from a carrier
+		/// only the weapon group picked for it (<see cref="FighterControl.SecondaryGroup"/>), at any other helm every guided
+		/// mount and rocket pod at once.</summary>
+		bool SecondaryFires(const cs::Ref<BattleUnit>& u, const cs::Ref<Subsystem>& s);
 
 		void PodHit(const cs::Ref<Missile>& m, const cs::Ref<BattleUnit>& t, DVec3 at, cs::Nullable<DVec3> shieldAt = std::nullopt);
 

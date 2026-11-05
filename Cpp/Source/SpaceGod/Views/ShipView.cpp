@@ -320,13 +320,13 @@ namespace SpaceGod::Views
 					: ShipMeshFactory::GetPart(sub->Kind(), Ship->Faction, false), "Base"));
 			SubsystemKind k = sub->Kind();
 			part->Turret = !d->Spinal && (k == SubsystemKind::HeavyLaser || k == SubsystemKind::LaserTurret || k == SubsystemKind::PointDefense ||
-				k == SubsystemKind::PlasmaCannon || k == SubsystemKind::FlakCannon);
+				k == SubsystemKind::PlasmaCannon || k == SubsystemKind::FlakCannon || k == SubsystemKind::VulcanCannon);
 			if (part->Turret)
 			{
 				auto barrels = NewGameObject("Barrels")->transform;
 				barrels->SetParent(mount, false);
 				barrels->localPosition = Vector3(0, k == SubsystemKind::HeavyLaser || k == SubsystemKind::PlasmaCannon ? 0.014f : k == SubsystemKind::LaserTurret ? 0.009f
-					: k == SubsystemKind::FlakCannon ? 0.011f : 0.008f, 0);
+					: k == SubsystemKind::FlakCannon || k == SubsystemKind::VulcanCannon ? 0.011f : 0.008f, 0);
 				part->Barrels = barrels;
 				if (!kit || !Rendering::StarSparrowKit::Turret(barrels, k, Ship->Faction, true, list))
 					list.Add(ShipModels::Part(barrels, ShipMeshFactory::GetPart(k, Ship->Faction, true), "Barrels"));

@@ -241,6 +241,10 @@ namespace SpaceGod::Core
 		static decltype(auto) S133() { return (World::TugNames()); } // Unity.SpaceGod.Core.World::TugNames
 		static decltype(auto) S134() { return (World::WorksEscortClasses()); } // Unity.SpaceGod.Core.World::WorksEscortClasses
 		static decltype(auto) S135() { return (World::WorksFreighterNames()); } // Unity.SpaceGod.Core.World::WorksFreighterNames
+		// The full arsenal (US-T101): no C# original, saved by identity as the other weapon specs are.
+		static decltype(auto) S136() { return (WeaponSpec::Vulcan()); } // Unity.SpaceGod.Core.WeaponSpec::Vulcan
+		static decltype(auto) S137() { return (WeaponSpec::HiveMissile()); } // Unity.SpaceGod.Core.WeaponSpec::HiveMissile
+		static decltype(auto) S138() { return (WeaponSpec::Rockets()); } // Unity.SpaceGod.Core.WeaponSpec::Rockets
 	};
 
 	SG_STATIC_OF("Unity.SpaceGod.Core.AlphaCentauri", "Orbit", Graph::Access<0>::S0())
@@ -379,4 +383,7 @@ namespace SpaceGod::Core
 	SG_STATIC_OF("Unity.SpaceGod.Core.World", "TugNames", Graph::Access<0>::S133())
 	SG_STATIC_OF("Unity.SpaceGod.Core.World", "WorksEscortClasses", Graph::Access<0>::S134())
 	SG_STATIC_OF("Unity.SpaceGod.Core.World", "WorksFreighterNames", Graph::Access<0>::S135())
+	SG_STATIC_OF("Unity.SpaceGod.Core.WeaponSpec", "Vulcan", Graph::Access<0>::S136())
+	SG_STATIC_OF("Unity.SpaceGod.Core.WeaponSpec", "HiveMissile", Graph::Access<0>::S137())
+	SG_STATIC_OF("Unity.SpaceGod.Core.WeaponSpec", "Rockets", Graph::Access<0>::S138())
 }

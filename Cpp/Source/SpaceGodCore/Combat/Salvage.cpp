@@ -239,6 +239,8 @@ namespace SpaceGod::Core
 			case SubsystemKind::InterceptorMissile:
 			case SubsystemKind::FlakCannon:
 			case SubsystemKind::FighterGuns:
+			case SubsystemKind::HiveLauncher:
+			case SubsystemKind::RocketPod:
 				return Good::Munitions;
 			case SubsystemKind::Engine:
 				return Good::Machinery;
@@ -377,6 +379,9 @@ namespace SpaceGod::Core
 			case SubsystemKind::AntimatterTorpedo: return "antimatter torpedo launcher";
 			case SubsystemKind::FlakCannon: return "flak cannon";
 			case SubsystemKind::InterceptorMissile: return "interceptor launcher";
+			case SubsystemKind::VulcanCannon: return "vulcan cannon";
+			case SubsystemKind::HiveLauncher: return "hive launcher";
+			case SubsystemKind::RocketPod: return "rocket pod";
 			case SubsystemKind::Railgun: return "railgun";
 			case SubsystemKind::Coilgun: return "coilgun";
 			case SubsystemKind::TachyonLance: return "tachyon lance";

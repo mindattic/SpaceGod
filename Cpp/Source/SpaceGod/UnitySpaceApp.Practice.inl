@@ -35,9 +35,11 @@ public:
 	/// ahead -- an interceptor and a fighter, a corvette and a destroyer -- already in the fight. Started from the main
 	/// menu, the Spawn &amp; Pilot screen, the <c>-dogfight</c> / <c>-dogfight-heavy</c> switch or the console's
 	/// <c>sg.DogfightDemo [heavy]</c>. Laid out in true km about the world, the fight in battle space, so it reads the
-	/// same at the gameplay and the realistic scale.
+	/// same at the gameplay and the realistic scale. <paramref name="kit"/> (US-T101, <c>sg.DogfightDemo [heavy] [kit]</c>)
+	/// rearms the player's craft first: <c>vulcan</c> (rotary cannons for its guns), <c>rockets</c>, <c>hive</c> (on its
+	/// missile mounts) or <c>arsenal</c> (vulcans and hive missiles); empty, it flies as built.
 	/// </summary>
-	void StartDogfightDemo(bool heavy);
+	void StartDogfightDemo(bool heavy, const cs::String& kit = cs::String());
 
 private:
 	/// <summary>Frames left before a dogfight demo asked for at launch starts (-1: none due); the scene settles first.</summary>

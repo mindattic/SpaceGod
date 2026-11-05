@@ -92,6 +92,9 @@ namespace SpaceGod::Core
 			case SubsystemKind::FlakCannon: return ModuleKind::FlakCannon;
 			case SubsystemKind::InterceptorMissile: return ModuleKind::InterceptorMissile;
 			case SubsystemKind::Coilgun: return ModuleKind::Coilgun;
+			case SubsystemKind::VulcanCannon: return ModuleKind::VulcanCannon;
+			case SubsystemKind::HiveLauncher: return ModuleKind::HiveLauncher;
+			case SubsystemKind::RocketPod: return ModuleKind::RocketPod;
 			case SubsystemKind::ShieldGenerator: return ModuleKind::ShieldGenerator;
 			case SubsystemKind::Engine: return ModuleKind::Engine;
 			default: return std::nullopt;

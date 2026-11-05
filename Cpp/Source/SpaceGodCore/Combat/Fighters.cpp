@@ -486,7 +486,9 @@ namespace SpaceGod::Core
 			u->PlayerSubTarget = nullptr;
 		}
 		u->Target = u->PlayerLockTarget;
-		u->PlayerSecondaryHeld = stick->Secondary && stick->SecondaryGroup == WeaponGroup::Missiles;
+		// The second trigger fires the group picked (Battle::SecondaryFires): homing or hive missiles on the lock, rockets
+		// straight off; a bomber's torpedoes go below (US-T101).
+		u->PlayerSecondaryHeld = stick->Secondary && stick->SecondaryGroup != WeaponGroup::Torpedoes;
 		// Lined up on a friendly flight deck's glide path, the deck takes it in, turns it round and launches it (U.SPC-T518).
 		if (FlightDecks::FlyManned(b, u, stick, dt)) return;
 		if (u->Stunned > 0)

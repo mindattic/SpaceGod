@@ -48,6 +48,9 @@ namespace SpaceGod::Core
 			case SubsystemKind::InterceptorMissile: return "InterceptorMissile";
 			case SubsystemKind::Coilgun: return "Coilgun";
 			case SubsystemKind::Radiator: return "Radiator";
+			case SubsystemKind::VulcanCannon: return "VulcanCannon";
+			case SubsystemKind::HiveLauncher: return "HiveLauncher";
+			case SubsystemKind::RocketPod: return "RocketPod";
 		}
 		return "";
 	}
@@ -192,6 +195,25 @@ namespace SpaceGod::Core
 		static const cs::Ref<WeaponSpec> s = [] { auto w = cs::New<WeaponSpec>(); w->RangeKm = 10; w->Damage = 60; w->Cooldown = 50; w->Accuracy = 1; w->Missile = true; w->MissileSpeedKmS = 0.8; w->Salvo = 2; w->Ammo = 6; return w; }();
 		return s;
 	}
+
+	// The full arsenal (US-T101).
+	const cs::Ref<WeaponSpec>& WeaponSpec::Vulcan()
+	{
+		static const cs::Ref<WeaponSpec> s = [] { auto w = cs::New<WeaponSpec>(); w->RangeKm = 1.2; w->Damage = 5; w->Cooldown = 0.06; w->Accuracy = 0.45; w->MuzzleSpeedKmS = 3.2; w->SpinUpS = 1.0; return w; }();
+		return s;
+	}
+
+	const cs::Ref<WeaponSpec>& WeaponSpec::HiveMissile()
+	{
+		static const cs::Ref<WeaponSpec> s = [] { auto w = cs::New<WeaponSpec>(); w->RangeKm = 8; w->Damage = 24; w->Cooldown = 10; w->Accuracy = 1; w->Missile = true; w->MissileSpeedKmS = 1.3; w->Salvo = 1; w->Ammo = 4; w->SeeksSmallCraft = true; w->SplitInto = 8; w->SplitAfterS = 1.0; return w; }();
+		return s;
+	}
+
+	const cs::Ref<WeaponSpec>& WeaponSpec::Rockets()
+	{
+		static const cs::Ref<WeaponSpec> s = [] { auto w = cs::New<WeaponSpec>(); w->RangeKm = 3; w->Damage = 45; w->Cooldown = 2.5; w->Accuracy = 1; w->Missile = true; w->MissileSpeedKmS = 2.4; w->Salvo = 4; w->Ammo = 24; w->Unguided = true; return w; }();
+		return s;
+	}
 	// ---------------------------------------------------------------- SubsystemDef
 
 	SubsystemDef::SubsystemDef(SubsystemKind kind, double x, double y, double z, bool facesAft, cs::Nullable<DVec3> coneAxis,
@@ -217,7 +239,7 @@ namespace SpaceGod::Core
 	double SubsystemDef::DefaultHp(SubsystemKind k)
 	{
 		return BaseHp(k) * (k == SubsystemKind::FighterGuns || k == SubsystemKind::Torpedo || k == SubsystemKind::Autocannon
-		                    || k == SubsystemKind::Radiator ? 1 : 3);
+		                    || k == SubsystemKind::Radiator || k == SubsystemKind::VulcanCannon || k == SubsystemKind::RocketPod ? 1 : 3);
 	}
 
 	double SubsystemDef::BaseHp(SubsystemKind k)
@@ -253,6 +275,9 @@ namespace SpaceGod::Core
 			case SubsystemKind::InterceptorMissile: return 120;
 			case SubsystemKind::Coilgun: return 450;
 			case SubsystemKind::Radiator: return Radiators::PanelHp;
+			case SubsystemKind::VulcanCannon: return 60;
+			case SubsystemKind::HiveLauncher: return 40;
+			case SubsystemKind::RocketPod: return 40;
 			default: return 200;
 		}
 	}
@@ -283,6 +308,9 @@ namespace SpaceGod::Core
 			case SubsystemKind::FlakCannon: return WeaponSpec::Flak();
 			case SubsystemKind::InterceptorMissile: return WeaponSpec::Interceptor();
 			case SubsystemKind::Coilgun: return SpinalMounts::Coilgun();
+			case SubsystemKind::VulcanCannon: return WeaponSpec::Vulcan();
+			case SubsystemKind::HiveLauncher: return WeaponSpec::HiveMissile();
+			case SubsystemKind::RocketPod: return WeaponSpec::Rockets();
 			default: return nullptr;
 		}
 	}
@@ -319,6 +347,9 @@ namespace SpaceGod::Core
 			case SubsystemKind::InterceptorMissile: return "Interceptor missiles";
 			case SubsystemKind::Coilgun: return "Coilgun";
 			case SubsystemKind::Radiator: return "Radiator";
+			case SubsystemKind::VulcanCannon: return "Vulcan cannon";
+			case SubsystemKind::HiveLauncher: return "Hive missiles";
+			case SubsystemKind::RocketPod: return "Rocket pod";
 			default: return "Reactor";
 		}
 	}
