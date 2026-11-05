@@ -72,5 +72,8 @@ namespace SpaceGod::UnityCompat
 
 		/// The Unreal components drawing the renderers under root (a scene capture's show-only list).
 		static TArray<UPrimitiveComponent*> ComponentsUnder(const cs::Ref<Transform>& root);
+
+		/// The Unreal component drawing one renderer (null before its first Sync, or while it draws nothing).
+		static UPrimitiveComponent* ComponentOf(const Renderer& renderer);
 	};
 }

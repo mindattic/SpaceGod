@@ -12,6 +12,13 @@
 #include "Input/InputDevice.h"
 #include "UnityCompat/UnityRuntime.h"
 #include "Views/SkyView.h"
+#include "Rendering/ShipModels.h"
+#include "UnitySpaceAppActor.h"
+#include "UnrealSpace.h"
+#include "UnityCompat/UnityScene.h"
+#include "Camera/CameraComponent.h"
+#include "Components/PrimitiveComponent.h"
+#include "Engine/World.h"
 
 #include "Astro.h"
 #include "BodyCatalog.h"
@@ -19,6 +26,7 @@
 #include "Ephemeris.h"
 #include "Fleet.h"
 #include "Hyperlanes.h"
+#include "ScaleModel.h"
 #include "Ships.h"
 #include "SimClock.h"
 #include "World.h"
@@ -701,6 +709,104 @@ namespace SpaceGod::Smoke::FeatureAudit
 			ToCommand();
 		}
 
+		// ---------------------------------------------------------------- focus (US-T78)
+
+		/// Focuses one target as F does (FocusOn), lets the flight end and a few frames pass at the given warp, then checks
+		/// in Unreal's own space, from the components actually drawn, that the model is where the camera's focus is: the
+		/// middle of its drawn model (a body's sphere, a ship's hull without its plume or FX, boxed in the model's own
+		/// frame) on the focus point (FocusScene - camera, through UnrealSpace), and dead ahead of the rendered camera.
+		void FocusCheck(const cs::String& id, const Target& target, int warp)
+		{
+			auto* host = AUnitySpaceAppActor::Find(GWorld);
+			auto* camera = host ? host->FindComponentByClass<UCameraComponent>() : nullptr;
+			if (!camera)
+			{
+				Result(id, false, "no app actor camera");
+				return;
+			}
+			app->Clock->SetWarp(warp);
+			app->SpaceCamera->FocusOn(target);
+			Settle();
+			// A ship's model is streamed in once it is near (U.SPC-T414).
+			for (int i = 0; i < 1200 && app->ModelRenderersOf(target).Count() == 0; i++) frames(1);
+			app->Clock->SetWarp(warp);
+			frames(20);
+
+			FVector focus = UnrealSpace::ToUnreal(app->Relative(app->SpaceCamera->FocusTarget == target ? app->FocusScene(target) : app->TargetScene(target)));
+			FQuat frame = UnrealSpace::ToUnreal(app->TargetRotation(target));
+			double radiusCm = FMath::Max(app->TargetRadius(target) * UnrealSpace::CmPerUnit, 1e-9);
+			FBox box(ForceInit);
+			int drawn = 0;
+			for (const auto& r : app->ModelRenderersOf(target))
+			{
+				UPrimitiveComponent* c = r ? UnityScene::ComponentOf(*r) : nullptr;
+				if (!c || !c->IsVisible()) continue;
+				drawn++;
+				// The component's own box, corner by corner into the model's frame about the focus point.
+				FBox local = c->CalcBounds(FTransform::Identity).GetBox();
+				const FTransform& world = c->GetComponentTransform();
+				for (int i = 0; i < 8; i++)
+				{
+					FVector corner((i & 1) ? local.Max.X : local.Min.X, (i & 2) ? local.Max.Y : local.Min.Y, (i & 4) ? local.Max.Z : local.Min.Z);
+					box += frame.UnrotateVector(world.TransformPosition(corner) - focus);
+				}
+			}
+			if (drawn == 0 || !box.IsValid)
+			{
+				Result(id, false, cs::Cat(Describe(target), ": nothing drawn (", app->ModelRenderersOf(target).Count(), " renderers)"));
+				return;
+			}
+			FVector centre = focus + frame.RotateVector(box.GetCenter());
+			double off = FVector::Dist(centre, focus) / radiusCm;
+			// Where the model's root is (TargetScene), for the record: what the camera orbited before US-T78.
+			double rootOff = FVector::Dist(centre, UnrealSpace::ToUnreal(app->Relative(app->TargetScene(target)))) / radiusCm;
+			FVector toModel = centre - camera->GetComponentLocation();
+			double angle = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(FVector::DotProduct(toModel.GetSafeNormal(), camera->GetForwardVector()), -1.0, 1.0)));
+			bool ok = off < 1e-3 && angle < 0.05 && app->SpaceCamera->Mode == CameraMode::Focus && app->SpaceCamera->FocusTarget == target;
+			Result(id, ok, cs::Cat(Describe(target), ", scale ", cs::Fmt(app->Scale()->Blend(), "F2"), ", warp ", app->Clock->Warp().Label, ": drawn model's middle ",
+				cs::Fmt(off, "G4"), " radii from the focus, ", cs::Fmt(angle, "F4"), " deg off the view axis (", drawn, " parts; its root ", cs::Fmt(rootOff, "F3"), " radii off); camera ",
+				Cameras::ToString(app->SpaceCamera->Mode), " on ", Describe(app->SpaceCamera->FocusTarget)));
+		}
+
+		void FocusProbes()
+		{
+			CloseEverything();
+			int earth = -1, moon = -1;
+			for (int i = 0; i < app->Catalog()->Count(); i++)
+			{
+				if ((*app->Catalog())[i]->Name == "Earth") earth = i;
+				if ((*app->Catalog())[i]->Name == "Moon") moon = i;
+			}
+			// A procedural hull: an imported (Kenney) craft's model never streams in headless (-nullrhi), so it has no row.
+			cs::Ref<Ship> ship;
+			for (const auto& s : app->Fleet()->Ships())
+				if (!s->Destroyed && !s->Derelict && s->Controller()->Phase != ShipPhase::Landed && s->Phase != ShipPhase::Lane && s->Battle == nullptr
+					&& Rendering::ShipModels::KenneyModelFor(s).empty() && s != app->World()->PilotedShip)
+				{
+					ship = s;
+					break;
+				}
+			int warp0 = app->Clock->WarpIndex;
+			double goal0 = app->ScaleGoal;
+			for (double goal : { 1.0, 0.0 })
+			{
+				if (app->ScaleGoal != goal) Tap(Key::G);
+				for (int i = 0; i < 900 && cs::Math::Abs(app->Scale()->Blend() - app->ScaleGoal) > 1e-9; i++) frames(1);
+				cs::String scale = goal > 0.5 ? "gameplay" : "realistic";
+				for (int warp : { 0, cs::Math::Min(app->Clock->Levels().Count() - 1, 8) })
+				{
+					cs::String w = warp == 0 ? "rest" : "warp";
+					if (earth >= 0) FocusCheck(cs::Cat("focus.", scale, "-", w, "-planet"), Target::OfBody(earth), warp);
+					if (moon >= 0) FocusCheck(cs::Cat("focus.", scale, "-", w, "-moon"), Target::OfBody(moon), warp);
+					if (ship) FocusCheck(cs::Cat("focus.", scale, "-", w, "-ship"), Target::OfShip(ship), warp);
+				}
+			}
+			app->Clock->SetWarp(warp0);
+			if (app->ScaleGoal != goal0) Tap(Key::G);
+			app->SpaceCamera->ExitFocus();
+			CloseEverything();
+		}
+
 		void Probe(const char* group, void (*body)())
 		{
 			try { body(); }
@@ -733,6 +839,7 @@ namespace SpaceGod::Smoke::FeatureAudit
 		{
 			Probe("text", [] { TextEditProbes(Result); });
 			Probe("viewer", [] { ModelViewerProbes(Result, frames); });
+			Probe("focus", FocusProbes); // US-T78
 		}
 		// US-T58: what the binding probes left code-present: combat at the controls with the mouse, and the player's own
 		// transits (a hyperlane ridden, a jump gate gone through, an FTL crossing to another star). The last two leave Sol,

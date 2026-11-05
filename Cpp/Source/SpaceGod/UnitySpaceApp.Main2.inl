@@ -256,6 +256,9 @@ public:
 
 	Core::DVec3 TargetScene(const Target& target) override;
 
+	/// US-T78: a ship's hull centre as its view draws it (ShipView::HullCentre), else TargetScene.
+	Core::DVec3 FocusScene(const Target& target) override;
+
 	double TargetRadius(const Target& target) override;
 
 	Quaternion TargetRotation(const Target& target) override;
@@ -265,6 +268,10 @@ private:
 
 public:
 	double NearestSurface(Core::DVec3 p) override;
+
+	/// US-T78: the renderers of the model drawn for a body (its sphere and ring) or a ship (its hull, no FX); empty for any
+	/// other kind, or a ship not streamed in. The audit's focus probes compare where they are drawn with the focus.
+	cs::List<cs::Ref<UnityCompat::Renderer>> ModelRenderersOf(const Target& target);
 
 	// ---------------------------------------------------------------- views
 

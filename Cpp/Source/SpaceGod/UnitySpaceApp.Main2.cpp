@@ -1057,6 +1057,17 @@ namespace SpaceGod
 		return Core::DVec3::Zero;
 	}
 
+	Core::DVec3 UnitySpaceApp::FocusScene(const Target& target)
+	{
+		auto at = TargetScene(target);
+		if (!target.IsShip()) return at;
+		int i = target.Ship->Id;
+		if (i >= shipViews.Count() || !shipViews[i]) return at;
+		// The hull's middle, from its root's frame (one unit long) to scene units: turned and sized as Apply places it.
+		auto offset = shipRotation[i] * (shipViews[i]->HullCentre() * static_cast<float>(shipLength[i]));
+		return at + Core::DVec3(offset.x, offset.y, offset.z);
+	}
+
 	double UnitySpaceApp::TargetRadius(const Target& target)
 	{
 		if (target.IsBody()) return bodyRadius[target.Body];
@@ -1080,6 +1091,14 @@ namespace SpaceGod
 			return Quaternion::LookRotation(ToVector(u->Forward.SwapYZ()), ToVector(up.SwapYZ()));
 		}
 		return Quaternion::identity();
+	}
+
+	cs::List<cs::Ref<Renderer>> UnitySpaceApp::ModelRenderersOf(const Target& target)
+	{
+		if (target.IsBody() && target.Body >= 0 && target.Body < bodyViews.Count() && bodyViews[target.Body])
+			return GetComponentsInChildren<Renderer>(bodyViews[target.Body]->Root->transform, false);
+		if (target.IsShip() && target.Ship && target.Ship->Id < shipViews.Count() && shipViews[target.Ship->Id]) return shipViews[target.Ship->Id]->HullRenderers();
+		return cs::List<cs::Ref<Renderer>>();
 	}
 
 	Vector3 UnitySpaceApp::ToVector(Core::DVec3 v) { return Vector3(static_cast<float>(v.X), static_cast<float>(v.Y), static_cast<float>(v.Z)); }

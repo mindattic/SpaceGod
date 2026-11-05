@@ -81,7 +81,7 @@ namespace SpaceGod::Cameras
 		}
 		else if (Mode == CameraMode::Focus && !FocusTarget.IsNone())
 		{
-			auto offset = ScenePosition - world->TargetScene(FocusTarget);
+			auto offset = ScenePosition - OrbitCentre(FocusTarget);
 			if (offset.LengthSquared() > 0)
 			{
 				auto look = -ToLocal(ToVector(offset.Normalized()));
@@ -125,7 +125,7 @@ namespace SpaceGod::Cameras
 	void SpaceCamera::FocusOn(const Target& target, double radii, cs::Nullable<float> pitchOverride)
 	{
 		if (target.IsNone()) return;
-		auto targetScene = world->TargetScene(target);
+		auto targetScene = OrbitCentre(target);
 		double r = cs::Math::Max(world->TargetRadius(target), 1e-9);
 		auto offset = ScenePosition - targetScene;
 		double distance = offset.Length();
@@ -297,7 +297,7 @@ namespace SpaceGod::Cameras
 		Rotation = UpFrame * Quaternion::Euler(orbitPitch, orbitYaw, 0);
 		auto back = Rotation * Vector3::back();
 		double r = world->TargetRadius(FocusTarget);
-		ScenePosition = world->TargetScene(FocusTarget) + DVec3(back.x, back.y, back.z) * (zoom * r);
+		ScenePosition = OrbitCentre(FocusTarget) + DVec3(back.x, back.y, back.z) * (zoom * r);
 		CurrentSpeed = 0;
 	}
 
@@ -306,7 +306,7 @@ namespace SpaceGod::Cameras
 		travelT = Mathf::Min(1.0f, travelT + dt / TravelSeconds);
 		float e = SmootherStep(travelT);
 
-		auto target = world->TargetScene(FocusTarget);
+		auto target = OrbitCentre(FocusTarget);
 		double r = world->TargetRadius(FocusTarget);
 		double startDist = cs::Math::Max(travelStartOffset.Length(), 1e-9);
 		double endDist = travelEndZoom * r;

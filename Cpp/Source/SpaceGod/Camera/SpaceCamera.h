@@ -32,6 +32,10 @@ namespace SpaceGod::Cameras
 		virtual Core::DVec3 BodyScene(int body) = 0;
 		virtual Core::DVec3 TargetScene(const Target& target) = 0;
 
+		/// <summary>Where focus mode (F) orbits and looks: the middle of the target's model as drawn, which for a hull
+		/// is not its root (US-T78). TargetScene unless the world knows better.</summary>
+		virtual Core::DVec3 FocusScene(const Target& target) { return TargetScene(target); }
+
 		/// <summary>A target's framing radius in scene units (body radius, or half a ship's length).</summary>
 		virtual double TargetRadius(const Target& target) = 0;
 
@@ -233,6 +237,10 @@ namespace SpaceGod::Cameras
 
 		static float SmootherStep(float t) { return t * t * t * (t * (t * 6 - 15) + 10); }
 		static Vector3 ToVector(Core::DVec3 v) { return Vector3(static_cast<float>(v.X), static_cast<float>(v.Y), static_cast<float>(v.Z)); }
+
+		/// <summary>The point focus mode orbits and looks at (US-T78): the model's drawn middle (ICameraWorld::FocusScene);
+		/// the pilot's chase keeps to the hull's own root, as the helm flies it.</summary>
+		Core::DVec3 OrbitCentre(const Target& target) { return PilotLocked ? world->TargetScene(target) : world->FocusScene(target); }
 
 		// ---------------------------------------------------------------- reference frames
 

@@ -93,6 +93,17 @@ namespace SpaceGod::Views
 		void Apply(Vector3 relative, Quaternion rotation, float length, bool burning, bool highlighted);
 
 		/// <summary>
+		/// The middle of the hull as drawn (the box round its hull meshes: sections, an imported craft's parts, a
+		/// truss and its load; not the drive plume, exhaust or shield FX), in the root's own frame, where the ship
+		/// is one unit long. A hull is not built symmetric about its root (a carrier's island, a freighter's pods),
+		/// so the focus camera orbits this point rather than the root (US-T78).
+		/// </summary>
+		Vector3 HullCentre() const;
+
+		/// <summary>The hull's own renderers, the ones HullCentre measures.</summary>
+		const cs::List<cs::Ref<Renderer>>& HullRenderers() const { return renderers; }
+
+		/// <summary>
 		/// Shows the hull's combat state: turrets on their targets (or at rest), lost hardpoints as
 		/// scars and fires, engines that still work glowing, breaches by hull damage.
 		/// </summary>

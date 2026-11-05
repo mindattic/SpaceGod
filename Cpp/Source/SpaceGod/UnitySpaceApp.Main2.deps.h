@@ -25,3 +25,8 @@ namespace SpaceGod::Core
 	class BodyDefinition;
 	class ToggleSetting;
 }
+
+namespace SpaceGod::UnityCompat
+{
+	class Renderer; // ModelRenderersOf (US-T78)
+}

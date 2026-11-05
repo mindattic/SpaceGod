@@ -958,4 +958,10 @@ namespace SpaceGod::UnityCompat
 			if (auto* h = static_cast<RendererHandle*>(r->Engine.get()); h && h->Component.IsValid()) out.Add(h->Component.Get());
 		return out;
 	}
+
+	UPrimitiveComponent* UnityScene::ComponentOf(const Renderer& renderer)
+	{
+		auto* h = static_cast<RendererHandle*>(renderer.Engine.get());
+		return h && h->Component.IsValid() ? h->Component.Get() : nullptr;
+	}
 }

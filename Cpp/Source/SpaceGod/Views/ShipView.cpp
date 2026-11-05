@@ -356,6 +356,38 @@ namespace SpaceGod::Views
 
 	// ---------------------------------------------------------------- per frame
 
+	Vector3 ShipView::HullCentre() const
+	{
+		// Each hull mesh's box corners through its own transform into the root's frame (unit length): the root's
+		// world placement taken back out, so the answer is the same whenever the root was last placed.
+		auto root = Root ? Root->transform : nullptr;
+		if (!root) return Vector3::zero();
+		float scale = root->localScale.x;
+		if (!(scale > 0)) return Vector3::zero();
+		auto toLocal = Quaternion::Inverse(root->rotation());
+		Vector3 origin = root->position();
+		bool any = false;
+		Bounds box;
+		for (const auto& r : renderers)
+		{
+			if (!r || !r->transform()) continue;
+			auto mesh = r->DrawnMesh();
+			if (!mesh) continue;
+			auto m = WorldMatrix::Of(*r->transform());
+			Bounds local = mesh->bounds();
+			Vector3 mn = local.min(), mx = local.max();
+			for (int i = 0; i < 8; i++)
+			{
+				auto world = m.MultiplyPoint(Vector3((i & 1) ? mx.x : mn.x, (i & 2) ? mx.y : mn.y, (i & 4) ? mx.z : mn.z));
+				auto p = toLocal * (world - origin) / scale;
+				if (!any) box = Bounds(p, Vector3::zero());
+				else box.Encapsulate(p);
+				any = true;
+			}
+		}
+		return any ? box.center : Vector3::zero();
+	}
+
 	void ShipView::Apply(Vector3 relative, Quaternion rotation, float length, bool burning, bool highlighted)
 	{
 		auto t = Root->transform;
