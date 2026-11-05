@@ -35,6 +35,7 @@
 #include "Economy/Propulsion.h"
 #include "Economy/Settlement.h"
 #include "Economy/TradeDesk.h"
+#include "Combat/BioMass.h"
 #include "Events/EventDirector.h"
 #include "Events/EventSources.h"
 #include "Events/Opportunity.h"
@@ -131,6 +132,7 @@ namespace SpaceGod::Core
 		Economy->AdvanceTo(jd);
 		Companies->Update(jd);
 		War->Update(jd);
+		EnsureBioMass(jd)->Update(jd);
 		if (LaneUpkeep) LaneUpkeep->Update(jd);
 		if (Sensors) Sensors->Update(jd);
 		if (Infrastructure) Infrastructure->UpdateSatellites(jd);
@@ -148,6 +150,20 @@ namespace SpaceGod::Core
 			Economy->RecountInbound(Fleet->Ships());
 			nextRecountJd = jd + 1;
 		}
+	}
+
+	cs::Ref<::SpaceGod::Core::BioMass> World::EnsureBioMass(double jd)
+	{
+		if (BioMass == nullptr)
+		{
+			// Its own stream (US-T125), never one of the subsystems' seed offsets: FNV-1a of the root body's name.
+			uint32_t h = 2166136261u;
+			auto cat = Catalog();
+			if (cat != nullptr && cat->Count() > 0)
+				for (unsigned char c : cat->Root()->Name) { h ^= c; h *= 16777619u; }
+			BioMass = cs::New<::SpaceGod::Core::BioMass>(shared_from_this(), static_cast<int>(h & 0x7FFFFFFF) ^ 0x6B10, jd);
+		}
+		return BioMass;
 	}
 
 	void World::UpdateAdventures(double jd, DVec3 playerHelioKm)

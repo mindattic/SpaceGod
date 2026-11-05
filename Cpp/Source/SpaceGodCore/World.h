@@ -54,6 +54,7 @@ namespace SpaceGod::Core
 	class MaterialConvoy;
 	class SocietySpec;
 	class Facility;
+	class BioMass;
 	struct TugDanger;
 	struct HeavyLanePath;
 	enum class PodState : int;
@@ -190,6 +191,12 @@ namespace SpaceGod::Core
 
 		/// <summary>The hyperlanes' upkeep and the lane tenders that keep them running (U.SPC-T481, see <see cref="Core.LaneUpkeep"/>).</summary>
 		cs::Ref<::SpaceGod::Core::LaneUpkeep> LaneUpkeep;
+
+		/// <summary>The Bio Mass adrift in this system (US-T125): made on first use, so older saves load without it.</summary>
+		cs::Ref<::SpaceGod::Core::BioMass> BioMass;
+
+		/// <summary>This system's Bio Mass, made now (with its own random stream, seeded from the system's name) if it has none.</summary>
+		cs::Ref<::SpaceGod::Core::BioMass> EnsureBioMass(double jd);
 
 		/// <summary>The most bounty hunter groups the free traders keep in service.</summary>
 		int HunterCap = 3;

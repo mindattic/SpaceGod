@@ -7,6 +7,7 @@
 #include "BodyDefinition.h"
 #include "Combat/AlphaStrike.h"
 #include "Combat/Battle.h"
+#include "Combat/BioMass.h"
 #include "Combat/Boarding.h"
 #include "Combat/BoardingCommand.h"
 #include "Combat/Broadsides.h"
@@ -242,7 +243,7 @@ namespace SpaceGod::Core
 		SG_P(Adventures), SG_P(Colonisation), SG_P(Companies), SG_P(Contracts), SG_P(Economy), SG_P(Ephemeris),
 		SG_P(Escorts), SG_P(Fleet), SG_P(Holdings), SG_P(Infrastructure), SG_P(Jd), SG_P(LaneUpkeep), SG_P(Law),
 		SG_P(Mining), SG_P(Outlaws), SG_P(Polities), SG_P(Pursuit), SG_P(Sensors), SG_P(Shocks), SG_P(Trade),
-		SG_P(War), SG_F(Belt), SG_F(Events), SG_F(Gates), SG_F(HavenSites), SG_F(HunterCap), SG_F(Independents),
+		SG_P(War), SG_OPT(BioMass) /* US-T125, absent from older saves */, SG_F(Belt), SG_F(Events), SG_F(Gates), SG_F(HavenSites), SG_F(HunterCap), SG_F(Independents),
 		SG_F(Logged), SG_F(MerchantCap), SG_F(MerchantTarget), SG_F(NavyCap), SG_F(NavyCapAtWar), SG_F(PilotedShip),
 		SG_F(PirateGroupCap), SG_F(PirateIncomePerDay), SG_F(Pirates), SG_NULLARRAY(RaiderNames), SG_F(Reach),
 		SG_F(ReachedGate), SG_F(RivalA), SG_F(RivalB), SG_F(ShipAdded), SG_F(Sol), SG_F(VoyageOrders),
