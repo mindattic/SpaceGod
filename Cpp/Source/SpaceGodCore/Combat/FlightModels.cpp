@@ -285,7 +285,31 @@ namespace SpaceGod::Core
 			return;
 		}
 		if (dt <= 0) return;
+		if (input.Piloted)
+		{
+			// The player's hands (US-T80): the same rules on heavier handling and a surged boost, kicking in while it fires.
+			bool boosting = input.Boost && tuning.BoostDurationS > 0 && combat != nullptr && combat->BoostFraction > 0;
+			HeavyFighterFlightModel felt(PilotedHandling());
+			felt.Fly(s, combat, hull, Surged(tuning), input, gravityKmS2, dt, boosting ? Feel.BoostKickS : 0);
+			return;
+		}
+		Fly(s, combat, hull, tuning, input, gravityKmS2, dt, 0);
+	}
 
+	HeavyFighterHandling HeavyFighterFlightModel::PilotedHandling() const
+	{
+		return HeavyFighterHandling(Handling.TurnRateCapFraction, Max(Handling.SpinUpS, Feel.SpinUpS), Max(Handling.SettleS, Feel.SettleS),
+			Handling.StrafeSpeedFraction, Max(Handling.BoostBleedS, Feel.BoostBleedS));
+	}
+
+	PilotTuning HeavyFighterFlightModel::Surged(const PilotTuning& tuning) const
+	{
+		double boost = 1 + (Max(1.0, tuning.BoostSpeedMultiplier) - 1) * Max(1.0, Feel.BoostSurge);
+		return PilotTuning(tuning.MaxSpeed, tuning.TurnRateDegS, boost, tuning.BoostDurationS, tuning.CruiseSpeedMultiplier, tuning.CruiseRampS);
+	}
+
+	void HeavyFighterFlightModel::Fly(PilotState& s, const cs::Ref<ShipCombat>& combat, const HullDynamics& hull, const PilotTuning& tuning, const PilotInput& input, DVec3 gravityKmS2, double dt, double kickS) const
+	{
 		auto stiff = HullDynamics(hull.MassKt, hull.MainAccel, hull.RetroAccel, hull.LateralAccel, hull.VerticalAccel,
 			TurnAlpha(hull, tuning), hull.RollAngularAccel);
 		auto forwardBeforeTurn = s.Forward;
@@ -303,6 +327,13 @@ namespace SpaceGod::Core
 		auto ease = (commanded - s.Vel) / Max(dt, EaseTimeConstantS()) - gravityKmS2;
 		double along = DVec3::Dot(s.Vel, f);
 		double fwd = DVec3::Dot(ease, f);
+		// The boost's kick (US-T80, the player's only): while it fires, forward speed is gathered on the short kick rather
+		// than the settle, so the surge lands in the back at once; it only ever adds push, never brakes.
+		if (kickS > 0)
+		{
+			double kick = DVec3::Dot(commanded - s.Vel, f) / Max(dt, kickS) - DVec3::Dot(gravityKmS2, f);
+			fwd = Max(fwd, kick);
+		}
 		// The boost bleed: speed above the set point is shed no faster than the bleed, down to the set point, and the
 		// ease takes over from there.
 		if (along > setPoint)
@@ -478,8 +509,7 @@ namespace SpaceGod::Core
 		double fwd = Max(-hull.RetroAccel, Min(hull.MainAccel * driveMult, ease));
 
 		// The keel: slip across the hull (and gravity across it) is killed as hard as it can push.
-		auto across = (-(s.Vel - f * along)) / dt - (gravityKmS2 - f * DVec3::Dot(gravityKmS2, f));
-		double keel = KeelAccel(hull, tuning);
+		auto across = (-(s.Vel - f * along)) / dt - (gravityKmS2 - f * DVec3::Dot(gravityKmS2, f));		double keel = KeelAccel(hull, tuning);
 		auto thrust = f * fwd
 			+ r * Limit(DVec3::Dot(across, r), Max(hull.LateralAccel, keel))
 			+ u * Limit(DVec3::Dot(across, u), Max(hull.VerticalAccel, keel));

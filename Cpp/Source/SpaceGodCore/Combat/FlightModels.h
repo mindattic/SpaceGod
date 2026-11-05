@@ -407,6 +407,42 @@ namespace SpaceGod::Core
 		/*turnRateCapFraction:*/ 0.7, /*spinUpS:*/ 0.1, /*settleS:*/ 0.5, /*strafeSpeedFraction:*/ 0.45, /*boostBleedS:*/ 2);
 
 	/// <summary>
+	/// How a heavy fighter answers a player's hands (US-T80), over its <see cref="HeavyFighterHandling"/>: Everspace 2's
+	/// weight. More inertia than a light fighter (a slower spin-up and a longer settle, so it is punchy but never
+	/// twitchy) and a strong boost (a surge above the class's boost that kicks in at once and carries). Read only with
+	/// <see cref="PilotInput.Piloted"/> and flight assist on, so crews fly as before and the Bench's digests hold.
+	/// </summary>
+	struct HeavyFighterFeel
+	{
+		/// <summary>The least time for the nose to spin up to its top swing and stop from it, s (the handling's own if longer).</summary>
+		double SpinUpS = 0;
+
+		/// <summary>The least time to settle on a new set point, s (the handling's own if longer): the hull's heft.</summary>
+		double SettleS = 0;
+
+		/// <summary>The boost's extra speed times this: a heavy fighter's boost outdoes its class's crew-flown one.</summary>
+		double BoostSurge = 1;
+
+		/// <summary>While the boost fires, the time constant the hull gathers forward speed with, s: the kick in the back.
+		/// 0: the settle's.</summary>
+		double BoostKickS = 0;
+
+		/// <summary>The least time the boost's extra speed bleeds off over once let go, s: the momentum a boosted run carries.</summary>
+		double BoostBleedS = 0;
+
+		constexpr HeavyFighterFeel() = default;
+
+		constexpr HeavyFighterFeel(double spinUpS, double settleS, double boostSurge, double boostKickS, double boostBleedS)
+			: SpinUpS(spinUpS), SettleS(settleS), BoostSurge(boostSurge), BoostKickS(boostKickS), BoostBleedS(boostBleedS)
+		{
+		}
+
+		static const HeavyFighterFeel Default;
+	};
+	inline constexpr HeavyFighterFeel HeavyFighterFeel::Default = HeavyFighterFeel(
+		/*spinUpS:*/ 0.22, /*settleS:*/ 0.9, /*boostSurge:*/ 1.3, /*boostKickS:*/ 0.12, /*boostBleedS:*/ 3.5);
+
+	/// <summary>
 	/// Heavy fighters, Everspace 2 style (U.SPC-T441): always coupled and very responsive, heavy without being sluggish.
 	/// With flight assist on, (1) the nose turns at one rate at any speed (no corner speed), capped below a light
 	/// fighter's (<see cref="HeavyFighterHandling.TurnRateCapFraction"/>), and spins up and stops hard
@@ -416,12 +452,22 @@ namespace SpaceGod::Core
 	/// <see cref="HeavyFighterHandling.StrafeSpeedFraction"/> of the forward one, reached as fast as forward speed, for
 	/// circle-strafing; and (4) speed above the set point (a boost let go) bleeds off over
 	/// <see cref="HeavyFighterHandling.BoostBleedS"/> rather than being braked away, so a boosted run carries through.
-	/// With flight assist off the hull is the Newtonian one, unchanged.
+	/// With flight assist off the hull is the Newtonian one, unchanged. Under the player's own hands
+	/// (<see cref="PilotInput.Piloted"/>, US-T80) it flies on the <see cref="Feel"/>: heavier, and a stronger boost.
 	/// </summary>
 	class SPACEGODCORE_API HeavyFighterFlightModel final : public IFlightModel
 	{
 	public:
 		HeavyFighterHandling Handling;
+
+		/// <summary>How it answers the player's hands (US-T80); crews never read it.</summary>
+		HeavyFighterFeel Feel = HeavyFighterFeel::Default;
+
+		/// <summary>The handling the player flies: the class's, made as heavy as <see cref="Feel"/> asks.</summary>
+		HeavyFighterHandling PilotedHandling() const;
+
+		/// <summary>The class's tuning with the boost's extra speed times <see cref="HeavyFighterFeel.BoostSurge"/>.</summary>
+		PilotTuning Surged(const PilotTuning& tuning) const;
 
 		HeavyFighterFlightModel() : HeavyFighterFlightModel(HeavyFighterHandling::Default) {}
 
@@ -450,6 +496,10 @@ namespace SpaceGod::Core
 		void Step(PilotState& s, const cs::Ref<ShipCombat>& combat, const HullDynamics& hull, const PilotTuning& tuning, const PilotInput& input, DVec3 gravityKmS2, double dt) override;
 
 	private:
+		/// <summary>The assisted step on this model's <see cref="Handling"/>; with <paramref name="kickS"/> above 0 the hull
+		/// gathers forward speed on that time constant instead of the settle's (the boost's kick, US-T80).</summary>
+		void Fly(PilotState& s, const cs::Ref<ShipCombat>& combat, const HullDynamics& hull, const PilotTuning& tuning, const PilotInput& input, DVec3 gravityKmS2, double dt, double kickS) const;
+
 		static double Clamp(double x);
 	};
 

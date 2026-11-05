@@ -107,9 +107,10 @@ namespace SpaceGod::Core
 				  "after the nose, strafing on all six axes (W S, A D, Q E), and Shift held while strafing is a lateral boost, a "
 				  "hard sideways dash on the afterburner; they turn tightest at their corner speed. Interceptors push "
 				  "that further (their grip, strafe, corner speed and boost turn penalty, by speed or only while boosting, are "
-				  "in Settings > Dogfighting, and enemy crews fly the same model); bombers are a steady torpedo platform. Heavy fighters (the gunship) turn at one stiff rate at "
-				  "any speed that starts and stops crisply, settle on the throttle and strafe through a short ease, and carry "
-				  "a boost through the target, bleeding it off over a couple of seconds. Capital ships ring an engine telegraph a step at a "
+				  "in Settings > Dogfighting, and enemy crews fly the same model); bombers are a steady torpedo platform. Heavy fighters (the gunship) fly Everspace 2 style: weightier, "
+				  "with more inertia, they turn at one stiff rate at any speed, the nose a beat slower to start and stop than a "
+				  "light fighter's, settle on the throttle and strafe through an ease you can feel, and boost hard: the surge "
+				  "kicks in at once and carries through the target, bleeding off over a few seconds once let go. Capital ships ring an engine telegraph a step at a "
 				  "time (Full Astern, Stop, Slow, Half, Full, Flank), turn best at Half and trace a turning circle; pitch, yaw "
 				  "and roll are all free, slow and heavy. Freighters, miners and the other work hulls fly heavy on what they "
 				  "carry. With assist off, every hull flies plain Newtonian."),

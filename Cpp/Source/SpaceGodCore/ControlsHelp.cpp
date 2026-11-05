@@ -46,6 +46,7 @@ namespace SpaceGod::Core
 				L("Alt (hold)", "flip: swing the nose onto the retrograde, then W burns the speed off (a turn and burn); let go and the stick has the nose again"),
 				More("fighters: the mouse aims and the hull turns after it"),
 				L("Shift + A/D Q/E", "light fighters, interceptors: a lateral boost, a hard sideways dash on the afterburner"),				More("heavy fighters, freighters: the mouse turns the nose"),
+				More("heavy fighters: weightier, more momentum; Shift is a hard boost that carries"),
 				More("capital ships: A/D Q/E turn the hull, the mouse looks around"),
 				L("Ctrl", "freighters, miners, in a port's approach: docking mode (docking speed, a gentle turn)"),
 				L("Ring gate", "hyperlanes: fly through a ramp's ring gate to ride the lane"),
