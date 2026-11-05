@@ -126,11 +126,14 @@ namespace SpaceGod::Core
 		double cool = FtlRules::CoolUntil(ship) - jd;
 		if (cool > 0)
 			return "The FTL drive is cooling from its last jump: " + cs::Fmt(cool * 24, "0.0") + " h more";
-		double need = FtlRules::PropellantFor(drive, ship, km / Astro::LightYearKm);
+		double ly = km / Astro::LightYearKm;
+		// Flown as even jumps of no more than the drive reaches (US-T86), each charge paid for again.
+		int jumps = drive->JumpsFor(ly);
+		double need = jumps * FtlRules::PropellantFor(drive, ship, ly / jumps);
 		if (need > ship->Propellant() + 1e-9)
-			return "Not enough reaction mass to jump " + cs::Fmt(km / Astro::LightYearKm, "0.00") + " ly: it takes " +
-				cs::Fmt(need, "N0") + " t, the tanks hold " + cs::Fmt(ship->Propellant(), "N0") +
-				" t (range " + cs::Fmt(FtlRules::RangeLy(drive, ship), "0.#") + " ly)";
+			return "Not enough reaction mass to jump " + cs::Fmt(ly, "0.00") + " ly" +
+				(jumps > 1 ? cs::Cat(" in ", jumps, " jumps") : cs::String()) + ": it takes " +
+				cs::Fmt(need, "N0") + " t, the tanks hold " + cs::Fmt(ship->Propellant(), "N0") + " t";
 		return cs::String();
 	}
 
@@ -296,8 +299,9 @@ namespace SpaceGod::Core
 		int clamped = FtlCarriage::CountClamped(c->Aboard.Keys());
 		int docked = c->Aboard.Count() - clamped;
 		cs::String with = FtlCarriage::Describe(wing - c->Aboard.Count(), docked, clamped);
+		int jumps = c->JumpsLeft(jd);
 		world->Log(jd, cs::Cat(ship->Name, " of ", ship->Faction->Name, " engages its ", cs::Strings::ToLowerInvariant(Drive->Name), " beyond the rim for ", to->Name, ", ") +
-			cs::Cat(cs::Fmt(c->Profile.Ly, "0.00"), " ly under its own power", with), WorldEventKind::Info, here->Catalog->Root()->Index);
+			cs::Cat(cs::Fmt(c->Target.DistanceLy(c->Start), "0.00"), " ly under its own power", jumps > 1 ? cs::Cat(" in ", jumps, " jumps") : cs::String(), with), WorldEventKind::Info, here->Catalog->Root()->Index);
 		Reset();
 		return c;
 	}

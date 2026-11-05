@@ -52,6 +52,7 @@
 #include "Systems/CruiseDrive.h"
 #include "Systems/DeepSpace.h"
 #include "Systems/FtlNavigation.h"
+#include "Systems/FtlRules.h"
 #include "Systems/Galaxy.h"
 #include "Systems/HelmFtl.h"
 #include "Shared/Profiles/ProfileStore.h"
@@ -306,10 +307,23 @@ namespace SpaceGod::UI
 				cs::Strings::ToUpperInvariant(c->ToName), ", ", cs::Fmt(ly, "0.00"), " LY TO GO"));
 			return;
 		}
+		int left = c->JumpsLeft(jd);
+		if (c->AtVoidStop(jd))
+		{
+			// A stop in the void between jumps (US-T86): the drive cooling, then spooling, for the next.
+			bool cooling = c->Cooling(jd);
+			cs::String stage = cooling
+				? cs::Cat("DRIVE COOLING  ·  SPOOL STARTS IN ", Mathf::CeilToInt(static_cast<float>(app->FtlSecondsTo(c->ChargeJd))), " S")
+				: cs::Cat("DRIVE SPOOLING ", Percent(c->ChargeFraction(jd)), "  ·  ENGAGES IN ", Mathf::CeilToInt(static_cast<float>(app->FtlSecondsTo(c->EngageJd()))), " S");
+			DrawBanner(cs::Cat("VOID STOP ", c->Stops, "   ·   ", stage, "   ·   NEXT JUMP ", c->Stops + 1, " OF ", c->Stops + left, "   ·   BOUND FOR ",
+				cs::Strings::ToUpperInvariant(c->ToName), ", ", cs::Fmt(ly, "0.00"), " LY TO GO   ·   ", cs::Strings::ToUpperInvariant(app->Clock->Warp().Label), "  (, .)"));
+			return;
+		}
+		cs::String jump = c->Stops + left > 1 ? cs::Cat("JUMP ", c->Stops + 1, " OF ", c->Stops + left, "   ·   ") : cs::String();
 		// The trip compressed on the sim clock (U.SPC-T420): when it drops out, by the calendar and in real seconds at this pace.
-		DrawBanner(cs::Cat("FTL  ·  BOUND FOR ", cs::Strings::ToUpperInvariant(c->ToName), "   ·   ", cs::Fmt(ly, "0.00"), " LY TO GO   ·   ",
+		DrawBanner(cs::Cat("FTL  ·  ", jump, "BOUND FOR ", cs::Strings::ToUpperInvariant(c->ToName), "   ·   ", cs::Fmt(ly, "0.00"), " LY TO GO   ·   ",
 			cs::Fmt(speedC, "N0"), " C   ·   ETA ", Astro::ToDateTime(c->ArriveJd()).ToString("yyyy-MM-dd"),
-			"   ·   DROPPING OUT IN ", Mathf::CeilToInt(static_cast<float>(app->FtlSecondsLeft())), " S AT ", cs::Strings::ToUpperInvariant(app->Clock->Warp().Label), "  (, .)"));
+			"   ·   ", c->Stopover ? "VOID STOP" : "DROPPING OUT", " IN ", Mathf::CeilToInt(static_cast<float>(app->FtlSecondsLeft())), " S AT ", cs::Strings::ToUpperInvariant(app->Clock->Warp().Label), "  (, .)"));
 	}
 
 	void Hud::DrawFtl()
@@ -362,12 +376,28 @@ namespace SpaceGod::UI
 		else
 		{
 			auto t = app->FtlPointed;
-			if (t == nullptr) return;
-			head = cs::Cat("FTL  ·  ", cs::Strings::ToUpperInvariant(t->KindName()), "  ", cs::Strings::ToUpperInvariant(t->Name), "  ·  ", app->Distance(t));
+			auto helm = app->World()->PilotedShip;
+			auto drive = CruiseDrives::Of(helm);
+			if (t == nullptr)
+			{
+				// The jump drive cooling from its last drop-out (US-T86), shown whether or not the nose is on a star.
+				if (drive == nullptr || !(FtlRules::CoolUntil(helm) > jd)) return;
+				head = cs::Cat("JUMP DRIVE COOLING  ·  ", FtlNavigation::Describe(FtlRules::CoolUntil(helm) - jd), " more  ·  then a ",
+					FtlNavigation::Describe(drive->SpoolDays()), " spool  ·  ", cs::Fmt(drive->MaxJumpLy, "0.#"), " ly a jump");
+				tail = "the drive will not charge until it has cooled    End  autopilot holds on a course and spools when it has";
+			}
+			else
+			{
+			double km;
+			HelmFtl::Bearing(t, app->ActiveSystem, app->PilotRootKm(), km);
+			int jumps = drive != nullptr ? drive->JumpsFor(km / Astro::LightYearKm) : 1;
+			head = cs::Cat("FTL  ·  ", cs::Strings::ToUpperInvariant(t->KindName()), "  ", cs::Strings::ToUpperInvariant(t->Name), "  ·  ", app->Distance(t),
+				jumps > 1 ? cs::Cat("  ·  ", jumps, " JUMPS (", cs::Fmt(drive->MaxJumpLy, "0.#"), " LY A JUMP)") : cs::String());
 			tail = app->FtlBeyondRim
 				? (!app->FtlBlocked.empty() ? app->FtlBlocked : cs::String("Enter  spool the drive for it (out through open space to the edge of its well)    End  autopilot"))
 				: cs::Cat("inside the gravity wells: no jump until beyond the outer rim, ", cs::Fmt(app->FtlRimAu(), "0.##"), " AU out (",
 					cs::Fmt(app->PilotFromStarAu(), "0.##"), " AU now)    End  autopilot flies you out and on");
+			}
 		}
 		auto a = GUIContent(head);
 		auto m = GUIContent(mid);
@@ -393,7 +423,8 @@ namespace SpaceGod::UI
 	{
 		cs::String run = c->NeedsOutRun() ? cs::Cat("out to the rim ", cs::Fmt(c->OutRunKm / Astro::AuKm, "0.##"), " AU, ", FtlNavigation::Describe(c->OutRunDays), "   ·   ") : cs::String();
 		cs::String cool = c->CoolDays > 0 ? cs::Cat("cooling ", FtlNavigation::Describe(c->CoolDays), "   ·   ") : cs::String();
-		cs::String jump = cs::Cat(cs::Fmt(c->Ly, "0.00"), " ly under FTL, ", FtlNavigation::Describe(c->SpoolDays + c->FtlDays));
+		cs::String jump = cs::Cat(cs::Fmt(c->Ly, "0.00"), " ly under FTL, ", FtlNavigation::Describe(c->SpoolDays + c->FtlDays),
+			c->Stops > 0 ? cs::Cat(" in ", c->Jumps(), " jumps   ·   ", c->Stops, " void stop", c->Stops == 1 ? "" : "s", " (", FtlNavigation::Describe(c->StopDays), " cooling and spooling)") : cs::String());
 		cs::String pulled = c->Interdictions.Count() == 0 ? cs::String() : cs::Cat("   ·   pulled out by ", cs::Strings::Join(", ", c->Interdictions), " (", FtlNavigation::Describe(c->CrossingDays), " under normal drive)");
 		return cs::Cat(run, cool, jump, pulled, "   ·   ETA ", Astro::ToDateTime(c->EtaJd()).ToString("yyyy-MM-dd HH:mm"), " (", FtlNavigation::Describe(c->TotalDays()), ")",
 			"   ·   fuel ", cs::Fmt(c->FuelTonnes(), "N0"), " of ", cs::Fmt(c->TanksTonnes, "N0"), " t");

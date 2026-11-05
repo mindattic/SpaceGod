@@ -64,6 +64,15 @@ namespace SpaceGod::Core
 		cs::List<cs::String> Interdictions;
 		double CrossingDays = 0;
 
+		/// <summary>The stops in the void between jumps (US-T86): a way longer than the drive's
+		/// <see cref="CruiseDriveSpec.MaxJumpLy"/> is flown as even jumps, and at each stop the drive cools and spools again.
+		/// How many, and the days they take together.</summary>
+		int Stops = 0;
+		double StopDays = 0;
+
+		/// <summary>How many jumps the way is flown in.</summary>
+		int Jumps() const { return Stops + 1; }
+
 		/// <summary>Reaction mass the jump (every leg of it) burns, tonnes.</summary>
 		double JumpFuelTonnes = 0;
 
@@ -76,8 +85,8 @@ namespace SpaceGod::Core
 
 		bool Flyable() const { return Refusal.empty(); }
 
-		/// <summary>The whole trip, days: out-run, cooling, charge, FTL and crossings.</summary>
-		double TotalDays() const { return OutRunDays + CoolDays + SpoolDays + FtlDays + CrossingDays; }
+		/// <summary>The whole trip, days: out-run, cooling, charge, FTL, crossings and the void stops between jumps.</summary>
+		double TotalDays() const { return OutRunDays + CoolDays + SpoolDays + FtlDays + CrossingDays + StopDays; }
 
 		/// <summary>When it drops out at the far end.</summary>
 		double EtaJd() const { return PlottedJd + TotalDays(); }

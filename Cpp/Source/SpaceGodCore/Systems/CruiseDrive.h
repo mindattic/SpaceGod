@@ -48,8 +48,18 @@ namespace SpaceGod::Core
 		double ChargePropellantShare = 0;
 		double PropellantSharePerLy = 0;
 
+		/// <summary>The longest single jump the drive makes, light-years (US-T86): a capital drive reaches about seven, as far
+		/// as one jump gate (<see cref="GateConstruction.MaxLinkLy"/>). A longer trip is flown as even jumps of no more than
+		/// this, each ending at a stop in the void where every hull's drive cools (<see cref="CooldownDays"/>) and spools
+		/// again (<see cref="SpoolDays"/>) before the next (<see cref="Cruise.SetLeg"/>). 0: no limit. A drive saved before
+		/// it had one loads with the capital drive's seven.</summary>
+		double MaxJumpLy = 7;
+
 		CruiseDriveSpec(const cs::String& name, double cruiseC, double spoolDays, double rampDays, double cooldownDays = 0,
-			double chargePropellantShare = 0, double propellantSharePerLy = 0);
+			double chargePropellantShare = 0, double propellantSharePerLy = 0, double maxJumpLy = 7);
+
+		/// <summary>How many even jumps a trip of <paramref name="ly"/> takes on this drive (1 when it has no limit).</summary>
+		int JumpsFor(double ly) const;
 
 		/// <summary>Light-years a day at cruise speed, at the menu's speed scale now.</summary>
 		double LyPerDay() const;
@@ -166,13 +176,28 @@ namespace SpaceGod::Core
 	class SPACEGODCORE_API CruiseDrives
 	{
 	public:
-		/// <summary>A capital ship's drive: a light-year a day, charging six hours and cooling twelve after, a charge burning
-		/// 2% of the tanks and each light-year 0.2% (some 490 ly on full tanks).</summary>
+		/// <summary>A capital ship's drive: a light-year a day, seven light-years a jump (US-T86), charging six hours and
+		/// cooling twelve after, a charge burning 2% of the tanks and each light-year 0.2% (some 490 ly on full tanks).</summary>
 		static const cs::Ref<CruiseDriveSpec>& Capital();
 
-		/// <summary>A survey hull's drive: two light-years a day, charging under three hours and cooling six after, a charge
+		/// <summary>A survey hull's drive: two light-years a day, nine a jump, charging under three hours and cooling six after, a charge
 		/// burning 1% of the tanks and each light-year 0.1% (some 990 ly on full tanks).</summary>
 		static const cs::Ref<CruiseDriveSpec>& Survey();
+
+		/// <summary>A jump ring's drive (US-T86): the hyperdrive ring a small craft docks into to cross between the stars
+		/// on its own, a light-year a day, five light-years a jump, charging twelve hours and cooling a day after (a ring
+		/// is no capital drive: its stops in the void are long).</summary>
+		static const cs::Ref<CruiseDriveSpec>& JumpRing();
+
+		/// <summary>The heaviest hull a jump ring takes, tonnes (a fighter, a courier, a gunship; not a frigate).</summary>
+		static constexpr double JumpRingMaxTonnes = 3000;
+
+		/// <summary>What a yard asks to dock a jump ring to a small craft, credits; half is paid back when it is let go.</summary>
+		static constexpr double JumpRingPrice = 150000;
+
+		/// <summary>Why <paramref name="ship"/> cannot take a jump ring (a hull with a drive of its own, one too big, one that
+		/// never leaves home), or empty if it can.</summary>
+		static cs::String JumpRingRefusal(const cs::Ref<Ship>& ship);
 
 	private:
 		static cs::Dictionary<ShipClass, cs::Ref<CruiseDriveSpec>>& byClass();
@@ -187,7 +212,8 @@ namespace SpaceGod::Core
 		static cs::Ref<CruiseDriveSpec> Of(ShipClass cls);
 
 		/// <summary>The drive <paramref name="ship"/> carries, or null if it cannot cross between the stars on its own: by its
-		/// class's roster entry (<see cref="FtlRoster"/>), and for a battleship whether its design has the drive fitted.</summary>
+		/// class's roster entry (<see cref="FtlRoster"/>), for a battleship whether its design has the drive fitted, and for
+		/// a small craft whether it is docked to a jump ring (<see cref="Ship.JumpRing"/>, US-T86).</summary>
 		static cs::Ref<CruiseDriveSpec> Of(const cs::Ref<Ship>& ship);
 
 		/// <summary>The settings menu's FTL tuning: every cruise drive's speed, as a multiple of its rated speed.</summary>

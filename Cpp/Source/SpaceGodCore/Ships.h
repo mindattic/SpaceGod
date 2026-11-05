@@ -622,6 +622,10 @@ namespace SpaceGod::Core
 		/// <summary>When its FTL drive is cool enough to charge again after its last drop-out (U.SPC-T418, see <see cref="FtlRules"/>).</summary>
 		double FtlCoolUntilJd = 0;
 
+		/// <summary>Docked to a jump ring (US-T86): a small craft with a hyperdrive ring of its own, so it can jump between the
+		/// stars like a capital hull (<see cref="CruiseDrives.JumpRing"/>). Fitted only by the player at a yard.</summary>
+		bool JumpRing = false;
+
 		/// <summary>Ran dry in flight: drifting dead where the tanks gave out, calling for a tanker.</summary>
 		bool OutOfPropellant = false;
 		double OutOfPropellantSinceJd = 0;

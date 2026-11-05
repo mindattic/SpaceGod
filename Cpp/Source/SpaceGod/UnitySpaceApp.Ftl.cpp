@@ -28,6 +28,7 @@
 
 #include "Camera/SpaceCamera.h"
 #include "Rendering/AssetStreamer.h"
+#include "Streaming/AreaStreaming.h"
 #include "Views/InterstellarView.h"
 
 using namespace SpaceGod::Core;
@@ -55,6 +56,25 @@ namespace SpaceGod
 		else return 0;
 		if (cs::Double::IsInfinity(end) || cs::Double::IsNaN(end)) return 0;
 		return cs::Math::Max(0.0, end - jd) * Core::Astro::SecondsPerDay / cs::Math::Max(Clock->Warp().SimSecondsPerSecond, 1e-9);
+	}
+
+	double UnitySpaceApp::FtlSecondsTo(double end)
+	{
+		if (cs::Double::IsInfinity(end) || cs::Double::IsNaN(end)) return 0;
+		return cs::Math::Max(0.0, end - Clock->Jd) * Core::Astro::SecondsPerDay / cs::Math::Max(Clock->Warp().SimSecondsPerSecond, 1e-9);
+	}
+
+	void UnitySpaceApp::PrefetchFtlDestination(const cs::Ref<Core::FtlTarget>& target)
+	{
+		if (target == nullptr) return;
+		PrefetchFtlDestination(target->System, target->Name);
+	}
+
+	void UnitySpaceApp::PrefetchFtlDestination(const cs::Ref<Core::StarSystem>& system, const cs::String& name)
+	{
+		// The area streaming (US-T133) brings the drop-out in ahead of the jump: the running system, or the plain star
+		// by its name, at the most urgent priority, so it is built before the player can see it.
+		AreaStreaming::Prefetch(system, name, StreamPriority::Imminent);
 	}
 
 	DVec3 UnitySpaceApp::PilotRootKm()
@@ -107,6 +127,7 @@ namespace SpaceGod
 			if (ftlWarpBefore < 0) ftlWarpBefore = Clock->WarpIndex;
 			Clock->SetWarp(Core::SimClock::WarpToCover((Ftl->ChargedJd - jd) * Core::Astro::SecondsPerDay, FtlSpoolRealSeconds, ftlWarpBefore));
 			auto t = Ftl->Target;
+			PrefetchFtlDestination(t);
 			ShowToast(cs::Cat("FTL DRIVE SPOOLING for ", cs::Strings::ToUpperInvariant(t->Name), ", ", Distance(t), "  (hold the nose on it; Enter calls it off)"));
 			return false;
 		}
@@ -198,7 +219,7 @@ namespace SpaceGod
 		ftlCruiseLegJd = c->LegJd;
 		Clock->SetWarp(Core::FtlNavigation::WarpFor(c->ArriveJd() - jd, cs::Math::Max(0, ftlWarpBefore)));
 		// What the far system is drawn with starts loading now, in the background (U.SPC-T414).
-		Rendering::AssetStreamer::WarmSystem(c->To);
+		PrefetchFtlDestination(c->To, c->ToName);
 		SetSystemVisible(false);
 		Interstellar->SetVisible(true);
 		GateFlash = 1;
@@ -208,8 +229,12 @@ namespace SpaceGod
 		int docked = c->Aboard.Count() - clamped;
 		cs::String carried = docked > 0 && clamped > 0 ? cs::Cat(" (", docked, " docked aboard, ", clamped, " clamped to the hull)")
 			: docked > 0 ? cs::Cat(" (", docked, " docked aboard)") : clamped > 0 ? cs::Cat(" (", clamped, " clamped to the hull)") : cs::String();
-		ShowToast(cs::Cat("FTL ENGAGED for ", cs::Strings::ToUpperInvariant(c->ToName), ", ", cs::Fmt(c->Profile.Ly, "0.00"),
-			" ly through open space", (wing == 0 ? cs::String() : cs::Cat(", ", wing, " of your wing with you", carried))));
+		// No jump longer than the drive reaches (US-T86): a longer way is flown in even jumps, a stop in the void between each.
+		int jumps = c->JumpsLeft(jd);
+		ftlAtStop = false;
+		ShowToast(cs::Cat("FTL ENGAGED for ", cs::Strings::ToUpperInvariant(c->ToName), ", ", cs::Fmt(c->Target.DistanceLy(c->Start), "0.00"),
+			" ly through open space", (jumps > 1 ? cs::Cat(" in ", jumps, " jumps of ", cs::Fmt(c->Profile.Ly, "0.0"), " ly (the drive cools and spools again in the void between them)") : cs::String()),
+			(wing == 0 ? cs::String() : cs::Cat(", ", wing, " of your wing with you", carried))));
 		return true;
 	}
 
@@ -223,17 +248,41 @@ namespace SpaceGod
 			Galaxy->Viewpoint = c->PositionAt(jd);
 			// A new leg (pulled out by a well or a gravity projector, or spooled again past it, U.SPC-T418): the clock
 			// is compressed again for what is left of it (U.SPC-T420).
+			bool atStop = c->AtVoidStop(jd);
 			if (c->LegJd != ftlCruiseLegJd && !c->Holding)
 			{
 				ftlCruiseLegJd = c->LegJd;
-				Clock->SetWarp(Core::FtlNavigation::WarpFor(c->ArriveJd() - jd));
-				ShowToast(c->Crossing
-					? cs::Cat("PULLED OUT OF FTL by ", FtlOrElse(c->InterdictedBy, "a gravity well"), ": crossing it under the ordinary drive, ", Core::FtlNavigation::Describe(c->ArriveJd() - jd))
-					: cs::Cat("Clear of ", FtlOrElse(c->InterdictedBy, "the well"), ": the drive spools again for ", c->ToName));
+				if (atStop)
+				{
+					// Dropped out in the void between jumps (US-T86): the stop runs at a pace the drive can be seen to cool
+					// and spool at, then the next jump is compressed again.
+					Clock->SetWarp(Core::SimClock::WarpToCover((c->EngageJd() - jd) * Core::Astro::SecondsPerDay, FtlStopRealSeconds));
+					// The last jump next: the far end streams in while the drive cools and spools (US-T133 hook).
+					if (c->JumpsLeft(jd) <= 1) PrefetchFtlDestination(c->To, c->ToName);
+					ShowToast(cs::Cat("VOID STOP ", c->Stops, ": dropped out ", cs::Fmt(c->LyToGo(jd), "0.0"), " ly short of ", cs::Strings::ToUpperInvariant(c->ToName),
+						"; the drive cools ", Core::FtlNavigation::Describe(cs::Math::Max(0.0, c->ChargeJd - jd)), " and spools ",
+						Core::FtlNavigation::Describe(c->EngageJd() - cs::Math::Max(jd, c->ChargeJd)), " before jump ", c->Stops + 1, " of ", c->Stops + c->JumpsLeft(jd)));
+				}
+				else
+				{
+					Clock->SetWarp(Core::FtlNavigation::WarpFor(c->ArriveJd() - jd));
+					ShowToast(c->Crossing
+						? cs::Cat("PULLED OUT OF FTL by ", FtlOrElse(c->InterdictedBy, "a gravity well"), ": crossing it under the ordinary drive, ", Core::FtlNavigation::Describe(c->ArriveJd() - jd))
+						: cs::Cat("Clear of ", FtlOrElse(c->InterdictedBy, "the well"), ": the drive spools again for ", c->ToName));
+				}
 			}
+			else if (ftlAtStop && !atStop && !c->Holding)
+			{
+				// Charged at a void stop: the next jump is under way.
+				Clock->SetWarp(Core::FtlNavigation::WarpFor(c->ArriveJd() - jd));
+				int left = c->JumpsLeft(jd);
+				ShowToast(cs::Cat("JUMP ", c->Stops + 1, " of ", c->Stops + left, " ENGAGED for ", cs::Strings::ToUpperInvariant(c->ToName), ", ", cs::Fmt(c->Profile.Ly, "0.0"), " ly"));
+			}
+			ftlAtStop = atStop;
 			double total = c->ArriveJd() - c->LegJd;
 			double share = total > 0 && !cs::Double::IsInfinity(total) ? (jd - c->LegJd) / total : 0;
-			if (!ftlDestinationBuilt && share >= 0.5 && c->To != nullptr)
+			// Built on the last jump only (US-T86): the far system is not yet anywhere near on the earlier ones.
+			if (!ftlDestinationBuilt && share >= 0.5 && c->To != nullptr && !c->Stopover)
 			{
 				Activate(c->To);
 				SetSystemVisible(false);
@@ -285,6 +334,7 @@ namespace SpaceGod
 
 	void UnitySpaceApp::EndFtlCruise()
 	{
+		ftlAtStop = false;
 		FtlCruise = nullptr;
 		ftlCruiseLegJd = cs::Double::NaN;
 		ftlShip = nullptr;
@@ -337,7 +387,8 @@ namespace SpaceGod
 		if (c == nullptr) return "No course plotted";
 		cs::String name = c->Target ? cs::Strings::ToUpperInvariant(c->Target->Name) : cs::String("nowhere");
 		if (!c->Flyable()) return cs::Cat("No course for ", name, ": ", c->Refusal);
-		return cs::Cat("COURSE PLOTTED for ", name, " (", c->Target->KindName(), "), ", cs::Fmt(c->Ly, "0.00"), " ly, ETA ",
+		return cs::Cat("COURSE PLOTTED for ", name, " (", c->Target->KindName(), "), ", cs::Fmt(c->Ly, "0.00"), " ly",
+			(c->Stops > 0 ? cs::Cat(" in ", c->Jumps(), " jumps (", c->Stops, " void stop", c->Stops == 1 ? "" : "s", ")") : cs::String()), ", ETA ",
 			Core::FtlNavigation::Describe(c->TotalDays()), ", ", cs::Fmt(c->FuelTonnes(), "N0"), " t of ", cs::Fmt(c->TanksTonnes, "N0"),
 			" t reaction mass", (c->Interdictions.Count() > 0 ? cs::Cat(", pulled out ", c->Interdictions.Count(), "x on the way") : cs::String()), "  (End engages the autopilot)");
 	}
@@ -438,6 +489,7 @@ namespace SpaceGod
 			return false;
 		}
 		ap->Spooling();
+		PrefetchFtlDestination(ap->Course->Target);
 		if (ftlWarpBefore < 0) ftlWarpBefore = Clock->WarpIndex;
 		Clock->SetWarp(Core::SimClock::WarpToCover((Ftl->ChargedJd - jd) * Core::Astro::SecondsPerDay, FtlSpoolRealSeconds, cs::Math::Max(0, ftlWarpBefore)));
 		ShowToast(cs::Cat("FTL DRIVE SPOOLING for ", cs::Strings::ToUpperInvariant(ap->Course->Target->Name), ", ", Distance(ap->Course->Target), "  (the autopilot holds the nose on it; End lets go)"));

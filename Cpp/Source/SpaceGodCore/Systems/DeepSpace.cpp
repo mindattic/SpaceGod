@@ -65,15 +65,52 @@ namespace SpaceGod::Core
 		Start = from;
 		End = Target;
 		LegJd = jd;
+		StopJd = cs::Double::NaN;
 		double ly = Target.DistanceLy(from);
+		// No jump longer than the drive reaches (US-T86): a longer way is flown as even jumps, this the first of them,
+		// ending at a stop in the void (DeepSpace.Due takes it on from there).
+		int jumps = Drive->JumpsFor(ly);
+		Stopover = jumps > 1;
+		if (Stopover)
+		{
+			End = GalacticPosition::Lerp(from, Target, 1.0 / jumps);
+			ly = End.DistanceLy(from);
+		}
 		double cool = 0;
 		for (const auto& s : Ships)
 		{
 			cool = cs::Math::Max(cool, FtlRules::CoolUntil(s) - jd);
 			s->SetPropellant(s->Propellant() - FtlRules::PropellantFor(Drive, s, ly));
 		}
+		ChargeJd = charged ? jd : jd + cs::Math::Max(0.0, cool);
 		Profile = charged ? CruiseProfile(ly, Drive->LyPerDay(), Drive->RampDays, 0)
 			: CruiseProfile(ly, Drive->LyPerDay(), Drive->RampDays, Drive->SpoolDays() + cs::Math::Max(0.0, cool));
+	}
+
+	bool Cruise::AtVoidStop(double jd) const
+	{
+		return !Holding && !Crossing && !cs::Double::IsNaN(StopJd) && jd < EngageJd();
+	}
+
+	double Cruise::ChargeFraction(double jd) const
+	{
+		double from = cs::Double::IsNaN(ChargeJd) ? LegJd : ChargeJd, to = EngageJd();
+		if (jd <= from) return 0;
+		return to <= from ? 1 : cs::Math::Min(1.0, (jd - from) / (to - from));
+	}
+
+	void Cruise::DelayCharge(double days)
+	{
+		if (!(days > 0)) return;
+		if (!cs::Double::IsNaN(ChargeJd)) ChargeJd += days;
+		Profile.SpoolDays += days;
+	}
+
+	int Cruise::JumpsLeft(double jd) const
+	{
+		if (Holding || Crossing || Drive == nullptr) return 1;
+		auto from = jd >= EngageJd() ? End : Start;
+		return (jd >= EngageJd() ? 1 : 0) + (from.DistanceKm(Target) > 1 ? Drive->JumpsFor(Target.DistanceLy(from)) : 0);
 	}
 
 	void Cruise::SetCrossing(GalacticPosition entry, GalacticPosition exit, double jd)
@@ -353,6 +390,19 @@ namespace SpaceGod::Core
 			}
 			if (next == nullptr) return;
 			if (next->Holding) next->SetLeg(next->Start, when);
+			else if (next->Stopover && !next->Crossing)
+			{
+				// One jump done of several (US-T86): it drops out here in the void, every drive cooling from the jump, and
+				// spools again for the next once they have cooled.
+				for (const auto& s : next->Ships) FtlRules::StartCooldown(s, next->Drive, when);
+				int stops = next->Stops + 1;
+				next->SetLeg(next->End, when);
+				next->StopJd = when;
+				next->Stops = stops;
+				cs::String many = next->Ships.Count() > 1 ? "" : "s";
+				Log(when, cs::Cat(next->Leader()->Name, More(next), " drop", many, " out in the void between jumps (stop ", stops, ", ",
+					cs::Fmt(next->LyToGo(when), "0.0"), " ly short of ", next->ToName, "), the drive", next->Ships.Count() > 1 ? "s" : "", " cooling to spool again"), next->Start);
+			}
 			else if (next->Crossing && next->End.DistanceKm(next->Target) > 1)
 			{
 				// Clear of the field on the far side: it spools again for where it was going.

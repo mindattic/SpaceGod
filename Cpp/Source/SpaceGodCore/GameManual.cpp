@@ -469,6 +469,19 @@ namespace SpaceGod::Core
 				  "drive. No jump is possible inside a system's gravity wells: fly out beyond the outer rim, put the nose on "
 				  "another star and press Enter to spool, holding the nose on it. PgDn / PgUp or the galaxy map plot a course "
 				  "with its ETA and fuel, and End engages the FTL autopilot, compressing the trip on the clock."),
+				T("Jumps and void stops",
+				  "A jump drive reaches about 7 light-years in one jump, as far as one jump gate links (a survey drive 9, a jump "
+				  "ring 5). Aim at a star farther off and the whole way is still one flight, with no loading screen, but it is "
+				  "flown as even jumps: after each the hull drops out in the void between the stars, the drive cools from the "
+				  "jump and spools again before the next (a capital drive 12 hours cooling and 6 spooling, scaled in Settings > "
+				  "FTL). The HUD shows VOID STOP, the cooldown, the spool and which jump of how many is next; the course line "
+				  "counts the jumps and stops in its ETA, and the helm shows the drive cooling after a drop-out. A ship sitting "
+				  "in the void is exposed, so a fast spool is worth having, and void stations make safer stops. The jump gates "
+				  "stay the way most traffic goes."),
+				T("Jump rings",
+				  "Fighters, couriers and other small craft carry no drive of their own. At a shipyard (F2, outfitting) a small "
+				  "craft can dock to a jump ring, a hyperdrive ring it rides between the stars like a capital hull: aim at a star "
+				  "beyond the rim and press Enter. A ring's stops are long, its jumps short; let it go at a yard for half its price back."),
 				T("Deep space",
 				  "Space between the stars is simulated: void stations, gravity projectors that pull ships out of FTL, and the "
 				  "traffic crossing it."),

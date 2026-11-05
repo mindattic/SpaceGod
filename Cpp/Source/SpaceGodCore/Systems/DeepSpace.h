@@ -101,6 +101,40 @@ namespace SpaceGod::Core
 		/// <summary>What pulled it out last (a star's or a projector's name), or null.</summary>
 		cs::String InterdictedBy;
 
+		// ---------------------------------------------------------------- jumps and void stops (US-T86)
+
+		/// <summary>This leg is one jump of several (US-T86): longer than the drive's <see cref="CruiseDriveSpec.MaxJumpLy"/>,
+		/// the way is flown as even jumps, and this one ends short of the <see cref="Target"/> at <see cref="End"/>, a stop in
+		/// the void where every hull's drive cools and spools again for the next.</summary>
+		bool Stopover = false;
+
+		/// <summary>When it dropped out at the void stop it is waiting at now (NaN: it is not waiting at one), and how many
+		/// void stops it has made on its way.</summary>
+		double StopJd = cs::Double::NaN;
+		int Stops = 0;
+
+		/// <summary>When this leg's charge begins: the drive has cooled from its last drop-out by then (it spools from here
+		/// to <see cref="LegJd"/> + the profile's <see cref="CruiseProfile.SpoolDays"/>).</summary>
+		double ChargeJd = cs::Double::NaN;
+
+		/// <summary>Waiting at a void stop at <paramref name="jd"/>: dropped out between jumps, not yet under way again.</summary>
+		bool AtVoidStop(double jd) const;
+
+		/// <summary>At a void stop and the drive still cooling at <paramref name="jd"/> (else spooling).</summary>
+		bool Cooling(double jd) const { return AtVoidStop(jd) && jd < ChargeJd; }
+
+		/// <summary>When this leg's charge is done and it engages.</summary>
+		double EngageJd() const { return LegJd + Profile.SpoolDays; }
+
+		/// <summary>0..1 through this leg's charge at <paramref name="jd"/> (0 while the drive still cools).</summary>
+		double ChargeFraction(double jd) const;
+
+		/// <summary>The charge put off by <paramref name="days"/> (a drive scrambled, or held cold while running dark).</summary>
+		void DelayCharge(double days);
+
+		/// <summary>How many jumps are left from where it is, this one included (US-T86).</summary>
+		int JumpsLeft(double jd) const;
+
 		cs::Ref<Ship> Leader() const;
 
 		/// <summary>When this leg ends (it drops out at its <see cref="End"/>); infinite while it holds.</summary>

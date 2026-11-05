@@ -48,6 +48,7 @@
 #include "Law/Outlaws.h"
 #include "Sensors/Sensors.h"
 #include "Sensors/SensorPosture.h"
+#include "Systems/CruiseDrive.h"
 #include "Systems/Galaxy.h"
 #include "Systems/InterstellarTraffic.h"
 
@@ -625,10 +626,38 @@ namespace SpaceGod::UI
 				!CoopSends("prisoners", K(port))) // US-T44 (US-T43): an entry in co-op
 				HandOverPrisoners(ship, port); // US-T44 (US-T43): the original's lines, moved into HandOverPrisoners (Hud.Coop.cpp)
 		}
+		// A jump ring for a small craft (US-T86): docked to it, the craft jumps between the stars like a capital hull.
+		bool ringable = yard != nullptr && CruiseDrives::JumpRingRefusal(ship).empty();
 		GUI::contentColor = Dim;
-		GUI::Label(Rect(r.x + 12, r.y + 64, w - 24, 18), yard != nullptr
-			? "Pick a hardpoint, a facility or the free space, then what to fit.   Prices are this yard's market.   F2 to close"
+		GUI::Label(Rect(r.x + 12, r.y + 64, w - (ringable ? 224 : 24), 18), yard != nullptr
+			? (ringable ? "Pick a hardpoint, a facility or the free space, then what to fit.   F2 to close"
+				: "Pick a hardpoint, a facility or the free space, then what to fit.   Prices are this yard's market.   F2 to close")
 			: "Bring the ship alongside a shipyard (or a haven) to refit.   F2 to close", small);
+		if (ringable)
+		{
+			GUI::contentColor = Color::white();
+			cs::String ringLabel = ship->JumpRing ? cs::Cat("Let jump ring go  +", Credits(CruiseDrives::JumpRingPrice / 2))
+				: cs::Cat("Dock a jump ring  ", Credits(CruiseDrives::JumpRingPrice));
+			if (GUI::Button(Rect(r.xMax() - 208, r.y + 62, 196, 20), ringLabel, ship->JumpRing ? buttonActive : button))
+			{
+				if (ship->JumpRing)
+				{
+					ship->JumpRing = false;
+					ship->Faction->Treasury += CruiseDrives::JumpRingPrice / 2;
+					app->ShowToast(cs::Cat("Jump ring let go at ", yard->Name, ": the ", ship->Name, " goes by the gates again"));
+				}
+				else if (ship->Faction->Treasury < CruiseDrives::JumpRingPrice)
+					app->ShowToast(cs::Cat("Not enough credits for a jump ring: ", Credits(CruiseDrives::JumpRingPrice)));
+				else
+				{
+					ship->Faction->Treasury -= CruiseDrives::JumpRingPrice;
+					ship->JumpRing = true;
+					auto ring = CruiseDrives::JumpRing();
+					app->ShowToast(cs::Cat("JUMP RING docked at ", yard->Name, ": fly beyond the rim, nose on a star, Enter to spool (", cs::Fmt(ring->MaxJumpLy, "0"),
+						" ly a jump, ", cs::Fmt(ring->RatedSpoolDays * 24, "0"), " h spool, ", cs::Fmt(ring->RatedCooldownDays * 24, "0"), " h cooldown)"));
+				}
+			}
+		}
 
 		// The hardpoints and what is on them, the facilities inside the hull, and the space left.
 		auto view = Rect(r.x + 8, r.y + 84, w - 16, listH);

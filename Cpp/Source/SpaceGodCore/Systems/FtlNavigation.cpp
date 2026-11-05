@@ -51,21 +51,31 @@ namespace SpaceGod::Core
 		double crossSpeedKmS = cs::Math::Max(1e-6, FtlRules::CrossingSpeedKmS()->Value);
 		for (int leg = 0; ; leg++)
 		{
-			double legLy = arrive.DistanceLy(at);
+			// No jump longer than the drive reaches (US-T86): as Cruise.SetLeg flies it, even jumps, each ending at a stop
+			// in the void where the drive cools and spools again.
+			int jumps = drive->JumpsFor(arrive.DistanceLy(at));
+			auto hop = jumps > 1 ? GalacticPosition::Lerp(at, arrive, 1.0 / jumps) : arrive;
+			double legLy = hop.DistanceLy(at);
 			c->JumpFuelTonnes += FtlRules::PropellantFor(drive, ship, legLy);
 			// As the trip itself is flown (FtlInterdiction): not the fields the leg starts in or ends in.
 			cs::List<GravityField> fields;
 			if (leg < MaxInterdictions && galaxy != nullptr && galaxy->DeepSpace != nullptr)
-				for (const auto& f : galaxy->DeepSpace->FieldsAlong(probe, at, arrive))
+				for (const auto& f : galaxy->DeepSpace->FieldsAlong(probe, at, hop))
 					if (!f.Contains(at, 1.001) && !f.Contains(arrive, 1.001)) fields.Add(f);
 			GravityField field;
 			double along;
-			if (!FtlRules::FirstEntry(at, arrive, fields, field, along))
+			if (!FtlRules::FirstEntry(at, hop, fields, field, along))
 			{
 				c->FtlDays += CruiseProfile::For(drive, legLy).FlightDays();
-				break;
+				if (jumps <= 1) break;
+				// A void stop: the drive cools from the jump and spools again for the next.
+				c->Stops++;
+				c->StopDays += drive->CooldownDays() + drive->SpoolDays();
+				at = hop;
+				if (leg > 4096) break;
+				continue;
 			}
-			auto entry = GalacticPosition::Lerp(at, arrive, along);
+			auto entry = GalacticPosition::Lerp(at, hop, along);
 			c->FtlDays += DaysToReach(CruiseProfile::For(drive, legLy), entry.DistanceLy(at));
 			auto dir = arrive.KmFrom(entry);
 			dir = dir.LengthSquared() > 0 ? dir.Normalized() : DVec3::UnitX;
@@ -110,8 +120,8 @@ namespace SpaceGod::Core
 
 		c->CoolDays = cs::Math::Max(0.0, FtlRules::CoolUntil(ship) - (jd + c->OutRunDays));
 		if (c->JumpFuelTonnes > ship->Propellant() + 1e-9)
-			c->Refusal = "Out of range: " + cs::Fmt(c->Ly, "0.00") + " ly, the tanks reach " +
-				cs::Fmt(c->RangeLy, "0.#") + " ly";
+			c->Refusal = "Out of range: " + cs::Fmt(c->Ly, "0.00") + " ly in " + cs::Fmt(c->Jumps(), "0") + " jump" + (c->Jumps() == 1 ? "" : "s") +
+				" takes " + cs::Fmt(c->JumpFuelTonnes, "N0") + " t, the tanks hold " + cs::Fmt(ship->Propellant(), "N0") + " t";
 		return c;
 	}
 

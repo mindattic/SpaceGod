@@ -21,7 +21,7 @@ namespace SpaceGod::Core
 	double CruiseDriveSpec::CooldownDays() const { return RatedCooldownDays * FtlRules::CooldownScale()->Value; }
 
 	CruiseDriveSpec::CruiseDriveSpec(const cs::String& name, double cruiseC, double spoolDays, double rampDays, double cooldownDays,
-		double chargePropellantShare, double propellantSharePerLy)
+		double chargePropellantShare, double propellantSharePerLy, double maxJumpLy)
 	{
 		if (!(cruiseC > 0)) throw cs::ArgumentOutOfRangeException("cruiseC: A cruise drive must move: " + name);
 		Name = name;
@@ -31,6 +31,14 @@ namespace SpaceGod::Core
 		RatedCooldownDays = cs::Math::Max(0.0, cooldownDays);
 		ChargePropellantShare = cs::Math::Max(0.0, chargePropellantShare);
 		PropellantSharePerLy = cs::Math::Max(0.0, propellantSharePerLy);
+		MaxJumpLy = cs::Math::Max(0.0, maxJumpLy);
+	}
+
+	int CruiseDriveSpec::JumpsFor(double ly) const
+	{
+		if (!(MaxJumpLy > 0) || !(ly > MaxJumpLy)) return 1;
+		// A hair over the limit is still one jump (a drop-out point a few km past the edge of a well).
+		return cs::Math::Max(1, static_cast<int>(cs::Math::Ceiling(ly / MaxJumpLy - 1e-6)));
 	}
 
 	double CruiseDriveSpec::LyPerDay() const { return CruiseC * CruiseDrives::SpeedScale()->Value / (Astro::DaysPerCentury / 100); }
@@ -154,13 +162,15 @@ namespace SpaceGod::Core
 		case FtlAccess::Fitted:
 			return "The " + ship->Name + " has no FTL drive fitted: a yard can fit one into its free space; until then the jump gates are its way";
 		case FtlAccess::Hangar:
-			return "A " + cls + " carries no FTL drive: it crosses between the stars in a carrier's hangar, or through the jump gates";
+			return "A " + cls + " carries no FTL drive: it crosses between the stars in a carrier's hangar, through the jump gates, or docked to a jump ring (a shipyard fits one, F2)";
 		case FtlAccess::HomeSystem:
 			return "A " + cls + " carries no FTL drive and never leaves its home system";
 		default:
 			return FtlCarriage::RidesClamped(ship->Spec->Class)
 				? "A " + cls + " carries no FTL drive of its own: the jump gates and lanes are its way, or clamped to a carrier's hull"
-				: "A " + cls + " carries no FTL drive of its own: the jump gates and lanes are its way, or docked aboard a carrier";
+				: CruiseDrives::JumpRingRefusal(ship).empty()
+					? "A " + cls + " carries no FTL drive of its own: the jump gates and lanes are its way, docked aboard a carrier, or docked to a jump ring (a shipyard fits one, F2)"
+					: "A " + cls + " carries no FTL drive of its own: the jump gates and lanes are its way, or docked aboard a carrier";
 		}
 	}
 
@@ -176,8 +186,26 @@ namespace SpaceGod::Core
 	const cs::Ref<CruiseDriveSpec>& CruiseDrives::Survey()
 	{
 		static const cs::Ref<CruiseDriveSpec> d = cs::New<CruiseDriveSpec>("Survey cruise drive", 2 * (Astro::DaysPerCentury / 100), 0.1, 0.05,
-			0.25, 0.01, 0.001);
+			0.25, 0.01, 0.001, 9);
 		return d;
+	}
+
+	const cs::Ref<CruiseDriveSpec>& CruiseDrives::JumpRing()
+	{
+		static const cs::Ref<CruiseDriveSpec> d = cs::New<CruiseDriveSpec>("Jump ring", (Astro::DaysPerCentury / 100), 0.5, 0.1,
+			1.0, 0.03, 0.004, 5);
+		return d;
+	}
+
+	cs::String CruiseDrives::JumpRingRefusal(const cs::Ref<Ship>& ship)
+	{
+		if (ship == nullptr || ship->Spec == nullptr) return "No ship";
+		auto access = FtlRoster::Of(ship->Spec->Class);
+		if (access == FtlAccess::HomeSystem) return "The " + ship->Name + " never leaves its home system: no jump ring takes it";
+		if (access == FtlAccess::Own || access == FtlAccess::Fitted) return "The " + ship->Name + " is a capital hull: a jump ring is for small craft";
+		if (ship->MassTonnes() > JumpRingMaxTonnes)
+			return "The " + ship->Name + " is too heavy for a jump ring (" + cs::Fmt(ship->MassTonnes(), "N0") + " t; a ring takes " + cs::Fmt(JumpRingMaxTonnes, "N0") + " t)";
+		return cs::String();
 	}
 
 	cs::Dictionary<ShipClass, cs::Ref<CruiseDriveSpec>>& CruiseDrives::byClass()
@@ -213,6 +241,8 @@ namespace SpaceGod::Core
 	cs::Ref<CruiseDriveSpec> CruiseDrives::Of(const cs::Ref<Ship>& ship)
 	{
 		if (ship == nullptr || ship->Spec == nullptr) return nullptr;
+		// A small craft docked to a jump ring (US-T86): only ever the player's (a yard fits one), so every crew's hull is as before.
+		if (ship->JumpRing && JumpRingRefusal(ship).empty()) return JumpRing();
 		auto drive = Of(ship->Spec->Class);
 		if (drive == nullptr) return nullptr;
 		switch (FtlRoster::Of(ship->Spec->Class))

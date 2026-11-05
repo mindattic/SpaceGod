@@ -58,6 +58,8 @@ namespace SpaceGod::Core
 				L("Ctrl", "interdiction (riding): drop out short of the field"),
 				L("Y", "back into the lane where you left it"),
 				L("Enter", "FTL (capital ships, survey hulls): beyond the system's outer rim, put the nose on another star, Enter to spool (hold it there); it engages for that star"),
+				More("a jump reaches about 7 ly (survey drive 9, jump ring 5); farther stars are flown in even jumps with a stop in the void between each: the drive cools, then spools, then jumps on -- the HUD shows the stop, the cooldown and the spool"),
+				More("small craft: dock a jump ring at a shipyard (F2, outfitting) to jump like a capital hull; most traffic still goes by the gates"),
 				L("PgDn / PgUp", "plot a course to the next star or beacon (nearest first), or pick one on the galaxy map ([): ETA, fuel, wells on the way"),
 				L("Del", "clear the plotted course"),
 				L("End", "FTL autopilot: flies out beyond the rim, turns onto the star, spools and engages, time compressed (Settings > FTL); End again takes the helm back"),

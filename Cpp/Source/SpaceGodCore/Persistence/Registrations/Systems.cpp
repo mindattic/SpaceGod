@@ -170,11 +170,13 @@ namespace SpaceGod::Core
 	SG_SERIALIZE(Cruise, "Unity.SpaceGod.Core.Cruise",
 		SG_F(Aboard), SG_F(CarriedVelocityKmS), SG_F(Crossing), SG_F(Drive), SG_F(End), SG_F(From), SG_F(Hired),
 		SG_F(HoldUntilJd), SG_F(Holding), SG_F(InterdictedBy), SG_F(LegJd), SG_F(News), SG_F(Piloted), SG_F(Plan),
-		SG_F(Profile), SG_F(SetOutJd), SG_F(Ships), SG_F(Start), SG_F(Target), SG_F(To), SG_F(ToName))
+		SG_F(Profile), SG_F(SetOutJd), SG_F(Ships), SG_F(Start), SG_F(Target), SG_F(To), SG_F(ToName),
+		SG_OPT(ChargeJd), SG_OPT(StopJd), SG_OPT(Stopover), SG_OPT(Stops)) // US-T86: jumps and void stops, absent from older saves
 
 	SG_SERIALIZE(CruiseDriveSpec, "Unity.SpaceGod.Core.CruiseDriveSpec",
 		SG_P(ChargePropellantShare), SG_P(CruiseC), SG_P(Name), SG_P(PropellantSharePerLy), SG_P(RampDays),
-		SG_P(RatedCooldownDays), SG_P(RatedSpoolDays))
+		SG_P(RatedCooldownDays), SG_P(RatedSpoolDays),
+		SG_OPT(MaxJumpLy)) // US-T86: a drive's longest jump, absent from older saves (which load with the capital drive's 7 ly)
 
 	SG_SERIALIZE(CruiseMeeting, "Unity.SpaceGod.Core.CruiseMeeting",
 		SG_IMPLEMENTS(IDeepSpaceEncounter))

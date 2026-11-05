@@ -68,12 +68,32 @@ private:
 	/// <summary>The leg of the crossing the clock was last set for (a new one: pulled out by a well, or spooled again past it).</summary>
 	double ftlCruiseLegJd = cs::Double::NaN;
 
+	/// <summary>Whether the crossing was waiting at a void stop between jumps when last looked at (US-T86): the clock is
+	/// set again when it engages for the next jump.</summary>
+	bool ftlAtStop = false;
+
+	/// <summary>A void stop between jumps runs at the slowest warp that gets it over in about this many real seconds
+	/// (US-T86): long enough to see the drive cool and spool, and to answer a ghost on the sensors (US-T124).</summary>
+	static constexpr double FtlStopRealSeconds = 14;
+
 public:
 	/// <summary>Real seconds left of the charge or of the crossing at the clock's present rate.</summary>
 	double FtlSecondsLeft();
 
-private:
-	/// <summary>Where the hull is, km from the system's root.</summary>
+	/// <summary>Real seconds until <paramref name="jd"/> at the clock's present rate (0 if it is past, or never).</summary>
+	double FtlSecondsTo(double jd);
+
+	/// <summary>
+	/// The jump drive has begun to spool for <paramref name="target"/> (US-T86): the place it drops out at starts streaming in
+	/// now, so it is built before the player can see it (there are never loading screens). Called at every spool-up (the
+	/// helm's Enter, the autopilot's), at the engagement and at the void stop before the last jump: the area streaming
+	/// (US-T133, <see cref="Streaming.AreaStreaming.Prefetch"/>) takes the destination at Imminent priority, a running
+	/// system or a procedural star not yet built into one (outside Sol the galaxy is procedural).
+	/// </summary>
+	void PrefetchFtlDestination(const cs::Ref<Core::FtlTarget>& target);
+	void PrefetchFtlDestination(const cs::Ref<Core::StarSystem>& system, const cs::String& name);
+
+	/// <summary>Where the hull is, km from the system's root (public for the HUD's jump count, US-T86).</summary>
 	Core::DVec3 PilotRootKm();
 
 public:
