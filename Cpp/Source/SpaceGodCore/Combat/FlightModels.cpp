@@ -509,7 +509,14 @@ namespace SpaceGod::Core
 		double fwd = Max(-hull.RetroAccel, Min(hull.MainAccel * driveMult, ease));
 
 		// The keel: slip across the hull (and gravity across it) is killed as hard as it can push.
-		auto across = (-(s.Vel - f * along)) / dt - (gravityKmS2 - f * DVec3::Dot(gravityKmS2, f));		double keel = KeelAccel(hull, tuning);
+		auto across = (-(s.Vel - f * along)) / dt - (gravityKmS2 - f * DVec3::Dot(gravityKmS2, f));
+		if (input.Piloted)
+		{
+			// The player's broadside translation (US-T81): the keel holds the slip the strafe input asks for instead of none.
+			double slip = tuning.MaxSpeed * TranslateSpeedFraction;
+			auto want = r * (Limit(input.StrafeRight, 1) * slip) + u * (Limit(input.StrafeUp, 1) * slip);
+			across = (want - (s.Vel - f * along)) / dt - (gravityKmS2 - f * DVec3::Dot(gravityKmS2, f));
+		}		double keel = KeelAccel(hull, tuning);
 		auto thrust = f * fwd
 			+ r * Limit(DVec3::Dot(across, r), Max(hull.LateralAccel, keel))
 			+ u * Limit(DVec3::Dot(across, u), Max(hull.VerticalAccel, keel));
@@ -517,6 +524,16 @@ namespace SpaceGod::Core
 	}
 
 	double CapitalFlightModel::Limit(double x, double max) { return Max(-max, Min(max, x)); }
+
+	DVec3 CapitalFlightModel::BeamOn(DVec3 forward, DVec3 up, DVec3 toTarget)
+	{
+		if (toTarget.LengthSquared() < 1e-18) return forward;
+		auto t = toTarget.Normalized();
+		auto beam = forward - t * DVec3::Dot(forward, t);
+		if (beam.LengthSquared() < 1e-12) beam = DVec3::Cross(up, t);
+		if (beam.LengthSquared() < 1e-12) beam = DVec3::Cross(PilotState::LevelUp(t), t);
+		return beam.Normalized();
+	}
 
 	// ---------------------------------------------------------------- FlightModelRegistry
 

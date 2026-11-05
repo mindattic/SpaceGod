@@ -1125,8 +1125,14 @@ namespace SpaceGod
 				// A/D and Q/E (C/]) are the helm's yaw and pitch: a capital ship turns rather than strafes.
 				helmLookYaw = Mathf::Repeat(helmLookYaw + look.x * PilotLookSensitivity() + 180.0f, 360.0f) - 180.0f;
 				helmLookPitch = Mathf::Clamp(helmLookPitch - look.y * PilotLookSensitivity(), -80.0f, 80.0f);
-				pilotAim = PilotAim::Helm(pilot().Forward, pilot().Up, strafeRight, strafeUp, leadRad);
-				strafeRight = strafeUp = 0;
+				// Alt held, the broadside stance (US-T81): the keys slide the hull instead of turning it, and the helm
+				// (ShipHelm) lays it beam-on to the locked hull.
+				if (Input.Manoeuvre) pilotAim = pilot().Forward;
+				else
+				{
+					pilotAim = PilotAim::Helm(pilot().Forward, pilot().Up, strafeRight, strafeUp, leadRad);
+					strafeRight = strafeUp = 0;
+				}
 				break;
 			default:
 			{

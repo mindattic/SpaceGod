@@ -596,11 +596,26 @@ namespace SpaceGod::Core
 	/// and (4) nothing holds the hull to a plane or levels it: pitch, yaw and roll are all free, slow and heavy, so a
 	/// capital climbs, dives and rolls to bring a broadside to bear above or below. The turn is fitted to the class's
 	/// come-about (<see cref="CapitalHandling.ComeAboutS"/>). With flight assist off the hull is the Newtonian one, unchanged.
+	/// Under the player's own hands (<see cref="PilotInput.Piloted"/>, US-T81) the keel also takes a commanded slip: the
+	/// strafe input translates the hull slowly sideways and up or down (<see cref="TranslateSpeedFraction"/>), so a
+	/// captain can hold a flank on a target while sliding along or across its line, Age-of-Sail style
+	/// (the helm's broadside stance, <see cref="BeamOn"/>).
 	/// </summary>
 	class SPACEGODCORE_API CapitalFlightModel final : public IFlightModel
 	{
 	public:
 		CapitalHandling Handling;
+
+		/// <summary>The player's broadside translation (US-T81): the slip the keel holds with the strafe input full, as a
+		/// fraction of top speed. Slow, as a capital's manoeuvre thrusters are weak for its mass.</summary>
+		static constexpr double TranslateSpeedFraction = 0.15;
+
+		/// <summary>
+		/// The heading that lays the hull beam-on to a target along <paramref name="toTarget"/> (US-T81): the nose kept as
+		/// near where it is as the beam-on circle allows, so whichever flank is nearer the target comes to bear and the
+		/// turn is the shortest. Dead on the bow or stern, the roof decides which flank.
+		/// </summary>
+		static DVec3 BeamOn(DVec3 forward, DVec3 up, DVec3 toTarget);
 
 		CapitalFlightModel() : CapitalFlightModel(CapitalHandling::Default) {}
 

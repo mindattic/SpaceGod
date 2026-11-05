@@ -112,7 +112,10 @@ namespace SpaceGod::Core
 				  "light fighter's, settle on the throttle and strafe through an ease you can feel, and boost hard: the surge "
 				  "kicks in at once and carries through the target, bleeding off over a few seconds once let go. Capital ships ring an engine telegraph a step at a "
 				  "time (Full Astern, Stop, Slow, Half, Full, Flank), turn best at Half and trace a turning circle; pitch, yaw "
-				  "and roll are all free, slow and heavy. Freighters, miners and the other work hulls fly heavy on what they "
+				  "and roll are all free, slow and heavy. They fight with their broadsides, Age-of-Sail style: hold Alt for the "
+				  "broadside stance and the turn keys slide the hull slowly sideways and up or down instead of turning it, "
+				  "while the helm lays it beam-on to the hull you have locked, so the nearer flank's batteries bear as you "
+				  "work along or across the enemy's line. Freighters, miners and the other work hulls fly heavy on what they "
 				  "carry. With assist off, every hull flies plain Newtonian."),
 				T("Every role at the helm",
 				  "Every ship can be flown, and each is flown with the controls its work wants. A fighter's mouse is its gunsight "

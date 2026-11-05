@@ -10,6 +10,7 @@ namespace SpaceGod::Core
 {
 	class BattleUnit;
 	class HelmFlight;
+	struct PilotState;
 	class Ship;
 	class World;
 
@@ -91,6 +92,10 @@ namespace SpaceGod::Core
 
 	private:
 		static double Clamp1(double v);
+
+		/// <summary>A capital's broadside stance (US-T81): beam-on to the hull locked in its fight, or the heading held with
+		/// none; <paramref name="note"/> gets the HUD line naming the flank that bears.</summary>
+		DVec3 BroadsideAim(const PilotState& s, cs::String& note) const;
 
 	public:
 		/// <summary>

@@ -76,7 +76,9 @@ namespace SpaceGod::Core
 		int TelegraphStep = 0;
 
 		/// <summary>The manoeuvre key held (Alt, US-T87): the hull swings its nose onto the retrograde for a turn-and-burn
-		/// (<see cref="PilotFlight.FlipAim"/>), sliding on along its track as it turns.</summary>
+		/// (<see cref="PilotFlight.FlipAim"/>), sliding on along its track as it turns. At a capital ship's helm it is the
+		/// broadside stance instead (US-T81): the turn keys translate the hull and the helm lays it beam-on to the locked
+		/// hull (<see cref="CapitalFlightModel.BeamOn"/>).</summary>
 		bool Manoeuvre = false;
 	};
 

@@ -50,7 +50,8 @@ namespace SpaceGod::Core
 		switch (Role)
 		{
 		case HelmRole::Capital:
-			return "capital: W/S ring the engine telegraph, A/D Q/E turn the hull, mouse looks round it, hold left mouse for a broadside";
+			return "capital: W/S ring the engine telegraph, A/D Q/E turn the hull, mouse looks round it, hold left mouse for a broadside, "
+				"hold Alt for the broadside stance (A/D Q/E slide the hull, the helm lays a flank on the locked hull)";
 		case HelmRole::Escort:
 			return cs::Cat("escort, flying free of its formation: ", StickHint(), fire);
 		case HelmRole::Courier:
