@@ -239,7 +239,9 @@ namespace SpaceGod::Core
 
 	SG_SERIALIZE(DeckVisit, "Unity.SpaceGod.Core.DeckVisit",
 		SG_F(After), SG_F(Along), SG_F(Deck), SG_F(Offset), SG_F(Relaunch), SG_F(Service), SG_F(Speed),
-		SG_F(SpotAlong), SG_F(Stage), SG_F(Stowing))
+		SG_F(SpotAlong), SG_F(Stage), SG_F(Stowing),
+		// The deck it visits rejoins its carrier's decks, which no save holds (US-T111, FlightDecks::Adopt).
+		SG_LOADED([](DeckVisit& v) { FlightDecks::Adopt(v.Deck); }))
 
 	SG_SERIALIZE(Decoy, "Unity.SpaceGod.Core.Decoy",
 		SG_F(Gone), SG_F(Life), SG_F(Pos), SG_F(Side), SG_F(Vel))

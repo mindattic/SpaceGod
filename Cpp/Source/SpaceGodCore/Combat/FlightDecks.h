@@ -196,6 +196,16 @@ namespace SpaceGod::Core
 		/// fighter, a hull without hangars, or a station.</summary>
 		static const cs::List<cs::Ref<FlightDeck>>& Of(const cs::Ref<BattleUnit>& carrier);
 
+		/// <summary>
+		/// A deck read back from a save (or a rewind keyframe, or a co-op resync) takes its place among its carrier's decks
+		/// (US-T111). The table above is not saved, but a craft's <see cref="DeckVisit"/> saves the deck it is visiting, so
+		/// without this a loaded carrier would build fresh decks and the visit would hold an orphan copy the carrier no longer
+		/// runs. Called from DeckVisit's SG_LOADED hook: the carrier's decks are built as <see cref="Of"/> builds them, then
+		/// the loaded deck replaces the one through its own hangar. Decks no saved visit holds are built afresh, as they hold
+		/// no state that outlives a visit. A C++-only addition (the C# original loses the deck the same way).
+		/// </summary>
+		static void Adopt(const cs::Ref<FlightDeck>& deck);
+
 	private:
 		static cs::Ref<cs::List<cs::Ref<FlightDeck>>> Build(const cs::Ref<BattleUnit>& carrier);
 

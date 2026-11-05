@@ -140,8 +140,12 @@ which saves deliberately skip (docs/PERSISTENCE.md section 11). The fighter's `D
 references, though. After a load, `Of(carrier)` builds new decks, so the fighter and the carrier now use two different
 copies of the same deck, and the deck's landing and launch state (`Final`, `Aboard`, `NextLaunch`) splits between them.
 This is not specific to rewind: any save/load or co-op resync taken while a fighter holds a deck visit loses it. It is
-inherited from the original game's design. Rewinding a carrier fight cannot be exact until this is fixed (see US-T111
-for the fix direction and the probe command that tests it).
+inherited from the original game's design.
+
+**Fixed (US-T111).** DeckVisit's `SG_LOADED` hook now hands each loaded deck back to its carrier
+(`FlightDecks::Adopt`, docs/PERSISTENCE.md section 11). `Bench.Rewind.exe --scenario battle --rewind-probe
+--rewind-then-warp 0 --ticks 7000 --rewind-trace 1` now restores from ticks 2333 and 4666 and matches the live digest
+at the restore tick, +60 and the end (7000): `determinism: ALL MATCH`. The five Bench digests are unchanged.
 
 Two smaller findings:
 
@@ -219,7 +223,7 @@ session, defaulting to whole session. The numbers show no need to cap it.
 
 **Open problems for the build phase:**
 
-1. **US-T111 (the flight-deck split) is a blocker** for rewinding any battle that has carriers.
+1. ~~US-T111 (the flight-deck split) is a blocker~~ for rewinding any battle that has carriers. Fixed: see above.
 2. **Capture is a synchronous 110-490 ms graph walk on the simulation thread.** At the 10 s battle cadence that means a
    visible hitch every 10 game-s of real-time combat. Phase 2 needs an incremental or off-thread capture (or a cheaper
    per-battle snapshot) before the dense battle tier can ship.

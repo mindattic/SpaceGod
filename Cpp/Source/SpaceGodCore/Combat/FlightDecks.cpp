@@ -170,6 +170,21 @@ namespace SpaceGod::Core
 		return *entry.Decks;
 	}
 
+	void FlightDecks::Adopt(const cs::Ref<FlightDeck>& deck)
+	{
+		if (deck == nullptr || deck->Bay == nullptr) return;
+		const auto& carrier = deck->Carrier;
+		// Of(carrier) finds the entry, or makes it in Build's order (one deck per hangar, in subsystem order).
+		if (&Of(carrier) == &None()) return;
+		auto& decks = *DeckTable()[carrier.get()].Decks;
+		for (int i = 0; i < decks.Count(); i++)
+		{
+			if (decks[i]->Bay != deck->Bay) continue;
+			decks[i] = deck;
+			return;
+		}
+	}
+
 	cs::Ref<cs::List<cs::Ref<FlightDeck>>> FlightDecks::Build(const cs::Ref<BattleUnit>& carrier)
 	{
 		auto list = cs::New<cs::List<cs::Ref<FlightDeck>>>();

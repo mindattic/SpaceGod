@@ -301,3 +301,11 @@ co-op peers' start, US-T39's finding of the same cause), before any galaxy exist
 later only in settings and the lazily filled star lists, which no save holds, so every process (single-player across runs,
 co-op peers, C++) names the same objects. Saves the unfixed original made once those caches held anything stay unloadable.
 
+**Flight decks across a load (US-T111).** Not walking `FlightDecks.decks` leaves one seam: a craft's `DeckVisit.Deck` does
+save the `FlightDeck` it visits (with its `Final`, `Aboard`, `NextLaunch`), but after a load `FlightDecks::Of(carrier)`
+found no entry and built new decks, so the visit and the carrier ran two copies of one deck and a restored carrier fight
+diverged the first time a craft used it. DeckVisit's `SG_LOADED` hook now calls `FlightDecks::Adopt`, which builds the
+carrier's entry as `Of` would and puts the loaded deck in the slot of its own hangar (`Bay`). No format change: existing
+saves load and are repaired the same way. Decks no visit holds are rebuilt fresh; the only state they could lose is
+`NextLaunch`, which no craft can read before a fresh landing's turnaround (at least 5 s) outlasts it (3 s).
+
