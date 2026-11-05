@@ -871,7 +871,7 @@ namespace SpaceGod
 				}
 				if (ship == World()->PilotedShip)
 				{
-					shipScene[i] = bodyScene[pilotFrameBody] + Scale()->LocalOffset((*Catalog())[pilotFrameBody], pilotOffsetKm());
+					shipScene[i] = PilotedScene(); // US-T127: where the scale model draws it, however far from its frame body
 					// Nose and roof both: the hull rolls for real (U.SPC-T59).
 					auto pilotFacing = pilotForward().SwapYZ();
 					auto pilotRoof = pilot().Up.SwapYZ();
@@ -1148,7 +1148,7 @@ namespace SpaceGod
 		UnityCamera->transform->SetPositionAndRotation(Vector3::zero(), SpaceCamera->Rotation);
 
 		float targetFov = RidingLane() ? BaseFov + (LaneFov - BaseFov) * LaneRideSpeed
-			: IsPiloting() && pilotCruise().Active() ? CruiseFov : IsPiloting() && pilotBoosting ? BoostFov : BaseFov;
+			: IsPiloting() && (pilotCruise().Active() || systemCruise.Cruising() /* US-T127 */) ? CruiseFov : IsPiloting() && pilotBoosting ? BoostFov : BaseFov;
 		cameraFov = Mathf::Lerp(cameraFov, targetFov, 1.0f - Mathf::Exp(-dt * FovResponseHz));
 		// A ring gate kicks the view wide for a moment and flashes as the hull goes through (U.SPC-T41).
 		fovKick *= Mathf::Exp(-dt * 3.5f);

@@ -595,6 +595,7 @@ namespace SpaceGod
 		bool menu = pauseMenu->IsOpen;
 		if (menu) GUI::enabled = false;
 		hud->Draw();
+		DrawSystemCruise(); // US-T127: the cruise drive's readout
 		cheatMenu->Draw(*this); // US-T126: the dev menu, or the HUD's hint for its key
 		GUI::enabled = true;
 		if (menu) pauseMenu->Draw();
@@ -1243,6 +1244,7 @@ namespace SpaceGod
 		stick.HelmAbility = HelmAbilityKey(ship);
 		// Tab, an active ping; Shift+F3, go dark or power up again (US-T93): a command the helm lands, said on a toast.
 		stick.Sensor = SensorCommand(ship);
+		CruiseStick(stick); // US-T127: cruising, the stick turns the hull and the drive carries it
 		helmFlight->FrameBody = pilotFrameBody;
 		pilotHelm->Control(stick, dt);
 		if (stick.HelmAbility != 0) NoteHelmAbility();
@@ -1262,6 +1264,7 @@ namespace SpaceGod
 		// Hulls, stations, rocks and wreckage have volume: what the hull flies into, it hits (U.SPC-T60).
 		if (!KeepPilotAboveSurfaces(ship)) return;
 		if (!UpdatePilotCollisions(ship, posBefore, dt)) return;
+		UpdateSystemCruise(ship, dt); // US-T127: Shift+J, and the cruise drive's leg this frame (past the swept collision test)
 		UpdatePropellant(ship, dt);
 
 		UpdatePilotBattle(ship, dt);

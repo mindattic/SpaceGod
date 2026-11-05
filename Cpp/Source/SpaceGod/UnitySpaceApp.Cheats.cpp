@@ -211,6 +211,7 @@ namespace SpaceGod
 		}
 		DVec3 outward;
 		double km = BodyStandoffKm(body, outward);
+		DropSystemCruise(cs::String()); // US-T127: a teleport ends any cruise
 		pilotFrameBody = body;
 		SetpilotOffsetKm(outward * km);
 		SetpilotVelKmS(DVec3::Zero);
@@ -243,6 +244,7 @@ namespace SpaceGod
 		auto rel = st->HelioAt(Ephemeris(), Clock->Jd) - Ephemeris()->Helio(st->Body);
 		auto outward = rel.LengthSquared() > 1e-6 ? rel.Normalized() : DVec3::UnitX;
 		double km = cs::Math::Max(4.0, st->LengthKm * 6 + ship->LengthKm() * 4);
+		DropSystemCruise(cs::String()); // US-T127: a teleport ends any cruise
 		pilotFrameBody = st->Body;
 		SetpilotOffsetKm(rel + outward * km);
 		SetpilotVelKmS(DVec3::Zero);
@@ -365,6 +367,7 @@ namespace SpaceGod
 		// US-T125: the Bio Mass, through its own console command; it lights up the moment that command is in the build.
 		CheatRegistry::Add("Enemies", CheatEntry::Console("Bio Mass globule", "a living globule beside your hull (US-T125)", "sg.BioMass here"));
 
+		// ---- Travel: the other stars, the worlds and stations of this one (the cruise drive adds its own, US-T127).
 		CheatRegistry::Add("Travel", CheatEntry::Menu("Teleport to a world", "the hull flown (or the camera) to a star, planet or moon here", [](UnitySpaceApp& a)
 		{
 			Entries out;

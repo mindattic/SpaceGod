@@ -23,6 +23,7 @@ namespace SpaceGod::Input
 		Boost = kb[Key::LeftShift].isPressed || kb[Key::RightShift].isPressed;
 		Slow = kb[Key::LeftCtrl].isPressed || kb[Key::RightCtrl].isPressed;
 		Cruise = kb[Key::J].isPressed;
+		ToggleSystemCruise = kb[Key::J].wasPressedThisFrame && Boost; // US-T127: Shift+J, the cruise drive
 		ThrottleStep = kb[Key::W].wasPressedThisFrame ? 1 : kb[Key::S].wasPressedThisFrame ? -1 : 0;
 		Roll = Axis(kb[Key::X], kb[Key::Z]);
 		// US-T87: Alt held is the manoeuvre key at the controls (a turn-and-burn's flip); with F9-F11 under capture, and
@@ -200,6 +201,7 @@ namespace SpaceGod::Input
 		SelfDestructTap = SelfDestructArm = false; // US-T97: nothing to set off in command
 		SelfDestructHoldS = 0;
 		SensorPing = PowerToggle = false; // US-T93: nothing to ping from or power down in command
+		ToggleSystemCruise = false; // US-T127: no drive to spool in command
 		ThrottleStep = 0;
 		Roll = 0;
 	}
@@ -251,6 +253,7 @@ namespace SpaceGod::Input
 		QuickSave = QuickLoad = ToggleSaves = false;
 		SpawnPractice = false;
 		ToggleCheatMenu = false; // US-T126
+		ToggleSystemCruise = false; // US-T127
 		ToggleFtlAutopilot = ClearFtlCourse = false;
 		CycleFtlTarget = 0;
 		CycleSeat = 0;

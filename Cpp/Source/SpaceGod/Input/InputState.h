@@ -31,6 +31,10 @@ namespace SpaceGod::Input
 		/// travel. See <see cref="Unity.SpaceGod.Core.PilotCruiseState"/>.</summary>
 		bool Cruise = false;
 
+		/// <summary>US-T127: Shift+J at a helm spools the in-system cruise drive (<see cref="Core.SystemCruise"/>), or drops out
+		/// of it. An edge; J held alone stays the tactical cruise tier above.</summary>
+		bool ToggleSystemCruise = false;
+
 		/// <summary>While piloting a capital ship (U.SPC-T499): W rings its engine telegraph one step ahead, S one step astern (0: neither).</summary>
 		int ThrottleStep = 0;
 

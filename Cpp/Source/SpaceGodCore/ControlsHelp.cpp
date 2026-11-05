@@ -57,6 +57,7 @@ namespace SpaceGod::Core
 				L("Shift", "interdiction (riding): a raider's field ahead, surge through"),
 				L("Ctrl", "interdiction (riding): drop out short of the field"),
 				L("Y", "back into the lane where you left it"),
+				L("Shift+J", "cruise drive, inside a system: spools a few seconds (longer the heavier the hull), then carries you along the nose at up to about 1000 c, for the world or station the nose is on (or the hull locked); the mouse steers, it slows as it closes and drops out off the target -- Earth to Mars in about half a minute. Shift+J again drops out; a fight, a hit or a world's gravity well drop it too"), // US-T127
 				L("Enter", "FTL (capital ships, survey hulls): beyond the system's outer rim, put the nose on another star, Enter to spool (hold it there); it engages for that star"),
 				More("a jump reaches about 7 ly (survey drive 9, jump ring 5); farther stars are flown in even jumps with a stop in the void between each: the drive cools, then spools, then jumps on -- the HUD shows the stop, the cooldown and the spool"),
 				More("small craft: dock a jump ring at a shipyard (F2, outfitting) to jump like a capital hull; most traffic still goes by the gates"),

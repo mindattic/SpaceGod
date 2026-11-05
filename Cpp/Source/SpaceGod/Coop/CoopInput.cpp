@@ -71,6 +71,7 @@ namespace SpaceGod::Coop
 				SG_FIELD(ToggleMarket), SG_FIELD(ToggleNews), SG_FIELD(ToggleOrbits), SG_FIELD(ToggleOutfit), SG_FIELD(TogglePause),
 				SG_FIELD(TogglePicker), SG_FIELD(ToggleReorient), SG_FIELD(ToggleRollPatches), SG_FIELD(ToggleRunHot),
 				SG_FIELD(ToggleSatellites), SG_FIELD(ToggleSaves), SG_FIELD(ToggleScale), SG_FIELD(ToggleSilent), SG_FIELD(ToggleSpawn),
+				SG_FIELD(ToggleSystemCruise), // US-T127: Shift+J at the helm, the cruise drive, an edge
 				SG_FIELD(ToggleTrade), SG_FIELD(TunePhasers), SG_FIELD(WatchBattle),
 			};
 			return fields;

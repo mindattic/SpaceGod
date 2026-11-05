@@ -139,6 +139,16 @@ namespace SpaceGod::Core
 				T("Cruise",
 				  "Hold J flying straight at full throttle and the cruise drive spools up to many times normal speed. It "
 				  "drops out if you take damage, enter a battle, throttle down or turn hard, and the guns cannot fire in it."),
+				T("The cruise drive", // US-T127
+				  "Shift+J crosses a system in tens of seconds. The drive spools for a few seconds (a fighter's in two and a "
+				  "half, a carrier's in eight), then carries the hull along its nose: it climbs fast to up to about a thousand "
+				  "times light's speed, and slows as it nears the world, station or locked hull it is bound for, dropping out "
+				  "a short flight off it. It is bound for whatever world or station the nose is on (or the hull locked with T), "
+				  "and you steer the whole way; turn off the target and it flies free until the nose finds another. Near any "
+				  "world its gravity well holds it back, and too deep in one it drops out. Shift+J again drops out at once; a "
+				  "fight, a hit or the drives knocked out end it too. The dev menu's Travel > Cruise to picks the target and "
+				  "swings the nose onto it for you. The readout gives the speed, the target, how far and the seconds to the "
+				  "drop: true kilometres and seconds, the same at the realistic and the game scale."),
 				T("Propellant",
 				  "Every change of speed is paid for in reaction mass, by the rocket equation, and a dry hull only coasts. The "
 				  "status bar shows the tanks and the ship panel the delta-v left. Refuel on the market board at a port, or "
