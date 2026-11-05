@@ -73,6 +73,13 @@ private:
 	/// <summary>The open adventures near the player, most urgent first: tag, title, distance, time left and the hook.</summary>
 	void DrawOpportunityBoard();
 
+	// ---------------------------------------------------------------- the Bio Mass (US-T125, Hud.BioMass.cpp)
+
+	/// <summary>Every Bio Mass globule bracketed in red where it is, with its size and how far it is; a warning across the
+	/// top when one is within <see cref="BioMassWarnKm"/> of the player.</summary>
+	void DrawBioMassMarkers();
+	static constexpr double BioMassWarnKm = 2e6;
+
 	cs::Ref<GUIStyle> opportunityHook;
 
 	void DrawBrackets(Rect r, Color color, float thickness);

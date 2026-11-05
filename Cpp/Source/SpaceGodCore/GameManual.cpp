@@ -337,7 +337,18 @@ namespace SpaceGod::Core
 				  "seat near you to click into. From the god view ' jumps into the nearest seat in the fight in view and ' and ; "
 				  "step through the rest; / mans the next gun; Shift+P puts you out on the hull as one of its EVA repair workers. "
 				  "P again lets go to the free SpaceGod view. What you do while embodied is that unit's doing: its faction and "
-				  "its crew keep the credit and the blame after you leave.")),
+				  "its crew keep the credit and the blame after you leave."),
+				T("The Bio Mass",
+				  "A space-dwelling lifeform and an infection: pulsing globules of flesh, bone, tissue, mouths and hair that "
+				  "seep into every system from the dark, drift, swell and creep toward the jump gates to spread. Everything "
+				  "shoots it on sight. Every star, planet and moon carries orbital guns, embedded and on satellites round it, "
+				  "that open fire the moment a globule comes in reach, with the defence platforms of the settlements there; a "
+				  "jump gate's guns and forts burn it on its approach, and the far gate fires again the moment one comes out. "
+				  "Every armed hull of every faction engages it within 5,000 km, yours too: fly at it and your guns fire. It "
+				  "eats the wrecks it touches and grows, gnaws at a hull it touches and eats into a station it reaches, and a "
+				  "big one buds in two, but each system holds only ten and none grows past a few megatonnes. The HUD brackets "
+				  "every globule in red with its size, health and range, and warns of one within 2 million km. The console "
+				  "command sg.BioMass spawns one beside your hull, at game scale (sg.BioMass real for realistic).")),
 
 			cs::New<ManualChapter>("Trade", "Markets, cargo, contracts, the trade desk and outfitting", Keys("TRADE"),
 				T("The economy",

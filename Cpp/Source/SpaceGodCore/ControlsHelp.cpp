@@ -96,7 +96,8 @@ namespace SpaceGod::Core
 				More("shoot a hull's radiators away to make it overheat"),
 				L("Shift+Del", "capital ships: the helm rolls your weak shield patches away from the heaviest fire (the readout above the orders names them)"),
 				L("B", "boarding (a fight aboard your hull, or one your marines are in): the panel of compartments and orders"),
-				L("1  2  3  0", "with it open: pick a compartment, push for it / muster on it, hold, auto-resolve")),
+				L("1  2  3  0", "with it open: pick a compartment, push for it / muster on it, hold, auto-resolve"),
+				More("Bio Mass (the red-bracketed globules): every gun fires on it on sight, yours within 5,000 km; console sg.BioMass spawns one beside you")),
 
 			cs::New<HelpSection>("TRADE",
 				L("M", "market: Buy / Sell and Refuel appear while piloting near the shown settlement's body"),

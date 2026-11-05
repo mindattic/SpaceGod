@@ -315,6 +315,7 @@ private:
 	cs::Ref<Views::BattleFx> battleFx;
 	cs::Ref<Views::DebrisFields> debrisFields;
 	cs::Ref<Views::PodBeacons> podBeacons;
+	cs::Ref<Views::BioMassView> bioMassView; // US-T125
 	cs::Ref<Views::DiscView> discView;
 	/// <summary>US-T131: the place's graveyards.</summary>
 	cs::Ref<Views::GraveyardView> graveyardView;

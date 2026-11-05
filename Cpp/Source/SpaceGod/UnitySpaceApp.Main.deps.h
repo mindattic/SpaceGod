@@ -61,6 +61,7 @@ namespace SpaceGod::Views
 	class BattleFx;
 	class DebrisFields;
 	class PodBeacons;
+	class BioMassView;
 	class DiscView;
 	class GraveyardView;
 	class SpaceFeaturesView;

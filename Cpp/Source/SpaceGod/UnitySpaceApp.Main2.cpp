@@ -79,6 +79,7 @@
 #include "Views/LaneView.h"
 #include "Views/LineStrip.h"
 #include "Views/PodBeacons.h"
+#include "Views/BioMassView.h"
 #include "Views/SatelliteSwarm.h"
 #include "Views/ShipView.h"
 #include "Views/StructureViews.h"
@@ -1343,6 +1344,7 @@ namespace SpaceGod
 		battleFx->Update();
 		debrisFields->Update();
 		podBeacons->Update();
+		bioMassView->Update();
 		Structures->Update(true);
 		swarm->Update(ShowSatellites);
 		UpdateOrbitLines(dt);
