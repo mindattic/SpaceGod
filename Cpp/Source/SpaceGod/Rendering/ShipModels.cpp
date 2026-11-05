@@ -3,8 +3,11 @@
 #include "Rendering/AssetStreamer.h"
 #include "Rendering/Materials.h"
 #include "Rendering/ShipMeshFactory.h"
+#include "Rendering/StarSparrowKit.h"
 
 #include "Combat/BulkFreighters.h"
+#include "Combat/CombatSpecs.h"
+#include "Combat/CombatState.h"
 #include "Combat/LaneInterdictors.h"
 #include "Economy/LocalTraffic.h"
 #include "Ships.h"
@@ -62,6 +65,21 @@ namespace SpaceGod::Rendering
 		cs::Ref<Transform>& stern, cs::Ref<Transform>& bow)
 	{
 		bow = nullptr;
+		// US-T110: every hull from the Star Sparrow kit when the pack is there (a recipe per class, StarSparrowKit), its
+		// engines on the hardpoints its view puts the glows on; without it, the Kenney craft and procedural hulls below.
+		if (StarSparrowKit::Available())
+		{
+			auto fitted = ship->Combat && ship->Combat->Spec ? &ship->Combat->Spec->Layout : nullptr;
+			auto layout = StarSparrowKit::LayoutOf(ship->Spec->Class, fitted);
+			int pods = 0, spheres = 0;
+			if (BulkFreighters::IsTruss(ship->Spec->Class))
+			{
+				auto [all, loaded, sp] = TrussLoad(ship);
+				pods = all;
+				spheres = sp;
+			}
+			if (StarSparrowKit::Build(ship->Spec->Class, ship->Civil, ship->Id, ship->Faction, layout, parent, renderers, stern, bow, pods, spheres)) return;
+		}
 		cs::String kenney = KenneyModelFor(ship);
 		if (!kenney.empty())
 		{
@@ -140,6 +158,8 @@ namespace SpaceGod::Rendering
 
 	cs::String ShipModels::KenneyModelFor(const cs::Ref<Ship>& ship)
 	{
+		// US-T110: with the Star Sparrow kit every hull is the kit's (nothing to stream in the background).
+		if (StarSparrowKit::Available()) return cs::String();
 		// Local traffic (U.SPC-T375): a boxy bus, nippy taxis and skiffs, and a roomier six-seat tourer, each drawn
 		// at its own design's length.
 		switch (ship->Civil)

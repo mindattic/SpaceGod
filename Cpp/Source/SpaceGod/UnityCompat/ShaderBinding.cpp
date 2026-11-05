@@ -52,12 +52,16 @@ namespace SpaceGod::UnityCompat
 
 		const ParentEntry& ResolveByName(const Shader* shader)
 		{
-			cs::String name = ShaderBinding::IsLit(shader) ? cs::String("Lit") : ShaderBinding::ShaderName(shader);
+			// US-T110: a shader named by a content path ("/Game/ThirdParty/StarSparrow/Materials/M_StarSparrowShip") is
+			// that material itself, not one of SpaceGodRender's.
+			bool asset = shader && !shader->name.empty() && shader->name[0] == '/';
+			cs::String name = asset ? shader->name : ShaderBinding::IsLit(shader) ? cs::String("Lit") : ShaderBinding::ShaderName(shader);
 			auto& parents = Parents();
 			auto it = parents.find(name);
 			if (it != parents.end()) return it->second;
 			ParentEntry e;
-			FString path = FString::Printf(TEXT("%s/M_%s.M_%s"), UTF8_TO_TCHAR(ShaderBinding::MaterialRoot), UTF8_TO_TCHAR(name.c_str()), UTF8_TO_TCHAR(name.c_str()));
+			FString path = asset ? FString::Printf(TEXT("%s.%s"), UTF8_TO_TCHAR(name.c_str()), UTF8_TO_TCHAR(ShaderBinding::ShaderName(shader).c_str()))
+				: FString::Printf(TEXT("%s/M_%s.M_%s"), UTF8_TO_TCHAR(ShaderBinding::MaterialRoot), UTF8_TO_TCHAR(name.c_str()), UTF8_TO_TCHAR(name.c_str()));
 			UMaterialInterface* m = LoadObject<UMaterialInterface>(nullptr, *path, nullptr, LOAD_NoWarn | LOAD_Quiet);
 			e.Real = m != nullptr;
 			if (!m)

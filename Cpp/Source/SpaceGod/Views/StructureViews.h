@@ -38,6 +38,8 @@ namespace SpaceGod::Views
 			cs::Ref<GameObject> Hull;
 			cs::Nullable<Core::ShipClass> HullClass;
 			cs::Ref<Core::Faction> HullOwner;
+			/// <summary>The hull's Star Sparrow kit parts (US-T110), shown stern first as the plating goes forward.</summary>
+			cs::List<cs::Ref<Renderer>> HullParts;
 			float Spin = 0;
 			cs::Ref<MeshFilter> Model;
 			cs::Ref<Core::Faction> Owner;

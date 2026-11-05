@@ -50,3 +50,26 @@ uses these assets must be built on a machine that has run the import.
   - `Materials/MI_StarSparrow_<Colour>`: one instance per supplied colour (painted texture, with the fitted tints
     stored too), and `MI_StarSparrow_Livery`: `UseLivery` on, the template for faction colours.
     Every mesh gets `MI_StarSparrow_Grey` by default.
+  - `Materials/M_StarSparrowShip` (US-T110): the material the game draws the kit with. The game has no Unreal lights
+    (every SpaceGodRender material is unlit and lights itself from the star(s) in `MPC_SpaceGod`), so this is the
+    pack's atlas in the game's terms: Neutral times `Tint1..4` inside the masks, the pack's normal, metallic,
+    glossiness and emission maps, lit by the star(s) as `M_Ship` is, then `SG_Expose3`. `_Tint`, `_Highlight` and
+    `_EngineGlow` take ShipView's property block. Rebuild just this material with
+    `tools/import-starsparrow.ps1 -MaterialOnly` (no zip needed once the textures are imported).
+
+### Ships built from the kit (US-T110)
+
+When the pack is imported, every ship is drawn from it (`Cpp/Source/SpaceGod/Rendering/StarSparrowKit.cpp`): a recipe
+per hull class names parts with a place, a size and a turn in the game's model frame (one unit long, nose +Z, beam
+about 0.2), scaled non-uniformly where that reads well. Fighters, interceptors, recon craft, couriers and the local
+traffic (taxi, skiff, runabout, tourer) are the pack's prebuilt fighters with their span narrowed; everything else is
+assembled from the eight modules, its engines on its class's Engine hardpoints so the glows sit in the bells. Warships
+still come in a stern and a bow split at `SplitZ`; gun turrets are kit parts too (a pod barbette and Weapon barrels),
+on the same mounts. Each faction gets a livery from its colour (`StarSparrowKit::Livery`): navies steel washed in
+their colour, pirates soot-black with the clan's colour on the trim and red lights, civilians white with a stripe.
+
+Without the pack (a fresh clone), in a headless run (`-nullrhi`, which cannot draw imported meshes), or with
+`-NoStarSparrow`, `StarSparrowKit::Available()` is false and the game draws the procedural hulls and Kenney craft
+exactly as before. `-SpaceGodShipLineup=<dir>` on the game's command line (it
+quits when done), or the console command `SpaceGod.ShipLineup <dir>`, screenshots contact sheets of the kit's parts
+and of every class in every livery, drawn by a camera of its own as the model viewer is (`Rendering/ShipLineup.cpp`).

@@ -4,6 +4,7 @@
 #include "UnitySpaceApp.h"
 #include "Rendering/ShipMeshFactory.h"
 #include "Rendering/ShipModels.h"
+#include "Rendering/StarSparrowKit.h"
 
 #include "BodyCatalog.h"
 #include "BodyOrientation.h"
@@ -23,6 +24,17 @@ namespace SpaceGod::Views
 {
 	using Rendering::ShipMeshFactory;
 	using Rendering::ShipModels;
+
+	namespace
+	{
+		/// Where a hull part's middle is along the hull on the slip (its own frame: -0.5 the stern, +0.5 the bow).
+		float PartZ(const cs::Ref<Transform>& hull, const cs::Ref<Renderer>& r)
+		{
+			auto m = WorldMatrix::Of(*hull);
+			Vector3 f = m.MultiplyVector(Vector3::forward());
+			return Vector3::Dot(r->bounds().center - m.t, f) / Mathf::Max(f.sqrMagnitude(), 1e-20f);
+		}
+	}
 
 	StructureViews::StructureViews(UnitySpaceApp* app_, const cs::Ref<Transform>& parent)
 		: app(app_)
@@ -232,8 +244,15 @@ namespace SpaceGod::Views
 			if (Alive(v->Hull)) Destroy(v->Hull);
 			v->Hull = NewGameObject("Hull on the slip");
 			v->Hull->transform->SetParent(v->Slip, false);
-			// The whole hull, bow included (a warship's Stern section alone is only its after half).
-			[[maybe_unused]] auto mr = Part(v->Hull->transform, ShipMeshFactory::GetSection(*cls, settlement->Owner, ShipMeshFactory::WholeHull), "Hull");
+			// The whole hull, bow included (a warship's Stern section alone is only its after half): the Star Sparrow kit's
+			// when the pack is there (US-T110), its parts plated on stern first as the work goes forward.
+			cs::List<cs::Ref<Renderer>> parts;
+			cs::Ref<Transform> stern, bow;
+			v->HullParts.Clear();
+			if (Rendering::StarSparrowKit::Build(*cls, CivilCraft::None, 0, settlement->Owner, Rendering::StarSparrowKit::LayoutOf(*cls, nullptr),
+				v->Hull->transform, parts, stern, bow))
+				v->HullParts = parts;
+			else [[maybe_unused]] auto mr = Part(v->Hull->transform, ShipMeshFactory::GetSection(*cls, settlement->Owner, ShipMeshFactory::WholeHull), "Hull");
 			v->HullClass = cls;
 			v->HullOwner = settlement->Owner;
 		}
@@ -244,8 +263,18 @@ namespace SpaceGod::Views
 			{
 				// Plating creeps forward from the stern: the hull shows along the slip as far as it has got.
 				float done = Mathf::Clamp01(static_cast<float>((progress - 0.6) / 0.37));
-				v->Hull->transform->localScale = Vector3(1, 1, Mathf::Max(0.05f, done));
-				v->Hull->transform->localPosition = Vector3(0, 0, -0.5f * (1 - done));
+				if (v->HullParts.Count() > 0)
+				{
+					// Kit parts: each fitted once the plating has reached its middle.
+					float front = -0.5f + done;
+					for (const auto& r : v->HullParts)
+						r->enabled = PartZ(v->Hull->transform, r) <= front + 0.02f;
+				}
+				else
+				{
+					v->Hull->transform->localScale = Vector3(1, 1, Mathf::Max(0.05f, done));
+					v->Hull->transform->localPosition = Vector3(0, 0, -0.5f * (1 - done));
+				}
 				for (const auto& r : GetComponentsInChildren<Renderer>(v->Hull)) r->SetPropertyBlock(block);
 			}
 		}

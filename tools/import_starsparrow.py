@@ -228,6 +228,162 @@ def build_material():
     return mat
 
 
+# ---------------------------------------------------------------- the in-game material (US-T110)
+
+GAME_MATERIAL = "M_StarSparrowShip"
+MPC = "/SpaceGodRender/Materials/MPC_SpaceGod"
+
+# The game draws with no Unreal lights: every material is unlit and lights itself from the star(s) in MPC_SpaceGod, as
+# SpaceGodRender's M_Ship does (Shaders/Ship.ush). This is the pack's atlas in those terms: the livery (Neutral times a
+# tint per mask), its normal, metallic, glossiness and emission maps, lit by the star(s) with a cool fill on the night
+# side, then SG_Expose3 so it reaches the image as the game's own hulls do. The C++ side (Rendering/StarSparrowKit)
+# sets Tint1..4 per faction, and ShipView's property block sets _Tint (a wreck's char), _Highlight and _EngineGlow.
+SHIP_CODE = r"""
+float3 tint = float3(1, 1, 1);
+tint = lerp(tint, Tint1, Texture2DSample(Mask1, Mask1Sampler, UV).r);
+tint = lerp(tint, Tint2, Texture2DSample(Mask2, Mask2Sampler, UV).r);
+tint = lerp(tint, Tint3, Texture2DSample(Mask3, Mask3Sampler, UV).r);
+tint = lerp(tint, Tint4, Texture2DSample(Mask4, Mask4Sampler, UV).r);
+float3 albedo = Texture2DSample(Neutral, NeutralSampler, UV).rgb * tint * _Tint;
+float metallic = Texture2DSample(Metallic, MetallicSampler, UV).r;
+float gloss = Texture2DSample(Glossiness, GlossinessSampler, UV).r;
+float2 nxy = Texture2DSample(Normal, NormalSampler, UV).rg * 2.0 - 1.0;
+nxy.y = -nxy.y; // the pack's maps are OpenGL-style (Unity); Unreal's tangent frame wants DirectX green
+float3 tn = float3(nxy * NormalStrength, sqrt(saturate(1.0 - dot(nxy, nxy))));
+float3 n = mul(normalize(tn), (float3x3)Parameters.TangentToWorld);
+// A mesh without a usable tangent frame falls back to its vertex normal rather than going black (NaN).
+if (!(dot(n, n) > 1e-8) || any(isnan(n))) n = VertexNormal;
+n = normalize(n);
+if (any(isnan(n))) n = float3(0, 0, 1);
+float3 l = normalize(SunRel - PositionCR);
+float3 v = normalize(-PositionCR);
+float ndl = saturate(dot(n, l));
+float ndl2 = saturate(dot(n, normalize(Sun2Rel - PositionCR)));
+float fill = saturate(dot(n, -l)) * 0.08 + 0.06;
+float power = exp2(gloss * 8.0 + 3.0);
+float spec = pow(saturate(dot(n, normalize(l + v))), power) * (0.1 + 0.9 * gloss) * step(0.0, dot(n, l));
+float3 f0 = lerp(float3(0.04, 0.04, 0.04), albedo, metallic);
+float3 col = albedo * (1.0 - 0.45 * metallic) * (ndl * SunColor + ndl2 * Sun2Color + fill) + f0 * spec * SunColor * 1.6;
+float rim = pow(1.0 - saturate(dot(n, v)), 4.0);
+col += float3(0.35, 0.7, 1.0) * rim * _Highlight * 0.6;
+col += Texture2DSample(Emission, EmissionSampler, UV).rgb * EmissiveIntensity * (0.55 + 0.45 * saturate(_EngineGlow)) * _Tint;
+col = any(isnan(col)) ? float3(1, 0, 1) : col;
+return SG_Expose3(col, Exposure, SceneLuminance);
+"""
+
+
+def build_game_material():
+    path = f"{MATERIALS}/{GAME_MATERIAL}"
+    mat = unreal.load_asset(path) if eal.does_asset_exist(path) else None
+    if mat is None:
+        mat = tools.create_asset(GAME_MATERIAL, MATERIALS, unreal.Material, unreal.MaterialFactoryNew())
+    else:
+        mel.delete_all_material_expressions(mat)
+    mat.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
+    mat.set_editor_property("blend_mode", unreal.BlendMode.BLEND_OPAQUE)
+    mat.set_editor_property("two_sided", False)
+    mpc = unreal.load_asset(MPC)
+    if mpc is None:
+        raise RuntimeError(f"missing {MPC} (the SpaceGodRender plugin)")
+    S = unreal.MaterialSamplerType
+    y = [0]
+
+    def node(cls, x=-1600):
+        e = mel.create_material_expression(mat, cls, x, y[0])
+        y[0] += 110
+        return e
+
+    def tex(name, base, sampler):
+        e = node(unreal.MaterialExpressionTextureObjectParameter)
+        e.set_editor_property("parameter_name", name)
+        e.set_editor_property("texture", _tex(base))
+        e.set_editor_property("sampler_type", sampler)
+        return e, ""
+
+    def vec(name, rgb, mask=True):
+        e = node(unreal.MaterialExpressionVectorParameter)
+        e.set_editor_property("parameter_name", name)
+        e.set_editor_property("default_value", unreal.LinearColor(rgb[0], rgb[1], rgb[2], 1.0))
+        return (_rgb(mat, e, "", -1300, y[0]), "") if mask else (e, "")
+
+    def scalar(name, value):
+        e = node(unreal.MaterialExpressionScalarParameter)
+        e.set_editor_property("parameter_name", name)
+        e.set_editor_property("default_value", value)
+        return e, ""
+
+    def collection(name, rgb):
+        e = node(unreal.MaterialExpressionCollectionParameter)
+        e.set_editor_property("collection", mpc)
+        e.set_editor_property("parameter_name", name)
+        return (_rgb(mat, e, "", -1300, y[0]), "") if rgb else (e, "")
+
+    camera = node(unreal.MaterialExpressionCameraPositionWS)
+
+    def relative(name):
+        s = node(unreal.MaterialExpressionSubtract, -1100)
+        c, _ = collection(name, True)
+        mel.connect_material_expressions(c, "", s, "A")
+        mel.connect_material_expressions(camera, "", s, "B")
+        return s, ""
+
+    def position_cr():
+        e = node(unreal.MaterialExpressionWorldPosition)
+        e.set_editor_property("world_position_shader_offset", unreal.WorldPositionIncludedOffsets.WPT_CAMERA_RELATIVE)
+        return e, ""
+
+    uv = node(unreal.MaterialExpressionTextureCoordinate)
+    grey = LIVERY_TINTS["Grey"]
+    inputs = [
+        ("UV", (uv, "")),
+        ("Neutral", tex("Neutral", "Neutral", S.SAMPLERTYPE_COLOR)),
+        ("Mask1", tex("Mask1", "Mask1", S.SAMPLERTYPE_MASKS)),
+        ("Mask2", tex("Mask2", "Mask2", S.SAMPLERTYPE_MASKS)),
+        ("Mask3", tex("Mask3", "Mask3", S.SAMPLERTYPE_MASKS)),
+        ("Mask4", tex("Mask4", "Mask4", S.SAMPLERTYPE_MASKS)),
+        ("Metallic", tex("Metallic", "Metallic", S.SAMPLERTYPE_MASKS)),
+        ("Glossiness", tex("Glossiness", "Glossiness", S.SAMPLERTYPE_MASKS)),
+        ("Normal", tex("Normal", "Normal", S.SAMPLERTYPE_NORMAL)),
+        ("Emission", tex("Emission", "Emission", S.SAMPLERTYPE_COLOR)),
+        ("Tint1", vec("Tint1", _linear(grey[0]))),
+        ("Tint2", vec("Tint2", _linear(grey[1]))),
+        ("Tint3", vec("Tint3", _linear(grey[2]))),
+        ("Tint4", vec("Tint4", _linear(grey[3]))),
+        ("_Tint", vec("_Tint", (1, 1, 1))),
+        ("_Highlight", scalar("_Highlight", 0.0)),
+        ("_EngineGlow", scalar("_EngineGlow", 0.6)),
+        ("EmissiveIntensity", scalar("EmissiveIntensity", 2.0)),
+        ("NormalStrength", scalar("NormalStrength", 1.0)),
+        ("VertexNormal", (node(unreal.MaterialExpressionVertexNormalWS), "")),
+        ("PositionCR", position_cr()),
+        ("SunRel", relative("_SunPositionWS")),
+        ("SunColor", collection("_SunColor", True)),
+        ("Sun2Rel", relative("_Sun2PositionWS")),
+        ("Sun2Color", collection("_Sun2Color", True)),
+        ("Exposure", (node(unreal.MaterialExpressionEyeAdaptation), "")),
+        ("SceneLuminance", collection("_UnitySpaceSceneLuminance", False)),
+    ]
+    custom = mel.create_material_expression(mat, unreal.MaterialExpressionCustom, -500, 0)
+    custom.set_editor_property("description", "StarSparrow/Ship")
+    custom.set_editor_property("code", SHIP_CODE)
+    custom.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+    custom.set_editor_property("include_file_paths", ["/Plugin/SpaceGodRender/SpaceGodCommon.ush"])
+    custom_inputs = []
+    for name, _ in inputs:
+        ci = unreal.CustomInput()
+        ci.set_editor_property("input_name", name)
+        custom_inputs.append(ci)
+    custom.set_editor_property("inputs", custom_inputs)
+    for name, (source, out) in inputs:
+        if not mel.connect_material_expressions(source, out, custom, name):
+            raise RuntimeError(f"{GAME_MATERIAL}: could not connect input {name}")
+    mel.connect_material_property(custom, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    mel.recompile_material(mat)
+    eal.save_asset(path, only_if_is_dirty=False)
+    _log(f"built {path}")
+    return mat
+
+
 def _instance(parent, name):
     path = f"{MATERIALS}/{name}"
     mi = unreal.load_asset(path) if eal.does_asset_exist(path) else None
@@ -470,11 +626,20 @@ def finish_meshes(meshes, instance):
 
 
 def main():
+    if os.environ.get("STARSPARROW_MATERIAL_ONLY"):
+        # Just the in-game material (needs the imported textures, not the source art).
+        build_game_material()
+        _log(f"SUMMARY material only, failures={len(failures)}")
+        return
     src = _source_dir()
     _log(f"source {src}")
     textures = import_textures(src)
     master = build_material()
     instances = build_instances(master)
+    try:
+        build_game_material()
+    except Exception as error:  # the summary names it; the meshes still import
+        _fail(f"{GAME_MATERIAL}: {error}")
     default = unreal.load_asset(f"{MATERIALS}/{DEFAULT_INSTANCE}")
     meshes = import_meshes(src)
     finish_meshes(meshes, default)

@@ -2,7 +2,9 @@
 param(
   # The pack's FBX zip (starsparrow_fbx.zip, from the owner's library). Only needed until it has been extracted once.
   [string]$Zip = (Join-Path $env:USERPROFILE 'Downloads\starsparrow\starsparrow_fbx.zip'),
-  [string]$EngineVersion = '5.8'
+  [string]$EngineVersion = '5.8',
+  # US-T110: rebuild only the in-game material (M_StarSparrowShip) from the textures already imported; no zip needed.
+  [switch]$MaterialOnly
 )
 
 <#
@@ -20,7 +22,7 @@ $project = Join-Path $repo 'Cpp\SpaceGod.uproject'
 $dest = Join-Path $repo 'Cpp\SourceArt\ThirdParty\StarSparrow'
 $source = Join-Path $dest 'StarSparrow_FBX'
 
-if (-not (Test-Path -LiteralPath (Join-Path $source 'StarSparrowModules.fbx'))) {
+if (-not $MaterialOnly -and -not (Test-Path -LiteralPath (Join-Path $source 'StarSparrowModules.fbx'))) {
   if (-not (Test-Path -LiteralPath $Zip)) { throw "Star Sparrow zip not found: $Zip (pass -Zip <path to starsparrow_fbx.zip>)." }
   if ((Test-Path -LiteralPath $dest) -and (Get-ChildItem -LiteralPath $dest -Force | Select-Object -First 1)) {
     throw "$dest exists but has no StarSparrow_FBX/StarSparrowModules.fbx; empty it and run again."
@@ -37,6 +39,7 @@ $engine = Find-UnrealEngine $EngineVersion
 $editor = Join-Path $engine 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
 $script = (Join-Path $PSScriptRoot 'import_starsparrow.py') -replace '\\', '/'
 $env:STARSPARROW_SOURCE = $source
+$env:STARSPARROW_MATERIAL_ONLY = if ($MaterialOnly) { '1' } else { '' }
 & $editor $project -run=pythonscript "-script=$script" -unattended -nop4 -nosplash -stdout -FullStdOutLogOutput |
   Where-Object { $_ -match 'StarSparrow|Error' }
 if ($LASTEXITCODE) { throw "Star Sparrow import failed (exit $LASTEXITCODE)." }

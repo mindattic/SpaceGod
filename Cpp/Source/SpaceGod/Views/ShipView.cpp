@@ -4,6 +4,7 @@
 #include "Rendering/MeshFactory.h"
 #include "Rendering/ShipMeshFactory.h"
 #include "Rendering/ShipModels.h"
+#include "Rendering/StarSparrowKit.h"
 
 #include "Combat/CombatSpecs.h"
 #include "Combat/CombatState.h"
@@ -66,6 +67,10 @@ namespace SpaceGod::Views
 			truss = GetComponent<MeshFilter>(stern);
 			trussShown = ShipModels::TrussLoad(ship);
 		}
+		// A kit-built truss freighter (US-T110) carries its containers as parts: as many shown as its load fills.
+		if (!bow && !truss)
+			for (const auto& r : renderers)
+				if (r->gameObject() && r->gameObject()->name.rfind(Rendering::StarSparrowKit::CargoName, 0) == 0) cargo.Add(r);
 		EnsureStatics();
 
 		auto plumeGo = NewGameObject("Plume");
@@ -306,9 +311,13 @@ namespace SpaceGod::Views
 			mount->localPosition = pos;
 			mount->localRotation = part->Rest;
 			part->Mount = mount;
-			// A spinal mount is a gun the length of the hull laid down the keel from its muzzle (U.SPC-T490).
-			cs::List<cs::Ref<Renderer>> list{ ShipModels::Part(mount, d->Spinal ? ShipMeshFactory::GetSpinal(sub->Kind(), Ship->Faction)
-				: ShipMeshFactory::GetPart(sub->Kind(), Ship->Faction, false), "Base") };
+			// A spinal mount is a gun the length of the hull laid down the keel from its muzzle (U.SPC-T490). A gun turret is
+			// the Star Sparrow kit's when the hull is (US-T110): a pod barbette and its barrels.
+			cs::List<cs::Ref<Renderer>> list;
+			bool kit = !d->Spinal && Rendering::StarSparrowKit::Turret(mount, sub->Kind(), Ship->Faction, false, list);
+			if (!kit)
+				list.Add(ShipModels::Part(mount, d->Spinal ? ShipMeshFactory::GetSpinal(sub->Kind(), Ship->Faction)
+					: ShipMeshFactory::GetPart(sub->Kind(), Ship->Faction, false), "Base"));
 			SubsystemKind k = sub->Kind();
 			part->Turret = !d->Spinal && (k == SubsystemKind::HeavyLaser || k == SubsystemKind::LaserTurret || k == SubsystemKind::PointDefense ||
 				k == SubsystemKind::PlasmaCannon || k == SubsystemKind::FlakCannon);
@@ -319,7 +328,8 @@ namespace SpaceGod::Views
 				barrels->localPosition = Vector3(0, k == SubsystemKind::HeavyLaser || k == SubsystemKind::PlasmaCannon ? 0.014f : k == SubsystemKind::LaserTurret ? 0.009f
 					: k == SubsystemKind::FlakCannon ? 0.011f : 0.008f, 0);
 				part->Barrels = barrels;
-				list.Add(ShipModels::Part(barrels, ShipMeshFactory::GetPart(k, Ship->Faction, true), "Barrels"));
+				if (!kit || !Rendering::StarSparrowKit::Turret(barrels, k, Ship->Faction, true, list))
+					list.Add(ShipModels::Part(barrels, ShipMeshFactory::GetPart(k, Ship->Faction, true), "Barrels"));
 			}
 			part->Renderers = list;
 		}
@@ -413,6 +423,11 @@ namespace SpaceGod::Views
 		}
 
 		UpdateTow();
+		if (cargo.Count() > 0)
+		{
+			int loaded = std::get<1>(ShipModels::TrussLoad(Ship));
+			for (int i = 0; i < cargo.Count(); i++) cargo[i]->enabled = visible && i < loaded;
+		}
 
 		block.SetFloat(EngineGlowId, burning ? 2.2f : 0.35f);
 		block.SetFloat(HighlightId, highlighted ? 1.0f : 0.0f);

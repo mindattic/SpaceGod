@@ -49,6 +49,9 @@ namespace SpaceGod::Views
 		/// it, and what that mesh shows now; null for any other hull.</summary>
 		cs::Ref<MeshFilter> truss;
 		std::tuple<int, int, int> trussShown;
+		/// <summary>A kit-built truss freighter's containers (US-T110), front pair first: the first as many as its load
+		/// fills are shown.</summary>
+		cs::List<cs::Ref<Renderer>> cargo;
 
 		/// <summary>What an ore tug has latched on (U.SPC-T498), drawn ahead of its push plate, and the load it shows now; null until it first carries one.</summary>
 		cs::Ref<MeshRenderer> towRenderer;
