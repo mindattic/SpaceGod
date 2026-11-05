@@ -5,6 +5,7 @@
 #include "Rendering/MeshFactory.h"
 #include "Rendering/ShipMeshFactory.h"
 #include "Rendering/ShipModels.h"
+#include "Rendering/SscKit.h"
 #include "Rendering/VoidStationModel.h"
 #include "Rendering/VoidSiteModel.h"
 #include "UnitySpaceApp.h"
@@ -27,6 +28,7 @@ namespace SpaceGod::Views
 	using Rendering::MeshFactory;
 	using Rendering::ShipMeshFactory;
 	using Rendering::ShipModels;
+	using Rendering::SscKit;
 	using Rendering::VoidStationModel;
 	using Rendering::VoidSiteModel;
 
@@ -88,6 +90,17 @@ namespace SpaceGod::Views
 		{
 			material = ShipModels::ProceduralMaterial();
 			renderer->SetSharedMaterial(material);
+			// US-T143: one of Space Station Creator's big complexes when the pack is there, radius one, its plane across the
+			// spine the view turns it about.
+			auto holder = NewGameObject("Station");
+			holder->transform->SetParent(Root->transform, false);
+			cs::List<cs::Ref<Renderer>> parts;
+			if (SscKit::Station(holder->transform, SscKit::ForStationBody(body->Name), 2.0f, nullptr, parts, SscKit::Condition::Working, true))
+			{
+				sscRoot = holder;
+				renderer->enabled = false;
+			}
+			else Destroy(holder);
 			return;
 		}
 		if (body->IsStar() && body->Singularity)
@@ -290,6 +303,18 @@ namespace SpaceGod::Views
 		horizonRenderer->SetSharedMaterial(glowMaterial);
 		horizonRenderer->shadowCastingMode = ShadowCastingMode::Off;
 		glow = horizonGo->transform;
+
+		// US-T143: with Space Station Creator, the station round the generator is the pack's: its sunburst frame, docks and
+		// pole frames take the procedural shell's place; the core, accretion ring and gimbals stay.
+		auto holder = NewGameObject("Station");
+		holder->transform->SetParent(Root->transform, false);
+		cs::List<cs::Ref<Renderer>> parts;
+		if (SscKit::VoidStation(holder->transform, Body->Name, nullptr, parts))
+		{
+			sscRoot = holder;
+			renderer->enabled = false;
+		}
+		else Destroy(holder);
 	}
 
 	void BodyView::ApplyVoidStation(Vector3 relative, float radius, bool highlighted, Vector3 cameraForward)
@@ -304,8 +329,8 @@ namespace SpaceGod::Views
 		float distance = relative.magnitude();
 		float size = distance > 0 ? radius / distance : 1.0f;
 		if (nearDetail ? size < NearDetailOff : size > NearDetailOn) nearDetail = !nearDetail;
-		renderer->enabled = !nearDetail;
-		nearShell->enabled = nearDetail;
+		renderer->enabled = !sscRoot && !nearDetail;
+		nearShell->enabled = !sscRoot && nearDetail;
 
 		// The rings turn on their own, not with the shell: its spin is taken back out first.
 		Quaternion unspin = Quaternion::AngleAxis(-now * ShellSpinDegS, up);
@@ -332,6 +357,19 @@ namespace SpaceGod::Views
 		GetComponent<MeshFilter>(Root)->sharedMesh = VoidSiteModel::Body(*site);
 		material = VoidSiteModel::CreateMaterial(*site, Body->Name);
 		renderer->SetSharedMaterial(material);
+		if (site->Kind == VoidSiteKind::Megastructure)
+		{
+			// US-T143: the megastructure built from Space Station Creator's blocks and girders when the pack is there.
+			auto holder = NewGameObject("Megastructure");
+			holder->transform->SetParent(Root->transform, false);
+			cs::List<cs::Ref<Renderer>> parts;
+			if (SscKit::Megastructure(holder->transform, Body->Name, parts))
+			{
+				sscRoot = holder;
+				renderer->enabled = false;
+			}
+			else Destroy(holder);
+		}
 
 		debrisPieces = VoidSiteModel::Debris(*site);
 		if (debrisPieces.Count() > 0)
@@ -443,6 +481,7 @@ namespace SpaceGod::Views
 
 	void BodyView::SetVisible(bool visible)
 	{
-		renderer->enabled = visible && Body->IsVisible();
+		renderer->enabled = visible && Body->IsVisible() && !sscRoot;
+		if (sscRoot) sscRoot->SetActive(visible);
 	}
 }

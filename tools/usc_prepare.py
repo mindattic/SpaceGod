@@ -80,6 +80,38 @@ MODULES = {
     ("VoidWhale", "VoidWhale_Parts_Modules"): ["TurretBase", "Cannon", "Lazer", "Thruster", "Dish", "Engine"],
 }
 
+# US-T143: Ebal Studios' Space Station Creator, the same way (tools/import-ssc.ps1 passes "ssc" as the third argument).
+# Its stations come whole (none is cut), each mesh painted from one of four atlases (a Combined station has one mesh per
+# atlas: Bridge, Cylinderical, Hangars, Storage). Kept in step with Rendering/SscKit.cpp.
+SSC_MODELS = {
+    # Free-flying stations (Rigil Gate, Toliman Forge, Blackhollow ...), derelicts.
+    "Combined20": ("Combined", False),
+    "Combined28": ("Combined", False),
+    "Combined30": ("Combined", False),
+    "Combined08": ("Combined", False),
+    "Combined21": ("Combined", False),
+    "Combined01": ("Combined", False),
+    # Factories, depots and the megastructure's tower blocks.
+    "Storage01": ("Storage", False),
+    "Storage04": ("Storage", False),
+    "Storage05": ("Storage", False),
+    "Storage11": ("Storage", False),
+    "Storage12": ("Storage", False),
+    "Storage13": ("Storage", False),
+    "Storage18": ("Storage", False),
+    "Storage19": ("Storage", False),
+    # Habitats (the wheel), gateways (the gyroscope ring), the void stations' sunburst frame, docks.
+    "Cylinderical12": ("Cylinderical", False),
+    "Cylinderical18": ("Cylinderical", False),
+    "Cylinderical02": ("Cylinderical", False),
+    "Hangars05": ("Hangars", False),
+    "Bridge04": ("Bridge", False),
+}
+SSC_MODULES = {
+    ("Hangars", "HangarsModules"): ["Beam", "BeamTall", "Hangar", "Extension", "Gate"],
+}
+SSC_ATLASES = ("Bridge", "Cylinderical", "Hangars", "Storage")
+
 
 def reset():
     bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -158,12 +190,21 @@ def find_fbx(folder, stem):
     return None
 
 
+def ssc_atlas_of(name):
+    """Combined08_Bridge -> Bridge; Storage01 -> Hull (a single-set station is painted from its set's atlas)."""
+    tail = name.split(".")[0].split("_")[-1]
+    return tail if tail in SSC_ATLASES else "Hull"
+
+
 def main():
     args = sys.argv[sys.argv.index("--") + 1:]
     src, out = args[0], args[1]
+    ssc = len(args) > 2 and args[2].lower() == "ssc"
+    tag = "SSC" if ssc else "USC"
+    models, modules = (SSC_MODELS, SSC_MODULES) if ssc else (MODELS, MODULES)
     os.makedirs(out, exist_ok=True)
     written, failed = 0, []
-    for model, (family, warship) in MODELS.items():
+    for model, (family, warship) in models.items():
         path = find_fbx(os.path.join(src, family), model)
         if not path:
             failed.append(f"{model}: no FBX in {family}")
@@ -179,9 +220,9 @@ def main():
         length = mx.y - mn.y
         split_y = SPLIT_AFT * length  # the nose is -Y, so aft of the middle is +Y
         for o in meshes:
-            atlas = atlas_of(o.name)
+            atlas = ssc_atlas_of(o.name) if ssc else atlas_of(o.name)
             if not warship:
-                export([o], os.path.join(out, f"SM_USC_{model}_{atlas}_Whole.fbx"))
+                export([o], os.path.join(out, f"SM_{tag}_{model}_{atlas}_Whole.fbx"))
                 written += 1
                 continue
             data = o.data
@@ -193,27 +234,27 @@ def main():
                     export([piece], os.path.join(out, f"SM_USC_{model}_{atlas}_{section}.fbx"))
                     written += 1
                 bpy.data.objects.remove(piece)
-        print(f"USC: {model} {length:.1f} m, {len(meshes)} mesh(es)")
+        print(f"{tag}: {model} {length:.1f} m, {len(meshes)} mesh(es)")
 
-    for (family, stem), parts in MODULES.items():
+    for (family, stem), parts in modules.items():
         path = find_fbx(os.path.join(src, family), stem)
         if not path:
             failed.append(f"{stem}: no FBX")
             continue
         meshes = import_fbx(path)
         for part in parts:
-            name = f"{family}_Parts_{part}"
+            name = f"{family}_{part}" if ssc else f"{family}_Parts_{part}"
             obj = next((o for o in meshes if o.name == name or o.name.startswith(name + ".")), None)
             if obj is None:
                 failed.append(f"module {name} not found")
                 continue
             mn, mx = bounds([obj])
             shift(obj, -(mn + mx) * 0.5)
-            export([obj], os.path.join(out, f"SM_USC_Mod_{family}{part}.fbx"))
+            export([obj], os.path.join(out, f"SM_{tag}_Mod_{family}{part}.fbx"))
             written += 1
-    print(f"USC: SUMMARY pieces={written} failures={len(failed)}")
+    print(f"{tag}: SUMMARY pieces={written} failures={len(failed)}")
     for f in failed:
-        print(f"USC: FAILURE {f}")
+        print(f"{tag}: FAILURE {f}")
 
 
 main()

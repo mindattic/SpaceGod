@@ -6,7 +6,8 @@
 //   SpaceGod.ShipLineup <dir>   the same from the console, without quitting.
 //
 // Sheets: kit-pieces (the 8 modules then fighters 1..40, row by row), usc-models (US-T142: every Ultimate Spaceships
-// Creator ship the classes fly, when that pack is imported), classes-<livery> (every hull class in LineupOrder,
+// Creator ship the classes fly, when that pack is imported), ssc-stations and ssc-archetypes (US-T143: Space Station
+// Creator's stations, and the Void Station frame, megastructure and derelicts built from them), classes-<livery> (every hull class in LineupOrder,
 // row by row, as its ShipView draws it: hull, turrets and all), detail-small/-large (the navy's, larger), classes-top,
 // classes-side and capitals-to-scale, screenshots of the game's view; then thumbnails-<livery>, the spawn screen's
 // ShipThumbnails (an off-screen scene capture) of every class side by side (US-T116).
@@ -17,6 +18,7 @@
 #include "ModelViewer.h"
 #include "Rendering/Pipeline/RenderBackend.h"
 #include "Rendering/ShipThumbnails.h"
+#include "Rendering/SscKit.h"
 #include "Rendering/StarSparrowKit.h"
 #include "Rendering/UscKit.h"
 #include "UnityCompat/UnityScene.h"
@@ -166,6 +168,48 @@ namespace SpaceGod::Rendering
 					}
 				};
 				sheets.Add(models);
+			}
+			// US-T143: every Space Station Creator station the game uses, then the built archetypes: a Void Station's frame,
+			// a megastructure and two derelicts.
+			if (SscKit::Available())
+			{
+				Sheet stations;
+				stations.Name = TEXT("ssc-stations");
+				stations.Width = 5 * 1.25f;
+				stations.Height = 4 * 1.25f;
+				stations.Build = [](const cs::Ref<Transform>& root, cs::List<cs::Ref<Views::ShipView>>&)
+				{
+					auto names = SscKit::ModelNames();
+					for (int i = 0; i < names.Count(); i++)
+					{
+						auto holder = NewGameObject(names[i]);
+						holder->transform->SetParent(root, false);
+						holder->transform->localPosition = Cell(i, names.Count(), 5, 1.25f);
+						holder->transform->localRotation = Facing(ThreeQuarter);
+						cs::List<cs::Ref<Renderer>> drawn;
+						SscKit::Station(holder->transform, names[i], 1.0f, nullptr, drawn);
+					}
+				};
+				sheets.Add(stations);
+				Sheet archetypes;
+				archetypes.Name = TEXT("ssc-archetypes");
+				archetypes.Width = 2 * 2.6f;
+				archetypes.Height = 2 * 2.6f;
+				archetypes.Build = [](const cs::Ref<Transform>& root, cs::List<cs::Ref<Views::ShipView>>&)
+				{
+					for (int i = 0; i < 4; i++)
+					{
+						auto holder = NewGameObject("Archetype");
+						holder->transform->SetParent(root, false);
+						holder->transform->localPosition = Cell(i, 4, 2, 2.6f);
+						holder->transform->localRotation = Facing(ThreeQuarter);
+						cs::List<cs::Ref<Renderer>> drawn;
+						if (i == 0) SscKit::VoidStation(holder->transform, "Void Station", nullptr, drawn);
+						else if (i == 1) SscKit::Megastructure(holder->transform, "Megastructure", drawn);
+						else SscKit::Derelict(holder->transform, i * 7919, 2.0f, drawn);
+					}
+				};
+				sheets.Add(archetypes);
 			}
 			struct Livery
 			{

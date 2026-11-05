@@ -4,6 +4,7 @@
 #include "UnitySpaceApp.h"
 #include "Rendering/ShipMeshFactory.h"
 #include "Rendering/ShipModels.h"
+#include "Rendering/SscKit.h"
 #include "Rendering/StarSparrowKit.h"
 #include "Rendering/UscKit.h"
 
@@ -91,7 +92,39 @@ namespace SpaceGod::Views
 			}
 		}
 		v->Renderers = list.ToArray();
+		AttachStation(v);
 		return v;
+	}
+
+	void StructureViews::AttachStation(const cs::Ref<View>& v)
+	{
+		auto s = v->S;
+		if (!Rendering::SscKit::Available()) return;
+		cs::String model = Rendering::SscKit::ForStructure(s->Kind, s->Industry, s->Name);
+		if (model.empty()) return;
+		auto modelRenderer = GetComponent<MeshRenderer>(v->Model->gameObject());
+		if (v->BaseRenderers < 0) v->BaseRenderers = v->Renderers.Count();
+		if (Alive(v->Station))
+		{
+			// Rebuilt in a new owner's livery: its renderers come off the list first.
+			cs::List<cs::Ref<Renderer>> kept;
+			for (int i = 0; i < v->BaseRenderers && i < v->Renderers.Count(); i++) kept.Add(v->Renderers[i]);
+			v->Renderers = kept;
+			Destroy(v->Station);
+		}
+		auto holder = NewGameObject("Station");
+		holder->transform->SetParent(v->Root->transform, false);
+		cs::List<cs::Ref<Renderer>> parts;
+		// A habitat's (and gateway's) ring turns about the model's +Z, as the procedural ring does.
+		bool ring = s->Kind == StructureKind::Habitat || s->Kind == StructureKind::Gateway;
+		if (!Rendering::SscKit::Station(holder->transform, model, 1.0f, s->Owner(), parts, Rendering::SscKit::Condition::Working, ring))
+		{
+			Destroy(holder);
+			return;
+		}
+		v->Station = holder;
+		if (modelRenderer) modelRenderer->enabled = false;
+		for (const auto& r : parts) v->Renderers.Add(r);
 	}
 
 	cs::Ref<Mesh> StructureViews::ModelMesh(const cs::Ref<OrbitalStructure>& s)
@@ -167,6 +200,7 @@ namespace SpaceGod::Views
 			{
 				v->Owner = s->Owner();
 				v->Model->sharedMesh = ModelMesh(s);
+				if (Alive(v->Station)) AttachStation(v);
 			}
 
 			auto t = v->Root->transform;

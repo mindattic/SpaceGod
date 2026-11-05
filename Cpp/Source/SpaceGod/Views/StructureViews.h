@@ -43,7 +43,15 @@ namespace SpaceGod::Views
 			float Spin = 0;
 			cs::Ref<MeshFilter> Model;
 			cs::Ref<Core::Faction> Owner;
+			/// <summary>US-T143: the Space Station Creator station drawn in the procedural model's place, when the pack is there.</summary>
+			cs::Ref<GameObject> Station;
+			/// <summary>How many of <see cref="Renderers"/> are the procedural model's (the station's follow them).</summary>
+			int BaseRenderers = -1;
 		};
+
+		/// <summary>US-T143: (re)builds a structure's Space Station Creator model in its owner's livery, hiding the procedural
+		/// one; leaves the procedural model for a kind the pack does not draw or without the pack.</summary>
+		static void AttachStation(const cs::Ref<View>& v);
 
 		class RingView final
 		{

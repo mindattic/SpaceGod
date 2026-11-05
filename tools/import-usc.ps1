@@ -55,6 +55,7 @@ if (-not $SkipPrepare) {
 $engine = Find-UnrealEngine $EngineVersion
 $editor = Join-Path $engine 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
 $script = (Join-Path $PSScriptRoot 'import_usc.py') -replace '\\', '/'
+$env:USC_PACK = 'usc'
 $env:USC_SOURCE = $source
 $env:USC_PIECES = $pieces
 & $editor $project -run=pythonscript "-script=$script" -unattended -nop4 -nosplash -stdout -FullStdOutLogOutput |

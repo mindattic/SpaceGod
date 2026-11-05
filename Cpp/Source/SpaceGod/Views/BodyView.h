@@ -36,6 +36,10 @@ namespace SpaceGod::Views
 		/// <summary>A free-flying station: drawn as a model with the ship shader, not a sphere.</summary>
 		bool station = false;
 
+		/// <summary>US-T143: the Space Station Creator model drawn in place of the procedural one (a station, a Void
+		/// Station's frame, a megastructure), when the pack is there; shown and hidden with the body.</summary>
+		cs::Ref<GameObject> sscRoot;
+
 		// A void station's generator (US-T84): a metal Dyson sphere (see VoidStationModel). The root's own renderer draws
 		// the far shell; the near shell, the dark core, the accretion ring and the two gimbal rings are its children.
 		bool voidStation = false;

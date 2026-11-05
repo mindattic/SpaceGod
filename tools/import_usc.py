@@ -22,15 +22,25 @@ import os
 
 import unreal
 
-ROOT = "/Game/ThirdParty/USC"
+# US-T143: the same import serves Ebal Studios' Space Station Creator with USC_PACK=ssc (tools/import-ssc.ps1): its own
+# folder (/Game/ThirdParty/SSC), names (SM_SSC_*, T_SSC_*, MI_SSC_*) and material (M_SSCStation, the same shading).
+SSC = os.environ.get("USC_PACK", "usc").lower() == "ssc"
+TAG = "SSC" if SSC else "USC"
+ROOT = f"/Game/ThirdParty/{TAG}"
 MESHES = ROOT + "/Meshes"
 TEXTURES = ROOT + "/Textures"
 MATERIALS = ROOT + "/Materials"
-GAME_MATERIAL = "M_USCShip"
+GAME_MATERIAL = "M_SSCStation" if SSC else "M_USCShip"
 MPC = "/SpaceGodRender/Materials/MPC_SpaceGod"
 
 # Atlas -> family folder. Galactic Leopard and Void Whale paint their hull (Main) and fittings (Parts) from two atlases.
+# The station pack keeps every set's textures under Textures/<atlas>.
 ATLASES = {
+    "Bridge": "Textures/Bridge",
+    "Cylinderical": "Textures/Cylinderical",
+    "Hangars": "Textures/Hangars",
+    "Storage": "Textures/Storage",
+} if SSC else {
     "GalacticLeopard_Main": "GalacticLeopard",
     "GalacticLeopard_Parts": "GalacticLeopard",
     "VoidWhale_Main": "VoidWhale",
@@ -40,7 +50,8 @@ ATLASES = {
     "HyperFalcon": "HyperFalcon",
     "ForceBadger": "ForceBadger",
 }
-COLOURS = ["Grey", "Red", "Blue", "Green", "Purple", "White", "Black"]
+COLOURS = ["Grey", "Red", "Blue", "Green", "Purple", "White", "Brown", "Silver"] if SSC else \
+    ["Grey", "Red", "Blue", "Green", "Purple", "White", "Black"]
 # Each map and the file stems that hold it (the sets name them differently).
 MAPS = {
     "Normal": ["Normal"],
@@ -57,12 +68,12 @@ failures = []
 
 
 def _log(msg):
-    unreal.log(f"USC: {msg}")
+    unreal.log(f"{TAG}: {msg}")
 
 
 def _fail(msg):
     failures.append(msg)
-    unreal.log_error(f"USC: {msg}")
+    unreal.log_error(f"{TAG}: {msg}")
 
 
 # ---------------------------------------------------------------- textures
@@ -70,7 +81,7 @@ def _fail(msg):
 def _index(src, family):
     """{lower-case file stem: path} of a set's textures (Masks and Bonus folders left out)."""
     found = {}
-    for dirpath, _, names in os.walk(os.path.join(src, family, "Textures")):
+    for dirpath, _, names in os.walk(os.path.join(src, family) if SSC else os.path.join(src, family, "Textures")):
         if any(part in ("Masks", "Bonus") for part in dirpath.replace("\\", "/").split("/")):
             continue
         for n in names:
@@ -111,7 +122,7 @@ def import_textures(atlases):
     tasks, wanted = [], []
     for atlas, maps in atlases.items():
         for key, path in maps.items():
-            name = f"T_USC_{atlas}_{key}"
+            name = f"T_{TAG}_{atlas}_{key}"
             task = unreal.AssetImportTask()
             task.set_editor_property("filename", path)
             task.set_editor_property("destination_path", TEXTURES)
@@ -146,7 +157,7 @@ def import_textures(atlases):
 
 
 def _tex(atlas, key):
-    return unreal.load_asset(f"{TEXTURES}/T_USC_{atlas}_{key}")
+    return unreal.load_asset(f"{TEXTURES}/T_{TAG}_{atlas}_{key}")
 
 
 # ---------------------------------------------------------------- the in-game material
@@ -308,7 +319,7 @@ def build_instances(parent, atlases):
         for colour in COLOURS:
             if colour not in maps:
                 continue
-            name = f"MI_USC_{atlas}_{colour}"
+            name = f"MI_{TAG}_{atlas}_{colour}"
             path = f"{MATERIALS}/{name}"
             mi = unreal.load_asset(path) if eal.does_asset_exist(path) else None
             if mi is None:
@@ -381,7 +392,13 @@ def _task(path, name):
 def atlas_of(mesh_name):
     """SM_USC_GalacticLeopard31_Main_Bow -> GalacticLeopard_Main; SM_USC_HyperFalcon07_Hull_Whole -> HyperFalcon;
     SM_USC_Mod_VoidWhaleTurretBase -> VoidWhale_Parts."""
-    rest = mesh_name[len("SM_USC_"):]
+    rest = mesh_name[len(f"SM_{TAG}_"):]
+    if SSC:
+        # SM_SSC_Combined20_Bridge_Whole -> Bridge; SM_SSC_Storage01_Hull_Whole -> Storage; SM_SSC_Mod_HangarsBeam -> Hangars.
+        if rest.startswith("Mod_"):
+            return next(a for a in ATLASES if rest[4:].startswith(a))
+        model, atlas = rest.split("_")[0], rest.split("_")[1]
+        return model.rstrip("0123456789") if atlas == "Hull" else atlas
     if rest.startswith("Mod_"):
         family = next(f for f in ("GalacticLeopard", "VoidWhale") if rest[4:].startswith(f))
         return f"{family}_Parts"
@@ -411,7 +428,7 @@ def import_meshes(pieces):
     keep = {os.path.splitext(f)[0] for f in files}
     for stale in eal.list_assets(MESHES, recursive=False):
         short = stale.split("/")[-1].split(".")[0]
-        if short.startswith("SM_USC_") and short not in keep:
+        if short.startswith(f"SM_{TAG}_") and short not in keep:
             eal.delete_asset(stale.split(".")[0])
             _log(f"removed {short} (no longer cut)")
     tasks =[_task(os.path.join(pieces, f), os.path.splitext(f)[0]) for f in files]
@@ -425,7 +442,7 @@ def import_meshes(pieces):
             _fail(f"mesh import failed: {f}")
             continue
         atlas = atlas_of(name)
-        mi = unreal.load_asset(f"{MATERIALS}/MI_USC_{atlas}_Grey")
+        mi = unreal.load_asset(f"{MATERIALS}/MI_{TAG}_{atlas}_Grey")
         if mi is not None:
             for slot in range(len(mesh.get_editor_property("static_materials"))):
                 mesh.set_material(slot, mi)
@@ -453,7 +470,7 @@ def main():
     textures = import_textures(atlases)
     instances = 0
     try:
-        parent = build_game_material("GalacticLeopard_Main")
+        parent = build_game_material("Storage" if SSC else "GalacticLeopard_Main")
         instances = build_instances(parent, atlases)
     except Exception as error:  # the summary names it; the meshes still import
         _fail(f"{GAME_MATERIAL}: {error}")
@@ -461,7 +478,7 @@ def main():
     eal.save_directory(ROOT, only_if_is_dirty=True, recursive=True)
     _log(f"SUMMARY meshes={len(meshes)} textures={textures} instances={instances} failures={len(failures)}")
     for f in failures:
-        unreal.log_error(f"USC: FAILURE {f}")
+        unreal.log_error(f"{TAG}: FAILURE {f}")
 
 
 main()

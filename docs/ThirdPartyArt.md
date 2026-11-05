@@ -135,3 +135,33 @@ Mechlab (US-T89) would choose another hull or gun.
 The order is USC, then Star Sparrow, then procedural: without USC (or with `-NoUSC`) the Star Sparrow kit draws them,
 without that too (or headless) the procedural hulls. `-SpaceGodShipLineup=<dir>` adds a `usc-models` sheet of every
 model the classes use.
+
+## Space Station Creator Remastered (Ebal Studios, US-T143)
+
+- **Source:** Ebal Studios' "Space Station Creator Remastered", bought by the owner; the import uses its FBX
+  download, `spacestationscreator_fbx.zip` (300 MB): four sets (Bridge, Cylinderical, Hangars, Storage) of 20 stations
+  each with a `<Set>Modules.fbx`, 30 `Combined` stations mixing all four, and `Textures/<Set>/` (Red, Green, Blue,
+  Purple, Grey, White, Brown, Silver, normal, metallic, roughness or glossiness, emission, masks). The store licence
+  applies: no redistribution.
+- **Re-import:** `tools/import-ssc.ps1 -Zip <path>\spacestationscreator_fbx.zip` (default
+  `%USERPROFILE%\Downloads\spacestationscreator_fbx.zip`). The same pipeline as USC: the zip into
+  `Cpp/SourceArt/ThirdParty/SSC/`, `tools/usc_prepare.py ... ssc` in Blender (the stations in `SSC_MODELS`, whole,
+  centred, a piece per atlas; the Hangars girders and hangars as modules), then `tools/import_usc.py` with
+  `USC_PACK=ssc` into `/Game/ThirdParty/SSC` (`SM_SSC_*`, `T_SSC_*`, `M_SSCStation`, `MI_SSC_<Atlas>_<Colour>`).
+- **Drawn** (`Cpp/Source/SpaceGod/Rendering/SscKit.cpp`), ahead of the procedural models:
+  - orbital structures (`Views/StructureViews.cpp`): factories on the Storage complexes (by industry), depots on the
+    tank farm, habitats on the wheel and gateways on the gyroscope ring (both turning about +Z as before); shipyards
+    keep their slip and the ISS and Tiangong their real shapes;
+  - free-flying stations (Rigil Gate, Toliman Forge, Blackhollow: `BodyKind::Station`): one of the big `Combined`
+    complexes, by name (`Views/BodyView.cpp`);
+  - Void Stations: the generator's core, accretion ring and gimbals inside the pack's sunburst frame, docks at its
+    spokes' ends and frames over the poles, in place of the procedural shell;
+  - the megastructure archetype (US-T130's void site): tower blocks stacked into a city at its heart and long girder
+    spars out to its edge with docks and hangars along them, laid out from its name;
+  - derelict stations (US-T131): `SscKit::Derelict(parent, seed, size, into)` draws one of the big complexes darkened
+    and lightless with a module torn off and tumbling beside it, and `SscKit::Station(..., Condition::Derelict)` any
+    station so; the void-content work places them (GraveyardView), this only draws them.
+
+  A station is painted in one of the pack's colours (a navy's nearest hue, civilians White, pirates Brown, unowned
+  Grey) with a light wash of its owner's colour. Without the pack, headless, or with `-NoSSC`, every station is
+  procedural as before. The lineup adds `ssc-stations` and `ssc-archetypes` sheets.
