@@ -49,7 +49,67 @@ public:
 	/// <summary>Shift+P (US-T135): out on the plating as the next EVA repair worker of the hull held (or flown, or selected).</summary>
 	void CycleWorker();
 
+	// ---------------------------------------------------------------- US-T136: other players' units, co-op or PvP
+
+	/// <summary>How two players stand, from the units they hold now: the same side of one fight (or one faction) is an ally,
+	/// the other side of a fight (or a faction at war with theirs) hostile; nothing held on either side is no stance.</summary>
+	enum class PlayerStance { None, Ally, Neutral, Hostile };
+
+	/// <summary>A hull another player embodies, as this machine draws its shine (US-T136).</summary>
+	struct ShiningUnit
+	{
+		Core::PlayerId Player = Core::PlayerId::None();
+		/// <summary>The hull drawn: a seat's host ship (a gun, a worker), a launched craft or station as its battle unit.</summary>
+		Target What;
+		/// <summary>Its hull centre and half length in scene units, and its nose as a scene direction.</summary>
+		Core::DVec3 Centre, Forward;
+		double Radius = 0;
+		/// <summary>Running dark: silent running (US-T93's F3) or its reactor down (Shift+F3), dark or restarting.</summary>
+		bool Dark = false;
+		/// <summary>Within visual range of this machine's eye (<see cref="VisualRangeKm"/>), from the unit it holds, else its camera.</summary>
+		bool InVisualRange = true;
+		/// <summary>A test holder from sg.Shine (no session seat behind it).</summary>
+		bool Fake = false;
+		/// <summary>Whether it shines here: a lit hull always; a dark one only inside visual range.</summary>
+		bool Shows() const { return !Dark || InVisualRange; }
+	};
+
+	/// <summary>This machine's player.</summary>
+	Core::PlayerId LocalPlayerId() const;
+
+	/// <summary>Every hull a player other than this machine's embodies now, each once (US-T136), and the sg.Shine test holders;
+	/// presentation only, read from the session's held seats and the helm, identical on every peer.</summary>
+	cs::List<ShiningUnit> ShiningNow();
+
+	/// <summary>How <paramref name="a"/> and <paramref name="b"/> stand, by the units they hold now (US-T136).</summary>
+	PlayerStance StanceBetween(Core::PlayerId a, Core::PlayerId b);
+
+	/// <summary>The hull <paramref name="p"/> holds as this machine sees it (a ShiningNow entry); false when none, or this machine's own.</summary>
+	bool ShiningOf(Core::PlayerId p, ShiningUnit& out);
+
+	/// <summary>
+	/// How far the naked eye makes out a hull <paramref name="lengthKm"/> long (US-T136): the range at which it spans one
+	/// arcminute, the eye's resolution, about 3,400 lengths (a 15 m fighter 52 km, a 1 km capital 3,400 km). Measured in the
+	/// scale's ship km (scene units over BattleKmScale), so it reads alike at realistic and game scale.
+	/// </summary>
+	static double VisualRangeKm(double lengthKm);
+
+	/// <summary>A test holder (sg.Shine fake): this hull shines as if <see cref="Seat"/>'s player held it, optionally dark.</summary>
+	struct FakeHolder
+	{
+		int Seat = 1;
+		Target What;
+		bool Dark = false;
+	};
+	cs::List<FakeHolder> FakeHolders;
+
+	/// <summary>The other players' units shining (US-T136); null before a system is shown.</summary>
+	cs::Ref<Views::EmbodiedShine> embodiedShine;
+
 private:
+	/// <summary>Where this machine's eye is for visual range (US-T136): the hull it holds or flies, else its camera.</summary>
+	Core::DVec3 ObserverScene();
+
 	/// <summary>The one embody gate as the player meets it: true to go on, else toasts its reason.</summary>
 	bool PassesEmbodyGate(const cs::Ref<Core::IEmbodiable>& next);
 

@@ -348,6 +348,18 @@ namespace SpaceGod::Core
 				  "step through the rest; / mans the next gun; Shift+P puts you out on the hull as one of its EVA repair workers. "
 				  "P again lets go to the free SpaceGod view. What you do while embodied is that unit's doing: its faction and "
 				  "its crew keep the credit and the blame after you leave."),
+				T("Other players: allies or rivals",
+				  "In co-op every player embodies what they like, and nothing says you must fly together: the side of a fight "
+				  "a unit is on decides who it shoots, players or not, so two players on opposite sides fight each other's "
+				  "hulls, every shot resolved the same on every machine. A hull another player embodies catches the eye: a rim "
+				  "glow in their seat colour (P1 amber, P2 cyan, P3 rose, P4 lime), a slow glint of light sweeping its plating "
+				  "and now and then a star-like flare; far off, when the hull is a few pixels, a twinkling glint the same size "
+				  "on any screen. Your own does not shine for you. A hull running dark (silent running, or its reactor down) "
+				  "shines only inside visual range, the distance at which the eye makes out the hull at all (about 3,400 of "
+				  "its own lengths). The co-op roster shows each player in their colour and how they stand to you by the units "
+				  "you both hold (ally, neutral, hostile); a rival's selection stays theirs, and a rival running dark out of "
+				  "sight has no marker. The console command sg.Shine fakes another player on the hull selected or nearest, "
+				  "to see it alone (sg.Shine dark, sg.Shine clear)."),
 				T("The Bio Mass",
 				  "A space-dwelling lifeform and an infection: pulsing globules of flesh, bone, tissue, mouths and hair that "
 				  "seep into every system from the dark, drift, swell and creep toward the jump gates to spread. Everything "

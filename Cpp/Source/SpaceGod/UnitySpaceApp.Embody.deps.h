@@ -13,3 +13,8 @@ namespace SpaceGod::Core
 	class BattleUnit;
 	class Ship;
 }
+
+namespace SpaceGod::Views
+{
+	class EmbodiedShine; // US-T136
+}

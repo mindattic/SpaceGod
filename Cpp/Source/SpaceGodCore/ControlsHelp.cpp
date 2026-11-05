@@ -141,6 +141,7 @@ namespace SpaceGod::Core
 				More("in a fighter: mouse aims, W/S throttle (assist off: raw thrust), Alt flip, left mouse guns, right mouse torpedoes"),
 				More("at any seat the craft has the keys and mouse, the camera only follows it (the wheel zooms the chase); keys held through a switch wait to be let go"),
 				More("at every seat a role panel down the left lists that role's keys, greyed when they cannot be used now"),
+	
 				L("P", "hands the seat back to its AI and returns you to the free SpaceGod view")),
 
 			cs::New<HelpSection>("SCREENS AND PANELS",

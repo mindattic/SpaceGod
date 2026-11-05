@@ -36,6 +36,7 @@
 #include "Views/LineStrip.h"
 #include "Views/PodBeacons.h"
 #include "Views/BioMassView.h"
+#include "Views/EmbodiedShine.h" // US-T136
 #include "Views/SatelliteSwarm.h"
 #include "Views/ShipView.h"
 #include "Views/SkyView.h"
@@ -297,6 +298,7 @@ namespace SpaceGod
 		debrisFields = cs::New<Views::DebrisFields>(this, systemRoot);
 		podBeacons = cs::New<Views::PodBeacons>(this, systemRoot);
 		bioMassView = cs::New<Views::BioMassView>(this, systemRoot);
+		embodiedShine = cs::New<Views::EmbodiedShine>(this, systemRoot); // US-T136
 		discView = cs::New<Views::DiscView>(this, systemRoot);
 		graveyardView = cs::New<Views::GraveyardView>(this, systemRoot); // US-T131
 		spaceFeaturesView = cs::New<Views::SpaceFeaturesView>(this, systemRoot); // US-T130

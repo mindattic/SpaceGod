@@ -80,6 +80,7 @@
 #include "Views/LineStrip.h"
 #include "Views/PodBeacons.h"
 #include "Views/BioMassView.h"
+#include "Views/EmbodiedShine.h" // US-T136
 #include "Views/SatelliteSwarm.h"
 #include "Views/ShipView.h"
 #include "Views/StructureViews.h"
@@ -1345,6 +1346,7 @@ namespace SpaceGod
 		debrisFields->Update();
 		podBeacons->Update();
 		bioMassView->Update();
+		if (embodiedShine) embodiedShine->Update(); // US-T136: other players' units shine
 		Structures->Update(true);
 		swarm->Update(ShowSatellites);
 		UpdateOrbitLines(dt);

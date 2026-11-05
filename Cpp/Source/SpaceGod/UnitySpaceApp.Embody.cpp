@@ -3,7 +3,12 @@
 #include "UnitySpaceApp.h"
 
 #include "Camera/SpaceCamera.h"
+#include "Astro.h"
 #include "Combat/Battle.h"
+#include "Combat/Diplomacy.h" // US-T136
+#include "Fleet.h"
+#include "Sensors/SensorPosture.h" // US-T136
+#include "Sensors/Sensors.h"
 #include "Coop/CoopPeer.h"
 #include "Embodiment/Embodiables.h"
 #include "Embodiment/Embodiment.h"
@@ -160,6 +165,140 @@ namespace SpaceGod
 			return;
 		}
 		TakeSeat(Embodiables::Cycle(workers, HeldNonHelm(), 1));
+	}
+
+	// ---------------------------------------------------------------- US-T136: other players' units
+
+	PlayerId UnitySpaceApp::LocalPlayerId() const { return session->LocalPlayer(); }
+
+	double UnitySpaceApp::VisualRangeKm(double lengthKm)
+	{
+		// One arcminute: the range is the length over tan(1'), 3,437.7 lengths.
+		return cs::Math::Max(lengthKm, 0.005) / cs::Math::Tan(Astro::Deg2Rad / 60.0);
+	}
+
+	DVec3 UnitySpaceApp::ObserverScene()
+	{
+		auto held = HeldNonHelm();
+		if (held != nullptr)
+		{
+			auto t = SeatTarget(held);
+			if (!t.IsNone()) return FocusScene(t);
+		}
+		if (IsPiloting() && Piloted.Ship != nullptr) return FocusScene(Target::OfShip(Piloted.Ship));
+		return SpaceCamera->ScenePosition;
+	}
+
+	namespace
+	{
+		/// <summary>The hull's own ship and battle unit, whichever the target names.</summary>
+		void HullOf(const Target& t, cs::Ref<Ship>& ship, cs::Ref<Battle>& battle, cs::Ref<BattleUnit>& unit)
+		{
+			ship = t.IsShip() ? t.Ship : t.IsUnit() && t.Unit != nullptr ? t.Unit->Ship : nullptr;
+			battle = t.IsUnit() ? t.Battle : ship != nullptr ? ship->Battle : nullptr;
+			unit = t.IsUnit() ? t.Unit : battle != nullptr && ship != nullptr ? battle->UnitOf(ship) : nullptr;
+		}
+
+		/// <summary>US-T93's dark: silent running (or lying in wait), or the reactor down or restarting.</summary>
+		bool RunningDark(const Target& t)
+		{
+			cs::Ref<Ship> ship;
+			cs::Ref<Battle> battle;
+			cs::Ref<BattleUnit> unit;
+			HullOf(t, ship, battle, unit);
+			if (ship != nullptr && Signatures::Silent(ship)) return true;
+			auto combat = ship != nullptr ? ship->Combat : unit != nullptr ? unit->Combat : nullptr;
+			return SensorPosture::Offline(combat);
+		}
+	}
+
+	cs::List<UnitySpaceApp::ShiningUnit> UnitySpaceApp::ShiningNow()
+	{
+		cs::List<ShiningUnit> list;
+		if (World() == nullptr || !SystemVisible) return list;
+		PlayerId me = LocalPlayerId();
+		DVec3 eye = ObserverScene();
+		double perKm = cs::Math::Max(BattleKmScale(), 1e-30);
+		auto add = [&](PlayerId who, const Target& t, bool fakeDark, bool fake)
+		{
+			if (t.IsNone() || who.IsNone()) return;
+			if (t.IsShip())
+			{
+				if (t.Ship == nullptr || t.Ship->Destroyed || !Fleet()->IsPresent(t.Ship) || t.Ship->Controller()->Phase == ShipPhase::Landed) return;
+			}
+			else if (!t.IsUnit() || t.Unit == nullptr || t.Battle == nullptr || !t.Unit->Present()) return;
+			for (const auto& s : list)
+				if (s.What == t) return;
+			ShiningUnit s;
+			s.Player = who;
+			s.What = t;
+			s.Centre = FocusScene(t);
+			s.Radius = TargetRadius(t);
+			auto f = TargetRotation(t) * Vector3::forward();
+			s.Forward = DVec3(f.x, f.y, f.z);
+			s.Dark = fakeDark || RunningDark(t);
+			// The eye's distance in ship km against the hull's own visual range, both through the scale's ship mapping.
+			double km = (s.Centre - eye).Length() / perKm;
+			s.InVisualRange = km <= VisualRangeKm(s.Radius * 2 / perKm);
+			s.Fake = fake;
+			list.Add(s);
+		};
+		for (const auto& e : EmbodiedNow())
+		{
+			if (e.Player == me) continue; // your own embodied unit doesn't shine for you
+			add(e.Player, SeatTarget(e.Seat), false, false);
+		}
+		for (const auto& f : FakeHolders)
+			if (PlayerId(f.Seat) != me) add(PlayerId(f.Seat), f.What, f.Dark, true);
+		return list;
+	}
+
+	bool UnitySpaceApp::ShiningOf(PlayerId p, ShiningUnit& out)
+	{
+		for (const auto& s : ShiningNow())
+			if (s.Player == p)
+			{
+				out = s;
+				return true;
+			}
+		return false;
+	}
+
+	UnitySpaceApp::PlayerStance UnitySpaceApp::StanceBetween(PlayerId a, PlayerId b)
+	{
+		if (a.IsNone() || b.IsNone() || a == b || World() == nullptr) return PlayerStance::None;
+		// What each holds: a session seat or the helm, else (sg.Shine) a test holder.
+		auto heldBy = [this](PlayerId p, Target& t)
+		{
+			for (const auto& e : EmbodiedNow())
+				if (e.Player == p)
+				{
+					t = SeatTarget(e.Seat);
+					if (!t.IsNone()) return true;
+				}
+			for (const auto& f : FakeHolders)
+				if (PlayerId(f.Seat) == p)
+				{
+					t = f.What;
+					return true;
+				}
+			return false;
+		};
+		Target ta, tb;
+		if (!heldBy(a, ta) || !heldBy(b, tb)) return PlayerStance::None;
+		cs::Ref<Ship> sa, sb;
+		cs::Ref<Battle> ba, bb;
+		cs::Ref<BattleUnit> ua, ub;
+		HullOf(ta, sa, ba, ua);
+		HullOf(tb, sb, bb, ub);
+		// In one fight its sides decide, as they decide every shot (Battle.Hostile): the other side is fair game.
+		if (ba != nullptr && ba == bb && ua != nullptr && ub != nullptr) return ua->Side != ub->Side ? PlayerStance::Hostile : PlayerStance::Ally;
+		auto fa = ua != nullptr ? ua->Faction : sa != nullptr ? sa->Faction : nullptr;
+		auto fb = ub != nullptr ? ub->Faction : sb != nullptr ? sb->Faction : nullptr;
+		if (fa == nullptr || fb == nullptr) return PlayerStance::Neutral;
+		if (fa == fb) return PlayerStance::Ally;
+		auto diplomacy = World()->Diplomacy();
+		return diplomacy != nullptr && diplomacy->Hostile(fa, fb) ? PlayerStance::Hostile : PlayerStance::Neutral;
 	}
 
 	// ---------------------------------------------------------------- the camera rig

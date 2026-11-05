@@ -35,6 +35,7 @@
 #include "Embodiment/FighterSeat.h"
 #include "Embodiment/MountedTurret.h"
 #include "Embodiment/RepairWorker.h" // US-T135
+#include "Views/EmbodiedShine.h" // US-T136: seat colours
 #include "Embodiment/StationSeat.h"
 #include "Fleet.h"
 #include "Persistence/SaveGame.h"
@@ -797,14 +798,25 @@ namespace SpaceGod
 		{
 			if (p == nullptr || p->Left) continue;
 			auto seat = session->State()->SeatOf(PlayerId(p->Seat));
-			cs::String sel = CoopTargetName(p->Selection);
+			bool mine = p->Seat == peer->LocalSeat();
+			// US-T136: players need not be allies. Each in their own seat colour (the colour their unit shines in), with how
+			// they stand to you by the units you both hold; a rival's selection is their own business, and a rival running
+			// dark beyond visual range is off your screen: no seat named, no marker.
+			auto stance = mine ? PlayerStance::None : StanceBetween(LocalPlayerId(), PlayerId(p->Seat));
+			bool rival = stance == PlayerStance::Hostile || stance == PlayerStance::Neutral;
+			ShiningUnit unit;
+			bool hidden = rival && ShiningOf(PlayerId(p->Seat), unit) && !unit.Shows();
+			cs::String sel = rival ? cs::String() : CoopTargetName(p->Selection);
 			bool helm = p->Seat == coopHelmSeat && !Piloted.IsNone(); // US-T43: the party's one helm
-			cs::String line = cs::Cat("P", p->Seat + 1, "  ", p->Name, p->Seat == 0 ? " (host)" : "", p->Seat == peer->LocalSeat() ? " (you)" : "",
-				"  \xC2\xB7  ", helm ? cs::Cat("at the helm of ", Piloted.Ship->Name) : seat != nullptr ? seat->Name() : cs::String("in command"),
+			cs::String tag = stance == PlayerStance::Hostile ? "  [HOSTILE]" : stance == PlayerStance::Ally ? "  [ALLY]" : stance == PlayerStance::Neutral ? "  [NEUTRAL]" : "";
+			cs::String line = cs::Cat("P", p->Seat + 1, "  ", p->Name, p->Seat == 0 ? " (host)" : "", mine ? " (you)" : "", tag,
+				"  \xC2\xB7  ", hidden ? cs::String("running dark") : helm ? cs::Cat("at the helm of ", Piloted.Ship->Name) : seat != nullptr ? seat->Name() : cs::String("in command"),
 				!sel.empty() ? cs::Cat("  \xC2\xB7  ", sel) : cs::String());
+			auto seatColor = Views::EmbodiedShine::SeatColor(p->Seat);
+			GUI::color = Color(seatColor.r, seatColor.g, seatColor.b, 1.0f);
 			GUI::Label(Rect(x, y, 334, 20), line);
 			y += 18;
-			if (p->Seat == peer->LocalSeat() || p->Body < 0 || p->Body >= Catalog()->Count() || !SystemVisible) continue;
+			if (mine || hidden || p->Body < 0 || p->Body >= Catalog()->Count() || !SystemVisible) continue;
 			DVec3 scene = BodyScene(p->Body) + Scale()->LocalOffset((*Catalog())[p->Body], p->OffsetKm);
 			Vector2 g;
 			float depth;
