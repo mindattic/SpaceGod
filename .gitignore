@@ -32,3 +32,9 @@ Capture/**/bin/
 Capture/**/obj/
 Vendor/**/bin/
 Vendor/**/obj/
+
+# US-T171: the Prose Universe Interchange files are rebuilt from Core and a seed (tools/universe-export.ps1, tools/prose-sync.ps1;
+# docs/PROSE.md). The schema copy and the reviewed proposals under Data/Lore are committed; the outbox journal is not.
+Data/Prose/*.json
+!Data/Prose/universe.schema.json
+Data/Lore/.outbox/

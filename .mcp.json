@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "prose": {
+      "command": "dotnet",
+      "args": ["run", "--project", "../Prose/src/Prose.Mcp/Prose.Mcp.csproj", "--no-build", "--configuration", "Release", "--no-launch-profile"],
+      "env": { "PROSE_UNIVERSE": "spacegod" }
+    }
+  }
+}
