@@ -166,6 +166,17 @@ namespace SpaceGod::Cameras
 		Core::DVec3 travelEndDirection;
 		double travelEndZoom = 0;
 		float travelT = 0;
+		/// <summary>How long this glide takes: <see cref="TravelSeconds"/>, or <see cref="QuickTravelSeconds"/> once hurried.</summary>
+		float travelSeconds = TravelSeconds;
+
+	public:
+		/// <summary>US-T90: a glide from one seat to the next mid-fight, short so a switch reads as instant.</summary>
+		static constexpr float QuickTravelSeconds = 0.3f;
+
+		/// <summary>US-T90: the glide under way (a seat switched to another) finishes in <see cref="QuickTravelSeconds"/>.</summary>
+		void Hurry() { travelSeconds = QuickTravelSeconds; }
+
+	private:
 
 		// The rotation the view had before levelling, relative to where it is now, eased away.
 		Quaternion levelOffset = Quaternion::identity();

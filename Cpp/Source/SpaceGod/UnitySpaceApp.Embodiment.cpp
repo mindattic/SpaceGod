@@ -12,6 +12,7 @@
 #include "Embodiment/FighterSeat.h"
 #include "Embodiment/MountedTurret.h"
 #include "Embodiment/ShipHelm.h"
+#include "Embodiment/StationSeat.h"
 #include "Fleet.h"
 #include "Infrastructure/Infrastructure.h"
 #include "Session/Commands.h"
@@ -57,6 +58,30 @@ namespace SpaceGod
 		return host != nullptr && EmbodiableEquals(HeldNonHelm(), host);
 	}
 
+	void UnitySpaceApp::ArbitrateInput(bool frameStart)
+	{
+		bool craft = AtControls();
+		if (frameStart)
+		{
+			if (craft != craftHasInput) inputHandover = true; // changed outside the frame's commands (a seat lost, a load)
+			craftHasInput = craft;
+			Input.Arbitrate(craft);
+			if (inputHandover)
+			{
+				// Let go of everything held across the change: from the next frame on, the hands are the new owner's.
+				bool idle = Input.HandsIdle();
+				Input.HoldHandsOff();
+				if (idle) inputHandover = false;
+			}
+			return;
+		}
+		if (craft == craftHasInput) return;
+		// Taken or let go by this frame's own keys: what was pressed has been spent on that.
+		craftHasInput = craft;
+		Input.Handover();
+		inputHandover = true;
+	}
+
 	bool UnitySpaceApp::IsSeated() const { return HeldNonHelm() != nullptr; }
 
 	cs::Ref<IEmbodiable> UnitySpaceApp::Seat() const { return HeldNonHelm(); }
@@ -78,6 +103,8 @@ namespace SpaceGod
 			ShowToast(cs::Cat("Can't take ", next->Name(), ": ", next->Blocker()));
 			return;
 		}
+		// US-T90: from one seat straight into the next (mid-fight, say), the view gets there in a blink, not a glide.
+		bool switching = AtControls();
 		RememberCommand();
 		if (auto helm = cs::As<ShipHelm>(next))
 		{
@@ -85,6 +112,7 @@ namespace SpaceGod
 			if (IsPiloting() && Piloted.Ship == helm->Ship) return;
 			if (IsPiloting()) ExitPiloting();
 			EnterPiloting(Target::OfShip(helm->Ship));
+			if (switching) SpaceCamera->Hurry();
 			return;
 		}
 		if (IsPiloting()) ExitPiloting();
@@ -99,6 +127,7 @@ namespace SpaceGod
 		seatAim = ToVector(pose.Forward.SwapYZ()).normalized();
 		Clock->SetWarp(0);
 		SpaceCamera->EnterPilotChase(SeatTarget(next), cs::Is<FighterSeat>(next) ? 7 : 2.5);
+		if (switching) SpaceCamera->Hurry();
 		// A gun is laid from the mount itself (U.SPC-T445): the eye glides in to sit on it, looking down the barrel.
 		if (auto gun = cs::As<MountedTurret>(next))
 		{
@@ -110,6 +139,7 @@ namespace SpaceGod
 
 	cs::String UnitySpaceApp::SeatKeys(const cs::Ref<IEmbodiable>& s)
 	{
+		if (cs::Is<StationSeat>(s)) return cs::String("  (mouse lays its guns, left mouse fires, / man one of its guns, ' ; next seat in the fight, P back to command)");
 		return cs::Is<FighterSeat>(s)
 			? cs::String("  (mouse aims, W/S throttle, A/D Q/E strafe, Z/X roll, Shift boost (with A/D Q/E a lateral boost), F flight assist (off: W/S raw thrust), Alt flip for a turn and burn, left mouse guns, right mouse "
 				"weapon group, 1 next group, T lock, 6 next weak point, Ctrl flares, 2 attack my target, 3 cover me, 4 form up, "
@@ -155,14 +185,36 @@ namespace SpaceGod
 			return;
 		}
 		SpaceCamera->PilotEye = nullptr;
-		ShowToast(cs::Cat("Holding ", host->Name(), ", ", Clock->Warp().Label, "  (mouse lays its guns, left mouse fires, P back to command)"));
+		ShowToast(cs::Cat("Holding ", host->Name(), ", ", Clock->Warp().Label, "  (mouse lays its guns, left mouse fires, / man one of its guns, P back to command)"));
 	}
 
 	Target UnitySpaceApp::SeatTarget(const cs::Ref<IEmbodiable>& s)
 	{
 		if (auto f = cs::As<FighterSeat>(s)) return Target::OfUnit(f->Battle, f->Unit);
 		if (auto t = cs::As<MountedTurret>(s)) return t->Unit->Ship != nullptr ? Target::OfShip(t->Unit->Ship) : Target::OfUnit(t->Battle, t->Unit);
+		// US-T90: a station taken in a fight is followed as its unit there, as its guns' mount is; without this the
+		// camera stayed free (and swam on the keys flying it).
+		if (auto st = cs::As<StationSeat>(s))
+		{
+			cs::Ref<Battle> battle;
+			auto unit = st->Unit(battle);
+			if (unit != nullptr) return Target::OfUnit(battle, unit);
+		}
 		return Target::None();
+	}
+
+	cs::List<cs::Ref<IEmbodiable>> UnitySpaceApp::SeatsInFight(const cs::Ref<Battle>& battle)
+	{
+		auto seats = Embodiables::SeatsIn(World(), battle);
+		if (battle == nullptr || battle->Over) return seats;
+		// US-T90: the stations fighting there too (a defence platform, a gate fort), in the battle's own order after the
+		// hulls, so ' and ; reach a station and from it (/) every gun mounted on it.
+		for (const auto& u : battle->Units)
+		{
+			auto station = Embodiables::StationOf(World(), battle, u);
+			if (station != nullptr && station->CanEmbody() && EmbodiableIndexOf(seats, station) < 0) seats.Add(station);
+		}
+		return seats;
 	}
 
 	void UnitySpaceApp::ReturnToCommand(const cs::String& why, const cs::String& lostName)
@@ -193,6 +245,11 @@ namespace SpaceGod
 	{
 		if (auto f = cs::As<FighterSeat>(HeldNonHelm())) return f->Battle;
 		if (auto t = cs::As<MountedTurret>(HeldNonHelm())) return t->Battle;
+		if (auto st = cs::As<StationSeat>(HeldNonHelm()))
+		{
+			cs::Ref<Battle> fight;
+			if (st->Unit(fight) != nullptr) return fight;
+		}
 		if (IsPiloting() && Piloted.Ship && Piloted.Ship->Battle != nullptr) return Piloted.Ship->Battle;
 		if (Selected.IsShip() && Selected.Ship->Battle != nullptr) return Selected.Ship->Battle;
 		auto focus = SpaceCamera->FocusTarget;
@@ -217,13 +274,18 @@ namespace SpaceGod
 		if (auto h = cs::As<ShipHelm>(s)) return TargetScene(Target::OfShip(h->Ship));
 		if (auto f = cs::As<FighterSeat>(s)) return BattleScene(f->Battle, f->Unit->Pos);
 		if (auto t = cs::As<MountedTurret>(s)) return BattleScene(t->Battle, t->Unit->PointOf(t->Mount->Def));
+		if (auto st = cs::As<StationSeat>(s))
+		{
+			cs::Ref<Battle> fight;
+			if (auto u = st->Unit(fight)) return BattleScene(fight, u->Pos);
+		}
 		return SpaceCamera->ScenePosition;
 	}
 
 	void UnitySpaceApp::CycleSeat(int step)
 	{
 		auto battle = BattleInView();
-		auto seats = Embodiables::SeatsIn(World(), battle);
+		auto seats = SeatsInFight(battle); // US-T90: was Embodiables::SeatsIn, which leaves the stations out
 		if (seats.Count() == 0)
 		{
 			ShowToast(battle == nullptr ? cs::String("No battles under way: nothing to take charge of") : cs::Cat("Nobody left to fly in ", battle->Name));
@@ -263,6 +325,9 @@ namespace SpaceGod
 			unit = held->Unit;
 			battle = held->Battle;
 		}
+		// US-T90: at a station's controls, / mans its own guns (it fell through to the selection before, so a station
+		// taken whole could not get back down to a gun).
+		else if (auto station = cs::As<StationSeat>(HeldNonHelm())) unit = station->Unit(battle);
 		else if (IsPiloting() && Piloted.Ship && Piloted.Ship->Battle != nullptr)
 		{
 			battle = Piloted.Ship->Battle;
@@ -341,6 +406,9 @@ namespace SpaceGod
 			}
 		}
 		pickerSeats = Embodiables::Pickable(World(), battle, onUnit, onShip, ShipsNearCamera(PickerNearbyShips));
+		// US-T90: and the stations in the fight in view, which ' and ; reach too.
+		for (const auto& s : SeatsInFight(battle))
+			if (EmbodiableIndexOf(pickerSeats, s) < 0) pickerSeats.Add(s);
 		return pickerSeats;
 	}
 
@@ -504,6 +572,8 @@ namespace SpaceGod
 		if (auto t = cs::As<MountedTurret>(held))
 			return cs::Cat("GUN  \xC2\xB7  ", t->Name(), "  \xC2\xB7  ", (t->Mount->Cooldown > 0 ? "reloading" : "ready"), "  \xC2\xB7  / next gun   ",
 				(cs::Is<ShipHelm>(t->Host()) ? "Backspace helm   " : t->Host() != nullptr ? "Backspace whole station   " : ""), "P back to command");
+		if (auto st = cs::As<StationSeat>(held))
+			return cs::Cat("STATION  \xC2\xB7  ", st->Name(), "  \xC2\xB7  / man a gun   ' ; next seat   P back to command"); // US-T90
 		return cs::String();
 	}
 }

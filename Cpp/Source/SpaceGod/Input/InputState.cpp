@@ -149,6 +149,47 @@ namespace SpaceGod::Input
 		RightClicked = false;
 	}
 
+	void InputState::Arbitrate(bool atControls)
+	{
+		if (atControls)
+		{
+			// The craft has F (flight assist), T (lock), Backspace (up to the host), B (boarding), X (roll), the number
+			// keys; the command view's meanings of them stand aside.
+			Focus = ResetTime = Home = WatchBattle = ToggleNews = CycleShips = CycleBackward = false;
+			return;
+		}
+		// In command nothing is flown: F focuses, T resets time, Backspace goes home, B watches a battle.
+		ToggleFlightAssist = LockTarget = MoveToHost = ToggleBoarding = Manoeuvre = false;
+		ThrottleStep = 0;
+		Roll = 0;
+	}
+
+	bool InputState::HandsIdle() const
+	{
+		return Move.sqrMagnitude() < 0.0001f && Roll == 0 && !Fire && !FireEmp && !LookHeld && !Boost && !Manoeuvre && !Cruise;
+	}
+
+	void InputState::HoldHandsOff()
+	{
+		Move = Vector3::zero();
+		Roll = 0;
+		ThrottleStep = 0;
+		Fire = FireEmp = Boost = Slow = Manoeuvre = Cruise = false;
+		LookHeld = false;
+		LookDelta = Vector2::zero();
+		SelectClicked = SelectDoubleClicked = RightClicked = false;
+	}
+
+	InputState InputState::ForChaseCamera() const
+	{
+		InputState chase = *this;
+		chase.Move = Vector3::zero();
+		chase.LookHeld = false;
+		chase.LookDelta = Vector2::zero();
+		chase.Boost = chase.Slow = false;
+		return chase;
+	}
+
 	void InputState::Reset()
 	{
 		Move = Vector3::zero();

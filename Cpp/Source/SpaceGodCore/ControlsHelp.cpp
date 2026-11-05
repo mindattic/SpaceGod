@@ -105,11 +105,12 @@ namespace SpaceGod::Core
 
 			cs::New<HelpSection>("FLEET AND COMMAND",
 				L("F10", "your fleet: buy hulls, warehouses, station shares and claims; hire captains and give them standing orders"),
-				L("'  ;", "take charge, any time: jump into the next seat in the fight in view (a ship's helm, a fighter or bomber)"),
-				L("/", "man the next gun on the hull (or on a station's defence platform, selected): the view sits on the mount, down the barrel"),
+				L("'  ;", "take charge, any time: jump into the next seat in the fight in view (a ship's helm, a fighter or bomber, a station), straight from the one you hold"),
+				L("/", "man the next gun on the hull or station you hold (or have selected): the view sits on the mount, down the barrel; past the last gun, back to the helm or station"),
 				L("Backspace", "at a gun: up to the helm of the hull it is on (or the whole station)"),
-				L("F9", "take-charge picker: every seat on the hull in hand and around the camera (helms, fighters, gun mounts), click one to jump in"),
+				L("F9", "take-charge picker: every seat on the hull in hand and around the camera (helms, fighters, stations, gun mounts), click one to jump in"),
 				More("in a fighter: mouse aims, W/S throttle (assist off: raw thrust), Alt flip, left mouse guns, right mouse torpedoes"),
+				More("at any seat the craft has the keys and mouse, the camera only follows it (the wheel zooms the chase); keys held through a switch wait to be let go"),
 				L("P", "hands the seat back to its AI and returns you to command")),
 
 			cs::New<HelpSection>("SCREENS AND PANELS",

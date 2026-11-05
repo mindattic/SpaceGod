@@ -44,6 +44,22 @@ private:
 
 	Target commandFocus = Target::None();
 
+	/// <summary>US-T90: whether the embodied craft (true) or the command view and its camera (false) owned this frame's
+	/// input, decided once as the frame starts (<see cref="ArbitrateInput"/>).</summary>
+	bool craftHasInput = false;
+
+	/// <summary>US-T90: the owner changed and the player's hands have not yet let go of what they held across it.</summary>
+	bool inputHandover = false;
+
+	/// <summary>
+	/// US-T90, one owner per input per frame: <paramref name="frameStart"/>, decides who owns this frame (the craft held,
+	/// else the command view) and strips the shared keys of the other's meanings; after the frame's commands, notices a
+	/// seat taken or let go part-way through the frame and gives the new owner an idle frame. Whatever was held across a
+	/// change (the stick, a trigger, the look) stays the old owner's until it is let go, so leaving a helm with W down does
+	/// not swim the camera out of the focus it went back to, and taking a seat mid-burn does not open the throttle.
+	/// </summary>
+	void ArbitrateInput(bool frameStart);
+
 public:
 	/// <summary>True while a non-helm seat (a fighter, a gun) is held.</summary>
 	bool IsSeated() const;
@@ -103,6 +119,10 @@ private:
 	/// <summary>The fight the strategy view is on: the seat's, the flown hull's, the selection's or the followed ship's,
 	/// else the battle nearest the camera.</summary>
 	cs::Ref<Core::Battle> BattleInView();
+
+	/// <summary>US-T90: every seat in <paramref name="battle"/> the player could take right now: <see cref="Embodiables.SeatsIn"/>
+	/// (each helm and cockpit) and then each station fighting there, whose guns / reaches from it.</summary>
+	cs::List<cs::Ref<Core::IEmbodiable>> SeatsInFight(const cs::Ref<Core::Battle>& battle);
 
 	/// <summary>Where a seat is in the scene.</summary>
 	Core::DVec3 SeatScene(const cs::Ref<Core::IEmbodiable>& s);

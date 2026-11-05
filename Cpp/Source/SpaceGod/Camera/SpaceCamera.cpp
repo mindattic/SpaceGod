@@ -152,6 +152,7 @@ namespace SpaceGod::Cameras
 		travelEndDirection = DVec3(endWorld.x, endWorld.y, endWorld.z);
 		travelEndZoom = framing;
 		travelT = 0;
+		travelSeconds = TravelSeconds;
 
 		// The orbit angles that reproduce endDir: offset = Euler(pitch, yaw) * back, in the level frame.
 		auto look = -endLocal;
@@ -303,7 +304,7 @@ namespace SpaceGod::Cameras
 
 	void SpaceCamera::UpdateTravel(float dt)
 	{
-		travelT = Mathf::Min(1.0f, travelT + dt / TravelSeconds);
+		travelT = Mathf::Min(1.0f, travelT + dt / travelSeconds);
 		float e = SmootherStep(travelT);
 
 		auto target = OrbitCentre(FocusTarget);

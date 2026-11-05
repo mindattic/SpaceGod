@@ -437,8 +437,10 @@ namespace SpaceGod
 			FreeCursorForMenu();
 			return;
 		}
+		ArbitrateInput(true); // US-T90: one owner per input this frame (the craft held, else the command view)
 		int screensOpen = OpenScreens();
 		HandleCommands();
+		ArbitrateInput(false); // US-T90: a seat taken or let go just now: the new owner starts on an idle frame
 		// A panel or screen opened while the screen is cleared (F11) brings the UI back, rather than opening unseen.
 		if (ScreenCleared && (OpenScreens() & ~screensOpen) != 0) ScreenCleared = false;
 		if (pauseMenu->IsOpen)
@@ -486,7 +488,8 @@ namespace SpaceGod
 		else
 		{
 			KeepReoriented();
-			SpaceCamera->Update(dt, Input);
+			// US-T90: at the controls the camera follows the craft and takes none of its keys (the wheel zooms the chase).
+			SpaceCamera->Update(dt, AtControls() ? Input.ForChaseCamera() : Input);
 		}
 		UpdateClipPlanes(dt);
 		UpdateStreaming(dt);

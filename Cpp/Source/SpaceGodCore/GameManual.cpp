@@ -355,13 +355,21 @@ namespace SpaceGod::Core
 				  "with escorts docked) drop out on a system's flank. Navies keep patrol wings, supply convoys, corvettes and "
 				  "gate pickets, and send groups to clear raiders off their gates."),
 				T("Taking a seat in a fight",
-				  "' jumps into the fight in view, ; and ' step through its seats, / mans a gun, P returns you to command with "
-				  "the view and warp you had."),
+				  "' jumps into the fight in view, ; and ' step through its seats (every helm, every fighter and bomber aloft, and "
+				  "every station fighting there), / mans a gun, P returns you to command with the view and warp you had. A switch "
+				  "from one seat to another is instant: the old one goes back to its crew, the new one is yours that frame, and "
+				  "the view is there in a blink. Each key has one owner at a time: at a seat the craft has the keys and the mouse "
+				  "(F is flight assist, T a lock, Backspace up to the helm) and the camera only follows it, the wheel zooming the "
+				  "chase; in command the same keys work the camera (F focus, T back to now, Backspace home). A key or button "
+				  "still held as you take or leave a seat is ignored until you let it go, so a burn held as you hand the helm back "
+				  "does not swim the camera off."),
 				T("Manning a gun",
 				  "/ mans the next gun on the hull you fly or have selected, or on a station's defence platform when the station "
 				  "is selected while its defences fight. The view sits on the mount, looking down the barrel: the mouse lays it "
 				  "(a heavy gun swings slowly, and only within its arc) and the left button fires it. / again steps to the next "
-				  "gun, Backspace moves up to the hull's helm, and P hands it back to its crew.")),
+				  "gun, Backspace moves up to the hull's helm (or the whole station), and P hands it back to its crew. Past the "
+				  "last gun / goes back to the helm or station, and / there starts on the first gun again, so every gun on a "
+				  "capital ship or a station is a few presses away for a better angle.")),
 
 			cs::New<ManualChapter>("The galaxy and travel", "Star systems, gates, lanes, FTL and the galaxy map", Keys(),
 				T("The systems",

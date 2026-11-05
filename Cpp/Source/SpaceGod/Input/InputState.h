@@ -201,6 +201,34 @@ namespace SpaceGod::Input
 		/// <summary>Drops this frame's right-button look (a full screen of its own has the mouse): no look, no right-click.</summary>
 		void ReleaseLook();
 
+		// ---------------------------------------------------------------- input ownership (US-T90)
+		//
+		// One owner per input per frame, by priority: the pause menu (it takes the frame before anything else reads it),
+		// then the open panels (the mouse, through ClickPanelOpen), then whatever the player is embodied in (a helm, a
+		// cockpit, a gun, a station), then the camera (free swim, focus orbit, travel). The owner is decided once, at the
+		// start of the frame; a key that means one thing at the controls and another in command (F flight assist / focus,
+		// T lock / reset time, Backspace up to the host / home, B boarding / watch a battle, X roll / news, Tab, the number
+		// keys) reaches only the owner's meaning.
+
+		/// <summary>Clears the meanings of the shared keys that do not belong to this frame's owner: the embodied craft's
+		/// when <paramref name="atControls"/>, the command view's otherwise.</summary>
+		void Arbitrate(bool atControls);
+
+		/// <summary>The owner changed part-way through this frame: what was pressed has been spent by the old owner, so
+		/// the new one gets an idle frame (every edge and every held key cleared).</summary>
+		void Handover() { Reset(); }
+
+		/// <summary>No stick, trigger or look held: what was held across an owner change has been let go.</summary>
+		bool HandsIdle() const;
+
+		/// <summary>Keys and buttons still held from before an owner change are not the new owner's until let go: the
+		/// stick, the triggers and the look read idle, and a click released now selects nothing.</summary>
+		void HoldHandsOff();
+
+		/// <summary>What the camera reads while it follows an embodied craft: the craft has the stick, the triggers and the
+		/// look, so only the wheel (the chase's zoom) is left to it.</summary>
+		InputState ForChaseCamera() const;
+
 	private:
 		void Reset();
 

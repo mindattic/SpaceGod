@@ -387,6 +387,71 @@ namespace SpaceGod::Smoke::FeatureAudit
 			CloseEverything();
 		}
 
+		// ---------------------------------------------------------------- input ownership (US-T90)
+
+		/// One owner per input per frame: at the helm the stick, the look and F are the craft's (the camera only follows
+		/// it), in command they are the camera's; and F pressed in the very frame P takes a helm is spent on the command
+		/// view's focus, not also on the new helm's flight assist.
+		void InputOwnershipProbes()
+		{
+			CloseEverything();
+			for (int i = 0; i < 3 && app->AtControls(); i++) { Tap(Key::P); frames(3); }
+			if (!SelectAShip()) { Result("input.camera-follows", false, "Tab found no ship to select"); return; }
+			auto ship = app->Selected.Ship;
+			Tap(Key::P);
+			if (!app->IsPiloting()) { Result("input.camera-follows", false, cs::Cat("P on ", ship->Name, ": not piloting")); return; }
+			Settle();
+			const auto& cam = app->SpaceCamera;
+			auto hull = Target::OfShip(PilotedShip());
+			// F at the helm, before anything is flown: flight assist only, the chase stays on the hull.
+			bool assist = app->PilotFlightAssist();
+			Tap(Key::F);
+			bool afterF = app->PilotFlightAssist();
+			bool toggled = afterF != assist;
+			bool stillChase = cam->PilotLocked && cam->FocusTarget == hull;
+			Tap(Key::F);
+
+			double d0 = (cam->ScenePosition - app->TargetScene(hull)).Length();
+			// W, the right button and the mouse all at once: the hull's burn, its second trigger and its aim, none the camera's.
+			kb->Hold(Key::W);
+			kb->HoldButton(Input::MouseButton::Right);
+			for (int i = 0; i < 40; i++) { kb->mouseDelta = Vector2(30, 12); frames(1); }
+			kb->ReleaseButton(Input::MouseButton::Right);
+			kb->Release(Key::W);
+			frames(1);
+			// The chase is placed before the hull's view moves in a frame, so it may trail by one frame's travel of the hull;
+			// a camera swimming on the keys would be off by far more than that.
+			DVec3 hullBefore = app->TargetScene(hull);
+			frames(1);
+			double step = (app->TargetScene(hull) - hullBefore).Length();
+			double d1 = (cam->ScenePosition - app->TargetScene(hull)).Length();
+			double r = app->TargetRadius(hull);
+			bool follows = cam->Mode != CameraMode::Free && cam->PilotLocked && cam->FocusTarget == hull;
+			// The chase sits at most 20 hull radii back (its widest zoom), a little lifted: never further, however long the
+			// keys are held.
+			Result("input.camera-follows", app->IsPiloting() && follows && d1 <= r * 20 * 1.3 + step * 2 + 1e-9,
+				cs::Cat("W + right-drag at the helm of the ", PilotedName(), ": camera ", Cameras::ToString(cam->Mode), " locked ", B(cam->PilotLocked),
+					" on ", Describe(cam->FocusTarget), ", ", cs::Fmt(d0, "G4"), " -> ", cs::Fmt(d1, "G4"), " from the hull (radius ", cs::Fmt(r, "G4"),
+					", its step a frame ", cs::Fmt(step, "G4"), ")"));
+
+			Tap(Key::P);
+			frames(3);
+			// F and P in the same frame from command: F is the command view's (a focus), so the helm P takes starts with its
+			// flight assist on, as every helm taken does.
+			app->Select(Target::OfShip(ship));
+			kb->Hold(Key::F);
+			kb->Tap(Key::P);
+			frames(1);
+			kb->Release(Key::F);
+			frames(2);
+			bool sameFrame = app->IsPiloting() && app->PilotFlightAssist();
+			Result("input.assist-vs-focus", toggled && stillChase && sameFrame,
+				cs::Cat("F at the helm: assist ", B(assist), " -> ", B(afterF), ", chase kept ", B(stillChase),
+					"; F+P in one frame: piloting ", B(app->IsPiloting()), ", assist on ", B(app->PilotFlightAssist())));
+			for (int i = 0; i < 3 && app->AtControls(); i++) { Tap(Key::P); frames(3); }
+			CloseEverything();
+		}
+
 		// ---------------------------------------------------------------- diplomacy
 
 		void DiplomacyProbes()
@@ -840,6 +905,7 @@ namespace SpaceGod::Smoke::FeatureAudit
 			Probe("text", [] { TextEditProbes(Result); });
 			Probe("viewer", [] { ModelViewerProbes(Result, frames); });
 			Probe("focus", FocusProbes); // US-T78
+			Probe("input", InputOwnershipProbes); // US-T90
 		}
 		// US-T58: what the binding probes left code-present: combat at the controls with the mouse, and the player's own
 		// transits (a hyperlane ridden, a jump gate gone through, an FTL crossing to another star). The last two leave Sol,
