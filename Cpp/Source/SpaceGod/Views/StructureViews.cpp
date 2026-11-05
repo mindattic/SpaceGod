@@ -5,6 +5,7 @@
 #include "Rendering/ShipMeshFactory.h"
 #include "Rendering/ShipModels.h"
 #include "Rendering/StarSparrowKit.h"
+#include "Rendering/UscKit.h"
 
 #include "BodyCatalog.h"
 #include "BodyOrientation.h"
@@ -244,13 +245,15 @@ namespace SpaceGod::Views
 			if (Alive(v->Hull)) Destroy(v->Hull);
 			v->Hull = NewGameObject("Hull on the slip");
 			v->Hull->transform->SetParent(v->Slip, false);
-			// The whole hull, bow included (a warship's Stern section alone is only its after half): the Star Sparrow kit's
-			// when the pack is there (US-T110), its parts plated on stern first as the work goes forward.
+			// The whole hull, bow included (a warship's Stern section alone is only its after half): Ultimate Spaceships
+			// Creator's when that pack is there (US-T142), else the Star Sparrow kit's (US-T110), its parts plated on stern
+			// first as the work goes forward.
 			cs::List<cs::Ref<Renderer>> parts;
 			cs::Ref<Transform> stern, bow;
 			v->HullParts.Clear();
-			if (Rendering::StarSparrowKit::Build(*cls, CivilCraft::None, 0, settlement->Owner, Rendering::StarSparrowKit::LayoutOf(*cls, nullptr),
-				v->Hull->transform, parts, stern, bow))
+			auto layout = Rendering::StarSparrowKit::LayoutOf(*cls, nullptr);
+			if (Rendering::UscKit::Build(*cls, CivilCraft::None, 0, settlement->Owner, layout, v->Hull->transform, parts, stern, bow)
+				|| Rendering::StarSparrowKit::Build(*cls, CivilCraft::None, 0, settlement->Owner, layout, v->Hull->transform, parts, stern, bow))
 				v->HullParts = parts;
 			else [[maybe_unused]] auto mr = Part(v->Hull->transform, ShipMeshFactory::GetSection(*cls, settlement->Owner, ShipMeshFactory::WholeHull), "Hull");
 			v->HullClass = cls;

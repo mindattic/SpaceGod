@@ -4,6 +4,7 @@
 #include "Rendering/Materials.h"
 #include "Rendering/ShipMeshFactory.h"
 #include "Rendering/StarSparrowKit.h"
+#include "Rendering/UscKit.h"
 
 #include "Combat/BulkFreighters.h"
 #include "Combat/CombatSpecs.h"
@@ -65,9 +66,10 @@ namespace SpaceGod::Rendering
 		cs::Ref<Transform>& stern, cs::Ref<Transform>& bow)
 	{
 		bow = nullptr;
-		// US-T110: every hull from the Star Sparrow kit when the pack is there (a recipe per class, StarSparrowKit), its
-		// engines on the hardpoints its view puts the glows on; without it, the Kenney craft and procedural hulls below.
-		if (StarSparrowKit::Available())
+		// US-T142: every hull from Ultimate Spaceships Creator when that pack is there (UscKit), then (US-T110) from the
+		// Star Sparrow kit (a recipe per class, StarSparrowKit), engines on the hardpoints the view puts the glows on;
+		// without either, the Kenney craft and procedural hulls below.
+		if (UscKit::Available() || StarSparrowKit::Available())
 		{
 			auto fitted = ship->Combat && ship->Combat->Spec ? &ship->Combat->Spec->Layout : nullptr;
 			auto layout = StarSparrowKit::LayoutOf(ship->Spec->Class, fitted);
@@ -78,6 +80,7 @@ namespace SpaceGod::Rendering
 				pods = all;
 				spheres = sp;
 			}
+			if (UscKit::Build(ship->Spec->Class, ship->Civil, ship->Id, ship->Faction, layout, parent, renderers, stern, bow, pods, spheres)) return;
 			if (StarSparrowKit::Build(ship->Spec->Class, ship->Civil, ship->Id, ship->Faction, layout, parent, renderers, stern, bow, pods, spheres)) return;
 		}
 		cs::String kenney = KenneyModelFor(ship);
@@ -158,8 +161,8 @@ namespace SpaceGod::Rendering
 
 	cs::String ShipModels::KenneyModelFor(const cs::Ref<Ship>& ship)
 	{
-		// US-T110: with the Star Sparrow kit every hull is the kit's (nothing to stream in the background).
-		if (StarSparrowKit::Available()) return cs::String();
+		// US-T110, US-T142: with either pack every hull is the pack's (nothing to stream in the background).
+		if (UscKit::Available() || StarSparrowKit::Available()) return cs::String();
 		// Local traffic (U.SPC-T375): a boxy bus, nippy taxis and skiffs, and a roomier six-seat tourer, each drawn
 		// at its own design's length.
 		switch (ship->Civil)

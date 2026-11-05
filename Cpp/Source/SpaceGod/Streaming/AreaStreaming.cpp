@@ -9,6 +9,7 @@
 #include "Rendering/AssetStreamer.h"
 #include "Rendering/ShipMeshFactory.h"
 #include "Rendering/StarSparrowKit.h"
+#include "Rendering/UscKit.h"
 #include "Rendering/VoidStationModel.h"
 #include "SpaceGodLog.h"
 #include "Views/SkyView.h"
@@ -233,16 +234,19 @@ namespace SpaceGod
 			// Once, at the start: every Star Sparrow mesh loads in the background (headless there is no kit, and hulls
 			// are procedural, built from code as before).
 			s.KitRequested = true;
-			if (FApp::CanEverRender() && Rendering::StarSparrowKit::Available())
+			// US-T142: Ultimate Spaceships Creator's meshes instead when that pack is there (it is drawn first).
+			bool usc = FApp::CanEverRender() && Rendering::UscKit::Available();
+			if (usc || (FApp::CanEverRender() && Rendering::StarSparrowKit::Available()))
 			{
 				TArray<FSoftObjectPath> paths;
-				for (const auto& p : Rendering::StarSparrowKit::AssetPaths())
+				for (const auto& p : usc ? Rendering::UscKit::AssetPaths() : Rendering::StarSparrowKit::AssetPaths())
 				{
 					FSoftObjectPath path(FString(UTF8_TO_TCHAR(p.c_str())));
 					if (FPackageName::DoesPackageExist(path.GetLongPackageName())) paths.Add(path);
 				}
 				if (paths.Num() > 0) s.KitHandle = Streamable().RequestAsyncLoad(paths, FStreamableDelegate());
-				UE_LOG(LogSpaceGod, Display, TEXT("AreaStreaming: streaming the Star Sparrow kit in the background (%d assets)"), paths.Num());
+				UE_LOG(LogSpaceGod, Display, TEXT("AreaStreaming: streaming the %s in the background (%d assets)"),
+					usc ? TEXT("Ultimate Spaceships Creator pack") : TEXT("Star Sparrow kit"), paths.Num());
 			}
 		}
 	}

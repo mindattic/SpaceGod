@@ -7,6 +7,7 @@
 #include "Rendering/ShipMeshFactory.h"
 #include "Rendering/ShipModels.h"
 #include "Rendering/StarSparrowKit.h"
+#include "Rendering/UscKit.h"
 #include "Views/LineStrip.h"
 
 #include "Combat/Battle.h"
@@ -207,12 +208,13 @@ namespace SpaceGod::Views
 		auto cls = FighterCraft::Of(u->Fighter->Role)->Class;
 		v->Hull = NewGameObject(Core::ToString(cls));
 		v->Hull->transform->SetParent(root, false);
-		// The Star Sparrow kit's model of its class when the pack is there (US-T110): parts under the hull, which is
-		// placed and scaled as before; otherwise the procedural craft.
+		// Ultimate Spaceships Creator's model of its class when that pack is there (US-T142), else the Star Sparrow kit's
+		// (US-T110): parts under the hull, which is placed and scaled as before; otherwise the procedural craft.
 		cs::List<cs::Ref<Renderer>> parts;
 		cs::Ref<Transform> stern, bow;
-		if (!Rendering::StarSparrowKit::Build(cls, CivilCraft::None, 0, u->Faction, Rendering::StarSparrowKit::LayoutOf(cls, nullptr), v->Hull->transform,
-			parts, stern, bow))
+		auto layout = Rendering::StarSparrowKit::LayoutOf(cls, nullptr);
+		if (!Rendering::UscKit::Build(cls, CivilCraft::None, 0, u->Faction, layout, v->Hull->transform, parts, stern, bow)
+			&& !Rendering::StarSparrowKit::Build(cls, CivilCraft::None, 0, u->Faction, layout, v->Hull->transform, parts, stern, bow))
 		{
 			AddComponent<MeshFilter>(v->Hull)->sharedMesh = ShipMeshFactory::GetFighter(u->Faction, cls);
 			auto mr = AddComponent<MeshRenderer>(v->Hull);

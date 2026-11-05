@@ -20,8 +20,10 @@ Builds/
 
 # Third-party art packs from the owner's libraries (US-T109): their licences forbid redistributing them, so neither
 # the source files nor the imported assets are committed. tools/import-*.ps1 rebuilds them; see docs/ThirdPartyArt.md.
+# That covers every pack: StarSparrow (US-T109), USC, Ultimate Spaceships Creator (US-T142), and any added later.
 Cpp/SourceArt/ThirdParty/
 Cpp/Content/ThirdParty/
+Cpp/Content/ThirdParty/USC/
 
 # .NET build output of the capture host and the vendored MindAttic.Capture (US-T72).
 Capture/**/bin/

@@ -5,7 +5,8 @@
 //                               after the last.
 //   SpaceGod.ShipLineup <dir>   the same from the console, without quitting.
 //
-// Sheets: kit-pieces (the 8 modules then fighters 1..40, row by row), classes-<livery> (every hull class in LineupOrder,
+// Sheets: kit-pieces (the 8 modules then fighters 1..40, row by row), usc-models (US-T142: every Ultimate Spaceships
+// Creator ship the classes fly, when that pack is imported), classes-<livery> (every hull class in LineupOrder,
 // row by row, as its ShipView draws it: hull, turrets and all), detail-small/-large (the navy's, larger), classes-top,
 // classes-side and capitals-to-scale, screenshots of the game's view; then thumbnails-<livery>, the spawn screen's
 // ShipThumbnails (an off-screen scene capture) of every class side by side (US-T116).
@@ -17,6 +18,7 @@
 #include "Rendering/Pipeline/RenderBackend.h"
 #include "Rendering/ShipThumbnails.h"
 #include "Rendering/StarSparrowKit.h"
+#include "Rendering/UscKit.h"
 #include "UnityCompat/UnityScene.h"
 #include "Views/ShipView.h"
 #include "SpaceGodLog.h"
@@ -142,6 +144,28 @@ namespace SpaceGod::Rendering
 				fighters.Height = 5 * 1.25f;
 				fighters.Build = pieceSheet(8, 40, 8, ThreeQuarter, Vector3::up());
 				sheets.Add(fighters);
+			}
+			// US-T142: every Ultimate Spaceships Creator ship the classes fly, whole, in the neutral grey.
+			if (UscKit::Available())
+			{
+				Sheet models;
+				models.Name = TEXT("usc-models");
+				models.Width = 7 * 1.25f;
+				models.Height = 6 * 1.25f;
+				models.Build = [grey](const cs::Ref<Transform>& root, cs::List<cs::Ref<Views::ShipView>>&)
+				{
+					auto names = UscKit::ModelNames();
+					for (int i = 0; i < names.Count(); i++)
+					{
+						auto holder = NewGameObject(names[i]);
+						holder->transform->SetParent(root, false);
+						holder->transform->localPosition = Cell(i, names.Count(), 7, 1.25f);
+						holder->transform->localRotation = Facing(ThreeQuarter);
+						cs::List<cs::Ref<Renderer>> drawn;
+						UscKit::Piece(holder->transform, names[i], 1.0f, grey, drawn);
+					}
+				};
+				sheets.Add(models);
 			}
 			struct Livery
 			{

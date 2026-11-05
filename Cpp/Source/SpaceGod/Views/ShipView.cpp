@@ -5,6 +5,7 @@
 #include "Rendering/ShipMeshFactory.h"
 #include "Rendering/ShipModels.h"
 #include "Rendering/StarSparrowKit.h"
+#include "Rendering/UscKit.h"
 
 #include "Combat/CombatSpecs.h"
 #include "Combat/CombatState.h"
@@ -312,9 +313,11 @@ namespace SpaceGod::Views
 			mount->localRotation = part->Rest;
 			part->Mount = mount;
 			// A spinal mount is a gun the length of the hull laid down the keel from its muzzle (U.SPC-T490). A gun turret is
-			// the Star Sparrow kit's when the hull is (US-T110): a pod barbette and its barrels.
+			// Ultimate Spaceships Creator's turret module and barrels when that pack is there (US-T142), else the Star
+			// Sparrow kit's when the hull is (US-T110): a pod barbette and its barrels.
 			cs::List<cs::Ref<Renderer>> list;
-			bool kit = !d->Spinal && Rendering::StarSparrowKit::Turret(mount, sub->Kind(), Ship->Faction, false, list);
+			bool usc = !d->Spinal && Rendering::UscKit::Turret(mount, sub->Kind(), Ship->Faction, false, list);
+			bool kit = usc || (!d->Spinal && Rendering::StarSparrowKit::Turret(mount, sub->Kind(), Ship->Faction, false, list));
 			if (!kit)
 				list.Add(ShipModels::Part(mount, d->Spinal ? ShipMeshFactory::GetSpinal(sub->Kind(), Ship->Faction)
 					: ShipMeshFactory::GetPart(sub->Kind(), Ship->Faction, false), "Base"));
@@ -328,7 +331,8 @@ namespace SpaceGod::Views
 				barrels->localPosition = Vector3(0, k == SubsystemKind::HeavyLaser || k == SubsystemKind::PlasmaCannon ? 0.014f : k == SubsystemKind::LaserTurret ? 0.009f
 					: k == SubsystemKind::FlakCannon || k == SubsystemKind::VulcanCannon ? 0.011f : 0.008f, 0);
 				part->Barrels = barrels;
-				if (!kit || !Rendering::StarSparrowKit::Turret(barrels, k, Ship->Faction, true, list))
+				if (!kit || !(usc ? Rendering::UscKit::Turret(barrels, k, Ship->Faction, true, list)
+						: Rendering::StarSparrowKit::Turret(barrels, k, Ship->Faction, true, list)))
 					list.Add(ShipModels::Part(barrels, ShipMeshFactory::GetPart(k, Ship->Faction, true), "Barrels"));
 			}
 			part->Renderers = list;

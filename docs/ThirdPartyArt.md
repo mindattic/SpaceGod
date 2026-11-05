@@ -73,3 +73,65 @@ Without the pack (a fresh clone), in a headless run (`-nullrhi`, which cannot dr
 exactly as before. `-SpaceGodShipLineup=<dir>` on the game's command line (it
 quits when done), or the console command `SpaceGod.ShipLineup <dir>`, screenshots contact sheets of the kit's parts
 and of every class in every livery, drawn by a camera of its own as the model viewer is (`Rendering/ShipLineup.cpp`).
+
+## Ultimate Spaceships Creator (Ebal Studios, US-T142)
+
+- **Source:** Ebal Studios' "Ultimate Spaceships Creator" (Fab listing e2e41618-a3e0-440b-be4b-78b01a1cd42f), bought by
+  the owner. The Fab download is Blender only (`.blend` files saved by Blender 4.2, which Blender 3.3 cannot open);
+  the import uses the separate FBX download, `usc_fbx.zip` (1.3 GB): 18 sets (AstroEagle ... VoidWhale) of prebuilt
+  ships plus a `<Set>Modules.fbx` each, and each set's `Textures/` (the unified colours Red, Green, Blue, Purple, Grey
+  and White, extra colours of its own, normal, metallic, roughness or glossiness, emission, and masks). The store
+  licence applies: no redistribution of the source assets.
+- **Re-import:** close any editor that has the project open, then
+
+  ```powershell
+  tools/import-usc.ps1 -Zip <path>\usc_fbx.zip   # -Blender <blender.exe> if it is not under Program Files
+  ```
+
+  (`-Zip` defaults to `%USERPROFILE%\Downloads\usc_fbx.zip`). It extracts the zip into
+  `Cpp/SourceArt/ThirdParty/USC/USC_FBX/` if that is not there yet, runs `tools/usc_prepare.py` in Blender (3.3 or
+  later, FBX in and out only) to cut the ships the game uses into pieces in `Cpp/SourceArt/ThirdParty/USC/Pieces/`,
+  then `tools/import_usc.py` headless (`UnrealEditor-Cmd -run=pythonscript`). Re-running is safe; `-SkipPrepare`
+  re-imports the pieces already cut. Both scripts log `USC: SUMMARY` and every failure.
+- **The Blender step:** the pack's FBX ships are one mesh each, or two for Galactic Leopard and Void Whale (`Main`
+  and `Parts`, each painted from its own texture atlas), with no material slots. For every ship in `MODELS` (kept in
+  step with `Rendering/UscKit.cpp`) it writes each mesh centred on the whole ship's box, nose -Y and up +Z in Blender,
+  as `SM_USC_<Model>_<Main|Parts|Hull>_Whole.fbx`; a warship (battleship, carrier, gate breaker, cruiser, command
+  cruiser, destroyer, frigate, corvette) is cut across its length at `ShipMeshFactory::SplitZ` (6 % of its length aft of
+  the middle), the cut capped, as `..._Bow.fbx` and `..._Stern.fbx`, so the two meet exactly and a destroyed ship
+  breaks in two. The modules the game bolts on (Galactic Leopard's turret, gun, thruster and cargo, Void Whale's turret
+  base, cannon, laser and thruster, a few more for later use) are written centred on their own boxes as
+  `SM_USC_Mod_<Set><Part>.fbx`.
+- **Result** (`/Game/ThirdParty/USC`):
+  - `Meshes/SM_USC_*`: those pieces (no collision, no Nanite). LODs: the script asks `StaticMeshEditorSubsystem` for
+    two reduced LODs (50 % and 20 %) and logs whether the commandlet had it; when it does not, the area streaming's
+    detail rings (US-T133) carry the load, as they do for every other hull.
+  - `Textures/T_USC_<Atlas>_<Map>`: per atlas (`GalacticLeopard_Main`, `GalacticLeopard_Parts`, `VoidWhale_Main`,
+    `VoidWhale_Parts`, `StriderOx`, `NightAye`, `HyperFalcon`, `ForceBadger`) the unified colours (and Black where the
+    set has it), normal, metallic, roughness (or glossiness) and emission, at 2048 at most.
+  - `Materials/M_USCShip`: the in-game material, the pack's maps in the game's terms (unlit, lit from the star(s) in
+    `MPC_SpaceGod` as `M_StarSparrowShip` is, then `SG_Expose3`): the painted colour times `Tint` (the faction's wash)
+    and `_Tint`, `_Highlight`, `_EngineGlow` from ShipView's property block. `Materials/MI_USC_<Atlas>_<Colour>`: one
+    instance per atlas and colour.
+
+### Ships built from the pack (US-T142)
+
+When the pack is imported every hull is drawn from it (`Cpp/Source/SpaceGod/Rendering/UscKit.cpp`) ahead of the Star
+Sparrow kit: each class flies one of the pack's prebuilt ships, scaled to the game's model frame with its own
+proportions. The navies' warships are Galactic Leopard capitals and the pirates' Void Whale ones; the work hulls (miner,
+ore and capture tugs) are Void Whale, the lane tender, gate picket, explorer and truss freighter Galactic Leopard;
+fighters, interceptors, recon craft and couriers are Hyper Falcon, bombers Night Aye, gunships and assault shuttles
+Strider Ox, and the local traffic Force Badger. Warships come in the bow and stern pieces; a thruster bell from the
+pack goes on every Engine hardpoint (the glows sit in it); gun turrets are the pack's turret and barrel modules on the
+same mounts; a truss freighter carries the pack's cargo modules, as many as its load. A livery is one of the unified
+colours (`UscKit::ColourOf`): a navy the one nearest its own colour's hue, pirates Black (Red where a set has no
+black), civilians White, each with a light wash of the faction's colour.
+
+Hooks for what comes next: every hull piece is its own GameObject (`Hull:<Atlas>:<Section>`) and every module
+`Module:<Name>` under the section it is in (per-module sectional destruction, US-T91); `UscKit::Extent` is the hull's
+real box in the model frame (shield arrays, US-T102); `UscKit::ModelOf` and `UscKit::Turret` are where a refit or the
+Mechlab (US-T89) would choose another hull or gun.
+
+The order is USC, then Star Sparrow, then procedural: without USC (or with `-NoUSC`) the Star Sparrow kit draws them,
+without that too (or headless) the procedural hulls. `-SpaceGodShipLineup=<dir>` adds a `usc-models` sheet of every
+model the classes use.
