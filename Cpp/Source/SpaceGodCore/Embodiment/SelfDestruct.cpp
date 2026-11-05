@@ -18,6 +18,9 @@
 #include "Embodiment/MountedTurret.h"
 #include "Embodiment/ShipHelm.h"
 #include "Embodiment/StationSeat.h"
+#include "Economy/Economy.h"
+#include "Economy/Settlement.h"
+#include "Systems/JumpGate.h"
 
 namespace SpaceGod::Core
 {
@@ -132,13 +135,69 @@ namespace SpaceGod::Core
 		else if (key == static_cast<int>(SelfDestructKey::Abort)) c->SelfDestructS = -1;
 	}
 
-	bool SelfDestruct::Tick(const cs::Ref<ShipCombat>& c, int key, double fuse, double dt)
+	bool SelfDestruct::AtControls(const cs::Ref<ShipCombat>& c, int key, double fuse)
 	{
 		if (c == nullptr) return false;
 		Command(c, key, fuse);
-		if (c->SelfDestructed || c->SelfDestructS < 0 || !c->Alive()) return false;
-		c->SelfDestructS = cs::Math::Max(0.0, c->SelfDestructS - cs::Math::Max(0.0, dt));
-		return c->SelfDestructS <= 0;
+		return Due(c);
+	}
+
+	bool SelfDestruct::Due(const cs::Ref<ShipCombat>& c)
+	{
+		return c != nullptr && !c->SelfDestructed && c->SelfDestructS >= 0 && c->SelfDestructS <= 0 && c->Alive();
+	}
+
+	void SelfDestruct::Count(const cs::Ref<ShipCombat>& c, double seconds)
+	{
+		c->SelfDestructS = cs::Math::Max(0.0, c->SelfDestructS - cs::Math::Max(0.0, seconds));
+	}
+
+	namespace
+	{
+		bool Counting(const cs::Ref<ShipCombat>& c) { return c != nullptr && !c->SelfDestructed && c->SelfDestructS >= 0 && c->Alive(); }
+
+		bool Ticked(const std::vector<const ShipCombat*>& ticked, const ShipCombat* c)
+		{
+			for (auto t : ticked)
+				if (t == c) return true;
+			return false;
+		}
+	}
+
+	void SelfDestruct::Advance(const cs::Ref<Battle>& b, double seconds, std::vector<const ShipCombat*>& ticked)
+	{
+		if (b == nullptr) return;
+		// Nothing is ever armed but by the player, so this is almost always empty (and touches nothing: the Bench's digests).
+		cs::List<cs::Ref<BattleUnit>> due;
+		for (const auto& u : b->Units)
+		{
+			if (!u->Present() || !Counting(u->Combat) || Ticked(ticked, u->Combat.get())) continue;
+			ticked.push_back(u->Combat.get());
+			Count(u->Combat, seconds);
+			if (u->Combat->SelfDestructS <= 0) due.Add(u);
+		}
+		// Set off after the walk: a blast changes the unit list (wrecks, pods), and can take another counting hull with it.
+		for (const auto& u : due)
+			if (u->Present() && Due(u->Combat)) InBattle(b, u);
+	}
+
+	void SelfDestruct::AdvanceOutside(const cs::Ref<World>& world, double seconds, std::vector<const ShipCombat*>& ticked)
+	{
+		if (world == nullptr) return;
+		auto tick = [&](const cs::Ref<ShipCombat>& c) {
+			if (!Counting(c) || Ticked(ticked, c.get())) return;
+			ticked.push_back(c.get());
+			Count(c, seconds);
+		};
+		auto ship = world->PilotedShip;
+		if (ship != nullptr && !ship->Destroyed) tick(ship->Combat);
+		if (world->Economy != nullptr)
+			for (const auto& s : world->Economy->Settlements)
+				for (const auto& p : s->Platforms)
+					if (p != nullptr && p->StationHeld) tick(p);
+		for (const auto& g : world->Gates)
+			for (const auto& f : g->Forts)
+				if (f != nullptr && f->StationHeld) tick(f);
 	}
 
 	void SelfDestruct::Disarm(const cs::Ref<ShipCombat>& c)

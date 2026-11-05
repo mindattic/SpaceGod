@@ -412,4 +412,81 @@
 		return ok ? 0 : 3;
 	}
 
+	// ---------------------------------------------------------------- `--selfdestruct-probe` (US-T114)
+	// A self-destruct armed on the first hull in the first battle, run live to its blast; then the same run keyframed
+	// partway through the countdown and restored into a fresh Simulation: the restored countdown must go on from where it
+	// was and go off on the same tick, with the same digest 30 ticks later.
+
+	inline cs::Ref<ShipCombat> SdArmed(Simulation& sim)
+	{
+		for (const auto& s : sim.Galaxy->Systems)
+			for (const auto& b : s->World->War->Battles)
+				for (const auto& u : b->Units)
+					if (u->Combat != nullptr && u->Combat->SelfDestructS >= 0 && !u->Combat->SelfDestructed) return u->Combat;
+		return nullptr;
+	}
+
+	inline cs::Ref<ShipCombat> SdArm(Simulation& sim)
+	{
+		for (const auto& s : sim.Galaxy->Systems)
+			for (const auto& b : s->World->War->Battles)
+				for (const auto& u : b->Units)
+					if (u->Present() && u->Ship != nullptr && u->Combat != nullptr && u->Combat->Spec != nullptr && u->Combat->Alive())
+					{
+						SelfDestruct::Command(u->Combat, static_cast<int>(SelfDestructKey::Arm),
+							SelfDestruct::FuseSeconds(u->Combat, u->Kind == UnitKind::Fighter, u->Kind == UnitKind::Platform));
+						std::printf("  armed %s (%.0f s fuse)\n", u->Name().c_str(), u->Combat->SelfDestructS);
+						return u->Combat;
+					}
+		return nullptr;
+	}
+
+	int SelfDestructProbe(const ScenarioFile& file, const Scenario& sc)
+	{
+		using namespace Rewind;
+		std::printf("selfdestruct-probe %s\n", sc.Name.c_str());
+		const int after = 30;
+		int armAt = -1, blastAt = -1, keyAt = -1;
+		double leftAtKey = -1;
+		std::string liveHash;
+		Bytes key;
+		{
+			auto b = RwStart(file, sc);
+			auto& sim = *b.Sim;
+			cs::Ref<ShipCombat> c;
+			for (int t = 0; t < sc.Ticks; t++)
+			{
+				if (c == nullptr && RwBattlesRunning(sim) > 0 && (c = SdArm(sim)) != nullptr) armAt = t;
+				sim.Tick(b.Dt);
+				if (c != nullptr && keyAt < 0 && !c->SelfDestructed && c->SelfDestructS <= SelfDestruct::FuseSeconds(c, false, false) * 0.5)
+				{
+					keyAt = t + 1;
+					leftAtKey = c->SelfDestructS;
+					key = Capture(sim);
+				}
+				if (c != nullptr && blastAt < 0 && c->SelfDestructed) blastAt = t + 1;
+				if (blastAt >= 0 && t + 1 == blastAt + after) { liveHash = RwHash(sim, sc); break; }
+			}
+		}
+		std::printf("  live: armed at tick %d, keyframe at %d (%.3f s left), blast at %d\n", armAt, keyAt, leftAtKey, blastAt);
+		if (armAt < 0 || keyAt < 0 || blastAt < 0 || liveHash.empty()) { std::printf("  selfdestruct: NOT EXERCISED\n"); return 4; }
+		auto restored = Restore(key);
+		auto& sim = *restored;
+		auto c = SdArmed(sim);
+		double leftRestored = c != nullptr ? c->SelfDestructS : -1;
+		int replayBlast = -1;
+		std::string replayHash;
+		double dt = static_cast<double>(std::min(1.0f / static_cast<float>(sc.Fps), 0.1f));
+		for (int t = keyAt; t < sc.Ticks && c != nullptr; t++)
+		{
+			sim.Tick(dt);
+			if (replayBlast < 0 && c->SelfDestructed) replayBlast = t + 1;
+			if (replayBlast >= 0 && t + 1 == replayBlast + after) { replayHash = RwHash(sim, sc); break; }
+		}
+		bool ok = c != nullptr && leftRestored == leftAtKey && replayBlast == blastAt && replayHash == liveHash;
+		std::printf("  restored: %.3f s left, blast at %d, digest +%d %s\n", leftRestored, replayBlast, after, replayHash == liveHash ? "MATCH" : "MISMATCH");
+		std::printf("  selfdestruct: %s\n", ok ? "MATCH" : "MISMATCH");
+		return ok ? 0 : 3;
+	}
+
 #endif

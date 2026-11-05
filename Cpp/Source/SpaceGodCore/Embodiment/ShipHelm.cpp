@@ -105,8 +105,8 @@ namespace SpaceGod::Core
 			if (Ship->Combat->Reactor == nullptr) Ship->Combat->Reactor = cs::New<PowerDistribution>();
 			Ship->Combat->Reactor->SetCode(input.PowerSplit);
 		}
-		// The self-destruct (US-T97): armed or aborted here, counted down while the helm is held, and at zero the hull goes.
-		if (!Ship->Destroyed && SelfDestruct::Tick(Ship->Combat, input.SelfDestruct, SelfDestruct::FuseSeconds(Ship->Combat, false, false), dt))
+		// The self-destruct (US-T97): armed or aborted here; the sim counts it down (US-T114), and run out the hull goes.
+		if (!Ship->Destroyed && SelfDestruct::AtControls(Ship->Combat, input.SelfDestruct, SelfDestruct::FuseSeconds(Ship->Combat, false, false)))
 		{
 			SetOff();
 			return;

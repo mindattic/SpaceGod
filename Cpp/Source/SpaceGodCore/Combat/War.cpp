@@ -39,6 +39,7 @@
 #include "Combat/StrandedWings.h"
 #include "Combat/Wreck.h"
 #include "Economy/Economy.h"
+#include "Embodiment/SelfDestruct.h"
 #include "Economy/Goods.h"
 #include "Economy/Settlement.h"
 #include "Infrastructure/Infrastructure.h"
@@ -179,6 +180,8 @@ namespace SpaceGod::Core
 	{
 		double seconds = (jd - lastJd) * Astro::SecondsPerDay;
 		lastJd = jd;
+		// The self-destructs counting down (US-T114): once a tick each, on the sim clock, whoever holds the hull.
+		std::vector<const ShipCombat*> counted;
 		for (int i = Battles.Count() - 1; i >= 0; i--)
 		{
 			auto b = Battles[i];
@@ -188,12 +191,14 @@ namespace SpaceGod::Core
 				continue;
 			}
 			b->Advance(seconds, world->Coarse());
+			SelfDestruct::Advance(b, seconds, counted);
 			// The player who has left the fight (flown out of it, or let go for the cargo) is free of it
 			// now, not when the rest have finished: free to cruise, take the gate or engage elsewhere.
 			for (const auto& u : b->Units)
 				if (u->Fled && u->PlayerControlled() && u->Ship != nullptr && u->Ship->Battle == b) u->Ship->Battle = nullptr;
 			if (b->Over) Resolve(b, jd);
 		}
+		SelfDestruct::AdvanceOutside(world, seconds, counted);
 		Interdictions(jd);
 		GateAmbushes(jd);
 		if (jd >= nextPodSweepJd)

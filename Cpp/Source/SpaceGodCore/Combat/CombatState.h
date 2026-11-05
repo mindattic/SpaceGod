@@ -111,8 +111,10 @@ namespace SpaceGod::Core
 		cs::Ref<PowerDistribution> Reactor;
 
 		/// <summary>US-T97: seconds left on the self-destruct the player has armed aboard (<see cref="SelfDestruct"/>), below 0
-		/// when none is; and set once it has gone off. Only the player ever arms one (no crew does), and neither is saved: a
-		/// countdown under way when the game is saved is not one when it is loaded.</summary>
+		/// when none is; and set once it has gone off. Only the player ever arms one (no crew does). Counted down once a
+		/// simulation tick by <see cref="SelfDestruct.Advance"/> (US-T114), never by the seats holding the hull, and both are
+		/// saved (optional fields older saves lack), so a countdown under way goes on from where it was after a load or a
+		/// rewind.</summary>
 		double SelfDestructS = -1;
 		bool SelfDestructed = false;
 

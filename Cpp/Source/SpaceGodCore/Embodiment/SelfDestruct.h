@@ -5,6 +5,8 @@
 #include "DVec3.h"
 #include "Embodiment/Embodiment.h"
 
+#include <vector>
+
 namespace SpaceGod::Core
 {
 	class Battle;
@@ -41,7 +43,10 @@ namespace SpaceGod::Core
 	/// a station's controls, or a gun, which sets off the hull (or station) it is mounted on, the gunner being aboard. Two
 	/// steps, so it never goes off by accident: the key held for <see cref="ArmHoldS"/> arms it, which starts a countdown
 	/// (<see cref="FuseSeconds"/>: 5 s in a small craft, 8 s in a light hull, 15 s in a capital, 20 s on a station); the key
-	/// pressed again aborts it. Handed back to its crew (or lost), the countdown stops.
+	/// pressed again aborts it. Handed back to its crew (or lost), the countdown stops. The countdown lives on the hull
+	/// (<see cref="ShipCombat.SelfDestructS"/>, saved) and runs on the simulation's own tick (<see cref="Advance"/>, US-T114),
+	/// never per seat: arming and aborting are commands, leaving a seat goes through the session's command stream (co-op)
+	/// or the sim itself (a seat lost), so the whole thing replays the same on every peer and from any save.
 	///
 	/// At zero the craft is destroyed as a kill is (a wreck, its debris, its pieces) and its blast reaches everything within
 	/// <see cref="RadiusKm"/> of its hull: <see cref="ContactHp"/> to whatever touches it, falling off with the square of the
@@ -87,9 +92,27 @@ namespace SpaceGod::Core
 		static void Command(const cs::Ref<IEmbodiable>& seat, int key);
 		static void Command(const cs::Ref<ShipCombat>& c, int key, double fuse);
 
-		/// <summary>One frame of the countdown on <paramref name="c"/>: <paramref name="key"/> first, then <paramref name="dt"/>
-		/// off the clock. True when it reaches zero this frame (the caller then sets it off).</summary>
-		static bool Tick(const cs::Ref<ShipCombat>& c, int key, double fuse, double dt);
+		/// <summary>A seat's frame at the controls of <paramref name="c"/>: <paramref name="key"/> lands (arm or abort), and true
+		/// when the countdown has run out with the craft still there, for the seat to set it off where it is (out of a fight
+		/// only the seat knows where the helm has flown it). A seat never runs the clock (US-T114): <see cref="Advance"/> does,
+		/// once a simulation tick, however many players hold the hull.</summary>
+		static bool AtControls(const cs::Ref<ShipCombat>& c, int key, double fuse);
+
+		/// <summary>Whether the countdown on <paramref name="c"/> has run out and the craft has not gone up yet.</summary>
+		static bool Due(const cs::Ref<ShipCombat>& c);
+
+		/// <summary>
+		/// One simulation tick of every countdown in <paramref name="b"/> (US-T114), <paramref name="seconds"/> off the sim clock
+		/// (the battle's own step, <see cref="War.Update"/>): a unit whose countdown runs out goes up here, held or not, so a
+		/// hull two players hold counts down once, and a countdown restored from a save or a rewind keyframe goes off on the
+		/// same tick it would have. Each hull counted is added to <paramref name="ticked"/>, so nothing counts it twice.
+		/// </summary>
+		static void Advance(const cs::Ref<Battle>& b, double seconds, std::vector<const ShipCombat*>& ticked);
+
+		/// <summary>The same tick for the hulls counting down outside any battle advanced this tick: the helm's
+		/// (<see cref="World.PilotedShip"/>) and a held station (a settlement's platform, a gate's fort). Counted only: at zero
+		/// its seat sets it off where it is (<see cref="AtControls"/>).</summary>
+		static void AdvanceOutside(const cs::Ref<World>& world, double seconds, std::vector<const ShipCombat*>& ticked);
 
 		/// <summary>Stops a countdown (the seat handed back).</summary>
 		static void Disarm(const cs::Ref<ShipCombat>& c);
@@ -112,6 +135,7 @@ namespace SpaceGod::Core
 		static const SelfDestructReport& Last();
 
 	private:
+		static void Count(const cs::Ref<ShipCombat>& c, double seconds);
 		static double ReactorFactor(const cs::Ref<ShipCombat>& c);
 		static double MassKt(const cs::Ref<ShipCombat>& c);
 		static double KillCrew(const cs::Ref<ShipCombat>& c, const cs::Ref<Core::Faction>& owners);

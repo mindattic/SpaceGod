@@ -90,8 +90,8 @@ namespace SpaceGod::Core
 	{
 		cs::Ref<FighterControl> stick;
 		if (!Battle->Flown.TryGetValue(Unit, stick)) return;
-		// The self-destruct (US-T97): counted down while the craft is flown, and at zero it goes up where it is.
-		if (SelfDestruct::Tick(Unit->Combat, input.SelfDestruct, SelfDestruct::FuseSeconds(Unit->Combat, true, false), dt))
+		// The self-destruct (US-T97): armed or aborted here; the battle counts it down and sets it off (US-T114).
+		if (SelfDestruct::AtControls(Unit->Combat, input.SelfDestruct, SelfDestruct::FuseSeconds(Unit->Combat, true, false)))
 		{
 			SelfDestruct::InBattle(Battle, Unit);
 			return;

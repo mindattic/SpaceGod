@@ -42,6 +42,8 @@
 #include "Rewind.h"
 #include "Combat/War.h"
 #include "Combat/FlightDecks.h"
+#include "Combat/CombatState.h"
+#include "Embodiment/SelfDestruct.h"
 #include <map>
 #include <set>
 #endif
@@ -452,7 +454,7 @@ namespace Bench
 		int ticksOverride = -1;
 		TraceOptions trace;
 #if defined(BENCH_REWIND)
-		bool rewind = false;
+		bool rewind = false, selfDestruct = false;
 		RewindOptions rewindOpt;
 		int rewindThenWarp = -1;
 #endif
@@ -469,6 +471,7 @@ namespace Bench
 			else if (a == "--list") list = true;
 #if defined(BENCH_REWIND)
 			else if (a == "--rewind-probe") rewind = true;
+			else if (a == "--selfdestruct-probe") selfDestruct = true; // US-T114
 			else if (a == "--rewind-samples") rewindOpt.Samples = std::stoi(next());
 			else if (a == "--rewind-verify") rewindOpt.Verify = std::stoi(next());
 			else if (a == "--rewind-then-warp") rewindThenWarp = std::stoi(next());
@@ -506,11 +509,12 @@ namespace Bench
 #if defined(BENCH_REWIND)
 		// --rewind-then-warp: the scenario with another post-setup warp (e.g. a battle left at real time, warp 0), as
 		// "<name>-warp<N>" (its digest is then not one of expected-digests.json; the probe's own checks still apply).
-		if (rewind && rewindThenWarp >= 0)
+		if ((rewind || selfDestruct) && rewindThenWarp >= 0)
 		{
 			scenario->ThenWarp = rewindThenWarp;
 			scenario->Name += "-warp" + std::to_string(rewindThenWarp);
 		}
+		if (selfDestruct) return SelfDestructProbe(file, *scenario);
 		if (rewind) return RewindProbe(file, *scenario, outDir, rewindOpt);
 #endif
 		trace.Dir = outDir;

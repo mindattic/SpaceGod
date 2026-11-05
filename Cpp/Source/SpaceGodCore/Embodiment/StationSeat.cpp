@@ -188,8 +188,9 @@ namespace SpaceGod::Core
 		if (!Embodied()) return;
 		cs::Ref<Battle> b;
 		auto u = Unit(b);
-		// The self-destruct (US-T97): a station's scuttle, the longest fuse and the biggest blast.
-		if (SelfDestruct::Tick(Combat, input.SelfDestruct, SelfDestruct::FuseSeconds(Combat, false, true), dt))
+		// The self-destruct (US-T97): a station's scuttle, the longest fuse and the biggest blast. Armed or aborted here; the
+		// sim counts it down (US-T114).
+		if (SelfDestruct::AtControls(Combat, input.SelfDestruct, SelfDestruct::FuseSeconds(Combat, false, true)))
 		{
 			SetOff(b, u);
 			return;

@@ -106,13 +106,14 @@ namespace SpaceGod::Core
 		Battle->Manned[Mount] = control;
 	}
 
-	void MountedTurret::Control(const EmbodimentInput& input, double dt)
+	void MountedTurret::Control(const EmbodimentInput& input, double /*dt*/)
 	{
 		cs::Ref<MountControl> m;
 		if (!Battle->Manned.TryGetValue(Mount, m)) return;
 		// The self-destruct from a gun (US-T97) sets off the hull or station it is mounted on: the gunner is aboard.
-		if (SelfDestruct::Tick(Unit->Combat, input.SelfDestruct,
-			SelfDestruct::FuseSeconds(Unit->Combat, Unit->Kind == UnitKind::Fighter, Unit->Kind == UnitKind::Platform), dt))
+		// Armed or aborted here; the battle counts it down and sets it off (US-T114), however many guns aboard are manned.
+		if (SelfDestruct::AtControls(Unit->Combat, input.SelfDestruct,
+			SelfDestruct::FuseSeconds(Unit->Combat, Unit->Kind == UnitKind::Fighter, Unit->Kind == UnitKind::Platform)))
 		{
 			SelfDestruct::InBattle(Battle, Unit);
 			return;
