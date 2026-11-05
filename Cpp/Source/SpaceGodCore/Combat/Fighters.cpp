@@ -517,6 +517,8 @@ namespace SpaceGod::Core
 		// The player's own hands (US-T87): the player-facing handling, never a crew's. With assist off W and S are raw
 		// thrust on the main drive and the retros, and the flip key swings the nose onto the retrograde.
 		input.Piloted = true;
+		// Power to the engines refills the boost faster too (US-T94); speed and thrust already scale with it above.
+		input.BoostRecharge = engines;
 		if (stick->FlightAssistOff) input.Throttle = Max(-1.0, Min(1.0, stick->Burn));
 		if (stick->Flip) input.DesiredForward = PilotFlight::FlipAim(state);
 		auto tuning = craft->Tuning(engines);

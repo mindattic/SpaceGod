@@ -45,6 +45,10 @@ namespace SpaceGod::Input
 		/// the retrograde for a turn-and-burn (see <see cref="Unity.SpaceGod.Core.PilotFlight.FlipAim"/>).</summary>
 		bool Manoeuvre = false;
 
+		/// <summary>Edge, at the controls (US-T94): the arrow keys share the reactor (a <see cref="Core.PowerKey"/>): Left a pip
+		/// to weapons, Up to shields, Right to engines, Down an even share; with Shift, all it can spare to that one. -1 none.</summary>
+		int PowerKey = -1;
+
 		/// <summary>Held, not click-edged: while piloting, fires the ship's forward-mount weapons.
 		/// Left click still selects normally outside piloting, via the click-edged <see cref="SelectClicked"/>
 		/// below (gated off while piloting, so holding the trigger down and releasing it never also selects).</summary>

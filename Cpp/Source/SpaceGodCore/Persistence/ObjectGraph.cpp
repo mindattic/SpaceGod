@@ -926,7 +926,7 @@ namespace SpaceGod::Core
 							}
 					cs::List<cs::String> lacking;
 					for (size_t k = 0; k < seen.size(); k++)
-						if (!seen[k]) lacking.Add(t.Class->Fields[k].Key);
+						if (!seen[k] && !t.Class->Fields[k].Optional) lacking.Add(t.Class->Fields[k].Key); // SG_OPT may be absent (US-T94)
 					if (lacking.Count() > 0)
 						throw InvalidDataException(cs::Cat("The save is from an older build: ", t.FullName, " has fields it lacks (", cs::Strings::Join(", ", lacking), ")"));
 				}

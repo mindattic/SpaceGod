@@ -65,6 +65,10 @@ namespace SpaceGod::Core
 		/// fighter's snap and lateral dash, US-T79; the heavy fighter's weight and surge, US-T80; the capital's broadside
 		/// translation, US-T81) reads it. Crews never set it, so AI flight, and with it the Bench, flies exactly as before.</summary>
 		bool Piloted = false;
+
+		/// <summary>How fast the boost charge refills, times the design's (US-T94): the engines' share of the reactor under
+		/// the player's hands (<see cref="CraftPower"/>). Set only with <see cref="Piloted"/>; 1 for every crew.</summary>
+		double BoostRecharge = 1;
 	};
 
 	/// <summary>

@@ -78,6 +78,7 @@ namespace SpaceGod::Core
 		c->BoostFraction = BoostFraction;
 		c->Readiness = Readiness;
 		c->PhaserTuning = PhaserTuning;
+		c->Reactor = Reactor; // the player's share of the reactor (US-T94)
 		// The same craft stay aboard, as many as the refitted hangars hold (U.SPC-T526).
 		c->Hangar = Hangar;
 		// A refit changes what is mounted, not the hull's frame: its structure and any strain in it carry over (U.SPC-T596).
@@ -162,7 +163,7 @@ namespace SpaceGod::Core
 		for (const auto& s : Subsystems) if (s->Kind() == SubsystemKind::ShieldGenerator) s->LastHitSeconds = -999;
 	}
 
-	void ShipCombat::RegenShields(double nowSeconds, double dt)
+	void ShipCombat::RegenShields(double nowSeconds, double dt, double capacity)
 	{
 		double ratings = GeneratorRatings();
 		if (ratings <= 0) return;
@@ -171,10 +172,18 @@ namespace SpaceGod::Core
 		for (const auto& s : Subsystems)
 		{
 			if (s->Kind() != SubsystemKind::ShieldGenerator || s->Destroyed()) continue;
-			if (nowSeconds - s->LastHitSeconds > delay && s->Shield < s->MaxShield)
+			// The cap the reactor's share holds the field to (US-T94); a crew's hull passes 1, so it is MaxShield exactly.
+			double cap = capacity == 1 ? s->MaxShield : s->MaxShield * capacity;
+			if (s->Shield > cap)
+			{
+				// Power taken off the shields: the field the emitter can no longer hold bleeds away at its regen rate.
+				s->Shield = cs::Math::Max(cap, s->Shield - rate * s->Def->Rating / ratings * dt);
+				continue;
+			}
+			if (nowSeconds - s->LastHitSeconds > delay && s->Shield < cap)
 			{
 				double add = rate * s->Def->Rating / ratings * dt;
-				s->Shield = add >= s->MaxShield - s->Shield ? s->MaxShield : s->Shield + add;
+				s->Shield = add >= cap - s->Shield ? cap : s->Shield + add;
 			}
 		}
 	}

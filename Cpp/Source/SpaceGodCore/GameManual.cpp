@@ -188,7 +188,17 @@ namespace SpaceGod::Core
 				T("Dogfighting keys",
 				  "Left mouse guns, right mouse the second trigger's missiles or torpedoes (1 cycles them), T locks the hostile "
 				  "nearest the crosshair, Ctrl throws flares and chaff, 7 / 8 / 9 move reactor power to weapons, shields or "
-				  "engines and 0 evens it, 2-5 order your wingmen, and 6 picks a capital's next weak point.")),
+				  "engines and 0 evens it (the arrows too, as at any controls), 2-5 order your wingmen, and 6 picks a capital's next weak point."),
+				T("Reactor power",
+				  "Whatever you take the controls of -- a ship's helm, a fighter, a gun (which draws on the hull it is mounted on) or "
+				  "a station -- shares its reactor three ways, six pips in all and at most four to one system, two each at an even "
+				  "share. Left, Up and Right move a pip to weapons, shields or engines, from whichever other system has the most; "
+				  "Down evens it; Shift with Left, Up or Right gives one system all the reactor can spare (four, one, one). Each pip "
+				  "over two runs that system a quarter harder, each pip under a quarter softer: weapons reload (and so fire) faster "
+				  "and your guns cool faster; shields recharge faster and hold an eighth more field a pip (power taken off them "
+				  "bleeds the excess away); engines give more top speed and thrust and refill the boost faster. The REACTOR panel "
+				  "at the lower right shows the split. A hull keeps the split you set, saved with it; under its own crew it runs "
+				  "even, as designed.")),
 
 			cs::New<ManualChapter>("Ships: capital ships", "Carriers, battleships, command cruisers and gate breakers", Keys(),
 				T("Carrier",

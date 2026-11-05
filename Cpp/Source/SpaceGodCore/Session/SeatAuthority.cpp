@@ -1,6 +1,7 @@
 // Port of Unity.SpaceGod Core/Session/SeatAuthority.cs (US-T21, see docs/MIGRATION.md).
 
 #include "Session/SeatAuthority.h"
+#include "Embodiment/CraftPower.h"
 #include "Embodiment/EmbodimentSession.h"
 #include "Session/Commands.h"
 #include "Session/SessionEvents.h"
@@ -108,7 +109,11 @@ namespace SpaceGod::Core
 				raise(cs::New<CommandRefused>(command, cs::Cat(p, " holds no seat")));
 				return;
 			}
-			controls[p] = control->Input;
+			// The reactor split asked for (US-T94) lands once, as the command does; the stick is kept to fly on.
+			auto input = control->Input;
+			if (input.PowerSplit >= 0) CraftPower::Apply(session->Current, input.PowerSplit);
+			input.PowerSplit = -1;
+			controls[p] = input;
 			return;
 		}
 		raise(cs::New<CommandRefused>(command, cs::Cat("unknown command ", GameCommandTypeName(*command))));

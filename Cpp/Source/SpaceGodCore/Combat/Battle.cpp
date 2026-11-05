@@ -372,7 +372,8 @@ namespace SpaceGod::Core
 			if (u->Stunned > 0) u->Stunned -= dt;
 			// A small craft with power to spare for its shields recharges them that much faster (U.SPC-T424).
 			// A charging tachyon lance draws on the reactor, and the shields recover that much slower (U.SPC-T487).
-			else c->RegenShields(Seconds, dt * PowerDistribution::FactorOf(u, PowerSystem::Shields) * TachyonLances::ShieldRegenFactor(c));
+			// The player's split on a hull they hold counts the same way, and sets how much field it holds (US-T94).
+			else c->RegenShields(Seconds, dt * PowerFactor(u, PowerSystem::Shields) * TachyonLances::ShieldRegenFactor(c), ShieldCapacityOf(u));
 			// No escape with boarders fighting aboard (or latched to a hull it is boarding), nor for a hull that has struck
 			// its colours or been taken: drifting off with its drives cold is not running.
 			if (u->Kind == UnitKind::Ship && u->Latched == nullptr && !c->Disabled() && !c->Interior->UnderBoarding() && !u->Surrendering && !u->Captured && (u->Pos.Length() > EscapeKm || (u->Fleeing && NearestHostileDistance(u) > 30)))
@@ -1043,7 +1044,7 @@ namespace SpaceGod::Core
 		double picture = FleetCoordination::SharedPicture(u);
 		// A small craft's weapons reload as fast as the power it gives them (U.SPC-T424).
 		// A big ship that cannot shed its heat has its crew throttle the guns' reloading (U.SPC-T491).
-		double weaponPower = PowerDistribution::FactorOf(u, PowerSystem::Weapons) * Radiators::Throttle(u);
+		double weaponPower = PowerFactor(u, PowerSystem::Weapons) * Radiators::Throttle(u); // and a held hull's, US-T94
 		for (const auto& s : c->Subsystems)
 		{
 			// A fleet out of supply reloads slower: short of rounds, of spares for its mounts, of power to spare (U.SPC-T93).
@@ -1725,7 +1726,7 @@ namespace SpaceGod::Core
 	{
 		auto c = u->Combat;
 		bool working = !u->Captured && !u->Surrendering && u->Stunned <= 0;
-		double reload = working ? c->Readiness * PowerDistribution::FactorOf(u, PowerSystem::Weapons) : 0;
+		double reload = working ? c->Readiness * PowerFactor(u, PowerSystem::Weapons) : 0;
 		burnedOut.Clear();
 		Radiators::Step(u, dt, reload, &burnedOut);
 		for (const auto& s : burnedOut)
@@ -1735,10 +1736,36 @@ namespace SpaceGod::Core
 		}
 	}
 
+	double Battle::PowerFactor(const cs::Ref<BattleUnit>& u, PowerSystem s) const
+	{
+		// A small craft shares its own reactor, whoever flies it (U.SPC-T424).
+		if (u->Power != nullptr) return u->Power->Factor(s);
+		// A hull's or station's, only as the player set it and while the player holds it (US-T94): a crew runs even.
+		auto r = u->Combat->Reactor;
+		return r != nullptr && PlayerAboard(u) ? r->Factor(s) : 1;
+	}
+
+	double Battle::ShieldCapacityOf(const cs::Ref<BattleUnit>& u) const
+	{
+		// Only the player's hands (US-T94): a pilot's own share moves the recharge alone, as it always has.
+		if (u->Power != nullptr) return u->PlayerControlled() ? u->Power->ShieldCapacity() : 1;
+		auto r = u->Combat->Reactor;
+		return r != nullptr && PlayerAboard(u) ? r->ShieldCapacity() : 1;
+	}
+
+	bool Battle::PlayerAboard(const cs::Ref<BattleUnit>& u) const
+	{
+		if (u->PlayerControlled() || u->Combat->StationHeld) return true;
+		if (Manned.Count() == 0) return false;
+		for (const auto& s : u->Combat->Subsystems)
+			if (Manned.ContainsKey(s)) return true;
+		return false;
+	}
+
 	void Battle::StepPlayerWeapons(const cs::Ref<BattleUnit>& u, double dt)
 	{
 		// Power to the weapons cools the guns faster (U.SPC-T424).
-		u->Heat = cs::Math::Max(0.0, u->Heat - Gunnery::HeatCoolPerS * PowerDistribution::FactorOf(u, PowerSystem::Weapons) * dt);
+		u->Heat = cs::Math::Max(0.0, u->Heat - Gunnery::HeatCoolPerS * PowerFactor(u, PowerSystem::Weapons) * dt);
 		if (u->PlayerHelm && u->PlayerFireHeld) u->VolleyCharge = cs::Math::Min(VolleyBuildSeconds, u->VolleyCharge + dt);
 		if (u->Overheated && u->Heat < Gunnery::HeatRecoverBelow) u->Overheated = false;
 

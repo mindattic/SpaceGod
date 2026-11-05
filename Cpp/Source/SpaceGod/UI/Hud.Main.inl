@@ -202,6 +202,11 @@ private:
 	/// guns' rounds will meet it, and the gauges a pilot fights by -- heat, boost, shields and hull, missiles.
 	void DrawCombatHud();
 
+	/// At any controls with a reactor to share (US-T94, <see cref="Core::CraftPower"/>): the weapons / shields / engines pips,
+	/// what each runs at, the preset when it is one, and the keys. Screen space only, so it reads the same at the gameplay
+	/// and realistic scales.
+	void DrawReactor();
+
 	/// At a capital ship's helm (U.SPC-T272): how many guns bear where the player is looking (their fire cones take that
 	/// line in, U.SPC-T533) and how many of them are loaded, the volley building while the trigger is held, and the hull
 	/// it will be fired at.

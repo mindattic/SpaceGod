@@ -80,6 +80,10 @@ namespace SpaceGod::Core
 		/// broadside stance instead (US-T81): the turn keys translate the hull and the helm lays it beam-on to the locked
 		/// hull (<see cref="CapitalFlightModel.BeamOn"/>).</summary>
 		bool Manoeuvre = false;
+
+		/// <summary>The reactor split asked for this frame (US-T94, <see cref="PowerDistribution.Code"/>), -1 for no change:
+		/// whole, not a step, so a command carried twice (co-op, a replay) lands the same. See <see cref="CraftPower"/>.</summary>
+		int PowerSplit = -1;
 	};
 
 	/// <summary>

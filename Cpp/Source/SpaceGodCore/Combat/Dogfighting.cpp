@@ -346,6 +346,31 @@ namespace SpaceGod::Core
 		return true;
 	}
 
+	void PowerDistribution::AllTo(PowerSystem s)
+	{
+		for (int k = 0; k < pips.Count(); k++) pips[k] = 1;
+		pips[static_cast<int>(s)] = MaxPips;
+	}
+
+	bool PowerDistribution::SetCode(int code)
+	{
+		if (code < 0 || code >= 125) return false;
+		return Set(code / 25, code / 5 % 5, code % 5);
+	}
+
+	cs::String PowerDistribution::PresetName() const
+	{
+		if (IsEven()) return "BALANCED";
+		for (int k = 0; k < pips.Count(); k++)
+			if (pips[k] == MaxPips)
+			{
+				bool rest = true;
+				for (int j = 0; j < pips.Count(); j++) if (j != k && pips[j] != 1) rest = false;
+				if (rest) return cs::Cat("ALL ", cs::Strings::ToUpperInvariant(Core::ToString(static_cast<PowerSystem>(k))));
+			}
+		return cs::String();
+	}
+
 	double PowerDistribution::FactorOf(const cs::Ref<BattleUnit>& u, PowerSystem s) { return u->Power ? u->Power->Factor(s) : 1; }
 
 	cs::String PowerDistribution::ToString() const { return cs::Cat("W", pips[0], " S", pips[1], " E", pips[2]); }

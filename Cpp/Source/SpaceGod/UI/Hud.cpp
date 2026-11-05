@@ -27,6 +27,8 @@
 #include "Combat/CombatSpecs.h"
 #include "Combat/CombatState.h"
 #include "Combat/Diplomacy.h"
+#include "Combat/Dogfighting.h"
+#include "Embodiment/CraftPower.h"
 #include "Combat/EnergyWeapons.h"
 #include "Combat/FireCones.h"
 #include "Combat/FlightModels.h"
@@ -149,6 +151,7 @@ namespace SpaceGod::UI
 		}
 		DrawFlightMarkers();
 		DrawCombatHud();
+		DrawReactor(); // US-T94
 		DrawHunters();
 		DrawTopBar();
 		if (app->ShowNews) DrawNews();
@@ -903,6 +906,44 @@ namespace SpaceGod::UI
 		AddMount(line, c, SubsystemKind::MineLayer, "MINES", "Ctrl");
 		if (line.Count() > 0) DrawLabel(cs::Strings::Join("    ", line), Vector2(x0, y + 12), Dim, true);
 		if (app->PilotControlMode == PilotControl::Helm) DrawBroadside(battle, me, x0, y + 30);
+	}
+
+	// ---------------------------------------------------------------- the reactor's split (US-T94)
+
+	void Hud::DrawReactor()
+	{
+		if (Event::current().type != EventType::Repaint || app->Travel->Active) return;
+		auto seat = app->HeldSeat();
+		if (seat == nullptr || !CraftPower::Shares(seat)) return;
+		auto held = CraftPower::Of(seat, false);
+		PowerDistribution even; // nothing moved yet: the even share it runs at
+		const PowerDistribution& p = held != nullptr ? *held : even;
+		// Screen space, a fixed size: the same at the gameplay and the realistic scale. Lower right, clear of the gauges,
+		// the seat's readout and the flight line along the bottom middle; not registered as UI, so it never eats a click.
+		constexpr float w = 232, h = 142, segW = 56, segH = 9, gap = 3, step = 76;
+		auto r = Rect(SafeRight() - w - 16, Screen::height - h - 120, w, h);
+		GUI::Box(r, GUIContent::none(), panel);
+		cs::String preset = p.PresetName();
+		DrawLabel(preset.empty() ? cs::String("REACTOR") : cs::Cat("REACTOR  \xC2\xB7  ", preset), Vector2(r.x + 10, r.y + 6), Accent, true);
+		const char* names[] = { "WEAPONS", "SHIELDS", "ENGINES" };
+		const Color colors[] = { Color(1.0f, 0.62f, 0.32f), Color(0.45f, 0.7f, 1.0f), Color(0.55f, 1.0f, 0.62f) };
+		auto old = GUI::color;
+		float base = r.y + 30 + PowerDistribution::MaxPips * (segH + gap);
+		for (int k = 0; k < 3; k++)
+		{
+			auto s = static_cast<PowerSystem>(k);
+			float x = r.x + 12 + k * step;
+			// One bar per pip, filled from the bottom: four is all the reactor can give one system.
+			for (int i = 0; i < PowerDistribution::MaxPips; i++)
+			{
+				GUI::color = i < p[s] ? colors[k] : Color(0, 0, 0, 0.45f);
+				GUI::DrawTexture(Rect(x, base - (i + 1) * (segH + gap), segW, segH), Icons::White());
+			}
+			GUI::color = old;
+			DrawLabel(names[k], Vector2(x, base + 2), colors[k], true);
+			DrawLabel(cs::Cat("x", cs::Fmt(p.Factor(s), "0.00")), Vector2(x, base + 18), Dim, true);
+		}
+		DrawLabel("arrows: L/U/R a pip, Down even, Shift all", Vector2(r.x + 10, r.y + h - 20), Dim, true);
 	}
 
 	void Hud::DrawBroadside(const cs::Ref<Battle>& battle, const cs::Ref<BattleUnit>& me, float x, float y)

@@ -9,6 +9,7 @@
 #include "Combat/Battle.h"
 #include "Combat/Broadsides.h"
 #include "Combat/CombatState.h"
+#include "Combat/Dogfighting.h"
 #include "Combat/FlightModels.h"
 #include "Combat/HaulerFlight.h"
 #include "Combat/PilotFlight.h"
@@ -97,6 +98,12 @@ namespace SpaceGod::Core
 
 	void ShipHelm::Control(const EmbodimentInput& input, double dt)
 	{
+		// The reactor split asked for this frame (US-T94), whole, so a repeated command lands the same.
+		if (input.PowerSplit >= 0 && Ship->Combat != nullptr)
+		{
+			if (Ship->Combat->Reactor == nullptr) Ship->Combat->Reactor = cs::New<PowerDistribution>();
+			Ship->Combat->Reactor->SetCode(input.PowerSplit);
+		}
 		auto unit = Unit();
 		if (unit != nullptr && unit->PlayerControlled())
 		{
@@ -132,6 +139,17 @@ namespace SpaceGod::Core
 		input.DockingApproach = f->DockingApproach;
 		// The player's own hands (US-T87): the models' player-facing handling applies, never a crew's.
 		input.Piloted = true;
+		// The engines' share of the reactor (US-T94): top speed (assist's set point), every thruster's push and the boost's
+		// recharge, a quarter a pip either side of an even share. The helm is only ever the player's, so crews fly as before.
+		auto reactor = ship->Combat->Reactor;
+		double engines = reactor != nullptr ? reactor->Factor(PowerSystem::Engines) : 1;
+		if (engines != 1)
+		{
+			tuning.MaxSpeed *= engines;
+			hull = HullDynamics(hull.MassKt, hull.MainAccel * engines, hull.RetroAccel * engines, hull.LateralAccel * engines,
+				hull.VerticalAccel * engines, hull.PitchYawAngularAccel, hull.RollAngularAccel);
+			input.BoostRecharge = engines;
+		}
 		// The turn-and-burn (US-T87): held, the nose swings onto the retrograde while the hull slides on along its track.
 		// A capital ship's is the broadside stance instead (US-T81): the helm lays it beam-on to the locked hull (or holds
 		// its heading with none) while the turn keys, passed through as strafe, slide it sideways and up or down.

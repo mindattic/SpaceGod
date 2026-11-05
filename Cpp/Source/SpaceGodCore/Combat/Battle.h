@@ -33,6 +33,7 @@ namespace SpaceGod::Core
 	enum class StrikePhase : int;
 	enum class ShipClass : int;
 	enum class SubsystemKind : int;
+	enum class PowerSystem : int;
 
 	enum class UnitKind : int
 	{
@@ -997,6 +998,21 @@ namespace SpaceGod::Core
 		/// <summary>A big ship's heat this step (U.SPC-T491, <see cref="Radiators.Step"/>), with the guns reloading as fast as
 		/// <see cref="Fire"/> lets them, and every system the heat burns out shown going.</summary>
 		void StepHeat(const cs::Ref<BattleUnit>& u, double dt);
+
+	public:
+		/// <summary>How hard <paramref name="u"/> runs <paramref name="s"/> on its reactor's split: a small craft's own
+		/// (<see cref="PowerDistribution.FactorOf"/>, its pilot's or the player's), a hull's or station's the player set
+		/// (US-T94, <see cref="ShipCombat.Reactor"/>) while the player holds it, else 1.</summary>
+		double PowerFactor(const cs::Ref<BattleUnit>& u, PowerSystem s) const;
+
+		/// <summary>How much field <paramref name="u"/>'s emitters hold on the player's split (US-T94,
+		/// <see cref="PowerDistribution.ShieldCapacity"/>): 1 for anything the player does not hold.</summary>
+		double ShieldCapacityOf(const cs::Ref<BattleUnit>& u) const;
+
+		/// <summary>The player holds <paramref name="u"/> (US-T94): at its helm, at one of its guns, or at its station's controls.</summary>
+		bool PlayerAboard(const cs::Ref<BattleUnit>& u) const;
+
+	private:
 
 		/// <summary>
 		/// The player's guns cool and the missile lock builds or slips (U.SPC-T270): the lock grows while the

@@ -335,7 +335,8 @@ namespace SpaceGod::Core
 
 	SG_SERIALIZE(ShipCombat, "Unity.SpaceGod.Core.ShipCombat",
 		SG_F(BoostFraction), SG_F(Hangar), SG_F(Hull), SG_F(Interior), SG_F(PhaserTuning), SG_F(Readiness),
-		SG_F(ShuttleBay), SG_F(Spec), SG_F(StationHeld), SG_F(Subsystems), SG_F(structure))
+		SG_F(ShuttleBay), SG_F(Spec), SG_F(StationHeld), SG_F(Subsystems), SG_F(structure),
+		SG_OPT(Reactor)) // US-T94: the player's reactor split, absent from older saves
 
 	SG_SERIALIZE(Subsystem, "Unity.SpaceGod.Core.Subsystem",
 		SG_F(Aim), SG_F(Ammo), SG_F(Cooldown), SG_F(Def), SG_F(Hp), SG_F(Index), SG_F(LastHitSeconds),

@@ -29,6 +29,7 @@
 #include "Combat/War.h"
 #include "Economy/Economy.h"
 #include "Economy/Settlement.h"
+#include "Embodiment/CraftPower.h"
 #include "Embodiment/Embodiables.h"
 #include "Embodiment/Embodiment.h"
 #include "Embodiment/FighterSeat.h"
@@ -303,6 +304,7 @@ namespace SpaceGod
 			input.Manoeuvre = Input.Manoeuvre; // US-T87: the turn-and-burn's flip
 			input.Primary = Input.Fire && !ClickPanelOpen();
 			input.Secondary = Input.LookHeld && !ClickPanelOpen();
+			input.PowerSplit = CraftPower::After(held, Input.PowerKey); // US-T94: the arrows' reactor split, whole
 			cs::String line = CommandCodec::Write(cs::New<SeatControlCommand>(session->LocalPlayer(), input));
 			if (line != coopLastControl)
 			{

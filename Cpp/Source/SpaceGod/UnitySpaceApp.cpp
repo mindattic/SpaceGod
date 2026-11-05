@@ -58,6 +58,7 @@
 #include "Economy/Holdings.h"
 #include "Economy/Settlement.h"
 #include "Economy/TradeDesk.h"
+#include "Embodiment/CraftPower.h"
 #include "Embodiment/Embodiables.h"
 #include "Embodiment/Embodiment.h"
 #include "Embodiment/HelmControls.h"
@@ -1192,6 +1193,8 @@ namespace SpaceGod
 		// The trigger and the crosshair; UpdatePilotBattle below gates them on what the hull can fire right now.
 		stick.Primary = Input.Fire && !ClickPanelOpen();
 		stick.Secondary = Input.LookHeld && !ClickPanelOpen();
+		// The arrows share the hull's reactor (US-T94): the whole split asked for goes in with the stick.
+		stick.PowerSplit = CraftPower::After(pilotHelm, Input.PowerKey);
 		pilotHelm->Control(stick, dt);
 		// The camera's FOV kick below, and the HUD's readouts.
 		pilotBoosting = helmFlight->Boosting;

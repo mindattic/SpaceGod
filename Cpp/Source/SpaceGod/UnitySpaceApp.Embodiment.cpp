@@ -9,6 +9,7 @@
 #include "Combat/War.h"
 #include "Embodiment/Embodiables.h"
 #include "Embodiment/Embodiment.h"
+#include "Embodiment/CraftPower.h"
 #include "Embodiment/FighterSeat.h"
 #include "Embodiment/MountedTurret.h"
 #include "Embodiment/ShipHelm.h"
@@ -502,6 +503,8 @@ namespace SpaceGod
 		input.Manoeuvre = Input.Manoeuvre; // US-T87: the turn-and-burn's flip
 		input.Primary = Input.Fire && !ClickPanelOpen();
 		input.Secondary = Input.LookHeld && !ClickPanelOpen();
+		// The arrows share the reactor the seat draws on (US-T94): a craft's own, a gun's hull's, a station's.
+		input.PowerSplit = CraftPower::After(held, Input.PowerKey);
 		if (auto cockpit = cs::As<FighterSeat>(held))
 			if (!ClickPanelOpen()) UpdateCockpit(cockpit, input.Aim);
 		// On the sim clock's time, so a fight run faster is flown faster too.

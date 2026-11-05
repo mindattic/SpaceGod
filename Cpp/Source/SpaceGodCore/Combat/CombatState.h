@@ -12,6 +12,7 @@ namespace SpaceGod::Core
 	class Ship;
 	class Interior;
 	class ModularHull;
+	class PowerDistribution;
 	enum class SubsystemKind : int;
 	enum class ShipClass : int;
 	enum class PhaserTuning : int;
@@ -101,6 +102,13 @@ namespace SpaceGod::Core
 		/// <see cref="StationSeat"/> (U.SPC-T447): its guns are laid on the player's aim, in a fight or out of one. Kept on
 		/// the station itself, so it stays held as a fight starts or ends around it.</summary>
 		bool StationHeld = false;
+
+		/// <summary>How the player has shared the hull's reactor between weapons, shields and engines at its helm, at one of its
+		/// guns or at the station's controls (US-T94, <see cref="CraftPower"/>); null until the player first moves power, and
+		/// read only while the player holds the hull, so a crew always fights at the even share it was designed for. Kept on
+		/// the hull (and saved, an optional field older saves lack) so the split is still there when the player comes back.
+		/// A small craft shares its own reactor through <see cref="BattleUnit.Power"/> instead.</summary>
+		cs::Ref<PowerDistribution> Reactor;
 
 		/// <summary>Boost charge, 0-1: drains over <see cref="CombatSpec.BoostDurationS"/> while held and
 		/// recharges (twice as slowly) otherwise. Shared by AI and player flight so boost behaves the same
@@ -193,7 +201,10 @@ namespace SpaceGod::Core
 		/// <summary>Regrows every live emitter's field whose patch has not been hit for <see cref="ShieldEmitters.RegenDelay"/>
 		/// battle-seconds, each toward its own cap, sharing the hull's total regen rate (times <see cref="ShieldEmitters.RegenRate"/>)
 		/// across its emitters by their ratings (evenly, on a stock hull). The patch under fire stays down while the rest recover.</summary>
-		void RegenShields(double nowSeconds, double dt);
+		/// <para><paramref name="capacity"/> (US-T94) scales each emitter's cap: the player's reactor share for the shields
+		/// (<see cref="PowerDistribution.ShieldCapacity"/>), above 1 an overcharge, below 1 a field that bleeds down to it.
+		/// A crew's hull always passes 1.</para>
+		void RegenShields(double nowSeconds, double dt, double capacity = 1);
 
 		bool Armed() const;
 

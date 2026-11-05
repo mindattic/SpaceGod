@@ -121,6 +121,9 @@ namespace SpaceGod::Core
 			std::function<void(Writer&, void*)> Write;
 			std::function<void(Reader&, const Value&, void*)> Read;
 			std::function<void(StaticWalker&, void*, const cs::String&, int)> Walk;
+			/// A field added after saves were made (SG_OPT, US-T94): a save without it still loads, the member keeping the
+			/// value the default constructor gave it.
+			bool Optional = false;
 		};
 
 		/// <summary>A registered C++ type: a class (held by cs::Ref) or a struct (held by value).</summary>
@@ -1080,6 +1083,8 @@ namespace SpaceGod::Core
 				return *this;
 			}
 			template <class M> ClassBuilder& Field(const cs::String& netName, M T::* member) { return FieldWith<Codec<Bare<M>>>(netName, member); }
+			/// The field just added may be missing from a save (see FieldInfo::Optional).
+			ClassBuilder& Optional() { info.Own.back().Optional = true; return *this; }
 			/// An auto-property's backing field: .NET names it `<Name>k__BackingField`.
 			template <class M> ClassBuilder& Property(const cs::String& name, M T::* member) { return Field(cs::Cat("<", name, ">k__BackingField"), member); }
 			/// A C# array (`T[]`) the port holds as cs::List<T> (or cs::Ref<cs::List<T>>).
@@ -1265,6 +1270,8 @@ namespace SpaceGod::Core
 
 /// A field whose .NET name is the C++ member's name.
 #define SG_F(member) b.Field(#member, &Self::member)
+/// A C++-only field added after saves were made (US-T94): an older save without it loads, the member left at its default.
+#define SG_OPT(member) b.Field(#member, &Self::member).Optional()
 /// A field whose .NET name differs from the C++ member's.
 #define SG_FN(netName, member) b.Field(netName, &Self::member)
 /// An auto-property: the backing field `<member>k__BackingField`.

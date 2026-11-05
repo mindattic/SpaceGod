@@ -27,6 +27,12 @@ namespace SpaceGod::Input
 		// US-T87: Alt held is the manoeuvre key at the controls (a turn-and-burn's flip); with F9-F11 under capture, and
 		// Shift+Alt+K, Alt keeps its other meanings, which only read it with another key.
 		Manoeuvre = kb[Key::LeftAlt].isPressed || kb[Key::RightAlt].isPressed;
+		// US-T94: the arrows move reactor power at the controls (Core::PowerKey): Left weapons, Up shields, Right engines a
+		// pip at a time, Down an even share; Shift with one of the three, all the reactor can spare to it.
+		PowerKey = kb[Key::LeftArrow].wasPressedThisFrame ? (Boost ? 3 : 0)
+			: kb[Key::UpArrow].wasPressedThisFrame ? (Boost ? 4 : 1)
+			: kb[Key::RightArrow].wasPressedThisFrame ? (Boost ? 5 : 2)
+			: kb[Key::DownArrow].wasPressedThisFrame ? 6 : -1;
 
 		MousePosition = mouse.position;
 		MouseDelta = mouse.delta;
@@ -160,6 +166,7 @@ namespace SpaceGod::Input
 		}
 		// In command nothing is flown: F focuses, T resets time, Backspace goes home, B watches a battle.
 		ToggleFlightAssist = LockTarget = MoveToHost = ToggleBoarding = Manoeuvre = false;
+		PowerKey = -1; // US-T94: nothing to share a reactor of in command
 		ThrottleStep = 0;
 		Roll = 0;
 	}
@@ -200,6 +207,7 @@ namespace SpaceGod::Input
 		Roll = 0;
 		ToggleFlightAssist = false;
 		Manoeuvre = false;
+		PowerKey = -1;
 		Boost = Slow = Fire = Cruise = FireEmp = DropMine = false;
 		SelectClicked = SelectDoubleClicked = RightClicked = false;
 		Focus = Escape = ToggleScale = TimeFaster = TimeSlower = TogglePause = ResetTime = false;

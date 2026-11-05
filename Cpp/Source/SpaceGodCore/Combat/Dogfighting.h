@@ -221,6 +221,22 @@ namespace SpaceGod::Core
 
 		bool IsEven() const { return pips[0] == EvenPips && pips[1] == EvenPips && pips[2] == EvenPips; }
 
+		/// <summary>All the reactor can spare to <paramref name="s"/> (US-T94): <see cref="MaxPips"/> to it, one each to the others.</summary>
+		void AllTo(PowerSystem s);
+
+		/// <summary>How much field the shield emitters hold on the player's split (US-T94): 1 at an even share, an eighth
+		/// more or less per pip (0.75 with none, 1.25 at the most).</summary>
+		double ShieldCapacity() const { return 1 + (pips[static_cast<int>(PowerSystem::Shields)] - EvenPips) * PerPip * 0.5; }
+
+		/// <summary>The split as one number for a command line (US-T94): weapons*25 + shields*5 + engines.</summary>
+		int Code() const { return pips[0] * 25 + pips[1] * 5 + pips[2]; }
+
+		/// <summary>Sets the split from <see cref="Code"/>'s number; false (and unchanged) if it is not a legal split.</summary>
+		bool SetCode(int code);
+
+		/// <summary>"BALANCED", "ALL WEAPONS" and so on for a preset split, else empty.</summary>
+		cs::String PresetName() const;
+
 		/// <summary><paramref name="u"/>'s factor for <paramref name="s"/>: 1 when it shares no power.</summary>
 		static double FactorOf(const cs::Ref<BattleUnit>& u, PowerSystem s);
 
