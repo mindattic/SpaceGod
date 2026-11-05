@@ -10,6 +10,7 @@
 #include "Combat/Diplomacy.h"
 #include "Combat/Morale.h"
 #include "Combat/War.h"
+#include "Comms/Pilots.h" // US-T138: Law.Pilots's registration
 #include "Economy/CargoHold.h"
 #include "Economy/Economy.h"
 #include "Economy/Goods.h"
@@ -623,5 +624,6 @@ namespace SpaceGod::Core
 		SG_F(world), SG_F(Player), SG_F(Captains), SG_F(Recent), SG_F(notices), SG_P(Hail), SG_F(Committed),
 		SG_F(PatrolHailKm), SG_F(PatrolHoldKm), SG_F(ScanSeconds), SG_F(HailSeconds), SG_F(ScanCooldownDays), SG_F(TrespassCooldownDays),
 		// (Committed's subscriber, Outlaws.OnCrime, is World's wiring: World's SG_LOADED hook makes it again.)
-		SG_F(lastJd), SG_F(scannedUntil), SG_F(trespassUntil))
+		SG_F(lastJd), SG_F(scannedUntil), SG_F(trespassUntil),
+		SG_OPT(Pilots)) // US-T138: the named pilots, absent from older saves
 }

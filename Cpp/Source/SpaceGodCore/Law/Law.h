@@ -23,6 +23,7 @@ namespace SpaceGod::Core
 	class Battle;
 	class BattleUnit;
 	class CargoItem;
+	class Characters;
 	struct LaneHop;
 	enum class ContactLevel : int;
 
@@ -171,6 +172,11 @@ namespace SpaceGod::Core
 
 		/// <summary>The patrol hail the player's ship is answering, or null.</summary>
 		cs::Ref<PatrolHail> Hail;
+
+		/// <summary>The named pilots met in this system, their life stories and careers (US-T138, <see cref="Characters"/>),
+		/// and what comms has made of them (US-T137). Null until the first is met (<see cref="Characters.Of"/>); absent
+		/// from older saves.</summary>
+		cs::Ref<Characters> Pilots;
 
 		/// <summary>Raised for every crime, witnessed or not (recorded ones carry their bounty).</summary>
 		cs::Event<cs::Ref<Crime>> Committed;
