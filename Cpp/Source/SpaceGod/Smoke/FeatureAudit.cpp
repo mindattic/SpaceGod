@@ -587,43 +587,64 @@ namespace SpaceGod::Smoke::FeatureAudit
 			double after = AngleDeg(PilotAim(), DirectionTo(me, target));
 			Result("combat.mouse-aim", after < 1, cs::Cat("mouse: crosshair ", F(before, "F1"), " -> ", F(after, "F2"), " deg off the ", target->Name, " in ", steps, " frames"));
 
-			// The target selected (what a left-click on it does in the god view), T locks it; the left button opens fire
-			// (weapons free on a lone merchant), and held down the guns fire down the crosshair, the mouse keeping it on the target.
+			// US-T112: the trigger is probed in a fight the probe lays out itself, not one the click above would open wherever
+			// the practice fighter happens to be (TryStartPlayerAttack there may start no fight, or put the two sides at
+			// stations km apart for the AI to close): the dogfight demo (US-T88) seats the player in a fighter in a fresh fight
+			// against four pirates, and the corvette among them is pinned 0.8 km dead ahead, inside the guns' reach, so all
+			// that is left is the input: the left button held (in bursts, as a player does: held until the guns run hot, let go
+			// until they cool) fires the guns down the crosshair, the mouse keeping it on the lead.
+			app->StartDogfightDemo(false);
+			frames(3);
+			me = app->IsPiloting() ? PilotedShip() : cs::Ref<Ship>();
+			auto mine = me && me->Battle ? me->Battle->UnitOf(me) : cs::Ref<BattleUnit>();
+			cs::Ref<BattleUnit> foe;
+			if (mine)
+				for (const auto& u : me->Battle->Units)
+					if (u->Ship && u->Side != mine->Side && u->Present() && (!foe || Contains(u->Ship->Name, "Corvette"))) foe = u;
+			if (!foe)
+			{
+				Result("combat.mouse-fire", false, cs::Cat("dogfight demo: piloting ", B(me != nullptr), ", fight ", me && me->Battle ? "on" : "none", ", no enemy hull in it"));
+				ToCommand();
+				return;
+			}
+			target = foe->Ship;
+			DVec3 ahead = mine->Forward.Normalized();
+			auto pin = [&]()
+			{
+				auto u = me->Battle ? me->Battle->UnitOf(me) : cs::Ref<BattleUnit>();
+				auto t = me->Battle ? me->Battle->UnitOf(target) : cs::Ref<BattleUnit>();
+				if (!u || !t || !t->Present()) return;
+				t->Pos = u->Pos + ahead * 0.8;
+				t->Vel = u->Vel;
+				t->Forward = -ahead;
+			};
+			pin();
 			app->Select(Target::OfShip(target));
 			Tap(Key::T);
 			cs::String locked = Describe(app->SpaceCamera->PilotLockTarget);
-			double whole = Integrity(target->Combat), least = whole, heat = 0, worst = 0, range = 0;
-			cs::String fireToast;
+			double whole = Integrity(foe->Combat ? foe->Combat : target->Combat), least = whole, heat = 0, worst = 0, range = 0;
+			cs::String fireToast = Toast();
 			int held = 0, frame = 0;
 			bool trigger = false;
-			// The click opens the fight, which puts the two sides at their stations some km apart (War.TryStartPlayerAttack):
-			// the player runs in on W, under cruise (J) while far out, and inside the guns' reach fires in bursts, as a
-			// player does: held until the guns run hot, let go until they cool, the mouse keeping the crosshair on the lead.
-			kb->Hold(Key::W);
-			double nearest = std::numeric_limits<double>::max(), closest = std::numeric_limits<double>::max(), first = -1;
-			bool cruising = false;
-			for (; frame < 3600; frame++)
+			double closest = std::numeric_limits<double>::max();
+			for (; frame < 1200; frame++)
 			{
+				pin();
 				auto unit = me->Battle ? me->Battle->UnitOf(me) : cs::Ref<BattleUnit>();
-				auto tu = me->Battle ? me->Battle->UnitOf(target) : cs::Ref<BattleUnit>();
-				double to = unit && tu ? (tu->Pos - unit->Pos).Length() : 0;
-				bool far = to > 3, inReach = unit && to < 1.5;
-				if (far != cruising) { if (far) kb->Hold(Key::J); else kb->Release(Key::J); cruising = far; }
 				bool hot = unit && (unit->Overheated || unit->Heat > 0.8);
 				bool cool = !unit || unit->Heat < 0.3;
-				bool want = !unit ? frame < 2 : inReach && (trigger ? !hot : cool);
+				bool want = unit && (trigger ? !hot : cool);
 				if (trigger && !want) { kb->ReleaseButton(Input::MouseButton::Left); trigger = false; }
 				else if (!trigger && want) { kb->HoldButton(Input::MouseButton::Left); trigger = true; }
 				SteerMouse(DirectionTo(me, target), signX, signY);
 				if (trigger) held++;
-				if (fireToast.empty() && me->Battle) fireToast = Toast();
 				unit = me->Battle ? me->Battle->UnitOf(me) : cs::Ref<BattleUnit>();
-				tu = me->Battle ? me->Battle->UnitOf(target) : cs::Ref<BattleUnit>();
+				auto tu = me->Battle ? me->Battle->UnitOf(target) : cs::Ref<BattleUnit>();
 				if (unit)
 				{
 					heat = cs::Math::Max(heat, unit->Heat);
-					if (trigger && inReach) worst = cs::Math::Max(worst, AngleDeg(unit->PlayerAim, DirectionTo(me, target)));
-					if (tu) { range = (tu->Pos - unit->Pos).Length(); nearest = cs::Math::Min(nearest, range); if (first < 0) first = range; }
+					if (trigger) worst = cs::Math::Max(worst, AngleDeg(unit->PlayerAim, DirectionTo(me, target)));
+					if (tu) range = (tu->Pos - unit->Pos).Length();
 					// The guns' rounds (this side's, in flight): how close any came to the target's hull.
 					if (tu)
 						for (const auto& r : me->Battle->Rounds)
@@ -631,15 +652,13 @@ namespace SpaceGod::Smoke::FeatureAudit
 				}
 				least = cs::Math::Min(least, Integrity(tu && tu->Combat ? tu->Combat : target->Combat));
 				if (target->Destroyed || (held > 120 && least < whole && closest < 0.1)) break;
-				if (me->Destroyed || !app->IsPiloting()) break;
+				if (me->Destroyed || !app->IsPiloting() || !me->Battle) break;
 			}
-			kb->Release(Key::J);
 			if (trigger) kb->ReleaseButton(Input::MouseButton::Left);
-			kb->Release(Key::W);
 			frames(1);
 			Result("combat.mouse-fire", me->Battle != nullptr && heat > 0 && least < whole && closest < 0.1,
-				cs::Cat("T: locked ", locked, "; left button held ", held, " of ", cs::Math::Min(frame + 1, 3600), " frames: fight ", me->Battle ? "on" : "none", ", gun heat ", F(heat, "F2"), ", ",
-					"crosshair within ", F(worst, "F2"), " deg of the lead, ", F(nearest == std::numeric_limits<double>::max() ? 0 : nearest, "F2"), " to ", F(range, "F2"), " km off, first ", F(first, "F2"), " km, rounds to ", F(closest == std::numeric_limits<double>::max() ? -1 : closest, "F3"), " km of its hull, the ", target->Name, " ", F(whole, "F0"), " -> ", F(least, "F0"),
+				cs::Cat("dogfight demo, T: locked ", locked, "; left button held ", held, " of ", cs::Math::Min(frame + 1, 1200), " frames: fight ", me->Battle ? "on" : "none", ", gun heat ", F(heat, "F2"), ", ",
+					"crosshair within ", F(worst, "F2"), " deg of the lead, ", F(range, "F2"), " km off, rounds to ", F(closest == std::numeric_limits<double>::max() ? -1 : closest, "F3"), " km of its hull, the ", target->Name, " ", F(whole, "F0"), " -> ", F(least, "F0"),
 					target->Destroyed ? " (destroyed)" : "", "; toast '", fireToast, "'"));
 			ToCommand();
 		}
