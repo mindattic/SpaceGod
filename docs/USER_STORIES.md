@@ -96,7 +96,7 @@ _Nothing recorded yet._
 | US-T73 | 2026-11-04 | feature | closed | SpaceGod copies: Desktop shortcut (run.bat) asks 1) Deploy or 2) Deploy & Run in SpaceGod.Unreal.Cpp, SpaceGod.Unreal.CSharp and SpaceGod.Unity.CSharp | Cpp/UCS/Unity run.bat menu |
 | US-T74 | 2026-11-04 | feature | closed | SpaceGod copies: every launch records through MindAttic.Capture (run.ps1 -Launch and deploy.bat Run pass -capture video hq) in SpaceGod.Unreal.Cpp, SpaceGod.Unreal.CSharp and SpaceGod.Unity.CSharp | run.ps1 + deploy.bat -capture video hq |
 | US-T75 | 2026-11-04 | feature | closed | SpaceGod copies: game icon from Assets/logo.png with the engine logo lower-left and Cpp/C# lower-right, exported as icon.ico then embedded in each packaged EXE | Cpp 424ab81; UCS f00b070; Unity 7d90c53 |
-| US-T76 | 2026-11-05 | feature | open | Promote SpaceGod.Unreal.Cpp to the new SpaceGod repo: push history, rename UnrealSpaceGod/module namespaces and docs to SpaceGod | US-T69 |
+| US-T76 | 2026-11-05 | feature | closed | Promote SpaceGod.Unreal.Cpp to the new SpaceGod repo: push history, rename UnrealSpaceGod/module namespaces and docs to SpaceGod | ca39434 |
 | US-T77 | 2026-11-05 | fix | open | UI buttons don't respond to clicks/input in SpaceGod | US-T69 |
 | US-T78 | 2026-11-05 | fix | open | Models don't appear at the exact position the F focus-mode zoom targets | US-T69 |
 | US-T79 | 2026-11-05 | feature | open | Light fighters: Star Conflict-style Newtonian six-axis flight model | — |
