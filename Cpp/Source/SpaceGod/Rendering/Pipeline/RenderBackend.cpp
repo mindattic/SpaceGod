@@ -118,20 +118,48 @@ namespace SpaceGod::Rendering
 
 	void NeutralRenderBackend::SetLighting(const StarLighting& value)
 	{
-		if (lightingOverride)
-		{
-			gameLighting = value;
-			return;
-		}
-		ApplyLighting(value);
+		gameLighting = value;
+		gameLightingSet = true;
+		if (lightingOverride) return;
+		ApplyLighting(Graded(value));
 	}
 
 	void NeutralRenderBackend::OverrideLighting(const std::optional<StarLighting>& value)
 	{
 		// Unset to set: what the game shows now is what comes back when the override ends.
-		if (!lightingOverride && value) gameLighting = Lighting();
+		if (!lightingOverride && value && !gameLightingSet)
+		{
+			gameLighting = Lighting();
+			gameLightingSet = true;
+		}
 		lightingOverride = value;
-		ApplyLighting(value ? *value : gameLighting);
+		ApplyLighting(value ? *value : Graded(gameLighting));
+	}
+
+	void NeutralRenderBackend::SetSystemGrade(const SystemGrade& value)
+	{
+		grade = value;
+		if (!lightingOverride && gameLightingSet) ApplyLighting(Graded(gameLighting));
+	}
+
+	StarLighting NeutralRenderBackend::Graded(const StarLighting& value) const
+	{
+		// US-T132: beyond Sol the star's light takes the place's colour, and with no companion star lighting the scene the
+		// companion slot carries the fill from the sky's heart, so hulls and worlds sit in the sky's light.
+		if (!grade.Active) return value;
+		StarLighting l = value;
+		l.SunColor = Vector4(value.SunColor.x * grade.KeyTint.x, value.SunColor.y * grade.KeyTint.y, value.SunColor.z * grade.KeyTint.z, value.SunColor.w);
+		bool companion = value.Sun2Color.x + value.Sun2Color.y + value.Sun2Color.z > 1e-3f;
+		if (companion)
+			l.Sun2Color = Vector4(value.Sun2Color.x * grade.KeyTint.x, value.Sun2Color.y * grade.KeyTint.y, value.Sun2Color.z * grade.KeyTint.z, value.Sun2Color.w);
+		else
+		{
+			// At infinity in the heart's direction (camera-relative, as the star's position is).
+			constexpr float Far = 1e9f;
+			l.Sun2Position = Vector4(grade.FillDirection.x * Far, grade.FillDirection.y * Far, grade.FillDirection.z * Far, 0);
+			l.Sun2Color = Vector4(grade.FillColor.x, grade.FillColor.y, grade.FillColor.z, value.Sun2Color.w);
+		}
+		return l;
 	}
 
 	void NeutralRenderBackend::ApplyLighting(const StarLighting& value)
@@ -201,6 +229,12 @@ namespace SpaceGod::Rendering
 	{
 		if (!camera) return;
 		game = value;
+		Apply();
+	}
+
+	void UnrealRenderBackend::SetSystemGrade(const SystemGrade& value)
+	{
+		NeutralRenderBackend::SetSystemGrade(value);
 		Apply();
 	}
 
@@ -278,6 +312,11 @@ namespace SpaceGod::Rendering
 		// None draws the image as the shaders do (clipping above white); Neutral and ACES take Unreal's filmic curve.
 		s.bOverride_ToneCurveAmount = true;
 		s.ToneCurveAmount = stack && look.Tonemapping != ToneCurve::None ? 1.0f : 0.0f;
+		// US-T132: the place's fog and dust (none in Sol): a coloured lift in the shadows and a wash over the frame.
+		s.bOverride_SceneColorTint = true;
+		s.SceneColorTint = grade.Active ? FLinearColor(grade.Tint.x, grade.Tint.y, grade.Tint.z, 1) : FLinearColor::White;
+		s.bOverride_ColorOffsetShadows = true;
+		s.ColorOffsetShadows = grade.Active ? FVector4(grade.Haze.x, grade.Haze.y, grade.Haze.z, 0) : FVector4(0, 0, 0, 0);
 	}
 
 	cs::String UnrealRenderBackend::Describe()

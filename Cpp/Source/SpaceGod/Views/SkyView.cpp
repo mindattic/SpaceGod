@@ -2,6 +2,8 @@
 #include "Views/SkyView.h"
 #include "Views/BodyView.h"
 #include "Rendering/Materials.h"
+#include "Rendering/Pipeline/RenderBackend.h"
+#include "Rendering/SystemSkies.h"
 
 #include "Rendering/ProceduralSky.h"
 #include "Rendering/Skyboxes.h"
@@ -107,6 +109,7 @@ namespace SpaceGod::Views
 				renderer->enabled = false;
 				if (Alive(starfield)) starfield->SetActive(true);
 				shownKey = wantedKey;
+				Rendering::RenderBackend::Active()->SetSystemGrade(Rendering::SystemGrade());
 				break;
 			case SkyKind::Image:
 			{
@@ -130,18 +133,18 @@ namespace SpaceGod::Views
 			case SkyKind::Procedural:
 			{
 				int width = SkyboxSettings::NebulaFaceSize() * 4;
-				uint64_t seed = ProceduralSky::SeedFor(systemName);
+				cs::String place = systemName; // US-T132: beyond Sol the place's painted sky, Sol's seeded nebulae
 				auto mips = std::make_shared<cs::List<int>>();
 				pendingBakeWidth = width;
 				pendingBakeMips = mips;
 				bakeCancel = std::make_shared<std::atomic<bool>>(false);
 				auto token = bakeCancel;
-				pendingBake = Async(EAsyncExecution::ThreadPool, [seed, width, mips, token]() -> cs::List<uint8_t>
+				pendingBake = Async(EAsyncExecution::ThreadPool, [place, width, mips, token]() -> cs::List<uint8_t>
 				{
 					// A bake overtaken by another choice stops at its next row and is dropped (an empty result).
 					try
 					{
-						return ProceduralSky::BakePanorama(seed, width, *mips, token.get());
+						return Rendering::SystemSkies::BakePanorama(place, width, *mips, token.get());
 					}
 					catch (const std::exception& e)
 					{
@@ -229,17 +232,17 @@ namespace SpaceGod::Views
 			case SkyKind::Procedural:
 			{
 				int width = SkyboxSettings::NebulaFaceSize() * 4;
-				uint64_t seed = ProceduralSky::SeedFor(system);
+				cs::String place = system; // US-T132: beyond Sol the place's painted sky (shared with SystemSkies' cache)
 				auto mips = std::make_shared<cs::List<int>>();
 				a->BakeWidth = width;
 				a->Mips = mips;
 				a->Cancel = std::make_shared<std::atomic<bool>>(false);
 				auto token = a->Cancel;
-				a->Bake = Async(EAsyncExecution::ThreadPool, [seed, width, mips, token]() -> cs::List<uint8_t>
+				a->Bake = Async(EAsyncExecution::ThreadPool, [place, width, mips, token]() -> cs::List<uint8_t>
 				{
 					try
 					{
-						return ProceduralSky::BakePanorama(seed, width, *mips, token.get());
+						return Rendering::SystemSkies::BakePanorama(place, width, *mips, token.get());
 					}
 					catch (const std::exception& e)
 					{
@@ -402,6 +405,8 @@ namespace SpaceGod::Views
 		if (Alive(starfield)) starfield->SetActive(spec->PointStars);
 		shownKey = wantedKey;
 		fade = 0;
+		// US-T132: the light follows the sky on screen: graded to a place's painted sky, plain under any other.
+		Rendering::RenderBackend::Active()->SetSystemGrade(spec->Kind == SkyKind::Procedural ? Rendering::SystemSkies::GradeFor(systemName) : Rendering::SystemGrade());
 		ApplyBrightness();
 		if (old && old != tex) Free(old, oldFromResources);
 	}

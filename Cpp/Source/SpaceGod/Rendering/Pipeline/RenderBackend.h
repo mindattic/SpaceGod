@@ -45,6 +45,22 @@ namespace SpaceGod::Rendering
 	};
 
 	/// <summary>
+	/// US-T132: the light of a place beyond Sol, graded to its painted sky (Rendering::SystemSkies::GradeFor). The star's
+	/// light is tinted, a fill comes from the sky's bright heart (as the companion light, when there is no companion star),
+	/// and the frame gets the place's fog and dust: a coloured lift in the shadows and a wash. Inactive (Sol) changes nothing.
+	/// </summary>
+	struct SystemGrade
+	{
+		bool Active = false;
+		/// <summary>Multiplies the star's light (rgb).</summary>
+		Vector4 KeyTint = Vector4(1, 1, 1, 1);
+		/// <summary>Toward the sky's heart (unit, the game's world axes) and the fill's colour times its strength (rgb).</summary>
+		Vector4 FillDirection = Vector4(0, 1, 0, 0), FillColor = Vector4(0, 0, 0, 1);
+		/// <summary>The fog and dust: added to the shadows (rgb), and the frame's colour wash (rgb, 1 for none).</summary>
+		Vector4 Haze = Vector4(0, 0, 0, 0), Tint = Vector4(1, 1, 1, 1);
+	};
+
+	/// <summary>
 	/// A post-process look in pipeline-neutral terms (U.SPC-T429): each pipeline turns it into its own volume and
 	/// overrides. <see cref="None"/> (the default) means no post-processing at all, which is how the game draws today.
 	/// </summary>
@@ -100,6 +116,10 @@ namespace SpaceGod::Rendering
 		/// </summary>
 		virtual void OverrideLighting(const std::optional<StarLighting>& value) = 0;
 		virtual std::optional<StarLighting> LightingOverride() const = 0;
+
+		/// <summary>US-T132: grades the game's light (not an override's) to the place in view; an inactive grade for Sol.</summary>
+		virtual void SetSystemGrade(const SystemGrade& value) = 0;
+		virtual SystemGrade Grade() const = 0;
 
 		/// <summary>Applies <paramref name="look"/> to what <paramref name="camera"/> draws (<see cref="PostProcessLook.None"/> turns it off).</summary>
 		virtual void SetPostProcessing(Camera* camera, const PostProcessLook& look) = 0;
@@ -160,6 +180,8 @@ namespace SpaceGod::Rendering
 		void SetLighting(const StarLighting& value) override;
 		void OverrideLighting(const std::optional<StarLighting>& value) override;
 		std::optional<StarLighting> LightingOverride() const override { return lightingOverride; }
+		void SetSystemGrade(const SystemGrade& value) override;
+		SystemGrade Grade() const override { return grade; }
 		void SetPostProcessing(Camera* camera, const PostProcessLook& look) override {}
 		cs::List<cs::String> RenderFeatures() const override { return cs::List<cs::String>(); }
 		Core::PhotorealOptions Photoreal() const override { return photoreal; }
@@ -169,12 +191,16 @@ namespace SpaceGod::Rendering
 	protected:
 		cs::Ref<Core::RenderPipelineProfile> profile;
 		Core::PhotorealOptions photoreal = Core::PhotorealOptions::Default();
+		SystemGrade grade;
 
 	private:
 		void ApplyLighting(const StarLighting& value);
+		/// The game's light with the place's grade on it.
+		StarLighting Graded(const StarLighting& value) const;
 		std::optional<StarLighting> lightingOverride;
-		/// What the game last asked for while an override held.
+		/// What the game last asked for (ungraded).
 		StarLighting gameLighting;
+		bool gameLightingSet = false;
 	};
 
 	/// <summary>
@@ -193,6 +219,7 @@ namespace SpaceGod::Rendering
 
 		void SetupCamera(Camera* camera, CameraRole role) override;
 		void SetPostProcessing(Camera* camera, const PostProcessLook& look) override;
+		void SetSystemGrade(const SystemGrade& value) override;
 		/// The C# track's UnrealRenderBackend.SetMsaa (US-T55): 4x MSAA on the forward renderer, or none, with Unity's
 		/// MSAA line width.
 		void SetMsaa(Camera* camera, bool on) override;
