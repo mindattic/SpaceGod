@@ -249,7 +249,9 @@ namespace SpaceGod::Core
 		static cs::String NextStep(const cs::Ref<NamedPilot>& p, double jd);
 
 		/// <summary>Days served in detention before rehabilitation, then before fighter school, then before the first posting.</summary>
-		static constexpr double DetentionDays = 30, RehabilitationDays = 90, SchoolDays = 120;
+		static constexpr double DetentionDays = 30;
+		static constexpr double RehabilitationDays = 90;
+		static constexpr double SchoolDays = 120;
 	};
 
 	/// <summary>
