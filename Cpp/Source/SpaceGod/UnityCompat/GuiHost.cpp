@@ -726,7 +726,7 @@ namespace SpaceGod::UnityCompat
 			}
 		}
 
-		int32 RunFrame(const FGeometry& allotted, FSlateWindowElementList& out, int32 layerId)
+		int32 RunFrame(const FPaintArgs& args, const FGeometry& allotted, FSlateWindowElementList& out, int32 layerId)
 		{
 			if (inFrame) return layerId; // a nested paint (should not happen) draws nothing
 			inFrame = true;
@@ -739,7 +739,9 @@ namespace SpaceGod::UnityCompat
 				Screen::width = pw;
 				Screen::height = ph;
 			}
-			input.overlayAbsTopLeft = FVector2f(allotted.GetAbsolutePosition());
+			// Paint geometry is window space, the input events' positions desktop space (US-T77: with the window anywhere
+			// but the desktop's top-left, every click and hover missed the controls by the window's position).
+			input.overlayAbsTopLeft = FVector2f(allotted.GetAbsolutePosition()) + FVector2f(args.GetWindowToDesktopTransform());
 			// Absolute (desktop) units to the overlay's pixels: its absolute size over its pixel size.
 			FVector2f absSize = FVector2f(allotted.GetAbsoluteSize());
 			input.absToPixel = absSize.X > 0 ? static_cast<float>(pw) / absSize.X : 1.0f;
@@ -795,10 +797,10 @@ namespace SpaceGod::UnityCompat
 				SetVisibility(EVisibility::HitTestInvisible);
 			}
 
-			int32 OnPaint(const FPaintArgs&, const FGeometry& allotted, const FSlateRect&, FSlateWindowElementList& out,
+			int32 OnPaint(const FPaintArgs& args, const FGeometry& allotted, const FSlateRect&, FSlateWindowElementList& out,
 				int32 layerId, const FWidgetStyle&, bool) const override
 			{
-				return RunFrame(allotted, out, layerId);
+				return RunFrame(args, allotted, out, layerId);
 			}
 
 			FVector2D ComputeDesiredSize(float) const override { return FVector2D(0, 0); }
