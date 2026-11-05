@@ -165,6 +165,41 @@ namespace SpaceGod::Core
 		/*grip:*/ 0.6, /*strafeSpeedFraction:*/ 0.35, /*cornerSpeedFraction:*/ 0.4, /*overspeedTurnFactor:*/ 0.45);
 
 	/// <summary>
+	/// How a light fighter answers a player's hands (US-T79), over its <see cref="LightFighterHandling"/>: Star Conflict's
+	/// snap and its lateral boosts. Read only with <see cref="PilotInput.Piloted"/> and flight assist on, so crews fly as
+	/// before and the Bench's digests hold.
+	/// </summary>
+	struct LightFighterFeel
+	{
+		/// <summary>Seconds for the nose (and the roll) to spin up from still to its top swing and to stop from it: the
+		/// floor on the attitude thrusters' push, so the aim snaps on and off a target. 0 leaves the hull's own.</summary>
+		double SpinUpS = 0;
+
+		/// <summary>The lateral boost: with boost held while strafing, flight assist's strafe set point as a fraction of
+		/// the boosted forward one (so a dash outruns an ordinary strafe by the boost's factor). 0: no dash.</summary>
+		double DashSpeedFraction = 0;
+
+		/// <summary>The dash's push across the nose, as a fraction of the main drive's (boosted) push: what makes it a
+		/// kick, not a drift.</summary>
+		double DashThrustFraction = 0;
+
+		constexpr LightFighterFeel() = default;
+
+		constexpr LightFighterFeel(double spinUpS, double dashSpeedFraction, double dashThrustFraction)
+			: SpinUpS(spinUpS), DashSpeedFraction(dashSpeedFraction), DashThrustFraction(dashThrustFraction)
+		{
+		}
+
+		/// <summary>Light fighters and interceptors: a snap of under a tenth of a second and a hard lateral boost.</summary>
+		static const LightFighterFeel Dogfighter;
+
+		/// <summary>Couriers: a little crisper than their hull, and no dash; a runner outruns a fight, it does not dance in one.</summary>
+		static const LightFighterFeel Runner;
+	};
+	inline constexpr LightFighterFeel LightFighterFeel::Dogfighter = LightFighterFeel(/*spinUpS:*/ 0.08, /*dashSpeedFraction:*/ 0.6, /*dashThrustFraction:*/ 0.8);
+	inline constexpr LightFighterFeel LightFighterFeel::Runner = LightFighterFeel(/*spinUpS:*/ 0.2, /*dashSpeedFraction:*/ 0, /*dashThrustFraction:*/ 0);
+
+	/// <summary>
 	/// Light fighters, Star Conflict style (U.SPC-T17): arcade-coupled dogfighting. With flight assist on,
 	/// (1) the track carves after the nose -- the computer may push across the nose as hard as
 	/// <see cref="LightFighterHandling.Grip"/> allows, so a hard turn at the corner speed leaves no
@@ -174,13 +209,21 @@ namespace SpaceGod::Core
 	/// something to manage in a fight (or, on <see cref="TurnPenaltyRule.BoostHeld"/>, only while the boost fires).
 	/// With flight assist off the hull is the Newtonian one, unchanged: the drift and the turn-and-burn stay a
 	/// pilot's tool. The player and the crews in a battle's dogfight (<see cref="Battle"/>, U.SPC-T274, U.SPC-T440)
-	/// fly the same model.
+	/// fly the same model; under the player's own hands (<see cref="PilotInput.Piloted"/>, US-T79) it adds the
+	/// <see cref="Feel"/>: a nose that snaps on and off, and boost held while strafing is a lateral boost.
 	/// </summary>
 	class SPACEGODCORE_API LightFighterFlightModel final : public IFlightModel
 	{
 		cs::Func<LightFighterHandling> handling;
 
 	public:
+		/// <summary>How it answers the player's hands (US-T79); crews never read it.</summary>
+		LightFighterFeel Feel = LightFighterFeel::Dogfighter;
+
+		/// <summary>The lateral boost is firing: boost held, with charge left, while strafing, under the player's hands with
+		/// assist on (US-T79).</summary>
+		bool Dashing(const PilotInput& input, const cs::Ref<ShipCombat>& combat, const PilotTuning& tuning) const;
+
 		/// <summary>The numbers it flies on now: fixed, or read from the settings each frame (<see cref="LightFighterSettings"/>).</summary>
 		LightFighterHandling Handling() const { return handling(); }
 

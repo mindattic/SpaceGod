@@ -103,7 +103,9 @@ namespace SpaceGod::Core
 				  "slower but without turning. With assist off the HUD shows what each would cost, in seconds and km, the "
 				  "same at either scale. Near a world its gravity pulls on the hull."),
 				T("A flight model per family",
-				  "Light fighters carve their track after the nose and turn tightest at their corner speed; interceptors push "
+				  "Light fighters fly Star Conflict style: very agile, the nose snapping on and off a target, the track carved "
+				  "after the nose, strafing on all six axes (W S, A D, Q E), and Shift held while strafing is a lateral boost, a "
+				  "hard sideways dash on the afterburner; they turn tightest at their corner speed. Interceptors push "
 				  "that further (their grip, strafe, corner speed and boost turn penalty, by speed or only while boosting, are "
 				  "in Settings > Dogfighting, and enemy crews fly the same model); bombers are a steady torpedo platform. Heavy fighters (the gunship) turn at one stiff rate at "
 				  "any speed that starts and stops crisply, settle on the throttle and strafe through a short ease, and carry "

@@ -111,7 +111,7 @@ namespace SpaceGod
 	cs::String UnitySpaceApp::SeatKeys(const cs::Ref<IEmbodiable>& s)
 	{
 		return cs::Is<FighterSeat>(s)
-			? cs::String("  (mouse aims, W/S throttle, A/D Q/E strafe, Z/X roll, Shift boost, F flight assist (off: W/S raw thrust), Alt flip for a turn and burn, left mouse guns, right mouse "
+			? cs::String("  (mouse aims, W/S throttle, A/D Q/E strafe, Z/X roll, Shift boost (with A/D Q/E a lateral boost), F flight assist (off: W/S raw thrust), Alt flip for a turn and burn, left mouse guns, right mouse "
 				"weapon group, 1 next group, T lock, 6 next weak point, Ctrl flares, 2 attack my target, 3 cover me, 4 form up, "
 				"5 engage at will, 7/8/9 power to weapons/shields/engines, 0 even power, ' ; next seat, P back to command)")
 			: cs::String("  (mouse lays it, left mouse fires, / next gun, Backspace up to the helm, P back to command)");

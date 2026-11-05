@@ -117,13 +117,41 @@ namespace SpaceGod::Core
 		auto turning = PilotTuning(tuning.MaxSpeed, TurnRateAt(h, s.Vel.Length(), tuning, boosting), tuning.BoostSpeedMultiplier,
 			tuning.BoostDurationS, tuning.CruiseSpeedMultiplier, tuning.CruiseRampS);
 		auto forwardBeforeTurn = s.Forward;
-		PilotFlight::Rotate(s, hull, turning, input, dt);
+		bool snap = input.Piloted && Feel.SpinUpS > 0;
+		if (snap)
+		{
+			// The player's snap (US-T79): the attitude thrusters reach the top swing and roll in SpinUpS, or faster if
+			// the hull's own can; Rotate's v² = 2αθ then brakes the nose onto the aim just as crisply.
+			double spin = Max(hull.PitchYawAngularAccel, turning.TurnRateDegS * Astro::Deg2Rad / Feel.SpinUpS);
+			double roll = Max(hull.RollAngularAccel, turning.RollRateDegS() * Astro::Deg2Rad / Feel.SpinUpS);
+			PilotFlight::Rotate(s, HullDynamics(hull.MassKt, hull.MainAccel, hull.RetroAccel, hull.LateralAccel, hull.VerticalAccel, spin, roll),
+				turning, input, dt);
+		}
+		else PilotFlight::Rotate(s, hull, turning, input, dt);
+		bool dashing = Dashing(input, combat, tuning);
 		double driveMult = PilotFlight::DriveMultiplier(s, combat, tuning, input, forwardBeforeTurn, dt);
 
 		double grip = GripAccel(h, tuning);
-		auto thrust = PilotFlight::AssistThrust(s, hull, tuning, input, gravityKmS2, driveMult, dt, h.StrafeSpeedFraction,
-			Max(hull.LateralAccel, grip), Max(hull.VerticalAccel, grip));
+		double strafeFraction = h.StrafeSpeedFraction, lateralCap = Max(hull.LateralAccel, grip), verticalCap = Max(hull.VerticalAccel, grip);
+		if (dashing)
+		{
+			// The lateral boost (US-T79): the strafe set point rises to the dash's share of the boosted speed, and the
+			// push across the nose to a share of the boosted main drive, so it kicks sideways and is there in a moment.
+			strafeFraction = Max(strafeFraction, Feel.DashSpeedFraction);
+			double kick = hull.MainAccel * driveMult * Feel.DashThrustFraction;
+			lateralCap = Max(lateralCap, kick);
+			verticalCap = Max(verticalCap, kick);
+		}
+		auto thrust = PilotFlight::AssistThrust(s, hull, tuning, input, gravityKmS2, driveMult, dt, strafeFraction, lateralCap, verticalCap);
 		PilotFlight::Integrate(s, thrust, gravityKmS2, dt);
+	}
+
+	bool LightFighterFlightModel::Dashing(const PilotInput& input, const cs::Ref<ShipCombat>& combat, const PilotTuning& tuning) const
+	{
+		if (!input.Piloted || input.FlightAssistOff || Feel.DashSpeedFraction <= 0) return false;
+		bool boosting = input.Boost && tuning.BoostDurationS > 0 && combat != nullptr && combat->BoostFraction > 0;
+		bool strafing = cs::Math::Abs(input.StrafeRight) > 0.1 || cs::Math::Abs(input.StrafeUp) > 0.1;
+		return boosting && strafing;
 	}
 
 	// ---------------------------------------------------------------- LightFighterSettings
@@ -504,7 +532,9 @@ namespace SpaceGod::Core
 		r->Register(FlightFamily::Bomber, cs::New<BomberFlightModel>());
 		// Heavy fighters (U.SPC-T441): the Gunship, and the gate picket flown nose-first like one.
 		r->Register(FlightFamily::HeavyFighter, cs::New<HeavyFighterFlightModel>());
-		r->Register(FlightFamily::Runner, cs::New<LightFighterFlightModel>(cs::Func<LightFighterHandling>([] { return LightFighterSettings::Runner()->Handling(); }), "Runner"));
+		auto runner = cs::New<LightFighterFlightModel>(cs::Func<LightFighterHandling>([] { return LightFighterSettings::Runner()->Handling(); }), "Runner");
+		runner->Feel = LightFighterFeel::Runner; // US-T79: a courier gets no lateral boost
+		r->Register(FlightFamily::Runner, runner);
 		// Haulers (U.SPC-T443): freighters, miners and the other work hulls fly heavy on what they carry.
 		r->Register(FlightFamily::Hauler, cs::New<HaulerFlightModel>());
 		// Capital ships (U.SPC-T499): one model, each class on its own handling.

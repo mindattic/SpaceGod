@@ -60,7 +60,8 @@ namespace SpaceGod::Core
 		case HelmRole::Miner:
 			return cs::Cat("miner: ", StickHint(), Heavy(), fire);
 		default:
-			return cs::Cat("fighter: ", StickHint(), ", Shift boost", fire);
+			// A light fighter's lateral boost (US-T79): Shift held while strafing.
+			return cs::Cat("fighter: ", StickHint(), Stick == PilotControl::FreeAim ? ", Shift boost (with A/D Q/E a lateral boost)" : ", Shift boost", fire);
 		}
 	}
 
