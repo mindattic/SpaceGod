@@ -83,33 +83,25 @@ MODULES = {
 # US-T143: Ebal Studios' Space Station Creator, the same way (tools/import-ssc.ps1 passes "ssc" as the third argument).
 # Its stations come whole (none is cut), each mesh painted from one of four atlases (a Combined station has one mesh per
 # atlas: Bridge, Cylinderical, Hangars, Storage). Kept in step with Rendering/SscKit.cpp.
+# US-T149: only complete prebuilt stations, each used whole for one role (no parts to assemble our own from).
 SSC_MODELS = {
-    # Free-flying stations (Rigil Gate, Toliman Forge, Blackhollow ...), derelicts.
-    "Combined20": ("Combined", False),
-    "Combined28": ("Combined", False),
-    "Combined30": ("Combined", False),
+    "Combined20": ("Combined", False),  # Void Stations (the largest)
+    "Combined28": ("Combined", False),  # megastructures
+    "Combined30": ("Combined", False),  # free-flying stations (Rigil Gate, Toliman Forge, Blackhollow ...)
     "Combined08": ("Combined", False),
-    "Combined21": ("Combined", False),
     "Combined01": ("Combined", False),
-    # Factories, depots and the megastructure's tower blocks.
+    "Combined16": ("Combined", False),  # derelicts
+    "Combined24": ("Combined", False),
+    "Combined10": ("Combined", False),
+    "Combined21": ("Combined", False),  # factories
     "Storage01": ("Storage", False),
     "Storage04": ("Storage", False),
-    "Storage05": ("Storage", False),
     "Storage11": ("Storage", False),
-    "Storage12": ("Storage", False),
-    "Storage13": ("Storage", False),
-    "Storage18": ("Storage", False),
-    "Storage19": ("Storage", False),
-    # Habitats (the wheel), gateways (the gyroscope ring), the void stations' sunburst frame, docks.
-    "Cylinderical12": ("Cylinderical", False),
-    "Cylinderical18": ("Cylinderical", False),
-    "Cylinderical02": ("Cylinderical", False),
-    "Hangars05": ("Hangars", False),
-    "Bridge04": ("Bridge", False),
+    "Storage18": ("Storage", False),    # depots (the tank farm)
+    "Cylinderical12": ("Cylinderical", False),  # habitats (the wheel)
+    "Cylinderical18": ("Cylinderical", False),  # gateways (the gyroscope ring)
 }
-SSC_MODULES = {
-    ("Hangars", "HangarsModules"): ["Beam", "BeamTall", "Hangar", "Extension", "Gate"],
-}
+SSC_MODULES = {}
 SSC_ATLASES = ("Bridge", "Cylinderical", "Hangars", "Storage")
 
 

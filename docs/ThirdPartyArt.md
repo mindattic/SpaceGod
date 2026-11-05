@@ -154,13 +154,19 @@ model the classes use.
     keep their slip and the ISS and Tiangong their real shapes;
   - free-flying stations (Rigil Gate, Toliman Forge, Blackhollow: `BodyKind::Station`): one of the big `Combined`
     complexes, by name (`Views/BodyView.cpp`);
-  - Void Stations: the generator's core, accretion ring and gimbals inside the pack's sunburst frame, docks at its
-    spokes' ends and frames over the poles, in place of the procedural shell;
-  - the megastructure archetype (US-T130's void site): tower blocks stacked into a city at its heart and long girder
-    spars out to its edge with docks and hangars along them, laid out from its name;
-  - derelict stations (US-T131): `SscKit::Derelict(parent, seed, size, into)` draws one of the big complexes darkened
-    and lightless with a module torn off and tumbling beside it, and `SscKit::Station(..., Condition::Derelict)` any
-    station so; the void-content work places them (GraveyardView), this only draws them.
+  - Void Stations (US-T149): the pack's largest prebuilt station, `Combined20`, whole, in place of the procedural
+    Dyson-sphere generator (`VoidStationModel` and its core, rings and glow are now only the fallback without the pack);
+  - the megastructure (US-T130's void site, US-T149): the next grandest prebuilt complex, `Combined28`, whole;
+  - derelict stations (US-T131): `SscKit::Derelict(parent, seed, size, into)` draws one of three prebuilt complexes
+    no working station uses (`Combined16`, `Combined24`, `Combined10`) darkened and lightless with a module torn off
+    and tumbling beside it, and `SscKit::Station(..., Condition::Derelict)` any station so; the void-content work
+    places them (GraveyardView), this only draws them.
+
+  US-T149 (the owner: "use the prebuilt ships and space stations first before you invent your own"): every station
+  role is one of the pack's complete prebuilt stations, used whole and one per role; nothing is assembled from its
+  parts. The ships already follow it: each hull class flies one of USC's complete prebuilt example ships, the pack's
+  modules only bolted on where the game needs a part of its own (thruster bells on Engine hardpoints, turrets on gun
+  mounts, the truss freighter's cargo).
 
   A station is painted in one of the pack's colours (a navy's nearest hue, civilians White, pirates Brown, unowned
   Grey) with a light wash of its owner's colour. Without the pack, headless, or with `-NoSSC`, every station is

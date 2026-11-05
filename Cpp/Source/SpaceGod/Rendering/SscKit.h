@@ -16,9 +16,8 @@ namespace SpaceGod::Rendering
 	/// Builds stations from Space Station Creator (US-T143), imported to /Game/ThirdParty/SSC by tools/import-ssc.ps1: the
 	/// orbital structures (factories and depots from its Storage complexes, habitats on its wheel, gateways on its gyroscope
 	/// ring), the free-flying stations (Rigil Gate, Toliman Forge, Blackhollow: its big Combined complexes), the Void
-	/// Stations (the generator's core and rings inside the pack's sunburst frame, docks and frames round it), the void
-	/// sites' megastructure archetype (tower blocks stacked into a city with long docking spars out to its edge, after the
-	/// US-T130 reference) and, for US-T131, a derelict station: the same complexes darkened and lightless with a module
+	/// Stations and the void sites' megastructures (US-T149: the pack's grandest prebuilt complexes, whole, in place of
+	/// the procedural Dyson sphere and an assembled city) and, for US-T131, a derelict station: the same complexes darkened and lightless with a module
 	/// torn off. Each station is painted in one of the pack's colours (navies by their hue, civilians white, pirates brown,
 	/// unowned grey) with a light wash of the owner's colour.
 	///
@@ -54,14 +53,13 @@ namespace SpaceGod::Rendering
 		/// <summary>The station a free-flying station body (BodyKind::Station) is drawn as, by its name.</summary>
 		static cs::String ForStationBody(const cs::String& name);
 
-		/// <summary>A Void Station round its generator, in body radii (inside VoidStationModel::OuterRadius, clear of the
-		/// core): the sunburst frame across the equator, docks at its spokes' ends and frames over the poles.</summary>
+		/// <summary>A Void Station, in body radii (inside VoidStationModel::OuterRadius): US-T149, the pack's largest prebuilt
+		/// station whole, in place of the procedural generator model.</summary>
 		static bool VoidStation(const cs::Ref<Transform>& parent, const cs::String& name, const cs::Ref<Core::Faction>& faction,
 			cs::List<cs::Ref<Renderer>>& into);
 
-		/// <summary>The megastructure archetype (US-T130), in body radii, no part past 1.2: tower blocks stacked into a
-		/// cluster at the heart and long docking spars out to its edge with docks along them. Laid out from
-		/// <paramref name="name"/>, so each megastructure is its own and the same every time.</summary>
+		/// <summary>The megastructure (US-T130), in body radii, no part past 1.2: US-T149, the pack's next grandest prebuilt
+		/// complex whole.</summary>
 		static bool Megastructure(const cs::Ref<Transform>& parent, const cs::String& name, cs::List<cs::Ref<Renderer>>& into);
 
 		/// <summary>US-T131's hook: a derelict station <paramref name="size"/> across, one of the big complexes chosen by

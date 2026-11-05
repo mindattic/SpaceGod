@@ -282,7 +282,8 @@ namespace SpaceGod::Views
 		// The generator itself, dark as before, now the core the frame is built round.
 		material = Materials::Create(Materials::Sun(), Body->Name);
 		material->SetColor("_Color", Color(Body->Color.R, Body->Color.G, Body->Color.B));
-		child("Generator Core", sphereMesh(), material, nullptr)->localScale = Vector3::one() * VoidStationModel::CoreRadius;
+		auto core = child("Generator Core", sphereMesh(), material, nullptr);
+		core->localScale = Vector3::one() * VoidStationModel::CoreRadius;
 
 		child("Frame (near)", VoidStationModel::Shell(true), metal, &nearShell);
 		nearShell->enabled = false;
@@ -304,8 +305,8 @@ namespace SpaceGod::Views
 		horizonRenderer->shadowCastingMode = ShadowCastingMode::Off;
 		glow = horizonGo->transform;
 
-		// US-T143: with Space Station Creator, the station round the generator is the pack's: its sunburst frame, docks and
-		// pole frames take the procedural shell's place; the core, accretion ring and gimbals stay.
+		// US-T143, US-T149: with Space Station Creator the Void Station is the pack's grandest prebuilt station, whole; the
+		// procedural model (shell, core, accretion ring, gimbals and the horizon's glow) is only the fallback without it.
 		auto holder = NewGameObject("Station");
 		holder->transform->SetParent(Root->transform, false);
 		cs::List<cs::Ref<Renderer>> parts;
@@ -313,6 +314,11 @@ namespace SpaceGod::Views
 		{
 			sscRoot = holder;
 			renderer->enabled = false;
+			core->gameObject()->SetActive(false);
+			accretion->gameObject()->SetActive(false);
+			gimbals[0]->gameObject()->SetActive(false);
+			gimbals[1]->gameObject()->SetActive(false);
+			horizonGo->SetActive(false);
 		}
 		else Destroy(holder);
 	}

@@ -229,35 +229,6 @@ namespace SpaceGod::Rendering
 				into.Add(Draw(at, Info(p.Leaf).Drawn, Livery(p.Atlas, faction, derelict)));
 			}
 		}
-
-		/// A Hangars module (a girder, a hangar) fitted into a box of `size` (across, up, along) at `pos`, its longest side
-		/// along the box's z, turned by `turn`.
-		void Module(const cs::Ref<Transform>& parent, const cs::String& name, Vector3 pos, Vector3 size, Quaternion turn, const cs::Ref<Faction>& faction,
-			cs::List<cs::Ref<Renderer>>& into)
-		{
-			const auto& info = Info(cs::Cat("SM_SSC_Mod_", name));
-			if (!info.Ok) return;
-			Vector3 s = info.Max - info.Min;
-			Quaternion lay = Quaternion::identity();
-			if (s.y >= s.x && s.y >= s.z)
-			{
-				lay = Quaternion::Euler(90, 0, 0);
-				s = Vector3(s.x, s.z, s.y);
-			}
-			else if (s.x > s.z)
-			{
-				lay = Quaternion::Euler(0, 90, 0);
-				s = Vector3(s.z, s.y, s.x);
-			}
-			auto holder = NewChild(parent, cs::Cat("Module:", name));
-			holder->localPosition = pos;
-			holder->localRotation = turn;
-			holder->localScale = Vector3(size.x / Mathf::Max(s.x, 1e-4f), size.y / Mathf::Max(s.y, 1e-4f), size.z / Mathf::Max(s.z, 1e-4f));
-			auto inner = NewChild(holder, name);
-			inner->localRotation = lay;
-			inner->localPosition = -(lay * ((info.Min + info.Max) * 0.5f));
-			into.Add(Draw(inner, info.Drawn, Livery("Hangars", faction, false)));
-		}
 	}
 
 	bool SscKit::Available()
@@ -318,80 +289,49 @@ namespace SpaceGod::Rendering
 		}
 	}
 
+	// US-T149 (user: "use the prebuilt ships and space stations first before you invent your own"): every station role
+	// is one of the pack's complete prebuilt stations, as it ships, each prebuilt used for one role before any is
+	// assembled from parts: the grandest for the Void Stations and the megastructures, the next for the free-flying
+	// stations, others for the derelicts.
+
 	cs::String SscKit::ForStationBody(const cs::String& name)
 	{
-		static const char* const stations[] = { "Combined20", "Combined28", "Combined30", "Combined08", "Combined01" };
+		static const char* const stations[] = { "Combined30", "Combined08", "Combined01" };
 		Dice d(name);
-		return stations[d.Pick(5)];
+		return stations[d.Pick(3)];
 	}
 
 	bool SscKit::VoidStation(const cs::Ref<Transform>& parent, const cs::String&, const cs::Ref<Faction>& faction, cs::List<cs::Ref<Renderer>>& into)
 	{
-		if (!Available() || !ModelInfo("Cylinderical02").Ok) return false;
+		// The largest prebuilt station in the pack (Combined20, a three-armed complex over half a kilometre across), whole,
+		// filling the generator's radius (VoidStationModel::OuterRadius) in place of the procedural Dyson sphere.
+		if (!Available() || !ModelInfo("Combined20").Ok) return false;
 		auto root = NewChild(parent, "SSC Void Station");
-		// The sunburst frame across the equator, its hub round the core, its spokes to just inside the outer radius.
-		Lay(root, "Cylinderical02", Vector3::zero(), 2.1f, Quaternion::identity(), faction, false, into);
-		// Docks at four of the spokes' ends, and a frame over each pole.
-		for (int i = 0; i < 4; i++)
-		{
-			float a = (45.0f + 90.0f * i) * Mathf::Deg2Rad;
-			Vector3 at(Mathf::Cos(a) * 0.82f, 0, Mathf::Sin(a) * 0.82f);
-			Lay(root, i % 2 == 0 ? "Hangars05" : "Storage19", at, 0.3f, Quaternion::LookRotation(at.normalized(), Vector3::up()), faction, false, into);
-		}
-		for (float y : { 0.62f, -0.62f })
-			Lay(root, "Storage13", Vector3(0, y, 0), 0.5f, Quaternion::identity(), faction, false, into);
+		Lay(root, "Combined20", Vector3::zero(), 2.2f, Quaternion::identity(), faction, false, into);
 		return true;
 	}
 
-	bool SscKit::Megastructure(const cs::Ref<Transform>& parent, const cs::String& name, cs::List<cs::Ref<Renderer>>& into)
+	bool SscKit::Megastructure(const cs::Ref<Transform>& parent, const cs::String&, cs::List<cs::Ref<Renderer>>& into)
 	{
-		if (!Available() || !ModelInfo("Storage05").Ok) return false;
-		Dice d(name);
+		// The next grandest prebuilt complex (Combined28), whole, to the megastructure's 1.2 radii.
+		if (!Available() || !ModelInfo("Combined28").Ok) return false;
 		auto root = NewChild(parent, "SSC Megastructure");
-		static const char* const blocks[] = { "Storage05", "Storage12", "Storage19", "Storage13", "Bridge04" };
-		// The city: a dense cluster of tall towers at the heart, each a stack of big blocks (stood upright, so they read as
-		// tower storeys), the middle one tallest; the towers crowd each other as the reference's do.
-		int towers = 6 + d.Pick(3);
-		for (int t = 0; t < towers; t++)
-		{
-			float a = (360.0f * t / towers + d.Range(-20, 20)) * Mathf::Deg2Rad, r = t == 0 ? 0.0f : d.Range(0.12f, 0.3f);
-			Vector3 base(Mathf::Cos(a) * r, 0, Mathf::Sin(a) * r);
-			int stories = (t == 0 ? 7 : 4) + d.Pick(3);
-			float block = d.Range(0.24f, 0.32f), pitch = block * 0.55f, y = -pitch * (stories - 1) * 0.5f;
-			for (int s = 0; s < stories; s++)
-			{
-				Lay(root, blocks[d.Pick(5)], base + Vector3(0, y, 0), block, Quaternion::Euler(90.0f, d.Range(0, 360), 0), nullptr, false, into);
-				y += pitch;
-			}
-		}
-		// Long docking spars out to the edge, a dock at the tip and hangars along them.
-		int spars = 4 + d.Pick(3);
-		for (int s = 0; s < spars; s++)
-		{
-			float a = (360.0f * s / spars + d.Range(-15, 15)) * Mathf::Deg2Rad;
-			Vector3 dir = Vector3(Mathf::Cos(a), d.Range(-0.12f, 0.12f), Mathf::Sin(a)).normalized();
-			float from = 0.3f, to = d.Range(0.95f, 1.12f), mid = (from + to) * 0.5f;
-			auto turn = Quaternion::LookRotation(dir, Vector3::up());
-			Module(root, "HangarsBeamTall", dir * mid, Vector3(0.035f, 0.035f, to - from), turn, nullptr, into);
-			Module(root, "HangarsBeam", dir * mid + Vector3(0, 0.05f, 0), Vector3(0.02f, 0.02f, (to - from) * 0.9f), turn, nullptr, into);
-			Lay(root, "Hangars05", dir * to, 0.14f, turn, nullptr, false, into);
-			for (float f : { 0.45f, 0.7f })
-				Module(root, "HangarsHangar", dir * (from + (to - from) * f) + Vector3(0, -0.045f, 0), Vector3(0.07f, 0.04f, 0.06f), turn, nullptr, into);
-		}
+		Lay(root, "Combined28", Vector3::zero(), 2.4f, Quaternion::identity(), nullptr, false, into);
 		return true;
 	}
 
 	bool SscKit::Derelict(const cs::Ref<Transform>& parent, int seed, float size, cs::List<cs::Ref<Renderer>>& into)
 	{
-		static const char* const wrecks[] = { "Combined20", "Combined28", "Combined30", "Combined08", "Combined21", "Combined01" };
+		// Prebuilt complexes no working station uses, so a derelict never looks like a live station nearby.
+		static const char* const wrecks[] = { "Combined16", "Combined24", "Combined10" };
 		Dice d(seed);
-		return Station(parent, wrecks[d.Pick(6)], size, nullptr, into, Condition::Derelict, false, seed);
+		return Station(parent, wrecks[d.Pick(3)], size, nullptr, into, Condition::Derelict, false, seed);
 	}
 
 	cs::List<cs::String> SscKit::ModelNames()
 	{
-		return cs::List<cs::String>{ "Combined20", "Combined28", "Combined30", "Combined08", "Combined21", "Combined01", "Storage01", "Storage04", "Storage05",
-			"Storage11", "Storage12", "Storage13", "Storage18", "Storage19", "Cylinderical12", "Cylinderical18", "Cylinderical02", "Hangars05", "Bridge04" };
+		return cs::List<cs::String>{ "Combined20", "Combined28", "Combined30", "Combined08", "Combined01", "Combined21", "Combined16", "Combined24",
+			"Combined10", "Storage01", "Storage04", "Storage11", "Storage18", "Cylinderical12", "Cylinderical18" };
 	}
 
 	cs::List<cs::String> SscKit::AssetPaths()
@@ -399,7 +339,6 @@ namespace SpaceGod::Rendering
 		cs::List<cs::String> paths;
 		for (const auto& model : ModelNames())
 			for (const auto& p : ModelInfo(model).Pieces) paths.Add(MeshPath(p.Leaf));
-		for (const char* mod : { "HangarsBeam", "HangarsBeamTall", "HangarsHangar" }) paths.Add(MeshPath(cs::Cat("SM_SSC_Mod_", mod)));
 		paths.Add(GameMaterial);
 		return paths;
 	}
