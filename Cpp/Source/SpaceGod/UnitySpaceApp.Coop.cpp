@@ -34,6 +34,7 @@
 #include "Embodiment/Embodiment.h"
 #include "Embodiment/FighterSeat.h"
 #include "Embodiment/MountedTurret.h"
+#include "Embodiment/RepairWorker.h" // US-T135
 #include "Embodiment/StationSeat.h"
 #include "Fleet.h"
 #include "Persistence/SaveGame.h"
@@ -247,14 +248,8 @@ namespace SpaceGod
 		auto pose = next->PoseAt(Clock->Jd);
 		seatAim = ToVector(pose.Forward.SwapYZ()).normalized();
 		Clock->SetWarp(0);
-		SpaceCamera->EnterPilotChase(SeatTarget(next), cs::Is<FighterSeat>(next) ? 7 : 2.5);
-		if (auto gun = cs::As<MountedTurret>(next))
-		{
-			SpaceCamera->PilotView = Quaternion::LookRotation(seatAim, MountRoof(pose, seatAim));
-			SpaceCamera->PilotEye = [this, gun]() { return MountEye(gun); };
-		}
-		else SpaceCamera->PilotEye = nullptr;
-		ShowToast(cs::Cat(cs::Is<FighterSeat>(next) ? "Flying " : "Manning ", next->Name(), ", ", Clock->Warp().Label, SeatKeys(next)));
+		RideCameraRig(next, pose, false); // US-T135: the seat's own camera rig
+		ShowToast(cs::Cat(next->RolePanel().Verb, " ", next->Name(), ", ", Clock->Warp().Label, SeatKeys(next)));
 	}
 
 	bool UnitySpaceApp::CoopTakeSeat(const cs::Ref<IEmbodiable>& next)
@@ -459,6 +454,11 @@ namespace SpaceGod
 			int u = unit != nullptr && battle != nullptr ? IndexOfRef(battle->Units, unit) : -1;
 			return b < 0 || u < 0 ? cs::String() : cs::Cat("SB ", b, " ", u);
 		}
+		if (auto w = cs::As<RepairWorker>(seat)) // US-T135: an EVA worker, by its hull and team
+		{
+			int b = IndexOfRef(battles, w->Battle), u = w->Battle != nullptr ? IndexOfRef(w->Battle->Units, w->Unit) : -1;
+			return b < 0 || u < 0 ? cs::String() : cs::Cat("W ", b, " ", u, " ", w->Team);
+		}
 		return cs::String();
 	}
 
@@ -497,6 +497,15 @@ namespace SpaceGod
 			{
 				auto b = battleAt(Wire::ParseI(f.at(1)));
 				return Embodiables::StationOf(World(), b, unitAt(b, Wire::ParseI(f.at(2))));
+			}
+			if (f[0] == "W") // US-T135
+			{
+				auto b = battleAt(Wire::ParseI(f.at(1)));
+				auto u = unitAt(b, Wire::ParseI(f.at(2)));
+				int team = Wire::ParseI(f.at(3));
+				for (const auto& w : Embodiables::WorkersOn(World(), b, u))
+					if (w->Team == team) return w;
+				return nullptr;
 			}
 		}
 		catch (const std::exception& e)

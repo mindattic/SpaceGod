@@ -678,6 +678,7 @@ namespace SpaceGod
 		// Take charge of anything, any time (U.SPC-T422): the next seat in the fight in view, or the next gun on the hull.
 		if (i.CycleSeat != 0) CycleSeat(i.CycleSeat);
 		if (i.ManGun) ManNextGun();
+		if (i.EmbodyCrew) CycleWorker(); // US-T135: Shift+P, out on the hull as an EVA repair worker
 		// Shift+/ (US-T106): into the newest craft the carrier launched, the next, and back to its helm.
 		if (i.JumpToCraft) JumpToCraft();
 		// At a gun mount (U.SPC-T445): up to the helm of the hull it is on; in a launched craft, back to its carrier's (US-T106).
@@ -794,15 +795,18 @@ namespace SpaceGod
 		auto t = Selected.IsShip() ? Selected : Hovered.IsShip() ? Hovered : Target::None();
 		if (!t.IsShip())
 		{
-			ShowToast("Select a ship to pilot it");
+			// US-T135: P is the one embody key: anything else selected (a hull or station in a fight) is embodied too.
+			if (!EmbodyTarget()) ShowToast("Select something to embody: a ship, a hull or station in a fight (F9 lists every seat near you)");
 			return;
 		}
 		// Only a wreck, a derelict or a prize already taken in a fight still on is out of reach (U.SPC-T18).
-		if (!Embodiables::HelmOf(World(), t.Ship)->CanEmbody())
+		auto helm = Embodiables::HelmOf(World(), t.Ship);
+		if (!helm->CanEmbody())
 		{
 			ShowToast("Can't take the helm of that ship right now");
 			return;
 		}
+		if (!PassesEmbodyGate(helm)) return; // US-T135: the one embody gate
 		RememberCommand();
 		EnterPiloting(t);
 	}

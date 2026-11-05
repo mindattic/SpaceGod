@@ -35,6 +35,7 @@
 #include "UnitySpaceApp.Saves.deps.h"
 #include "UnitySpaceApp.Streaming.deps.h"
 #include "UnitySpaceApp.Coop.deps.h" // US-T44
+#include "UnitySpaceApp.Embody.deps.h" // US-T135
 
 namespace SpaceGod
 {
@@ -89,5 +90,6 @@ namespace SpaceGod
 #include "UnitySpaceApp.Saves.inl"
 #include "UnitySpaceApp.Streaming.inl"
 #include "UnitySpaceApp.Coop.inl" // US-T44: co-op (the C# track's UnitySpaceApp.Coop.cs)
+#include "UnitySpaceApp.Embody.inl" // US-T135: the universal embody layer
 	};
 }

@@ -111,6 +111,7 @@ namespace SpaceGod
 			ShowToast(cs::Cat("Can't take ", next->Name(), ": ", next->Blocker()));
 			return;
 		}
+		if (!PassesEmbodyGate(next)) return; // US-T135: the one embody gate (US-T140's rules), its reason toasted
 		// US-T90: from one seat straight into the next (mid-fight, say), the view gets there in a blink, not a glide.
 		bool switching = AtControls();
 		RememberCommand();
@@ -134,26 +135,19 @@ namespace SpaceGod
 		auto pose = next->PoseAt(Clock->Jd);
 		seatAim = ToVector(pose.Forward.SwapYZ()).normalized();
 		Clock->SetWarp(0);
-		SpaceCamera->EnterPilotChase(SeatTarget(next), cs::Is<FighterSeat>(next) ? 7 : 2.5);
-		if (switching) SpaceCamera->Hurry();
-		// A gun is laid from the mount itself (U.SPC-T445): the eye glides in to sit on it, looking down the barrel.
-		if (auto gun = cs::As<MountedTurret>(next))
-		{
-			SpaceCamera->PilotView = Quaternion::LookRotation(seatAim, MountRoof(pose, seatAim));
-			SpaceCamera->PilotEye = [this, gun]() { return MountEye(gun); };
-		}
-		ShowToast(cs::Cat(cs::Is<FighterSeat>(next) ? "Flying " : "Manning ", next->Name(), ", ", Clock->Warp().Label, SeatKeys(next)));
+		// US-T135: the camera rides it by its own rig (a chase, a gun's mount down the barrel, a worker's shoulder).
+		RideCameraRig(next, pose, switching);
+		ShowToast(cs::Cat(next->RolePanel().Verb, " ", next->Name(), ", ", Clock->Warp().Label, SeatKeys(next)));
 	}
 
 	cs::String UnitySpaceApp::SeatKeys(const cs::Ref<IEmbodiable>& s)
 	{
-		if (cs::Is<StationSeat>(s)) return cs::String("  (mouse lays its guns, left mouse fires, / man one of its guns, ' ; next seat in the fight, Shift+Backspace (hold) self-destruct, P back to command)");
-		return cs::Is<FighterSeat>(s)
-			? cs::String("  (mouse aims, W/S throttle, A/D Q/E strafe, Z/X roll, Shift boost (with A/D Q/E a lateral boost), F flight assist (off: W/S raw thrust), Alt flip for a turn and burn, left mouse guns, right mouse "
-				"weapon group, 1 next group, T lock, 6 next weak point, Ctrl flares, 2 attack my target, 3 cover me, 4 form up, "
-				"5 engage at will, 7/8/9 power to weapons/shields/engines, 0 even power, Shift+/ next craft of the wing, Backspace back to the carrier's helm, "
-				"' ; next seat, Shift+Backspace (hold) self-destruct, P back to command)")
-			: cs::String("  (mouse lays it, left mouse fires, / next gun, Backspace up to the helm, P back to command)");
+		// US-T135: every kind's keys come from its own role panel.
+		if (s == nullptr) return cs::String();
+		auto panel = s->RolePanel();
+		cs::String keys;
+		for (const auto& a : panel.Abilities) keys = cs::Cat(keys, keys.empty() ? "" : ", ", a.Key, " ", a.Label);
+		return keys.empty() ? cs::String() : cs::Cat("  (", keys, ")");
 	}
 
 	DVec3 UnitySpaceApp::MountEye(const cs::Ref<MountedTurret>& t)
@@ -179,19 +173,21 @@ namespace SpaceGod
 			if (!BackToCarrier()) ShowToast(cs::Cat("The ", craft->Name(), "'s carrier is out of reach: ' ; next seat, P back to command"));
 			return;
 		}
-		auto gun = cs::As<MountedTurret>(HeldNonHelm());
-		if (!gun) return;
-		if (gun->Host() == nullptr)
+		// Anything mounted on or working a hull (a gun, an EVA worker, US-T135): up to its host.
+		auto held = HeldNonHelm();
+		if (!held) return;
+		if (held->Host() == nullptr)
 		{
-			ShowToast(cs::Cat("The ", gun->Unit->Name(), " has no helm to take: / next gun, P back to command"));
+			ShowToast(cs::Cat("The ", held->Name(), " has nothing to move up to: P back to command"));
 			return;
 		}
-		if (cs::Is<ShipHelm>(gun->Host()))
+		if (cs::Is<ShipHelm>(held->Host()))
 		{
-			TakeSeat(gun->Host());
+			TakeSeat(held->Host());
 			return;
 		}
-		auto host = gun->Host();
+		auto host = held->Host();
+		if (!PassesEmbodyGate(host)) return; // US-T135
 		if (!SeatToHost(host))
 		{
 			cs::String blocker = host->Blocker();
@@ -199,23 +195,20 @@ namespace SpaceGod
 			if (!IsSeated()) ReturnToCommand();
 			return;
 		}
-		SpaceCamera->PilotEye = nullptr;
-		ShowToast(cs::Cat("Holding ", host->Name(), ", ", Clock->Warp().Label, "  (mouse lays its guns, left mouse fires, / man one of its guns, P back to command)"));
+		RideCameraRig(host, host->PoseAt(Clock->Jd), false); // US-T135: the host's own rig (a station's chase)
+		ShowToast(cs::Cat(host->RolePanel().Verb, " ", host->Name(), ", ", Clock->Warp().Label, SeatKeys(host)));
 	}
 
 	Target UnitySpaceApp::SeatTarget(const cs::Ref<IEmbodiable>& s)
 	{
-		if (auto f = cs::As<FighterSeat>(s)) return Target::OfUnit(f->Battle, f->Unit);
-		if (auto t = cs::As<MountedTurret>(s)) return t->Unit->Ship != nullptr ? Target::OfShip(t->Unit->Ship) : Target::OfUnit(t->Battle, t->Unit);
-		// US-T90: a station taken in a fight is followed as its unit there, as its guns' mount is; without this the
-		// camera stayed free (and swam on the keys flying it).
-		if (auto st = cs::As<StationSeat>(s))
-		{
-			cs::Ref<Battle> battle;
-			auto unit = st->Unit(battle);
-			if (unit != nullptr) return Target::OfUnit(battle, unit);
-		}
-		return Target::None();
+		// US-T135: from what the seat is in the world, never its type. A launched craft is followed as its unit; anything on
+		// a ship's hull (a gun, a worker) as the ship; a station taken in a fight as its unit there (US-T90: without this the
+		// camera stayed free, and swam on the keys flying it).
+		if (s == nullptr) return Target::None();
+		auto sub = s->Subject();
+		if (sub.Unit == nullptr || sub.Battle == nullptr) return sub.Ship != nullptr ? Target::OfShip(sub.Ship) : Target::None();
+		if (s->InputProfile() != EmbodimentInputProfile::Cockpit && sub.Unit->Ship != nullptr) return Target::OfShip(sub.Unit->Ship);
+		return Target::OfUnit(sub.Battle, sub.Unit);
 	}
 
 	cs::List<cs::Ref<IEmbodiable>> UnitySpaceApp::SeatsInFight(const cs::Ref<Battle>& battle)
@@ -258,12 +251,10 @@ namespace SpaceGod
 
 	cs::Ref<Battle> UnitySpaceApp::BattleInView()
 	{
-		if (auto f = cs::As<FighterSeat>(HeldNonHelm())) return f->Battle;
-		if (auto t = cs::As<MountedTurret>(HeldNonHelm())) return t->Battle;
-		if (auto st = cs::As<StationSeat>(HeldNonHelm()))
+		if (auto held = HeldNonHelm()) // US-T135: whatever it is, the fight it is in
 		{
-			cs::Ref<Battle> fight;
-			if (st->Unit(fight) != nullptr) return fight;
+			auto sub = held->Subject();
+			if (sub.Battle != nullptr && sub.Unit != nullptr) return sub.Battle;
 		}
 		if (IsPiloting() && Piloted.Ship && Piloted.Ship->Battle != nullptr) return Piloted.Ship->Battle;
 		if (Selected.IsShip() && Selected.Ship->Battle != nullptr) return Selected.Ship->Battle;
@@ -287,13 +278,11 @@ namespace SpaceGod
 	DVec3 UnitySpaceApp::SeatScene(const cs::Ref<IEmbodiable>& s)
 	{
 		if (auto h = cs::As<ShipHelm>(s)) return TargetScene(Target::OfShip(h->Ship));
-		if (auto f = cs::As<FighterSeat>(s)) return BattleScene(f->Battle, f->Unit->Pos);
-		if (auto t = cs::As<MountedTurret>(s)) return BattleScene(t->Battle, t->Unit->PointOf(t->Mount->Def));
-		if (auto st = cs::As<StationSeat>(s))
-		{
-			cs::Ref<Battle> fight;
-			if (auto u = st->Unit(fight)) return BattleScene(fight, u->Pos);
-		}
+		// US-T135: from its subject: where on its hull it is (a mount, a worker), else the hull itself.
+		if (s == nullptr) return SpaceCamera->ScenePosition;
+		auto sub = s->Subject();
+		if (sub.Battle != nullptr && sub.Unit != nullptr) return BattleScene(sub.Battle, sub.HasPoint ? sub.PointKm : sub.Unit->Pos);
+		if (sub.Ship != nullptr) return TargetScene(Target::OfShip(sub.Ship));
 		return SpaceCamera->ScenePosition;
 	}
 
@@ -333,27 +322,10 @@ namespace SpaceGod
 
 	void UnitySpaceApp::ManNextGun()
 	{
-		cs::Ref<BattleUnit> unit = nullptr;
+		// The hull of the seat held (a gun, a station: US-T90 / mans a station's own guns; an EVA worker, US-T135), the one
+		// flown, the one selected, or a station fighting at what is selected.
 		cs::Ref<Battle> battle = nullptr;
-		if (auto held = cs::As<MountedTurret>(HeldNonHelm()))
-		{
-			unit = held->Unit;
-			battle = held->Battle;
-		}
-		// US-T90: at a station's controls, / mans its own guns (it fell through to the selection before, so a station
-		// taken whole could not get back down to a gun).
-		else if (auto station = cs::As<StationSeat>(HeldNonHelm())) unit = station->Unit(battle);
-		else if (IsPiloting() && Piloted.Ship && Piloted.Ship->Battle != nullptr)
-		{
-			battle = Piloted.Ship->Battle;
-			unit = battle->UnitOf(Piloted.Ship);
-		}
-		else if (Selected.IsShip() && Selected.Ship->Battle != nullptr)
-		{
-			battle = Selected.Ship->Battle;
-			unit = battle->UnitOf(Selected.Ship);
-		}
-		else unit = DefencePlatformAt(Selected, battle);
+		cs::Ref<BattleUnit> unit = HullInHand(battle);
 		if (unit == nullptr)
 		{
 			ShowToast("Select a hull in a fight (or fly one), or a station whose defences are fighting, to man its guns");
@@ -518,15 +490,11 @@ namespace SpaceGod
 		cs::Ref<BattleUnit> onUnit = nullptr;
 		cs::Ref<Ship> onShip = nullptr;
 		auto held = HeldNonHelm();
-		if (auto t = cs::As<MountedTurret>(held))
+		auto heldOn = held != nullptr ? held->Subject() : EmbodimentSubject(); // US-T135: whatever is held, the unit it is on
+		if (heldOn.Unit != nullptr && heldOn.Battle != nullptr)
 		{
-			onUnit = t->Unit;
-			battle = t->Battle;
-		}
-		else if (auto f = cs::As<FighterSeat>(held))
-		{
-			onUnit = f->Unit;
-			battle = f->Battle;
+			onUnit = heldOn.Unit;
+			battle = heldOn.Battle;
 		}
 		else
 		{
@@ -641,8 +609,11 @@ namespace SpaceGod
 		input.PowerSplit = CraftPower::After(held, Input.PowerKey);
 		// Shift+Backspace, the self-destruct (US-T97): held a second it arms, pressed again it aborts.
 		input.SelfDestruct = SelfDestructCommand(held);
-		if (auto cockpit = cs::As<FighterSeat>(held))
-			if (!ClickPanelOpen()) UpdateCockpit(cockpit, input.Aim);
+		// The keys a profile adds on top of the shared hands (US-T135): a cockpit's lock, flares and wing orders. A worker's
+		// torch is the trigger itself (its timing judged in Core, RepairWorker), so it needs nothing here.
+		if (held->InputProfile() == EmbodimentInputProfile::Cockpit)
+			if (auto cockpit = cs::As<FighterSeat>(held))
+				if (!ClickPanelOpen()) UpdateCockpit(cockpit, input.Aim);
 		// On the sim clock's time, so a fight run faster is flown faster too.
 		double simDt = dt * Clock->Warp().SimSecondsPerSecond * Clock->Speed;
 		// The stick goes in as the local player's command; the session's authority steps the seat with it.
@@ -771,14 +742,10 @@ namespace SpaceGod
 
 	cs::String UnitySpaceApp::SeatLine()
 	{
+		// US-T135: every kind's line is its own role panel's title and state; its keys are on the role panel beside it.
 		auto held = HeldNonHelm();
-		if (auto f = cs::As<FighterSeat>(held))
-			return cs::Cat(f->Readout(), "  \xC2\xB7  Shift+/ next of the wing   Backspace carrier   ' ; next seat   P back to command"); // (\xC2\xB7 is the UTF-8 middle dot)
-		if (auto t = cs::As<MountedTurret>(held))
-			return cs::Cat("GUN  \xC2\xB7  ", t->Name(), "  \xC2\xB7  ", (t->Mount->Cooldown > 0 ? "reloading" : "ready"), "  \xC2\xB7  / next gun   ",
-				(cs::Is<ShipHelm>(t->Host()) ? "Backspace helm   " : t->Host() != nullptr ? "Backspace whole station   " : ""), "P back to command");
-		if (auto st = cs::As<StationSeat>(held))
-			return cs::Cat("STATION  \xC2\xB7  ", st->Name(), "  \xC2\xB7  / man a gun   ' ; next seat   P back to command"); // US-T90
-		return cs::String();
+		if (held == nullptr) return cs::String();
+		auto panel = held->RolePanel();
+		return cs::Cat(panel.Title, "  \xC2\xB7  ", panel.Status.empty() ? held->Name() : panel.Status, "  \xC2\xB7  P back to command"); // (\xC2\xB7 is the UTF-8 middle dot)
 	}
 }

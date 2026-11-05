@@ -1306,6 +1306,7 @@ namespace SpaceGod::UI
 		if (line.empty()) return; // C#: line == null
 		DrawSeatSight();
 		DrawDeckGuide();
+		DrawRolePanel(); // US-T135
 		auto content = GUIContent(line);
 		float w = toast->CalcSize(content).x + 40;
 		auto r = Rect((Screen::width - w) * 0.5f, Screen::height - 96, w, 34);

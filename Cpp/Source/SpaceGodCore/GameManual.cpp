@@ -325,8 +325,12 @@ namespace SpaceGod::Core
 				  "hull goes to the largest claimant that can pay the others their share of its worth, and if none can, it "
 				  "is sold to the breakers and the money is shared."),
 				T("Taking any seat",
-				  "From the god view ' jumps into the nearest seat in the fight in view and ' and ; step through the rest; / "
-				  "mans the next gun. P hands the seat back to its AI.")),
+				  "You are the SpaceGod, never any one ship or pilot: you embody whatever you choose and let it go again. Select "
+				  "it (or point at it) and press P: a ship's helm, a hull or station in a fight, a launched craft. F9 lists every "
+				  "seat near you to click into. From the god view ' jumps into the nearest seat in the fight in view and ' and ; "
+				  "step through the rest; / mans the next gun; Shift+P puts you out on the hull as one of its EVA repair workers. "
+				  "P again lets go to the free SpaceGod view. What you do while embodied is that unit's doing: its faction and "
+				  "its crew keep the credit and the blame after you leave.")),
 
 			cs::New<ManualChapter>("Trade", "Markets, cargo, contracts, the trade desk and outfitting", Keys("TRADE"),
 				T("The economy",
@@ -400,6 +404,20 @@ namespace SpaceGod::Core
 				  "gun, Backspace moves up to the hull's helm (or the whole station), and P hands it back to its crew. Past the "
 				  "last gun / goes back to the helm or station, and / there starts on the first gun again, so every gun on a "
 				  "capital ship or a station is a few presses away for a better angle."),
+				T("EVA repair: welding a hull back together",
+				  "A capital ship's or a station's damage control teams can go outside. Shift+P (at its helm, on one of its guns, "
+				  "or with it selected in a fight) puts you in the suit of its next EVA repair worker, out on the plating; again "
+				  "for the next. The camera rides over the worker's shoulder; W/S and A/D crawl the plating the way you look, "
+				  "Shift fires the suit's jets, and an orange bracket marks the nearest damaged hardpoint -- a shield generator, "
+				  "an engine, a turret -- with how far it is. Reach it and the bracket turns green and the torch lights: the "
+				  "worker welds at its team's own rate, a quarter faster for your hands on it. Above the seat line a marker "
+				  "sweeps a bar: tap left mouse as it crosses the green zone for a good weld, which raises the weld's quality "
+				  "and speeds the job, up to two and three-quarter times what the team manages alone; each hit moves the zone "
+				  "and a streak narrows it, and a miss sputters the torch for a moment and halves the quality. A damaged "
+				  "hardpoint comes up to 85%; one shot away (a shield emitter or gun mount) is brought back as the emergency "
+				  "crews do. While you hold a worker its team is outside, not in the damage control pool; let go (P, or "
+				  "Backspace back inside to the helm or station) and it rejoins them. Distances are in hull lengths, so it "
+				  "plays the same at gameplay and realistic scale."),
 				T("A hull's own abilities: launch, then fly what you launched",
 				  "At a helm the ability bar above the flight readout lists what that hull can order from what it really carries, "
 				  "each on Shift and a digit (Shift+1 the first, Shift+0 the tenth). A carrier has one launch for each class of "

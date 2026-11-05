@@ -121,7 +121,8 @@ namespace SpaceGod::Input
 		// US-T97: Shift+Backspace is the self-destruct's, never home or up to the host.
 		bool backspaceAlone = kb[Key::Backspace].wasPressedThisFrame && !Boost;
 		Home = kb[Key::Home].wasPressedThisFrame || backspaceAlone;
-		Pilot = kb[Key::P].wasPressedThisFrame;
+		Pilot = kb[Key::P].wasPressedThisFrame && !Boost;
+		EmbodyCrew = kb[Key::P].wasPressedThisFrame && Boost; // US-T135
 		CycleSeat = kb[Key::Quote].wasPressedThisFrame ? 1 : kb[Key::Semicolon].wasPressedThisFrame ? -1 : 0;
 		ManGun = kb[Key::Slash].wasPressedThisFrame && !Boost;
 		JumpToCraft = kb[Key::Slash].wasPressedThisFrame && Boost; // US-T106: Shift+/ into a launched craft
@@ -253,6 +254,7 @@ namespace SpaceGod::Input
 		CycleSky = 0;
 		ThrottleStep = 0;
 		ManGun = false;
+		EmbodyCrew = false; // US-T135
 		JumpToCraft = false;
 		MoveToHost = false;
 		TogglePicker = false;

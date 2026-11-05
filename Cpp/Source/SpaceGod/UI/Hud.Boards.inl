@@ -198,6 +198,14 @@ private:
 	void DrawSeat();
 
 	/// <summary>
+	/// US-T135, the role panel of whatever seat is held (<see cref="Core::IEmbodiable.RolePanel"/>): the role, its state and
+	/// every key of it down the left, greyed when it cannot be used now; a role's meter (the EVA worker's weld timing: the
+	/// marker, the zone to tap it in, the job's progress, the weld's quality) above the seat line; and a bracket on the part
+	/// of the hull it is working (or the nearest damaged one). One panel for every kind, drawn from the kind's own data.
+	/// </summary>
+	void DrawRolePanel();
+
+	/// <summary>
 	/// US-T106: at a helm, the hull's ability bar (<see cref="HelmAbilities.Of"/>): what its own hangars and bays let it order,
 	/// each on its Shift+digit with how it stands (craft aboard and up, a team ready, reloading), bright when it can go now;
 	/// with Shift+/ to jump into a launched craft. Nothing for a hull that carries none of them.

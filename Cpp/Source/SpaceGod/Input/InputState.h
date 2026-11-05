@@ -134,8 +134,12 @@ namespace SpaceGod::Input
 		bool Home = false;
 		int NumberKey = -1;
 
-		/// <summary>Takes or releases direct control of the selected/focused ship.</summary>
+		/// <summary>P, the embody key (US-T135): embodies what is selected (or under the mouse), whatever it is -- a ship's helm, a hull
+		/// or station in a fight -- or, at any controls, lets go back to the free SpaceGod view.</summary>
 		bool Pilot = false;
+
+		/// <summary>Shift+P (US-T135): out on the hull held, flown or selected as its next EVA repair worker.</summary>
+		bool EmbodyCrew = false;
 
 		/// <summary>Take charge (U.SPC-T422): ' takes the next seat in the fight in view (a ship's helm or a launched
 		/// fighter's cockpit), ; the one before (0: neither).</summary>
