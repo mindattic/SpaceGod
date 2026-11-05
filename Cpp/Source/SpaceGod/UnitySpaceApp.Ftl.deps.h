@@ -15,4 +15,6 @@ namespace SpaceGod::Core
 	class Cruise;
 	class FtlTarget;
 	class FtlCourse;
+	class DeepSpaceEvent; // US-T124: the last void-stop event said (UnitySpaceApp.Ftl.inl)
+	class Galaxy;
 }

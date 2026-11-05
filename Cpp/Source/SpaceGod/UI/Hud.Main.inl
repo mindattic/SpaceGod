@@ -102,6 +102,9 @@ private:
 	/// star ahead, and one caption: where it is bound, how far is left, and how long at this pace.
 	void DrawFtlCruise();
 
+	/// <summary>At a void stop between jumps (US-T124): the hull's sensor posture, any ghost closing, and the keys.</summary>
+	void DrawVoidStopSensors(const cs::Ref<Core::Cruise>& c, double jd);
+
 	/// The helm's FTL drive (U.SPC-T417): the star the nose is on and the key to spool for it (or, inside the system's
 	/// gravity wells, how far out the rim is: canon, U.SPC-T455, no jump inside them), and the charge as it builds.
 	void DrawFtl();

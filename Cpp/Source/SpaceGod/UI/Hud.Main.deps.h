@@ -22,6 +22,7 @@ namespace SpaceGod::Core
 	class CargoHold;
 	class SaveHeader;
 	class FtlCourse;
+	class Cruise;
 	class BodyDefinition;
 	class Battle;
 	class BattleUnit;

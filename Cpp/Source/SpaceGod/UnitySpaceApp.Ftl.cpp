@@ -25,8 +25,10 @@
 #include "Systems/FtlRules.h"
 #include "Systems/Galaxy.h"
 #include "Systems/HelmFtl.h"
+#include "Systems/VoidRaiders.h"
 
 #include "Camera/SpaceCamera.h"
+#include "Input/InputDevice.h"
 #include "Rendering/AssetStreamer.h"
 #include "Streaming/AreaStreaming.h"
 #include "Views/InterstellarView.h"
@@ -279,6 +281,7 @@ namespace SpaceGod
 				ShowToast(cs::Cat("JUMP ", c->Stops + 1, " of ", c->Stops + left, " ENGAGED for ", cs::Strings::ToUpperInvariant(c->ToName), ", ", cs::Fmt(c->Profile.Ly, "0.0"), " ly"));
 			}
 			ftlAtStop = atStop;
+			UpdateVoidStop(c, jd);
 			double total = c->ArriveJd() - c->LegJd;
 			double share = total > 0 && !cs::Double::IsInfinity(total) ? (jd - c->LegJd) / total : 0;
 			// Built on the last jump only (US-T86): the far system is not yet anywhere near on the earlier ones.
@@ -316,6 +319,62 @@ namespace SpaceGod
 		BeginHelmGateCover();
 		ShowToast(cs::Cat("Dropped out of FTL at the edge of ", cs::Strings::ToUpperInvariant(to->Name), ", ",
 			DistanceText(ship->Orbit->Center.Length()), " from its star  (in from ", (c->From ? c->From->Name : cs::String("open space")), ")"));
+	}
+
+	void UnitySpaceApp::UpdateVoidStop(const cs::Ref<Core::Cruise>& c, double jd)
+	{
+		// The sensor keys at a void stop (US-T124), read off the keyboard: between the stars nothing is at the controls.
+		if (c->AtVoidStop(jd) && CoopHelmMine())
+		{
+			const auto& kb = SpaceGod::Input::InputDevice::current();
+			bool shift = kb[SpaceGod::Input::Key::LeftShift].isPressed || kb[SpaceGod::Input::Key::RightShift].isPressed;
+			if (kb.present && kb[SpaceGod::Input::Key::Tab].wasPressedThisFrame)
+			{
+				cs::String why = Core::VoidRaiders::Ping(c, jd);
+				ShowToast(why.empty() ? cs::String("ACTIVE PING: anything out there closing on you shows now, and may break off; you are lit up a while (Shift+F3 runs dark)") : cs::Cat("NO PING: ", why));
+			}
+			else if (kb.present && kb[SpaceGod::Input::Key::F3].wasPressedThisFrame && shift)
+			{
+				bool changed;
+				ShowToast(Core::VoidRaiders::ToggleDark(c, jd, changed));
+			}
+		}
+		// What happened to the hull out here with the ghosts, said once each (newest first back to the last one said).
+		const auto& events = Galaxy->DeepSpace->Events();
+		cs::String name = c->Leader() != nullptr ? c->Leader()->Name : cs::String();
+		cs::Ref<Core::DeepSpaceEvent> newest = events.Count() > 0 ? events[events.Count() - 1] : nullptr;
+		if (ftlRaidEventSeen == nullptr || !events.Contains(ftlRaidEventSeen)) ftlRaidEventSeen = newest;
+		else if (newest != ftlRaidEventSeen)
+		{
+			for (int i = events.Count() - 1; i >= 0 && events[i] != ftlRaidEventSeen; i--)
+			{
+				const auto& t = events[i]->Text;
+				bool raid = t.find("ghost") != cs::String::npos || t.find("Raider") != cs::String::npos || t.find("Out of the void") != cs::String::npos;
+				if (raid && !name.empty() && t.find(name) != cs::String::npos)
+				{
+					ShowToast(t);
+					break;
+				}
+			}
+			ftlRaidEventSeen = newest;
+		}
+	}
+
+	void UnitySpaceApp::UpdateVoidRaiderNews()
+	{
+		if (Galaxy == nullptr || Galaxy->DeepSpace == nullptr) return;
+		int stage = Galaxy->DeepSpace->VoidRaidLore;
+		if (voidLoreGalaxy != Galaxy.get() || voidLoreSeen < 0 || stage < voidLoreSeen)
+		{
+			// A new galaxy (or a load): what is known already is not news.
+			voidLoreGalaxy = Galaxy.get();
+			voidLoreSeen = stage;
+			return;
+		}
+		if (stage == voidLoreSeen) return;
+		const auto& l = Core::VoidRaiders::Lore()[stage - 1];
+		voidLoreSeen = stage;
+		ShowToast(cs::Cat("NEWS  ·  OUT OF THE VOID: ", cs::Strings::ToUpperInvariant(l.Title), "  ·  ", l.Text));
 	}
 
 	void UnitySpaceApp::UpdateFtlCruiseView(float dt)

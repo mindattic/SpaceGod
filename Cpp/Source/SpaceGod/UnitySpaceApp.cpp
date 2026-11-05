@@ -1064,6 +1064,7 @@ namespace SpaceGod
 	{
 		// Set again below once the hull has flown this frame; a lane ride or a lost helm leaves the chase on the hull.
 		SpaceCamera->PilotView = std::nullopt;
+		UpdateVoidRaiderNews(); // US-T124: what is learned of the Void Raiders comes as news
 		// The hull out between the stars under its own drive (U.SPC-T417): the helm is taken again where it drops out.
 		if (InFtlCruise())
 		{

@@ -55,6 +55,7 @@
 #include "Systems/FtlRules.h"
 #include "Systems/Galaxy.h"
 #include "Systems/HelmFtl.h"
+#include "Systems/VoidRaiders.h"
 #include "Shared/Profiles/ProfileStore.h"
 
 #include <tuple>
@@ -317,6 +318,7 @@ namespace SpaceGod::UI
 				: cs::Cat("DRIVE SPOOLING ", Percent(c->ChargeFraction(jd)), "  ·  ENGAGES IN ", Mathf::CeilToInt(static_cast<float>(app->FtlSecondsTo(c->EngageJd()))), " S");
 			DrawBanner(cs::Cat("VOID STOP ", c->Stops, "   ·   ", stage, "   ·   NEXT JUMP ", c->Stops + 1, " OF ", c->Stops + left, "   ·   BOUND FOR ",
 				cs::Strings::ToUpperInvariant(c->ToName), ", ", cs::Fmt(ly, "0.00"), " LY TO GO   ·   ", cs::Strings::ToUpperInvariant(app->Clock->Warp().Label), "  (, .)"));
+			if (c->Piloted) DrawVoidStopSensors(c, jd);
 			return;
 		}
 		cs::String jump = c->Stops + left > 1 ? cs::Cat("JUMP ", c->Stops + 1, " OF ", c->Stops + left, "   ·   ") : cs::String();
@@ -324,6 +326,35 @@ namespace SpaceGod::UI
 		DrawBanner(cs::Cat("FTL  ·  ", jump, "BOUND FOR ", cs::Strings::ToUpperInvariant(c->ToName), "   ·   ", cs::Fmt(ly, "0.00"), " LY TO GO   ·   ",
 			cs::Fmt(speedC, "N0"), " C   ·   ETA ", Astro::ToDateTime(c->ArriveJd()).ToString("yyyy-MM-dd"),
 			"   ·   ", c->Stopover ? "VOID STOP" : "DROPPING OUT", " IN ", Mathf::CeilToInt(static_cast<float>(app->FtlSecondsLeft())), " S AT ", cs::Strings::ToUpperInvariant(app->Clock->Warp().Label), "  (, .)"));
+	}
+
+	void Hud::DrawVoidStopSensors(const cs::Ref<Cruise>& c, double jd)
+	{
+		// The hull's sensors at a void stop (US-T124): its posture, and any ghost closing on it.
+		int stage = app->Galaxy != nullptr && app->Galaxy->DeepSpace != nullptr ? app->Galaxy->DeepSpace->VoidRaidLore : 0;
+		cs::String posture = c->RunDark ? cs::String("SENSORS DARK  ·  reactor down, drive cold: hard to find, but no charge builds")
+			: VoidRaiders::Lit(*c, jd) ? cs::String("SENSORS LIT UP  ·  your ping is heard by anything out here")
+			: cs::String("SENSORS PASSIVE  ·  listening");
+		cs::String contact;
+		bool closing = !cs::Double::IsNaN(c->RaidStrikeJd);
+		if (closing && c->RaidSeen)
+			contact = cs::Cat("CONTACT: ", cs::Strings::ToUpperInvariant(VoidRaiders::Called(stage)), " CLOSING  ·  strikes in ",
+				Mathf::CeilToInt(static_cast<float>(app->FtlSecondsTo(c->RaidStrikeJd))), " s", c->RaidStrikeJd < c->EngageJd() ? "  ·  before the drive engages" : "  ·  the drive engages first");
+		else if (c->RaidStruck) contact = "struck at this stop: the ghosts are gone for now";
+		else contact = cs::Cat("no contact  ·  the longer you sit in the void, the likelier something finds you", stage > 0 ? cs::Cat(" (", VoidRaiders::Called(stage), "s)") : cs::String());
+		cs::String keys = c->RunDark ? "Shift+F3  power up (the charge builds again)" : "Tab  active ping    Shift+F3  run dark";
+		auto a = GUIContent(posture);
+		auto m = GUIContent(contact);
+		auto b = GUIContent(keys);
+		float w = Mathf::Max(text->CalcSize(a).x, Mathf::Max(small->CalcSize(m).x, small->CalcSize(b).x)) + 28;
+		auto r = Panel(Rect((Screen::width - w) * 0.5f, Screen::height - 290, w, 68));
+		GUI::contentColor = c->RunDark ? Dim : StreakColor;
+		GUI::Label(Rect(r.x + 14, r.y + 5, w, 20), a, text);
+		GUI::contentColor = closing && c->RaidSeen ? RetrogradeColor : Color::white();
+		GUI::Label(Rect(r.x + 14, r.y + 27, w, 18), m, small);
+		GUI::contentColor = Dim;
+		GUI::Label(Rect(r.x + 14, r.y + 45, w, 18), b, small);
+		GUI::contentColor = Color::white();
 	}
 
 	void Hud::DrawFtl()

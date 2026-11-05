@@ -117,6 +117,19 @@ namespace SpaceGod::Core
 		/// to <see cref="LegJd"/> + the profile's <see cref="CruiseProfile.SpoolDays"/>).</summary>
 		double ChargeJd = cs::Double::NaN;
 
+		/// <summary>The player's hull at a void stop, running dark (US-T124, its <see cref="SensorPosture"/>): the reactor
+		/// down, the drive cold, so a ghost seldom finds it, but no charge builds while it lasts. Only the player's.</summary>
+		bool RunDark = false;
+
+		/// <summary>When the player's hull last pinged at a void stop (NaN: never): lit up a while for anyone listening.</summary>
+		double PingJd = cs::Double::NaN;
+
+		/// <summary>A ghost closing on it at this void stop (US-T124): when it strikes (NaN: none), and whether its sensors
+		/// have picked it out; and whether it was struck at this stop already.</summary>
+		double RaidStrikeJd = cs::Double::NaN;
+		bool RaidSeen = false;
+		bool RaidStruck = false;
+
 		/// <summary>Waiting at a void stop at <paramref name="jd"/>: dropped out between jumps, not yet under way again.</summary>
 		bool AtVoidStop(double jd) const;
 
@@ -514,6 +527,17 @@ namespace SpaceGod::Core
 		/// <summary>Souls brought home from distress calls, and finds surveyed, so far.</summary>
 		int Rescued = 0;
 		int SurveyFindsMade = 0;
+
+		/// <summary>The Void Raiders (US-T124): raids on record (a ghost wreck counts twice), and how much of their
+		/// <see cref="VoidRaiders.Lore"/> has come out.</summary>
+		int VoidRaids = 0;
+		int VoidRaidLore = 0;
+
+	private:
+		/// <summary>The Void Raiders' own numbers (US-T124), so nothing else out here draws differently for them.</summary>
+		cs::Random raidRng{ 6113 };
+
+	public:
 
 		/// <summary>How far sensors see inside a nebula, as a share of the open-space range.</summary>
 		static constexpr double NebulaSensorShare = 0.1;

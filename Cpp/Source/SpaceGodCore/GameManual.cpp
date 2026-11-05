@@ -482,6 +482,18 @@ namespace SpaceGod::Core
 				  "Fighters, couriers and other small craft carry no drive of their own. At a shipyard (F2, outfitting) a small "
 				  "craft can dock to a jump ring, a hyperdrive ring it rides between the stars like a capital hull: aim at a star "
 				  "beyond the rim and press Enter. A ring's stops are long, its jumps short; let it go at a yard for half its price back."),
+				T("Void Raiders",
+				  "Something hunts the void between the stars. A ship stopped between jumps, its drive cooling and spooling, can "
+				  "be found by ghost ships no yard has built, and the longer it sits there the likelier they come: the chance "
+				  "grows with the square of the stop, so a fast spool is the best defence, and they never come within half a "
+				  "light-year of a star or a void station. A ghost closes for a couple of hours before it strikes; a hull that "
+				  "jumps first is gone, and one whose sensors pick it out (CONTACT on the HUD) meets the strike, losing less and "
+				  "downing more of them. At a stop your sensors are yours: Tab pings (any ghost closing shows at once and may "
+				  "break off, but you are lit up and three times as findable for a while), Shift+F3 runs dark (a quarter as "
+				  "findable, a ghost closing may lose you, but no charge builds until you power up). A strike costs escorts, or "
+				  "hull, reaction mass and a scrambled drive. Nobody knows at first what they are: unidentified sensor ghosts. "
+				  "What they are comes out as raids pile up, as news (OUT OF THE VOID), and the wrecks of the ones brought down "
+				  "are worth a salvager's while."),
 				T("Deep space",
 				  "Space between the stars is simulated: void stations, gravity projectors that pull ships out of FTL, and the "
 				  "traffic crossing it."),

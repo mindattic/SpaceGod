@@ -72,6 +72,21 @@ private:
 	/// set again when it engages for the next jump.</summary>
 	bool ftlAtStop = false;
 
+	/// <summary>The last deep-space event looked at for the hull's own run-ins with the Void Raiders (US-T124), so each
+	/// is said once; and how much of their lore the player has been told of, in which galaxy.</summary>
+	cs::Ref<Core::DeepSpaceEvent> ftlRaidEventSeen;
+	int voidLoreSeen = -1;
+	Core::Galaxy* voidLoreGalaxy = nullptr;
+
+	/// <summary>At a void stop (US-T124): Tab pings, Shift+F3 runs dark or powers up; a ghost seen closing, a strike, an
+	/// escape, said on a toast.</summary>
+	void UpdateVoidStop(const cs::Ref<Core::Cruise>& c, double jd);
+
+public:
+	/// <summary>Something new learned of the Void Raiders anywhere in the galaxy (US-T124) comes to the player as news.</summary>
+	void UpdateVoidRaiderNews();
+
+private:
 	/// <summary>A void stop between jumps runs at the slowest warp that gets it over in about this many real seconds
 	/// (US-T86): long enough to see the drive cool and spool, and to answer a ghost on the sensors (US-T124).</summary>
 	static constexpr double FtlStopRealSeconds = 14;

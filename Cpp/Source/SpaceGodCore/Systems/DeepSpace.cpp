@@ -21,6 +21,7 @@
 #include "Systems/Galaxy.h"
 #include "Systems/InterstellarTraffic.h"
 #include "Systems/Polities.h"
+#include "Systems/VoidRaiders.h"
 #include "Settings/GameSetting.h"
 
 namespace SpaceGod::Core
@@ -66,6 +67,8 @@ namespace SpaceGod::Core
 		End = Target;
 		LegJd = jd;
 		StopJd = cs::Double::NaN;
+		RaidStrikeJd = cs::Double::NaN;
+		RaidSeen = RaidStruck = RunDark = false;
 		double ly = Target.DistanceLy(from);
 		// No jump longer than the drive reaches (US-T86): a longer way is flown as even jumps, this the first of them,
 		// ending at a stop in the void (DeepSpace.Due takes it on from there).
@@ -366,6 +369,9 @@ namespace SpaceGod::Core
 			double mark = nextMarkJd;
 			Due(mark);
 			for (const auto& e : Encounters) e->Step(*this, mark - StepDays, mark, rng);
+			// The ghosts at the void stops (US-T124), on their own numbers (not an encounter kind, so a save from before
+			// them runs them too).
+			VoidRaiders::Step(*this, mark - StepDays, mark, raidRng);
 			nextMarkJd += StepDays;
 		}
 		Due(jd);
