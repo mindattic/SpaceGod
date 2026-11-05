@@ -73,6 +73,11 @@ namespace SpaceGod::Rendering
 		/// the 40 fighters.</summary>
 		static cs::List<cs::String> PieceNames();
 
+		/// <summary>US-T133: the object path of every mesh the kit draws (the 8 modules, the 40 fighters) and of its
+		/// material, so the area streaming can load them in the background before a hull built from them is ever wanted
+		/// (each is otherwise loaded on the frame its first hull is built).</summary>
+		static cs::List<cs::String> AssetPaths();
+
 		/// <summary>One piece by name, nose +Z and scaled to <paramref name="length"/> (debug and the lineup).</summary>
 		static cs::Ref<Renderer> Piece(const cs::Ref<Transform>& parent, const cs::String& name, float length, const cs::Ref<Core::Faction>& faction);
 	};

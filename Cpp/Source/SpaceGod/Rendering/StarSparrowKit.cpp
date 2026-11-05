@@ -753,6 +753,15 @@ namespace SpaceGod::Rendering
 		return names;
 	}
 
+	cs::List<cs::String> StarSparrowKit::AssetPaths()
+	{
+		cs::List<cs::String> paths;
+		for (P m : { P::Core, P::Engine, P::Thruster, P::Plasma, P::Weapon, P::Wing, P::Fin, P::Tail }) paths.Add(PathOf(m, 0));
+		for (int i = 1; i <= 40; i++) paths.Add(PathOf(P::Fighter, i));
+		paths.Add(cs::Cat(MaterialPath, ".M_StarSparrowShip"));
+		return paths;
+	}
+
 	cs::Ref<Renderer> StarSparrowKit::Piece(const cs::Ref<Transform>& parent, const cs::String& name, float length, const cs::Ref<Faction>& faction)
 	{
 		Part p;

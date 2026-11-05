@@ -18,14 +18,17 @@
 #include "Combat/War.h"
 #include "Combat/Wreck.h"
 #include "Settings/GameSetting.h"
+#include "Systems/DeepSpace.h"
 #include "Systems/Galaxy.h"
 #include "Systems/JumpGate.h"
+#include "Systems/TravelCourse.h"
 
 #include "Camera/SpaceCamera.h"
 #include "Camera/StarTravel.h"
 #include "Rendering/AssetStreamer.h"
 #include "Rendering/Materials.h"
 #include "Rendering/ShipModels.h"
+#include "Streaming/AreaStreaming.h"
 #include "Views/GateView.h"
 #include "Views/ShipView.h"
 
@@ -67,6 +70,7 @@ namespace SpaceGod
 	{
 		// (C#: shipViews == null || ActiveSystem == null.)
 		if (ActiveSystem == nullptr) return;
+		AreaStreaming::Attach(Sky, Galaxy); // US-T133
 		if (helmCover->Active) helmCover->Advance(dt, StreamingPending > 0);
 
 		DVec3 camera = StreamFocus.has_value() ? *StreamFocus : SpaceCamera->ScenePosition;
@@ -76,6 +80,7 @@ namespace SpaceGod
 			streamSystem = ActiveSystem;
 			streamVelocity = DVec3::Zero;
 			OnSystemStreamed(ActiveSystem);
+			AreaStreaming::EnterSystem(ActiveSystem); // US-T133
 		}
 		else if (dt > 1e-4f && !StreamFocus.has_value())
 		{
@@ -93,6 +98,10 @@ namespace SpaceGod
 		double ppu = PixelsPerUnitAtUnitDistance();
 		double modelPx = ShipLod::IconBelowPx()->Value;
 		StreamView view(camera, StreamFocus.has_value() ? DVec3::Zero : streamVelocity, heading, ppu, modelPx, Core::Streaming::LeadSeconds()->Value);
+
+		// US-T133: the bodies' detail rings, from the same view (the body the camera is on, or the one selected, held close).
+		int focusBody = SpaceCamera->FocusTarget.IsBody() ? SpaceCamera->FocusTarget.Body : Selected.IsBody() ? Selected.Body : -1;
+		AreaStreaming::UpdateRings(view, bodyScene, bodyRadius, focusBody);
 
 		const cs::List<cs::Ref<Core::Ship>>& ships = Fleet()->Ships();
 		int n = cs::Math::Min(ships.Count(), shipViews.Count());
@@ -140,8 +149,9 @@ namespace SpaceGod
 			double px = ShipLod::ApparentPx(shipLength[i] * ShipLod::ExtentFactor(Fleet()->Ships()[i]), (shipScene[i] - camera).Length(), ppu);
 			if (ShipLod::DrawsModel(px)) pending++;
 		}
-		for (const cs::String& path : activePaths)
-			if (!Rendering::AssetStreamer::Ready(path)) pending++;
+		// US-T133: only the maps of bodies big enough on screen to show them (a far body is its impostor, its own colour,
+		// until it is near); before, every map of the system was waited on, holding a gate's cover open for a moon across it.
+		pending += AreaStreaming::PendingInView();
 		StreamingPending = pending;
 
 		UpdateWarming(dt, camera);
@@ -170,36 +180,54 @@ namespace SpaceGod
 
 	void UnitySpaceApp::UpdateWarming(float dt, DVec3 camera)
 	{
+		// US-T133: where the view is headed is asked for every frame, and the area streaming works through it within its
+		// own budget (a system's sky, maps, models and meshes; the kit's meshes).
+		PredictAreas(camera);
+		AreaStreaming::Tick(dt);
+		// An area let go of (no longer headed for): what it held is released with the rest nothing draws.
+		if (AreaStreaming::ConsumeReleased()) releasePending = true;
+
 		warmTimer -= dt;
 		if (releaseInS > 0) releaseInS -= dt;
 		if (warmTimer > 0) return;
 		warmTimer = WarmEvery;
+		if (releasePending && releaseInS <= 0)
+		{
+			releasePending = false;
+			streamKeep.Clear();
+			for (const cs::String& p : activePaths) streamKeep.Add(p);
+			AreaStreaming::Keep(streamKeep);
+			Rendering::AssetStreamer::ReleaseExcept(streamKeep);
+		}
+	}
 
-		streamKeep.Clear();
-		for (const cs::String& p : activePaths) streamKeep.Add(p);
-		if (Travel->Active && Travel->To != nullptr) { Warm(Travel->To); if (Travel->Hop() != nullptr) Warm(Travel->Hop()); }
-		if (nearGate != nullptr) Warm(nearGate->Destination());
+	void UnitySpaceApp::PredictAreas(DVec3 camera)
+	{
+		using P = StreamPriority;
+		// A trip between the stars under way (the god view's, gate by gate or across): its destination and next stop.
+		if (Travel->Active && Travel->To != nullptr)
+		{
+			AreaStreaming::Prefetch(Travel->To, P::Urgent);
+			AreaStreaming::Prefetch(Travel->Hop(), P::Urgent);
+		}
+		// The jump drive (US-T86): a crossing under way, a charge spooling, an autopilot flying a course, a course plotted.
+		if (FtlCruise != nullptr) AreaStreaming::Prefetch(FtlCruise->To, FtlCruise->ToName, P::Urgent);
+		if (Ftl->Stage == Core::FtlStage::Spooling && Ftl->Target != nullptr) AreaStreaming::Prefetch(Ftl->Target->System, Ftl->Target->Name, P::Imminent);
+		if (FtlAutopilot->Active() && FtlAutopilot->Course != nullptr && FtlAutopilot->Course->Target != nullptr)
+			AreaStreaming::Prefetch(FtlAutopilot->Course->Target->System, FtlAutopilot->Course->Target->Name, P::Ahead);
+		if (PlottedCourse != nullptr && PlottedCourse->Target != nullptr)
+			AreaStreaming::Prefetch(PlottedCourse->Target->System, PlottedCourse->Target->Name, P::Background);
+		// The helm's gate-by-gate course: the system past its next gate.
+		if (Course != nullptr && !Course->Done() && Course->Next() != nullptr) AreaStreaming::Prefetch(Course->Next()->Destination(), P::Ahead);
+		// A gate in activation range, and any the view is near or closing on at its present speed (the cruise drive's
+		// speeds included, US-T127): the rings are the gate's own size, so they scale with the scale model.
+		if (nearGate != nullptr) AreaStreaming::Prefetch(nearGate->Destination(), P::Urgent);
 		double ring = Scale()->ShipLength(Views::GateView::DiameterKm);
 		for (const cs::Ref<JumpGate>& gate : ActiveSystem->Gates())
 		{
 			if (gate->Destination() == nullptr) continue;
 			DVec3 at = Scale()->MapNear(Ephemeris(), bodyScene, Catalog()->Root()->Index, gate->PositionKm);
-			if (Core::Streaming::ShouldWarm(camera, streamVelocity, at, ring * WarmGateDiameters)) Warm(gate->Destination());
-		}
-		if (releasePending && releaseInS <= 0)
-		{
-			releasePending = false;
-			Rendering::AssetStreamer::ReleaseExcept(streamKeep);
-		}
-	}
-
-	void UnitySpaceApp::Warm(const cs::Ref<StarSystem>& system)
-	{
-		if (system == nullptr) return;
-		for (const cs::String& path : Rendering::AssetStreamer::SystemPaths(system))
-		{
-			streamKeep.Add(path);
-			Rendering::AssetStreamer::Warm(path);
+			if (Core::Streaming::ShouldWarm(camera, streamVelocity, at, ring * WarmGateDiameters)) AreaStreaming::Prefetch(gate->Destination(), P::Imminent);
 		}
 	}
 }

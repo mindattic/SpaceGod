@@ -82,6 +82,20 @@ namespace SpaceGod::Views
 		/// <summary>Gives the system in view the next sky (<paramref name="step"/> back for a negative one) and keeps it; returns it.</summary>
 		cs::Ref<Core::SkyboxSpec> Cycle(int step = 1);
 
+		/// <summary>
+		/// US-T133: starts the sky <paramref name="system"/> keeps loading (or baking) now, off screen, in a slot of its own,
+		/// so that <see cref="Show"/> for it later swaps it in at once with no fade: a system streamed in ahead of arrival
+		/// has its sky ready before it is seen. One system is held ahead at a time; asking for another drops the last. A
+		/// star not yet built into a system is asked for by its name (the seeded sky is the name's).
+		/// </summary>
+		void Prefetch(const cs::String& system);
+
+		/// <summary>Whether the sky <paramref name="system"/> keeps is ready to show at once (held ahead, or on screen).</summary>
+		bool PrefetchReady(const cs::String& system) const;
+
+		/// <summary>Lets go of the sky held ahead for <paramref name="system"/> (no longer headed for).</summary>
+		void DropPrefetch(const cs::String& system);
+
 		/// <summary>Picks up a finished load or bake and fades the sky in; once a frame.</summary>
 		void Update(float dt);
 
@@ -89,6 +103,31 @@ namespace SpaceGod::Views
 		void Dispose();
 
 	private:
+		/// <summary>US-T133: a sky loading or baked ahead of the system it belongs to being shown.</summary>
+		struct Ahead
+		{
+			cs::String Key, System;
+			cs::Ref<Core::SkyboxSpec> Spec;
+			cs::Ref<Texture2D> Texture;
+			bool FromResources = false, Ready = false, Failed = false;
+			cs::Ref<ResourceRequest> Resource;
+			TFuture<UnityCompat::TextureFactory::DecodedImage> File;
+			bool FileActive = false;
+			TFuture<cs::List<uint8_t>> Bake;
+			bool BakeActive = false;
+			int BakeWidth = 0;
+			std::shared_ptr<cs::List<int>> Mips;
+			std::shared_ptr<std::atomic<bool>> Cancel;
+		};
+		std::shared_ptr<Ahead> ahead;
+
+		/// <summary>The key a sky is loaded under for a system (a seeded sky is the system's own, at the present size).</summary>
+		static cs::String KeyFor(const cs::Ref<Core::SkyboxSpec>& spec, const cs::String& system);
+		void UpdateAhead();
+		/// <summary>The sky held ahead goes on screen (at once, no fade, if <paramref name="instant"/>).</summary>
+		void TakeAhead(bool instant);
+		void DropAhead();
+
 		void Apply(const cs::Ref<Core::SkyboxSpec>& spec);
 		void OnResourceLoaded(int id, const cs::Ref<Core::SkyboxSpec>& spec, const cs::Ref<ResourceRequest>& req);
 		static cs::Ref<Texture2D> Upload(const cs::List<uint8_t>& data, int width, const cs::List<int>& mips);

@@ -89,11 +89,17 @@ namespace SpaceGod::Views
 	{
 		if (!spec) return;
 		wanted = spec;
-		wantedKey = spec->Kind == SkyKind::Procedural ? cs::Cat(spec->Id, "@", systemName, "@", SkyboxSettings::NebulaFaceSize()) : spec->Id;
+		wantedKey = KeyFor(spec, systemName);
 		// Whatever was loading for the last choice is dropped, even when this one is already on screen.
 		int id = ++request;
 		CancelPending();
 		if (wantedKey == shownKey && (texture || spec->Kind == SkyKind::Starfield)) return;
+		// US-T133: streamed in ahead of arrival: on screen at once if it is ready, else it goes up the moment it is (Update).
+		if (ahead && ahead->Key == wantedKey && !ahead->Failed)
+		{
+			if (ahead->Ready) TakeAhead(true);
+			return;
+		}
 		switch (spec->Kind)
 		{
 			case SkyKind::Starfield:
@@ -167,8 +173,163 @@ namespace SpaceGod::Views
 		Swap(tex, true, spec);
 	}
 
+	cs::String SkyView::KeyFor(const cs::Ref<SkyboxSpec>& spec, const cs::String& system)
+	{
+		return spec->Kind == SkyKind::Procedural ? cs::Cat(spec->Id, "@", system, "@", SkyboxSettings::NebulaFaceSize()) : spec->Id;
+	}
+
+	void SkyView::Prefetch(const cs::String& system)
+	{
+		if (system.empty() || !Memory) return;
+		auto spec = Memory->For(system);
+		if (!spec || spec->Kind == SkyKind::Starfield) return; // nothing to load
+		cs::String key = KeyFor(spec, system);
+		// On screen, or already loading for the screen.
+		if (key == shownKey || key == wantedKey) return;
+		if (ahead && ahead->Key == key) return;
+		DropAhead();
+		auto a = std::make_shared<Ahead>();
+		a->Key = key;
+		a->System = system;
+		a->Spec = spec;
+		ahead = a;
+		switch (spec->Kind)
+		{
+			case SkyKind::Image:
+			{
+				auto load = Resources::LoadAsync(spec->Path, ResourceType::Texture2D);
+				if (!load) { a->Failed = true; break; }
+				a->Resource = load;
+				std::weak_ptr<Ahead> weak = a;
+				load->completed += [this, weak, load](cs::Ref<ResourceRequest>)
+				{
+					auto tex = std::holds_alternative<cs::Ref<Texture2D>>(load->asset) ? std::get<cs::Ref<Texture2D>>(load->asset) : nullptr;
+					auto held = weak.lock();
+					if (!held || held != ahead)
+					{
+						// Dropped meanwhile: let go of it unless it is the one on screen.
+						if (tex && tex != texture) Resources::UnloadAsset(tex);
+						return;
+					}
+					held->Resource = nullptr;
+					if (!tex) { held->Failed = true; return; }
+					held->Texture = tex;
+					held->FromResources = true;
+					held->Ready = true;
+				};
+				break;
+			}
+			case SkyKind::ImageFile:
+			{
+				cs::String path = spec->Path;
+				a->File = Async(EAsyncExecution::ThreadPool, [path] { return UnityCompat::TextureFactory::Decode(path); });
+				a->FileActive = true;
+				break;
+			}
+			case SkyKind::Procedural:
+			{
+				int width = SkyboxSettings::NebulaFaceSize() * 4;
+				uint64_t seed = ProceduralSky::SeedFor(system);
+				auto mips = std::make_shared<cs::List<int>>();
+				a->BakeWidth = width;
+				a->Mips = mips;
+				a->Cancel = std::make_shared<std::atomic<bool>>(false);
+				auto token = a->Cancel;
+				a->Bake = Async(EAsyncExecution::ThreadPool, [seed, width, mips, token]() -> cs::List<uint8_t>
+				{
+					try
+					{
+						return ProceduralSky::BakePanorama(seed, width, *mips, token.get());
+					}
+					catch (const std::exception& e)
+					{
+						Debug::LogError(cs::Cat("[Unity.SpaceGod] The seeded sky could not be made ahead: ", e.what()));
+						return cs::List<uint8_t>();
+					}
+				});
+				a->BakeActive = true;
+				break;
+			}
+			default:
+				break;
+		}
+	}
+
+	bool SkyView::PrefetchReady(const cs::String& system) const
+	{
+		if (system.empty() || !Memory) return true;
+		auto spec = Memory->For(system);
+		if (!spec || spec->Kind == SkyKind::Starfield) return true;
+		cs::String key = KeyFor(spec, system);
+		if (key == shownKey && texture) return true;
+		return ahead && ahead->Key == key && ahead->Ready;
+	}
+
+	void SkyView::DropPrefetch(const cs::String& system)
+	{
+		if (ahead && ahead->System == system) DropAhead();
+	}
+
+	void SkyView::UpdateAhead()
+	{
+		if (!ahead) return;
+		auto a = ahead;
+		if (a->FileActive && a->File.IsReady())
+		{
+			a->FileActive = false;
+			auto decoded = a->File.Get();
+			if (decoded.Ok())
+			{
+				a->Texture = UnityCompat::TextureFactory::FromMips(a->Spec ? a->Spec->Name : cs::String("Sky"), decoded.Width, decoded.Height, decoded.Levels,
+					TextureWrapMode::Repeat, TextureWrapMode::Clamp, false);
+				a->Ready = a->Texture != nullptr;
+			}
+			a->Failed = !a->Ready;
+		}
+		if (a->BakeActive && a->Bake.IsReady())
+		{
+			a->BakeActive = false;
+			const auto& data = a->Bake.Get();
+			if (data.Count() > 0) a->Texture = Upload(data, a->BakeWidth, *a->Mips);
+			a->Ready = a->Texture != nullptr;
+			a->Failed = !a->Ready;
+		}
+		bool forScreen = a->Key == wantedKey && shownKey != wantedKey;
+		if (a->Failed)
+		{
+			// Could not be made ahead: the screen's own load takes over, if the screen wants it.
+			ahead = nullptr;
+			if (forScreen && wanted) Apply(wanted);
+			return;
+		}
+		// Asked for on screen before it was ready: up now, faded in like any late sky.
+		if (a->Ready && forScreen) TakeAhead(false);
+	}
+
+	void SkyView::TakeAhead(bool instant)
+	{
+		auto a = ahead;
+		ahead = nullptr;
+		if (!a || !a->Texture) return;
+		Swap(a->Texture, a->FromResources, a->Spec);
+		if (instant)
+		{
+			fade = 1;
+			ApplyBrightness();
+		}
+	}
+
+	void SkyView::DropAhead()
+	{
+		if (!ahead) return;
+		if (ahead->Cancel) *ahead->Cancel = true; // a bake under way stops at its next row
+		if (ahead->Texture && ahead->Texture != texture) Free(ahead->Texture, ahead->FromResources);
+		ahead = nullptr;
+	}
+
 	void SkyView::Update(float dt)
 	{
+		UpdateAhead();
 		if (pendingFileActive && pendingFile.IsReady())
 		{
 			pendingFileActive = false;
@@ -282,6 +443,7 @@ namespace SpaceGod::Views
 		SkyboxSettings::Brightness()->Changed -= onBrightness;
 		SkyboxSettings::NebulaResolution()->Changed -= onResolution;
 		CancelPending();
+		DropAhead();
 		Release();
 		if (Alive(material)) Destroy(material);
 		if (Alive(mesh)) Destroy(mesh);

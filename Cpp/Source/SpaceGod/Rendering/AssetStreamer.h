@@ -3,6 +3,8 @@
 
 #include "UnityCompat/UnityRenderingTypes.h"
 
+#include <functional>
+
 namespace SpaceGod::Core
 {
 	class StarSystem;
@@ -24,6 +26,8 @@ namespace SpaceGod::Rendering
 			cs::Ref<ResourceRequest> Request;
 			UnityCompat::ResourceAsset Asset;
 			bool Done = false;
+			/// <summary>US-T133: its load has been started (false while it waits for <see cref="Admit"/>).</summary>
+			bool Started = false;
 			cs::List<cs::Action<const UnityCompat::ResourceAsset&>> Waiting;
 			bool HasWaiting = false;
 		};
@@ -36,15 +40,27 @@ namespace SpaceGod::Rendering
 		/// <summary>How many loads are still on their way.</summary>
 		static inline int InFlight = 0;
 
-		/// <summary>Whether <paramref name="path"/> (under Resources) is already in memory, starting it loading if not.</summary>
-		static bool Ready(const cs::String& path) { return Get(path)->Done; }
+		/// <summary>
+		/// US-T133: which assets are loaded the moment a view asks for them. A path this says false for is not: the view
+		/// keeps its stand-in, and the asset loads once <see cref="Warm"/>ed (the area streaming warms it as the view closes
+		/// in), its waiting views then getting it as usual. Unset (or true): everything loads on request, as before.
+		/// </summary>
+		static inline std::function<bool(const cs::String&)> Admit;
+
+		/// <summary>Whether <paramref name="path"/> (under Resources) is already in memory, starting it loading if not
+		/// (unless <see cref="Admit"/> holds it back).</summary>
+		static bool Ready(const cs::String& path) { return Get(path, false)->Done; }
+
+		/// <summary>Whether <paramref name="path"/> is in memory or on its way (asked for and not held back).</summary>
+		static bool Started(const cs::String& path);
 
 		/// <summary>The asset at <paramref name="path"/> if it is in memory (null while loading, or if there is none),
 		/// starting it loading if it is not.</summary>
-		template <class T> static cs::Ref<T> Loaded(const cs::String& path) { return As<T>(Get(path)->Asset); }
+		template <class T> static cs::Ref<T> Loaded(const cs::String& path) { return As<T>(Get(path, false)->Asset); }
 
-		/// <summary>Starts <paramref name="path"/> loading in the background, if it is not already.</summary>
-		static void Warm(const cs::String& path) { Get(path); }
+		/// <summary>Starts <paramref name="path"/> loading in the background, if it is not already (whatever
+		/// <see cref="Admit"/> says: warming is the streaming's own say-so).</summary>
+		static void Warm(const cs::String& path) { Get(path, true); }
 
 		/// <summary>
 		/// Hands the asset at <paramref name="path"/> to <paramref name="ready"/>: at once if it is in memory, otherwise
@@ -53,7 +69,7 @@ namespace SpaceGod::Rendering
 		/// </summary>
 		template <class T> static void Request(const cs::String& path, const cs::Action<cs::Ref<T>>& ready)
 		{
-			auto e = Get(path);
+			auto e = Get(path, false);
 			if (e->Done)
 			{
 				if (ready) ready(As<T>(e->Asset));
@@ -102,7 +118,10 @@ namespace SpaceGod::Rendering
 		/// <summary>What sort of asset lives at <paramref name="path"/>: a model under Ships/, otherwise a map.</summary>
 		static UnityCompat::ResourceType TypeAt(const cs::String& path);
 
-		static cs::Ref<Entry> Get(const cs::String& path);
+		/// <summary>The entry for <paramref name="path"/>, its load started unless <see cref="Admit"/> holds it back
+		/// (<paramref name="force"/>: started regardless).</summary>
+		static cs::Ref<Entry> Get(const cs::String& path, bool force);
+		static void Start(const cs::String& path, const cs::Ref<Entry>& e);
 		static void Complete(const cs::String& path, const cs::Ref<Entry>& e);
 		static cs::Dictionary<cs::String, cs::Ref<Entry>>& Entries();
 		static cs::HashSet<cs::String>& Pinned();

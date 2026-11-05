@@ -9,6 +9,11 @@
 // background (<see cref="AssetStreamer"/>), and the systems beyond the gates the view is closing on are warmed
 // ahead of arrival. What is still loading (<see cref="StreamingPending"/>) holds a jump gate's tunnel open, or the
 // helm's own flare through a ring (<see cref="HelmGateGlow"/>), so the far side is never seen half built.
+//
+// US-T133: whole areas stream in ahead of the view (Streaming/AreaStreaming): a system's sky is loaded or baked off
+// screen, its maps, models and station meshes are made under a frame budget, as soon as a trip, a crossing, a charge, a
+// course or a gate says it is where the view is headed, so the cover above has nothing left to wait for; and only what is
+// big enough on screen to be seen in full is waited on (a far body is its impostor until its ring is reached).
 // </summary>
 
 private:
@@ -89,9 +94,14 @@ private:
 	/// until it is wanted again.</summary>
 	void DropShipView(int i);
 
-	/// <summary>Warms the systems the view is heading for: the destination of a trip under way, and the far side of
-	/// any gate it is near or closing on. Some while after a system is entered, the maps of systems neither drawn
-	/// nor warmed are let go of.</summary>
+	/// <summary>Streams in the areas the view is heading for (US-T133, <see cref="AreaStreaming"/>), and some while after a
+	/// system is entered, or once an area is no longer headed for, lets go of the maps of systems neither drawn nor
+	/// streamed in.</summary>
 	void UpdateWarming(float dt, Core::DVec3 camera);
 
-	void Warm(const cs::Ref<Core::StarSystem>& system);
+	/// <summary>
+	/// Says where the view may be headed, each frame (US-T133): a trip under way (Urgent), an FTL crossing (Urgent) or charge
+	/// (Imminent), the FTL autopilot's course (Ahead) or one plotted (Background), the helm's next gate (Ahead), a gate in
+	/// activation range (Urgent) and any the view is near or closing on at its present speed (Imminent).
+	/// </summary>
+	void PredictAreas(Core::DVec3 camera);

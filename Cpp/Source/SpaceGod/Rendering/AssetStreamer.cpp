@@ -51,22 +51,41 @@ namespace SpaceGod::Rendering
 		return cs::Strings::StartsWith(path, "Ships/") ? UnityCompat::ResourceType::GameObject : UnityCompat::ResourceType::Texture2D;
 	}
 
-	cs::Ref<AssetStreamer::Entry> AssetStreamer::Get(const cs::String& path)
+	cs::Ref<AssetStreamer::Entry> AssetStreamer::Get(const cs::String& path, bool force)
 	{
 		cs::Ref<Entry> e;
-		if (Entries().TryGetValue(path, e)) return e;
-		e = cs::New<Entry>();
-		Entries()[path] = e;
+		if (!Entries().TryGetValue(path, e))
+		{
+			e = cs::New<Entry>();
+			Entries()[path] = e;
+		}
+		if (e->Started) return e;
+		// US-T133: held back until the streaming warms it (the view draws its stand-in meanwhile).
+		if (!force && Admit && !Pinned().Contains(path) && !Admit(path)) return e;
+		Start(path, e);
+		return e;
+	}
+
+	void AssetStreamer::Start(const cs::String& path, const cs::Ref<Entry>& e)
+	{
+		e->Started = true;
 		auto request = Resources::LoadAsync(path, TypeAt(path));
 		if (!request)
 		{
-			e->Done = true;
-			return e;
+			// No such asset. A view that waited on a path held back hears there is none, as it would have on asking.
+			InFlight++; // Complete counts it off again
+			Complete(path, e);
+			return;
 		}
 		e->Request = request;
 		InFlight++;
 		request->completed += [path, e](cs::Ref<ResourceRequest>) { Complete(path, e); };
-		return e;
+	}
+
+	bool AssetStreamer::Started(const cs::String& path)
+	{
+		cs::Ref<Entry> e;
+		return Entries().TryGetValue(path, e) && e->Started;
 	}
 
 	void AssetStreamer::Complete(const cs::String&, const cs::Ref<Entry>& e)
@@ -97,7 +116,9 @@ namespace SpaceGod::Rendering
 	void AssetStreamer::WarmSystem(const cs::Ref<StarSystem>& system)
 	{
 		if (!system) return;
-		for (const auto& path : SystemPaths(system)) Warm(path);
+		// Held-back paths (US-T133: a relief map, loaded only near its body) stay held back.
+		for (const auto& path : SystemPaths(system))
+			if (!Admit || Admit(path)) Warm(path);
 	}
 
 	cs::List<cs::String> AssetStreamer::SystemPaths(const cs::Ref<StarSystem>& system)
