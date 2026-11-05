@@ -1,0 +1,120 @@
+// US-T145: the local layer of a system's sky, a painted volume. A panorama (the system's painted sky, or a hero
+// painting) is projected outward into a finite sphere about the size of the system's outer rim: density comes from the
+// painting's brightness in that direction, shaped by a radial profile and broken up by 3D noise (SolarFbm, the value
+// noise the sky painter's clouds share their look with), and each point glows with the painting's colour. From the centre
+// it integrates back to the painting itself; near the rim it thins, with real depth to fly through; from outside it
+// reads as a cloud wrapped round the system's star. Raymarched on an inward-facing sphere drawn without a depth test:
+// the ray is clipped to the sphere and to the scene depth, so hulls and worlds inside it sit in the cloud correctly.
+//
+// Lengths are in the sphere's own units (the ray is divided by its radius), so the look is the same at real scale and
+// game scale: only the radius the game gives it changes.
+#ifndef SPACEGOD_NEBULA_USH
+#define SPACEGOD_NEBULA_USH
+#include "/Plugin/SpaceGodRender/SpaceGodCommon.ush"
+
+// Three octaves of SolarValueNoise, 0..1.
+float SG_NebulaFbm(float3 p)
+{
+    float sum = 0.5 * SolarValueNoise(p);
+    p = p * 2.03 + 17.1;
+    sum += 0.25 * SolarValueNoise(p);
+    p = p * 2.03 + 17.1;
+    sum += 0.125 * SolarValueNoise(p);
+    return sum / 0.875;
+}
+
+// The painting toward unit direction d (Unreal axes), at a blurred mip, in the panorama's own frame (as SG_Sky).
+float3 SG_NebulaPaint(float3 d, Texture2D tex, SamplerState texSampler, float mip, float3 ax, float3 ay, float3 az)
+{
+    float fx = dot(d, ax), fy = dot(d, ay), fz = dot(d, az);
+    float lon = atan2(fy, fx);
+    float lat = asin(clamp(fz, -1.0, 1.0));
+    float2 uv = SG_UnityUv(float2(0.5 - lon * (0.5 / SG_PI), 0.5 + lat / SG_PI));
+    return Texture2DSampleLevel(tex, texSampler, uv, mip).rgb;
+}
+
+// Where the cloud lies along a radius (0 at the centre, 1 at the rim): clear about the star and the inner worlds,
+// thickest through the middle of the system, thinning out to nothing at the rim.
+float SG_NebulaProfile(float r, float inner)
+{
+    return smoothstep(inner * 0.4, inner, r) * (1.0 - smoothstep(0.86, 1.0, r));
+}
+
+// posCR: the sphere's surface point at this pixel, camera-relative (Unreal units). centerPR: the system's centre
+// (xyz, camera-relative) and the volume's radius (w). sceneDepth: the opaque scene's depth here; forward: the camera's
+// view axis. Returns premultiplied (radiance, coverage): emissive = rgb / a, opacity = a for a translucent blend.
+float4 SG_Nebula(float3 posCR, float4 centerPR, float sceneDepth, float3 forward, float2 svPos,
+    Texture2D tex, SamplerState texSampler, float3 ax, float3 ay, float3 az,
+    float density, float brightness, float mip, float steps, float inner, float detail, float time)
+{
+    float radius = max(centerPR.w, 1e-3);
+    float3 rd = normalize(posCR);
+    // In the sphere's units, the camera relative to the centre.
+    float3 o = -centerPR.xyz / radius;
+    float b = dot(o, rd);
+    float c = dot(o, o) - 1.0;
+    float h = b * b - c;
+    if (h <= 0.0) return float4(0, 0, 0, 0);
+    h = sqrt(h);
+    float t0 = max(-b - h, 0.0);
+    float t1 = -b + h;
+    // Stop at whatever opaque is in the way (a hull, a world): the cloud in front of it still shows.
+    float along = max(dot(rd, forward), 1e-4);
+    t1 = min(t1, sceneDepth / along / radius);
+    if (t1 <= t0) return float4(0, 0, 0, 0);
+
+    // The further the eye is from the centre, the softer the painting is read: from the centre a feature lies along the
+    // line of sight and stays sharp; seen from the side it would be a long dash, so it is drawn as the soft cloud it is.
+    float away = length(o);
+    mip += 2.4 * saturate(away * away) + 0.8 * saturate(away - 1.0);
+    int n = (int)clamp(steps, 8.0, 96.0);
+    float dt = (t1 - t0) / n;
+    // Interleaved gradient noise: the sample positions shift a little per pixel so the steps do not band.
+    float jitter = frac(52.9829189 * frac(dot(svPos, float2(0.06711056, 0.00583715))));
+    // The optical depth the centre sees through its sheet, per unit of density and brightness^0.8 (the sheet's
+    // integral, thickness * sqrt(pi), times the noise's mean weight): the glow is scaled by it, so from the centre the cloud adds
+    // up to the painting itself whatever its density.
+    const float sheetThickness = 0.11;
+    const float centreDepth = 0.13;
+    float3 L = 0;
+    float T = 1.0;
+    [loop]
+    for (int i = 0; i < n; i++)
+    {
+        float t = t0 + (i + jitter) * dt;
+        float3 p = o + rd * t;
+        float r = length(p);
+        float w = SG_NebulaProfile(r, inner);
+        if (w <= 0.0) continue;
+        float3 dir = p / max(r, 1e-4);
+        // Each direction's gas lies on a sheet at a depth of its own (noise over the direction), not all along the
+        // radius: seen from anywhere but the centre it reads as layered clouds at different distances, not as cones.
+        float3 qd = SG_UnityFromUnreal(dir);
+        float sheet = lerp(0.38, 0.9, SG_NebulaFbm(qd * 2.3 + 31.7));
+        float across = (r - sheet) / sheetThickness;
+        w *= exp(-across * across);
+        if (w <= 0.004) continue;
+        // The noise lattice in Unity's axes (as every SolarFbm user), slowly drifting.
+        float3 q = SG_UnityFromUnreal(p) + float3(0.0, time * 0.004, 0.0);
+        // The painting is looked up through a curl of 3D noise, so a feature is not a straight cone out from the
+        // star but a billow that bends with depth; and the gas comes in puffs, so the cones break into clouds.
+        float3 curl = float3(SolarValueNoise(q * 3.1 + 7.3), SolarValueNoise(q * 3.1 + 19.1), SolarValueNoise(q * 3.1 + 41.7)) - 0.5;
+        float3 look = normalize(dir + curl * (0.16 * detail));
+        float3 paint = SG_NebulaPaint(look, tex, texSampler, mip, ax, ay, az);
+        float lum = dot(paint, float3(0.2126, 0.7152, 0.0722));
+        if (lum <= 1e-4) continue;
+        float puffs = SG_NebulaFbm(q * 5.5 + curl * 1.5);
+        float shape = lerp(0.45, smoothstep(0.3, 0.72, puffs) * 1.6, detail);
+        float lumw = pow(lum, 0.8);
+        float sigma = density * lumw * w * shape;
+        float a = 1.0 - exp(-sigma * dt);
+        float centreA = 1.0 - exp(-density * lumw * centreDepth);
+        float3 source = paint * brightness / max(centreA, 0.05);
+        L += T * source * a;
+        T *= 1.0 - a;
+        if (T < 0.004) break;
+    }
+    return float4(L, 1.0 - T);
+}
+
+#endif

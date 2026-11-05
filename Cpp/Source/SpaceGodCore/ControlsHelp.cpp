@@ -31,6 +31,8 @@ namespace SpaceGod::Core
 				L("N", "hyperlanes"),
 				L("K", "satellites"),
 				L("Shift+K  or  numpad *", "skybox: the next sky for the system in view, which keeps it (Shift+Alt+K or numpad / goes back)"),
+				More("the sky has two layers: the Milky Way, which never moves, and the system's painting as a cloud the size of its rim that thins as you fly out (Shift+F1 > Travel > Sky: cube, sphere or volume to compare; sg.EdgeRun flies a hull out and back)"), // US-T145
+				More("bright points over the sky are the stars your jump drive can reach, each where it really is: put the nose on one to aim at it"), // US-T145
 				L("Navigator", "STAR SYSTEMS: fly to another star (Esc to skip the trip)"),
 				L("Esc", "close panels / leave focus / deselect, then the pause menu")),
 

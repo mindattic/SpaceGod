@@ -81,7 +81,10 @@ namespace SpaceGod::UnityCompat
 		}
 
 		/// Vector properties that hold a direction in Unity's world (Unreal axes).
-		bool IsDirection(const cs::String& n) { return n == "_AxisX" || n == "_AxisY" || n == "_AxisZ"; }
+		bool IsDirection(const cs::String& n)
+		{
+			return n == "_AxisX" || n == "_AxisY" || n == "_AxisZ" || n == "_SmearAxis" || n == "_WarpAxis"; // US-T145: the jump's tunnel axis
+		}
 
 		FLinearColor ToUnrealVector(const cs::String& n, Vector4 v)
 		{
@@ -96,7 +99,7 @@ namespace SpaceGod::UnityCompat
 				FVector d = US::DirectionToUnreal(Vector3(v.x, v.y, v.z));
 				return FLinearColor(static_cast<float>(d.X), static_cast<float>(d.Y), static_cast<float>(d.Z), v.w);
 			}
-			if (n == "_PlanetPosRadius")
+			if (n == "_PlanetPosRadius" || n == "_NebulaPosRadius") // US-T145: the nebula volume's centre and radius
 			{
 				// A world position and a radius, both scene lengths.
 				FVector p = US::ToUnreal(Vector3(v.x, v.y, v.z));
@@ -130,6 +133,8 @@ namespace SpaceGod::UnityCompat
 		{
 			cs::String n = ShaderName(s);
 			if (n == "Stars") return -1000;
+			if (n == "Nebula") return -500; // US-T145: the sky's local layer, behind every line and glow in the system
+			if (n == "Warp") return 30;     // US-T145: the jump's streaks, over everything
 			if (n == "Line") return -10;
 			if (n == "Glow") return 10;
 			if (n == "Fx") return 20;

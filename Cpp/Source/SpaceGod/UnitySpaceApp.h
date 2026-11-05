@@ -38,6 +38,7 @@
 #include "UnitySpaceApp.Comms.deps.h" // US-T137
 #include "UnitySpaceApp.Cheats.deps.h" // US-T126
 #include "UnitySpaceApp.Cruise.deps.h" // US-T127
+#include "UnitySpaceApp.SkyTravel.deps.h" // US-T145
 #include "UnitySpaceApp.Embody.deps.h" // US-T135
 
 namespace SpaceGod
@@ -96,6 +97,7 @@ namespace SpaceGod
 #include "UnitySpaceApp.Comms.inl" // US-T137: the comms panel, US-T138: the held unit's pilot
 #include "UnitySpaceApp.Cheats.inl" // US-T126: the dev menu
 #include "UnitySpaceApp.Cruise.inl" // US-T127: the in-system cruise drive
+#include "UnitySpaceApp.SkyTravel.inl" // US-T145: the sky's layers and the travel between them
 #include "UnitySpaceApp.Embody.inl" // US-T135: the universal embody layer
 	};
 }

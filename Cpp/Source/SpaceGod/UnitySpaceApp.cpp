@@ -212,6 +212,7 @@ namespace SpaceGod
 		// The skybox behind every system (U.SPC-T595): the player's own panoramas join the catalogue first.
 		Views::SkyView::DiscoverDropIns();
 		Sky = cs::New<Views::SkyView>(worldRoot, starfield);
+		BeginSkyTravel(); // US-T145: the Milky Way, the painted volume, the jump stars and the tunnel
 		orbitSamples = cs::NewArray<DVec3>(257);
 		orbitPoints = cs::NewArray<Vector3>(orbitSamples.Count());
 
@@ -434,6 +435,7 @@ namespace SpaceGod
 	void UnitySpaceApp::OnDestroy()
 	{
 		if (Sky != nullptr) Sky->Dispose();
+		EndSkyTravel(); // US-T145
 		Rendering::Materials::DestroyAllOwned();
 		if (hud != nullptr) hud->DestroyOwnedTextures();
 		pauseMenu->DestroyOwnedTextures();
@@ -517,6 +519,7 @@ namespace SpaceGod
 		UpdateClipPlanes(dt);
 		UpdateStreaming(dt);
 		Sky->Update(dt);
+		UpdateSkyTravel(dt); // US-T145
 		UpdateViews(dt);
 		UpdateHover();
 		HandleSelectionClicks();

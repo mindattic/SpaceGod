@@ -106,8 +106,10 @@ namespace SpaceGod::Views
 		{
 			case SkyKind::Starfield:
 				Release();
+				rendererWanted = false;
+				starfieldWanted = true;
 				renderer->enabled = false;
-				if (Alive(starfield)) starfield->SetActive(true);
+				if (Alive(starfield)) starfield->SetActive(!suppressed);
 				shownKey = wantedKey;
 				Rendering::RenderBackend::Active()->SetSystemGrade(Rendering::SystemGrade());
 				break;
@@ -401,14 +403,30 @@ namespace SpaceGod::Views
 		material->SetVector(AxisXId, BodyView::ToUnity(x));
 		material->SetVector(AxisYId, BodyView::ToUnity(y));
 		material->SetVector(AxisZId, BodyView::ToUnity(z));
-		renderer->enabled = true;
-		if (Alive(starfield)) starfield->SetActive(spec->PointStars);
+		rendererWanted = true;
+		starfieldWanted = spec->PointStars;
+		renderer->enabled = !suppressed;
+		if (Alive(starfield)) starfield->SetActive(!suppressed && starfieldWanted);
 		shownKey = wantedKey;
 		fade = 0;
 		// US-T132: the light follows the sky on screen: graded to a place's painted sky, plain under any other.
 		Rendering::RenderBackend::Active()->SetSystemGrade(spec->Kind == SkyKind::Procedural ? Rendering::SystemSkies::GradeFor(systemName) : Rendering::SystemGrade());
 		ApplyBrightness();
 		if (old && old != tex) Free(old, oldFromResources);
+	}
+
+	void SkyView::Suppress(bool value)
+	{
+		if (suppressed == value) return;
+		suppressed = value;
+		renderer->enabled = rendererWanted && !suppressed;
+		if (Alive(starfield)) starfield->SetActive(starfieldWanted && !suppressed);
+	}
+
+	void SkyView::SetSmear(float amount, Vector3 axis)
+	{
+		material->SetFloat("_Smear", amount);
+		material->SetVector("_SmearAxis", Vector4(axis.x, axis.y, axis.z, 0));
 	}
 
 	void SkyView::ApplyBrightness() { material->SetFloat(BrightnessId, static_cast<float>(SkyboxSettings::Brightness()->Value) * fade * fade); }

@@ -10,7 +10,7 @@ logged ("Failed to compile Material ..."), and the editor quits when done:
 import unreal
 
 NAMES = ["M_Planet", "M_Sun", "M_Ring", "M_GasGiant", "M_Sky", "M_Stars", "M_Points", "M_Line", "M_Glow", "M_Fx",
-         "M_Asteroids", "M_Ship", "M_Lit"]
+         "M_Asteroids", "M_Ship", "M_Lit", "M_Nebula", "M_Warp"]
 
 bad = []
 for name in NAMES:

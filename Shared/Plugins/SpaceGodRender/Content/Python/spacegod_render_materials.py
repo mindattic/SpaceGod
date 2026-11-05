@@ -252,6 +252,13 @@ class Graph:
             return self.subtract(self.mask(*self.collection(spec[1]), "rgb"), self.camera())
         if kind == "vector_rel":  # ("vector_rel", name, default): a world-position parameter made camera-relative
             return self.subtract(self.mask(*self.vector(spec[1], spec[2]), "rgb"), self.camera())
+        if kind == "vector_rel4":  # US-T145: a world position (xyz) made camera-relative, its w (a length) kept
+            rel = self.subtract(self.mask(*self.vector(spec[1], spec[2]), "rgb"), self.camera())
+            w = self.mask(*self.vector(spec[1], spec[2]), "a")
+            a = self._new(unreal.MaterialExpressionAppendVector, -900)
+            mel.connect_material_expressions(rel[0], rel[1], a, "A")
+            mel.connect_material_expressions(w[0], w[1], a, "B")
+            return a, ""
         if kind == "uv":  # ("uv", index, channels)
             return self.mask(*self.uv(spec[1]), spec[2])
         if kind == "vc":
@@ -268,6 +275,8 @@ class Graph:
             return self.once("time", lambda: (self._new(unreal.MaterialExpressionTime), ""))
         if kind == "exposure":
             return self.once("exposure", lambda: (self._new(unreal.MaterialExpressionEyeAdaptation), ""))
+        if kind == "scene_depth":  # US-T145: the opaque scene's depth at this pixel (translucent materials only)
+            return self.once("scene_depth", lambda: (self._new(unreal.MaterialExpressionSceneDepth), ""))
         if kind == "node":
             return spec[1], spec[2]
         raise ValueError(f"unknown input kind {kind}")
@@ -462,10 +471,51 @@ def build_sky(mpc):
     inputs = [("LocalPos", ("pos_os",)), texture("_MainTex", "T_SG_Black"), scalar("_Brightness", 1),
               ("_AxisX", ("vector", "_AxisX", (1, 0, 0, 0), "rgb")),
               ("_AxisY", ("vector", "_AxisY", (0, -1, 0, 0), "rgb")),   # Unity (0, 0, 1) in Unreal axes
-              ("_AxisZ", ("vector", "_AxisZ", (0, 0, 1, 0), "rgb"))] + EXPOSE  # Unity (0, 1, 0)
-    code = ("return SG_Expose3(SG_Sky(LocalPos, _MainTex, _MainTexSampler, _Brightness, _AxisX, _AxisY, _AxisZ), "
-            "Exposure, SceneLuminance);")
+              ("_AxisZ", ("vector", "_AxisZ", (0, 0, 1, 0), "rgb")),  # Unity (0, 1, 0)
+              # US-T145: the jump drive's smear (0 = the plain sky) and the way it streams from (Unreal axes).
+              scalar("_Smear", 0), ("_SmearAxis", ("vector", "_SmearAxis", (1, 0, 0, 0), "rgb"))] + EXPOSE
+    code = ("return SG_Expose3(SG_SkySmeared(LocalPos, _MainTex, _MainTexSampler, _Brightness, _AxisX, _AxisY, _AxisZ, "
+            "_Smear, _SmearAxis), Exposure, SceneLuminance);")
     c = g.custom("Unity.SpaceGod/Sky", "Sky.ush", code, F3, inputs)
+    finish(mat, (c, ""), wpo=wpo)
+    return mat
+
+
+def build_nebula(mpc):
+    """US-T145: the local layer of a system's sky, a painted volume raymarched inside a sphere the size of its rim."""
+    mat = new_material("M_Nebula", unreal.BlendMode.BLEND_TRANSLUCENT, False)
+    # The ray is clipped to the scene depth in the shader, so the sphere draws over everything it surrounds.
+    mat.set_editor_property("disable_depth_test", True)
+    g = Graph(mat, mpc)
+    inputs = [("PositionCR", ("pos_cr",)), ("SceneDepth", ("scene_depth",)),
+              ("_NebulaPosRadius", ("vector_rel4", "_NebulaPosRadius", (0, 0, 0, 1))),
+              texture("_MainTex", "T_SG_Black"),
+              ("_AxisX", ("vector", "_AxisX", (1, 0, 0, 0), "rgb")),
+              ("_AxisY", ("vector", "_AxisY", (0, -1, 0, 0), "rgb")),
+              ("_AxisZ", ("vector", "_AxisZ", (0, 0, 1, 0), "rgb")),
+              scalar("_Density", 14), scalar("_Brightness", 1), scalar("_Mip", 2), scalar("_Steps", 40),
+              scalar("_Inner", 0.35), scalar("_Detail", 1), ("Time", ("time",))] + EXPOSE
+    code = ("float4 n = SG_Nebula(PositionCR, _NebulaPosRadius, SceneDepth, ResolvedView.ViewToTranslatedWorld[2].xyz, "
+            "Parameters.SvPosition.xy, _MainTex, _MainTexSampler, _AxisX, _AxisY, _AxisZ, _Density, _Brightness, _Mip, "
+            "_Steps, _Inner, _Detail, Time);\n"
+            "return float4(SG_Expose3(n.rgb / max(n.a, 1e-4), Exposure, SceneLuminance), n.a);")
+    c = g.custom("Unity.SpaceGod/Nebula", "Nebula.ush", code, F4, inputs)
+    finish(mat, g.mask(c, "", "rgb"), opacity=g.mask(c, "", "a"))
+    return mat
+
+
+def build_warp(mpc):
+    """US-T145: the jump drive's star-streak tunnel, on a cube round the camera in front of the sky and stars."""
+    mat = new_material("M_Warp", unreal.BlendMode.BLEND_ADDITIVE, True)
+    g = Graph(mat, mpc)
+    wpo_inputs = [("LocalPos", ("pos_os",)), ("PositionCR", ("pos_cr_vs",)), scalar("_SkyDistance", SKY_DISTANCE)]
+    wpo = g.custom("Unity.SpaceGod/Warp (vertex)", "Sky.ush",
+                   "return SG_SkyOffset(TransformLocalVectorToWorld(Parameters, LocalPos), PositionCR, 0.4 * _SkyDistance);",
+                   F3, wpo_inputs)
+    inputs = [("LocalPos", ("pos_os",)), ("_WarpAxis", ("vector", "_WarpAxis", (1, 0, 0, 0), "rgb")),
+              scalar("_Warp", 0), ("Time", ("time",)), color3("_WarpTint", (0.55, 0.7, 1.0, 1))] + EXPOSE
+    code = "return SG_Expose3(SG_Warp(LocalPos, _WarpAxis, _Warp, Time, _WarpTint), Exposure, SceneLuminance);"
+    c = g.custom("Unity.SpaceGod/Warp", "Warp.ush", code, F3, inputs)
     finish(mat, (c, ""), wpo=wpo)
     return mat
 
@@ -643,7 +693,7 @@ def _snake(name):
 
 
 BUILDERS = [build_planet, build_sun, build_ring, build_gas_giant, build_sky, build_stars, build_points, build_line,
-            build_glow, build_fx, build_asteroids, build_ship, build_lit]
+            build_glow, build_fx, build_asteroids, build_ship, build_lit, build_nebula, build_warp]
 
 
 def main():

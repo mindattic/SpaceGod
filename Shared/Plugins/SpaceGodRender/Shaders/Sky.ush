@@ -33,4 +33,43 @@ float3 SG_Sky(float3 dirOS, Texture2D mainTex, SamplerState mainTexSampler,
     return c * _Brightness;
 }
 
+// The panorama's uv toward unit direction d (the frame as SG_Sky's), for a level-of-detail sample.
+float2 SG_SkyUv(float3 d, float3 _AxisX, float3 _AxisY, float3 _AxisZ)
+{
+    float lon = atan2(dot(d, _AxisY), dot(d, _AxisX));
+    float lat = asin(clamp(dot(d, _AxisZ), -1.0, 1.0));
+    return SG_UnityUv(float2(0.5 - lon * (0.5 / SG_PI), 0.5 + lat / SG_PI));
+}
+
+// US-T145: the sky smeared into a tunnel round the way the hull jumps (_SmearAxis, unit, the cube's frame), as the
+// jump drive spools up and drops out: each direction gathers the sky from nearer the axis ahead, so the whole panorama
+// streams outward from it. 0 is the plain sky (and costs nothing more than the branch).
+float3 SG_SkySmeared(float3 dirOS, Texture2D mainTex, SamplerState mainTexSampler,
+    float _Brightness, float3 _AxisX, float3 _AxisY, float3 _AxisZ, float _Smear, float3 _SmearAxis)
+{
+    float3 c = SG_Sky(dirOS, mainTex, mainTexSampler, _Brightness, _AxisX, _AxisY, _AxisZ);
+    if (_Smear <= 0.001) return c;
+    float3 d = normalize(dirOS);
+    float3 a = normalize(_SmearAxis);
+    float ca = clamp(dot(d, a), -1.0, 1.0);
+    float theta = acos(ca);
+    float3 side = d - a * ca;
+    float sl = length(side);
+    if (sl < 1e-5) return c;
+    side /= sl;
+    float reach = _Smear * 0.55 * sin(min(theta, 1.5707963));
+    float mip = 1.0 + _Smear * 4.0;
+    float3 sum = 0;
+    const int taps = 10;
+    [unroll]
+    for (int k = 0; k < taps; k++)
+    {
+        float th = max(theta - reach * (k / (taps - 1.0)), 0.0);
+        float3 dk = a * cos(th) + side * sin(th);
+        sum += Texture2DSampleLevel(mainTex, mainTexSampler, SG_SkyUv(dk, _AxisX, _AxisY, _AxisZ), mip).rgb;
+    }
+    float3 smeared = sum / taps * _Brightness * (1.0 + 0.8 * _Smear);
+    return lerp(c, smeared, saturate(_Smear * 1.6));
+}
+
 #endif

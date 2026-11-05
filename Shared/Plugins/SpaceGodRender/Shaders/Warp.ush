@@ -1,0 +1,51 @@
+// US-T145: the jump drive's star-streak tunnel. Drawn on a cube round the camera just in front of the sky and the
+// point stars (as M_Stars, pushed out by SG_FarPoint): thin streaks running outward from the way the hull jumps
+// (_WarpAxis), longer and faster as the drive's charge (_Warp, 0..1) builds, with a faint tinted glow round the tunnel.
+// At full strength the streaks cover the whole sky, which is when the game swaps one sky for the next.
+#ifndef SPACEGOD_WARP_USH
+#define SPACEGOD_WARP_USH
+#include "/Plugin/SpaceGodRender/SpaceGodCommon.ush"
+
+float SG_WarpHash(float n) { return frac(sin(n * 12.9898) * 43758.5453); }
+
+// One ring of lanes round the axis: a streak per lane, its head flowing outward along s (log tan(theta / 2)).
+float SG_WarpLanes(float phi01, float s, float lanes, float seed, float amount, float time)
+{
+    float x = phi01 * lanes;
+    float cell = floor(x);
+    float f = frac(x) - 0.5;
+    float h1 = SG_WarpHash(cell + seed), h2 = SG_WarpHash(cell * 1.37 + seed + 7.1), h3 = SG_WarpHash(cell * 0.71 + seed + 3.3);
+    float width = max(fwidth(x), 1e-4);
+    float across = saturate(1.0 - abs(f) / (width * 1.2));
+    float speed = (0.15 + 1.6 * amount * amount) * (0.6 + 0.8 * h2);
+    float head = frac(h1 + time * speed) * 8.0 - 5.0;
+    float len = 0.03 + 2.2 * amount * amount * amount;
+    float behind = head - s;
+    float along = behind >= 0.0 && behind < len ? pow(1.0 - behind / len, 1.5) : 0.0;
+    // A bright head on each streak, the brightest lanes the rarer.
+    float headGlow = exp(-abs(behind) * 60.0) * 0.6;
+    return (along + headGlow) * across * (0.25 + 0.75 * h3 * h3);
+}
+
+float3 SG_Warp(float3 dirOS, float3 axis, float amount, float time, float3 tint)
+{
+    if (amount <= 0.001) return float3(0, 0, 0);
+    float3 d = normalize(dirOS);
+    float3 a = normalize(axis);
+    float ca = clamp(dot(d, a), -1.0, 1.0);
+    float3 u = normalize(cross(a, abs(a.z) < 0.9 ? float3(0, 0, 1) : float3(1, 0, 0)));
+    float3 v = cross(a, u);
+    float phi01 = atan2(dot(d, v), dot(d, u)) / (2.0 * SG_PI) + 0.5;
+    float theta = acos(ca);
+    float s = log(max(tan(theta * 0.5), 1e-4));
+    float lanes = SG_WarpLanes(phi01, s, 360.0, 0.0, amount, time) + 0.7 * SG_WarpLanes(phi01, s, 911.0, 41.0, amount, time * 1.13);
+    // Nothing dead ahead (the star the hull is aimed at stays clear), nothing straight behind.
+    float window = smoothstep(0.02, 0.12, theta) * (1.0 - smoothstep(2.6, 3.0, theta));
+    float3 streaks = lerp(float3(0.75, 0.85, 1.0), tint, 0.35) * lanes * window * (0.4 + 1.4 * amount);
+    // The tunnel's wall: a soft glow round the axis that closes in as the charge builds.
+    float wall = exp(-pow((theta - lerp(1.4, 0.55, amount)) / 0.45, 2.0)) * amount * amount * 0.22;
+    float core = exp(-theta * theta / 0.004) * amount * amount * 0.8;
+    return streaks + tint * wall + float3(1.0, 0.97, 0.92) * core;
+}
+
+#endif

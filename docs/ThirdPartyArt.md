@@ -171,3 +171,24 @@ model the classes use.
   A station is painted in one of the pack's colours (a navy's nearest hue, civilians White, pirates Brown, unowned
   Grey) with a light wash of its owner's colour. Without the pack, headless, or with `-NoSSC`, every station is
   procedural as before. The lineup adds `ssc-stations` and `ssc-archetypes` sheets.
+
+## Alien Space Nebula 1 (Skybox), by Jungle Jim (US-T145)
+
+The one third-party piece that **is** committed: its licence allows redistribution with credit.
+
+- **Source:** "Alien Space Nebula 1 (Skybox)" by Jungle Jim (sketchfab.com/jungle_jim),
+  sketchfab.com/3d-models/alien-space-nebula-1-skybox-4a4e7aec37c04320a09ac4c7434b8810. The FBX download (a
+  960-triangle sky sphere) carries `textures/alien-space-nebula_7680x3840.png`, a 7680 x 3840 (2:1) equirectangular
+  painting: a violet, teal and gold nebula round a white-hot core, dust lanes, filaments and a dense star field. Only
+  the texture is used (any sphere at infinity draws it the same).
+- **Licence:** CC BY 4.0 (creativecommons.org/licenses/by/4.0): use, change and redistribute, commercially too, with
+  credit. Credit line, also on the sky in game (Settings and the Shift+K toast name it, and the manual's "The sky"):
+  *"Alien Space Nebula 1 (Skybox)" by Jungle Jim, CC BY 4.0.* We use it changed: stretched to 8192 x 4096 and, in the
+  painted-volume mode, projected into a 3D volume.
+- **Imported** with `Shared/Plugins/SpaceGodRender/Content/Python/spacegod_import_hero_sky.py` (set `SPACEGOD_SKY_PNG`
+  to the PNG; run headless with `-run=pythonscript`) to
+  `Shared/Plugins/SpaceGodRender/Content/Resources/Skyboxes/jungle_jim_alien_space_nebula_8k.uasset`: sRGB, default
+  compression, stretched to a power of two for the whole mip chain, never streamed, wrap U / clamp V.
+- **Drawn** (`Cpp/Source/SpaceGod/Views/SkyLayers.cpp`): the hero system's sky (the first violet-storm system beyond
+  Sol), as a sky sphere (`sg.SkyMode sphere`) and as a painted volume (`sg.SkyMode volume`, the default); its core's
+  direction (longitude -3.16, latitude +1.05 degrees in its frame) is where the hero system's fill light comes from.

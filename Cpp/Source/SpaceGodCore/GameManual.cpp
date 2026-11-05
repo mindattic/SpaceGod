@@ -78,7 +78,21 @@ namespace SpaceGod::Core
 				  "sky with point stars. Settings > Graphics sets the default sky, its brightness and how finely seeded nebulae "
 				  "are made. Your own 2:1 panoramas (.jpg or .png) dropped into the Skyboxes folder of the game's data folder "
 				  "(on Windows %USERPROFILE%\\AppData\\LocalLow\\MindAttic\\Unity.SpaceGod\\Skyboxes) join the cycle as "
-				  "'Your sky' the next time a game starts.")),
+				  "'Your sky' the next time a game starts."),
+				T("Inside a system's sky, and between the stars",
+				  "A system's sky is two layers. The far one is the Milky Way, its band and bright bulge where they really are, "
+				  "and it never moves. The near one is the system's own painting, not flat but a cloud about the size of the "
+				  "system's outer rim: from inside it looks like the painted sky, as you fly toward the rim it thins and its "
+				  "wisps stream past, and from outside it is a glowing cloud wrapped round a shrinking star. Past the rim is "
+				  "open space under the Milky Way. Every star your jump drive can reach is a bright point in its true "
+				  "direction over the sky, so the star you see is the star you aim at. As the drive spools the stars streak "
+				  "and the sky smears into a tunnel; at full strength the system's sky gives way to the Milky Way, which is "
+				  "the sky through the jump and at the void stops between jumps, and dropping out plays the tunnel backwards "
+				  "into the next system's sky with a flash. One system is drawn with a hand-painted hero sky, 'Alien Space "
+				  "Nebula 1 (Skybox)' by Jungle Jim (CC BY 4.0), its white-hot core lighting the system. The dev menu "
+				  "(Shift+F1 > Travel) switches every sky between the cube (the painting at infinity), the sphere (the hero "
+				  "painting everywhere) and the volume (the two layers, the default), flies a hull out through the rim and "
+				  "back (Edge run), and previews the jump's tunnel and the Milky Way.")),
 
 			cs::New<ManualChapter>("Flying", "Taking a helm, the flight models, propellant, lanes and gates", Keys("HELM AND FLIGHT"),
 				T("Any ship, anywhere",

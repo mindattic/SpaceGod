@@ -66,6 +66,8 @@ namespace SpaceGod::Views
 		std::shared_ptr<cs::List<int>> pendingBakeMips;
 		std::shared_ptr<std::atomic<bool>> bakeCancel;
 		int onBrightness = 0, onResolution = 0;
+		bool suppressed = false; // US-T145
+		bool starfieldWanted = true, rendererWanted = false; // US-T145: what the sky on screen asks for, suppressed or not
 
 	public:
 		SkyView(const cs::Ref<Transform>& parent, const cs::Ref<GameObject>& starfield);
@@ -98,6 +100,20 @@ namespace SpaceGod::Views
 
 		/// <summary>Picks up a finished load or bake and fades the sky in; once a frame.</summary>
 		void Update(float dt);
+
+		/// <summary>
+		/// US-T145: hides the sky (and the point stars it shows) while another layer owns the backdrop (SkyLayers: the
+		/// Milky Way between the stars, a hero sky sphere, the painted volume's far layer). It keeps loading and fading as
+		/// usual underneath, so lifting it shows the system's sky at once.
+		/// </summary>
+		void Suppress(bool value);
+		bool Suppressed() const { return suppressed; }
+
+		/// <summary>US-T145: smears the sky into a tunnel round <paramref name="axis"/> (Unity world axes, unit), 0..1: the jump drive.</summary>
+		void SetSmear(float amount, Vector3 axis);
+
+		/// <summary>US-T145: the key of the sky on screen (changes whenever another sky is swapped in).</summary>
+		const cs::String& ShownKey() const { return shownKey; }
 
 		/// <summary>Lets go of the sky's texture, material and mesh (the game scene is going).</summary>
 		void Dispose();
