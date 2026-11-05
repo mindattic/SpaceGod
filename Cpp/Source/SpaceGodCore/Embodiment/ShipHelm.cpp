@@ -4,6 +4,7 @@
 #include "Embodiment/HelmAbilities.h"
 #include "Embodiment/HelmFlight.h"
 #include "Embodiment/SelfDestruct.h"
+#include "Sensors/SensorPosture.h"
 #include "Ephemeris.h"
 #include "Fleet.h"
 #include "Ships.h"
@@ -114,11 +115,15 @@ namespace SpaceGod::Core
 		}
 		// A helm ability ordered this frame (US-T106): a squadron launched, the wing recalled or called, a boarding order.
 		if (input.HelmAbility != 0 && !Ship->Destroyed) HelmAbilities::Use(Ship, static_cast<HelmAbility>(input.HelmAbility));
+		// The sensor and power command (US-T93): a ping, going dark, powering up; the sim runs the clocks (SensorPosture::Advance).
+		if (input.Sensor != 0 && !Ship->Destroyed) SensorPosture::Command(world, Ship, input.Sensor);
+		// Dark or restarting, nothing fires.
+		bool offline = SensorPosture::Offline(Ship->Combat);
 		auto unit = Unit();
 		if (unit != nullptr && unit->PlayerControlled())
 		{
-			unit->PlayerFireHeld = input.Primary;
-			unit->PlayerSecondaryHeld = input.Secondary;
+			unit->PlayerFireHeld = input.Primary && !offline;
+			unit->PlayerSecondaryHeld = input.Secondary && !offline;
 			unit->PlayerAim = input.Aim;
 		}
 		if (Flight != nullptr && !Ship->Destroyed) Fly(Flight, input, dt);
@@ -187,7 +192,8 @@ namespace SpaceGod::Core
 		cs::String broadside;
 		if (e.Manoeuvre && capital != nullptr) input.DesiredForward = BroadsideAim(f->State, broadside);
 		else if (e.Manoeuvre) input.DesiredForward = PilotFlight::FlipAim(f->State);
-		if (f->DrivesDown)
+		// Powered down (US-T93): no drive, no thrusters; the hull drifts on its momentum, as with its drives knocked out.
+		if (f->DrivesDown || SensorPosture::Offline(ship->Combat))
 		{
 			input.DesiredForward = f->State.Forward;
 			input.Throttle = input.StrafeRight = input.StrafeUp = input.Roll = 0;
@@ -253,6 +259,8 @@ namespace SpaceGod::Core
 	{
 		// Leaving the helm stops a self-destruct under way (US-T97): no crew carries one on.
 		if (Ship != nullptr) SelfDestruct::Disarm(Ship->Combat);
+		// Nor does a crew sit dark (US-T93): it brings the hull straight back up as it takes it.
+		if (Ship != nullptr) SensorPosture::Reset(Ship->Combat);
 		if (world->PilotedShip == Ship) world->PilotedShip = nullptr;
 		if (Ship->Destroyed) return;
 		auto unit = Unit();

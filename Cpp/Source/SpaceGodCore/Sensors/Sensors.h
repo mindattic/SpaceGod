@@ -427,6 +427,61 @@ namespace SpaceGod::Core
 		/// <summary>Whether the helm last reported the piloted ship's drive lit.</summary>
 		bool PilotBurning() const { return pilotShip != nullptr && pilotBurning; }
 
+		// ---------------------------------------------------------------- the player's ping and line of sight (US-T93)
+
+		/// <summary>The suite the piloted ship sees with now: its own, at <see cref="SensorPosture.DarkSensorShare"/> of its
+		/// reach while dark or restarting, boosted for <see cref="SensorPosture.PingBurstS"/> after a ping.</summary>
+		static SensorSuite PilotSuite(const cs::Ref<Ship>& ship);
+
+		/// <summary>
+		/// An active ping from <paramref name="ship"/> (the helm's, <see cref="SensorPosture"/>): its own picture is swept at
+		/// once with the ping's burst, and every faction's ships and stations in reach of the flash (its signature as it is
+		/// now, lit) hold it in their pictures straight away, line of sight permitting, without waiting for their next sweep.
+		/// </summary>
+		void PilotPinged(const cs::Ref<Ship>& ship, double jd);
+
+		/// <summary>A body or rock that can stand between two lines of sight: where it is (heliocentric km) and its radius.</summary>
+		struct Occluder
+		{
+			DVec3 HelioKm;
+			double RadiusKm = 0;
+			Occluder() = default;
+			Occluder(DVec3 helio, double radiusKm) : HelioKm(helio), RadiusKm(radiusKm) {}
+		};
+
+		/// <summary>The bodies smaller than this are never counted as occluders, km.</summary>
+		static constexpr double MinOccluderRadiusKm = 0.5;
+
+		/// <summary>The helm reports the belt's rocks near the piloted hull (the Runtime's own scan of the asteroid field,
+		/// those of at least <see cref="MinOccluderRadiusKm"/>), heliocentric at <paramref name="jd"/>, for line of sight.
+		/// Held for <see cref="RockHoldSeconds"/>; older reports are not used.</summary>
+		void ReportPilotRocks(const cs::List<Occluder>& rocks, double jd);
+		static constexpr double RockHoldSeconds = 60;
+
+		/// <summary>
+		/// Whether the line between the piloted ship (as the helm last reported it) and <paramref name="other"/> passes through
+		/// a planet, moon, dwarf planet, catalogued asteroid or the Sun, or one of the belt rocks near the hull (US-T93).
+		/// Asked only where the player is the observer or the observed, so no crew's look is ever changed. A body that holds
+		/// either end inside it (a settlement at its world's centre) is not counted. Cheap: the catalogue's bodies are placed
+		/// once a date, and each is tested against the segment with a few multiplies.
+		/// </summary>
+		bool PilotOccluded(DVec3 other, double jd);
+
+		/// <summary>Whether the segment <paramref name="a"/>..<paramref name="b"/> passes through the sphere of <paramref name="o"/>
+		/// (an end inside the sphere does not count).</summary>
+		static bool Blocks(DVec3 a, DVec3 b, const Occluder& o);
+
+		/// <summary>A deed this close to the piloted hull is the player's: its witnesses need line of sight to the hull, km.</summary>
+		static constexpr double WitnessAtPilotKm = 1000;
+
+	private:
+		cs::List<Occluder> bodyOccluders, pilotRocks;
+		double bodyOccludersJd = cs::Double::NaN, pilotRocksJd = cs::Double::NegativeInfinity;
+
+		/// <summary>Whether <paramref name="target"/> is the piloted ship as the helm reports it.</summary>
+		bool IsPilot(const cs::Ref<Ship>& target) const;
+	public:
+
 		// ---------------------------------------------------------------- witnesses and havens
 
 		/// <summary>

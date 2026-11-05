@@ -91,6 +91,10 @@ namespace SpaceGod::Input
 		/// <summary>While piloting: switches silent running on or off (F3; see <see cref="Unity.SpaceGod.Core.Ship.SilentRunning"/>).</summary>
 		bool ToggleSilent = false;
 
+		/// <summary>At a helm (US-T93): Tab, an active ping (in command Tab cycles the ships); Shift+F3, power down to go
+		/// dark, or from dark power up again (see <see cref="Core.SensorPosture"/>).</summary>
+		bool SensorPing = false, PowerToggle = false;
+
 		/// <summary>The bounty board of the port in view (F4): who is wanted there, for how much, and where last seen.</summary>
 		bool ToggleBounties = false;
 

@@ -47,6 +47,7 @@
 #include "ScaleModel.h"
 #include "Embodiment/MountedTurret.h"
 #include "Economy/Settlement.h"
+#include "Sensors/SensorPosture.h"
 #include "Settings/GameSetting.h"
 #include "Ships.h"
 #include "Systems/JumpGate.h"
@@ -1045,6 +1046,8 @@ namespace SpaceGod::Core
 		auto c = u->Combat;
 		// Knocked out by a pulse or an EMP: no gun on the hull fires until its systems come back.
 		if (u->Captured || u->Surrendering || u->Stunned > 0) return;
+		// Powered down by the player (US-T93): the reactor at minimum, no gun fires until the restart is done.
+		if (SensorPosture::Offline(c)) return;
 		// Surer under a command ship's targeting computers, worse in the confusion after losing it (U.SPC-T477).
 		// Worse again with an enemy recon fighter jamming it (U.SPC-T485).
 		double accuracyScale = (c->BridgeIntact() ? 1 : 0.6) * FleetCoordination::AccuracyFactor(u) * ElectronicWarfare::JamFactor(shared_from_this(), u);
@@ -1794,6 +1797,9 @@ namespace SpaceGod::Core
 	{
 		// A small craft shares its own reactor, whoever flies it (U.SPC-T424).
 		if (u->Power != nullptr) return u->Power->Factor(s);
+		// A hull the player has powered down (US-T93) has nothing to give its guns or drive until its restart is done; its
+		// shields' factor stays the rate the unheld field bleeds away at (ShieldCapacityOf holds it to nothing).
+		if (SensorPosture::Offline(u->Combat)) return s == PowerSystem::Shields ? 1 : 0;
 		// A hull's or station's, only as the player set it and while the player holds it (US-T94): a crew runs even.
 		auto r = u->Combat->Reactor;
 		return r != nullptr && PlayerAboard(u) ? r->Factor(s) : 1;
@@ -1803,6 +1809,8 @@ namespace SpaceGod::Core
 	{
 		// Only the player's hands (US-T94): a pilot's own share moves the recharge alone, as it always has.
 		if (u->Power != nullptr) return u->PlayerControlled() ? u->Power->ShieldCapacity() : 1;
+		// Powered down (US-T93): the field has nothing holding it up and bleeds away.
+		if (SensorPosture::Offline(u->Combat)) return 0;
 		auto r = u->Combat->Reactor;
 		return r != nullptr && PlayerAboard(u) ? r->ShieldCapacity() : 1;
 	}

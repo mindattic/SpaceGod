@@ -146,6 +146,16 @@ namespace SpaceGod::Core
 				  "At the helm you see only what your scanners hold: an unknown blip, then a class, then a named, coloured "
 				  "contact. Your own signature jumps when the drive lights. F3 runs silent: transponder off and heat damped, "
 				  "though a burn still shows."),
+				T("Passive, active and dark",
+				  "Your sensors are passive: they hear what others give off, and nobody hears them. Tab sends an active ping: "
+				  "for 3 s your scanners reach three times as far and see twice as fine, but for 15 s you are lit up, a flash "
+				  "every sensor in reach picks up at once, so hostiles hold you and witnesses see you; the emitters need 20 s "
+				  "between pings. Shift+F3 goes dark: the reactor drops to minimum, guns, shields and drive go offline, the "
+				  "transponder stops and the hull drifts on its momentum while its heat cools toward almost nothing (bigger "
+				  "hulls hold their heat longer). Shift+F3 again powers up, a timed restart (8 s in a fighter, up to a minute "
+				  "in a capital ship) with nothing back until it is done and your heat climbing all the while. Planets, moons "
+				  "and big asteroids block the line of sight both ways, so the way to vanish is dark, behind a rock, and cold. "
+				  "The SENSORS panel above the reactor's shows which: PASSIVE, LIT UP, DARK and cooling, or RESTARTING."),
 				T("Hyperlanes",
 				  "Fly through a ramp's ring gate to ride the lane at up to 4% of light, the clock running fast. On the lane, "
 				  "1 comes off at the next ramp and 2-9 carry on along another lane. Raiders can lie beside a lane with an "

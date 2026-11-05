@@ -212,6 +212,12 @@ private:
 	/// gameplay and realistic scales; drawn with the HUD hidden too, as a warning should be.
 	void DrawSelfDestruct();
 
+	/// At a ship's helm (US-T93, <see cref="Core::SensorPosture"/>): the sensors' and the reactor's state, above the reactor
+	/// panel: PASSIVE (and when the next ping is ready), PING / LIT UP nn s after an active ping, DARK with the hull's heat
+	/// cooling toward its floor, RESTARTING nn s with its bar; the signature, and the keys. Screen space only, so it reads the
+	/// same at the gameplay and realistic scales.
+	void DrawSensors();
+
 	/// At a capital ship's helm (U.SPC-T272): how many guns bear where the player is looking (their fire cones take that
 	/// line in, U.SPC-T533) and how many of them are loaded, the volley building while the trigger is held, and the hull
 	/// it will be fired at.

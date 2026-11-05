@@ -94,7 +94,10 @@ namespace SpaceGod::Input
 		ToggleMarket = kb[Key::M].wasPressedThisFrame;
 		ToggleCargo = kb[Key::I].wasPressedThisFrame;
 		ToggleOutfit = kb[Key::F2].wasPressedThisFrame;
-		ToggleSilent = kb[Key::F3].wasPressedThisFrame;
+		// US-T93: Shift+F3 powers down (or up again), F3 alone is silent running; Tab at a helm is the active ping.
+		ToggleSilent = kb[Key::F3].wasPressedThisFrame && !Boost;
+		PowerToggle = kb[Key::F3].wasPressedThisFrame && Boost;
+		SensorPing = kb[Key::Tab].wasPressedThisFrame;
 		ToggleBounties = kb[Key::F4].wasPressedThisFrame;
 		ToggleContracts = kb[Key::F7].wasPressedThisFrame;
 		ToggleFleet = kb[Key::F10].wasPressedThisFrame;
@@ -193,6 +196,7 @@ namespace SpaceGod::Input
 		PowerKey = -1; // US-T94: nothing to share a reactor of in command
 		SelfDestructTap = SelfDestructArm = false; // US-T97: nothing to set off in command
 		SelfDestructHoldS = 0;
+		SensorPing = PowerToggle = false; // US-T93: nothing to ping from or power down in command
 		ThrottleStep = 0;
 		Roll = 0;
 	}
@@ -236,6 +240,7 @@ namespace SpaceGod::Input
 		PowerKey = -1;
 		SelfDestructTap = SelfDestructArm = false;
 		SelfDestructHoldS = 0;
+		SensorPing = PowerToggle = false; // US-T93
 		Boost = Slow = Fire = Cruise = FireEmp = DropMine = false;
 		SelectClicked = SelectDoubleClicked = RightClicked = false;
 		Focus = Escape = ToggleScale = TimeFaster = TimeSlower = TogglePause = ResetTime = false;

@@ -62,6 +62,9 @@ namespace SpaceGod::Core
 				L("Del", "clear the plotted course"),
 				L("End", "FTL autopilot: flies out beyond the rim, turns onto the star, spools and engages, time compressed (Settings > FTL); End again takes the helm back"),
 				L("F3", "silent running: transponder off, heat damped -- only what your scanners hold is shown: blips, then class, then name"),
+				More("your sensors are passive: they hear what others give off, as far as your scanners reach their signature; planets, moons and big rocks block the line of sight both ways"),
+				L("Tab", "active ping: for 3 s your scanners reach three times as far and resolve twice as fine -- but you are LIT UP for 15 s, heard by every sensor in reach (hostiles hold you, witnesses see you); again after 20 s"),
+				L("Shift+F3", "go dark: the reactor to minimum -- guns, shields and drive offline, transponder off, drifting on your momentum, your heat cooling toward nothing (hide behind a rock); Shift+F3 again powers up: a timed restart (8 s a fighter to a minute a capital), nothing online until it is done and your heat climbing back"),
 				L("1, then 1-4", "derelicts and wrecks: match velocity alongside, 1 latch on, then 1-4 as the panel shows")),
 
 			cs::New<HelpSection>("COMBAT",

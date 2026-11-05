@@ -122,6 +122,14 @@ namespace SpaceGod::Core
 		double SelfDestructS = -1;
 		bool SelfDestructed = false;
 
+		/// <summary>US-T93, the sensors and power the player plays (<see cref="SensorPosture"/>): the reactor's state (a
+		/// <see cref="PowerState"/>: 0 online, 1 dark, 2 restarting), the hull's heat while dark or restarting as a share of a
+		/// coasting hull's, the seconds left on a restart, and the seconds left lit after an active ping and before the next.
+		/// Only the player ever sets them (a crew's hull keeps the defaults); counted on the sim clock and saved (optional
+		/// fields older saves lack).</summary>
+		int PowerDown = 0;
+		double ResidualHeat = 1, RestartLeftS = 0, PingLitS = 0, PingCooldownS = 0;
+
 		/// <summary>Boost charge, 0-1: drains over <see cref="CombatSpec.BoostDurationS"/> while held and
 		/// recharges (twice as slowly) otherwise. Shared by AI and player flight so boost behaves the same
 		/// whoever is flying.</summary>

@@ -89,6 +89,10 @@ private:
 	/// a full pass replaces the list tested every frame.</summary>
 	void ScanBelt(const cs::Ref<Core::AsteroidField>& field, Core::DVec3 hullHelio, double jd);
 
+	/// <summary>US-T93: hands the sensors the belt's rocks near the hull (this scan's candidates big enough to hide a
+	/// hull behind), for line of sight.</summary>
+	void ReportBeltRocks(double jd);
+
 	/// <summary>Drops a contact's last-toast time once it is old enough that the suppression window no longer
 	/// cares about it, so <see cref="contactToastAt"/> cannot grow without bound over a long session and never
 	/// has to be wiped wholesale (U.SPC-T366, the same treatment BattleFx.PruneSeen gives its own

@@ -47,6 +47,7 @@
 #include "Law/Law.h"
 #include "Law/Outlaws.h"
 #include "Sensors/Sensors.h"
+#include "Sensors/SensorPosture.h"
 #include "Systems/Galaxy.h"
 #include "Systems/InterstellarTraffic.h"
 
@@ -1175,7 +1176,11 @@ namespace SpaceGod::UI
 		if (sensors == nullptr || ship == nullptr) return "";
 		auto book = sensors->Player;
 		int id = book->CountLive(ContactLevel::Identified), cls = book->CountLive(ContactLevel::Class), blips = book->CountLive(ContactLevel::Blip);
-		return cs::Cat(ship->SilentRunning ? "  ·  SILENT RUNNING" : "",
+		// US-T93: dark or restarting says so before silent running (which it outdoes).
+		auto power = SensorPosture::StateOf(ship->Combat);
+		const char* posture = power == PowerState::Dark ? "  ·  DARK" : power == PowerState::Restarting ? "  ·  RESTARTING"
+			: SensorPosture::Lit(ship->Combat.get()) ? "  ·  LIT UP" : ship->SilentRunning ? "  ·  SILENT RUNNING" : "";
+		return cs::Cat(posture,
 			"  ·  SIG ", cs::Fmt(sensors->PilotSignature(), sensors->PilotSignature() < 10 ? "0.00" : "0"),
 			"  ·  CONTACTS ", id, " id / ", cls, " class / ", blips, " unknown");
 	}

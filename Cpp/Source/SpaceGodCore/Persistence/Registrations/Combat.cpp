@@ -340,7 +340,8 @@ namespace SpaceGod::Core
 		SG_F(BoostFraction), SG_F(Hangar), SG_F(Hull), SG_F(Interior), SG_F(PhaserTuning), SG_F(Readiness),
 		SG_F(ShuttleBay), SG_F(Spec), SG_F(StationHeld), SG_F(Subsystems), SG_F(structure),
 		SG_OPT(Reactor), // US-T94: the player's reactor split, absent from older saves
-		SG_OPT(SelfDestructS), SG_OPT(SelfDestructed)) // US-T114: a self-destruct under way, absent from older saves
+		SG_OPT(SelfDestructS), SG_OPT(SelfDestructed), // US-T114: a self-destruct under way, absent from older saves
+		SG_OPT(PingCooldownS), SG_OPT(PingLitS), SG_OPT(PowerDown), SG_OPT(ResidualHeat), SG_OPT(RestartLeftS)) // US-T93: the player's ping and power-down, absent from older saves
 
 	SG_SERIALIZE(Subsystem, "Unity.SpaceGod.Core.Subsystem",
 		SG_F(Aim), SG_F(Ammo), SG_F(Cooldown), SG_F(Def), SG_F(Hp), SG_F(Index), SG_F(LastHitSeconds),

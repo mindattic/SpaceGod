@@ -19,6 +19,7 @@
 #include "Combat/War.h"
 #include "Combat/Wreck.h"
 #include "Infrastructure/Infrastructure.h"
+#include "Sensors/Sensors.h"
 
 #include "Views/AsteroidBelt.h"
 
@@ -255,6 +256,24 @@ namespace SpaceGod
 		std::swap(beltCandidates, beltScanning);
 		beltScanning.Clear();
 		beltCursor = 0;
+	}
+
+	void UnitySpaceApp::ReportBeltRocks(double jd)
+	{
+		auto sensors = World()->Sensors;
+		if (sensors == nullptr) return;
+		cs::List<Core::Sensors::Occluder> rocks;
+		cs::Ref<Core::AsteroidField> field = IsSol() ? (AsteroidBelt != nullptr ? AsteroidBelt->Field : nullptr) : nullptr;
+		if (field != nullptr && beltCandidates.Count() > 0)
+		{
+			DVec3 sun = Ephemeris()->HelioAt(0, jd);
+			for (int i : beltCandidates)
+			{
+				double r = field->DiameterKm(i) * 0.5;
+				if (r >= Core::Sensors::MinOccluderRadiusKm) rocks.Add(Core::Sensors::Occluder(sun + field->PositionAu(i, jd) * Astro::AuKm, r));
+			}
+		}
+		sensors->ReportPilotRocks(rocks, jd);
 	}
 
 	void UnitySpaceApp::PruneContactToasts(float now)

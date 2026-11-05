@@ -1205,6 +1205,8 @@ namespace SpaceGod
 		stick.SelfDestruct = SelfDestructCommand(pilotHelm);
 		// Shift+1..0, the hull's own abilities (US-T106): launch a squadron, recall or call the wing, a boarding order.
 		stick.HelmAbility = HelmAbilityKey(ship);
+		// Tab, an active ping; Shift+F3, go dark or power up again (US-T93): a command the helm lands, said on a toast.
+		stick.Sensor = SensorCommand(ship);
 		helmFlight->FrameBody = pilotFrameBody;
 		pilotHelm->Control(stick, dt);
 		if (stick.HelmAbility != 0) NoteHelmAbility();
@@ -1230,6 +1232,7 @@ namespace SpaceGod
 		// What the ship's own scanners make of everything else, and what everyone else can see of it: its drive is
 		// lit whenever its thrusters changed its velocity beyond what gravity did this frame (U.SPC-T66).
 		bool burning = helmFlight->Burning;
+		ReportBeltRocks(Clock->Jd); // US-T93: the rocks near the hull, for line of sight
 		if (World()->Sensors != nullptr) World()->Sensors->UpdatePilot(ship, Ephemeris()->HelioAt(pilotFrameBody, Clock->Jd) + pilotOffsetKm(), burning, Clock->Jd);
 		// The law around the ship: trespass, and patrols that scan it or, if it is wanted, hail it to pay up.
 		World()->Holdings->PilotFrameBody = pilotFrameBody;

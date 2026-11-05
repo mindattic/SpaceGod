@@ -1,6 +1,9 @@
 // Port of Unity.SpaceGod Assets/UnitySpace/Core/Sensors/Sensors.cs (see docs/MIGRATION.md).
 
 #include "Sensors/Sensors.h"
+#include "Sensors/SensorPosture.h"
+#include "BodyCatalog.h"
+#include "BodyDefinition.h"
 
 #include "Astro.h"
 #include "Combat/CombatState.h"
@@ -41,7 +44,8 @@ namespace SpaceGod::Core
 
 	bool Signatures::Transponder(const cs::Ref<Ship>& s)
 	{
-		return s != nullptr && s->Faction != nullptr && !s->Faction->IsPirate && !s->Derelict && !Silent(s);
+		// A hull powered down (US-T93, only ever the player's) squawks nothing.
+		return s != nullptr && s->Faction != nullptr && !s->Faction->IsPirate && !s->Derelict && !Silent(s) && !SensorPosture::Offline(s->Combat);
 	}
 
 	double Signatures::Of(const cs::Ref<Ship>& s, bool burning, cs::Nullable<bool> firing)
@@ -53,10 +57,21 @@ namespace SpaceGod::Core
 		if (s->Derelict) return hull * HulkFactor;
 		bool silent = Silent(s);
 		double em = silent ? 0 : s->Spec->IsMilitary && (s->Combat == nullptr || s->Combat->Armed()) ? MilitaryEm : CivilEm;
+		// US-T93, the player's power-down and ping (a crew's hull never has either, so its sum is the original's):
+		// dark, the hull's residual heat alone, no EM, no drive, no guns; restarting, the heat and EM climbing back.
+		const ShipCombat* c = s->Combat.get();
+		double ping = SensorPosture::Lit(c) ? SensorPosture::PingSignature : 0;
+		if (SensorPosture::Offline(c))
+		{
+			bool restarting = c->PowerDown == static_cast<int>(PowerState::Restarting);
+			return hull * c->ResidualHeat + (restarting ? em * c->ResidualHeat : 0) + ping;
+		}
 		if (silent) hull *= SilentFactor;
 		double drive = burning ? DriveFactor * ratio * s->Spec->AccelG / 0.1 : 0;
 		double weapons = (firing.has_value() ? *firing : s->Battle != nullptr) ? WeaponsFire : 0;
-		return hull + em + drive + weapons;
+		double sum = hull + em + drive + weapons;
+		if (ping > 0) sum += ping;
+		return sum;
 	}
 
 	// ---------------------------------------------------------------- SensorSuite
@@ -282,7 +297,10 @@ namespace SpaceGod::Core
 		double d = (from - to).Length();
 		auto suite = GroupSuite(observer);
 		double sig = SignatureOf(target, jd);
-		return Resolve(suite, sig, d, Signatures::Transponder(target));
+		auto level = Resolve(suite, sig, d, Signatures::Transponder(target));
+		// Line of sight (US-T93), only where the player is one end of it.
+		if (level != ContactLevel::None && (IsPilot(observer) || IsPilot(target)) && PilotOccluded(IsPilot(observer) ? to : from, jd)) return ContactLevel::None;
+		return level;
 	}
 
 	SensorSuite Sensors::GroupSuite(const cs::Ref<Ship>& s)
@@ -308,11 +326,14 @@ namespace SpaceGod::Core
 		auto best = ContactLevel::None;
 		auto by = helio;
 		double byKm2 = cs::Double::MaxValue;
+		bool pilot = IsPilot(target);
 		for (const auto& o : Observers(jd))
 		{
 			if (o.Faction != f) continue;
 			double d2 = (o.Helio - helio).LengthSquared();
 			auto level = Resolve(o.Suite, sig, cs::Math::Sqrt(d2), squawk);
+			// Line of sight to the player's hull (US-T93): a body between hides it.
+			if (pilot && level != ContactLevel::None && PilotOccluded(o.Helio, jd)) continue;
 			// The best look, and of those the nearest: the one with the least light delay.
 			if (level != ContactLevel::None && (level > best || (level == best && d2 < byKm2)))
 			{
@@ -402,12 +423,15 @@ namespace SpaceGod::Core
 				auto best = ContactLevel::None;
 				auto by = t.Helio;
 				double byKm2 = cs::Double::MaxValue;
+				bool pilot = IsPilot(t.Ship);
 				if (t.Signature > 0 && mineList != nullptr)
 					for (const auto& o : *mineList)
 					{
 						double reach = o.Suite.RangeKm * t.Root;
 						double d2 = (o.Helio - t.Helio).LengthSquared();
 						if (d2 > reach * reach) continue;
+						// Line of sight to the player's hull (US-T93): a body between hides it. No crew's look is changed.
+						if (pilot && PilotOccluded(o.Helio, jd)) continue;
 						auto level = Resolve(o.Suite, t.Signature, cs::Math::Sqrt(d2), t.Transponder);
 						// The best look, and of those the nearest: the one with the least light delay.
 						if (level != ContactLevel::None && (level > best || (level == best && d2 < byKm2)))
@@ -467,7 +491,8 @@ namespace SpaceGod::Core
 		pilotBurning = burning;
 		if (jd < nextPlayerSweepJd && jd >= nextPlayerSweepJd - PlayerSweepSeconds * 2 / Astro::SecondsPerDay) return;
 		nextPlayerSweepJd = jd + PlayerSweepSeconds / Astro::SecondsPerDay;
-		auto suite = SensorSuite::Of(ship);
+		// Passive by default; half its reach dark or restarting, the ping's burst just after one (US-T93).
+		auto suite = PilotSuite(ship);
 		// (helio, burning) of each group's leader
 		cs::Dictionary<cs::Ref<Ship>, std::tuple<DVec3, bool>> seen;
 		for (const auto& s : world->Fleet->Ships())
@@ -483,7 +508,10 @@ namespace SpaceGod::Core
 				seen[c] = st;
 			}
 			double sig = Signatures::Of(s, std::get<1>(st));
-			Record(Player, s, Resolve(suite, sig, (std::get<0>(st) - helioKm).Length(), Signatures::Transponder(s)), std::get<0>(st), helioKm, sig, jd);
+			auto level = Resolve(suite, sig, (std::get<0>(st) - helioKm).Length(), Signatures::Transponder(s));
+			// Line of sight (US-T93): a body or rock between the hull and the contact hides it.
+			if (level != ContactLevel::None && PilotOccluded(std::get<0>(st), jd)) level = ContactLevel::None;
+			Record(Player, s, level, std::get<0>(st), helioKm, sig, jd);
 		}
 		auto lost = Player->Expire(jd, PlayerHoldSeconds / Astro::SecondsPerDay);
 		if (lost.Count() > 0 && Lost.HasHandlers()) for (const auto& s : lost) Lost.Invoke(nullptr, s);
@@ -494,18 +522,107 @@ namespace SpaceGod::Core
 	cs::String Sensors::FindWitness(DVec3 helioKm, double jd, double signature, const cs::Func<bool, cs::Ref<Ship>>& exclude)
 	{
 		double root = cs::Math::Sqrt(cs::Math::Max(0.0, signature));
+		// A deed at the player's own hull (US-T93): a witness has to have it in line of sight.
+		bool atPilot = pilotShip != nullptr && pilotShip == world->PilotedShip && (helioKm - pilotHelio).LengthSquared() < WitnessAtPilotKm * WitnessAtPilotKm;
 		for (const auto& s : world->Economy->Settlements)
 		{
 			if (s->Fallen || s->Owner == nullptr || s->Owner->IsPirate || s->Population <= 0) continue;
-			if ((world->Ephemeris->HelioAt(s->Body, jd) - helioKm).Length() <= SensorSuite::Station.RangeKm * root) return s->Name;
+			auto at = world->Ephemeris->HelioAt(s->Body, jd);
+			if ((at - helioKm).Length() <= SensorSuite::Station.RangeKm * root && !(atPilot && PilotOccluded(at, jd))) return s->Name;
 		}
 		for (const auto& ship : world->Fleet->Ships())
 		{
 			if (ship->Destroyed || ship->GateDeparted || ship->Derelict || ship->Faction == nullptr || ship->Faction->IsPirate || ship->Controller()->Planetside()) continue;
 			if (ship == world->PilotedShip || (exclude != nullptr && exclude(ship))) continue;
-			if ((world->Fleet->StateOf(ship, jd).HelioKm - helioKm).Length() <= SensorSuite::Of(ship).RangeKm * root) return cs::Cat("the ", ship->Name);
+			auto at = world->Fleet->StateOf(ship, jd).HelioKm;
+			if ((at - helioKm).Length() <= SensorSuite::Of(ship).RangeKm * root && !(atPilot && PilotOccluded(at, jd))) return cs::Cat("the ", ship->Name);
 		}
 		return cs::String();
+	}
+
+	// ---------------------------------------------------------------- the player's ping and line of sight (US-T93)
+
+	bool Sensors::IsPilot(const cs::Ref<Ship>& target) const
+	{
+		return pilotShip != nullptr && target == pilotShip && target == world->PilotedShip;
+	}
+
+	SensorSuite Sensors::PilotSuite(const cs::Ref<Ship>& ship)
+	{
+		auto suite = SensorSuite::Of(ship);
+		const ShipCombat* c = ship != nullptr ? ship->Combat.get() : nullptr;
+		if (SensorPosture::Offline(c)) return SensorSuite(suite.RangeKm * SensorPosture::DarkSensorShare, suite.Resolution);
+		if (SensorPosture::Bursting(c)) return SensorSuite(suite.RangeKm * SensorPosture::PingRangeFactor, suite.Resolution * SensorPosture::PingResolutionFactor);
+		return suite;
+	}
+
+	void Sensors::PilotPinged(const cs::Ref<Ship>& ship, double jd)
+	{
+		if (!IsPilot(ship)) return;
+		// Its own picture: swept at the next report, with the burst.
+		nextPlayerSweepJd = cs::Double::NegativeInfinity;
+		// Everyone else's: the flash is heard now by every faction with a ship or station in reach and in sight of it.
+		double sig = Signatures::Of(ship, pilotBurning);
+		bool squawk = Signatures::Transponder(ship);
+		cs::Dictionary<cs::Ref<Faction>, std::tuple<ContactLevel, DVec3, double>> best;
+		for (const auto& o : Observers(jd))
+		{
+			if (o.Faction == nullptr || o.Faction == ship->Faction) continue;
+			double d2 = (o.Helio - pilotHelio).LengthSquared();
+			auto level = Resolve(o.Suite, sig, cs::Math::Sqrt(d2), squawk);
+			if (level == ContactLevel::None || PilotOccluded(o.Helio, jd)) continue;
+			std::tuple<ContactLevel, DVec3, double> had;
+			bool has = best.TryGetValue(o.Faction, had);
+			if (!has || level > std::get<0>(had) || (level == std::get<0>(had) && d2 < std::get<2>(had))) best[o.Faction] = std::make_tuple(level, o.Helio, d2);
+		}
+		for (auto kv : best) Record(PictureOf(kv.first), ship, std::get<0>(kv.second), pilotHelio, std::get<1>(kv.second), sig, jd);
+	}
+
+	void Sensors::ReportPilotRocks(const cs::List<Occluder>& rocks, double jd)
+	{
+		pilotRocks = rocks;
+		pilotRocksJd = jd;
+	}
+
+	bool Sensors::Blocks(DVec3 a, DVec3 b, const Occluder& o)
+	{
+		double r2 = o.RadiusKm * o.RadiusKm;
+		DVec3 ac = o.HelioKm - a;
+		// An end inside the body (a settlement at its world's centre, a hull down in it) is not hidden by it.
+		if (ac.LengthSquared() <= r2 || (o.HelioKm - b).LengthSquared() <= r2) return false;
+		DVec3 ab = b - a;
+		double len2 = ab.LengthSquared();
+		if (len2 <= 0) return false;
+		double t = DVec3::Dot(ac, ab) / len2;
+		if (t <= 0 || t >= 1) return false;
+		return (ac - ab * t).LengthSquared() < r2;
+	}
+
+	bool Sensors::PilotOccluded(DVec3 other, double jd)
+	{
+		if (pilotShip == nullptr) return false;
+		auto catalog = world->Catalog();
+		if (catalog == nullptr || world->Ephemeris == nullptr) return false;
+		// The catalogue's bodies, placed once a date (a sweep asks about many lines at the same moment).
+		if (!(jd == bodyOccludersJd))
+		{
+			bodyOccluders.Clear();
+			for (int i = 0; i < catalog->Count(); i++)
+			{
+				auto b = (*catalog)[i];
+				if (b == nullptr || b->RadiusKm < MinOccluderRadiusKm) continue;
+				if (b->Kind != BodyKind::Star && b->Kind != BodyKind::Planet && b->Kind != BodyKind::DwarfPlanet && b->Kind != BodyKind::Moon && b->Kind != BodyKind::Asteroid) continue;
+				bodyOccluders.Add(Occluder(world->Ephemeris->HelioAt(i, jd), b->RadiusKm));
+			}
+			bodyOccludersJd = jd;
+		}
+		for (const auto& o : bodyOccluders)
+			if (Blocks(pilotHelio, other, o)) return true;
+		// The belt's rocks round the hull, as the helm last reported them, while the report is fresh.
+		if (cs::Math::Abs(jd - pilotRocksJd) * Astro::SecondsPerDay <= RockHoldSeconds)
+			for (const auto& o : pilotRocks)
+				if (Blocks(pilotHelio, other, o)) return true;
+		return false;
 	}
 
 	double Sensors::HavenReachKm(const cs::Ref<Ship>& s) { return SensorSuite::Of(s).ReachKm(Signatures::Haven); }

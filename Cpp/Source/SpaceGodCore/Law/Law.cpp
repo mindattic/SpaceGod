@@ -511,7 +511,10 @@ namespace SpaceGod::Core
 		auto sensors = world->Sensors;
 		if (sensors == nullptr) return ContactLevel::Identified;
 		bool burning = ship == world->PilotedShip ? sensors->PilotBurning() : sensors->Burning(ship, jd);
-		return Sensors::Resolve(sensors->GroupSuite(p), Signatures::Of(ship, burning), rangeKm, Signatures::Transponder(ship));
+		auto level = Sensors::Resolve(sensors->GroupSuite(p), Signatures::Of(ship, burning), rangeKm, Signatures::Transponder(ship));
+		// The player's hull behind a planet, moon or rock from the patrol is not seen at all (US-T93).
+		if (level != ContactLevel::None && ship == world->PilotedShip && sensors->PilotOccluded(world->Fleet->StateOf(p, jd).HelioKm, jd)) return ContactLevel::None;
+		return level;
 	}
 
 	bool Law::IsPatrol(const cs::Ref<Ship>& p, const cs::Ref<Ship>& player)

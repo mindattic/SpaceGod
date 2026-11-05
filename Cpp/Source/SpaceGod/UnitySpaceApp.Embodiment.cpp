@@ -19,6 +19,7 @@
 #include "Embodiment/StationSeat.h"
 #include "Fleet.h"
 #include "Infrastructure/Infrastructure.h"
+#include "Sensors/SensorPosture.h"
 #include "Session/Commands.h"
 #include "Session/ISession.h"
 #include "Session/LocalSession.h"
@@ -398,6 +399,39 @@ namespace SpaceGod
 		// Only what is still flying is worth remembering.
 		launchedCraft.RemoveAll([](const cs::Ref<BattleUnit>& u) { return u == nullptr || u->Dead || u->Fled; });
 		if (!r.Toast.empty()) ShowToast(r.Toast);
+	}
+
+	// ---------------------------------------------------------------- the sensors and power (US-T93)
+
+	int UnitySpaceApp::SensorCommand(const cs::Ref<Ship>& ship)
+	{
+		if (ship == nullptr || ClickPanelOpen()) return 0;
+		int key = Input.SensorPing ? static_cast<int>(SensorKey::Ping) : Input.PowerToggle ? SensorPosture::PowerToggle(ship) : 0;
+		if (key == 0) return 0;
+		cs::String why = SensorPosture::Refusal(ship, key);
+		if (!why.empty())
+		{
+			ShowToast(cs::Cat(key == static_cast<int>(SensorKey::Ping) ? "NO PING: " : "NO POWER CHANGE: ", why));
+			return 0;
+		}
+		switch (static_cast<SensorKey>(key))
+		{
+			case SensorKey::Ping:
+				ShowToast(cs::Cat("ACTIVE PING: a burst of range and detail -- and every sensor in reach hears it: LIT UP for ",
+					static_cast<int>(SensorPosture::PingLitS), " s  (Tab again in ", static_cast<int>(SensorPosture::PingCooldownS), " s)"));
+				break;
+			case SensorKey::GoDark:
+				ShowToast(cs::Cat("GOING DARK: reactor to minimum -- guns, shields and drive offline, transponder off, drifting on your momentum; the hull cools  (Shift+F3 powers up: a ",
+					static_cast<int>(cs::Math::Ceiling(SensorPosture::RestartSeconds(ship))), " s restart)"));
+				break;
+			case SensorKey::PowerUp:
+				ShowToast(cs::Cat("POWERING UP: reactor restart, ", static_cast<int>(cs::Math::Ceiling(SensorPosture::RestartSeconds(ship))),
+					" s -- nothing online until it is done, and your heat climbs back  (Shift+F3 goes dark again)"));
+				break;
+			default:
+				break;
+		}
+		return key;
 	}
 
 	cs::Ref<BattleUnit> UnitySpaceApp::JumpCarrier(cs::Ref<Battle>& battle)

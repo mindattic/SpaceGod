@@ -92,6 +92,10 @@ namespace SpaceGod::Core
 		/// <summary>The helm ability ordered this frame (US-T106, a <see cref="HelmAbility"/>), 0 for none: launch a squadron,
 		/// recall the wing, an order to it, a shuttle, a Breacher or the pods at the locked hull. A command, landed once.</summary>
 		int HelmAbility = 0;
+
+		/// <summary>The sensor and power command at a helm this frame (US-T93, a <see cref="SensorKey"/>), 0 for none: an active
+		/// ping, go dark, or power up. A command, landed once. See <see cref="SensorPosture"/>.</summary>
+		int Sensor = 0;
 	};
 
 	/// <summary>

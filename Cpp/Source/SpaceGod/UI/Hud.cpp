@@ -46,6 +46,7 @@
 #include "Information/LightSpeed.h"
 #include "Persistence/SaveGame.h"
 #include "Sensors/Sensors.h"
+#include "Sensors/SensorPosture.h"
 #include "Settings/GameSetting.h"
 #include "Systems/CruiseDrive.h"
 #include "Systems/DeepSpace.h"
@@ -155,6 +156,7 @@ namespace SpaceGod::UI
 		DrawFlightMarkers();
 		DrawCombatHud();
 		DrawReactor(); // US-T94
+		DrawSensors(); // US-T93
 		DrawHunters();
 		DrawTopBar();
 		if (app->ShowNews) DrawNews();
@@ -944,7 +946,10 @@ namespace SpaceGod::UI
 		auto r = Rect(SafeRight() - w - 16, Screen::height - h - 120, w, h);
 		GUI::Box(r, GUIContent::none(), panel);
 		cs::String preset = p.PresetName();
-		DrawLabel(preset.empty() ? cs::String("REACTOR") : cs::Cat("REACTOR  \xC2\xB7  ", preset), Vector2(r.x + 10, r.y + 6), Accent, true);
+		// Powered down (US-T93): the split waits for the restart, nothing runs on it now.
+		bool offline = SensorPosture::Offline(SelfDestruct::CombatOf(seat));
+		if (offline) DrawLabel("REACTOR  \xC2\xB7  OFFLINE", Vector2(r.x + 10, r.y + 6), Color(0.6f, 0.75f, 1.0f), true);
+		else DrawLabel(preset.empty() ? cs::String("REACTOR") : cs::Cat("REACTOR  \xC2\xB7  ", preset), Vector2(r.x + 10, r.y + 6), Accent, true);
 		const char* names[] = { "WEAPONS", "SHIELDS", "ENGINES" };
 		const Color colors[] = { Color(1.0f, 0.62f, 0.32f), Color(0.45f, 0.7f, 1.0f), Color(0.55f, 1.0f, 0.62f) };
 		auto old = GUI::color;
@@ -956,7 +961,7 @@ namespace SpaceGod::UI
 			// One bar per pip, filled from the bottom: four is all the reactor can give one system.
 			for (int i = 0; i < PowerDistribution::MaxPips; i++)
 			{
-				GUI::color = i < p[s] ? colors[k] : Color(0, 0, 0, 0.45f);
+				GUI::color = i < p[s] ? (offline ? Color(colors[k].r, colors[k].g, colors[k].b, 0.25f) : colors[k]) : Color(0, 0, 0, 0.45f);
 				GUI::DrawTexture(Rect(x, base - (i + 1) * (segH + gap), segW, segH), Icons::White());
 			}
 			GUI::color = old;
@@ -964,6 +969,77 @@ namespace SpaceGod::UI
 			DrawLabel(cs::Cat("x", cs::Fmt(p.Factor(s), "0.00")), Vector2(x, base + 18), Dim, true);
 		}
 		DrawLabel("arrows: L/U/R a pip, Down even, Shift all", Vector2(r.x + 10, r.y + h - 20), Dim, true);
+	}
+
+	// ---------------------------------------------------------------- the sensors and power (US-T93)
+
+	void Hud::DrawSensors()
+	{
+		if (Event::current().type != EventType::Repaint || app->Travel->Active || !app->IsPiloting()) return;
+		auto ship = app->Piloted.Ship;
+		auto sensors = app->World()->Sensors;
+		if (ship == nullptr || ship->Combat == nullptr || sensors == nullptr) return;
+		auto c = ship->Combat;
+		// Above the reactor's panel, the same width; screen space, the same at either scale.
+		constexpr float w = 232, h = 62;
+		auto r = Rect(SafeRight() - w - 16, Screen::height - 142 - 120 - h - 8, w, h);
+		GUI::Box(r, GUIContent::none(), panel);
+		auto state = SensorPosture::StateOf(c);
+		float pulse = 0.65f + 0.35f * Mathf::Abs(Mathf::Sin(Time::unscaledTime * 4.0f));
+		const Color darkBlue(0.55f, 0.72f, 1.0f), amber(1.0f, 0.75f, 0.3f), hot(1.0f, 0.42f, 0.25f);
+		cs::String heading, detail;
+		Color tint = Accent;
+		// The bar under the heading: the heat (dark), the restart (restarting) or the lit window (after a ping).
+		float bar = -1;
+		Color barTint = tint;
+		if (state == PowerState::Dark)
+		{
+			bool cold = c->ResidualHeat <= SensorPosture::DarkFloor * 1.5;
+			heading = cold ? "DARK  \xC2\xB7  COLD" : "DARK  \xC2\xB7  COOLING";
+			detail = cs::Cat("heat ", cs::Fmt(c->ResidualHeat * 100, c->ResidualHeat < 0.1 ? "0.0" : "0"), "%  \xC2\xB7  Shift+F3 power up (",
+				static_cast<int>(cs::Math::Ceiling(SensorPosture::RestartSeconds(ship))), " s)");
+			tint = darkBlue;
+			bar = static_cast<float>(c->ResidualHeat);
+			barTint = darkBlue;
+		}
+		else if (state == PowerState::Restarting)
+		{
+			double total = SensorPosture::RestartSeconds(ship);
+			heading = cs::Cat("RESTARTING  ", static_cast<int>(cs::Math::Ceiling(c->RestartLeftS)), " s");
+			detail = "nothing online yet  \xC2\xB7  heat climbing  \xC2\xB7  Shift+F3 dark";
+			tint = Color(amber.r, amber.g, amber.b, pulse);
+			bar = total > 0 ? static_cast<float>(1 - c->RestartLeftS / total) : 1.0f;
+			barTint = amber;
+		}
+		else if (SensorPosture::Lit(c.get()))
+		{
+			heading = SensorPosture::Bursting(c.get()) ? cs::String("PING  \xC2\xB7  ACTIVE SWEEP") : cs::Cat("LIT UP  ", static_cast<int>(cs::Math::Ceiling(c->PingLitS)), " s");
+			detail = "every sensor in reach hears you";
+			tint = Color(hot.r, hot.g, hot.b, pulse);
+			bar = static_cast<float>(c->PingLitS / SensorPosture::PingLitS);
+			barTint = hot;
+		}
+		else
+		{
+			heading = "SENSORS  \xC2\xB7  PASSIVE";
+			detail = c->PingCooldownS > 0 ? cs::Cat("ping ready in ", static_cast<int>(cs::Math::Ceiling(c->PingCooldownS)), " s  \xC2\xB7  Shift+F3 go dark")
+				: cs::String("Tab ping  \xC2\xB7  Shift+F3 go dark");
+		}
+		// After the restart's last seconds, a ping just past: show the lit window on the dark and restart lines too.
+		if (state != PowerState::Online && SensorPosture::Lit(c.get())) detail = cs::Cat("LIT UP ", static_cast<int>(cs::Math::Ceiling(c->PingLitS)), " s  \xC2\xB7  ", detail);
+		double sig = sensors->PilotSignature();
+		DrawLabel(heading, Vector2(r.x + 10, r.y + 6), tint, true);
+		DrawLabel(cs::Cat("SIG ", cs::Fmt(sig, sig < 10 ? "0.00" : "0")), Vector2(r.x + w - 70, r.y + 6), Dim, true);
+		if (bar >= 0)
+		{
+			auto old = GUI::color;
+			GUI::color = Color(0, 0, 0, 0.5f);
+			GUI::DrawTexture(Rect(r.x + 10, r.y + 26, w - 20, 5), Icons::White());
+			GUI::color = barTint;
+			GUI::DrawTexture(Rect(r.x + 10, r.y + 26, (w - 20) * Mathf::Clamp01(bar), 5), Icons::White());
+			GUI::color = old;
+		}
+		DrawLabel(detail, Vector2(r.x + 10, r.y + 38), Dim, true);
 	}
 
 	// ---------------------------------------------------------------- the self-destruct (US-T97)

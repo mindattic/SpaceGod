@@ -40,6 +40,7 @@
 #include "Combat/Wreck.h"
 #include "Economy/Economy.h"
 #include "Embodiment/SelfDestruct.h"
+#include "Sensors/SensorPosture.h"
 #include "Economy/Goods.h"
 #include "Economy/Settlement.h"
 #include "Infrastructure/Infrastructure.h"
@@ -199,6 +200,8 @@ namespace SpaceGod::Core
 			if (b->Over) Resolve(b, jd);
 		}
 		SelfDestruct::AdvanceOutside(world, seconds, counted);
+		// The helm's ping windows, a dark hull's cooling and a restart (US-T93), on the same clock.
+		SensorPosture::Advance(world, seconds);
 		Interdictions(jd);
 		GateAmbushes(jd);
 		if (jd >= nextPodSweepJd)

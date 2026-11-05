@@ -165,6 +165,10 @@ public:
 	/// <summary>After the helm has flown a frame: what the last ability order came to, toasted, and its craft remembered.</summary>
 	void NoteHelmAbility();
 
+	/// <summary>US-T93 at the helm: Tab an active ping, Shift+F3 go dark (or, dark, power up), as a
+	/// <see cref="Core.SensorKey"/> for the helm to land; said on a toast, or why not. 0 for no key.</summary>
+	int SensorCommand(const cs::Ref<Core::Ship>& ship);
+
 private:
 
 	// ---------------------------------------------------------------- the picker (U.SPC-T446)
