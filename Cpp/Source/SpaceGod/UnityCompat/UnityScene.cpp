@@ -757,7 +757,18 @@ namespace SpaceGod::UnityCompat
 			{
 				FTransform world = ToUnreal(WorldMatrix::Of(*t));
 				// An imported part is drawn in its import's frame: corrected to the Unity mesh first.
-				c->SetWorldTransform(imported ? ImportedCorrection(mesh->ImportedScale, mesh->ImportedRotation) * world : world);
+				FTransform placed = imported ? ImportedCorrection(mesh->ImportedScale, mesh->ImportedRotation) * world : world;
+				c->SetWorldTransform(placed);
+				// US-T122: Unreal ignores a move under KINDA_SMALL_NUMBER (1e-4 cm, or 1e-4 degrees of turn: the Equals in
+				// USceneComponent::InternalSetWorldLocationAndRotation). At real scale a hull is about a millimetre across
+				// (CmPerUnit 100), so a slow drift (an escort's wander about its slot, under a camera that follows it) left
+				// the drawn hull up to a micron, about a thousandth of a cruiser's half-length, behind where the frame put it
+				// until the drift built past that and it jumped. Placed exactly instead (unattached: relative is world).
+				if (!c->GetComponentLocation().Equals(placed.GetLocation(), 0.0) || !c->GetComponentQuat().Equals(placed.GetRotation(), 1e-7))
+				{
+					c->SetRelativeTransform_Direct(placed);
+					c->UpdateComponentToWorld();
+				}
 			}
 			if (!h->Visible) c->SetVisibility(true);
 			h->Visible = true;
