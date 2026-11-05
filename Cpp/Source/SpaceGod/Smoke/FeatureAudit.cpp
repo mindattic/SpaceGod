@@ -392,14 +392,17 @@ namespace SpaceGod::Smoke::FeatureAudit
 		/// One owner per input per frame: at the helm the stick, the look and F are the craft's (the camera only follows
 		/// it), in command they are the camera's; and F pressed in the very frame P takes a helm is spent on the command
 		/// view's focus, not also on the new helm's flight assist.
+		///
+		/// US-T118: the hull is the probe's own, staged a fighter 1 AU above the star, out of every lane, fight and orbit:
+		/// the ship left selected by the probes before (after the focus probes' months at warp) could be riding a lane (where
+		/// F is not the flight assist's), in a fight or killed under the helm, and the probe measured that instead.
+		cs::Ref<Ship> StageAtHelm(const cs::String& name, ShipClass cls, int body, DVec3 offsetKm, DVec3 forward);
+
 		void InputOwnershipProbes()
 		{
 			CloseEverything();
-			for (int i = 0; i < 3 && app->AtControls(); i++) { Tap(Key::P); frames(3); }
-			if (!SelectAShip()) { Result("input.camera-follows", false, "Tab found no ship to select"); return; }
-			auto ship = app->Selected.Ship;
-			Tap(Key::P);
-			if (!app->IsPiloting()) { Result("input.camera-follows", false, cs::Cat("P on ", ship->Name, ": not piloting")); return; }
+			auto ship = StageAtHelm("Audit Input Fighter", ShipClass::Fighter, app->Catalog()->Root()->Index, DVec3(0, 0, Astro::AuKm), DVec3::UnitY);
+			if (!ship) { Result("input.camera-follows", false, cs::Cat("P on the staged fighter: piloting ", B(app->IsPiloting()))); return; }
 			Settle();
 			const auto& cam = app->SpaceCamera;
 			auto hull = Target::OfShip(PilotedShip());
@@ -667,30 +670,57 @@ namespace SpaceGod::Smoke::FeatureAudit
 
 		/// A hyperlane (U.SPC-T41): a fighter staged just outside a lane's on-ramp ring, flown in on W, rides it (Fleet.JoinLane,
 		/// the clock compressed) to the far ramp and comes off there.
+		///
+		/// US-T118: a hull in a fight is not let into a lane (UpdateLaneEntry), and the staged fighter can be drawn into one on
+		/// its way to the ramp (once, the combat probe's own pirate freighter, left where the practice fighter was, struck its
+		/// colours to it there). Then nothing is recorded: an INFO line says so and the next ramp clear of a fight is tried.
 		void LaneProbes()
 		{
 			ToCommand();
 			const auto& lanes = app->Fleet()->Lanes;
-			double jd = app->Clock->Jd;
 			cs::Ref<Lane> lane;
+			cs::Ref<Ship> ship;
+			int at = -1, to = -1, f = 0, tried = 0;
+			bool riding = false;
+			cs::String lost;
 			for (const auto& l : lanes->Lanes)
-				if (lanes->Carries(l) && !l->IsGateSpur() && !BattleAt(l->A) && !BattleAt(l->B)) { lane = l; break; }
-			if (!lane) { Result("transit.lane-enter", false, "no lane carrying traffic, clear of a fight"); return; }
-			int at = lane->A, to = lane->B;
-			DVec3 dir = lanes->RampDirection(lane, at, jd);
-			DVec3 ramp = lanes->RampOffset(lane, at, jd);
-			auto ship = StageAtHelm("Audit Lane Fighter", ShipClass::Fighter, at, ramp + dir * (Hyperlanes::GateRadiusKm + 0.5), -dir);
-			if (!ship)
 			{
-				Result("transit.lane-enter", false, cs::Cat("P on the staged fighter: piloting ", B(app->IsPiloting())));
+				if (!lanes->Carries(l) || l->IsGateSpur() || BattleAt(l->A) || BattleAt(l->B)) continue;
+				for (int end = 0; end < 2 && !riding && tried < 4; end++)
+				{
+					int from = end == 0 ? l->A : l->B;
+					double jd = app->Clock->Jd;
+					DVec3 dir = lanes->RampDirection(l, from, jd);
+					DVec3 ramp = lanes->RampOffset(l, from, jd);
+					tried++;
+					lane = l;
+					at = from;
+					to = end == 0 ? l->B : l->A;
+					ship = StageAtHelm("Audit Lane Fighter", ShipClass::Fighter, at, ramp + dir * (Hyperlanes::GateRadiusKm + 0.5), -dir);
+					if (!ship)
+					{
+						Result("transit.lane-enter", false, cs::Cat("P on the staged fighter: piloting ", B(app->IsPiloting())));
+						return;
+					}
+					kb->Hold(Key::W);
+					for (f = 0; f < 1800 && !app->RidingLane() && ship->Battle == nullptr && !ship->Destroyed; f++) frames(1);
+					kb->Release(Key::W);
+					frames(1);
+					riding = app->RidingLane();
+					if (riding || (ship->Battle == nullptr && !ship->Destroyed)) break;
+					lost = cs::Cat("the fighter off the ", (*app->Catalog())[at]->Name, " ramp of the ", l->Name, " lane ", ship->Destroyed ? cs::String("destroyed") : cs::Cat("drawn into the ", ship->Battle->Name),
+						" after ", f, " frames (toast '", Toast(), "')");
+					Log(cs::Cat("AUDIT transit.lane-enter INFO: ", lost, "; trying another ramp"));
+					ToCommand();
+					ship = nullptr;
+				}
+				if (riding || ship || tried >= 4) break;
+			}
+			if (!ship && !riding)
+			{
+				Result("transit.lane-enter", false, lost.empty() ? cs::String("no lane carrying traffic, clear of a fight") : cs::Cat("every ramp tried was lost to a fight; last: ", lost));
 				return;
 			}
-			kb->Hold(Key::W);
-			int f = 0;
-			for (; f < 1800 && !app->RidingLane(); f++) frames(1);
-			kb->Release(Key::W);
-			frames(1);
-			bool riding = app->RidingLane();
 			Result("transit.lane-enter", riding,
 				cs::Cat("W held ", f, " frames from ", F(Hyperlanes::GateRadiusKm + 0.5, "F1"), " km off the ", (*app->Catalog())[at]->Name, " ramp: riding ", B(riding), "; toast '", Toast(), "'"));
 			if (!riding) { ToCommand(); return; }
