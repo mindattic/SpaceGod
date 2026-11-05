@@ -24,8 +24,9 @@ namespace SpaceGod::Views
 		}
 	}
 
-	void DiscView::Update(bool visible)
+	void DiscView::Update(bool visible, float fade)
 	{
+		visible = visible && fade > 0.001f;
 		bool relayout = laidOutBlend != app->Scale()->Blend();
 		for (const auto& [disc, rings] : discs)
 		{
@@ -52,7 +53,9 @@ namespace SpaceGod::Views
 					auto c = Color(DustColor.r, DustColor.g, DustColor.b, DustColor.a * (edge ? 1.0f : 0.55f));
 					ring->SetPoints(points, Points, c);
 				}
-				ring->SetTint(Color::white());
+				// Fainter the further off it is, never gone (US-T134); the camera sits at -at in the ring's frame.
+				double size = app->Scale()->LocalDistance(host, disc->OuterKm);
+				ring->SetTint(Color(1, 1, 1, fade * UnitySpaceApp::OrbitDistanceFade(ring->NearestDistance(-at), size)));
 				ring->Root->transform->localPosition = at;
 				ring->Root->transform->localRotation = Quaternion::identity();
 			}

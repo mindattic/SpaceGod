@@ -39,7 +39,8 @@ namespace SpaceGod::Views
 	public:
 		DiscView(UnitySpaceApp* app, const cs::Ref<Transform>& parent);
 
-		void Update(bool visible);
+		/// <summary><paramref name="fade"/> multiplies the rings (the battle fade, US-T134); each ring also fades with its distance.</summary>
+		void Update(bool visible, float fade = 1.0f);
 
 	private:
 		static Core::DVec3 Perpendicular(Core::DVec3 n);

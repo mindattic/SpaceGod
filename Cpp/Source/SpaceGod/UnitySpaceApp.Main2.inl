@@ -331,7 +331,22 @@ private:
 
 	void UpdatePathLine();
 
+	/// <summary>US-T134: 1 normally, eased to 0 while a battle is on near the player (<see cref="BattleNearPlayer"/>)
+	/// and back after it; multiplies every orbit and path line. Visual only.</summary>
+	float orbitBattleFade = 1;
+
+	/// <summary>A fight the piloted hull is in, or a live one the camera is within a few thousand battle-km of.</summary>
+	bool BattleNearPlayer();
+
 public:
+	/// <summary>
+	/// US-T134: how opaque an orbit line is when its nearest point is <paramref name="nearestScene"/> from the camera
+	/// and the orbit is <paramref name="sizeScene"/> across (both in the active scale's scene units, so the ratio and
+	/// the fade read the same at real and game scale). Full out to 2 sizes, then a log-distance smoothstep down to a
+	/// 1% floor at 300 sizes: never 0.
+	/// </summary>
+	static float OrbitDistanceFade(double nearestScene, double sizeScene);
+
 	double PixelsPerUnitAtUnitDistance();
 
 	/// <summary>Where another star system shines in this one's sky (a Unity-axes unit vector).</summary>

@@ -39,6 +39,10 @@ namespace SpaceGod::Views
 
 		void SetTint(Color tint);
 
+		/// <summary>Distance from <paramref name="local"/> (in Root's frame) to the nearest point on the drawn
+		/// strip, per segment; +inf before any points are set. Used to fade orbits with distance (US-T134).</summary>
+		double NearestDistance(Vector3 local) const;
+
 		bool Visible() const { return renderer->enabled; }
 		void SetVisible(bool value) { renderer->enabled = value; }
 	};

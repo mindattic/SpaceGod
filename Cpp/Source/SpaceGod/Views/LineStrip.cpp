@@ -2,6 +2,9 @@
 #include "Views/LineStrip.h"
 #include "Rendering/Materials.h"
 
+#include <cmath>
+#include <limits>
+
 namespace SpaceGod::Views
 {
 	using Rendering::Materials;
@@ -59,5 +62,28 @@ namespace SpaceGod::Views
 	{
 		block.SetColor(ColorId, tint);
 		renderer->SetPropertyBlock(block);
+	}
+
+	double LineStrip::NearestDistance(Vector3 local) const
+	{
+		int n = allocated ? vertices.Count() : 0;
+		if (n == 0) return std::numeric_limits<double>::infinity();
+		// In doubles: realistic-scale orbits are far enough out that squared float distances overflow.
+		double px = local.x, py = local.y, pz = local.z;
+		double ax = vertices[0].x, ay = vertices[0].y, az = vertices[0].z;
+		double best = (ax - px) * (ax - px) + (ay - py) * (ay - py) + (az - pz) * (az - pz);
+		for (int i = 1; i < n; i++)
+		{
+			double bx = vertices[i].x, by = vertices[i].y, bz = vertices[i].z;
+			double ex = bx - ax, ey = by - ay, ez = bz - az;
+			double len2 = ex * ex + ey * ey + ez * ez;
+			double t = len2 > 0 ? ((px - ax) * ex + (py - ay) * ey + (pz - az) * ez) / len2 : 0;
+			t = t < 0 ? 0 : t > 1 ? 1 : t;
+			double dx = ax + ex * t - px, dy = ay + ey * t - py, dz = az + ez * t - pz;
+			double d2 = dx * dx + dy * dy + dz * dz;
+			if (d2 < best) best = d2;
+			ax = bx; ay = by; az = bz;
+		}
+		return std::sqrt(best);
 	}
 }

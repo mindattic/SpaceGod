@@ -1348,7 +1348,7 @@ namespace SpaceGod
 		Structures->Update(true);
 		swarm->Update(ShowSatellites);
 		UpdateOrbitLines(dt);
-		discView->Update(ShowOrbits);
+		discView->Update(ShowOrbits, orbitBattleFade);
 		if (graveyardView) graveyardView->Update(); // US-T131: graveyards
 		if (spaceFeaturesView) spaceFeaturesView->Update(); // US-T130: nebulae and ice fields
 		UpdatePathLine();
@@ -1455,11 +1455,47 @@ namespace SpaceGod
 		for (const auto& k : gone) platformViews.Remove(k);
 	}
 
+	float UnitySpaceApp::OrbitDistanceFade(double nearestScene, double sizeScene)
+	{
+		constexpr double FullWithin = 2.0, FloorBeyond = 300.0;
+		constexpr float Floor = 0.01f;
+		if (!(sizeScene > 0) || !(nearestScene >= 0)) return 1.0f;
+		double ratio = nearestScene / sizeScene;
+		if (ratio <= FullWithin) return 1.0f;
+		double t = cs::Math::Log(ratio / FullWithin) / cs::Math::Log(FloorBeyond / FullWithin);
+		t = t > 1 ? 1 : t;
+		t = t * t * (3 - 2 * t);
+		// Geometric between 1 and the floor: each step out dims by the same factor, so it reads smooth.
+		return static_cast<float>(cs::Math::Pow(static_cast<double>(Floor), t));
+	}
+
+	bool UnitySpaceApp::BattleNearPlayer()
+	{
+		// The flown hull's own fight, wherever the camera is (the map included).
+		if (Piloted.Ship != nullptr && Piloted.Ship->Battle != nullptr && !Piloted.Ship->Battle->Over) return true;
+		// A live fight the camera is at: a seat in it (fighter, turret, station), a chase on one of its ships,
+		// or just flying close. Battle-km through the scale's ship mapping, so "close" is the same at both scales.
+		constexpr double NearBattleKm = 3000.0;
+		double nearScene = NearBattleKm * BattleKmScale();
+		for (const auto& b : World()->War->Battles)
+		{
+			if (b->Over) continue;
+			if ((BattleAnchorScene(b) - SpaceCamera->ScenePosition).Length() < nearScene) return true;
+		}
+		return false;
+	}
+
 	void UnitySpaceApp::UpdateOrbitLines(float dt)
 	{
 		orbitRefreshTimer -= dt;
 		bool refresh = orbitRefreshTimer <= 0 || ScaleAnimating();
 		if (refresh) orbitRefreshTimer = 0.2f;
+
+		// US-T134: orbits add nothing in a fight -- out in ~0.4 s when one starts nearby, back in ~1.5 s after.
+		bool battle = BattleNearPlayer();
+		orbitBattleFade = battle ? Mathf::Max(0.0f, orbitBattleFade - dt / 0.4f) : Mathf::Min(1.0f, orbitBattleFade + dt / 1.5f);
+		bool show = ShowOrbits && orbitBattleFade > 0.001f;
+		float battleEase = orbitBattleFade * orbitBattleFade * (3 - 2 * orbitBattleFade);
 
 		for (int i = 0; i < Catalog()->Count(); i++)
 		{
@@ -1467,22 +1503,19 @@ namespace SpaceGod
 			if (line == nullptr) continue;
 			auto body = (*Catalog())[i];
 			auto parent = (*Catalog())[body->ParentIndex];
-			line->SetVisible(ShowOrbits);
-			if (!ShowOrbits) continue;
+			line->SetVisible(show);
+			if (!show) continue;
 
 			double orbitScene = Scale()->LocalDistance(parent, body->Elements->AKm);
-			double cameraDistance = (SpaceCamera->ScenePosition - bodyScene[parent->Index]).Length();
-			float alpha;
+			float alpha = 1.0f;
 			Color color;
 			bool selected = Selected == Target::OfBody(i);
 			if (body->Kind == Core::BodyKind::Moon)
 			{
-				alpha = Mathf::Clamp01(1.6f - static_cast<float>(cameraDistance / (orbitScene * 14.0)));
 				color = Color(0.55f, 0.65f, 0.78f, 0.45f);
 			}
 			else
 			{
-				alpha = 1.0f;
 				color = body->Kind == Core::BodyKind::DwarfPlanet || body->Kind == Core::BodyKind::Asteroid ? Color(0.7f, 0.62f, 0.5f, 0.32f)
 					: body->Kind == Core::BodyKind::Station ? Color(0.9f, 0.75f, 0.45f, 0.3f)
 					: body->IsStar() ? Color(1.0f, 0.85f, 0.55f, 0.35f)
@@ -1490,8 +1523,6 @@ namespace SpaceGod
 					: Color(0.45f, 0.62f, 0.9f, 0.42f);
 			}
 			if (selected) color = Color(0.55f, 0.9f, 1.0f, 0.85f);
-			line->SetVisible(alpha > 0.01f);
-			if (!line->Visible()) continue;
 
 			if (refresh || line->Capacity() == 0)
 			{
@@ -1503,8 +1534,13 @@ namespace SpaceGod
 				}
 				line->SetPoints(orbitPoints, orbitPoints.Count(), color, 1.0f, 0.12f);
 			}
-			line->SetTint(Color(1, 1, 1, alpha));
-			line->Root->transform->localPosition = Relative(bodyScene[parent->Index]);
+			// US-T134: fainter the further the camera is from the nearest point of the drawn orbit, down to a 1%
+			// floor (every orbit, moons included: they used to blink out entirely). The selected one stays readable.
+			auto origin = Relative(bodyScene[parent->Index]);
+			alpha = OrbitDistanceFade(line->NearestDistance(-origin), orbitScene * 2.0);
+			if (selected) alpha = Mathf::Max(alpha, 0.6f);
+			line->SetTint(Color(1, 1, 1, alpha * battleEase));
+			line->Root->transform->localPosition = origin;
 			line->Root->transform->localRotation = Quaternion::identity();
 		}
 	}
@@ -1528,9 +1564,13 @@ namespace SpaceGod
 		// A company hull's path is drawn in its company's livery.
 		auto c = ship->Company ? ship->Company->Livery : ship->Faction->Color;
 		pathLine->SetPoints(pathPoints, pathPoints.Count(), Color(c.R, c.G, c.B, 0.9f), 1.0f, 0.35f);
-		pathLine->SetTint(Color::white());
+		// US-T134: the trajectory fades with distance like the orbits (its points are camera-relative, so the camera
+		// is the origin), sized by its own span, and goes with them in a fight.
+		double span = (pathPoints[pathPoints.Count() - 1] - pathPoints[0]).magnitude();
+		float alpha = OrbitDistanceFade(pathLine->NearestDistance(Vector3::zero()), span) * orbitBattleFade;
+		pathLine->SetTint(Color(1, 1, 1, alpha));
 		pathLine->Root->transform->localPosition = Vector3::zero();
-		pathLine->SetVisible(true);
+		pathLine->SetVisible(orbitBattleFade > 0.001f);
 	}
 
 	double UnitySpaceApp::PixelsPerUnitAtUnitDistance()
