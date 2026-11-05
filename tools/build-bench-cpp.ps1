@@ -3,7 +3,11 @@ param(
   [ValidateSet('Release', 'Debug')][string]$Configuration = 'Release',
   # Build SpaceGodCore.lib first (tools/build-core.ps1, whole Core, only what changed).
   [switch]$BuildCore,
-  [int]$MaxParallel = 3
+  [int]$MaxParallel = 3,
+  # Build Bench.Rewind.exe instead (US-T99): the same sources with /DBENCH_REWIND (the --rewind-probe mode), the whole
+  # Core lib linked in (/WHOLEARCHIVE, so every ObjectGraph registration is there) and, when UE 5.8 is installed, the
+  # engine's Oodle SDK for the codecs. Bench.Cpp.exe is left exactly as it was.
+  [switch]$Rewind
 )
 
 <#
@@ -50,7 +54,29 @@ $flags = @('/nologo', '/c', '/std:c++20', '/EHsc', '/GR', '/W4', '/permissive-',
   '/Zc:__cplusplus', '/Zc:preprocessor', '/bigobj', '/DSPACEGOD_STANDALONE', '/D_CRT_SECURE_NO_WARNINGS', "/I`"$core`"", "/I`"$src`"")
 if ($Configuration -eq 'Release') { $flags += @('/O2', '/GL', '/Gw', '/arch:AVX', '/MD', '/DNDEBUG', '/Zi') } else { $flags += @('/Od', '/MDd', '/Zi', '/RTC1') }
 
-$objDir = Join-Path $out 'benchobj'
+$exeName = 'Bench.Cpp.exe'
+$objName = 'benchobj'
+[string[]]$extraLibs = @()
+[string[]]$extraLink = @()
+if ($Rewind) {
+  $exeName = 'Bench.Rewind.exe'
+  $objName = 'rewindobj'
+  $flags += '/DBENCH_REWIND'
+  $extraLink += "/WHOLEARCHIVE:$lib"
+  try {
+    . (Join-Path $PSScriptRoot 'engine.ps1')
+    $sdks = Join-Path (Find-UnrealEngine '5.8') 'Engine\Source\Runtime\OodleDataCompression\Sdks'
+    $sdk = Get-ChildItem -LiteralPath $sdks -Directory | Sort-Object { [version]$_.Name } | Select-Object -Last 1
+    $oodleLib = Join-Path $sdk.FullName 'lib\Win64\oo2core_win64.lib'
+    if (Test-Path -LiteralPath $oodleLib) {
+      $flags += @('/DBENCH_WITH_OODLE', "/I`"$(Join-Path $sdk.FullName 'include')`"")
+      $extraLibs += $oodleLib
+      Write-Host "oodle: $($sdk.FullName)"
+    }
+  } catch { Write-Host 'oodle: none (no UE 5.8): the probe measures DEFLATE only' }
+}
+
+$objDir = Join-Path $out $objName
 New-Item -ItemType Directory -Force $objDir | Out-Null
 $objs = @()
 $failed = $false
@@ -62,10 +88,10 @@ foreach ($f in Get-ChildItem -LiteralPath $src -Filter '*.cpp' -File) {
 }
 if ($failed) { exit 1 }
 
-$exe = Join-Path $out 'Bench.Cpp.exe'
+$exe = Join-Path $out $exeName
 # Release: link-time code generation across Bench.Cpp and SpaceGodCore.lib (both compiled /GL).
 [string[]]$linkOpt = if ($Configuration -eq 'Release') { @('/LTCG', '/OPT:REF', '/OPT:ICF', "/CGTHREADS:$([Math]::Min($MaxParallel, 8))") } else { @() }
-& link.exe /nologo /DEBUG @linkOpt "/OUT:$exe" @objs $lib psapi.lib dbghelp.lib
-if ($LASTEXITCODE -ne 0) { throw 'link.exe failed (Bench.Cpp).' }
+& link.exe /nologo /DEBUG @linkOpt @extraLink "/OUT:$exe" @objs $lib @extraLibs psapi.lib dbghelp.lib
+if ($LASTEXITCODE -ne 0) { throw "link.exe failed ($exeName)." }
 Write-Host "exe     $exe"
 exit 0

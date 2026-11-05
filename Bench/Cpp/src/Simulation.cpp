@@ -38,6 +38,20 @@ namespace Bench
 		return sim;
 	}
 
+	cs::Ref<Simulation> Simulation::Restore(const cs::Ref<SimClock>& clock, const cs::Ref<sg::Galaxy>& galaxy, const cs::String& activeSystem)
+	{
+		auto sim = cs::New<Simulation>();
+		sim->Clock = clock;
+		sim->Galaxy = galaxy;
+		for (const auto& system : sim->Galaxy->Systems) sim->SubscribeWorld(system);
+		Simulation* raw = sim.get();
+		sim->Galaxy->SystemAdded += [raw](cs::Ref<StarSystem> s, double) { raw->SubscribeWorld(s); };
+		for (const auto& system : sim->Galaxy->Systems)
+			if (system->Name == activeSystem) { sim->ActiveSystem = system; break; }
+		if (sim->ActiveSystem == nullptr) throw std::runtime_error("keyframe: no active system " + activeSystem);
+		return sim;
+	}
+
 	void Simulation::SubscribeWorld(const cs::Ref<StarSystem>& s)
 	{
 		s->World->War->BattleStarted += [this](cs::Ref<sg::Battle>) { BattlesStarted++; };

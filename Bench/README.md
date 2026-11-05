@@ -15,6 +15,10 @@ tools/bench.ps1 -Scenario battle -NoBuild
 Cpp/Intermediate/CoreStandalone/Release/Bench.Cpp.exe --scenario sol-idle [--ticks N] [--scenarios path] [--out dir]
 ```
 
+`tools/bench.ps1 -Rewind` builds `Bench.Rewind.exe` (the same sources with `/DBENCH_REWIND`) and runs its
+`--rewind-probe` per scenario: keyframe size and time, deltas, replay speed and restore determinism for rewind
+(US-T99), written to `Bench/results/rewind-<scenario>.json`. Methods and results are in docs/REWIND.md.
+
 Output, per scenario (gitignored): `Bench/results/cpp-<scenario>.json` (hashes, timings, memory) and
 `Bench/results/cpp-<scenario>.digest.txt` (the full digest text).
 

@@ -8,6 +8,10 @@
 // --trace N writes cpp-<scenario>.trace.txt: every N ticks (and at tick 0, after the setup) one line of FNV-1a hashes
 // of the digest's head and of each system's block (Digest::TraceLine); --dump-at T also writes the full digest at tick T
 // to cpp-<scenario>.t<T>.digest.txt. Bench.CSharp takes the same two flags, so the first divergence can be found.
+//
+// Bench.Rewind.exe (the same sources with /DBENCH_REWIND: tools/build-bench-cpp.ps1 -Rewind, tools/bench.ps1 -Rewind) adds
+//   --rewind-probe [--rewind-samples N] [--rewind-verify N]   keyframe size/time, deltas, replay speed and restore
+//   determinism for rewind (US-T99; RewindProbe.inl, docs/REWIND.md), written to rewind-<scenario>.json.
 
 #include "Digest.h"
 #include "Simulation.h"
@@ -33,6 +37,14 @@
 #include <iostream>
 #include <new>
 #include <sstream>
+
+#if defined(BENCH_REWIND)
+#include "Rewind.h"
+#include "Combat/War.h"
+#include "Combat/FlightDecks.h"
+#include <map>
+#include <set>
+#endif
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -418,6 +430,8 @@ namespace Bench
 		return RunResult{ j.out + "\n", digest, summary };
 	}
 
+#include "RewindProbe.inl"
+
 	std::string FindScenarios(const char* argv0)
 	{
 		std::error_code ec;
@@ -437,6 +451,11 @@ namespace Bench
 		bool list = false;
 		int ticksOverride = -1;
 		TraceOptions trace;
+#if defined(BENCH_REWIND)
+		bool rewind = false;
+		RewindOptions rewindOpt;
+		int rewindThenWarp = -1;
+#endif
 		for (int i = 1; i < argc; i++)
 		{
 			std::string a = argv[i];
@@ -448,6 +467,25 @@ namespace Bench
 			else if (a == "--trace") trace.Every = std::stoi(next());
 			else if (a == "--dump-at") trace.DumpAt = std::stoi(next());
 			else if (a == "--list") list = true;
+#if defined(BENCH_REWIND)
+			else if (a == "--rewind-probe") rewind = true;
+			else if (a == "--rewind-samples") rewindOpt.Samples = std::stoi(next());
+			else if (a == "--rewind-verify") rewindOpt.Verify = std::stoi(next());
+			else if (a == "--rewind-then-warp") rewindThenWarp = std::stoi(next());
+			else if (a == "--rewind-trace") rewindOpt.Trace = std::stoi(next());
+			else if (a == "--rewind-dump-at") rewindOpt.DumpAt = std::stoi(next());
+			else if (a == "--rewind-decks") rewindOpt.Decks = true;
+			else if (a == "--rewind-graph-diff") rewindOpt.GraphDiff = std::stoi(next());
+			else if (a == "--graph-diff-files")
+			{
+				// Two keyframes dumped by --rewind-dump-at: which saved entries differ.
+				auto read = [](const std::string& p) { std::ifstream f(p, std::ios::binary); return Rewind::Bytes((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>()); };
+				auto x = read(next());
+				auto y = read(next());
+				std::cout << Rewind::GraphDiff(x, y, 40);
+				return 0;
+			}
+#endif
 			else { std::cerr << "unknown argument " << a << "\n"; return 2; }
 		}
 		if (scenariosPath.empty()) scenariosPath = FindScenarios(argv[0]);
@@ -465,6 +503,16 @@ namespace Bench
 		if (ticksOverride >= 0) scenario->Ticks = ticksOverride;
 
 		fs::create_directories(outDir);
+#if defined(BENCH_REWIND)
+		// --rewind-then-warp: the scenario with another post-setup warp (e.g. a battle left at real time, warp 0), as
+		// "<name>-warp<N>" (its digest is then not one of expected-digests.json; the probe's own checks still apply).
+		if (rewind && rewindThenWarp >= 0)
+		{
+			scenario->ThenWarp = rewindThenWarp;
+			scenario->Name += "-warp" + std::to_string(rewindThenWarp);
+		}
+		if (rewind) return RewindProbe(file, *scenario, outDir, rewindOpt);
+#endif
 		trace.Dir = outDir;
 		trace.Prefix = "cpp-";
 		auto result = Run(file, *scenario, trace);

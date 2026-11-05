@@ -9,6 +9,8 @@
   tools/bench.ps1 -Scenario sol-idle,battle
   tools/bench.ps1 -NoBuild -Ticks 100      # quick smoke run with a tick cap (digests then differ; not checked)
   tools/bench.ps1 -Compare                 # only check the results already in Bench/results
+  tools/bench.ps1 -Rewind                  # US-T99: build Bench.Rewind.exe, run --rewind-probe per scenario (keyframe
+                                           # sizes, deltas, replay speed, restore determinism; docs/REWIND.md)
 #>
 param(
     [string[]] $Scenario,
@@ -17,7 +19,11 @@ param(
     [int] $Ticks = 0,
     [switch] $NoBuild,
     # Only check the results already on disk, running nothing.
-    [switch] $Compare
+    [switch] $Compare,
+    # The rewind probe (US-T99) instead of the digest check: Bench/results/rewind-<scenario>.json per scenario. Exits 1
+    # if any restored keyframe re-simulates to a different digest than the live run, or keyframing changed the run.
+    [switch] $Rewind,
+    [int] $RewindSamples = 4
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
@@ -29,6 +35,24 @@ New-Item -ItemType Directory -Force $results | Out-Null
 
 $names = if ($Scenario) { $Scenario | ForEach-Object { $_ -split ',' } | Where-Object { $_ } }
          else { (Get-Content $scenarios -Raw | ConvertFrom-Json).scenarios | ForEach-Object { $_.name } }
+
+if ($Rewind) {
+    if (-not $NoBuild) {
+        & (Join-Path $PSScriptRoot 'build-bench-cpp.ps1') -BuildCore -Rewind
+        if ($LASTEXITCODE -ne 0) { throw "Bench.Rewind build failed" }
+    }
+    $exe = Join-Path $root 'Cpp\Intermediate\CoreStandalone\Release\Bench.Rewind.exe'
+    $bad = @()
+    foreach ($n in $names) {
+        & $exe --scenario $n --scenarios $scenarios --out $results --rewind-probe --rewind-samples $RewindSamples
+        if ($LASTEXITCODE -ne 0) { $bad += $n }
+        $j = Get-Content (Join-Path $results "rewind-$n.json") -Raw | ConvertFrom-Json
+        if ($j.plainDigest -ne $expected.$n) { Write-Host "$n : the plain pass gave $($j.plainDigest), expected $($expected.$n)" -ForegroundColor Red; $bad += $n }
+    }
+    if ($bad) { Write-Host "`nrewind probe: determinism problems in $($bad -join ', ')" -ForegroundColor Red; exit 1 }
+    Write-Host "`nrewind probe: every restore re-simulated to the live digest"
+    exit 0
+}
 
 # Bench.Cpp over Cpp/Source/SpaceGodCore: the standalone Core lib (tools/build-core.ps1, incremental) plus the runner
 # (tools/build-bench-cpp.ps1).

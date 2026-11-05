@@ -46,6 +46,16 @@ namespace Bench
 		/// <summary>UnitySpaceApp.Awake: the clock (a fixed start date instead of now), the galaxy, the first system active.</summary>
 		static cs::Ref<Simulation> Build(double startJd, int seed);
 
+		/// <summary>
+		/// (Rewind probe, US-T99) The app shell around a clock and galaxy read back from a keyframe: the Bench's own
+		/// subscriptions again (Core's are rewired by the load), the active system by name, no Promote (the keyframe
+		/// already holds the promoted state).
+		/// </summary>
+		static cs::Ref<Simulation> Restore(const cs::Ref<sg::SimClock>& clock, const cs::Ref<sg::Galaxy>& galaxy, const cs::String& activeSystem);
+
+		cs::Ref<sg::Battle> BattleTimeFor() const { return battleTimeFor; }
+		void SetBattleTimeFor(const cs::Ref<sg::Battle>& battle) { battleTimeFor = battle; }
+
 		void Activate(const cs::Ref<sg::StarSystem>& system);
 		sg::DVec3 PlayerHelioKm() const;
 		void Tick(double dt);
