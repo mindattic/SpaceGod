@@ -24,6 +24,8 @@ namespace SpaceGod::Core
 			return cs::Cat("control ", Int(c->Player().Seat), " ", Num(i.Aim.X), " ", Num(i.Aim.Y), " ", Num(i.Aim.Z), " ",
 				Num(i.Throttle), " ", Num(i.StrafeRight), " ", Num(i.StrafeUp), " ", Num(i.Roll), " ", Int(flags));
 		}
+		// US-T137: something said over comms, to a hull's id or -(settlement id + 1).
+		if (auto m = cs::As<CommsCommand>(command)) return cs::Cat("comms ", Int(m->Player().Seat), " ", Int(m->Target), " ", Int(m->Verb));
 		// C#: throw new ArgumentException("No codec for " + (command?.GetType().Name ?? "null"), nameof(command));
 		throw cs::ArgumentException(cs::Cat("No codec for ", command ? GameCommandTypeName(*command) : cs::String("null"), " (Parameter 'command')"));
 	}
@@ -67,6 +69,11 @@ namespace SpaceGod::Core
 			input.Sensor = (flags >> 18) & 3; // US-T93
 
 			return cs::New<SeatControlCommand>(p, input);
+		}
+		if (f[0] == "comms")
+		{
+			Need(f, 4, line);
+			return cs::New<CommsCommand>(p, ParseInt(f[2]), ParseInt(f[3])); // US-T137
 		}
 		throw cs::FormatException(cs::Cat("Unknown command '", f[0], "'"));
 	}

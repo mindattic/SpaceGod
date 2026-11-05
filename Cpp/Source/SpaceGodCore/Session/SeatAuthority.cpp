@@ -149,6 +149,8 @@ namespace SpaceGod::Core
 			controls[p] = input;
 			return;
 		}
+		// US-T137: what is said over comms is the world's to apply (Comms::Apply), not the seats'.
+		if (cs::Is<CommsCommand>(command)) return;
 		raise(cs::New<CommandRefused>(command, cs::Cat("unknown command ", GameCommandTypeName(*command))));
 	}
 

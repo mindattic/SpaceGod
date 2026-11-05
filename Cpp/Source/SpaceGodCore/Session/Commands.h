@@ -83,6 +83,29 @@ namespace SpaceGod::Core
 		PlayerId player_;
 	};
 
+	/// <summary>
+	/// Something said over comms by the unit the player holds (US-T137): to whom (<see cref="CommsParty.Key"/>: a hull's id,
+	/// or -(settlement id + 1)) and what (a <see cref="CommsVerb"/>). Comms answers from the world's state alone
+	/// (<see cref="Comms.Say"/>), so the same command at the same tick says and does the same on every peer and in a replay.
+	/// The seat authority passes it by: the world, not the seats, applies it.
+	/// </summary>
+	struct CommsCommand final : IGameCommand
+	{
+		CommsCommand(PlayerId player, int target, int verb)
+		{
+			player_ = player;
+			Target = target;
+			Verb = verb;
+		}
+
+		PlayerId Player() const override { return player_; }
+		int Target = 0;
+		int Verb = 0;
+
+	private:
+		PlayerId player_;
+	};
+
 	/// Not C#: `command.GetType().Name` for the codec's and the authority's messages -- the class name without its
 	/// namespace (typeid names are compiler-specific; MSVC's are "struct SpaceGod::Core::X", so the last segment is kept).
 	inline cs::String GameCommandTypeName(const IGameCommand& command)
