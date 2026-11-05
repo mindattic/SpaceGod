@@ -18,6 +18,7 @@
 #include "Systems/StrategicCommand.h"
 #include "Systems/Statecraft.h"
 #include "Systems/VoidBaseBuilder.h"
+#include "Systems/VoidSites.h"
 #include "Combat/GatePickets.h"
 #include "Economy/Economy.h"
 #include "Economy/Settlement.h"
@@ -125,6 +126,19 @@ namespace SpaceGod::Core
 		eph->Update(jd);
 		auto world = SpaceGod::Core::World::CreateUnsettled(eph, jd, SeedOf(name), polities);
 		return cs::New<StarSystem>(name, positionLy, eph, world, nullptr, cs::List<cs::Ref<DebrisDisc>>(), VoidBaseBuilder::OverviewSpanKm, true);
+	}
+
+	cs::Ref<StarSystem> StarSystem::CreateVoidStation(const cs::String& name, DVec3 positionLy, double jd, const cs::Ref<Polities>& polities)
+	{
+		auto plan = VoidSites::Plan(name);
+		auto bodies = VoidBaseBuilder::Build(name)->Bodies();
+		VoidSites::AddBodies(bodies, plan);
+		auto catalog = cs::New<BodyCatalog>(bodies);
+		auto eph = cs::New<SpaceGod::Core::Ephemeris>(catalog);
+		eph->Update(jd);
+		auto world = SpaceGod::Core::World::CreateUnsettled(eph, jd, SeedOf(name), polities);
+		VoidSites::Settle(world, plan);
+		return cs::New<StarSystem>(name, positionLy, eph, world, nullptr, VoidSites::Discs(plan), plan.OverviewSpanKm, true);
 	}
 
 	cs::Ref<StarSystem> StarSystem::CreateAlphaCentauri(double jd, const cs::Ref<Polities>& polities)

@@ -442,6 +442,13 @@ namespace SpaceGod::Core
 				T("Deep space",
 				  "Space between the stars is simulated: void stations, gravity projectors that pull ships out of FTL, and the "
 				  "traffic crossing it."),
+				T("Void stations",
+				  "A void station is a stop worth making, not just a relay. Round its generator: an asteroid drift whose rocks "
+				  "you can stake mining claims on (F10), with an assay camp on the biggest that buys the ore and mines a rarer "
+				  "seam of its own; a planetoid that cracked or blew apart, wrapped in a shell of its debris with its broken "
+				  "chunks circling it; and a sight or two (a crystal moonlet, a frozen fountain, a lamplit derelict ark, a stone "
+				  "hoop, a glowing rock) to visit while the drive cools. Each station's places are always the same, and they "
+				  "read the same in realistic and game scale."),
 				T("The galaxy map",
 				  "[ opens it: every system at its real place, who holds it, gate traffic, war fronts, blockades and raiders as "
 				  "far as the news goes. Click a star to inspect it, double-click to travel; DIPLOMACY and COMMAND are its panels."),

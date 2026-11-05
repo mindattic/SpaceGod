@@ -132,6 +132,13 @@ namespace SpaceGod::Core
 		/// </summary>
 		static cs::Ref<StarSystem> CreateVoidBase(const cs::String& name, DVec3 positionLy, double jd, const cs::Ref<Polities>& polities = nullptr);
 
+		/// <summary>
+		/// A void station of the real neighbourhood (<see cref="VoidStations"/>): the relay a Void Base is, plus the places
+		/// about it (US-T123, <see cref="VoidSites"/>) -- an asteroid drift with its assay camp, a cracked or shattered
+		/// planetoid and a sight or two -- all from the station's name alone.
+		/// </summary>
+		static cs::Ref<StarSystem> CreateVoidStation(const cs::String& name, DVec3 positionLy, double jd, const cs::Ref<Polities>& polities = nullptr);
+
 		static cs::Ref<StarSystem> CreateAlphaCentauri(double jd, const cs::Ref<Polities>& polities = nullptr);
 
 		/// <summary>

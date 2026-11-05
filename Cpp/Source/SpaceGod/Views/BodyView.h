@@ -3,6 +3,7 @@
 
 #include "UnityCompat/UnityRenderingTypes.h"
 #include "GasGiantWeather.h"
+#include "Rendering/VoidSiteModel.h"
 
 namespace SpaceGod::Core
 {
@@ -49,6 +50,22 @@ namespace SpaceGod::Views
 
 		/// <summary>Turns the shell and its rings, and picks the level of detail by how large it is on screen.</summary>
 		void ApplyVoidStation(Vector3 relative, float radius, bool highlighted, Vector3 cameraForward);
+
+		// A void station's site (US-T123, Core's VoidSites): its own model, the debris drawn round it (laid out again when the
+		// scale blend moves) and a halo for a sight that glows.
+		bool voidSite = false;
+		cs::List<Rendering::VoidSiteModel::Fragment> debrisPieces;
+		cs::Ref<Mesh> debrisMesh;
+		cs::Ref<Transform> debris;
+		double laidBlend = cs::Double::NaN;
+		cs::Ref<Transform> siteHalo;
+		cs::Ref<Material> siteHaloMaterial;
+
+		/// <summary>Builds a void site's model, debris and halo; false if the body is no site.</summary>
+		bool BuildVoidSite(const cs::Ref<Transform>& parent);
+
+		/// <summary>Lays out and turns the debris and faces the halo to the camera.</summary>
+		void ApplyVoidSite(Vector3 relative, float radius, Vector3 cameraForward);
 
 		// A flare star brightens suddenly and fades over seconds (Proxima Centauri).
 		bool flareStar = false;

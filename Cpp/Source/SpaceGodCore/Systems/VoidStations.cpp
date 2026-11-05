@@ -167,6 +167,7 @@ namespace SpaceGod::Core
 
 	cs::Ref<StarSystem> VoidStations::Build(const cs::Ref<StarEntry>& star, const cs::Ref<SystemSpec>& /*spec*/, double jd, const cs::Ref<Polities>& polities)
 	{
-		return StarSystem::CreateVoidBase(star->Name, star->PositionLy, jd, polities);
+		// US-T123: with the places about it (VoidSites): its asteroid drift and assay camp, its broken planetoid, its sights.
+		return StarSystem::CreateVoidStation(star->Name, star->PositionLy, jd, polities);
 	}
 }

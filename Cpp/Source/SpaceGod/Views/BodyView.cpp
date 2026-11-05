@@ -6,12 +6,16 @@
 #include "Rendering/ShipMeshFactory.h"
 #include "Rendering/ShipModels.h"
 #include "Rendering/VoidStationModel.h"
+#include "Rendering/VoidSiteModel.h"
 #include "UnitySpaceApp.h"
 
 #include "Astro.h"
 #include "BodyDefinition.h"
 #include "BodyOrientation.h"
+#include "ScaleModel.h"
+#include "Systems/VoidSites.h"
 
+#include <algorithm>
 #include <cmath>
 
 using namespace SpaceGod::Core;
@@ -24,6 +28,7 @@ namespace SpaceGod::Views
 	using Rendering::ShipMeshFactory;
 	using Rendering::ShipModels;
 	using Rendering::VoidStationModel;
+	using Rendering::VoidSiteModel;
 
 	namespace
 	{
@@ -78,6 +83,7 @@ namespace SpaceGod::Views
 			renderer->enabled = false;
 			return;
 		}
+		if (BuildVoidSite(parent)) return;
 		if (station)
 		{
 			material = ShipModels::ProceduralMaterial();
@@ -213,6 +219,7 @@ namespace SpaceGod::Views
 			ApplyVoidStation(relative, radius, highlighted, cameraForward);
 			return;
 		}
+		if (voidSite) ApplyVoidSite(relative, radius, cameraForward);
 		Vector3 pole = ToUnity(Body->Pole);
 		// The sphere mesh has north on +Y, longitude 0 on +X and east on +Z. Ecliptic→Unity is a
 		// reflection, which turns the right-handed (meridian, north, east) triad into a proper rotation.
@@ -313,6 +320,81 @@ namespace SpaceGod::Views
 		glow->localPosition = relative;
 		glow->localRotation = Quaternion::LookRotation(-toCamera, up);
 		glow->localScale = Vector3::one() * (radius * 1.9f);
+	}
+
+	bool BodyView::BuildVoidSite(const cs::Ref<Transform>& parent)
+	{
+		// US-T123: a void station's drift rock, broken planetoid, chunk or sight: its own model in place of the sphere, with
+		// the debris drawn round it and, for a sight that glows, a halo. Spun by Apply like any body.
+		const VoidSite* site = Body->IsVisible() && !Body->IsStar() ? VoidSites::Find(Body->Name, Body->ParentName) : nullptr;
+		if (site == nullptr) return false;
+		voidSite = true;
+		GetComponent<MeshFilter>(Root)->sharedMesh = VoidSiteModel::Body(*site);
+		material = VoidSiteModel::CreateMaterial(*site, Body->Name);
+		renderer->SetSharedMaterial(material);
+
+		debrisPieces = VoidSiteModel::Debris(*site);
+		if (debrisPieces.Count() > 0)
+		{
+			auto go = NewGameObject(Body->Name + " Debris");
+			go->transform->SetParent(parent, false);
+			debrisMesh = Materials::Own(cs::New<Mesh>(Body->Name + " Debris"));
+			debrisMesh->MarkDynamic();
+			AddComponent<MeshFilter>(go)->sharedMesh = debrisMesh;
+			auto r = AddComponent<MeshRenderer>(go);
+			r->SetSharedMaterial(material);
+			r->shadowCastingMode = ShadowCastingMode::Off;
+			r->receiveShadows = false;
+			debris = go->transform;
+		}
+
+		bool halo = false;
+		Color glowColor = VoidSiteModel::GlowColor(*site, halo);
+		if (halo)
+		{
+			auto haloGo = NewGameObject(Body->Name + " Halo");
+			haloGo->transform->SetParent(parent, false);
+			AddComponent<MeshFilter>(haloGo)->sharedMesh = quadMesh();
+			auto hr = AddComponent<MeshRenderer>(haloGo);
+			siteHaloMaterial = Materials::Create(Materials::Glow(), Body->Name + " Halo");
+			siteHaloMaterial->SetColor("_Color", glowColor);
+			siteHaloMaterial->SetFloat("_Intensity", 0.8f);
+			siteHaloMaterial->SetFloat("_Falloff", 2.4f);
+			hr->SetSharedMaterial(siteHaloMaterial);
+			hr->shadowCastingMode = ShadowCastingMode::Off;
+			siteHalo = haloGo->transform;
+		}
+		return true;
+	}
+
+	void BodyView::ApplyVoidSite(Vector3 relative, float radius, Vector3 cameraForward)
+	{
+		if (debris)
+		{
+			// The scale blend this radius was drawn at (display radius is a log-lerp between the realistic and game radii),
+			// so the debris is laid out by the same mapping as the body without reaching for the app.
+			double real = ScaleModel::RealisticRadius(Body->RadiusKm), game = ScaleModel::GameplayRadius(Body->RadiusKm);
+			double span = std::log(game / real);
+			double blend = std::abs(span) < 1e-9 ? 1.0 : std::clamp(std::log(radius / real) / span, 0.0, 1.0);
+			if (std::isnan(laidBlend) || std::abs(blend - laidBlend) > 0.002)
+			{
+				VoidSiteModel::LayDebris(debrisMesh, debrisPieces, blend);
+				laidBlend = blend;
+			}
+			debris->localPosition = relative;
+			debris->localScale = Vector3::one() * radius;
+			// The debris tumbles slowly about the body's pole, on its own.
+			Vector3 up = Vector3::up();
+			debris->localRotation = Quaternion::FromToRotation(up, ToUnity(Body->Pole)) * Quaternion::AngleAxis(Time::unscaledTime * 0.8f, up);
+		}
+		if (siteHalo)
+		{
+			float distance = relative.magnitude();
+			Vector3 toCamera = distance > 0 ? -relative / distance : -cameraForward;
+			siteHalo->localPosition = relative;
+			siteHalo->localRotation = Quaternion::LookRotation(-toCamera, Vector3::up());
+			siteHalo->localScale = Vector3::one() * (radius * 3.2f);
+		}
 	}
 
 	void BodyView::UpdateWeather(double jd, double simSecondsPerSecond)

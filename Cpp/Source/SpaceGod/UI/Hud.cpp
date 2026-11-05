@@ -48,6 +48,7 @@
 #include "Sensors/Sensors.h"
 #include "Sensors/SensorPosture.h"
 #include "Settings/GameSetting.h"
+#include "Systems/VoidSites.h"
 #include "Systems/CruiseDrive.h"
 #include "Systems/DeepSpace.h"
 #include "Systems/FtlNavigation.h"
@@ -1368,6 +1369,8 @@ namespace SpaceGod::UI
 
 	cs::String Hud::KindName(const cs::Ref<BodyDefinition>& b)
 	{
+		// US-T123: a void station's drift rock, broken planetoid or sight says what it is.
+		if (auto site = VoidSites::KindLabel(b); !site.empty()) return site;
 		switch (b->Kind)
 		{
 		case BodyKind::Star:
