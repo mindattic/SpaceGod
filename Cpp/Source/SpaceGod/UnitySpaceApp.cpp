@@ -25,6 +25,8 @@
 #include "Views/BodyView.h"
 #include "Views/DebrisFields.h"
 #include "Views/DiscView.h"
+#include "Views/GraveyardView.h"
+#include "Systems/Graveyards.h"
 #include "Views/SpaceFeaturesView.h"
 #include "Views/EmbeddedPods.h"
 #include "Views/FighterViews.h"
@@ -285,6 +287,8 @@ namespace SpaceGod
 			if ((*Catalog())[i]->ParentIndex >= 0) orbitLines[i] = cs::New<Views::LineStrip>(cs::Cat("Orbit ", (*Catalog())[i]->Name), systemRoot);
 		}
 		shipViews = cs::List<cs::Ref<Views::ShipView>>(); // C#: null (the old views went with systemRoot)
+		// US-T131: the place's graveyards are laid the first time a player comes (their hulks are wrecks in its fleet).
+		Core::Graveyards::Populate(World(), Clock->Jd);
 		BuildShipViews();
 		pathLine = cs::New<Views::LineStrip>("Flight path", systemRoot);
 		pathLine->SetVisible(false);
@@ -292,6 +296,7 @@ namespace SpaceGod
 		debrisFields = cs::New<Views::DebrisFields>(this, systemRoot);
 		podBeacons = cs::New<Views::PodBeacons>(this, systemRoot);
 		discView = cs::New<Views::DiscView>(this, systemRoot);
+		graveyardView = cs::New<Views::GraveyardView>(this, systemRoot); // US-T131
 		spaceFeaturesView = cs::New<Views::SpaceFeaturesView>(this, systemRoot); // US-T130
 		fighterViews = cs::New<Views::FighterViews>(this, systemRoot);
 		laneView = cs::New<Views::LaneView>(this, systemRoot);

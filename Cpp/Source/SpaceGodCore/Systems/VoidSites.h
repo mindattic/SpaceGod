@@ -60,6 +60,8 @@ namespace SpaceGod::Core
 		VoidFieldStyle Field = VoidFieldStyle::Drift;
 		bool Nebula = false;
 		bool Megastructure = false;
+		/// <summary>US-T131: a ship graveyard among the station's sites (see <see cref="Graveyards"/>).</summary>
+		bool Graveyard = false;
 	};
 
 	/// <summary>The kinds of oddity a void station's <see cref="VoidSiteKind.Sight"/> can be.</summary>

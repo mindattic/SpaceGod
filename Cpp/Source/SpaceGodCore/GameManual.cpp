@@ -497,6 +497,11 @@ namespace SpaceGod::Core
 				T("Deep space",
 				  "Space between the stars is simulated: void stations, gravity projectors that pull ships out of FTL, and the "
 				  "traffic crossing it."),
+				T("Ship graveyards",
+				  "Beyond Sol some systems and void stations keep a graveyard: capital wrecks and broken freighters among "
+				  "dense, slowly tumbling wreckage, in an orange haze near a hot star or a cold blue one far out, and now and then "
+				  "a dark derelict station. Match speed alongside a hulk or a station to latch on and salvage what is left "
+				  "aboard. Graveyards are where raiders and worse like to lie up."),
 				T("Void stations",
 				  "A void station is a stop worth making, not just a relay. Round its generator: an asteroid drift whose rocks "
 				  "you can stake mining claims on (F10), with an assay camp on the biggest that buys the ore and mines a rarer "

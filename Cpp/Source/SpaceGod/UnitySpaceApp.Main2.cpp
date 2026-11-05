@@ -70,6 +70,7 @@
 #include "Views/BodyView.h"
 #include "Views/DebrisFields.h"
 #include "Views/DiscView.h"
+#include "Views/GraveyardView.h"
 #include "Views/SpaceFeaturesView.h"
 #include "Views/EmbeddedPods.h"
 #include "Views/FighterViews.h"
@@ -1346,6 +1347,7 @@ namespace SpaceGod
 		swarm->Update(ShowSatellites);
 		UpdateOrbitLines(dt);
 		discView->Update(ShowOrbits);
+		if (graveyardView) graveyardView->Update(); // US-T131: graveyards
 		if (spaceFeaturesView) spaceFeaturesView->Update(); // US-T130: nebulae and ice fields
 		UpdatePathLine();
 	}

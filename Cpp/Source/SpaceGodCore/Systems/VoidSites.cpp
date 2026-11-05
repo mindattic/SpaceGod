@@ -216,6 +216,7 @@ namespace SpaceGod::Core
 		mix.Field = f < 0.3 ? VoidFieldStyle::Drift : f < 0.5 ? VoidFieldStyle::Rubble : f < 0.7 ? VoidFieldStyle::MetalSwarm : VoidFieldStyle::IceField;
 		mix.Nebula = rng.U() < 0.4;
 		mix.Megastructure = rng.U() < 0.3;
+		mix.Graveyard = rng.U() < 0.35;
 		return mix;
 	}
 

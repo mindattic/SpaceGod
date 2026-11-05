@@ -316,6 +316,8 @@ private:
 	cs::Ref<Views::DebrisFields> debrisFields;
 	cs::Ref<Views::PodBeacons> podBeacons;
 	cs::Ref<Views::DiscView> discView;
+	/// <summary>US-T131: the place's graveyards.</summary>
+	cs::Ref<Views::GraveyardView> graveyardView;
 	/// <summary>US-T130: the place's nebulae and ice fields.</summary>
 	cs::Ref<Views::SpaceFeaturesView> spaceFeaturesView;
 	cs::Ref<Views::FighterViews> fighterViews;
