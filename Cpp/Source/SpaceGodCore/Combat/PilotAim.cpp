@@ -51,6 +51,44 @@ namespace SpaceGod::Core
 		return PilotFlight::RotateAbout(hullForward, axis, leadRad * cs::Math::Min(1.0, mag)).Normalized();
 	}
 
+	DVec3 PilotAim::Stick(double& stickX, double& stickY, double rightDeg, double upDeg, DVec3 hullForward, DVec3 hullUp, double leadRad, double dt)
+	{
+		if (dt > 0)
+		{
+			double keep = cs::Math::Exp(-StickReturnHz * dt);
+			stickX *= keep;
+			stickY *= keep;
+		}
+		stickX += rightDeg / StickFullDeg;
+		stickY += upDeg / StickFullDeg;
+		double mag = cs::Math::Sqrt(stickX * stickX + stickY * stickY);
+		if (mag > 1)
+		{
+			stickX /= mag;
+			stickY /= mag;
+		}
+		return Helm(hullForward, hullUp, stickX, stickY, leadRad);
+	}
+
+	double PilotAim::RollOffLevelDeg(DVec3 hullForward, DVec3 hullUp)
+	{
+		auto levelUp = PilotState::LevelUp(hullForward);
+		auto levelRight = DVec3::Cross(hullForward, levelUp);
+		return cs::Math::Atan2(DVec3::Dot(hullUp, levelRight), DVec3::Dot(hullUp, levelUp)) * Astro::Rad2Deg;
+	}
+
+	double PilotAim::LevelRoll(DVec3 hullForward, DVec3 hullUp, double stickX)
+	{
+		// No horizon to roll against with the nose near the poles: fade the auto-level out there (as Soulslike's does).
+		double horizon = cs::Math::Max(0.0, cs::Math::Min(1.0, (0.97 - cs::Math::Abs(hullForward.Z)) / 0.25));
+		if (horizon <= 0) return 0;
+		double want = cs::Math::Max(-1.0, cs::Math::Min(1.0, stickX)) * BankDeg;
+		double error = want - RollOffLevelDeg(hullForward, hullUp);
+		while (error > 180) error -= 360;
+		while (error < -180) error += 360;
+		return cs::Math::Max(-1.0, cs::Math::Min(1.0, error / LevelFullDeg)) * horizon;
+	}
+
 	DVec3 PilotAim::Square(DVec3 up, DVec3 forward, DVec3 fallback)
 	{
 		auto u = up - forward * DVec3::Dot(up, forward);

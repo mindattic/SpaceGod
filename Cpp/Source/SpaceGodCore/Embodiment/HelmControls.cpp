@@ -68,5 +68,5 @@ namespace SpaceGod::Core
 
 	cs::String HelmControls::Heavy() const { return DockingMode ? ", flies heavy on its load, Ctrl in a port's approach to dock" : ""; }
 
-	cs::String HelmControls::StickHint() const { return Stick == PilotControl::FreeAim ? "mouse aims, the hull turns after it" : "mouse steers the nose"; }
+	cs::String HelmControls::StickHint() const { return Stick == PilotControl::FreeAim ? "mouse aims, the hull turns after it" : "mouse pushes a dogfight stick that drifts back to centre"; }
 }

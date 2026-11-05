@@ -187,6 +187,10 @@ private:
 	/// else the helm's aim reticle while piloting -- and nothing at all in the strategy view or between the stars.
 	void DrawReticleOnly();
 
+	/// <summary>A fighter's seat (US-T129): the second reticle, the boresight where the craft's nose points, swinging over to
+	/// the seat's crosshair (the middle of the view, where the mouse aims) as the craft turns after it. Hud.Sights.cpp.</summary>
+	void DrawSeatNose();
+
 	// ---------------------------------------------------------------- the chase (U.SPC-T273)
 
 	/// Hostiles running the ship down: each group's name, range and closing speed, and an EMP charging with the seconds

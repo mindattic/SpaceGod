@@ -269,7 +269,10 @@ namespace SpaceGod::Cameras
 			}
 			// Eases toward the hull's facing (and any lock-on blend) rather than welding to it
 			// instantly, so sharp turns read as a chase rather than a rigid 1:1 attachment.
-			Rotation = Quaternion::Slerp(Rotation, wantRotation, 1.0f - Mathf::Exp(-dt * (PilotView.has_value() ? PilotViewResponseHz : PilotCamResponseHz)));
+			// A view the mouse sets (free aim, a fighter's seat, a gun, a capital's look-around) is the mouse's own: it
+			// turns with it at once and the hull catches up after it (US-T129).
+			if (PilotView.has_value()) Rotation = *PilotView;
+			else Rotation = Quaternion::Slerp(Rotation, wantRotation, 1.0f - Mathf::Exp(-dt * PilotCamResponseHz));
 			if (cs::Math::Abs(input.Scroll) > 0)
 				zoomTarget = cs::Math::Max(MinZoom(FocusTarget), cs::Math::Min(20.0, zoomTarget * cs::Math::Pow(0.82, input.Scroll)));
 			zoom = cs::Math::Exp(cs::Math::Log(zoom) + (cs::Math::Log(zoomTarget) - cs::Math::Log(zoom)) * (1 - cs::Math::Exp(-dt * 10)));

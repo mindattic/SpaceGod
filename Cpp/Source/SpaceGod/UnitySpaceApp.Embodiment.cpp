@@ -7,6 +7,9 @@
 #include "Combat/CombatState.h"
 #include "Combat/Dogfighting.h"
 #include "Combat/Fighters.h" // US-T106: a craft's carrier
+#include "Astro.h"
+#include "Combat/PilotAim.h" // US-T129
+#include "Combat/PilotFlight.h"
 #include "Combat/War.h"
 #include "Embodiment/Embodiables.h"
 #include "Embodiment/Embodiment.h"
@@ -623,6 +626,7 @@ namespace SpaceGod
 		auto right = rot * Vector3::right();
 		seatAim = (Quaternion::AngleAxis(look.x * Cameras::SpaceCamera::LookSensitivity(), up) *
 			Quaternion::AngleAxis(-Cameras::SpaceCamera::LookY(look.y) * Cameras::SpaceCamera::LookSensitivity(), right) * seatAim).normalized();
+		ClampSeatAim(held); // US-T129
 		EmbodimentInput input;
 		input.Aim = DVec3(seatAim.x, seatAim.y, seatAim.z).SwapYZ();
 		input.Throttle = Mathf::Clamp(Input.Move.z, -1.0f, 1.0f);
@@ -654,6 +658,16 @@ namespace SpaceGod
 		auto pose = held->PoseAt(Clock->Jd);
 		auto roof = ToVector(pose.Up.SwapYZ());
 		SpaceCamera->PilotView = Quaternion::LookRotation(seatAim, Vector3::Dot(roof, seatAim) > 0.99f ? up : roof);
+	}
+
+	void UnitySpaceApp::ClampSeatAim(const cs::Ref<IEmbodiable>& held)
+	{
+		auto f = cs::As<FighterSeat>(held);
+		if (f == nullptr || f->Unit == nullptr) return;
+		auto aim = DVec3(seatAim.x, seatAim.y, seatAim.z).SwapYZ();
+		if (aim.LengthSquared() < 1e-12 || f->Unit->Forward.LengthSquared() < 1e-12) return;
+		aim = PilotFlight::ClampAim(aim.Normalized(), f->Unit->Forward.Normalized(), PilotAim::FreeAimMaxLeadDeg * Astro::Deg2Rad);
+		seatAim = ToVector(aim.SwapYZ()).normalized();
 	}
 
 	void UnitySpaceApp::UpdateCockpit(const cs::Ref<FighterSeat>& f, DVec3 aim)

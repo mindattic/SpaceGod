@@ -1467,6 +1467,7 @@ namespace SpaceGod::UI
 		GUI::DrawTexture(Rect(cx - 1, cy - 14, 2, 9), tex);
 		GUI::DrawTexture(Rect(cx - 1, cy + 5, 2, 9), tex);
 		GUI::color = old;
+		DrawSeatNose(); // US-T129: a fighter's nose, swinging over to the crosshair
 	}
 
 	void Hud::DrawToast()

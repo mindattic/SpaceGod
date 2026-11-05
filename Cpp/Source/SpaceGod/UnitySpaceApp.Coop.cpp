@@ -294,6 +294,7 @@ namespace SpaceGod
 			auto right = rot * Vector3::right();
 			seatAim = (Quaternion::AngleAxis(look.x * Cameras::SpaceCamera::LookSensitivity(), up) *
 				Quaternion::AngleAxis(-Cameras::SpaceCamera::LookY(look.y) * Cameras::SpaceCamera::LookSensitivity(), right) * seatAim).normalized();
+			ClampSeatAim(held); // US-T129
 			EmbodimentInput input;
 			input.Aim = DVec3(seatAim.x, seatAim.y, seatAim.z).SwapYZ();
 			input.Throttle = Mathf::Clamp(Input.Move.z, -1.0f, 1.0f);

@@ -47,6 +47,42 @@ namespace SpaceGod::Core
 		/// </summary>
 		static DVec3 Helm(DVec3 hullForward, DVec3 hullUp, double yaw, double pitch, double leadRad);
 
+		// ------------------------------------------------------------ the dogfight stick (US-T129)
+
+		/// <summary>Mouse travel, degrees of look, that pushes the dogfight stick (<see cref="Stick"/>) from centre to full.</summary>
+		static constexpr double StickFullDeg = 12;
+
+		/// <summary>How fast the dogfight stick drifts back to centre on its own, 1/s (Unreal.Soulslike's fighter: 1.6).</summary>
+		static constexpr double StickReturnHz = 1.6;
+
+		/// <summary>How far a medium hull banks into a full-stick turn, deg, when nothing else holds the roll.</summary>
+		static constexpr double BankDeg = 35;
+
+		/// <summary>The roll error, deg, at which the auto-level asks for full roll rate.</summary>
+		static constexpr double LevelFullDeg = 30;
+
+		/// <summary>
+		/// The medium hulls' dogfight stick (US-T129; <see cref="PilotControl.DirectNose"/>, <see cref="PilotControl.Hauler"/>), as
+		/// the spaceship in Unreal.Soulslike flies: the mouse pushes a virtual stick (<paramref name="stick"/>, x to starboard,
+		/// y up, each -1..1 and held inside the unit circle) by <paramref name="rightDeg"/> and <paramref name="upDeg"/> of look
+		/// (<see cref="StickFullDeg"/> to full), and the stick drifts back to centre at <see cref="StickReturnHz"/>. Its
+		/// deflection is a turn rate, not a heading: the result is the heading <see cref="Helm"/> sets for that much stick, so a
+		/// held push keeps the nose swinging and a centred stick lets it settle. The camera rides behind the hull and the nose is
+		/// the crosshair.
+		/// </summary>
+		static DVec3 Stick(double& stickX, double& stickY, double rightDeg, double upDeg, DVec3 hullForward, DVec3 hullUp, double leadRad, double dt);
+
+		/// <summary>
+		/// The dogfight stick's roll (US-T129), as Unreal.Soulslike's fighter: with no roll asked for and the guns quiet, the
+		/// hull rolls itself back toward level with the ecliptic, banked <see cref="BankDeg"/> into the turn the stick asks
+		/// (<paramref name="stickX"/>, + to starboard: the starboard wing dips). A roll input, -1..1 (+ clockwise from behind);
+		/// it fades out as the nose nears the ecliptic's poles, where there is no level to find.
+		/// </summary>
+		static double LevelRoll(DVec3 hullForward, DVec3 hullUp, double stickX);
+
+		/// <summary>The hull's roll off level, deg, -180..180: + with the starboard wing down (clockwise from behind).</summary>
+		static double RollOffLevelDeg(DVec3 hullForward, DVec3 hullUp);
+
 	private:
 		/// <summary><paramref name="up"/> made square to <paramref name="forward"/> (unit), falling back to
 		/// <paramref name="fallback"/>'s and then the level roof when it lies along it.</summary>

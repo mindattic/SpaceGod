@@ -112,6 +112,7 @@ namespace SpaceGod
 		pilotAim = pilot().Forward;
 		pilotViewUp = pilot().Up;
 		helmLookYaw = helmLookPitch = 0;
+		helmStickX = helmStickY = 0; // US-T129
 	}
 
 	void UnitySpaceApp::HailPolity()
@@ -1153,12 +1154,22 @@ namespace SpaceGod
 				break;
 			default:
 			{
-				float factor = static_cast<float>(controls.LookFactor);
-				pilotAim = PilotAim::Nose(pilotAim, pilot().Forward, pilot().Up, lookRight * factor, lookUp * factor, leadRad);
+				// The medium hulls' dogfight stick (US-T129), as Unreal.Soulslike's spaceship: the mouse pushes a stick that
+				// drifts back to centre, its push a turn rate; the camera rides behind and the nose is the crosshair. A hauler's
+				// slow mouse (LookFactor) pushes it less.
+				double factor = controls.LookFactor;
+				pilotAim = PilotAim::Stick(helmStickX, helmStickY, lookRight * Mathf::Rad2Deg * factor, lookUp * Mathf::Rad2Deg * factor,
+					pilot().Forward, pilot().Up, leadRad, dt);
 				break;
 			}
 		}
 		auto desiredForward = pilotAim;
+		// With nothing on the roll keys and the guns quiet, a medium hull levels itself, banked into the turn (US-T129). Only
+		// with flight assist on: off, roll input is raw torque, and a hull once rolled keeps rolling.
+		double roll = Input.Roll;
+		bool stickHull = control == PilotControl::DirectNose || control == PilotControl::Hauler;
+		if (stickHull && !pilotFlightAssistOff && cs::Math::Abs(roll) < 0.1 && !Input.Fire && !Input.Manoeuvre)
+			roll = PilotAim::LevelRoll(pilot().Forward, pilot().Up, helmStickX);
 
 		if (Input.ToggleFlightAssist)
 		{
@@ -1194,7 +1205,7 @@ namespace SpaceGod
 		stick.Throttle = Input.Move.z;
 		stick.StrafeRight = strafeRight;
 		stick.StrafeUp = strafeUp;
-		stick.Roll = Input.Roll;
+		stick.Roll = roll;
 		stick.Boost = Input.Boost;
 		stick.Cruise = Input.Cruise;
 		stick.Fine = Input.Slow;

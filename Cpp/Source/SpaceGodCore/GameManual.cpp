@@ -118,8 +118,13 @@ namespace SpaceGod::Core
 				  "work along or across the enemy's line. Freighters, miners and the other work hulls fly heavy on what they "
 				  "carry. With assist off, every hull flies plain Newtonian."),
 				T("Every role at the helm",
-				  "Every ship can be flown, and each is flown with the controls its work wants. A fighter's mouse is its gunsight "
-				  "(the hull turns after the crosshair, or the mouse turns the nose itself on a heavy fighter or bomber); a courier "
+				  "Every ship can be flown, and each is flown with the controls its work wants. A fighter's mouse is its gunsight: "
+				  "the camera turns with the mouse at once and the hull turns after it, so the HUD shows two reticles, the "
+				  "crosshair where you aim and the nose's boresight swinging over until it meets it, and the guns converge on the "
+				  "crosshair as far as they gimbal (a craft launched from a carrier flies the same from its seat). A heavy "
+				  "fighter, bomber or picket flies a dogfight stick instead: the mouse pushes it and it drifts back to centre, "
+				  "the push a turn rate, the camera riding behind with the nose as the crosshair and the guns firing down it; "
+				  "with the roll keys let go and the guns quiet the hull rolls itself level, banked into the turn. A courier "
 				  "flies a fighter's stick on the longest boost, to run rather than fight; an escort taken from a formation is cut "
 				  "loose from it and flies as its class does; freighters and miners have a slower mouse, fly heavy on their load "
 				  "and dock on Ctrl; capital ships ring the engine telegraph and turn on the keys while the mouse looks round. "

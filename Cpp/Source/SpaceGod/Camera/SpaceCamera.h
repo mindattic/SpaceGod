@@ -112,9 +112,7 @@ namespace SpaceGod::Cameras
 		cs::Func<Core::DVec3> PilotEye;
 
 	private:
-		/// <summary>How fast the view catches up to <see cref="PilotView"/>: quick, since in free aim the
-		/// crosshair is the middle of the screen and must stay under the mouse.</summary>
-		static constexpr float PilotViewResponseHz = 30.0f;
+		// (PilotViewResponseHz is gone, US-T129: the view is welded to PilotView, so it turns with the mouse at once.)
 
 		/// <summary>How far above the line of sight a free-aim chase sits, in chase distances, so the
 		/// hull flies below the crosshair instead of covering it.</summary>

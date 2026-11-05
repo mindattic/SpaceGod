@@ -38,6 +38,11 @@ private:
 	/// <summary>Where the stick points at a seat, Unity axes (unit): the mouse swings it, the view follows it.</summary>
 	Vector3 seatAim = Vector3::forward();
 
+	/// <summary>A fighter's seat (US-T129): the view is the mouse's and turns with it at once, the craft turns after it; the
+	/// aim is held within <see cref="Core::PilotAim::FreeAimMaxLeadDeg"/> of the nose, as the helm's free aim, so the view
+	/// never swings round to look back at its own craft.</summary>
+	void ClampSeatAim(const cs::Ref<Core::IEmbodiable>& held);
+
 	/// <summary>What the commander had before taking a seat: their time warp and what the camera was following,
 	/// restored on <see cref="ReturnToCommand"/>. <see cref="commandWarp"/> is -1 when nothing is remembered.</summary>
 	int commandWarp = -1;

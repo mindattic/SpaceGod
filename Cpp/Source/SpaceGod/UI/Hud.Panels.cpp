@@ -188,7 +188,7 @@ namespace SpaceGod::UI
 	{
 		return control == PilotControl::FreeAim ? "WASD throttle/strafe, mouse aims, the hull turns after it"
 			: control == PilotControl::Helm ? "W/S ring the engine telegraph, A/D Q/E turn the hull, Z/X roll, mouse looks around, 1-9 0 captain's orders"
-			: "WASD throttle/strafe, mouse steers the nose";
+			: "WASD throttle/strafe, mouse pushes a dogfight stick (it drifts back to centre), the nose is the crosshair";
 	}
 
 	float Hud::SafeLeft() { return (Screen::width - SafeWidth()) * 0.5f; }
