@@ -804,6 +804,9 @@ namespace SpaceGod::UI
 		// U.SPC-T601: the system's one practice fighter, at the camera, the player at its helm (Shift+V does the same).
 		if (GUI::Button(Rect(Screen::width - 470, 28, 250, 26), "PRACTICE FIGHTER HERE  (Shift+V)", button))
 			app->SpawnPracticeFighter();
+		// US-T88: the dogfight demo, at a light fighter's helm (Shift-click: a heavy fighter's) against four pirates.
+		if (GUI::Button(Rect(Screen::width - 730, 28, 250, 26), "DOGFIGHT DEMO  (Shift: heavy)", button))
+			app->StartDogfightDemo(Event::current().shift);
 		if (GUI::Button(Rect(Screen::width - 40, 24, 30, 30), "X", button))
 			app->ShowSpawn = false;
 

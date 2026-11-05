@@ -27,6 +27,14 @@ namespace SpaceGod
 
 		static void Load(const cs::String& slot);
 
+		/// US-T88: a new game that drops the player straight into the dogfight demo (UnitySpaceApp::StartDogfightDemo),
+		/// at a light fighter's helm or, with <paramref name="heavy"/>, a heavy fighter's.
+		static void DogfightDemo(bool heavy);
+
+		/// US-T88: the dogfight demo this game was asked to open with, once: 0 none, 1 light fighter, 2 heavy fighter.
+		/// Asked from the main menu, or on the command line with <c>-dogfight</c> (<c>-dogfight-heavy</c> for the heavy).
+		static int TakeDogfightDemo();
+
 		/// The save the menu asked the game to resume, once (empty for a new game; C# null).
 		static cs::String TakeLoadSlot();
 
@@ -47,5 +55,7 @@ namespace SpaceGod
 	private:
 		static void Start(const cs::String& slot);
 		static inline cs::String loadSlot;
+		static inline int dogfightDemo = 0;
+		static inline bool dogfightFlagTaken = false;
 	};
 }

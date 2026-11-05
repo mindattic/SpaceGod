@@ -214,7 +214,7 @@ namespace SpaceGod::UI
 
 	void MainMenu::DrawMain()
 	{
-		const float w = 380, h = 468;
+		const float w = 380, h = 516;
 		auto r = Centred(w, h);
 		GUI::Label(Rect(r.x, r.y - 70, w, 48), "UNITYSPACE", heading);
 		GUI::Box(r, GUIContent::none(), panel);
@@ -235,7 +235,11 @@ namespace SpaceGod::UI
 		if (GUI::Button(Rect(r.x + 20, y + 192, bw, 38), "Settings", button)) settings->OpenSettings();
 		if (GUI::Button(Rect(r.x + 20, y + 240, bw, 38), "Help", button)) Open(Page::Help);
 		if (GUI::Button(Rect(r.x + 20, y + 288, bw, 38), "Asset Library POC", button)) Open(Page::AssetLibraries);
-		if (GUI::Button(Rect(r.x + 20, y + 336, bw, 38), "Quit", button)) Quit();
+		// US-T88: a new game straight into the dogfight demo, at a light or a heavy fighter's helm (-dogfight / -dogfight-heavy).
+		float half = (bw - 10) * 0.5f;
+		if (GUI::Button(Rect(r.x + 20, y + 336, half, 38), "Dogfight Demo", button)) GameLaunch::DogfightDemo(false);
+		if (GUI::Button(Rect(r.x + 30 + half, y + 336, half, 38), "Dogfight (Heavy)", button)) GameLaunch::DogfightDemo(true);
+		if (GUI::Button(Rect(r.x + 20, y + 384, bw, 38), "Quit", button)) Quit();
 	}
 
 	void MainMenu::DrawLoad()

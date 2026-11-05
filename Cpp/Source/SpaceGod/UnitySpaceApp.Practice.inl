@@ -25,3 +25,28 @@ private:
 	/// <summary>Everything near enough to matter that the fighter must not start inside, heliocentric km: the system's
 	/// hulls (and the craft of its fights), stations, wrecks' debris and its worlds. <paramref name="self"/> is left out.</summary>
 	void CollectPracticeObstacles(const cs::Ref<Core::Ship>& self);
+
+	// ---------------------------------------------------------------- the dogfight demo (US-T88)
+
+public:
+	/// <summary>
+	/// The dogfight demo (US-T88): a home-side fighter (a light fighter, or with <paramref name="heavy"/> a heavy one) off a
+	/// quiet giant world, its sunlit face and rings behind the enemy, with the player at its helm and four pirates a few km
+	/// ahead -- an interceptor and a fighter, a corvette and a destroyer -- already in the fight. Started from the main
+	/// menu, the Spawn &amp; Pilot screen, the <c>-dogfight</c> / <c>-dogfight-heavy</c> switch or the console's
+	/// <c>sg.DogfightDemo [heavy]</c>. Laid out in true km about the world, the fight in battle space, so it reads the
+	/// same at the gameplay and the realistic scale.
+	/// </summary>
+	void StartDogfightDemo(bool heavy);
+
+private:
+	/// <summary>Frames left before a dogfight demo asked for at launch starts (-1: none due); the scene settles first.</summary>
+	int dogfightDemoDueFrames = -1;
+	bool dogfightDemoHeavy = false;
+	bool dogfightDemoAsked = false;
+
+	/// <summary>Once a frame: starts the dogfight demo the game was launched for (GameLaunch::TakeDogfightDemo).</summary>
+	void UpdateDogfightDemo();
+
+	/// <summary>Where the demo is fought: the first quiet giant (no fight, no hulls there), else the system's largest world.</summary>
+	int DogfightDemoBody();

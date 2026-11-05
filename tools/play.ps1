@@ -1,6 +1,8 @@
 [CmdletBinding()]
 param(
-  [ValidateSet('solo', 'host', 'join', 'smoke', 'shots', 'views', 'viewshot', 'demo', 'fidelity', 'coop-smoke', 'audit')][string]$Mode = 'solo',
+  [ValidateSet('solo', 'host', 'join', 'smoke', 'shots', 'views', 'viewshot', 'demo', 'fidelity', 'coop-smoke', 'audit', 'dogfight')][string]$Mode = 'solo',
+  # -Mode dogfight only (US-T88): a heavy fighter's helm instead of a light fighter's.
+  [switch]$Heavy,
   [string]$CaptureDir = '',
   [string]$Address = '127.0.0.1',
   # SpaceGod.Unreal.Cpp is the C++ game only (the C# track lives on in SpaceGod.Unreal.CSharp).
@@ -33,6 +35,7 @@ quits; the log is Cpp/Saved/Logs/<project>.log.
   ./tools/play.ps1 -Mode smoke              # headless smoke (US-T38)
   ./tools/play.ps1 -Mode shots              # docs/images/cpp-ui-*.png
   ./tools/play.ps1 -Mode demo               # the -demo scene tour (US-T58)
+  ./tools/play.ps1 -Mode dogfight [-Heavy]  # the dogfight demo: a fighter's helm against four pirates (US-T88)
   ./tools/play.ps1 -Mode coop-smoke         # headless: a host and a client on localhost, their digests compared (US-T44)
   ./tools/play.ps1 -Mode coop-smoke -PackageDir Builds/Cpp/Windows # the same from a package, Shipping too (US-T64)
   ./tools/play.ps1 -Mode audit              # headless: the smoke, then a probe per binding, PASS/FAIL each (US-T48)
@@ -289,6 +292,11 @@ $map = switch ($Mode) {
   'solo' { '/Engine/Maps/Entry' }
   'host' { '/Engine/Maps/Entry?listen' }
   'join' { $Address }
+}
+if ($Mode -eq 'dogfight') {
+  # -Mode dogfight (US-T88): straight into the dogfight demo, a light fighter's helm against four pirates (-Heavy: a heavy fighter's).
+  & $editor $project.FullName '/Engine/Maps/Entry' -game -windowed -ResX=1600 -ResY=900 -log $(if ($Heavy) { '-dogfight-heavy' } else { '-dogfight' })
+  exit $LASTEXITCODE
 }
 if ($Mode -eq 'solo') { & $editor $project.FullName $map -game -windowed -ResX=1600 -ResY=900 -log }
 else { & $editor $project.FullName $map -game -windowed -ResX=1600 -ResY=900 -log $coopNet } # US-T39: host / join

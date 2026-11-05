@@ -467,6 +467,7 @@ namespace SpaceGod
 		AnimateScale(dt);
 		Scale()->Layout(Ephemeris(), bodyScene);
 		UpdateRadii();
+		UpdateDogfightDemo(); // US-T88: the demo the game was launched for (-dogfight, the main menu's button)
 		CoopUpdatePiloting(dt); // US-T44 (US-T43): UpdatePiloting(dt), on the helm holder's frame of input on every peer in co-op
 		UpdateSeat(dt);
 		ShowLawNotices();
