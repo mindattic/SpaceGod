@@ -55,7 +55,8 @@ namespace SpaceGod::Coop
 				SG_FIELD(ActivateGate), SG_FIELD(Boost), SG_FIELD(ClearFtlCourse), SG_FIELD(ClearScreen), SG_FIELD(Cruise),
 				SG_FIELD(CycleBackward), SG_FIELD(CycleFtlTarget), SG_FIELD(CycleSeat), SG_FIELD(CycleShips), SG_FIELD(CycleSky),
 				SG_FIELD(DropMine), SG_FIELD(EngageFtl), SG_FIELD(Escape), SG_FIELD(Fire), SG_FIELD(FireEmp), SG_FIELD(Focus),
-				SG_FIELD(HailPolity), SG_FIELD(Home), SG_FIELD(JumpToCraft), SG_FIELD(LockTarget), // US-T106: Shift+/ SG_FIELD(LookDelta), SG_FIELD(LookHeld), SG_FIELD(ManGun),
+				SG_FIELD(HailPolity), SG_FIELD(Home), SG_FIELD(JumpToCraft), // US-T106: Shift+/
+				SG_FIELD(LockTarget), SG_FIELD(LookDelta), SG_FIELD(LookHeld), SG_FIELD(ManGun),
 				SG_FIELD(Manoeuvre), SG_FIELD(MouseDelta), SG_FIELD(MousePosition), SG_FIELD(Move), SG_FIELD(MoveToHost), SG_FIELD(NumberKey), SG_FIELD(Pilot),
 				SG_FIELD(PowerKey), // US-T94: the reactor split's arrow keys, an edge
 				SG_FIELD(QuickLoad), SG_FIELD(QuickSave), SG_FIELD(ResetTime), SG_FIELD(RightClicked), SG_FIELD(Roll), SG_FIELD(Scroll),
