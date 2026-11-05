@@ -3,6 +3,7 @@
 #include "Session/SeatAuthority.h"
 #include "Embodiment/CraftPower.h"
 #include "Embodiment/EmbodimentSession.h"
+#include "Embodiment/HelmAbilities.h"
 #include "Embodiment/SelfDestruct.h"
 #include "Session/Commands.h"
 #include "Session/SessionEvents.h"
@@ -117,6 +118,9 @@ namespace SpaceGod::Core
 			// So does the self-destruct's arm or abort (US-T97); the sim counts it down, once a tick (US-T114).
 			if (input.SelfDestruct != 0) SelfDestruct::Command(session->Current, input.SelfDestruct);
 			input.SelfDestruct = 0;
+			// And a helm ability (US-T106): a squadron launched once, not every step the stick is flown on.
+			if (input.HelmAbility != 0) HelmAbilities::Command(session->Current, input.HelmAbility);
+			input.HelmAbility = 0;
 			controls[p] = input;
 			return;
 		}

@@ -211,6 +211,14 @@ namespace SpaceGod::Core
 		/// <summary>Seconds until a carrier can send its next boarding shuttle out of its hangar (U.SPC-T486, <see cref="BoardingShuttles"/>).</summary>
 		double ShuttleLaunchIn = 0;
 
+		/// <summary>A carrier's wing as the player ordered it from the helm (US-T106, <see cref="HelmAbilities"/>): held aboard
+		/// when the hull came into the fight with the player at its helm (launched squadron by squadron on order), recalled
+		/// to land and stay aboard, and the standing call to its craft (<see cref="HelmWingCall"/>: 0 their own fights, 1 the
+		/// helm's locked hull, 2 guard the carrier). They lapse, and its captain launches what is held, once nobody holds the
+		/// helm or flies one of its craft (<see cref="Battle.HelmOrdersLapse"/>). Never set by the AI.</summary>
+		bool WingHeld = false, WingRecalled = false;
+		int WingCall = 0;
+
 		/// <summary>Taken by boarders: it has changed sides and carries a prize crew, so it no longer fights.</summary>
 		bool Captured = false;
 
@@ -1169,6 +1177,35 @@ namespace SpaceGod::Core
 		/// prize (U.SPC-T521): whatever its side would board (<see cref="MayBoard"/>), and, for a lawful hull of any side (a
 		/// merchant's escort), a raider attacking it, which is no piracy to take.</summary>
 		bool MayBreach(const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& target);
+
+		/// <summary>A Breacher round away from <paramref name="u"/>'s bays at <paramref name="target"/>, its team drawn from the
+		/// habitats and the bays set cycling (the firing half of <see cref="FireBreacherBay"/>).</summary>
+		void FireBreacherAt(const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& target);
+
+		/// <summary>A salvo of boarding pods away from mount <paramref name="s"/> at <paramref name="target"/> (the firing half
+		/// of <see cref="FirePods"/>).</summary>
+		void FirePodsAt(const cs::Ref<BattleUnit>& u, const cs::Ref<Subsystem>& s, const cs::Ref<BattleUnit>& target);
+
+	public:
+		// ---------------------------------------------------------------- orders from the player's helm (US-T106)
+
+		/// <summary>The helm orders a Breacher round at <paramref name="target"/> (the hull locked): fired now if the bays have
+		/// cycled, a team is ready and the round would get in. Empty when it went, else why not.</summary>
+		cs::String OrderBreacher(const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& target);
+
+		/// <summary>The helm orders the boarding pods at <paramref name="target"/>: the first loaded launcher fires its salvo if
+		/// the target's shields are down and it is in reach. Empty when they went, else why not.</summary>
+		cs::String OrderPods(const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& target);
+
+		/// <summary>The helm sends a boarding shuttle at <paramref name="target"/> with a team (the carrier keeping its reserve);
+		/// <paramref name="sent"/> is the shuttle. Empty when it went, else why not.</summary>
+		cs::String OrderShuttle(const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& target, cs::Ref<BattleUnit>& sent);
+
+		/// <summary>A carrier's helm orders (<see cref="BattleUnit.WingHeld"/>) lapse once nobody holds its helm or flies one of
+		/// its craft: the recall and the call are lifted and its captain launches the wing held aboard, as at the start of a fight.</summary>
+		void HelmOrdersLapse(const cs::Ref<BattleUnit>& u);
+
+	private:
 
 		/// <summary>
 		/// A Breacher round in flight (U.SPC-T466): it coasts like a bullet, its thrusters bending its track only slightly

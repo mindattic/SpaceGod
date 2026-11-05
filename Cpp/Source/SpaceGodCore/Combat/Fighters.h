@@ -143,7 +143,29 @@ namespace SpaceGod::Core
 		/// </summary>
 		static void Launch(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& carrier);
 
+		/// <summary>
+		/// One squadron of <paramref name="role"/>'s craft out of <paramref name="carrier"/>'s hangar on the helm's order
+		/// (US-T106): the first squadron, in berth order, with a craft of that class aboard fit to fly, all of its craft
+		/// aboard that are, out through the flight decks. A craft that landed in this fight and was struck down into the
+		/// hangar goes out again as the unit it was; one not yet out launches as itself (<see cref="LaunchCraft"/>). Returns
+		/// the craft launched, lead first; none with no hangar left standing or nothing of that class aboard fit to fly.
+		/// </summary>
+		static cs::List<cs::Ref<BattleUnit>> LaunchOrdered(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& carrier, FighterRole role);
+
+		/// <summary>The carrier's helm has recalled its wing (US-T106, <see cref="BattleUnit.WingRecalled"/>): <paramref name="u"/>
+		/// flies home to land and stays aboard.</summary>
+		static bool Recalled(const cs::Ref<BattleUnit>& u);
+
+		/// <summary>How far round its carrier a craft told to guard it (US-T106) goes after a hostile, km.</summary>
+		static constexpr double GuardKm = 8;
+
 	private:
+		/// <summary>The target the carrier's helm has called its wing onto for <paramref name="u"/> (US-T106): its locked hull
+		/// (never a fighter for a bomber), or the nearest armed hostile within <see cref="GuardKm"/> of the carrier when told
+		/// to guard it; null with no call, nothing to go for, or (guarding) nothing near. <paramref name="guard"/> is set
+		/// when the call is to guard the carrier.</summary>
+		static cs::Ref<BattleUnit> HelmCall(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& u, bool& guard);
+
 		/// <summary>Docked craft <paramref name="hull"/> out of the bays as slot <paramref name="k"/> of squadron
 		/// <paramref name="q"/>, under <paramref name="lead"/> (none: it leads), flying on its own hull with its own pilot
 		/// (U.SPC-T526); returns the squadron's lead.</summary>

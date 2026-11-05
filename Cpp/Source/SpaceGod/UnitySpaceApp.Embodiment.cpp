@@ -6,11 +6,13 @@
 #include "Combat/Battle.h"
 #include "Combat/CombatState.h"
 #include "Combat/Dogfighting.h"
+#include "Combat/Fighters.h" // US-T106: a craft's carrier
 #include "Combat/War.h"
 #include "Embodiment/Embodiables.h"
 #include "Embodiment/Embodiment.h"
 #include "Embodiment/CraftPower.h"
 #include "Embodiment/FighterSeat.h"
+#include "Embodiment/HelmAbilities.h"
 #include "Embodiment/MountedTurret.h"
 #include "Embodiment/ShipHelm.h"
 #include "Embodiment/SelfDestruct.h"
@@ -145,7 +147,8 @@ namespace SpaceGod
 		return cs::Is<FighterSeat>(s)
 			? cs::String("  (mouse aims, W/S throttle, A/D Q/E strafe, Z/X roll, Shift boost (with A/D Q/E a lateral boost), F flight assist (off: W/S raw thrust), Alt flip for a turn and burn, left mouse guns, right mouse "
 				"weapon group, 1 next group, T lock, 6 next weak point, Ctrl flares, 2 attack my target, 3 cover me, 4 form up, "
-				"5 engage at will, 7/8/9 power to weapons/shields/engines, 0 even power, ' ; next seat, Shift+Backspace (hold) self-destruct, P back to command)")
+				"5 engage at will, 7/8/9 power to weapons/shields/engines, 0 even power, Shift+/ next craft of the wing, Backspace back to the carrier's helm, "
+				"' ; next seat, Shift+Backspace (hold) self-destruct, P back to command)")
 			: cs::String("  (mouse lays it, left mouse fires, / next gun, Backspace up to the helm, P back to command)");
 	}
 
@@ -166,6 +169,12 @@ namespace SpaceGod
 
 	void UnitySpaceApp::MoveSeatToHost()
 	{
+		// In a launched craft (US-T106): back to the helm of the carrier it flew from.
+		if (auto craft = cs::As<FighterSeat>(HeldNonHelm()))
+		{
+			if (!BackToCarrier()) ShowToast(cs::Cat("The ", craft->Name(), "'s carrier is out of reach: ' ; next seat, P back to command"));
+			return;
+		}
 		auto gun = cs::As<MountedTurret>(HeldNonHelm());
 		if (!gun) return;
 		if (gun->Host() == nullptr)
@@ -362,6 +371,91 @@ namespace SpaceGod
 			}
 		}
 		TakeSeat(Embodiables::Cycle(guns, HeldNonHelm(), 1));
+	}
+
+	// ---------------------------------------------------------------- the helm's abilities (US-T106)
+
+	int UnitySpaceApp::HelmAbilityKey(const cs::Ref<Ship>& ship)
+	{
+		if (!Input.Boost || Input.NumberKey < 0 || ClickPanelOpen() || ship == nullptr || ship->Phase == ShipPhase::Lane) return 0;
+		int slot = Input.NumberKey == 0 ? 10 : Input.NumberKey;
+		auto ability = HelmAbilities::AtSlot(ship, slot);
+		if (ability == HelmAbility::None) return 0;
+		Input.NumberKey = -1; // spent: Shift+digit is the ability, never also the captain's order on the digit
+		return static_cast<int>(ability);
+	}
+
+	void UnitySpaceApp::NoteHelmAbility()
+	{
+		const auto& r = HelmAbilities::Last();
+		if (r.Seq == helmAbilitySeq) return;
+		helmAbilitySeq = r.Seq;
+		for (int i = r.Launched.Count() - 1; i >= 0; i--)
+		{
+			launchedCraft.Remove(r.Launched[i]);
+			launchedCraft.Insert(0, r.Launched[i]);
+		}
+		// Only what is still flying is worth remembering.
+		launchedCraft.RemoveAll([](const cs::Ref<BattleUnit>& u) { return u == nullptr || u->Dead || u->Fled; });
+		if (!r.Toast.empty()) ShowToast(r.Toast);
+	}
+
+	cs::Ref<BattleUnit> UnitySpaceApp::JumpCarrier(cs::Ref<Battle>& battle)
+	{
+		battle = nullptr;
+		if (auto f = cs::As<FighterSeat>(HeldNonHelm()))
+		{
+			battle = f->Battle;
+			return f->Unit->Fighter != nullptr ? f->Unit->Fighter->Carrier : nullptr;
+		}
+		if (IsPiloting() && Piloted.Ship != nullptr && Piloted.Ship->Battle != nullptr && !Piloted.Ship->Battle->Over)
+		{
+			battle = Piloted.Ship->Battle;
+			return battle->UnitOf(Piloted.Ship);
+		}
+		return nullptr;
+	}
+
+	void UnitySpaceApp::JumpToCraft()
+	{
+		cs::Ref<Battle> battle;
+		auto carrier = JumpCarrier(battle);
+		if (carrier == nullptr)
+		{
+			ShowToast(IsPiloting() ? cs::String("Not in a fight: nothing launched to jump into (Shift+/ works from a carrier's helm in battle)")
+				: cs::String("Shift+/ jumps between a carrier's helm and the craft it launched: fly a carrier in a fight first"));
+			return;
+		}
+		auto aloft = HelmAbilities::Aloft(battle, carrier, launchedCraft);
+		auto held = cs::As<FighterSeat>(HeldNonHelm());
+		int at = -1;
+		if (held != nullptr)
+			for (int i = 0; i < aloft.Count(); i++)
+				if (aloft[i] == held->Unit) at = i;
+		// Past the last of them (or with none up), back to the carrier's helm.
+		if (held != nullptr && (at < 0 ? aloft.Count() == 0 : at == aloft.Count() - 1))
+		{
+			if (!BackToCarrier()) ShowToast("No other craft of the wing up, and the carrier's helm is out of reach");
+			return;
+		}
+		if (aloft.Count() == 0)
+		{
+			ShowToast(cs::Cat("Nothing of the ", carrier->Name(), "'s up to jump into: launch a squadron first (Shift+1)"));
+			return;
+		}
+		TakeSeat(Embodiables::FighterOf(battle, aloft[at + 1]));
+	}
+
+	bool UnitySpaceApp::BackToCarrier()
+	{
+		auto f = cs::As<FighterSeat>(HeldNonHelm());
+		if (f == nullptr || f->Unit->Fighter == nullptr) return false;
+		auto carrier = f->Unit->Fighter->Carrier;
+		if (carrier == nullptr || carrier->Ship == nullptr || !carrier->Present() || carrier->Captured) return false;
+		auto helm = Embodiables::HelmOf(World(), carrier->Ship);
+		if (helm == nullptr || !helm->CanEmbody()) return false;
+		TakeSeat(helm);
+		return true;
 	}
 
 	// ---------------------------------------------------------------- the picker (U.SPC-T446)
@@ -631,7 +725,7 @@ namespace SpaceGod
 	{
 		auto held = HeldNonHelm();
 		if (auto f = cs::As<FighterSeat>(held))
-			return cs::Cat(f->Readout(), "  \xC2\xB7  ' ; next seat   P back to command"); // (\xC2\xB7 is the UTF-8 middle dot)
+			return cs::Cat(f->Readout(), "  \xC2\xB7  Shift+/ next of the wing   Backspace carrier   ' ; next seat   P back to command"); // (\xC2\xB7 is the UTF-8 middle dot)
 		if (auto t = cs::As<MountedTurret>(held))
 			return cs::Cat("GUN  \xC2\xB7  ", t->Name(), "  \xC2\xB7  ", (t->Mount->Cooldown > 0 ? "reloading" : "ready"), "  \xC2\xB7  / next gun   ",
 				(cs::Is<ShipHelm>(t->Host()) ? "Backspace helm   " : t->Host() != nullptr ? "Backspace whole station   " : ""), "P back to command");

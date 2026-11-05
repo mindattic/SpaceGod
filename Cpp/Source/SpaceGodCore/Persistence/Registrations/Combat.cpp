@@ -204,7 +204,8 @@ namespace SpaceGod::Core
 		SG_F(Pos), SG_F(Power), SG_F(RetargetIn), SG_F(Roof), SG_F(SeenVel), SG_F(Ship), SG_F(ShuttleLaunchIn),
 		SG_F(Side), SG_F(Slot), SG_F(Strike), SG_F(Stunned), SG_F(SurrenderOpenToBoarding), SG_F(SurrenderOutcome),
 		SG_F(SurrenderTimer), SG_F(Surrendering), SG_F(TakenFromSide), SG_F(Target), SG_F(TurnSpin), SG_F(Up),
-		SG_F(Vel), SG_F(VolleyCharge), SG_F(Wander), SG_F(dockSideFor), SG_F(playerControlled))
+		SG_F(Vel), SG_F(VolleyCharge), SG_F(Wander), SG_F(dockSideFor), SG_F(playerControlled),
+		SG_OPT(WingCall), SG_OPT(WingHeld), SG_OPT(WingRecalled)) // US-T106: a carrier's wing orders from the helm, absent from older saves
 
 	SG_SERIALIZE(BoardingParty, "Unity.SpaceGod.Core.BoardingParty",
 		SG_F(Faction), SG_F(Landed), SG_F(Order), SG_F(Strength))

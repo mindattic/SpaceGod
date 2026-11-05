@@ -493,6 +493,8 @@ namespace SpaceGod::Core
 			else ChooseBoarding(u);
 			// A carrier sends its boarding shuttles to the prizes instead (U.SPC-T486).
 			SendShuttles(u, dt);
+			// The wing orders the player gave from its helm lapse once nobody of ours holds it or one of its craft (US-T106).
+			HelmOrdersLapse(u);
 		}
 		u->RetargetIn -= dt;
 		if (u->Target == nullptr || !u->Target->Present() || u->RetargetIn <= 0)
@@ -2439,6 +2441,11 @@ namespace SpaceGod::Core
 			}
 		}
 		if (target == nullptr) return;
+		FirePodsAt(u, s, target);
+	}
+
+	void Battle::FirePodsAt(const cs::Ref<BattleUnit>& u, const cs::Ref<Subsystem>& s, const cs::Ref<BattleUnit>& target)
+	{
 		auto origin = u->PointOf(s->Def);
 		s->Cooldown = s->Def->Weapon->Cooldown * (0.85 + rng.NextDouble() * 0.3);
 		for (int k = 0; k < s->Def->Weapon->Salvo && s->Ammo > 0; k++)
@@ -2535,7 +2542,12 @@ namespace SpaceGod::Core
 		if (!BreacherBays::TeamReady(interior)) return;
 		auto target = BreacherTarget(u);
 		if (target == nullptr) return;
+		FireBreacherAt(u, target);
+	}
 
+	void Battle::FireBreacherAt(const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& target)
+	{
+		auto interior = u->Combat->Interior;
 		double speed = BreacherBays::RoundSpeedKmS()->Value;
 		auto origin = u->Pos + u->Forward * (u->Radius() * 0.3);
 		auto aim = BreacherBays::Lead(origin, u->Vel, target->Pos, target->Vel, speed);

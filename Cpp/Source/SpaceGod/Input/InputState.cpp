@@ -120,7 +120,8 @@ namespace SpaceGod::Input
 		Home = kb[Key::Home].wasPressedThisFrame || backspaceAlone;
 		Pilot = kb[Key::P].wasPressedThisFrame;
 		CycleSeat = kb[Key::Quote].wasPressedThisFrame ? 1 : kb[Key::Semicolon].wasPressedThisFrame ? -1 : 0;
-		ManGun = kb[Key::Slash].wasPressedThisFrame;
+		ManGun = kb[Key::Slash].wasPressedThisFrame && !Boost;
+		JumpToCraft = kb[Key::Slash].wasPressedThisFrame && Boost; // US-T106: Shift+/ into a launched craft
 		MoveToHost = backspaceAlone;
 		// US-T97, the self-destruct, two steps so it never goes off by accident: the press is a tap (it aborts a countdown
 		// under way), and held a second (Core::SelfDestruct::ArmHoldS) it arms, once a press. Let go of either key and the
@@ -188,7 +189,7 @@ namespace SpaceGod::Input
 			return;
 		}
 		// In command nothing is flown: F focuses, T resets time, Backspace goes home, B watches a battle.
-		ToggleFlightAssist = LockTarget = MoveToHost = ToggleBoarding = Manoeuvre = false;
+		ToggleFlightAssist = LockTarget = MoveToHost = ToggleBoarding = Manoeuvre = JumpToCraft = false; // US-T106: no craft to jump from
 		PowerKey = -1; // US-T94: nothing to share a reactor of in command
 		SelfDestructTap = SelfDestructArm = false; // US-T97: nothing to set off in command
 		SelfDestructHoldS = 0;
@@ -247,6 +248,7 @@ namespace SpaceGod::Input
 		CycleSky = 0;
 		ThrottleStep = 0;
 		ManGun = false;
+		JumpToCraft = false;
 		MoveToHost = false;
 		TogglePicker = false;
 		TunePhasers = false;

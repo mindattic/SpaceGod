@@ -39,6 +39,9 @@
 #include "Economy/TradeInsurance.h"
 #include "Embodiment/Embodiment.h"
 #include "Embodiment/FighterSeat.h"
+#include "Camera/StarTravel.h" // US-T106: the helm's bar stands aside for a trip
+#include "Embodiment/HelmAbilities.h" // US-T106
+#include "Embodiment/ShipHelm.h"
 #include "Information/LightSpeed.h"
 #include "Information/News.h"
 #include "Law/Law.h"
@@ -1303,6 +1306,65 @@ namespace SpaceGod::UI
 		auto r = Rect((Screen::width - w) * 0.5f, Screen::height - 96, w, 34);
 		GUI::Box(r, GUIContent::none(), panel);
 		GUI::Label(Rect(r.x + 20, r.y + 7, w, 22), content, toast);
+	}
+
+	// ---------------------------------------------------------------- the helm's abilities (US-T106)
+
+	void Hud::DrawHelmAbilities()
+	{
+		if (!app->IsPiloting() || app->Travel->Active || app->ShowPicker) return;
+		auto helm = cs::As<ShipHelm>(app->HeldSeat());
+		if (helm == nullptr || helm->Ship == nullptr) return;
+		auto bar = HelmAbilities::Of(helm->Ship);
+		if (bar.Count() == 0) return;
+		constexpr float pad = 10, rowH = 20, gap = 18;
+		float maxW = Mathf::Min(static_cast<float>(Screen::width) - 40, 1100.0f);
+		// Lay the entries out in rows, each "Shift+n  what  (how it stands)".
+		cs::List<cs::String> texts;
+		cs::List<float> widths;
+		for (int i = 0; i < bar.Count() && i < 10; i++)
+		{
+			cs::String key = cs::Cat("Shift+", i == 9 ? 0 : i + 1);
+			cs::String t = cs::Cat(key, "  ", bar[i].Label, "  (", bar[i].State, ")");
+			texts.Add(t);
+			widths.Add(small->CalcSize(GUIContent(t)).x);
+		}
+		cs::List<int> rowOf;
+		int rows = 1;
+		float x = 0, widest = 0;
+		for (int i = 0; i < texts.Count(); i++)
+		{
+			if (x > 0 && x + widths[i] > maxW - 2 * pad)
+			{
+				rows++;
+				x = 0;
+			}
+			rowOf.Add(rows - 1);
+			x += widths[i] + gap;
+			widest = Mathf::Max(widest, x - gap);
+		}
+		cs::String heading = cs::Cat(HelmAbilities::Heading(helm->Ship), "  \xC2\xB7  Shift+/ jump into a launched craft (again: the next, then back here)");
+		widest = Mathf::Max(widest, small->CalcSize(GUIContent(heading)).x);
+		float w = widest + 2 * pad, h = pad * 2 + rowH * (rows + 1);
+		auto r = Rect((Screen::width - w) * 0.5f, Screen::height - 104 - h, w, h);
+		GUI::Box(r, GUIContent::none(), panel);
+		auto old = GUI::contentColor;
+		GUI::contentColor = Dim;
+		GUI::Label(Rect(r.x + pad, r.y + pad - 2, w - 2 * pad, rowH), heading, small);
+		x = 0;
+		int onRow = 0;
+		for (int i = 0; i < texts.Count(); i++)
+		{
+			if (rowOf[i] != onRow)
+			{
+				onRow = rowOf[i];
+				x = 0;
+			}
+			GUI::contentColor = bar[i].Ready ? Color(0.55f, 1.0f, 0.65f, 1.0f) : Dim;
+			GUI::Label(Rect(r.x + pad + x, r.y + pad - 2 + rowH * (onRow + 1), widths[i] + 4, rowH), texts[i], small);
+			x += widths[i] + gap;
+		}
+		GUI::contentColor = old;
 	}
 
 	// ---------------------------------------------------------------- the take-charge picker (U.SPC-T446)

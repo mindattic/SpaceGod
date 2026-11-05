@@ -88,6 +88,10 @@ namespace SpaceGod::Core
 		/// <summary>The self-destruct asked for this frame (US-T97, a <see cref="SelfDestructKey"/>): 0 nothing, 1 arm, 2 abort.
 		/// A command, not a toggle, so one carried twice (co-op, a replay) lands the same. See <see cref="SelfDestruct"/>.</summary>
 		int SelfDestruct = 0;
+
+		/// <summary>The helm ability ordered this frame (US-T106, a <see cref="HelmAbility"/>), 0 for none: launch a squadron,
+		/// recall the wing, an order to it, a shuttle, a Breacher or the pods at the locked hull. A command, landed once.</summary>
+		int HelmAbility = 0;
 	};
 
 	/// <summary>

@@ -142,8 +142,8 @@ namespace SpaceGod::Core
 		// Its carrier lost or gone (U.SPC-T473): it looks for another friendly carrier or a station to land on.
 		StrandedWings::Step(b, u, dt);
 		auto carrier = f->LandsOn();
-		// Recalled: the shooting is over, or the carrier is pulling out.
-		if (carrier->Present() && !carrier->Captured && (b->Mopping || carrier->Fleeing))
+		// Recalled: the shooting is over, the carrier is pulling out, or its helm has called the wing in (US-T106).
+		if (carrier->Present() && !carrier->Captured && (b->Mopping || carrier->Fleeing || Recalled(u)))
 		{
 			if (f->Phase != FighterPhase::Return) Switch(f, FighterPhase::Return);
 			Land(b, u, dt);
@@ -165,8 +165,144 @@ namespace SpaceGod::Core
 		// A lead gone home to its deck leaves the squadron to the next in line until it is back.
 		if (f->Lead != nullptr && (!f->Lead->Present() || FlightDecks::Away(f->Lead))) f->Lead = NewLead(b, u);
 		SharePower(b, u);
-		if (f->Lead == nullptr) Lead(b, u, dt);
+		if (f->Lead == nullptr)
+		{
+			// The carrier's helm may have called the wing onto its locked hull, or to guard it (US-T106); with no call
+			// (every AI carrier's wing) the lead picks its own fight as before.
+			bool guard = false;
+			auto call = f->Carrier != nullptr && f->Carrier->WingCall != 0 ? HelmCall(b, u, guard) : nullptr;
+			if (guard && call == nullptr)
+			{
+				// Nothing near the carrier: the squadron flies a guard circuit round it.
+				auto c = f->Carrier;
+				auto ring = c->Pos + DVec3(cs::Math::Cos(b->Seconds * 0.15 + f->Seed), cs::Math::Sin(b->Seconds * 0.15 + f->Seed), 0.15) * (c->Radius() + 2.5);
+				u->Target = nullptr;
+				Steer(b, u, ring, u->Combat->Spec->MaxSpeed * 0.7, dt);
+				return;
+			}
+			Lead(b, u, dt, call);
+		}
 		else Wingman(b, u, dt);
+	}
+
+	bool FighterAI::Recalled(const cs::Ref<BattleUnit>& u)
+	{
+		auto f = u != nullptr ? u->Fighter : nullptr;
+		return f != nullptr && f->Carrier != nullptr && f->Carrier->WingRecalled && f->LandsOn() == f->Carrier && f->Role != FighterRole::AssaultShuttle;
+	}
+
+	cs::Ref<BattleUnit> FighterAI::HelmCall(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& u, bool& guard)
+	{
+		auto f = u->Fighter;
+		auto c = f->Carrier;
+		guard = c->WingCall == 2;
+		if (c->WingCall == 1)
+		{
+			auto t = c->PlayerLockTarget;
+			if (!Fair(b, u, t) || !t->Present() || (f->Bomber && t->Kind == UnitKind::Fighter)) return nullptr;
+			return t;
+		}
+		if (!guard || !c->Present()) return nullptr;
+		cs::Ref<BattleUnit> best = nullptr;
+		double bestD = c->Radius() + GuardKm;
+		for (const auto& o : b->Units)
+		{
+			if (!o->Present() || !Fair(b, u, o) || !o->Combat->Armed() || (f->Bomber && o->Kind == UnitKind::Fighter)) continue;
+			double d = (o->Pos - c->Pos).Length();
+			if (d < bestD)
+			{
+				bestD = d;
+				best = o;
+			}
+		}
+		return best;
+	}
+
+	cs::List<cs::Ref<BattleUnit>> FighterAI::LaunchOrdered(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& carrier, FighterRole role)
+	{
+		cs::List<cs::Ref<BattleUnit>> out;
+		if (b == nullptr || carrier == nullptr || carrier->Combat == nullptr || carrier->Combat->Hangar == nullptr || !carrier->Present()) return out;
+		bool bay = false;
+		for (const auto& s : carrier->Combat->Subsystems)
+			if (s->Kind() == SubsystemKind::Hangar && !s->Destroyed()) bay = true;
+		if (!bay) return out;
+		auto spec = carrier->Combat->Spec;
+		// The squadron that goes: the first, in berth order, with a craft of this class aboard fit to fly.
+		int pick = 0;
+		bool any = false;
+		for (const auto& craft : *carrier->Combat->Hangar)
+		{
+			if (craft->Craft->Role != role || !CarrierWings::Flyable(craft)) continue;
+			int q = 0, discardSlot = 0;
+			CarrierWings::Berth(spec, craft->Craft->Berth, q, discardSlot);
+			if (!any || q < pick) pick = q;
+			any = true;
+		}
+		if (!any) return out;
+		cs::List<cs::Ref<Ship>> group;
+		for (const auto& craft : *carrier->Combat->Hangar)
+		{
+			if (craft->Craft->Role != role || !CarrierWings::Flyable(craft)) continue;
+			int q = 0, discardSlot = 0;
+			CarrierWings::Berth(spec, craft->Craft->Berth, q, discardSlot);
+			if (q == pick) group.Add(craft);
+		}
+		// As Launch numbers them: the recon flight flies under the squadron number after the carrier's own.
+		int squadron = role == FighterRole::Recon
+			? (Max(0, spec->HangarCraft() - Max(0, spec->ReconCraft)) + SquadronSize - 1) / SquadronSize
+			: Max(0, pick);
+		auto phase = role == FighterRole::Recon ? FighterPhase::Approach : FighterPhase::Launch;
+		DVec3 right, up;
+		carrier->Basis(right, up);
+		cs::Ref<BattleUnit> lead = nullptr;
+		for (int k = 0; k < group.Count(); k++)
+		{
+			auto hull = group[k];
+			// Landed in this fight and struck down into the hangar: the same unit goes out again.
+			cs::Ref<BattleUnit> u = nullptr;
+			for (const auto& o : b->Units)
+				if (o->CraftHull == hull && !o->Dead && o->Fighter != nullptr) u = o;
+			if (u != nullptr)
+			{
+				auto f = u->Fighter;
+				if (auto v = f->Deck)
+				{
+					if (v->Deck != nullptr)
+					{
+						v->Deck->Aboard.Remove(u);
+						if (v->Deck->Final == u) v->Deck->Final = nullptr;
+					}
+					f->Deck = nullptr;
+				}
+				CarrierWings::Undock(carrier->Combat, hull);
+				hull->Craft->Carrier = carrier->Ship;
+				u->Docked = false;
+				u->Target = nullptr;
+				f->Carrier = carrier;
+				f->Home = nullptr;
+				f->Stranded = false;
+				f->Lead = lead;
+				f->Squadron = squadron;
+				f->Slot = k;
+				f->Order = WingOrder::FormUp;
+				f->Phase = phase;
+				f->PhaseTime = 0;
+				f->RunClosest = cs::Double::MaxValue;
+				f->RunEntry = DVec3::Zero;
+				u->Pos = carrier->Pos + carrier->Forward * (carrier->Radius() + 0.3 + 0.15 * k);
+				u->Vel = carrier->Vel + carrier->Forward * 0.25;
+				u->Forward = carrier->Forward;
+				FlightDecks::Catapult(b, carrier, u);
+				if (lead == nullptr) lead = u;
+			}
+			else
+			{
+				lead = LaunchCraft(b, carrier, hull, squadron, k, lead, right, up, phase);
+				u = b->Units[b->Units.Count() - 1];
+			}
+			out.Add(u);
+		}
+		return out;
 	}
 
 	void FighterAI::SharePower(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& u)

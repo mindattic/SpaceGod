@@ -442,8 +442,9 @@ namespace SpaceGod::Core
 			Service(u, v->Service);
 			bool player = b->Flown.ContainsKey(u);
 			// Home for good (the shooting over, its hull running, a shuttle back with its team, or its berth lost with a bay):
-			// struck down off the deck into the hangar, so the spot is free for the next one in.
-			if (BoardingShuttles::Is(u) || c->Fleeing || c->Surrendering || (b->Mopping && !player) || !Berthed(c, u))
+			// struck down off the deck into the hangar, so the spot is free for the next one in. A wing its carrier's helm has
+			// recalled (US-T106) stays aboard the same way until it is launched again.
+			if (BoardingShuttles::Is(u) || c->Fleeing || c->Surrendering || (b->Mopping && !player) || !Berthed(c, u) || (!player && FighterAI::Recalled(u)))
 			{
 				v->Stowing += dt;
 				if (v->Stowing >= StowSeconds)

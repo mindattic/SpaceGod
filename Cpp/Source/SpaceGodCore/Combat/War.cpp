@@ -453,7 +453,17 @@ namespace SpaceGod::Core
 		// Bounty hunters board, and hold their fire on a disabled quarry to take its captain alive (U.SPC-T63).
 		b->Boards = [this](cs::Ref<BattleUnit> u) { return u->Ship != nullptr && Hunter(u->Ship); };
 		b->WantsAlive = [this](cs::Ref<BattleUnit> u, cs::Ref<BattleUnit> o) { return u->Ship != nullptr && o->Ship != nullptr && world->Outlaws != nullptr && world->Outlaws->WantsAlive(u->Ship, o->Ship); };
-		b->Launch = [](cs::Ref<Battle> battle, cs::Ref<BattleUnit> carrier) { FighterAI::Launch(battle, carrier); };
+		b->Launch = [this](cs::Ref<Battle> battle, cs::Ref<BattleUnit> carrier)
+		{
+			// A carrier the player is flying into the fight holds its wing aboard for the helm to launch squadron by squadron
+			// (US-T106); every other carrier launches as it always has.
+			if (carrier->Ship != nullptr && carrier->Ship == world->PilotedShip)
+			{
+				carrier->WingHeld = true;
+				return;
+			}
+			FighterAI::Launch(battle, carrier);
+		};
 		b->FighterStep = [](cs::Ref<Battle> battle, cs::Ref<BattleUnit> u, double dt) { FighterAI::Step(battle, u, dt); };
 		b->UnitCaptured = [this](cs::Ref<Battle> battle, cs::Ref<BattleUnit> u, cs::Ref<Faction> captor)
 		{

@@ -1,6 +1,7 @@
 // Port of Unity.SpaceGod Core/Embodiment/ShipHelm.cs (US-T21, see docs/MIGRATION.md).
 
 #include "Embodiment/ShipHelm.h"
+#include "Embodiment/HelmAbilities.h"
 #include "Embodiment/HelmFlight.h"
 #include "Embodiment/SelfDestruct.h"
 #include "Ephemeris.h"
@@ -111,6 +112,8 @@ namespace SpaceGod::Core
 			SetOff();
 			return;
 		}
+		// A helm ability ordered this frame (US-T106): a squadron launched, the wing recalled or called, a boarding order.
+		if (input.HelmAbility != 0 && !Ship->Destroyed) HelmAbilities::Use(Ship, static_cast<HelmAbility>(input.HelmAbility));
 		auto unit = Unit();
 		if (unit != nullptr && unit->PlayerControlled())
 		{

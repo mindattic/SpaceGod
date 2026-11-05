@@ -385,6 +385,21 @@ namespace SpaceGod::Core
 				  "gun, Backspace moves up to the hull's helm (or the whole station), and P hands it back to its crew. Past the "
 				  "last gun / goes back to the helm or station, and / there starts on the first gun again, so every gun on a "
 				  "capital ship or a station is a few presses away for a better angle."),
+				T("A hull's own abilities: launch, then fly what you launched",
+				  "At a helm the ability bar above the flight readout lists what that hull can order from what it really carries, "
+				  "each on Shift and a digit (Shift+1 the first, Shift+0 the tenth). A carrier has one launch for each class of "
+				  "craft its hangar holds -- interceptors, fighters, bombers, heavy fighters, the recon flight -- and each press "
+				  "puts up the next squadron of that class aboard and fit to fly, out through its flight decks; then a recall, which "
+				  "brings the wing home to land and stay aboard until launched again, and the wing's call, stepping from their own "
+				  "fights to onto your locked hull (T) to guard the carrier and back. A hull with a shuttle bay sends a boarding "
+				  "shuttle with a marine team at the hull locked (a disabled one, or one that has struck on terms that open it); a "
+				  "Breacher bay fires a Breacher round at it (its shields down to a quarter); boarding pods fire a salvo at it (its "
+				  "shields down). A hull with none of these has no bar. The orders are for a fight: out of one they are refused, "
+				  "saying why, and a carrier you fly into a fight holds its wing aboard for you to launch. Shift+/ then jumps you "
+				  "straight into the craft launched last, again into the next, and past the last back to the carrier's helm; "
+				  "Backspace in any of its craft goes back to the helm too. Every switch is instant. Leave the carrier and its "
+				  "craft alone (back to command, or another seat) and its captain takes over: the recall and the call lapse and "
+				  "whatever you held aboard goes up."),
 				T("Self-destruct",
 				  "Whatever you hold -- a fighter, a ship's helm, a station, or a gun, which sets off the hull or station it is "
 				  "mounted on -- can be made to blow itself up. Hold Shift+Backspace for a second to arm it: a countdown starts, "

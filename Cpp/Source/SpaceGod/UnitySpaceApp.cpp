@@ -677,7 +677,9 @@ namespace SpaceGod
 		// Take charge of anything, any time (U.SPC-T422): the next seat in the fight in view, or the next gun on the hull.
 		if (i.CycleSeat != 0) CycleSeat(i.CycleSeat);
 		if (i.ManGun) ManNextGun();
-		// At a gun mount (U.SPC-T445): up to the helm of the hull it is on.
+		// Shift+/ (US-T106): into the newest craft the carrier launched, the next, and back to its helm.
+		if (i.JumpToCraft) JumpToCraft();
+		// At a gun mount (U.SPC-T445): up to the helm of the hull it is on; in a launched craft, back to its carrier's (US-T106).
 		if (i.MoveToHost && IsSeated()) MoveSeatToHost();
 		if (i.TogglePicker) TogglePicker();
 	}
@@ -1201,8 +1203,11 @@ namespace SpaceGod
 		stick.PowerSplit = CraftPower::After(pilotHelm, Input.PowerKey);
 		// Shift+Backspace, the self-destruct (US-T97): the helm counts it down, and out of a fight blows where it has flown.
 		stick.SelfDestruct = SelfDestructCommand(pilotHelm);
+		// Shift+1..0, the hull's own abilities (US-T106): launch a squadron, recall or call the wing, a boarding order.
+		stick.HelmAbility = HelmAbilityKey(ship);
 		helmFlight->FrameBody = pilotFrameBody;
 		pilotHelm->Control(stick, dt);
+		if (stick.HelmAbility != 0) NoteHelmAbility();
 		if (ship->Destroyed)
 		{
 			// Gone up under the helm: the player is out of it at once (UpdateSeat then says what the blast did).

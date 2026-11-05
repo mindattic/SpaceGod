@@ -168,6 +168,7 @@ namespace SpaceGod::UI
 		DrawLaneRide();
 		DrawFtl();
 		DrawSeat();
+		DrawHelmAbilities(); // US-T106
 		DrawCourseMarker();
 		DrawInterdiction();
 		if (!app->ShowMarket) DrawOpportunityBoard();

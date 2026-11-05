@@ -197,6 +197,13 @@ private:
 	/// </summary>
 	void DrawSeat();
 
+	/// <summary>
+	/// US-T106: at a helm, the hull's ability bar (<see cref="HelmAbilities.Of"/>): what its own hangars and bays let it order,
+	/// each on its Shift+digit with how it stands (craft aboard and up, a team ready, reloading), bright when it can go now;
+	/// with Shift+/ to jump into a launched craft. Nothing for a hull that carries none of them.
+	/// </summary>
+	void DrawHelmAbilities();
+
 	// ---------------------------------------------------------------- the take-charge picker (U.SPC-T446)
 
 	Vector2 pickerScroll;

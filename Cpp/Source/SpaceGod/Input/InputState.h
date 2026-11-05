@@ -141,6 +141,10 @@ namespace SpaceGod::Input
 		/// goes back up to the helm.</summary>
 		bool ManGun = false;
 
+		/// <summary>US-T106: Shift+/ jumps into the newest craft the carrier flown (or the one whose craft is held) launched,
+		/// again for the next, and past the last back to the carrier's helm.</summary>
+		bool JumpToCraft = false;
+
 		/// <summary>At a gun mount (U.SPC-T445): Backspace moves up from the gun to the helm of the hull it is mounted on
 		/// (in the strategy view Backspace is Home).</summary>
 		bool MoveToHost = false;

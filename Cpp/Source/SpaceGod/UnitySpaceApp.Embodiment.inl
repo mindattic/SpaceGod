@@ -139,6 +139,34 @@ private:
 	/// </summary>
 	void ManNextGun();
 
+	// ---------------------------------------------------------------- the helm's abilities (US-T106)
+
+	/// <summary>The craft the local player's helm orders launched, newest first, for <see cref="JumpToCraft"/>.</summary>
+	cs::List<cs::Ref<Core::BattleUnit>> launchedCraft;
+	int helmAbilitySeq = 0;
+
+	/// <summary>The carrier whose craft Shift+/ jumps between: the hull flown at the helm, or the carrier of the craft held;
+	/// null when neither is in a fight.</summary>
+	cs::Ref<Core::BattleUnit> JumpCarrier(cs::Ref<Core::Battle>& battle);
+
+	/// <summary>Shift+/ (US-T106): into the newest craft the carrier launched; from one of its craft, the next; past the last,
+	/// back to the carrier's helm. Every switch is the seats' instant one (<see cref="TakeSeat"/>).</summary>
+	void JumpToCraft();
+
+	/// <summary>Backspace in a launched craft (US-T106): back to the helm of the carrier it flew from, if that hull is still
+	/// in the fight. True if it handled the key.</summary>
+	bool BackToCarrier();
+
+public:
+	/// <summary>Shift+1..0 at the helm (US-T106): the ability in that slot of the hull's bar, the number key spent so it is not
+	/// also a captain's order; 0 when the key is no ability.</summary>
+	int HelmAbilityKey(const cs::Ref<Core::Ship>& ship);
+
+	/// <summary>After the helm has flown a frame: what the last ability order came to, toasted, and its craft remembered.</summary>
+	void NoteHelmAbility();
+
+private:
+
 	// ---------------------------------------------------------------- the picker (U.SPC-T446)
 
 public:
