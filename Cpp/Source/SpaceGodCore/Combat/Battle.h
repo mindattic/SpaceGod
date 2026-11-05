@@ -353,14 +353,6 @@ namespace SpaceGod::Core
 		/// <summary>A Breacher round (U.SPC-T466): a marine team fired from a Breacher bay, flying like a bullet with only a
 		/// slight course correction until it strikes a hull and drills in (<see cref="BreacherBays"/>).</summary>
 		Breacher,
-	};
-	SPACEGODCORE_API const char* ToString(MissileKind v);
-
-	/// <summary>
-	/// A proximity mine (U.SPC-T271): it sits where it was laid, arms after a moment, and blows when a hull hostile to
-	/// its layer comes within its trigger, hurting everything hostile within its blast.
-	/// </summary>
-	class Mine final
 
 		// The full arsenal (US-T101), appended. Missile above is the homing missile: it steers onto its target.
 
@@ -372,6 +364,14 @@ namespace SpaceGod::Core
 
 		/// <summary>One of a hive round's micro-missiles: a small, frail homing seeker.</summary>
 		HiveMicro,
+	};
+	SPACEGODCORE_API const char* ToString(MissileKind v);
+
+	/// <summary>
+	/// A proximity mine (U.SPC-T271): it sits where it was laid, arms after a moment, and blows when a hull hostile to
+	/// its layer comes within its trigger, hurting everything hostile within its blast.
+	/// </summary>
+	class Mine final
 	{
 	public:
 		DVec3 Pos, Vel;
@@ -443,6 +443,11 @@ namespace SpaceGod::Core
 		/// derelict with its team still alive inside, drilling into nothing now. Point defence can still shoot it out of the
 		/// sky; once the fight is over it is left drifting for a tow to recover or pirates to salvage (<see cref="DriftingRounds"/>).</summary>
 		bool Adrift = false;
+
+		/// <summary>A hive round (US-T101): seconds of flight left before it splits, and the micro-missiles it splits into
+		/// (0 for a round that stays whole).</summary>
+		double SplitIn = 0;
+		int SplitInto = 0;
 	};
 
 	/// <summary>
@@ -451,11 +456,6 @@ namespace SpaceGod::Core
 	/// landing the instant the trigger was pulled. <see cref="Hit"/> is decided at the muzzle, same as a
 	/// beam's accuracy roll; a round that "hit" only actually calls <see cref="Battle.ApplyDamage"/> once
 	/// it arrives, so a target that dies or peels off first takes nothing. A round that missed keeps
-
-		/// <summary>A hive round (US-T101): seconds of flight left before it splits, and the micro-missiles it splits into
-		/// (0 for a round that stays whole).</summary>
-		double SplitIn = 0;
-		int SplitInto = 0;
 	/// flying past its aim point and fades, rather than never having existed.
 	/// </summary>
 	class KineticRound final
@@ -487,6 +487,9 @@ namespace SpaceGod::Core
 
 		/// <summary>Fired by a small craft (U.SPC-T424, see <see cref="WeakPoints"/>).</summary>
 		bool SmallCraft = false;
+
+		/// <summary>A vulcan's round (US-T101): drawn as a hot tracer rather than a plain gun round -- cosmetic only.</summary>
+		bool Tracer = false;
 	};
 
 	enum class FxKind : int
@@ -495,9 +498,6 @@ namespace SpaceGod::Core
 		BeamMiss,
 
 		/// <summary>A railgun's hypervelocity kinetic round -- a harder, thinner, whiter streak than a
-
-		/// <summary>A vulcan's round (US-T101): drawn as a hot tracer rather than a plain gun round -- cosmetic only.</summary>
-		bool Tracer = false;
 		/// laser <see cref="Beam"/>.</summary>
 		Railgun,
 		RailgunMiss,
@@ -547,14 +547,6 @@ namespace SpaceGod::Core
 
 		/// <summary>A flak shell (U.SPC-T489): its tracer from the cannon (A) to its burst (B), Size the burst, km.</summary>
 		FlakBurst,
-	};
-	SPACEGODCORE_API const char* ToString(FxKind v);
-
-	/// <summary>Something to draw: a beam, a hit, an explosion. A and B are battle-local km.</summary>
-	struct CombatFx
-	{
-		int Seq = 0;
-		FxKind Kind = FxKind::Beam;
 
 		// The full arsenal (US-T101), appended.
 
@@ -563,6 +555,14 @@ namespace SpaceGod::Core
 
 		/// <summary>A hive round splitting (A, heading towards B): a flash and its swarm fanning out, Size the micro-missiles.</summary>
 		HiveSplit,
+	};
+	SPACEGODCORE_API const char* ToString(FxKind v);
+
+	/// <summary>Something to draw: a beam, a hit, an explosion. A and B are battle-local km.</summary>
+	struct CombatFx
+	{
+		int Seq = 0;
+		FxKind Kind = FxKind::Beam;
 		DVec3 A, B;
 		double Size = 0;
 		int Side = 0;
@@ -1127,14 +1127,6 @@ namespace SpaceGod::Core
 	private:
 		void StepMissiles(double dt);
 
-		// ---------------------------------------------------------------- boarding
-
-		/// <summary>
-		/// Pods go at hulls whose shields are down (they cannot get through a shield); each carries a
-		/// squad. A ship keeps a reserve of marines aboard to defend itself.
-		/// </summary>
-		void FirePods(const cs::Ref<BattleUnit>& u, const cs::Ref<Subsystem>& s);
-
 		// ---------------------------------------------------------------- the full arsenal (US-T101)
 
 		/// <summary>A salvo of dumb-fire rockets away from mount <paramref name="s"/> down <paramref name="dir"/> (unit), each
@@ -1152,6 +1144,14 @@ namespace SpaceGod::Core
 		/// only the weapon group picked for it (<see cref="FighterControl.SecondaryGroup"/>), at any other helm every guided
 		/// mount and rocket pod at once.</summary>
 		bool SecondaryFires(const cs::Ref<BattleUnit>& u, const cs::Ref<Subsystem>& s);
+
+		// ---------------------------------------------------------------- boarding
+
+		/// <summary>
+		/// Pods go at hulls whose shields are down (they cannot get through a shield); each carries a
+		/// squad. A ship keeps a reserve of marines aboard to defend itself.
+		/// </summary>
+		void FirePods(const cs::Ref<BattleUnit>& u, const cs::Ref<Subsystem>& s);
 
 		void PodHit(const cs::Ref<Missile>& m, const cs::Ref<BattleUnit>& t, DVec3 at, cs::Nullable<DVec3> shieldAt = std::nullopt);
 
