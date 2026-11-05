@@ -70,6 +70,7 @@ namespace SpaceGod::Core
 			cs::New<HelpSection>("COMBAT",
 				L("Left mouse", "guns, down the crosshair (watch the heat)"),
 				L("T", "lock the hull under the crosshair; hold the crosshair on it to lock"),
+				More("off-screen targets: an arrow on the screen's edge points the way to turn to each hostile, the locked hull (ringed), the selection, the hunters and a plotted course; the closer it is (against your guns' reach, the same at either scale), the bigger; red hostile, green your side, grey neutral, blue the course"),
 				L("Right mouse", "homing and hive missiles once locked; dumb-fire rockets straight down the nose, no lock"),
 				More("a vulcan rotary cannon spins up as it fires: short bursts from cold, a torrent once spun (watch the heat)"),
 				L("Middle mouse", "EMP (knocks out a small craft's drives and shields)"),

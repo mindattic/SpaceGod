@@ -34,6 +34,9 @@ namespace SpaceGod::UI
 		/// A contact the scanners have lost, marked where it was last seen: a question mark.
 		static const cs::Ref<Texture2D>& Lost();
 
+		/// An off-screen target's edge arrow (US-T128): a notched arrowhead pointing up, turned at draw time.
+		static const cs::Ref<Texture2D>& EdgeArrow();
+
 		static cs::Ref<Texture2D> ForBody(const cs::Ref<Core::BodyDefinition>& body);
 		static cs::Ref<Texture2D> ForShip(Core::ShipClass c);
 

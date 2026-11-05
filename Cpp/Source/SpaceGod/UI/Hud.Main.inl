@@ -191,6 +191,50 @@ private:
 	/// the seat's crosshair (the middle of the view, where the mouse aims) as the craft turns after it. Hud.Sights.cpp.</summary>
 	void DrawSeatNose();
 
+	// ---------------------------------------------------------------- off-screen target arrows (US-T128)
+
+	/// <summary>Arrows grow from <see cref="ArrowMinPx"/> (at <see cref="ArrowReachGuns"/> gun ranges or more) to
+	/// <see cref="ArrowMaxPx"/> (alongside): true km against this craft's own gun reach, so they read the same at either scale.</summary>
+	static constexpr float ArrowMinPx = 14.0f, ArrowMaxPx = 46.0f;
+	static constexpr double ArrowReachGuns = 4;
+	/// <summary>A gun reach to measure by for a craft that has none (a station seat with only point defence, say), km.</summary>
+	static constexpr double ArrowFallbackGunKm = 20;
+	/// <summary>At most this many hostile arrows, the nearest (a locked hull always has one).</summary>
+	static constexpr int ArrowMaxCount = 16;
+	static constexpr Color ArrowFriendlyColor{0.45f, 0.95f, 0.6f, 0.95f};
+	static constexpr Color ArrowNeutralColor{0.85f, 0.85f, 0.8f, 0.9f};
+
+	/// <summary>
+	/// At any controls (US-T128): an arrow on the screen's edge for each target off it, pointing the way to turn: every hostile
+	/// in the fight (the nearest named by its range), the locked hull ringed and named, the hunters running the ship down out
+	/// of a fight, and a plotted course's next star or beacon. Bigger the closer it is, against this craft's own gun reach;
+	/// coloured by stance (hostile red, own side green, neutral grey, the course its streak blue). The selection keeps its own
+	/// pointer (<see cref="DrawOffscreenPointer"/>), drawn the same way. Hud.Sights.cpp.
+	/// </summary>
+	void DrawOffscreenArrows();
+
+	/// <summary>One edge arrow, toward the camera-relative <paramref name="rel"/>, <paramref name="size"/> px, with an optional
+	/// label inside it and a lock ring round it.</summary>
+	void DrawEdgeArrow(Vector3 rel, float size, Color tint, const cs::String& text_, bool ringed);
+
+	/// <summary>The arrow's size for a target <paramref name="km"/> off, against <paramref name="reachKm"/> (nothing, the least).</summary>
+	static float ArrowSize(double km, double reachKm);
+
+	/// <summary>The reach an arrow is sized against: <see cref="ArrowReachGuns"/> times the craft's longest gun, km.</summary>
+	static double ArrowReachKm(const cs::Ref<Core::BattleUnit>& me);
+	static double LongestGunKm(const cs::Ref<Core::BattleUnit>& u);
+
+	/// <summary>Hostile red, own faction green, anyone else grey (<see cref="Core::Diplomacy.Hostile"/>).</summary>
+	Color StanceColor(const cs::Ref<Core::Faction>& mine, const cs::Ref<Core::Faction>& theirs);
+
+	/// <summary>The unit held at the controls (the helm's hull in its fight, a fighter, a gun's or a station's hull), and its fight; null out of one.</summary>
+	cs::Ref<Core::BattleUnit> HeldUnit(cs::Ref<Core::Battle>& battle);
+	/// <summary>Whose side the controls held are on.</summary>
+	cs::Ref<Core::Faction> HeldFaction();
+	/// <summary>At the controls, the selection's off-screen pointer as an edge arrow (US-T128): sized by its distance, coloured
+	/// by stance, named with its range. False in the command view, which keeps the plain pointer.</summary>
+	bool DrawSelectionArrow(Core::DVec3 scene, const cs::String& name);
+
 	// ---------------------------------------------------------------- the chase (U.SPC-T273)
 
 	/// Hostiles running the ship down: each group's name, range and closing speed, and an EMP charging with the seconds

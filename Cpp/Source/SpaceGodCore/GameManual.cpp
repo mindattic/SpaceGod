@@ -205,6 +205,13 @@ namespace SpaceGod::Core
 				  "rockets or torpedoes (1 cycles them; the readout names the group and its rounds) -- T locks the hostile "
 				  "nearest the crosshair, Ctrl throws flares and chaff, 7 / 8 / 9 move reactor power to weapons, shields or "
 				  "engines and 0 evens it (the arrows too, as at any controls), 2-5 order your wingmen, and 6 picks a capital's next weak point."),
+				T("Off-screen arrows",
+				  "At any controls, whatever is worth turning to and off the screen gets an arrow on the screen's edge, pointing "
+				  "the way to turn: every hostile in the fight (the nearest named by its range), the hull you have locked, ringed "
+				  "and named, what you have selected, the hunters running you down, and a plotted course's next star. An arrow "
+				  "grows as its target closes, measured against four times your longest gun's reach (the scanners' reach for the "
+				  "selection out of a fight and for the course) in true kilometres, so it reads the same at the realistic and the "
+				  "game scale. Red is hostile, green your own side, grey anyone else, blue the course."),
 				T("Reactor power",
 				  "Whatever you take the controls of -- a ship's helm, a fighter, a gun (which draws on the hull it is mounted on) or "
 				  "a station -- shares its reactor three ways, six pips in all and at most four to one system, two each at an even "

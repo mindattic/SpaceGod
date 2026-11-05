@@ -12,7 +12,7 @@ namespace SpaceGod::UI
 		constexpr int Size = 64;
 
 		cs::Ref<Texture2D> ring, dot, star, diamond, triangle, chevron, carrier, square, hexagon, dart, wedge, needle, broad, scout,
-			pennant, arrow, badge, shuttle, breaker, white, prograde, retrograde, blip, lost, singularity;
+			pennant, arrow, badge, shuttle, breaker, white, prograde, retrograde, blip, lost, singularity, edgeArrow;
 
 		/// Vector2.Max (component-wise), which UnityMath.h does not have.
 		Vector2 Max(Vector2 a, Vector2 b) { return Vector2(Mathf::Max(a.x, b.x), Mathf::Max(a.y, b.y)); }
@@ -141,6 +141,17 @@ namespace SpaceGod::UI
 			float cross = Mathf::Min(Box(p, Vector2(0.05f, 0.3f)), Box(p, Vector2(0.3f, 0.05f)));
 			float corners = Mathf::Max(Outline(Box(p, Vector2(0.62f, 0.62f)), 0.1f), -Mathf::Min(Box(p, Vector2(0.3f, 0.8f)), Box(p, Vector2(0.8f, 0.3f))));
 			return Mathf::Min(cross, corners);
+		});
+	}
+
+	const cs::Ref<Texture2D>& Icons::EdgeArrow()
+	{
+		// A narrow arrowhead with a notch cut from its base, so it reads as pointing, not as a ship (US-T128).
+		return Lazy(edgeArrow, [](Vector2 p)
+		{
+			float head = Triangle(Vector2(p.x * 1.25f, p.y), 0.82f);
+			float notch = Triangle(Vector2(p.x * 1.25f, p.y + 0.62f), 0.5f);
+			return Mathf::Max(head, -notch);
 		});
 	}
 

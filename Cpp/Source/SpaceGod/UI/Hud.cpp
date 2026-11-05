@@ -155,6 +155,7 @@ namespace SpaceGod::UI
 			return;
 		}
 		DrawFlightMarkers();
+		DrawOffscreenArrows(); // US-T128: targets off the screen, at its edge
 		DrawCombatHud();
 		DrawReactor(); // US-T94
 		DrawSensors(); // US-T93
