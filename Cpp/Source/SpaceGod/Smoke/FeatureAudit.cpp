@@ -799,7 +799,13 @@ namespace SpaceGod::Smoke::FeatureAudit
 		/// in Unreal's own space, from the components actually drawn, that the model is where the camera's focus is: the
 		/// middle of its drawn model (a body's sphere, a ship's hull without its plume or FX, boxed in the model's own
 		/// frame) on the focus point (FocusScene - camera, through UnrealSpace), and dead ahead of the rendered camera.
-		void FocusCheck(const cs::String& id, const Target& target, int warp)
+		///
+		/// US-T115: the flight and the model's streaming in run at real time, and only the last frames at the given warp, so
+		/// as little game time passes as can be: at 1 month/s the system's wars go on around the probe, and a hull can be
+		/// killed, land, or be drawn into a battle (whose BATTLE TIME drops the warp to real time for a focused hull,
+		/// UnitySpaceApp::BattleTime) before it is measured. When <paramref name="lost"/> is given and that happens to a
+		/// ship, nothing is recorded: the reason is put in it and the caller tries another hull.
+		void FocusCheck(const cs::String& id, const Target& target, int warp, cs::String* lost = nullptr)
 		{
 			auto* host = AUnitySpaceAppActor::Find(GWorld);
 			auto* camera = host ? host->FindComponentByClass<UCameraComponent>() : nullptr;
@@ -808,13 +814,30 @@ namespace SpaceGod::Smoke::FeatureAudit
 				Result(id, false, "no app actor camera");
 				return;
 			}
-			app->Clock->SetWarp(warp);
+			app->Clock->SetWarp(0);
 			app->SpaceCamera->FocusOn(target);
 			Settle();
-			// A ship's model is streamed in once it is near (U.SPC-T414).
+			// A ship's model is streamed in once it is near (U.SPC-T414); a focused hull is always wanted.
 			for (int i = 0; i < 1200 && app->ModelRenderersOf(target).Count() == 0; i++) frames(1);
 			app->Clock->SetWarp(warp);
 			frames(20);
+
+			if (lost && target.IsShip() && target.Ship)
+			{
+				const auto& s = target.Ship;
+				ShipPhase phase = s->Controller()->Phase;
+				cs::String why;
+				if (s->Destroyed || s->GateDeparted) why = "destroyed or gone";
+				else if (phase == ShipPhase::Landed || phase == ShipPhase::Descent || phase == ShipPhase::Ascent) why = cs::Cat("planetside (", ToString(phase), ")");
+				else if (s->Battle != nullptr) why = "drawn into a battle";
+				else if (app->Clock->WarpIndex != warp) why = cs::Cat("warp dropped to ", app->Clock->Warp().Label);
+				else if (!(app->SpaceCamera->FocusTarget == target)) why = cs::Cat("focus moved to ", Describe(app->SpaceCamera->FocusTarget));
+				if (!why.empty())
+				{
+					*lost = cs::Cat(Describe(target), " ", why, " (toast '", Toast(), "')");
+					return;
+				}
+			}
 
 			FVector focus = UnrealSpace::ToUnreal(app->Relative(app->SpaceCamera->FocusTarget == target ? app->FocusScene(target) : app->TargetScene(target)));
 			FQuat frame = UnrealSpace::ToUnreal(app->TargetRotation(target));
@@ -837,7 +860,15 @@ namespace SpaceGod::Smoke::FeatureAudit
 			}
 			if (drawn == 0 || !box.IsValid)
 			{
-				Result(id, false, cs::Cat(Describe(target), ": nothing drawn (", app->ModelRenderersOf(target).Count(), " renderers)"));
+				cs::String why;
+				if (target.IsShip() && target.Ship)
+				{
+					const auto& s = target.Ship;
+					why = cs::Cat("; phase ", ToString(s->Phase), "/", ToString(s->Controller()->Phase), ", destroyed ", B(s->Destroyed), ", gone ", B(s->GateDeparted),
+						", battle ", B(s->Battle != nullptr), ", view ", B(app->ShipModelShown(s, 1e12)), ", camera ", Cameras::ToString(app->SpaceCamera->Mode),
+						" on ", Describe(app->SpaceCamera->FocusTarget), ", warp ", app->Clock->Warp().Label, ", toast '", Toast(), "'");
+				}
+				Result(id, false, cs::Cat(Describe(target), ": nothing drawn (", app->ModelRenderersOf(target).Count(), " renderers)", why));
 				return;
 			}
 			FVector centre = focus + frame.RotateVector(box.GetCenter());
@@ -852,6 +883,44 @@ namespace SpaceGod::Smoke::FeatureAudit
 				Cameras::ToString(app->SpaceCamera->Mode), " on ", Describe(app->SpaceCamera->FocusTarget)));
 		}
 
+		/// US-T115: the ship is picked afresh for each check, the first in fleet order that is fit to be drawn right now: one
+		/// picked once for all six went on living through the warp probes, and at 1 month/s it was soon killed in one of the
+		/// system's battles (or landed), its view let go and the camera's focus dropped, so the checks after measured
+		/// nothing ("nothing drawn (0 renderers)"). A procedural hull: an imported (Kenney) craft's model never streams in
+		/// headless (-nullrhi). If the hull is lost before it is measured (see FocusCheck), the next one is tried.
+		void FocusShipCheck(const cs::String& id, int warp)
+		{
+			cs::List<cs::Ref<Ship>> tried;
+			cs::String lost;
+			for (int attempt = 0; attempt < 8; attempt++)
+			{
+				cs::Ref<Ship> ship;
+				for (const auto& s : app->Fleet()->Ships())
+				{
+					ShipPhase phase = s->Controller()->Phase;
+					if (!s->Destroyed && !s->GateDeparted && !s->Derelict && phase != ShipPhase::Landed && phase != ShipPhase::Descent && phase != ShipPhase::Ascent
+						&& s->Phase != ShipPhase::Lane && s->Battle == nullptr && Rendering::ShipModels::KenneyModelFor(s).empty()
+						&& s != app->World()->PilotedShip && !tried.Contains(s))
+					{
+						ship = s;
+						break;
+					}
+				}
+				if (!ship)
+				{
+					Result(id, false, cs::Cat("no hull fit to focus", lost.empty() ? cs::String() : cs::Cat("; last lost: ", lost)));
+					return;
+				}
+				tried.Add(ship);
+				cs::String why;
+				FocusCheck(id, Target::OfShip(ship), warp, &why);
+				if (why.empty()) return;
+				lost = why;
+				Log(cs::Cat("AUDIT ", id, " INFO: ", why, "; trying another hull"));
+			}
+			Result(id, false, cs::Cat("every hull tried was lost before it was measured; last: ", lost));
+		}
+
 		void FocusProbes()
 		{
 			CloseEverything();
@@ -861,15 +930,6 @@ namespace SpaceGod::Smoke::FeatureAudit
 				if ((*app->Catalog())[i]->Name == "Earth") earth = i;
 				if ((*app->Catalog())[i]->Name == "Moon") moon = i;
 			}
-			// A procedural hull: an imported (Kenney) craft's model never streams in headless (-nullrhi), so it has no row.
-			cs::Ref<Ship> ship;
-			for (const auto& s : app->Fleet()->Ships())
-				if (!s->Destroyed && !s->Derelict && s->Controller()->Phase != ShipPhase::Landed && s->Phase != ShipPhase::Lane && s->Battle == nullptr
-					&& Rendering::ShipModels::KenneyModelFor(s).empty() && s != app->World()->PilotedShip)
-				{
-					ship = s;
-					break;
-				}
 			int warp0 = app->Clock->WarpIndex;
 			double goal0 = app->ScaleGoal;
 			for (double goal : { 1.0, 0.0 })
@@ -882,7 +942,7 @@ namespace SpaceGod::Smoke::FeatureAudit
 					cs::String w = warp == 0 ? "rest" : "warp";
 					if (earth >= 0) FocusCheck(cs::Cat("focus.", scale, "-", w, "-planet"), Target::OfBody(earth), warp);
 					if (moon >= 0) FocusCheck(cs::Cat("focus.", scale, "-", w, "-moon"), Target::OfBody(moon), warp);
-					if (ship) FocusCheck(cs::Cat("focus.", scale, "-", w, "-ship"), Target::OfShip(ship), warp);
+					FocusShipCheck(cs::Cat("focus.", scale, "-", w, "-ship"), warp);
 				}
 			}
 			app->Clock->SetWarp(warp0);
