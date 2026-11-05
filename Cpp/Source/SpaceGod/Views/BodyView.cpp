@@ -5,6 +5,7 @@
 #include "Rendering/MeshFactory.h"
 #include "Rendering/ShipMeshFactory.h"
 #include "Rendering/ShipModels.h"
+#include "Rendering/VoidStationModel.h"
 #include "UnitySpaceApp.h"
 
 #include "Astro.h"
@@ -22,6 +23,22 @@ namespace SpaceGod::Views
 	using Rendering::MeshFactory;
 	using Rendering::ShipMeshFactory;
 	using Rendering::ShipModels;
+	using Rendering::VoidStationModel;
+
+	namespace
+	{
+		/// <summary>How fast the shell turns about its pole, and its rings, degrees per real second (US-T84).</summary>
+		constexpr float ShellSpinDegS = 1.5f;
+		constexpr float AccretionSpinDegS = 24.0f;
+		constexpr float InnerGimbalSpinDegS = 5.0f;
+		constexpr float OuterGimbalSpinDegS = -7.0f;
+		constexpr float OuterGimbalPrecessDegS = 2.0f;
+
+		/// <summary>The close-up shell is drawn once the body's radius is this much of its distance (about a tenth of the
+		/// screen's height), and given up again below the second, so it does not flicker at the edge.</summary>
+		constexpr float NearDetailOn = 0.05f;
+		constexpr float NearDetailOff = 0.035f;
+	}
 
 	cs::Ref<Mesh>& BodyView::sphereMesh()
 	{
@@ -45,7 +62,9 @@ namespace SpaceGod::Views
 		if (!quadMesh()) quadMesh() = MeshFactory::Quad();
 
 		station = body->Kind == BodyKind::Station;
-		AddComponent<MeshFilter>(Root)->sharedMesh = station ? ShipMeshFactory::GetStationBody(body->Name) : sphereMesh();
+		bool generator = body->IsVisible() && body->IsStar() && body->Singularity;
+		AddComponent<MeshFilter>(Root)->sharedMesh = station ? ShipMeshFactory::GetStationBody(body->Name)
+			: generator ? VoidStationModel::Shell(false) : sphereMesh();
 		renderer = AddComponent<MeshRenderer>(Root);
 		renderer->shadowCastingMode = ShadowCastingMode::Off;
 		renderer->receiveShadows = false;
@@ -70,20 +89,9 @@ namespace SpaceGod::Views
 			// A Void Base's generator (U.SPC-T372): dark and light-swallowing, not lit like an ordinary star --
 			// its own Color stands as-is, skipping the usual blackbody tint, and a tight violet glow stands in
 			// for an event horizon instead of a corona that would otherwise balloon with distance (see Apply).
-			material = Materials::Create(Materials::Sun(), body->Name);
-			material->SetColor("_Color", Color(body->Color.R, body->Color.G, body->Color.B));
-
-			auto horizonGo = NewGameObject("Event Horizon");
-			horizonGo->transform->SetParent(parent, false);
-			AddComponent<MeshFilter>(horizonGo)->sharedMesh = quadMesh();
-			auto horizonRenderer = AddComponent<MeshRenderer>(horizonGo);
-			glowMaterial = Materials::Create(Materials::Glow(), "Event Horizon");
-			glowMaterial->SetColor("_Color", Color(0.55f, 0.15f, 0.85f));
-			glowMaterial->SetFloat("_Intensity", 0.7f);
-			glowMaterial->SetFloat("_Falloff", 4.5f);
-			horizonRenderer->SetSharedMaterial(glowMaterial);
-			horizonRenderer->shadowCastingMode = ShadowCastingMode::Off;
-			glow = horizonGo->transform;
+			// US-T84: the machine round it is a metal Dyson sphere; the dark sphere is its core.
+			BuildVoidStation(parent);
+			return;
 		}
 		else if (body->IsStar())
 		{
@@ -200,6 +208,11 @@ namespace SpaceGod::Views
 			t->localRotation = Quaternion::LookRotation(axis, Quaternion::AngleAxis(Time::unscaledTime * 6.0f, axis) * side);
 			return;
 		}
+		if (voidStation)
+		{
+			ApplyVoidStation(relative, radius, highlighted, cameraForward);
+			return;
+		}
 		Vector3 pole = ToUnity(Body->Pole);
 		// The sphere mesh has north on +Y, longitude 0 on +X and east on +Z. Ecliptic→Unity is a
 		// reflection, which turns the right-handed (meridian, north, east) triad into a proper rotation.
@@ -213,17 +226,7 @@ namespace SpaceGod::Views
 		}
 		if (!Body->IsStar()) material->SetFloat("_Highlight", highlighted ? 1.0f : 0.0f);
 
-		if (glow && Body->Singularity)
-		{
-			// Hugs the sphere instead of ballooning with distance like a real corona: an event horizon is
-			// part of the body, not something that reads as a star from across a whole system.
-			float distance = relative.magnitude();
-			Vector3 toCamera = distance > 0 ? -relative / distance : -cameraForward;
-			glow->localPosition = relative + toCamera * Mathf::Min(radius * 1.05f, distance * 0.5f);
-			glow->localRotation = Quaternion::LookRotation(-toCamera, Vector3::up());
-			glow->localScale = Vector3::one() * (radius * 2.4f);
-		}
-		else if (glow)
+		if (glow)
 		{
 			float distance = relative.magnitude();
 			// Corona: at least ~4% of the view so the Sun reads as a star from anywhere in the system;
@@ -235,6 +238,81 @@ namespace SpaceGod::Views
 			glow->localRotation = Quaternion::LookRotation(-toCamera, Vector3::up());
 			glow->localScale = Vector3::one() * size;
 		}
+	}
+
+	void BodyView::BuildVoidStation(const cs::Ref<Transform>& parent)
+	{
+		voidStation = true;
+		metal = VoidStationModel::CreateMetal(Body->Name + " Frame");
+		renderer->SetSharedMaterial(metal);
+
+		auto child = [this](const cs::String& name, const cs::Ref<Mesh>& mesh, const cs::Ref<Material>& mat, cs::Ref<MeshRenderer>* made)
+		{
+			auto go = NewGameObject(name);
+			go->transform->SetParent(Root->transform, false);
+			AddComponent<MeshFilter>(go)->sharedMesh = mesh;
+			auto r = AddComponent<MeshRenderer>(go);
+			r->SetSharedMaterial(mat);
+			r->shadowCastingMode = ShadowCastingMode::Off;
+			r->receiveShadows = false;
+			if (made) *made = r;
+			return go->transform;
+		};
+
+		// The generator itself, dark as before, now the core the frame is built round.
+		material = Materials::Create(Materials::Sun(), Body->Name);
+		material->SetColor("_Color", Color(Body->Color.R, Body->Color.G, Body->Color.B));
+		child("Generator Core", sphereMesh(), material, nullptr)->localScale = Vector3::one() * VoidStationModel::CoreRadius;
+
+		child("Frame (near)", VoidStationModel::Shell(true), metal, &nearShell);
+		nearShell->enabled = false;
+		accretion = child("Accretion Ring", VoidStationModel::AccretionRing(), metal, nullptr);
+		gimbals[0] = child("Gimbal Ring (inner)", VoidStationModel::Gimbal(0), metal, nullptr);
+		gimbals[1] = child("Gimbal Ring (outer)", VoidStationModel::Gimbal(1), metal, nullptr);
+
+		// The event horizon's violet glow, now at the centre: the core hides its middle and the plating its edge, so it
+		// shows as a halo round the core and light spilling out through the frame's gaps (see ApplyVoidStation).
+		auto horizonGo = NewGameObject("Event Horizon");
+		horizonGo->transform->SetParent(parent, false);
+		AddComponent<MeshFilter>(horizonGo)->sharedMesh = quadMesh();
+		auto horizonRenderer = AddComponent<MeshRenderer>(horizonGo);
+		glowMaterial = Materials::Create(Materials::Glow(), "Event Horizon");
+		glowMaterial->SetColor("_Color", Color(0.55f, 0.15f, 0.85f));
+		glowMaterial->SetFloat("_Intensity", 1.3f);
+		glowMaterial->SetFloat("_Falloff", 2.2f);
+		horizonRenderer->SetSharedMaterial(glowMaterial);
+		horizonRenderer->shadowCastingMode = ShadowCastingMode::Off;
+		glow = horizonGo->transform;
+	}
+
+	void BodyView::ApplyVoidStation(Vector3 relative, float radius, bool highlighted, Vector3 cameraForward)
+	{
+		// Everything is in body radii under the root, so the model is the body's size in either scale and the focus
+		// framing, labels and picking (which take the body's radius) fit it as they do any body.
+		auto t = Root->transform;
+		float now = Time::unscaledTime;
+		Vector3 up = Vector3::up();
+		t->localRotation = Quaternion::FromToRotation(up, ToUnity(Body->Pole)) * Quaternion::AngleAxis(now * ShellSpinDegS, up);
+
+		float distance = relative.magnitude();
+		float size = distance > 0 ? radius / distance : 1.0f;
+		if (nearDetail ? size < NearDetailOff : size > NearDetailOn) nearDetail = !nearDetail;
+		renderer->enabled = !nearDetail;
+		nearShell->enabled = nearDetail;
+
+		// The rings turn on their own, not with the shell: its spin is taken back out first.
+		Quaternion unspin = Quaternion::AngleAxis(-now * ShellSpinDegS, up);
+		accretion->localRotation = unspin * Quaternion::AngleAxis(now * AccretionSpinDegS, up);
+		gimbals[0]->localRotation = unspin * Quaternion::Euler(14.0f, 0, 0) * Quaternion::AngleAxis(now * InnerGimbalSpinDegS, up);
+		gimbals[1]->localRotation = unspin * Quaternion::AngleAxis(now * OuterGimbalPrecessDegS, up) * Quaternion::Euler(0, 0, 68.0f)
+			* Quaternion::AngleAxis(now * OuterGimbalSpinDegS, up);
+
+		metal->SetFloat("_Highlight", highlighted ? 1.0f : 0.0f);
+
+		Vector3 toCamera = distance > 0 ? -relative / distance : -cameraForward;
+		glow->localPosition = relative;
+		glow->localRotation = Quaternion::LookRotation(-toCamera, up);
+		glow->localScale = Vector3::one() * (radius * 1.9f);
 	}
 
 	void BodyView::UpdateWeather(double jd, double simSecondsPerSecond)

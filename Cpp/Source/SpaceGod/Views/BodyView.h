@@ -35,6 +35,21 @@ namespace SpaceGod::Views
 		/// <summary>A free-flying station: drawn as a model with the ship shader, not a sphere.</summary>
 		bool station = false;
 
+		// A void station's generator (US-T84): a metal Dyson sphere (see VoidStationModel). The root's own renderer draws
+		// the far shell; the near shell, the dark core, the accretion ring and the two gimbal rings are its children.
+		bool voidStation = false;
+		bool nearDetail = false;
+		cs::Ref<Material> metal;
+		cs::Ref<MeshRenderer> nearShell;
+		cs::Ref<Transform> accretion;
+		cs::Ref<Transform> gimbals[2];
+
+		/// <summary>The generator as a Dyson sphere: builds the shell, core and rings under the root.</summary>
+		void BuildVoidStation(const cs::Ref<Transform>& parent);
+
+		/// <summary>Turns the shell and its rings, and picks the level of detail by how large it is on screen.</summary>
+		void ApplyVoidStation(Vector3 relative, float radius, bool highlighted, Vector3 cameraForward);
+
 		// A flare star brightens suddenly and fades over seconds (Proxima Centauri).
 		bool flareStar = false;
 		float flare = 0;
