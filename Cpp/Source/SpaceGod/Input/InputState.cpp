@@ -89,7 +89,9 @@ namespace SpaceGod::Input
 		LockTarget = kb[Key::T].wasPressedThisFrame;
 		ToggleOrbits = kb[Key::O].wasPressedThisFrame;
 		ToggleLabels = kb[Key::L].wasPressedThisFrame;
-		ToggleHelp = kb[Key::H].wasPressedThisFrame || kb[Key::F1].wasPressedThisFrame;
+		// US-T126: Shift+F1 is the dev menu's, F1 alone (or H) the help screen's.
+		ToggleHelp = kb[Key::H].wasPressedThisFrame || (kb[Key::F1].wasPressedThisFrame && !Boost);
+		ToggleCheatMenu = kb[Key::F1].wasPressedThisFrame && Boost;
 		ToggleHud = kb[Key::U].wasPressedThisFrame;
 		ToggleMarket = kb[Key::M].wasPressedThisFrame;
 		ToggleCargo = kb[Key::I].wasPressedThisFrame;
@@ -248,6 +250,7 @@ namespace SpaceGod::Input
 		ToggleOrbits = ToggleLabels = ToggleHelp = ToggleHud = ClearScreen = ToggleMarket = ToggleCargo = ToggleOutfit = ToggleSilent = ToggleBounties = ToggleContracts = ToggleFleet = ToggleTrade = ToggleGalaxyMap = ToggleNews = ToggleSpawn = WatchBattle = ToggleLanes = ToggleSatellites = ToggleReorient = CycleShips = CycleBackward = Home = Pilot = LockTarget = ActivateGate = EngageFtl = false;
 		QuickSave = QuickLoad = ToggleSaves = false;
 		SpawnPractice = false;
+		ToggleCheatMenu = false; // US-T126
 		ToggleFtlAutopilot = ClearFtlCourse = false;
 		CycleFtlTarget = 0;
 		CycleSeat = 0;

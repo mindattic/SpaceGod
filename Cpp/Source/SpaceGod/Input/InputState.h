@@ -79,6 +79,11 @@ namespace SpaceGod::Input
 		bool ToggleOrbits = false;
 		bool ToggleLabels = false;
 		bool ToggleHelp = false;
+
+		/// <summary>US-T126: Shift+F1 pulls the dev menu down (spawn ships and enemies, travel, helm, time, scale), or puts
+		/// it away. F1 alone stays the help screen. Local to this machine: the menu is never a co-op peer's.</summary>
+		bool ToggleCheatMenu = false;
+
 		/// <summary>U: the lighter toggle, the HUD's panels and readouts off while the names and markers on the view stay.</summary>
 		bool ToggleHud = false;
 

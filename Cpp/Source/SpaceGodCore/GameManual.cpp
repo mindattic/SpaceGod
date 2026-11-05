@@ -524,6 +524,16 @@ namespace SpaceGod::Core
 				  "the reticle in use. Esc closes panels, then opens the pause menu."),
 				T("The pause menu",
 				  "Resume, Help, Save / Load, Settings, Main Menu (with an autosave) and Quit."),
+				T("The dev menu", // US-T126
+				  "Shift+F1 pulls a menu down over the top of the view with every dev and debug function in one place, by "
+				  "category: Spawn (any hull beside you, friendly or neutral), Enemies (pirate raiders small, medium and "
+				  "large, any pirate hull, a hostile navy's warships, a Bio Mass globule; at a helm they open a fight with "
+				  "you), Travel (the cruise drive and Cruise to, teleports to a world or station, the other stars), Helm "
+				  "(take a helm, the nearest ship, seats, guns, launched craft), Combat (the dogfight demo in each kit, mend "
+				  "the hull flown) and Time & scale (pause, warp, the realistic or game scale). Type to filter everything, "
+				  "Up and Down pick, Enter or a click runs, Right opens a submenu, Left backs out, Tab steps the categories, "
+				  "Esc closes. While it is open it has the keys and the mouse; the game runs on and the craft holds its "
+				  "heading. The console's sg.Cheat runs any entry by its path."),
 				T("Saving",
 				  "The whole simulation saves and resumes exactly where it was. F5 quicksaves and F8 loads it; F6 opens the "
 				  "save slots, where you can make as many saves as you like. The game autosaves every five minutes and on "

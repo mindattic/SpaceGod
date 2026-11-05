@@ -426,6 +426,7 @@ namespace SpaceGod
 		Rendering::Materials::DestroyAllOwned();
 		if (hud != nullptr) hud->DestroyOwnedTextures();
 		pauseMenu->DestroyOwnedTextures();
+		cheatMenu->DestroyOwnedTextures(); // US-T126
 	}
 
 	void UnitySpaceApp::Update()
@@ -443,6 +444,9 @@ namespace SpaceGod
 			FreeCursorForMenu();
 			return;
 		}
+		// US-T126: the dev menu (Shift+F1) comes next in the order: while it is open the keys and the mouse are its, and the
+		// craft and the camera get an idle frame (the simulation runs on).
+		if (UpdateCheatMenu()) Input.Handover();
 		ArbitrateInput(true); // US-T90: one owner per input this frame (the craft held, else the command view)
 		int screensOpen = OpenScreens();
 		HandleCommands();
@@ -505,7 +509,7 @@ namespace SpaceGod
 		HandleSelectionClicks();
 
 		ToastAge += dt;
-		bool lockCursor = (Input.LookHeld || (AtControls() && !ClickPanelOpen())) && !ModelViewer::CapturesInput();
+		bool lockCursor = (Input.LookHeld || (AtControls() && !ClickPanelOpen())) && !ModelViewer::CapturesInput() && !cheatMenu->IsOpen; // US-T126
 		Cursor::lockState = lockCursor ? CursorLockMode::Locked : CursorLockMode::None;
 		Cursor::visible = !lockCursor;
 	}
@@ -582,6 +586,7 @@ namespace SpaceGod
 		bool menu = pauseMenu->IsOpen;
 		if (menu) GUI::enabled = false;
 		hud->Draw();
+		cheatMenu->Draw(*this); // US-T126: the dev menu, or the HUD's hint for its key
 		GUI::enabled = true;
 		if (menu) pauseMenu->Draw();
 	}
