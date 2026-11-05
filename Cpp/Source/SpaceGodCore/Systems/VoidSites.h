@@ -29,6 +29,37 @@ namespace SpaceGod::Core
 
 		/// <summary>A "tourist trap": an oddity crews make the detour for while the drive cools (see <see cref="VoidSight"/>).</summary>
 		Sight,
+
+		/// <summary>US-T130: the rock deep in a station's nebula a pirate clan has dug its haven into.</summary>
+		DenRock,
+
+		/// <summary>US-T130: a colossal inhabited megastructure: stacked tower blocks lit by thousands of windows, with
+		/// docking spars reaching far out and ships berthed along them.</summary>
+		Megastructure,
+	};
+
+	/// <summary>US-T130: what a station's asteroid field is like.</summary>
+	enum class VoidFieldStyle : int
+	{
+		/// <summary>A clump of a few big stony rocks riding one orbit (US-T123's drift).</summary>
+		Drift,
+		/// <summary>Many small rocks in a looser spread, each wrapped in thick rubble.</summary>
+		Rubble,
+		/// <summary>Dense, dark, metal-rich rocks, rich in the rarer ore.</summary>
+		MetalSwarm,
+		/// <summary>Glittering chunks of ice, mined for water and volatiles.</summary>
+		IceField,
+	};
+
+	/// <summary>
+	/// US-T130: the mix of places a station gets (its field's style, whether it hides in a nebula, whether it has a
+	/// megastructure). Chosen in one place (<see cref="VoidSites.Mix"/>) so a per-place biome can take the choice over.
+	/// </summary>
+	struct SPACEGODCORE_API VoidMix
+	{
+		VoidFieldStyle Field = VoidFieldStyle::Drift;
+		bool Nebula = false;
+		bool Megastructure = false;
 	};
 
 	/// <summary>The kinds of oddity a void station's <see cref="VoidSiteKind.Sight"/> can be.</summary>
@@ -68,6 +99,9 @@ namespace SpaceGod::Core
 		/// <summary>An icy rock rather than a stony one.</summary>
 		bool Icy = false;
 
+		/// <summary>US-T130: the style of field a field rock belongs to (how it is drawn and how much rubble is round it).</summary>
+		VoidFieldStyle Field = VoidFieldStyle::Drift;
+
 		/// <summary>Varies its drawn shape (the model is built from it, so it is the same every time).</summary>
 		uint32_t ShapeSeed = 0;
 	};
@@ -91,6 +125,19 @@ namespace SpaceGod::Core
 		double OutpostPopulation = 0;
 
 		cs::String PlanetoidName;
+
+		/// <summary>US-T130: the station's mix (see <see cref="VoidSites.Mix"/>).</summary>
+		VoidMix Mix;
+
+		/// <summary>US-T130: the nebula the station sits in (centred on its generator), if <see cref="VoidMix.Nebula"/>:
+		/// its name and reach, the rock its pirate haven is dug into, and the haven's name.</summary>
+		cs::String NebulaName;
+		double NebulaRadiusKm = 0;
+		cs::String DenName, HavenName;
+
+		/// <summary>US-T130: the megastructure, if <see cref="VoidMix.Megastructure"/>, and the city that lives in it.</summary>
+		cs::String MegastructureName;
+		double MegastructurePopulation = 0;
 
 		/// <summary>Every site, parents before their children, in the order they join the catalogue.</summary>
 		cs::List<VoidSite> Sites;
@@ -123,6 +170,12 @@ namespace SpaceGod::Core
 	class SPACEGODCORE_API VoidSites final
 	{
 	public:
+		/// <summary>
+		/// US-T130: the one place a station's mix is chosen (field style, nebula, megastructure), from its name alone. A
+		/// per-place biome (US-T132) replaces the body of this function and nothing else.
+		/// </summary>
+		static VoidMix Mix(const cs::String& station);
+
 		/// <summary>The plan for <paramref name="station"/>: the same every time for the same name.</summary>
 		static VoidSitePlan Plan(const cs::String& station);
 

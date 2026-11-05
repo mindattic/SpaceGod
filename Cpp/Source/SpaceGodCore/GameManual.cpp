@@ -504,6 +504,15 @@ namespace SpaceGod::Core
 				  "chunks circling it; and a sight or two (a crystal moonlet, a frozen fountain, a lamplit derelict ark, a stone "
 				  "hoop, a glowing rock) to visit while the drive cools. Each station's places are always the same, and they "
 				  "read the same in realistic and game scale."),
+				T("Void station mixes",
+				  "No two void stations are alike: a station's field may be a stony drift, a loose rubble swarm, a dense metal "
+				  "swarm rich in rare ore, or a glittering ice field mined for water and volatiles, and some stations keep a "
+				  "megastructure, a city of stacked lit towers with docking spars and ships berthed along them."),
+				T("Nebulae and ice fields",
+				  "Beyond Sol some systems hold a coloured nebula a few AU out or a cloud of ice chunks, and some void stations "
+				  "sit inside a nebula of their own. A nebula swallows sensors: inside it, or looking into it, your passive reach "
+				  "and an active ping (Tab) both fall well short. Pirates hide havens in them; one is found only by flying in "
+				  "close or pinging near it, and its raiders sail out from it."),
 				T("The galaxy map",
 				  "[ opens it: every system at its real place, who holds it, gate traffic, war fronts, blockades and raiders as "
 				  "far as the news goes. Click a star to inspect it, double-click to travel; DIPLOMACY and COMMAND are its panels."),

@@ -20,6 +20,7 @@
 #include "Information/LightSpeed.h"
 #include "Ships.h"
 #include "World.h"
+#include "Systems/SpaceFeatures.h"
 
 namespace SpaceGod::Core
 {
@@ -493,6 +494,10 @@ namespace SpaceGod::Core
 		nextPlayerSweepJd = jd + PlayerSweepSeconds / Astro::SecondsPerDay;
 		// Passive by default; half its reach dark or restarting, the ping's burst just after one (US-T93).
 		auto suite = PilotSuite(ship);
+		// US-T130: a nebula swallows sensors: inside one the helm's reach (passive, and a ping's burst alike) falls short,
+		// and a contact inside one is as hard to make out from anywhere.
+		const cs::String root = world->Catalog()->Root()->Name;
+		suite = SensorSuite(suite.RangeKm * SpaceFeatures::SensorMask(root, helioKm), suite.Resolution);
 		// (helio, burning) of each group's leader
 		cs::Dictionary<cs::Ref<Ship>, std::tuple<DVec3, bool>> seen;
 		for (const auto& s : world->Fleet->Ships())
@@ -508,7 +513,8 @@ namespace SpaceGod::Core
 				seen[c] = st;
 			}
 			double sig = Signatures::Of(s, std::get<1>(st));
-			auto level = Resolve(suite, sig, (std::get<0>(st) - helioKm).Length(), Signatures::Transponder(s));
+			double hidden = SpaceFeatures::SensorMask(root, std::get<0>(st));
+			auto level = Resolve(suite, sig, (std::get<0>(st) - helioKm).Length() / hidden, Signatures::Transponder(s));
 			// Line of sight (US-T93): a body or rock between the hull and the contact hides it.
 			if (level != ContactLevel::None && PilotOccluded(std::get<0>(st), jd)) level = ContactLevel::None;
 			Record(Player, s, level, std::get<0>(st), helioKm, sig, jd);

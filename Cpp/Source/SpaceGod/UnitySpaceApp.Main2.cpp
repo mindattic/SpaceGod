@@ -45,6 +45,8 @@
 #include "Rendering/Photoreal.h"
 #include "Rendering/RenderPipelineProfiles.h"
 #include "Sensors/Sensors.h"
+#include "Sensors/SensorPosture.h"
+#include "Systems/SpaceFeatures.h"
 #include "Settings/GameSetting.h"
 #include "Systems/AlphaCentauri.h"
 #include "Systems/Galaxy.h"
@@ -68,6 +70,7 @@
 #include "Views/BodyView.h"
 #include "Views/DebrisFields.h"
 #include "Views/DiscView.h"
+#include "Views/SpaceFeaturesView.h"
 #include "Views/EmbeddedPods.h"
 #include "Views/FighterViews.h"
 #include "Views/GateView.h"
@@ -305,6 +308,14 @@ namespace SpaceGod
 			// The piloted ship's scanners: a hidden haven within range goes on the map.
 			auto scanAt = Ephemeris()->HelioAt(pilotFrameBody, Clock->Jd) + pilotOffsetKm();
 			double scanRange = Core::Outfitting::ScanRangeKm(ship);
+			// US-T130: a haven hidden in a nebula is found only by flying in close or by pinging (Tab) near it.
+			{
+				const cs::String root = (*Catalog())[0]->Name;
+				double hereMask = Core::SpaceFeatures::SensorMask(root, scanAt), havenMask = 1;
+				for (const auto& st : World()->Economy->Settlements)
+					if (st->Hidden && !st->Fallen) havenMask = cs::Math::Min(havenMask, Core::SpaceFeatures::SensorMask(root, Ephemeris()->HelioAt(st->Body, Clock->Jd)));
+				scanRange = Core::SpaceFeatures::HavenScanKm(scanRange, havenMask, hereMask, Core::SensorPosture::Bursting(ship->Combat.get()));
+			}
 			for (const auto& found : World()->War->ScanFrom(ship->Faction, scanAt, Clock->Jd, ship->Name, scanRange))
 				ShowToast(cs::Cat("Scanners pick out a hidden pirate haven: ", found->Name, " on ", (*Catalog())[found->Body]->Name));
 			World()->War->TryStartPlayerBattle(ship, pilotFrameBody, pilotOffsetKm(), pilotForward(), Clock->Jd);
@@ -1335,6 +1346,7 @@ namespace SpaceGod
 		swarm->Update(ShowSatellites);
 		UpdateOrbitLines(dt);
 		discView->Update(ShowOrbits);
+		if (spaceFeaturesView) spaceFeaturesView->Update(); // US-T130: nebulae and ice fields
 		UpdatePathLine();
 	}
 

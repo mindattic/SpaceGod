@@ -62,6 +62,7 @@ namespace SpaceGod::Views
 	class DebrisFields;
 	class PodBeacons;
 	class DiscView;
+	class SpaceFeaturesView;
 	class FighterViews;
 	class LaneView;
 	class GateView;

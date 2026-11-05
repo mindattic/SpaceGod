@@ -216,7 +216,7 @@ namespace SpaceGod::Rendering
 		/// round it; <paramref name="veins"/> picks out glowing veins.
 		/// </summary>
 		void Rock(Builder& b, Dice& d, Vector3 centre, float size, Color base, int frequency, float roughness, float elongation,
-			int cuts, Color fracture, bool crack, bool veins, Color glow)
+			int cuts, Color fracture, bool crack, bool veins, Color glow, float glints = 0)
 		{
 			Lumps lumps(d, roughness, elongation);
 			Vector3 planeN[3];
@@ -260,6 +260,8 @@ namespace SpaceGod::Rendering
 				if (crack && Mathf::Abs(Vector3::Dot(mid, crackN) + 0.05f * Mathf::Sin(Mathf::Atan2(mid.z, mid.x) * 7 + mid.y * 5)) < 0.05f)
 					color = Color(glow.r, glow.g, glow.b, 0);
 				if (veins && Mathf::Abs(Mathf::Sin(Vector3::Dot(mid, veinW) + veinPhase)) < 0.16f) color = Color(glow.r, glow.g, glow.b, 0);
+				// US-T130: an ice face that catches the light glitters (emissive in the glow colour).
+				if (glints > 0 && d.U() < glints) color = Color(glow.r, glow.g, glow.b, 0);
 				b.Tri(centre + a * size, centre + bb * size, centre + c * size, mid, color);
 			}
 		}
@@ -283,6 +285,70 @@ namespace SpaceGod::Rendering
 		}
 
 		Color Base(const VoidSite& site) { return Color(site.Color.R, site.Color.G, site.Color.B, 1); }
+
+		/// <summary>
+		/// US-T130: the megastructure: a core of stacked tower blocks, every face gridded with windows (most lit), and long
+		/// docking spars reaching out to the edge of its radius with ships berthed along them and lamps at their tips.
+		/// </summary>
+		void BuildMegastructure(Builder& b, Dice& d, Color base, Color glow)
+		{
+			Color hull = base, dark = Shade(base, 0.6f), pale = Shade(base, 1.4f);
+			Color window(glow.r, glow.g, glow.b, 0), unlit = Shade(base, 0.45f);
+			// The towers: blocks stacked in columns round the core, staggered in height and size.
+			int columns = 7 + static_cast<int>(d.Next() % 4);
+			for (int c = 0; c < columns; c++)
+			{
+				float a = d.Range(0, 6.28f), r = c == 0 ? 0 : d.Range(0.1f, 0.3f);
+				Vector3 foot(Mathf::Cos(a) * r, 0, Mathf::Sin(a) * r);
+				float y = d.Range(-0.5f, -0.25f), top = d.Range(0.15f, 0.55f);
+				while (y < top)
+				{
+					float h = d.Range(0.06f, 0.14f), w = d.Range(0.07f, 0.13f), depth = d.Range(0.07f, 0.13f);
+					Vector3 p0 = foot + Vector3(0, y, 0), p1 = foot + Vector3(0, y + h, 0);
+					b.Beam(p0, p1, Vector3::right(), w, depth, d.U() < 0.3f ? dark : hull);
+					// Windows: a grid on each side, most of them lit.
+					for (int side = 0; side < 4; side++)
+					{
+						Vector3 n = side == 0 ? Vector3(1, 0, 0) : side == 1 ? Vector3(-1, 0, 0) : side == 2 ? Vector3(0, 0, 1) : Vector3(0, 0, -1);
+						float half = (side < 2 ? w : depth) * 0.5f, across = (side < 2 ? depth : w) * 0.5f;
+						Vector3 t = side < 2 ? Vector3(0, 0, 1) : Vector3(1, 0, 0);
+						for (int row = 0; row < 3; row++)
+							for (int col = -1; col <= 1; col++)
+							{
+								Vector3 at = p0 + Vector3(0, h * (0.25f + 0.25f * row), 0) + n * (half + 0.002f) + t * (across * 0.55f * col);
+								b.Beam(at - Vector3(0, 0.006f, 0), at + Vector3(0, 0.006f, 0), n, across * 0.35f, 0.004f, d.U() < 0.7f ? window : unlit);
+							}
+					}
+					y += h + d.Range(0.0f, 0.015f);
+				}
+				// An antenna mast on some of the towers.
+				if (d.U() < 0.4f) b.Beam(foot + Vector3(0, top, 0), foot + Vector3(0, top + d.Range(0.08f, 0.18f), 0), Vector3::right(), 0.01f, 0.01f, pale);
+			}
+			// The spars: long trusses out to the edge, ships berthed along them, a lamp at each tip.
+			int spars = 4 + static_cast<int>(d.Next() % 3);
+			for (int k = 0; k < spars; k++)
+			{
+				float a = Mathf::PI * 2 * (k + d.Range(-0.15f, 0.15f)) / spars;
+				float lift = d.Range(-0.35f, 0.25f);
+				Vector3 dir = Vector3(Mathf::Cos(a), lift, Mathf::Sin(a)).normalized();
+				float reach = d.Range(0.95f, 1.15f);
+				Vector3 from = dir * 0.2f, to = dir * reach;
+				b.Beam(from, to, Vector3::up(), 0.035f, 0.025f, dark);
+				Vector3 side = Vector3::Cross(dir, Vector3::up()).normalized();
+				b.Beam(from + side * 0.025f, to + side * 0.025f, Vector3::up(), 0.008f, 0.008f, pale);
+				b.Beam(from - side * 0.025f, to - side * 0.025f, Vector3::up(), 0.008f, 0.008f, pale);
+				b.Beam(to - dir * 0.01f, to + dir * 0.015f, Vector3::up(), 0.02f, 0.02f, window);
+				// Ships berthed along it, on alternate sides, each with a running light.
+				for (float u = 0.35f; u < reach - 0.08f; u += d.Range(0.09f, 0.16f))
+				{
+					float flip = d.U() < 0.5f ? 1.0f : -1.0f;
+					Vector3 at = dir * u + side * (0.06f * flip);
+					float len = d.Range(0.04f, 0.09f);
+					b.Beam(at - dir * len, at + dir * len, Vector3::up(), 0.025f, 0.02f, d.U() < 0.5f ? pale : hull);
+					b.Beam(at + side * (0.016f * flip), at + side * (0.022f * flip), Vector3::up(), 0.008f, 0.008f, window);
+				}
+			}
+		}
 
 		void BuildSight(Builder& b, Dice& d, const VoidSite& site, Color glow)
 		{
@@ -410,6 +476,12 @@ namespace SpaceGod::Rendering
 			case VoidSiteKind::Planetoid:
 			case VoidSiteKind::Chunk:
 				return site.Exploded ? Color(1.0f, 0.45f, 0.15f) : Color(0.9f, 0.5f, 0.25f);
+			case VoidSiteKind::FieldRock:
+				return site.Field == Core::VoidFieldStyle::IceField ? Color(0.7f, 0.92f, 1.0f) : Color(1.0f, 0.75f, 0.45f);
+			case VoidSiteKind::DenRock:
+				return Color(1.0f, 0.3f, 0.2f);
+			case VoidSiteKind::Megastructure:
+				return Color(1.0f, 0.82f, 0.5f);
 			case VoidSiteKind::Sight:
 				switch (site.Sight)
 				{
@@ -434,7 +506,20 @@ namespace SpaceGod::Rendering
 		switch (site.Kind)
 		{
 			case VoidSiteKind::FieldRock:
-				Rock(b, d, Vector3::zero(), 1, base, 3, site.Icy ? 0.8f : 1.2f, d.Range(0.2f, 0.55f), 0, base, false, false, glow);
+			{
+				bool ice = site.Field == Core::VoidFieldStyle::IceField;
+				bool metal = site.Field == Core::VoidFieldStyle::MetalSwarm;
+				// An ice chunk is sharper-faceted and glitters; a metal lump is dense, rounder and dark.
+				Rock(b, d, Vector3::zero(), 1, base, ice ? 2 : 3, ice ? 1.5f : metal ? 0.7f : site.Icy ? 0.8f : 1.2f, d.Range(0.2f, 0.55f),
+					ice ? 1 + static_cast<int>(d.Next() % 2) : 0, Shade(base, 1.25f), false, false, glow, ice ? 0.12f : metal ? 0.02f : 0.0f);
+				break;
+			}
+			case VoidSiteKind::DenRock:
+				// Dark, with the haven's few lamps showing in its pits.
+				Rock(b, d, Vector3::zero(), 1, base, 3, 1.3f, 0.3f, 0, base, false, false, glow, 0.03f);
+				break;
+			case VoidSiteKind::Megastructure:
+				BuildMegastructure(b, d, base, glow);
 				break;
 			case VoidSiteKind::Chunk:
 				// Broken off: sliced flat on one or two sides, the fresh faces paler (or still glowing, if it blew apart).
@@ -458,7 +543,7 @@ namespace SpaceGod::Rendering
 		}
 		// One radius across at most, so it is the body's size at either scale (a sight's spire or crystals to 1.2).
 		float reach = b.Reach();
-		float limit = site.Kind == VoidSiteKind::Sight ? 1.2f : 1.0f;
+		float limit = site.Kind == VoidSiteKind::Sight || site.Kind == VoidSiteKind::Megastructure ? 1.2f : 1.0f;
 		if (reach > limit) b.Scale(limit / reach);
 		return Materials::Own(b.ToMesh(cs::Cat("VoidSite ", site.Name)));
 	}
@@ -489,7 +574,8 @@ namespace SpaceGod::Rendering
 		}
 		else if (site.Kind == VoidSiteKind::FieldRock)
 		{
-			count = 18;
+			// US-T130: a rubble field's rocks are wrapped in more of it, an ice field's chunks in glittering splinters.
+			count = site.Field == Core::VoidFieldStyle::Rubble ? 40 : site.Field == Core::VoidFieldStyle::IceField ? 36 : 18;
 			inner = 1.3f;
 			outer = static_cast<float>(Core::VoidSites::RubbleRadii);
 			small = 0.02f;
@@ -520,7 +606,7 @@ namespace SpaceGod::Rendering
 				float sign = c % 2 == 0 ? 1.0f : -1.0f;
 				f.Corners[c] = (axis * sign + d.Direction() * 0.45f);
 			}
-			bool hot = site.Exploded && d.U() < 0.12f;
+			bool hot = (site.Exploded && d.U() < 0.12f) || (site.Kind == VoidSiteKind::FieldRock && site.Field == Core::VoidFieldStyle::IceField && d.U() < 0.3f);
 			f.Tint = hot ? Color(glow.r, glow.g, glow.b, 0) : Shade(base, d.Range(0.7f, 1.15f));
 			list.Add(f);
 		}

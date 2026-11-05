@@ -25,6 +25,7 @@
 #include "Views/BodyView.h"
 #include "Views/DebrisFields.h"
 #include "Views/DiscView.h"
+#include "Views/SpaceFeaturesView.h"
 #include "Views/EmbeddedPods.h"
 #include "Views/FighterViews.h"
 #include "Views/GateView.h"
@@ -291,6 +292,7 @@ namespace SpaceGod
 		debrisFields = cs::New<Views::DebrisFields>(this, systemRoot);
 		podBeacons = cs::New<Views::PodBeacons>(this, systemRoot);
 		discView = cs::New<Views::DiscView>(this, systemRoot);
+		spaceFeaturesView = cs::New<Views::SpaceFeaturesView>(this, systemRoot); // US-T130
 		fighterViews = cs::New<Views::FighterViews>(this, systemRoot);
 		laneView = cs::New<Views::LaneView>(this, systemRoot);
 		gateView = cs::New<Views::GateView>(this, systemRoot);

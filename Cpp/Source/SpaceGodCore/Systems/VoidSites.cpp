@@ -12,6 +12,8 @@
 #include "Economy/Goods.h"
 #include "Economy/Industry.h"
 #include "Economy/Settlement.h"
+#include "Combat/War.h"
+#include "Fleet.h"
 #include "Systems/StarSystemBuilder.h"
 #include "Systems/VoidBaseBuilder.h"
 #include "Systems/VoidStations.h"
@@ -55,6 +57,13 @@ namespace SpaceGod::Core
 			static const cs::List<cs::String> w = { "Cinder", "Tallow", "Gravel", "Magpie", "Rook", "Slag", "Hobnail", "Ironbark", "Pumice",
 				"Flint", "Tinder", "Clinker", "Bramble", "Cobble", "Grist", "Shale", "Marl", "Scree", "Talus", "Burr", "Ember", "Soot",
 				"Rust", "Ochre", "Jackdaw", "Tumbler", "Knuckle", "Hailstone", "Cairn", "Dross" };
+			return w;
+		}
+
+		const cs::List<cs::String>& IceWords()
+		{
+			static const cs::List<cs::String> w = { "Rime", "Hoarfrost", "Glimmer", "Sleet", "Frostglass", "Glint", "Shiver", "Diamond",
+				"Halo", "Snowblind", "Icicle", "Frazil", "Verglas", "Spindrift" };
 			return w;
 		}
 
@@ -198,6 +207,18 @@ namespace SpaceGod::Core
 		return nullptr;
 	}
 
+	VoidMix VoidSites::Mix(const cs::String& station)
+	{
+		// Its own stream (the name and a tag), so the mix never shifts what the plan draws for anything else.
+		Stream rng(cs::Cat(station, "/mix"));
+		VoidMix mix;
+		double f = rng.U();
+		mix.Field = f < 0.3 ? VoidFieldStyle::Drift : f < 0.5 ? VoidFieldStyle::Rubble : f < 0.7 ? VoidFieldStyle::MetalSwarm : VoidFieldStyle::IceField;
+		mix.Nebula = rng.U() < 0.4;
+		mix.Megastructure = rng.U() < 0.3;
+		return mix;
+	}
+
 	VoidSitePlan VoidSites::Plan(const cs::String& station)
 	{
 		Stream rng(station);
@@ -208,6 +229,9 @@ namespace SpaceGod::Core
 
 		VoidSitePlan plan;
 		plan.Station = station;
+		plan.Mix = Mix(station);
+		const auto style = plan.Mix.Field;
+		const bool iceField = style == VoidFieldStyle::IceField;
 
 		// The plane the sites keep to, tilted a little from the ecliptic.
 		double tilt = rng.Range(0, 20), azimuth = rng.Range(0, 360);
@@ -228,11 +252,12 @@ namespace SpaceGod::Core
 		}
 
 		// ---- the names
-		cs::String driftWord = rng.Pick(DriftWords());
-		plan.FieldName = cs::Cat(driftWord, " ", rng.Pick(DriftKinds()));
+		cs::String driftWord = rng.Pick(iceField ? IceWords() : DriftWords());
+		plan.FieldName = iceField ? cs::Cat(driftWord, " Ice Field") : cs::Cat(driftWord, " ", rng.Pick(DriftKinds()));
 		cs::String planetoid = rng.Pick(PlanetoidNames());
 		static const cs::List<Good> rareOres = { Good::Platinum, Good::RareEarths, Good::Titanium, Good::Copper, Good::Zinc };
-		plan.FieldOre = rng.Pick(rareOres);
+		static const cs::List<Good> volatiles = { Good::HeliumThree, Good::Nitrogen, Good::Hydrocarbons };
+		plan.FieldOre = iceField ? rng.Pick(volatiles) : rng.Pick(rareOres);
 		cs::String oreName = cs::Strings::ToLowerInvariant(GoodInfo::Of(plan.FieldOre)->Name);
 		int sightCount = rng.U() < 0.45 ? 2 : 1;
 		VoidSight sights[2] = { static_cast<VoidSight>(1 + rng.Int(5)), VoidSight::None };
@@ -292,7 +317,16 @@ namespace SpaceGod::Core
 		{
 			double centre = rng.Range(26000, 38000);
 			double clumpAt = rng.Range(0, 360);
-			int rocks = 6 + rng.Int(4);
+			// US-T130: the field's style sets how many rocks, how big, and how loosely they spread.
+			int rocks = style == VoidFieldStyle::Rubble ? 9 + rng.Int(4) : style == VoidFieldStyle::Drift ? 6 + rng.Int(4) : 7 + rng.Int(4);
+			double bigLo = 9, bigHi = 15, smallLo = 1.2, smallHi = 6.5, spread = 0.16, arc = 30;
+			switch (style)
+			{
+				case VoidFieldStyle::Rubble: bigLo = 4; bigHi = 8; smallLo = 0.8; smallHi = 3.5; spread = 0.22; arc = 42; break;
+				case VoidFieldStyle::MetalSwarm: bigLo = 6; bigHi = 11; smallLo = 1.5; smallHi = 5; spread = 0.12; arc = 24; break;
+				case VoidFieldStyle::IceField: bigLo = 6; bigHi = 12; smallLo = 1; smallHi = 5; spread = 0.2; arc = 36; break;
+				default: break;
+			}
 			int iceAt = rng.Int(rocks - 1) + 1;
 			cs::List<VoidSite> field;
 			for (int attempt = 0; attempt < 40; attempt++, centre *= 1.1)
@@ -305,20 +339,24 @@ namespace SpaceGod::Core
 					s.Kind = VoidSiteKind::FieldRock;
 					s.Name = cs::Cat(driftWord, " ", r + 1);
 					s.ParentName = station;
-					s.RadiusKm = r == 0 ? rng.Range(9, 15) : rng.Range(1.2, 6.5);
-					s.Icy = r == iceAt || (r > 0 && rng.U() < 0.2);
+					s.RadiusKm = r == 0 ? rng.Range(bigLo, bigHi) : rng.Range(smallLo, smallHi);
+					s.Icy = iceField || (style == VoidFieldStyle::Drift && (r == iceAt || (r > 0 && rng.U() < 0.2)));
+					s.Field = style;
 					s.NodeDeg = node;
 					s.PeriodDays = period;
 					s.RotationHours = rng.Range(3, 40);
 					s.ShapeSeed = static_cast<uint32_t>(rng.Next());
 					float shade = static_cast<float>(rng.Range(0.75, 1.1));
-					s.Color = s.Icy ? Rgb(0.72f * shade, 0.8f * shade, 0.88f * shade) : Rgb(0.42f * shade, 0.38f * shade, 0.34f * shade);
+					s.Color = s.Icy ? Rgb(0.72f * shade, 0.8f * shade, 0.88f * shade)
+						: style == VoidFieldStyle::MetalSwarm ? Rgb(0.33f * shade, 0.32f * shade, 0.33f * shade)
+						: style == VoidFieldStyle::Rubble ? Rgb(0.5f * shade, 0.4f * shade, 0.32f * shade)
+						: Rgb(0.42f * shade, 0.38f * shade, 0.34f * shade);
 					// Placed where it clears every rock placed so far at both scales, with their rubble, through a turn of the formation.
 					bool placed = false;
 					for (int tries = 0; tries < 50 && !placed; tries++)
 					{
-						s.AKm = centre * (1 + rng.Range(-0.16, 0.16));
-						s.LongitudeDeg = clumpAt + rng.Range(-30, 30);
+						s.AKm = centre * (1 + rng.Range(-spread, spread));
+						s.LongitudeDeg = clumpAt + rng.Range(-arc, arc);
 						s.InclinationDeg = tilt + rng.Range(-2.5, 2.5);
 						placed = true;
 						for (const auto& o : field)
@@ -371,10 +409,14 @@ namespace SpaceGod::Core
 			for (int r = 0; r < field.Count(); r++)
 			{
 				auto& s = field[r];
-				cs::String what = s.Icy ? cs::String("A dirty-ice rock") : cs::String("A stony, metal-rich rock");
+				cs::String what = iceField ? cs::String("A glittering chunk of clean ice") : s.Icy ? cs::String("A dirty-ice rock")
+					: style == VoidFieldStyle::MetalSwarm ? cs::String("A dark, dense lump of metal") : cs::String("A stony, metal-rich rock");
+				cs::String take = iceField ? cs::String("Water ice for anyone who stakes a claim (F10), and frozen ")
+					: style == VoidFieldStyle::MetalSwarm ? cs::String("Nickel-iron for anyone who stakes a claim (F10), and rich seams of ")
+					: cs::String("Nickel-iron and ice for anyone who stakes a claim (F10), and seams of ");
 				s.Summary = r == 0
-					? cs::Cat("The biggest rock of the ", plan.FieldName, ", a clump of asteroids the generator of ", station, " holds in one "
-						"orbit. Nickel-iron and ice for anyone who stakes a claim (F10), and seams of ", oreName, " the ", plan.OutpostName,
+					? cs::Cat("The biggest rock of the ", plan.FieldName, ", a clump the generator of ", station, " holds in one "
+						"orbit. ", take, oreName, " the ", plan.OutpostName,
 						" here works and buys. Capital crews waiting out a drive cooldown mine here to pay for the stop. Fiction.")
 					: cs::Cat(what, " of the ", plan.FieldName, ", riding the generator's field in formation with the rest. Claims on ",
 						"it sell at the ", plan.OutpostName, ". Fiction.");
@@ -383,6 +425,82 @@ namespace SpaceGod::Core
 		}
 
 		if (sightCount == 2) sites.Add(PlaceSight(sights[1], rng.Range(60000, 85000)));
+
+		// US-T130: a site on its own band, out from aKm until it is clear of everything at both scales.
+		auto Place = [&](VoidSite& site, double aKm, double reachRadii)
+		{
+			for (int tries = 0; tries < 60; tries++, aKm *= 1.12)
+			{
+				Band b;
+				for (int k = 0; k < 2; k++)
+				{
+					double reach = Disp(k, site.RadiusKm) * reachRadii;
+					b.In[k] = Ld(k, aKm) - reach;
+					b.Out[k] = Ld(k, aKm) + reach;
+				}
+				if (!Clear(taken, b)) continue;
+				taken.Add(b);
+				break;
+			}
+			site.AKm = aKm;
+			site.PeriodDays = PeriodAt(aKm);
+		};
+
+		// ---- US-T130: the megastructure, a city the size of a moon, its spars reaching out with ships berthed along them.
+		if (plan.Mix.Megastructure)
+		{
+			VoidSite m;
+			m.Kind = VoidSiteKind::Megastructure;
+			static const cs::List<cs::String> cities = { "Babel Stack", "the Hive of Ninefold", "Lantern Spire", "Concourse", "the Beehold",
+				"Tenement Ring", "the Steeple", "Gantry City", "Ossuary Tower", "the Warrens" };
+			m.Name = rng.Pick(cities);
+			if (m.Name.rfind("the ", 0) == 0) m.Name[0] = 'T';
+			m.ParentName = station;
+			m.RadiusKm = rng.Range(30, 48);
+			m.InclinationDeg = tilt + rng.Range(-2, 2);
+			m.NodeDeg = node;
+			m.LongitudeDeg = rng.Range(0, 360);
+			m.RotationHours = rng.Range(60, 140);
+			m.ShapeSeed = static_cast<uint32_t>(rng.Next());
+			m.Color = Rgb(0.32f, 0.3f, 0.3f);
+			plan.MegastructureName = m.Name;
+			plan.MegastructurePopulation = cs::Math::Round(rng.Range(150e3, 600e3) / 1000) * 1000;
+			m.Summary = cs::Cat(m.Name, ": a megastructure nobody remembers building, stacked tower on tower and lit by thousands of "
+				"windows, its docking spars reaching tens of kilometres out with ships berthed all along them. Every capital ship "
+				"waiting out a drive cooldown at ", station, " ends up here: a city of ", cs::Fmt(plan.MegastructurePopulation, "N0"),
+				" that lives off the people who have to stop. Fiction.");
+			Place(m, rng.Range(15000, 22000), 1.25);
+			sites.Add(m);
+		}
+
+		// ---- US-T130: the nebula the station sits in, and the rock deep inside it a clan has made its haven.
+		if (plan.Mix.Nebula)
+		{
+			static const cs::List<cs::String> clouds = { "Veil", "Shroud", "Smoke", "Pall", "Mantle", "Murk", "Bloom", "Caul", "Gauze", "Haze" };
+			static const cs::List<cs::String> hues = { "Rose", "Cinder", "Violet", "Jade", "Amber", "Cobalt", "Saffron", "Orchid", "Teal", "Ember" };
+			plan.NebulaName = cs::Cat("the ", rng.Pick(hues), " ", rng.Pick(clouds));
+			VoidSite den;
+			den.Kind = VoidSiteKind::DenRock;
+			den.Name = cs::Cat(rng.Pick(DriftWords()), " Hollow");
+			den.ParentName = station;
+			den.RadiusKm = rng.Range(5, 10);
+			den.InclinationDeg = tilt + rng.Range(-4, 4);
+			den.NodeDeg = node;
+			den.LongitudeDeg = rng.Range(0, 360);
+			den.RotationHours = rng.Range(10, 40);
+			den.ShapeSeed = static_cast<uint32_t>(rng.Next());
+			den.Color = Rgb(0.3f, 0.27f, 0.26f);
+			Place(den, rng.Range(48000, 66000), 1.2);
+			plan.DenName = den.Name;
+			static const cs::List<cs::String> dens = { "Rat's Nest", "the Lantern-Out", "Blackwater", "the Smokehole", "Gallows Rest", "the Burrow" };
+			plan.HavenName = rng.Pick(dens);
+			if (plan.HavenName.rfind("the ", 0) == 0) plan.HavenName[0] = 'T';
+			plan.NebulaRadiusKm = den.AKm * rng.Range(1.3, 1.6);
+			den.Summary = cs::Cat("A dark rock deep in ", plan.NebulaName, ", the nebula ", station, " hides in. The cloud swallows sensors "
+				"(passive and active reach both cut short inside it), which is why a clan dug in here: their haven is found only by "
+				"flying in close or by pinging (Tab) near it. Fiction.");
+			sites.Add(den);
+		}
 
 		// ---- the planetoid: its core, then the chunks circling it on one blast plane, sharing one period.
 		{
@@ -491,6 +609,7 @@ namespace SpaceGod::Core
 		}
 
 		for (const auto& s : sites) plan.OverviewSpanKm = cs::Math::Max(plan.OverviewSpanKm, s.AKm * 1.15);
+		plan.OverviewSpanKm = cs::Math::Max(plan.OverviewSpanKm, plan.NebulaRadiusKm * 1.05);
 		plan.Sites = sites;
 		return plan;
 	}
@@ -502,7 +621,7 @@ namespace SpaceGod::Core
 			auto b = cs::New<BodyDefinition>();
 			b->Name = s.Name;
 			b->ParentName = s.ParentName;
-			b->Kind = s.Kind == VoidSiteKind::Planetoid ? BodyKind::DwarfPlanet : BodyKind::Asteroid;
+			b->Kind = s.Kind == VoidSiteKind::Planetoid ? BodyKind::DwarfPlanet : s.Kind == VoidSiteKind::Megastructure ? BodyKind::Station : BodyKind::Asteroid;
 			b->RadiusKm = s.RadiusKm;
 			// Light enough that nothing round the generator falls into its pull, heavy enough to hold its chunks (the core).
 			b->Gm = s.Kind == VoidSiteKind::Planetoid ? 1e-9 : s.Kind == VoidSiteKind::Chunk ? 1e-16 : 1e-13;
@@ -542,12 +661,34 @@ namespace SpaceGod::Core
 		if (owner == nullptr) return;
 		auto camp = world->Economy->Add(plan.OutpostName, rock->Index, SettlementKind::MiningOutpost, owner, plan.OutpostPopulation);
 		double scale = plan.OutpostPopulation / 5000;
-		auto Mine = [&](Good g, double perDay) { camp->Facilities.Add(cs::New<Facility>(Recipe::Mine(g, perDay * scale), 1)); };
-		Mine(Good::NickelIron, 900);
-		Mine(Good::Water, 450);
+		auto Mine = [&](const cs::Ref<Settlement>& at, Good g, double perDay) { at->Facilities.Add(cs::New<Facility>(Recipe::Mine(g, perDay * scale), 1)); };
+		// US-T130: what the camp works follows the field: ice for water and volatiles, metal for iron and rare ore.
+		bool ice = plan.Mix.Field == VoidFieldStyle::IceField, metal = plan.Mix.Field == VoidFieldStyle::MetalSwarm;
+		Mine(camp, Good::NickelIron, ice ? 120 : metal ? 1500 : 900);
+		Mine(camp, Good::Water, ice ? 1400 : 450);
 		// The rarer ore, sized by its price so every camp's take is worth about the same.
-		Mine(plan.FieldOre, 9000 / cs::Math::Max(1.0, GoodInfo::Of(plan.FieldOre)->BasePrice));
+		Mine(camp, plan.FieldOre, (metal ? 14000 : 9000) / cs::Math::Max(1.0, GoodInfo::Of(plan.FieldOre)->BasePrice));
+
+		// US-T130: the megastructure's city: a big independent port living off the ships that have to stop here.
+		cs::Ref<BodyDefinition> tower;
+		if (!plan.MegastructureName.empty() && world->Catalog()->TryGet(plan.MegastructureName, tower))
+		{
+			auto city = world->Economy->Add(plan.MegastructureName, tower->Index, SettlementKind::Station, owner, plan.MegastructurePopulation);
+			double k = plan.MegastructurePopulation / 300e3;
+			city->Facilities.Add(cs::New<Facility>(Recipe::Mine(Good::Water, 900 * k), 1));
+			city->Facilities.Add(cs::New<Facility>(Recipe::Of(IndustryKind::Smelter), 0.6 * k));
+			city->Facilities.Add(cs::New<Facility>(Recipe::Of(IndustryKind::Shipyard), 0.5));
+		}
 		world->Economy->Initialise();
+
+		// US-T130: the clan's haven, hidden on the rock deep in the nebula; one band of raiders already out of it.
+		cs::Ref<BodyDefinition> den;
+		if (!plan.DenName.empty() && world->Catalog()->TryGet(plan.DenName, den) && world->Pirates != nullptr && world->Pirates->IsPirate)
+		{
+			double jd = cs::Double::IsNaN(world->Jd) ? Astro::J2000 : world->Jd;
+			if (world->FoundHaven(plan.HavenName, den->Index, world->Pirates, jd) != nullptr && world->War != nullptr)
+				world->War->RaisePirateGroup(jd, den->Index);
+		}
 	}
 
 	const VoidSite* VoidSites::Find(const cs::String& body, const cs::String& parent)
@@ -568,10 +709,12 @@ namespace SpaceGod::Core
 		if (site == nullptr) return cs::String();
 		switch (site->Kind)
 		{
-			case VoidSiteKind::FieldRock: return site->Icy ? "Mineable ice asteroid" : "Mineable asteroid";
+			case VoidSiteKind::FieldRock: return site->Field == VoidFieldStyle::IceField ? "Ice chunk (mineable)" : site->Icy ? "Mineable ice asteroid" : "Mineable asteroid";
 			case VoidSiteKind::Planetoid: return site->Exploded ? "Shattered planetoid" : "Cracked planetoid";
 			case VoidSiteKind::Chunk: return "Planetoid fragment";
 			case VoidSiteKind::Sight: return "Sight (worth the detour)";
+			case VoidSiteKind::DenRock: return "Rock in the nebula";
+			case VoidSiteKind::Megastructure: return "Megastructure (inhabited)";
 			default: return cs::String();
 		}
 	}
