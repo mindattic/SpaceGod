@@ -29,7 +29,27 @@ float3 SG_Sky(float3 dirOS, Texture2D mainTex, SamplerState mainTexSampler,
     float2 dxA = ddx(uvA), dyA = ddy(uvA), dxB = ddx(uvB), dyB = ddy(uvB);
     float2 gx = abs(dxA.x) <= abs(dxB.x) ? dxA : dxB;
     float2 gy = abs(dyA.x) <= abs(dyB.x) ? dyA : dyB;
-    float3 c = Texture2DSampleGrad(mainTex, mainTexSampler, uvA, gx, gy).rgb;
+    // US-T160: the pole singularity. A screen pixel near a pole covers a long strip of u (its u footprint is the
+    // angular size over cos(lat)) but a short one of v, and the sampler's anisotropy runs out, so it fell back to a
+    // blurry mip along u: the radial pinch / streak round the poles. Take the strip as several taps along u instead,
+    // each with its share of the gradient, so every tap stays at a sharp mip and the pole reads as the sky it is.
+    float uSpan = abs(gx.x) + abs(gy.x);
+    float vSpan = abs(gx.y) + abs(gy.y);
+    float aniso = uSpan / max(2.0 * vSpan, 1e-6);
+    int taps = (aniso > 1.5) ? (int)clamp(ceil(aniso), 2.0, 8.0) : 1;
+    float3 c = 0;
+    float invTaps = 1.0 / taps;
+    float2 tgx = float2(gx.x * invTaps, gx.y), tgy = float2(gy.x * invTaps, gy.y);
+    // The strip runs along u (the gradient's own direction is mostly u there, and the pole's content is a ring).
+    [loop]
+    for (int k = 0; k < 8; k++)
+    {
+        if (k >= taps) break;
+        float off = ((k + 0.5) * invTaps - 0.5) * min(uSpan, 1.0);
+        float2 tuv = float2(frac(uvA.x + off), uvA.y);
+        c += Texture2DSampleGrad(mainTex, mainTexSampler, tuv, tgx, tgy).rgb;
+    }
+    c *= invTaps;
     return c * _Brightness;
 }
 
