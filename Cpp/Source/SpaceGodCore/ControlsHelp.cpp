@@ -58,6 +58,7 @@ namespace SpaceGod::Core
 				L("Ctrl", "freighters, miners, in a port's approach: docking mode (docking speed, a gentle turn)"),
 				L("Ring gate", "hyperlanes: fly through a ramp's ring gate to ride the lane"),
 				L("1  /  2-9", "on the lane: 1 come off, 2-9 carry on at the off-ramp"),
+				L("A/D  Q/E  (riding)", "steer about inside the lane's tube while it carries you at its speed (slip round traffic on the centre line); out past the tube's wall you leave the lane still at its speed, which bleeds off smoothly to your own"), // US-T196
 				L("Shift", "interdiction (riding): a raider's field ahead, surge through"),
 				L("Ctrl", "interdiction (riding): drop out short of the field"),
 				L("Y", "back into the lane where you left it"),

@@ -79,6 +79,7 @@
 #include "Views/GateView.h"
 #include "Views/InterstellarView.h"
 #include "Views/LaneView.h"
+#include "Views/LaneTunnel.h" // US-T196: the in-lane offset drawn to meet the tunnel's wall
 #include "Views/LineStrip.h"
 #include "Views/PodBeacons.h"
 #include "Views/BioMassView.h"
@@ -101,6 +102,53 @@ namespace SpaceGod
 
 		/// Unity's implicit Vector3 -> Vector4 (w = 0).
 		Vector4 ToVector4(Vector3 v) { return Vector4(v.x, v.y, v.z, 0); }
+
+		/// <summary>
+		/// US-T196: scene units per true km across the lane tube at <paramref name="progress"/> along the piloted rider's
+		/// curve, so the hull's in-lane offset meets the drawn tunnel wall: the tube's drawn radius
+		/// (<c>LaneTunnel::DrawnRadius(trueRadius, blend) / Hyperlanes::GateRadiusKm</c>, as LaneView sizes the tunnel), eased
+		/// toward each ramp's ring gate over the same funnel LaneTunnel draws there.
+		/// </summary>
+		double LaneTubeScenePerKm(const cs::Ref<ScaleModel>& scale, const cs::Ref<Ephemeris>& eph, const cs::List<DVec3>& scene,
+			const cs::Ref<Hyperlanes>& lanes, const cs::Ref<Ship>& ship, double jd, double progress)
+		{
+			double trueKm = lanes->LaneLengthKm(ship->LaneLeg.Lane, jd);
+			if (trueKm <= 0) return 0;
+			constexpr int N = 24;
+			DVec3 dir;
+			DVec3 prev = scale->LaneScene(eph, scene, lanes, ship, 0, dir);
+			double total = 0, here = 0;
+			double p = cs::Math::Max(0.0, cs::Math::Min(1.0, progress));
+			for (int k = 1; k <= N; k++)
+			{
+				double f = static_cast<double>(k) / N;
+				DVec3 at = scale->LaneScene(eph, scene, lanes, ship, f, dir);
+				double seg = (at - prev).Length();
+				double f0 = static_cast<double>(k - 1) / N;
+				if (p >= f) here += seg;
+				else if (p > f0) here += seg * (p - f0) * N;
+				total += seg;
+				prev = at;
+			}
+			if (total <= 0) return 0;
+			float tube = Views::LaneTunnel::DrawnRadius(static_cast<float>(Hyperlanes::GateRadiusKm * total / trueKm), scale->Blend());
+			// Each ring gate's true radius as mapped at its ramp (the tunnel funnels into it), from the curve's own scale there.
+			constexpr double e = 1e-3;
+			auto gateAt = [&](double f0, double f1)
+			{
+				DVec3 d;
+				double len = (scale->LaneScene(eph, scene, lanes, ship, f1, d) - scale->LaneScene(eph, scene, lanes, ship, f0, d)).Length();
+				return static_cast<float>(Hyperlanes::GateRadiusKm * len / (e * trueKm));
+			};
+			float gateA = gateAt(0, e), gateB = gateAt(1 - e, 1);
+			float r = tube, totalF = static_cast<float>(total), hereF = static_cast<float>(here);
+			float spanA = Mathf::Min(8.0f * Mathf::Max(tube, gateA), totalF * 0.3f);
+			float spanB = Mathf::Min(8.0f * Mathf::Max(tube, gateB), totalF * 0.3f);
+			if (gateA > 0 && spanA > 0) r += (gateA - tube) * (1.0f - Mathf::SmoothStep(0.0f, 1.0f, hereF / spanA));
+			if (gateB > 0 && spanB > 0) r += (gateB - tube) * (1.0f - Mathf::SmoothStep(0.0f, 1.0f, (totalF - hereF) / spanB));
+			r = Mathf::Max(r, tube * 0.05f);
+			return r / Hyperlanes::GateRadiusKm;
+		}
 	}
 
 	void UnitySpaceApp::UpdatePursuit(const cs::Ref<Core::Ship>& ship, float dt)
@@ -862,6 +910,14 @@ namespace SpaceGod
 					auto onLane = Scale()->LaneScene(Ephemeris(), bodyScene, Fleet()->Lanes, ship, ride.Progress, along);
 					auto side = SideScene(Fleet()->LanePoint(ship, jd, ride.Progress), ship->LaneHoldSide);
 					shipScene[i] = onLane + side * Core::Fleet::LaneRejoin(ship, jd);
+					// Where the stick has it inside the tube (US-T196), square to the lane as drawn, at the tunnel's own scale.
+					if (laneFlight.OffsetKm() > 0)
+					{
+						auto offScene = laneFlight.Offset(pilot().Right(), pilot().Up).SwapYZ();
+						auto alongN = along.LengthSquared() > 1e-18 ? along.Normalized() : Core::DVec3::Zero;
+						offScene = offScene - alongN * Core::DVec3::Dot(offScene, alongN);
+						shipScene[i] = shipScene[i] + offScene * LaneTubeScenePerKm(Scale(), Ephemeris(), bodyScene, Fleet()->Lanes, ship, jd, ride.Progress);
+					}
 					auto af = Vector3(static_cast<float>(along.X), static_cast<float>(along.Y), static_cast<float>(along.Z));
 					auto roof = pilot().Up.SwapYZ();
 					auto ru = Vector3(static_cast<float>(roof.X), static_cast<float>(roof.Y), static_cast<float>(roof.Z));

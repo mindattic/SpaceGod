@@ -7,6 +7,7 @@
 #include "DVec3.h"
 #include "Hyperlanes.h"  // LaneHop, Lane, Hyperlanes
 #include "Combat/War.h"  // LaneThreat
+#include "Combat/LaneFlight.h"  // LaneFlight, LaneWake (US-T196, held by value)
 
 namespace SpaceGod::Core
 {

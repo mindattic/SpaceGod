@@ -130,3 +130,40 @@ private:
 
 	/// <summary>The far ramp: on along the lane picked, or off through the gate into the system there, coasting out at the hull's own speed.</summary>
 	void ReachRamp(const cs::Ref<Core::Ship>& ship);
+
+	// ---------------------------------------------------------------- flying inside the lane (US-T196)
+
+public:
+	/// <summary>Where the hull rides inside the lane's tube (US-T196): its offset off the centre line, true km; still when not riding.</summary>
+	const Core::LaneFlight& RideFlight() const { return laneFlight; }
+
+	/// <summary>The speed carried out of a lane bleeding down to the hull's own (US-T196); inactive when there is none.</summary>
+	const Core::LaneWake& LaneWakeNow() const { return laneWake; }
+
+private:
+	/// <summary>The stick's offset inside the tube, and the speed being bled off after a lane.</summary>
+	Core::LaneFlight laneFlight;
+	Core::LaneWake laneWake;
+	cs::Ref<Core::Ship> laneWakeShip; // the hull the bleed is for: another taken at the helm has none
+
+	/// <summary>The sim clock's Jd at the last step of each, for a frame time every co-op peer agrees on (-1: none yet).</summary>
+	double laneFlightJd = -1, laneWakeJd = -1;
+
+	/// <summary>
+	/// Real seconds since <paramref name="lastJd"/> by the sim clock (its Jd's advance over the warp's pace), clamped to a
+	/// frame's worth, and <paramref name="lastJd"/> moved on to now: the same on every peer of a co-op session, whatever its
+	/// own frame rate.
+	/// </summary>
+	double LaneFrameSeconds(double& lastJd);
+
+	/// <summary>
+	/// Steered out past the tube's wall: off the lane where the hull is (its offset kept), still at the lane's speed and
+	/// drifting on sideways as it was, the bleed down to its own top speed begun.
+	/// </summary>
+	void LeaveLanePastWall(const cs::Ref<Core::Ship>& ship);
+
+	/// <summary>Out of a lane at <paramref name="fromKmS"/>: the bleed from there down to the hull's own top speed (none if no faster).</summary>
+	void BeginLaneWake(const cs::Ref<Core::Ship>& ship, double fromKmS);
+
+	/// <summary>A frame of the bleed: the hull's speed held up to the wake's, along the way it is going, until it is down to its own.</summary>
+	void UpdateLaneWake(const cs::Ref<Core::Ship>& ship);

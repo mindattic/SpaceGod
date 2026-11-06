@@ -116,12 +116,14 @@ namespace SpaceGod
 		auto hop = ship->LaneLeg;
 		auto facing = pilot().Forward;
 		bool threatened = RideThreat.has_value();
+		// Off the lane where the hull is inside its tube (US-T196), not back on its centre line.
+		auto offset = laneFlight.Offset(pilot().Right(), pilot().Up);
 		Fleet()->DropOut(ship, jd, facing);
 		EndRide();
 		pilotFrameBody = ship->Orbit->Body;
 		auto tuning = Core::PilotTuning::Of(ship->Spec->Class);
 		auto up = pilot().Up;
-		pilot() = Core::PilotState::At(ship->Orbit->OffsetAt(jd), facing * tuning.MaxSpeed, facing);
+		pilot() = Core::PilotState::At(ship->Orbit->OffsetAt(jd) + offset, facing * tuning.MaxSpeed, facing);
 		auto level = up - facing * DVec3::Dot(up, facing);
 		if (level.LengthSquared() > 1e-9) pilot().Up = level.Normalized();
 		ResetPilotAim();
@@ -165,6 +167,8 @@ namespace SpaceGod
 
 	void UnitySpaceApp::UpdateLaneEntry(const cs::Ref<Core::Ship>& ship)
 	{
+		// The speed carried out of a lane, still bleeding off (US-T196).
+		UpdateLaneWake(ship);
 		auto lanes = Fleet()->Lanes;
 		if (lanes == nullptr) return;
 		auto helio = Ephemeris()->Helio(pilotFrameBody) + pilotOffsetKm();
@@ -185,8 +189,8 @@ namespace SpaceGod
 		BeginRide(ship, true);
 		auto lane = hop->Lane;
 		ShowToast(cs::Cat("Into the ", lane->Name, (lane->IsGateSpur() ? " spur" : " lane"), ", bound for ", lanes->EndName(lane, hop->To),
-			(lane->IsGateSpur() && hop->To == lane->B ? "  (Y at the gate to jump, P hands the ride to the crew)"
-				: "  (number keys pick the off-ramp's exit, P hands the ride to the crew)")));
+			(lane->IsGateSpur() && hop->To == lane->B ? "  (A/D Q/E steer in the tube, Y at the gate to jump, P hands the ride to the crew)"
+				: "  (A/D Q/E steer in the tube, past its wall to leave; number keys pick the off-ramp's exit, P hands the ride to the crew)")));
 	}
 
 	void UnitySpaceApp::BeginRide(const cs::Ref<Core::Ship>& ship, bool throughGate)
@@ -210,6 +214,11 @@ namespace SpaceGod
 		pilotBoosting = false;
 		nearGate = nullptr;
 		lastSpurCheckHelio = std::nullopt;
+		// On the centre line, at the lane's pace (US-T196): no bleed from an earlier lane, the stick's offset begun afresh.
+		laneFlight.Reset();
+		laneFlightJd = Clock->Jd;
+		laneWake.Clear();
+		laneWakeJd = -1;
 		if (throughGate) GateEffect(hop.Lane, hop.From);
 	}
 
@@ -223,6 +232,8 @@ namespace SpaceGod
 		RideThreat = std::nullopt;
 		warnedOf = nullptr;
 		lastSpurCheckHelio = std::nullopt;
+		laneFlight.Reset();
+		laneFlightJd = -1;
 	}
 
 	void UnitySpaceApp::GateEffect(const cs::Ref<Core::Lane>& lane, int at)
@@ -239,7 +250,7 @@ namespace SpaceGod
 		{
 			// Pulled into a fight mid-ride (an interdiction pulse, U.SPC-T42): off the lane where the hull is, and the
 			// fight is flown from there, at the pace of a fight; out of it, the hull can get back into the lane.
-			auto at = Fleet()->StateOf(ship, jd).HelioKm;
+			auto at = Fleet()->StateOf(ship, jd).HelioKm + laneFlight.Offset(pilot().Right(), pilot().Up);
 			EndRide();
 			pilotFrameBody = Catalog()->Root()->Index;
 			SetpilotOffsetKm(at - Ephemeris()->Helio(pilotFrameBody));
@@ -283,18 +294,98 @@ namespace SpaceGod
 		}
 
 		auto st = Fleet()->StateOf(ship, jd);
-		SetpilotOffsetKm(st.HelioKm - Ephemeris()->Helio(pilotFrameBody));
-		SetpilotVelKmS(st.Facing * st.SpeedKmS);
 		pilot().Forward = st.Facing;
 		auto level = pilot().Up - st.Facing * DVec3::Dot(pilot().Up, st.Facing);
 		pilot().Up = level.LengthSquared() > 1e-9 ? level.Normalized() : Core::PilotState::LevelUp(st.Facing);
 		pilot().AngularVelocity = DVec3::Zero;
 		ResetPilotAim();
+		// The stick moves the hull about inside the tube while the lane carries it (US-T196): A/D across, Q/E up and down,
+		// on a frame time from the sim clock so every co-op peer steps it alike. Out past the wall, the hull is off the lane.
+		bool outside = PilotStunSeconds() <= 0
+			? laneFlight.Step(Input.Move.x, Input.Move.y, LaneFrameSeconds(laneFlightJd))
+			: laneFlight.Step(0, 0, LaneFrameSeconds(laneFlightJd));
+		if (outside)
+		{
+			LeaveLanePastWall(ship);
+			return;
+		}
+		auto right = pilot().Right();
+		auto inTube = st.HelioKm + laneFlight.Offset(right, pilot().Up);
+		SetpilotOffsetKm(inTube - Ephemeris()->Helio(pilotFrameBody));
+		SetpilotVelKmS(st.Facing * st.SpeedKmS + laneFlight.Velocity(right, pilot().Up));
 		double span = cs::Math::Max(ship->PhaseEndJd - ship->PhaseStartJd, 1e-9);
 		double u = cs::Math::Max(0.0, cs::Math::Min(1.0, (jd - ship->PhaseStartJd) / span));
 		LaneRideSpeed = static_cast<float>((1 - cs::Math::Cos(Core::Astro::TwoPi * u)) * 0.5);
 		// A rider's drive is lit (as every rider's is) for whoever is watching.
-		if (World()->Sensors) World()->Sensors->UpdatePilot(ship, st.HelioKm, true, jd);
+		if (World()->Sensors) World()->Sensors->UpdatePilot(ship, inTube, true, jd);
+	}
+
+	double UnitySpaceApp::LaneFrameSeconds(double& lastJd)
+	{
+		double jd = Clock->Jd;
+		double dt = lastJd >= 0 ? (jd - lastJd) * Core::Astro::SecondsPerDay / cs::Math::Max(Clock->Warp().SimSecondsPerSecond, 1e-9) : 0;
+		lastJd = jd;
+		// A warp change or a hitch is not a leap across the tube: at most a slow frame's worth.
+		return cs::Math::Max(0.0, cs::Math::Min(0.1, dt));
+	}
+
+	void UnitySpaceApp::LeaveLanePastWall(const cs::Ref<Core::Ship>& ship)
+	{
+		double jd = Clock->Jd;
+		auto hop = ship->LaneLeg;
+		auto facing = pilot().Forward;
+		auto up = pilot().Up;
+		auto right = pilot().Right();
+		auto offset = laneFlight.Offset(right, up);
+		auto drift = laneFlight.Velocity(right, up);
+		double laneKmS = Fleet()->StateOf(ship, jd).SpeedKmS;
+		Fleet()->DropOut(ship, jd, facing);
+		EndRide();
+		pilotFrameBody = ship->Orbit->Body;
+		auto tuning = Core::PilotTuning::Of(ship->Spec->Class);
+		// Still at the lane's pace (never under the hull's own), and still drifting the way the stick took it out.
+		double carried = cs::Math::Max(laneKmS, tuning.MaxSpeed);
+		pilot() = Core::PilotState::At(ship->Orbit->OffsetAt(jd) + offset, facing * carried + drift, facing);
+		auto level = up - facing * DVec3::Dot(up, facing);
+		if (level.LengthSquared() > 1e-9) pilot().Up = level.Normalized();
+		ResetPilotAim();
+		BeginLaneWake(ship, (facing * carried + drift).Length());
+		insideRampGate = false;
+		laneRejoinable = true;
+		LaneExitFade = 1;
+		fovKick = GateFovKick * 0.5f;
+		ShowToast(cs::Cat("Out through the wall of the ", hop.Lane->Name, (hop.Lane->IsGateSpur() ? " spur" : " lane"),
+			" at its speed, bleeding off to your own  (Y to get back in where you left it)"));
+	}
+
+	void UnitySpaceApp::BeginLaneWake(const cs::Ref<Core::Ship>& ship, double fromKmS)
+	{
+		laneWake.Begin(fromKmS, Core::PilotTuning::Of(ship->Spec->Class).MaxSpeed);
+		laneWakeJd = laneWake.Active() ? Clock->Jd : -1;
+		laneWakeShip = laneWake.Active() ? ship : nullptr;
+	}
+
+	void UnitySpaceApp::UpdateLaneWake(const cs::Ref<Core::Ship>& ship)
+	{
+		if (!laneWake.Active()) return;
+		// A fight, the cruise drive or the drives knocked out take the hull's speed from here.
+		if (ship != laneWakeShip || ship->Battle != nullptr || SystemCruiseActive() || PilotStunSeconds() > 0)
+		{
+			laneWake.Clear();
+			laneWakeJd = -1;
+			laneWakeShip = nullptr;
+			return;
+		}
+		double kmS = laneWake.Step(LaneFrameSeconds(laneWakeJd));
+		auto vel = pilotVelKmS();
+		double speed = vel.Length();
+		// Flight assist would brake it at its retros; the wake holds it up, falling smoothly, along wherever it is headed now.
+		if (speed < kmS) SetpilotVelKmS((speed > 1e-9 ? vel / speed : pilotForward()) * kmS);
+		if (!laneWake.Active())
+		{
+			laneWakeJd = -1;
+			laneWakeShip = nullptr;
+		}
 	}
 
 	void UnitySpaceApp::ReachRamp(const cs::Ref<Core::Ship>& ship)
@@ -303,6 +394,9 @@ namespace SpaceGod
 		double jd = Clock->Jd;
 		cs::Nullable<Core::LaneHop> next = RideChoice >= 0 && RideChoice < RideOnward.Count() ? cs::Nullable<Core::LaneHop>(RideOnward[RideChoice]) : cs::Nullable<Core::LaneHop>();
 		auto facing = pilot().Forward;
+		// Where in the tube it came through the gate, and the lane's pace there (US-T196), before the ride is let go.
+		auto offset = laneFlight.Offset(pilot().Right(), pilot().Up);
+		double laneKmS = Fleet()->StateOf(ship, jd).SpeedKmS;
 		Fleet()->RampReached(ship, next, facing, jd);
 		GateEffect(hop.Lane, hop.To);
 		if (next.has_value())
@@ -315,13 +409,15 @@ namespace SpaceGod
 		}
 		EndRide();
 		pilotFrameBody = hop.To;
-		// Out of the gate still moving: flight assist brings the hull down from there.
+		// Out of the gate still moving, at the lane's pace if it was faster than the hull's own, bled down from there (US-T196).
 		auto tuning = Core::PilotTuning::Of(ship->Spec->Class);
 		auto up = pilot().Up;
-		pilot() = Core::PilotState::At(ship->Orbit->OffsetAt(jd), facing * tuning.MaxSpeed, facing);
+		double carried = cs::Math::Max(laneKmS, tuning.MaxSpeed);
+		pilot() = Core::PilotState::At(ship->Orbit->OffsetAt(jd) + offset, facing * carried, facing);
 		auto level = up - facing * DVec3::Dot(up, facing);
 		if (level.LengthSquared() > 1e-9) pilot().Up = level.Normalized();
 		ResetPilotAim();
+		BeginLaneWake(ship, carried);
 		insideRampGate = true;
 		LaneExitFade = 1;
 		// A spur's far end is at its gate, in range to open it (U.SPC-T379).
