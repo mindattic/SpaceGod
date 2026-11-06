@@ -76,7 +76,9 @@ namespace SpaceGod
 			if (!Alive(m))
 			{
 				m = Rendering::Materials::MarkShared(Rendering::Materials::Create(Rendering::RenderBackend::Active()->LoadShader("Ghost"), "OccluderGhost"));
-				m->SetVector("_GhostColor", Vector4(0.35f, 0.75f, 1.0f, 0.3f));
+				// M_Ghost exposes its colour to the scene's lit white, so this is a dark hull's tone, not a bright one: at
+				// (0.35, 0.75, 1, 0.3) a single layer outshone the focused hull behind it and the veil read as opaque (US-T219).
+				m->SetVector("_GhostColor", Vector4(0.05f, 0.11f, 0.15f, 0.3f));
 			}
 			return m;
 		}
