@@ -815,6 +815,14 @@ namespace SpaceGod
 		if (Selected.IsNone())
 		{
 			if (SpaceCamera->Mode != Cameras::SpaceCamera::CameraMode::Free) SpaceCamera->ExitFocus();
+			else ShowToast("Nothing selected: click something first (1-9 picks a body), then F");
+			return;
+		}
+		if (!TargetValid(Selected))
+		{
+			// Gone (a destroyed hull, a ship through a gate, a despawned structure): nothing to fly to.
+			Select(Target::None());
+			ShowToast("That target is gone");
 			return;
 		}
 		bool refocus = SpaceCamera->Mode == Cameras::SpaceCamera::CameraMode::Focus && SpaceCamera->FocusTarget == Selected;
