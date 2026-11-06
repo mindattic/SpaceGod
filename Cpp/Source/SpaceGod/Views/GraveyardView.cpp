@@ -13,6 +13,7 @@
 #include "Systems/Graveyards.h"
 
 #include <cmath>
+#include <functional>
 
 using namespace SpaceGod::Core;
 
@@ -62,6 +63,64 @@ namespace SpaceGod::Views
 			t.Add(i);
 			t.Add(i + 1);
 			t.Add(i + 2);
+		}
+
+		/// <summary>A box about <paramref name="p"/> with half-extents along x, y and z, each face shaded by <paramref name="shade"/>.</summary>
+		void AddBox(cs::List<Vector3>& v, cs::List<Vector3>& n, cs::List<Color>& c, cs::List<int>& t, Vector3 p, Vector3 half, const std::function<Color()>& shade)
+		{
+			Vector3 corner[8];
+			for (int k = 0; k < 8; k++)
+				corner[k] = p + Vector3(k & 1 ? half.x : -half.x, k & 2 ? half.y : -half.y, k & 4 ? half.z : -half.z);
+			static const int quads[6][4] = { { 0, 1, 3, 2 }, { 4, 6, 7, 5 }, { 0, 4, 5, 1 }, { 2, 3, 7, 6 }, { 0, 2, 6, 4 }, { 1, 5, 7, 3 } };
+			for (const auto& q : quads)
+			{
+				Color fc = shade();
+				AddFace(v, n, c, t, corner[q[0]], corner[q[1]], corner[q[2]], p, fc);
+				AddFace(v, n, c, t, corner[q[0]], corner[q[2]], corner[q[3]], p, fc);
+			}
+		}
+
+		/// <summary>
+		/// US-T85: the Unison's cube, a unit cube (side 1, about its centre): a dark core, and over each face a grid of
+		/// raised blocks and conduits at uneven heights, so the faces read as a grown lattice; one block in a dozen still
+		/// glows faintly (vertex alpha 0, lit by the material's engine colour).
+		/// </summary>
+		cs::Ref<Mesh> CubeMesh(const cs::String& name, uint32_t seed)
+		{
+			cs::List<Vector3> v, n;
+			cs::List<Color> c;
+			cs::List<int> t;
+			uint32_t s = seed ^ 0x27d4eb2fu;
+			Color dark(0.16f, 0.17f, 0.18f, 1), lit(0.4f, 1.0f, 0.55f, 0);
+			auto Metal = [&]() { float k = 0.7f + 0.6f * Unit(s); return Color(dark.r * k, dark.g * k, dark.b * k, 1); };
+			AddBox(v, n, c, t, Vector3::zero(), Vector3(0.47f, 0.47f, 0.47f), Metal);
+			const int cells = 10;
+			float cell = 1.0f / cells;
+			for (int axis = 0; axis < 3; axis++)
+				for (int side = -1; side <= 1; side += 2)
+					for (int i = 0; i < cells; i++)
+						for (int j = 0; j < cells; j++)
+						{
+							float u = -0.5f + (i + 0.5f) * cell, w = -0.5f + (j + 0.5f) * cell;
+							float height = 0.01f + 0.05f * Unit(s) * Unit(s);
+							float out = side * (0.47f + height * 0.5f);
+							// Some cells long conduits across two, the rest square blocks with a gap between.
+							float a = cell * (Unit(s) < 0.2f ? 0.95f : 0.4f), b = cell * 0.4f;
+							Vector3 p, half;
+							if (axis == 0) { p = Vector3(out, u, w); half = Vector3(height * 0.5f, a, b); }
+							else if (axis == 1) { p = Vector3(u, out, w); half = Vector3(a, height * 0.5f, b); }
+							else { p = Vector3(u, w, out); half = Vector3(a, b, height * 0.5f); }
+							bool glow = Unit(s) < 0.08f;
+							AddBox(v, n, c, t, p, half, [&]() { return glow ? lit : Metal(); });
+						}
+			auto mesh = Materials::Own(cs::New<Mesh>(name));
+			if (v.Count() > 65000) mesh->indexFormat = IndexFormat::UInt32;
+			mesh->SetVertices(v);
+			mesh->SetNormals(n);
+			mesh->SetColors(c);
+			mesh->SetTriangles(t, 0);
+			mesh->RecalculateBounds();
+			return mesh;
 		}
 	}
 
@@ -121,7 +180,14 @@ namespace SpaceGod::Views
 				m->SetFloat("_EngineGlow", 0.0f);
 				m->SetColor("_Color", g.Warm ? Color(0.42f, 0.34f, 0.28f) : Color(0.3f, 0.33f, 0.37f));
 				ShipModels::Plate(m, 10.0f);
-				auto mesh = ShipMeshFactory::GetStationBody(st.Name);
+				if (st.Cube)
+				{
+					// US-T85: the Unison's cube, its lattice faintly lit green.
+					m->SetColor("_Color", Color(0.34f, 0.36f, 0.37f));
+					m->SetColor("_EngineColor", Color(0.35f, 1.0f, 0.5f));
+					m->SetFloat("_EngineGlow", 0.7f);
+				}
+				auto mesh = st.Cube ? CubeMesh(st.Name, st.Seed) : ShipMeshFactory::GetStationBody(st.Name);
 				auto Part = [&](const cs::String& name)
 				{
 					auto go = NewGameObject(name);
@@ -133,7 +199,8 @@ namespace SpaceGod::Views
 					return go->transform;
 				};
 				uint32_t ss = st.Seed;
-				stations.Add(Station { st.OffsetKm, st.SizeKm, 0.5f + Unit(ss), Part(st.Name), Part(cs::Cat(st.Name, " module")) });
+				auto body = Part(st.Name);
+				stations.Add(Station { st.OffsetKm, st.SizeKm, 0.5f + Unit(ss), st.Cube, body, st.Cube ? nullptr : Part(cs::Cat(st.Name, " module")) });
 			}
 		}
 	}
@@ -234,8 +301,14 @@ namespace SpaceGod::Views
 			auto relative = app->Relative(rootScene + scale.LocalOffset(root, st.OffsetKm));
 			float length = static_cast<float>(scale.ShipLength(st.SizeKm));
 			st.Body->localPosition = relative;
-			st.Body->localRotation = Quaternion::Euler(now * 0.6f * st.Spin, now * 0.25f, now * 0.4f * st.Spin);
 			st.Body->localScale = Vector3::one() * length;
+			if (st.Cube)
+			{
+				// Not tumbling: held, turning slowly about one axis, as if it still keeps station.
+				st.Body->localRotation = Quaternion::Euler(20.0f, now * 0.8f, 10.0f);
+				continue;
+			}
+			st.Body->localRotation = Quaternion::Euler(now * 0.6f * st.Spin, now * 0.25f, now * 0.4f * st.Spin);
 			// A module torn off, drifting a little way from it and tumbling on its own.
 			st.Module->localPosition = relative + Vector3(0.9f, 0.35f, -0.6f) * length;
 			st.Module->localRotation = Quaternion::Euler(now * 2.1f, now * 1.3f * st.Spin, now * 0.8f);

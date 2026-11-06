@@ -122,10 +122,62 @@ namespace SpaceGod::Core
 			return g;
 		}
 
+		/// <summary>
+		/// US-T85: Wolf 359's graveyard, the same in every game. A picket fleet met something here long ago and none of it
+		/// left: their hulks lie in a cold field round what they met, a cube kilometres on a side, still and faintly lit.
+		/// </summary>
+		Graveyard WolfMuster(Stream& rng)
+		{
+			const cs::String place = "Wolf 359";
+			double au = 5.5;
+			double radius = 0.014 * Astro::AuKm;
+			DVec3 centre = DVec3(0.6, -0.8, 0.05).Normalized() * (au * Astro::AuKm);
+			// The picket line, warships all, broken where they stood.
+			static const cs::List<cs::String> names = { "Resolute Dawn", "Halberd", "Ardent", "Watchfire", "Lodestar", "Morrow",
+				"Thessaly", "Covenant Light", "Ninefold", "Tenebrae", "Cassiopeia", "Hold Fast" };
+			// Laid as any hulked graveyard (its haze, its dense wreckage), then given its own hulks and name.
+			Graveyard g = Make(rng, place, centre, radius, false, names.Count(), 0);
+			g.Hulks.Clear();
+			g.Name = "Wolf 359 Muster";
+			static const cs::List<ShipClass> classes = { ShipClass::Cruiser, ShipClass::Destroyer, ShipClass::Battleship, ShipClass::Destroyer,
+				ShipClass::CommandCruiser, ShipClass::Cruiser, ShipClass::Carrier, ShipClass::Destroyer };
+			static const cs::List<Good> holds = { Good::Munitions, Good::Alloys, Good::Electronics, Good::Machinery };
+			for (int i = 0; i < names.Count(); i++)
+			{
+				GraveHulk h;
+				h.Name = cs::Cat("the ", names[i], " (", g.Name, ")");
+				h.Class = classes[i % classes.Count()];
+				// A ring round the heart, as a line drawn up to bar the way would fall.
+				double a = cs::Math::PI * 2 * (i + rng.Range(-0.3, 0.3)) / names.Count();
+				double r = radius * rng.Range(0.35, 0.8);
+				h.OffsetKm = centre + DVec3(cs::Math::Cos(a) * r, cs::Math::Sin(a) * r, rng.Range(-0.15, 0.15) * radius);
+				h.Cargo = holds[rng.Int(holds.Count())];
+				h.CargoTonnes = rng.Range(30, 260);
+				g.Hulks.Add(h);
+			}
+			DerelictStation cube;
+			cube.Name = "Unison Cube (silent)";
+			cube.OffsetKm = centre;
+			cube.SizeKm = 3;
+			cube.Seed = static_cast<uint32_t>(rng.Next());
+			cube.Cube = true;
+			cube.Summary = "At the Muster's heart hangs a cube three kilometres on a side, its every face a grown lattice of conduit "
+				"and alcove: a vessel of the Unison, the many-in-one that thought with one mind. A picket fleet stood against it here "
+				"and lies round it still. It has not moved since. Its lights have never quite gone out.";
+			g.Stations.Add(cube);
+			return g;
+		}
+
 		cs::List<Graveyard> Build(const cs::String& root, double teffK, double luminosity)
 		{
 			cs::List<Graveyard> list;
 			if (root.empty() || root == "Sun" || root == "Sol" || root == "Sol System") return list;
+			if (root == "Wolf 359")
+			{
+				Stream wolf(cs::Cat(root, "/muster"));
+				list.Add(WolfMuster(wolf));
+				return list;
+			}
 			if (cs::Strings::StartsWith(root, "Void Base")) return list;
 			Stream rng(cs::Cat(root, "/graveyards"));
 			auto Away = [&](double loKm, double hiKm)
@@ -236,11 +288,23 @@ namespace SpaceGod::Core
 				w->Ship = nullptr;
 				w->Pieces.Clear();
 				w->LengthKm = st.SizeKm;
-				w->Salvage.Add(SalvageStack(Good::Electronics, 60 * st.SizeKm));
-				w->Salvage.Add(SalvageStack(Good::MedicalSupplies, 20 * st.SizeKm));
+				if (st.Cube)
+				{
+					// No stores, no sick bay: what is stripped off the cube is its own strange machinery.
+					w->Salvage.Add(SalvageStack(Good::Electronics, 200 * st.SizeKm));
+					w->Salvage.Add(SalvageStack(Good::Alloys, 150 * st.SizeKm));
+				}
+				else
+				{
+					w->Salvage.Add(SalvageStack(Good::Electronics, 60 * st.SizeKm));
+					w->Salvage.Add(SalvageStack(Good::MedicalSupplies, 20 * st.SizeKm));
+				}
 			}
 		}
 		world->Log(jd, cs::Cat("Wrecks lie in the dark here: ", yards[0].Name), WorldEventKind::Info, -1);
+		for (const auto& g : yards)
+			for (const auto& st : g.Stations)
+				if (!st.Summary.empty()) world->Log(jd, st.Summary, WorldEventKind::Info, -1);
 	}
 
 	cs::List<LurkSite> Graveyards::LurkSites(const cs::Ref<World>& world)

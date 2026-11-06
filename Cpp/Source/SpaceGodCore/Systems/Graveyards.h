@@ -33,6 +33,11 @@ namespace SpaceGod::Core
 		/// <summary>Its length, km (its model is drawn this size).</summary>
 		double SizeKm = 3;
 		uint32_t Seed = 0;
+		/// <summary>US-T85: not a station at all but the Unison's cube (Wolf 359's): drawn as a lattice-skinned cube, faintly
+		/// lit, turning slowly rather than tumbling.</summary>
+		bool Cube = false;
+		/// <summary>What the log says of it when a helm first comes in (empty for an ordinary derelict).</summary>
+		cs::String Summary;
 	};
 
 	/// <summary>A graveyard: its hulks and stations, the dense field of drawn wreckage round them and the light it is seen in.</summary>
@@ -84,6 +89,10 @@ namespace SpaceGod::Core
 	///
 	/// Hooks for other systems (none of this edits theirs): <see cref="LurkSites"/> lists where raiders or bio mass could lie
 	/// up; <see cref="StationInterior"/> is where a boarding or interior system plugs in a derelict station's insides.
+	///
+	/// US-T85: Wolf 359 always keeps one, and not a random one: the Muster, the hulks of a picket fleet that met something
+	/// here long ago, and at its heart what they met, the Unison's cube (<see cref="DerelictStation.Cube"/>), dark but for a
+	/// faint light in its lattice, and still there.
 	/// </summary>
 	class SPACEGODCORE_API Graveyards final
 	{
