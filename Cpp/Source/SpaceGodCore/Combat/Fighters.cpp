@@ -718,7 +718,7 @@ namespace SpaceGod::Core
 		auto tuning = craft->Tuning(engines);
 		Drift::Fly(craft->Model(), state, u->Combat, hull, tuning, input, DVec3::Zero, dt);
 		stick->Note = stick->FlightAssistOff ? PilotFlight::Brake(state, hull, tuning.TurnRateDegS).Text() : cs::String();
-		if (input.Drift) stick->Note = "DRIFT: coasting on your way, the craft turns free on its thrusters; let go of R to boost out along the nose";
+		if (input.Drift) stick->Note = "DRIFT: coasting on your way, the craft turns free on its thrusters; let go of R (toggle mode: R again) to boost out along the nose";
 		u->Pos = state.Pos;
 		u->Vel = state.Vel;
 		u->Forward = state.Forward;

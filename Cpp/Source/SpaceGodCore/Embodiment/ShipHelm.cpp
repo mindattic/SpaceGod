@@ -241,7 +241,7 @@ namespace SpaceGod::Core
 		// With assist off nothing brakes for the pilot (US-T87): what stopping costs, a flip and a burn or the retros.
 		// Assist off, every model flies the Newtonian rules on the class's own turn rate, so that is the flip's rate.
 		f->Note = input.FlightAssistOff && !f->DrivesDown ? PilotFlight::Brake(f->State, hull, tuning.TurnRateDegS).Text() : broadside;
-		if (input.Drift) f->Note = "DRIFT: coasting on your way, the hull turns free on its thrusters; let go of R to boost out along the nose";
+		if (input.Drift) f->Note = "DRIFT: coasting on your way, the hull turns free on its thrusters; let go of R (toggle mode: R again) to boost out along the nose";
 	}
 
 	DVec3 ShipHelm::BroadsideAim(const PilotState& s, cs::String& note) const

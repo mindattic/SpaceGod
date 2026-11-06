@@ -2,6 +2,7 @@
 
 #include "Input/InputState.h"
 #include "Input/InputDevice.h"
+#include "Input/DriftKey.h"
 #include "CaptureEvents.h"
 #include "Embodiment/SelfDestruct.h"
 
@@ -29,7 +30,8 @@ namespace SpaceGod::Input
 		// US-T87: Alt held is the manoeuvre key at the controls (a turn-and-burn's flip); with F9-F11 under capture, and
 		// Shift+Alt+K, Alt keeps its other meanings, which only read it with another key.
 		Manoeuvre = kb[Key::LeftAlt].isPressed || kb[Key::RightAlt].isPressed;
-		Drift = kb[Key::R].isPressed; // US-T165: held, at the controls (R alone toggles auto-reorient in command)
+		// US-T165: at the controls, held (or pressed on, then off, set to toggle); R alone toggles auto-reorient in command.
+		Drift = DriftKey::Read(kb[Key::R].isPressed, kb[Key::R].wasPressedThisFrame);
 		// US-T94: the arrows move reactor power at the controls (Core::PowerKey): Left weapons, Up shields, Right engines a
 		// pip at a time, Down an even share; Shift with one of the three, all the reactor can spare to it.
 		PowerKey = kb[Key::LeftArrow].wasPressedThisFrame ? (Boost ? 3 : 0)
@@ -203,6 +205,7 @@ namespace SpaceGod::Input
 		// In command nothing is flown: F focuses, T resets time, Backspace goes home, B watches a battle.
 		ToggleFlightAssist = LockTarget = MoveToHost = ToggleBoarding = Manoeuvre = JumpToCraft = false; // US-T106: no craft to jump from
 		Drift = false; // US-T165: R toggles auto-reorient
+		DriftKey::Drop(); // US-T165: a toggled drift ends with the controls
 		PowerKey = -1; // US-T94: nothing to share a reactor of in command
 		SelfDestructTap = SelfDestructArm = false; // US-T97: nothing to set off in command
 		SelfDestructHoldS = 0;

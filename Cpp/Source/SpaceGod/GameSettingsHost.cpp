@@ -3,6 +3,7 @@
 #include "EngineSettings.h"
 #include "UnitySpaceApp.h"
 #include "Camera/SpaceCamera.h"
+#include "Input/DriftKey.h"
 #include "Rendering/Pipeline/RenderBackend.h"
 #include "Views/BattleFx.h"
 #include "UnityCompat/UnityTypes.h"
@@ -35,6 +36,7 @@ namespace SpaceGod
 		SettingsRegistry::AddDeclarationSource([] { EngineSettings::FrameRateCap(); EngineSettings::Msaa(); EngineSettings::MasterVolume(); });
 		SettingsRegistry::AddDeclarationSource([] { UnitySpaceApp::AutoReorientSetting(); });
 		SettingsRegistry::AddDeclarationSource([] { Cameras::SpaceCamera::LookSensitivitySetting(); Cameras::SpaceCamera::InvertLook(); });
+		SettingsRegistry::AddDeclarationSource([] { ::SpaceGod::Input::DriftKey::ModeSetting(); }); // US-T165: drift on R, hold or toggle
 		SettingsRegistry::AddDeclarationSource([]
 		{
 			using Rendering::RenderPipelineSettings;
