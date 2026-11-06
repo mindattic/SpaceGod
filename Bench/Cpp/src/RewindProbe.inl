@@ -281,11 +281,11 @@
 			auto simRef = Restore(raw);
 			r.RestoreMs = Ms(Clock::now() - r0);
 			auto& sim = *simRef;
-			r.AtK = RwHash(sim, sc);
-			r.OkK = r.AtK == c.AtK;
-			if (opt.Decks) std::printf("  restored at tick %d: %s\n", c.Tick, RwDecks(sim).c_str());
 			{
 				// Round trip: the restored world written again must be the keyframe's bytes (what a save loses on load shows here).
+				// Written before anything reads the restored world, as the live keyframe was: the digest asks the ephemeris for
+				// positions at dates off the clock, and the ephemeris keeps each body's last answer (HelioAt/Lunar memos, which
+				// the save carries), so a digest taken first changed the memos and the re-captured bytes (US-T228).
 				Bytes again = Capture(sim);
 				r.RoundTrip = again == raw;
 				if (!r.RoundTrip)
@@ -296,6 +296,9 @@
 					if (opt.GraphDiff > 0) std::printf("%s", GraphDiff(raw, again, opt.GraphDiff).c_str());
 				}
 			}
+			r.AtK = RwHash(sim, sc);
+			r.OkK = r.AtK == c.AtK;
+			if (opt.Decks) std::printf("  restored at tick %d: %s\n", c.Tick, RwDecks(sim).c_str());
 			std::string stop;
 			int t = c.Tick;
 			double jdStart = jd[0]; // Done's startJd: the clock after the setup
@@ -408,8 +411,10 @@
 		}
 		bool ok = probedHash == plainHash;
 		for (const auto& r : replays) ok = ok && r.OkK && r.OkKV && r.OkEnd;
-		std::printf("  determinism: %s\n", ok ? "ALL MATCH" : "MISMATCH");
-		return ok ? 0 : 3;
+		bool exact = true; // every restored keyframe written again gives the keyframe's own bytes (US-T228)
+		for (const auto& r : replays) exact = exact && r.RoundTrip;
+		std::printf("  determinism: %s; save round trip: %s\n", ok ? "ALL MATCH" : "MISMATCH", exact ? "BYTE-EXACT" : "DIFFERS");
+		return ok && exact ? 0 : 3;
 	}
 
 	// ---------------------------------------------------------------- `--selfdestruct-probe` (US-T114)

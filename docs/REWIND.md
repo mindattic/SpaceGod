@@ -44,7 +44,12 @@ delegates), rebuilding the shell around it and running on. For reference, the pr
    Simulation, and the replay is checked three times: its digest must equal the live one at that tick, again after
    60 re-simulated ticks, and again at the end of the run (same tick count, same stop reason). The capture pass's
    own final digest must also equal the plain pass's, which shows that taking keyframes does not perturb the run.
-   (Writing a graph compacts dictionaries, so this was not obvious.)
+   (Writing a graph compacts dictionaries, so this was not obvious.) Before anything reads it, the restored world is
+   also written again, and those bytes must equal the keyframe's own (the save round trip, US-T228). It is written
+   first because reading the world is not free of writes: the digest asks the ephemeris for positions at dates off the
+   clock, and the ephemeris keeps each body's last answer (the `HelioAt` and lunar memos, which the save carries).
+   Writing it after the digest gave different bytes even though nothing was lost. A failed round trip fails the
+   probe; `--rewind-graph-diff N` lists the graph entries that differ.
 
 Scenarios: the five Bench scenarios, plus `battle-warp0`. This is the battle scenario left at real time
 (`--rewind-then-warp 0`, 20,000 ticks = 5.6 game-minutes), because the shipped `battle` scenario speeds up to
