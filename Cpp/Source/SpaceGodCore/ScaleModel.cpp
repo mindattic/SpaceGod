@@ -31,7 +31,7 @@ namespace SpaceGod::Core
 
 	double ScaleModel::ShipLength(double lengthKm) const
 	{
-		return LogLerp(lengthKm / KmPerUnit, GameShipScale * cs::Math::Pow(lengthKm, GameShipExponent), blend);
+		return LogLerp(lengthKm / KmPerUnit, GameShipScale * lengthKm, blend);
 	}
 
 	double ScaleModel::LocalDistance(const cs::Ref<BodyDefinition>& body, double distanceKm) const

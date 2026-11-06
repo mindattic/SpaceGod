@@ -44,9 +44,10 @@ namespace SpaceGod::Core
 		static constexpr double GameLocalC = 1.17;
 		static constexpr double GameLocalP = 0.44;
 
-		// Gameplay ship length: 12 units per km^0.5 (a 3 km carrier is ~21 units against Earth's 255 radius).
-		static constexpr double GameShipScale = 12.0;
-		static constexpr double GameShipExponent = 0.5;
+		// Gameplay hardware length: ONE linear scale for every ship, station, gate, harvester and piece of debris
+		// (7 units per km, so a 3 km carrier is ~21 units against Earth's 255 radius), so a 70 m interceptor is
+		// 1/43 of it, as it truly is. Only hardware-vs-planet and orbital distances are compressed.
+		static constexpr double GameShipScale = 7.0;
 
 	private:
 		static constexpr double EarthRadiusKm = 6371.0;
