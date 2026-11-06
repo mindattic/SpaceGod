@@ -489,6 +489,8 @@ namespace SpaceGod::UI
 
 	void Hud::DrawInterstellarLabels()
 	{
+		worldLabelPass = true; // US-T210
+		struct Reset { bool& f; ~Reset() { f = false; } } reset{ worldLabelPass };
 		if (Event::current().type == EventType::Repaint && app->Interstellar->Visible() && app->ShowLabels)
 		{
 			for (const auto& s : app->Interstellar->Stars())
@@ -557,6 +559,8 @@ namespace SpaceGod::UI
 	void Hud::DrawWorldOverlay()
 	{
 		if (Event::current().type != EventType::Repaint) return;
+		worldLabelPass = true; // US-T210: world names stay out from under the docked panels
+		struct Reset { bool& f; ~Reset() { f = false; } } reset{ worldLabelPass };
 		auto catalog = app->Catalog();
 		double ppu = app->PixelsPerUnitAtUnitDistance();
 		DrawSkyMarkers();
@@ -815,6 +819,7 @@ namespace SpaceGod::UI
 			}
 			if (!placed) return;
 		}
+		if (LabelUnderPanel(r)) return; // US-T210
 		shipLabelRects.Add(r);
 		app->ShipNameRects.Add(std::make_tuple(r, ship));
 		DrawLabel(text_, at2, tint, minor);

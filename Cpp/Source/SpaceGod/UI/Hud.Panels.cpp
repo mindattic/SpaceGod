@@ -386,12 +386,21 @@ namespace SpaceGod::UI
 		GUI::color = old;
 	}
 
+	bool Hud::LabelUnderPanel(const Rect& r) const
+	{
+		if (!worldLabelPass) return false;
+		for (const auto& u : app->UiRects)
+			if (u.Overlaps(r)) return true;
+		return false;
+	}
+
 	void Hud::DrawLabel(const cs::String& s, Vector2 p, Color color, bool minor)
 	{
 		auto style = minor ? minorLabel : label;
 		auto content = GUIContent(s);
 		auto size = style->CalcSize(content);
 		auto r = Rect(p.x, p.y, size.x, size.y);
+		if (LabelUnderPanel(r)) return; // US-T210
 		labelShadow->fontSize = style->fontSize;
 		GUI::Label(Rect(r.x + 1, r.y + 1, r.width, r.height), content, labelShadow);
 		auto old = GUI::contentColor;

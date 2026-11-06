@@ -139,6 +139,12 @@ private:
 
 	void DrawWorldOverlay();
 
+	/// US-T210: set while world-space labels (bodies, ships, stars, gates) draw: DrawLabel then skips a label whose rect
+	/// overlaps a registered panel rect (app->UiRects, the docked panels this frame's Layout pass placed), so no name shows
+	/// through a panel.
+	bool worldLabelPass = false;
+	bool LabelUnderPanel(const Rect& r) const;
+
 	/// C# (Ship ship, Texture2D icon, float size, Color tint, Vector2 p): one far-off ship's icon this repaint.
 	struct IconDraw
 	{
