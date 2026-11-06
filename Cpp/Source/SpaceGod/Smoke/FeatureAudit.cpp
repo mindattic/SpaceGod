@@ -9,6 +9,7 @@
 #include "UnitySpaceApp.h"
 #include "SpaceGodLog.h"
 #include "Camera/SpaceCamera.h"
+#include "Combat/FlightModels.h"
 #include "Input/InputDevice.h"
 #include "UnityCompat/UnityRuntime.h"
 #include "Views/SkyView.h"
@@ -981,6 +982,102 @@ namespace SpaceGod::Smoke::FeatureAudit
 			CloseEverything();
 		}
 
+		// ---------------------------------------------------------------- roles (US-T167, docs/ROLES.md)
+
+		int BodyIndex(const char* name)
+		{
+			for (int i = 0; i < app->Catalog()->Count(); i++)
+				if ((*app->Catalog())[i]->Name == name) return i;
+			return -1;
+		}
+
+		/// At the controls the camera is the craft's: with a planet selected, F, the planet's number key and Home leave it
+		/// where it was (a chase locked on the hull; a seat's rig untouched).
+		bool CameraHeldAtControls(int earth, cs::String& detail)
+		{
+			if (earth >= 0) app->Select(Target::OfBody(earth));
+			auto mode = app->SpaceCamera->Mode;
+			auto focus = app->SpaceCamera->FocusTarget;
+			Tap(Key::F);
+			Tap(Key::Digit3);
+			Tap(Key::Home);
+			frames(2);
+			bool held = app->AtControls() && app->SpaceCamera->Mode == mode && app->SpaceCamera->FocusTarget == focus;
+			detail = cs::Cat("F, 3, Home with Earth selected: camera ", Cameras::ToString(app->SpaceCamera->Mode), " on ", Describe(app->SpaceCamera->FocusTarget));
+			return held;
+		}
+
+		/// One embodied hull: its flight family, that F / 3 / Home never refocus its chase, and that R (drift) is the
+		/// light and heavy fighter's alone, never a capital's or a hauler's.
+		void HullRole(const char* role, ShipClass cls, FlightFamily family, bool canDrift, int earth)
+		{
+			cs::String id = cs::Cat("roles.", role);
+			auto ship = StageAtHelm(cs::Cat("Audit Role ", role), cls, app->Catalog()->Root()->Index, DVec3(0, 0, Astro::AuKm), DVec3::UnitY);
+			if (!ship) { Result(cs::Cat(id, ".helm"), false, cs::Cat("P on the staged ", ToString(cls), ": piloting ", B(app->IsPiloting()))); return; }
+			Settle();
+			auto got = FlightModelRegistry::Default()->FamilyOf(cls);
+			Result(cs::Cat(id, ".family"), got == family, cs::Cat(ToString(cls), " flies as ", ToString(got), ", expected ", ToString(family)));
+			cs::String detail;
+			bool held = CameraHeldAtControls(earth, detail) && app->SpaceCamera->PilotLocked;
+			Result(cs::Cat(id, ".focus-never-grabs"), held, detail);
+			kb->Hold(Key::R);
+			frames(12);
+			bool drifting = Contains(app->PilotFlightNote, "DRIFT");
+			kb->Release(Key::R);
+			frames(2);
+			Result(cs::Cat(id, ".drift"), drifting == canDrift, cs::Cat("R held at the helm of the ", ToString(cls), ": drifting ", B(drifting), ", expected ", B(canDrift)));
+			ToCommand();
+		}
+
+		/// A seat (gun, station, launched craft, EVA worker): F / 3 / Home leave the seat's own camera alone.
+		void SeatRole(const char* role, Key k, std::initializer_list<Key> mods, int earth)
+		{
+			cs::String id = cs::Cat("roles.", role);
+			ToCommand();
+			if (!SelectAShip()) { Log(cs::Cat("AUDIT ", id, ".focus-never-grabs INFO: no ship to select")); return; }
+			Tap(k, mods);
+			frames(5);
+			if (!app->IsSeated()) { Log(cs::Cat("AUDIT ", id, ".focus-never-grabs INFO: no seat taken ('", Toast(), "')")); ToCommand(); return; }
+			cs::String detail;
+			Result(cs::Cat(id, ".focus-never-grabs"), CameraHeldAtControls(earth, detail), detail);
+			ToCommand();
+		}
+
+		/// The free SpaceGod: the command keys are the camera's (F focuses what is selected), and the flight keys (cruise,
+		/// tractor, drift) do nothing.
+		void FreeRole(int earth)
+		{
+			ToCommand();
+			if (earth < 0) return;
+			app->SpaceCamera->ExitFocus();
+			app->Select(Target::OfBody(earth));
+			cs::String toast = Toast();
+			Tap(Key::J, { Key::LeftShift });
+			Tap(Key::T, { Key::LeftShift });
+			Result("roles.free.flight-keys-idle", !app->AtControls() && Toast() == toast, cs::Cat("Shift+J, Shift+T in command: toast '", Toast(), "'"));
+			Tap(Key::F);
+			Settle();
+			Result("roles.free.focus-grabs", app->SpaceCamera->Mode != CameraMode::Free && app->SpaceCamera->FocusTarget == Target::OfBody(earth),
+				cs::Cat("F with Earth selected: camera ", Cameras::ToString(app->SpaceCamera->Mode), " on ", Describe(app->SpaceCamera->FocusTarget)));
+			app->SpaceCamera->ExitFocus();
+			CloseEverything();
+		}
+
+		void RoleProbes()
+		{
+			CloseEverything();
+			int earth = BodyIndex("Earth");
+			HullRole("fighter", ShipClass::Fighter, FlightFamily::LightFighter, true, earth);
+			HullRole("heavy", ShipClass::Gunship, FlightFamily::HeavyFighter, true, earth);
+			HullRole("capital", ShipClass::Battleship, FlightFamily::Capital, false, earth);
+			HullRole("carrier", ShipClass::Carrier, FlightFamily::Capital, false, earth);
+			HullRole("hauler", ShipClass::Freighter, FlightFamily::Hauler, false, earth);
+			SeatRole("turret", Key::Slash, {}, earth);
+			SeatRole("worker", Key::P, { Key::LeftShift }, earth);
+			SeatRole("launched-craft", Key::Slash, { Key::LeftShift }, earth);
+			FreeRole(earth);
+		}
+
 		void Probe(const char* group, void (*body)())
 		{
 			try { body(); }
@@ -1015,6 +1112,7 @@ namespace SpaceGod::Smoke::FeatureAudit
 			Probe("viewer", [] { ModelViewerProbes(Result, frames); });
 			Probe("focus", FocusProbes); // US-T78
 			Probe("input", InputOwnershipProbes); // US-T90
+			Probe("roles", RoleProbes); // US-T167: docs/ROLES.md, per embodied role
 		}
 		// US-T58: what the binding probes left code-present: combat at the controls with the mouse, and the player's own
 		// transits (a hyperlane ridden, a jump gate gone through, an FTL crossing to another star). The last two leave Sol,

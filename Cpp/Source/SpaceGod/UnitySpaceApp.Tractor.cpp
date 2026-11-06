@@ -4,6 +4,7 @@
 #include "UnitySpaceAppActor.h"
 
 #include "BodyCatalog.h"
+#include "Camera/StarTravel.h"
 #include "Combat/CargoPods.h"
 #include "Combat/CombatSpecs.h"
 #include "Combat/CombatState.h"
@@ -14,6 +15,7 @@
 #include "Economy/Goods.h"
 #include "Ephemeris.h"
 #include "Fleet.h"
+#include "Sensors/SensorPosture.h"
 #include "ScaleModel.h"
 #include "Ships.h"
 #include "SimClock.h"
@@ -94,6 +96,11 @@ namespace SpaceGod
 		auto ship = World()->PilotedShip;
 		if (!IsPiloting() || ship == nullptr || ship->Destroyed || ship->Spec == nullptr) { said = "Take a helm to work a tractor beam"; return false; }
 		if (Salvage != nullptr) { said = "Latched on: the clamps hold the hull, cast off (4) to work the beam"; return false; }
+		// US-T167: the beam is a manoeuvring tool; not through a lane, the cruise drive, FTL, or with the ship powered down.
+		if (ship->Phase == ShipPhase::Lane) { said = "No tractor beam in a hyperlane tube"; return false; }
+		if (SystemCruiseActive()) { said = "No tractor beam under the cruise drive: drop out first (Shift+J)"; return false; }
+		if (InFtlCruise() || Travel->Active) { said = "No tractor beam between the stars"; return false; }
+		if (SensorPosture::Offline(ship->Combat)) { said = "No tractor beam while powered down (Shift+F3 to power up)"; return false; }
 		auto pods = World()->War->Wrecks->Pods;
 		auto spec = TractorSpec::Of(ship->Spec->Class);
 		double d = 0;
@@ -162,6 +169,11 @@ namespace SpaceGod
 			}
 		}
 
+		if (tractorPod != nullptr && (ship->Phase == ShipPhase::Lane || SystemCruiseActive() || InFtlCruise() || Travel->Active || SensorPosture::Offline(ship->Combat)))
+		{
+			TractorRelease("Tractor beam off: the drive regime changed"); // US-T167
+			return;
+		}
 		if (tractorPod != nullptr)
 		{
 			if (tractorShip != ship || pods == nullptr || !pods->Items.Contains(tractorPod) || tractorPod->Expired(jd))

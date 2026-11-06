@@ -678,7 +678,7 @@ namespace SpaceGod::UI
 			{
 				bool doubleClick = lastRowTarget == target && Time::unscaledTime - lastRowClick < 0.4f;
 				app->Select(target);
-				if (doubleClick && !app->IsPiloting()) app->SpaceCamera->FocusOn(target);
+				if (doubleClick && !app->AtControls()) app->SpaceCamera->FocusOn(target); // US-T167: a seat's view is the craft's, not the command camera's
 				lastRowClick = Time::unscaledTime;
 				lastRowTarget = target;
 			}
