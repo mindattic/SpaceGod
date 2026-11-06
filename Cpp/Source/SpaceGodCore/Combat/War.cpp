@@ -722,7 +722,6 @@ namespace SpaceGod::Core
 
 	void War::Loot(const cs::Ref<Ship>& ship, const cs::Ref<Faction>& clan, const cs::Ref<Battle>& b)
 	{
-		Economy()->Release(ship);
 		double value = ship->CargoTonnes * GoodInfo::Of(ship->CargoGood)->BasePrice;
 		DeliverLoot(clan, ship->CargoGood, ship->CargoTonnes, b);
 		clan->Treasury += value * 0.3;
