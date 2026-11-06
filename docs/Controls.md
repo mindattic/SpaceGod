@@ -136,18 +136,20 @@ the sky cycle. A plain key never changes meaning with Shift unless the table say
 
 ## Console
 
-Open with the console key; `sg.BigBattle sg.BioMass sg.CapitalRoll sg.Cheat sg.CheatMenu sg.Comms sg.DogfightDemo sg.Drift
-sg.EdgeRun sg.EvaRepair sg.Ghost sg.Harvest sg.HullLighting sg.HyperspaceToll sg.LaneRide sg.Lighting sg.Race sg.Shine sg.Sky*
-sg.StandDown sg.Tour sg.Tractor sg.VoidStation sg.WarpRun sg.WarpTunnel`. Every dev-menu entry is also reachable as a console
+Open with the console key; `sg.BigBattle sg.BioMass sg.CapitalRoll sg.Cheat sg.CheatMenu sg.Comms sg.CruiseRun sg.DogfightDemo
+sg.Drift sg.EdgeRun sg.EvaRepair sg.Ghost sg.Harvest sg.HullLighting sg.HyperspaceToll sg.LaneRide sg.Lighting sg.Race sg.Shine
+sg.Sky* sg.Squadron sg.StandDown sg.Tour sg.Tractor sg.VoidStation sg.WarpRun sg.WarpTunnel`. Every dev-menu entry is also reachable as a console
 command; the console is the only way to some tuning (`sg.Lighting`, `sg.Shine`, `sg.HullLighting`).
 
-Staged checks (US-T218), each logging its numbers under LogSpaceGod and, with `shot`, saving screenshots:
+Staged checks (US-T218, US-T224), each logging its numbers under LogSpaceGod and, with `shot`, saving screenshots:
 
 | Command | What it stages |
 |---|---|
 | `sg.Ghost [shot <file>] [quit]` | Two hulls on one line of sight, the far one focused: the near one drawn as the see-through occluder ghost (US-T185); logs each hull's materials; also `<file>-opaque.png` (focus let go) and `<file>-far-alone.png` |
 | `sg.LaneRide [shot <dir>] [quit]` | A fighter flown into a space lane, steered about inside the tube (US-T196), then out past its wall; logs the offset, sideways speed and speed every half second, and the speed bleeding down to the hull's own every quarter second; `lane-1..4-*.png` |
 | `sg.CapitalRoll [shot <dir>] [seconds=60] [preroll=90] [quit]` | The big battle off Uranus run on `preroll` battle seconds, the camera on the capital under the most fire; each second its roll, the threat's bearing and the shield field it shows the threat against its strongest face and every other roll (US-T187); `roll-NN.png` every 5 s |
+| `sg.CruiseRun [shot <dir>] [quit]` | A fighter's helm in open space 1.3 AU out (US-T224): Shift+J spools the cruise drive (US-T127, US-T197), the mouse turns it at cruise for 6 s, Shift+J drops it out; then spooled twice more to be dropped by a hit on the shields and by a hull parked across its path. Logs the regime, the drive's and the hull's speed, the heading and the distance covered every half second, and PASS/FAIL per check; `cruise-1..6-*.png` (with the HUD) |
+| `sg.Squadron [shot <dir>] [quit]` | Two carriers off Uranus 84 km apart, the far one's wing held aboard (US-T224): one of the near one's fighter squadrons followed in formation (US-T198), the far carrier's interceptors put out 4 km ahead of it, the wingmen breaking into dogfights (US-T188), then forming up again. Logs every wingman's distance off its slot (right/up/ahead), speed, broken state, target and manoeuvre each second, and a summary; `squad-1..4-*.png` (with the HUD) |
 
 ## Findings and conflicts
 
