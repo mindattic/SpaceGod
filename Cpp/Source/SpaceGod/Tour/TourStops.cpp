@@ -505,14 +505,21 @@ namespace SpaceGod::Tour
 					double km = app.BodyStandoffKm(earth, outward);
 					auto along = DVec3::Cross(outward, DVec3::UnitZ);
 					along = along.LengthSquared() > 1e-9 ? along.Normalized() : DVec3::UnitX;
+					// Laid out in scene units, not km: the gameplay scale compresses true offsets near a body, so a spacing in km
+					// piles the hulls up. Each hull gets its drawn length (ScaleModel::ShipLength) along the line, then is mapped back to km.
+					auto def = (*app.Catalog())[earth];
+					DVec3 baseScene = app.Scale()->LocalOffset(def, outward * km);
+					DVec3 alongScene = along.SwapYZ();
+					alongScene = alongScene.LengthSquared() > 1e-9 ? alongScene.Normalized() : DVec3::UnitX;
 					double at = 0;
 					for (auto cls : classes)
 					{
-						double len = CombatSpec::Of(cls)->LengthKm;
+						double len = std::max(app.Scale()->ShipLength(CombatSpec::Of(cls)->LengthKm), 1e-6);
 						at += len * 0.5;
+						DVec3 offsetKm = app.Scale()->InverseLocalOffset(def, baseScene + alongScene * at);
 						lineup->Ships.Add(app.Fleet()->SpawnAt(cs::Cat("Lineup ", ShipClassSpec::Of(cls)->DisplayName), cls, app.World()->Sol, earth,
-							outward * km + along * at, along, app.Clock->Jd));
-						at += len * 0.5 + std::max(0.15, len * 0.6);
+							offsetKm, along, app.Clock->Jd));
+						at += len * 0.5 + len * 0.6;
 					}
 					return cs::String();
 				})
@@ -532,7 +539,10 @@ namespace SpaceGod::Tour
 					auto line = (app.ShipScene(lineup->Ships[n - 1]) - app.ShipScene(lineup->Ships[0]));
 					auto side = DVec3::Cross(line.LengthSquared() > 0 ? line.Normalized() : DVec3::UnitX, DVec3::UnitY);
 					side = side.LengthSquared() > 1e-9 ? side.Normalized() : DVec3::UnitZ;
-					LookAt(app, subject, subject + (side + DVec3(0, 0.35, 0)) * (size * 3.2) - (line.LengthSquared() > 0 ? line.Normalized() : DVec3::UnitX) * (size * 1.2));
+					// Back far enough to frame the neighbours either side too, so the name labels separate.
+					double span = (app.ShipScene(a) - app.ShipScene(b)).Length();
+					double dist = std::max(size * 3.2, span * 2.5 + size * 1.5);
+					LookAt(app, subject, subject + (side + DVec3(0, 0.35, 0)) * dist - (line.LengthSquared() > 0 ? line.Normalized() : DVec3::UnitX) * (size * 1.2));
 				})
 				.For(14).AtBothScales());
 
