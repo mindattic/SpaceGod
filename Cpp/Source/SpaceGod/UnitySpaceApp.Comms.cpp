@@ -49,9 +49,7 @@ namespace SpaceGod
 		CommsContext c;
 		c.World = World();
 		c.Jd = Clock->Jd;
-		// Ranges at realistic scale are true; at game scale they are the distance as drawn (the scale model's mapping near the
-		// speaker's frame body), so "10 klicks" matches what is on the screen.
-		c.Ruler.Realistic = Scale()->Blend() < 0.5;
+		// Ranges are the true distance at both scales, through Core::Ranges like the HUD's (US-T156).
 		if (IsPiloting() && Piloted.Ship != nullptr)
 		{
 			c.Speaker = Piloted.Ship;
@@ -76,13 +74,6 @@ namespace SpaceGod
 			c.Piloted = true;
 		}
 		c.HelioKm = Ephemeris()->HelioAt(c.FrameBody, Clock->Jd) + c.OffsetKm;
-		int frame = c.FrameBody;
-		c.Ruler.DrawnKm = [this, frame](DVec3 a, DVec3 b)
-		{
-			auto sa = Scale()->MapNear(Ephemeris(), bodyScene, frame, a);
-			auto sb = Scale()->MapNear(Ephemeris(), bodyScene, frame, b);
-			return (sa - sb).Length() * ScaleModel::KmPerUnit;
-		};
 		return c;
 	}
 
@@ -387,8 +378,7 @@ namespace SpaceGod
 		cs::String speaker = me != nullptr ? cs::Cat(me->Styled(), ", the ", c.Speaker->Name)
 			: c.SpeakerStation != nullptr ? cs::Cat(c.SpeakerStation->Name, " control") : cs::String("no one");
 		GUI::Label(Rect(x + 16, y + 10, 200, 22), "COMMS", commsTitle);
-		GUI::Label(Rect(x + 96, y + 14, w - 112, 18), cs::Cat("speaking as ", speaker, c.SpeakerFaction != nullptr ? cs::Cat(" (", c.SpeakerFaction->Name, ")") : cs::String(),
-			"   ·   ranges ", c.Ruler.Realistic ? "true" : "as drawn"), commsSmall);
+		GUI::Label(Rect(x + 96, y + 14, w - 112, 18), cs::Cat("speaking as ", speaker, c.SpeakerFaction != nullptr ? cs::Cat(" (", c.SpeakerFaction->Name, ")") : cs::String()), commsSmall);
 
 		// The contacts, down the left.
 		float listW = 330, top = y + 40, rowH = 24;

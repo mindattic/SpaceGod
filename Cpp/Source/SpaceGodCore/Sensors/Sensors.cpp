@@ -267,7 +267,11 @@ namespace SpaceGod::Core
 		double seen = jd - lag;
 		auto helio = helioNow;
 		auto c = s->Controller();
-		if (lag > 0 && !(c == pilotShip && c == world->PilotedShip)) helio = world->Fleet->StateOf(c, seen).HelioKm;
+		// Where it was when the light left it: its schedule's place then. Not for the piloted hull, nor for a group running
+		// the player down (US-T156: the chase has it, not its schedule, which can be a million km off; the chase keeps no
+		// past, so the track takes where the chase has it now, as HelioOf does).
+		bool chasing = world->Pursuit != nullptr && world->Pursuit->Active() && world->Pursuit->HelioOf(s, jd).has_value();
+		if (lag > 0 && !(c == pilotShip && c == world->PilotedShip) && !chasing) helio = world->Fleet->StateOf(c, seen).HelioKm;
 		book->Observe(s, level, helio, signature, jd, observer, seen, ParkedAt(c));
 	}
 

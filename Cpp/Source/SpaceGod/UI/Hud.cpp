@@ -44,6 +44,7 @@
 #include "Economy/CargoHold.h"
 #include "Infrastructure/Infrastructure.h"
 #include "Information/LightSpeed.h"
+#include "Information/Ranges.h" // US-T156
 #include "Persistence/SaveGame.h"
 #include "Sensors/Sensors.h"
 #include "Sensors/SensorPosture.h"
@@ -1409,7 +1410,7 @@ namespace SpaceGod::UI
 
 	cs::String Hud::RangeText(double km)
 	{
-		return km < 10 ? cs::Cat(cs::Fmt(km * 1000, "N0"), " m") : cs::Cat(cs::Fmt(km, "0.0"), " km");
+		return Ranges::Readout(km); // US-T156: the one source comms reads its ranges from too
 	}
 
 	// ---------------------------------------------------------------- hyperlane rides (U.SPC-T41)

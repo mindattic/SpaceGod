@@ -490,7 +490,7 @@ namespace SpaceGod::Core
 				T("What you can say",
 				  "Ask about the area and they tell you what their own side's sensors hold that would go for you, with the "
 				  "range and the bearing off your own nose (\"pirates, 12 klicks out at bearing 104 mark 12\"), any fight on "
-				  "nearby, or the nearest friendly patrol. Ranges are true at realistic scale and as drawn at game scale. Ask "
+				  "nearby, or the nearest friendly patrol. Ranges are true at either scale, the same the HUD shows. Ask "
 				  "the news for the latest the system's log carries. Ask to trade: a freighter names a price for what is in "
 				  "its hold (its pilot's greed and how it feels about you set it) and sells you a crate at a time; a station "
 				  "tells you what it is long on and what it pays well for. Ask about them and they tell you their life."),

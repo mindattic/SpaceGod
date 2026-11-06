@@ -14,6 +14,7 @@
 #include "Economy/Settlement.h"
 #include "Ephemeris.h"
 #include "Fleet.h"
+#include "Information/Ranges.h" // US-T156
 #include "Law/Law.h"
 #include "Sensors/Sensors.h"
 #include "Ships.h"
@@ -96,23 +97,9 @@ namespace SpaceGod::Core
 
 	// ---------------------------------------------------------------- ranges and bearings
 
-	cs::String CommsRuler::Words(double km)
-	{
-		const double au = 1.495978707e8;
-		if (km < 1) return cs::Cat(cs::Fmt(km * 1000, "N0"), " metres");
-		if (km < 100) return cs::Cat(cs::Fmt(km, km < 10 ? "0.#" : "0"), km < 1.5 ? " klick" : " klicks");
-		if (km < 1000) return cs::Cat(cs::Fmt(cs::Math::Round(km / 10) * 10, "0"), " klicks");
-		if (km < 1e6) return cs::Cat(cs::Fmt(km / 1000, km < 1e4 ? "0.#" : "0"), " thousand klicks");
-		if (km < 0.05 * au) return cs::Cat(cs::Fmt(km / 1e6, "0.#"), " million klicks");
-		return cs::Cat(cs::Fmt(km / au, km < au ? "0.##" : "0.#"), " AU");
-	}
+	cs::String CommsRuler::Words(double km) { return Ranges::Spoken(km); }
 
-	cs::String CommsRuler::Range(DVec3 fromHelio, DVec3 toHelio) const
-	{
-		double km = (toHelio - fromHelio).Length();
-		if (!Realistic && DrawnKm) km = DrawnKm(fromHelio, toHelio);
-		return Words(km);
-	}
+	cs::String CommsRuler::Range(DVec3 fromHelio, DVec3 toHelio) const { return Ranges::Spoken(Ranges::Km(fromHelio, toHelio)); }
 
 	cs::String Comms::Bearing(DVec3 fromHelio, DVec3 forward, DVec3 up, DVec3 toHelio)
 	{

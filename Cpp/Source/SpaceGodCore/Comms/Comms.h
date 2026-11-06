@@ -83,18 +83,13 @@ namespace SpaceGod::Core
 	SPACEGODCORE_API const char* ToString(CommsOutcome v);
 
 	/// <summary>
-	/// How ranges are said (US-T137): at realistic scale the true distance ("10 klicks", "42 thousand klicks", "0.3 AU");
-	/// at game scale the distance as the game draws it, through <see cref="DrawnKm"/> (the app's scale model), so a range
-	/// matches what the player sees. Without it, or in a fight (a battle is drawn the same at both scales), the true range.
+	/// How ranges are said (US-T137): the true distance ("10 klicks", "42 thousand klicks", "0.3 AU") at both scales,
+	/// through <see cref="Ranges"/> (US-T156), the one source the HUD reads its ranges from too, so a hull the HUD has at
+	/// 320 km is "320 klicks" on the radio, in the contact list and in anyone's advice alike.
 	/// </summary>
 	struct SPACEGODCORE_API CommsRuler
 	{
-		bool Realistic = true;
-
-		/// <summary>The drawn distance between two heliocentric points (km), in klicks of the scene; null for true km.</summary>
-		std::function<double(DVec3, DVec3)> DrawnKm;
-
-		/// <summary>"10 klicks", "4.2 thousand klicks", "1.3 million klicks", "0.42 AU".</summary>
+		/// <summary>"10 klicks", "4.2 thousand klicks", "1.3 million klicks", "0.42 AU" (Ranges::Spoken).</summary>
 		static cs::String Words(double km);
 
 		cs::String Range(DVec3 fromHelio, DVec3 toHelio) const;

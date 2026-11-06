@@ -40,6 +40,7 @@
 #include "Economy/Settlement.h"
 #include "Events/Opportunity.h"
 #include "Infrastructure/Infrastructure.h"
+#include "Information/Ranges.h" // US-T156
 #include "Law/Law.h"
 #include "Persistence/Profiles.h" // GameSettings::AutoReorient (Core/Persistence/Profiles.cs)
 #include "Rendering/Photoreal.h"
@@ -116,7 +117,7 @@ namespace SpaceGod
 			{
 				if (Clock->WarpIndex > 0) Clock->SetWarp(0);
 				ShowToast(cs::Cat("CONTACT: ", HunterName(g), " has turned to run you down, ",
-					Mathf::RoundToInt(static_cast<float>((g->Pos - pilotOffsetKm()).Length())), " km out"));
+					Ranges::Readout(Ranges::Km(pilotOffsetKm(), g->Pos)), " out")); // US-T156: the one range source
 			}
 		}
 		if (!pursuit->Active()) return;
