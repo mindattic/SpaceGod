@@ -145,6 +145,10 @@ namespace SpaceGod::Core
 		/// </summary>
 		static Impact Resolve(CollisionVolume& a, CollisionVolume& b);
 
+		/// <summary>The push-apart and impulse of <see cref="Resolve"/> for a contact already found (by any narrow phase,
+		/// US-T177): unit normal <paramref name="n"/> from a toward b, overlap <paramref name="depth"/>.</summary>
+		static Impact ResolveContact(CollisionVolume& a, CollisionVolume& b, DVec3 n, double depth, DVec3 point);
+
 		/// <summary>
 		/// A hull settling onto (or slamming into) a world's surface: the sink speed it loses there is a
 		/// fully inelastic impact with something immovable, and this is the hull's share of the energy.

@@ -76,10 +76,15 @@ namespace SpaceGod::Core
 
 	Impact Collisions::Resolve(CollisionVolume& a, CollisionVolume& b)
 	{
-		Impact impact;
 		DVec3 n, point;
 		double depth;
-		if (!Contact(a, b, n, depth, point)) return impact;
+		if (!Contact(a, b, n, depth, point)) return Impact();
+		return ResolveContact(a, b, n, depth, point);
+	}
+
+	Impact Collisions::ResolveContact(CollisionVolume& a, CollisionVolume& b, DVec3 n, double depth, DVec3 point)
+	{
+		Impact impact;
 		double ia = a.Immovable() ? 0 : 1 / a.MassKt;
 		double ib = b.Immovable() ? 0 : 1 / b.MassKt;
 		impact.Hit = true;
