@@ -41,6 +41,9 @@ namespace SpaceGod::Core
 		double HullHp = 0, Armor = 0;
 
 		double SectionHpTotal() const;
+
+		/// <summary>The radius of a sphere about <see cref="CollisionVolume.Pos"/> holding the volume and every section's box.</summary>
+		double BroadRadiusKm() const;
 	};
 
 	/// <summary>One contact between two bodies: the pair of sections (-1 for a body with none) and the geometry.</summary>
@@ -72,8 +75,9 @@ namespace SpaceGod::Core
 		static constexpr int Passes = 4;
 
 		/// <summary>The colliders of a hull in a pose, from its Structure(): one per module still attached, hit points
-		/// shared out by structure so they sum to the design's hull points, scaled by what each has left.</summary>
-		static std::vector<SectionCollider> Build(const cs::Ref<ShipCombat>& c, DVec3 pos, DVec3 forward, DVec3 up);
+		/// shared out by structure so they sum to the design's hull points, scaled by what each has left.
+		/// <paramref name="lengthKm"/> is the hull's length in the caller's own scale (both scales, US-T179); negative for the design's true length.</summary>
+		static std::vector<SectionCollider> Build(const cs::Ref<ShipCombat>& c, DVec3 pos, DVec3 forward, DVec3 up, double lengthKm = -1);
 
 		/// <summary>Whether two bodies are inside each other's proximity radius (narrow phase is due).</summary>
 		static bool InProximity(const CollisionBody& a, const CollisionBody& b);

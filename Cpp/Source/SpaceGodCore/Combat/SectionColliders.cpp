@@ -21,11 +21,18 @@ namespace SpaceGod::Core
 		return t;
 	}
 
-	std::vector<SectionCollider> SectionColliders::Build(const cs::Ref<ShipCombat>& c, DVec3 pos, DVec3 forward, DVec3 up)
+	double CollisionBody::BroadRadiusKm() const
+	{
+		double r = Volume.BoundingRadiusKm();
+		for (const auto& s : Sections) r = std::max(r, (s.Centre - Volume.Pos).Length() + s.Half.Length());
+		return r;
+	}
+
+	std::vector<SectionCollider> SectionColliders::Build(const cs::Ref<ShipCombat>& c, DVec3 pos, DVec3 forward, DVec3 up, double lengthKm)
 	{
 		std::vector<SectionCollider> out;
 		auto h = c->Structure();
-		double length = c->Spec->LengthKm, total = 0;
+		double length = lengthKm >= 0 ? lengthKm : c->Spec->LengthKm, total = 0;
 		for (int i = 0; i < h->Modules.Count(); i++) total += h->Modules[i]->MaxStructure;
 		if (total <= 0) return out;
 		DVec3 right = Collisions::ToWorld(DVec3(1, 0, 0), forward, up);
@@ -49,7 +56,7 @@ namespace SpaceGod::Core
 
 	bool SectionColliders::InProximity(const CollisionBody& a, const CollisionBody& b)
 	{
-		return (a.Volume.Pos - b.Volume.Pos).Length() <= a.Volume.BoundingRadiusKm() + b.Volume.BoundingRadiusKm() + ProximityKm;
+		return (a.Volume.Pos - b.Volume.Pos).Length() <= a.BroadRadiusKm() + b.BroadRadiusKm() + ProximityKm;
 	}
 
 	bool SectionColliders::BoxBox(const SectionCollider& a, const SectionCollider& b, DVec3& normal, double& depthKm, DVec3& point)
@@ -79,7 +86,14 @@ namespace SpaceGod::Core
 				if (!test(DVec3::Cross(a.Axes[i], b.Axes[j]))) return false;
 		normal = bestAxis;
 		depthKm = best;
-		point = a.Centre + bestAxis * a.SupportAlong(bestAxis) - bestAxis * (best * 0.5);
+		// b's deepest vertex into a (along -normal), halfway back out: on the touching surfaces, wherever the hit is.
+		DVec3 v = b.Centre;
+		for (int i = 0; i < 3; i++)
+		{
+			double hb[3] = { b.Half.X, b.Half.Y, b.Half.Z };
+			v = v - b.Axes[i] * (hb[i] * (DVec3::Dot(b.Axes[i], bestAxis) >= 0 ? 1.0 : -1.0));
+		}
+		point = v + bestAxis * (best * 0.5);
 		return true;
 	}
 
@@ -121,19 +135,31 @@ namespace SpaceGod::Core
 		return true;
 	}
 
-	/// The point of a section-less body's core segment nearest a point: the sphere it stands for against a box.
-	static DVec3 NearestOnCore(const CollisionVolume& v, DVec3 to)
+	/// The point of a section-less body's core segment nearest a box (alternating clamps between segment and box):
+	/// the sphere the body stands for against that box.
+	static DVec3 NearestOnCore(const CollisionVolume& v, const SectionCollider& box)
 	{
 		if (v.HalfLengthKm <= 0) return v.Pos;
-		double t = std::max(-v.HalfLengthKm, std::min(v.HalfLengthKm, DVec3::Dot(to - v.Pos, v.Axis)));
-		return v.Pos + v.Axis * t;
+		DVec3 p = box.Centre;
+		DVec3 onSeg = v.Pos;
+		for (int it = 0; it < 4; it++)
+		{
+			double t = std::max(-v.HalfLengthKm, std::min(v.HalfLengthKm, DVec3::Dot(p - v.Pos, v.Axis)));
+			onSeg = v.Pos + v.Axis * t;
+			DVec3 d = onSeg - box.Centre;
+			double l[3] = { DVec3::Dot(d, box.Axes[0]), DVec3::Dot(d, box.Axes[1]), DVec3::Dot(d, box.Axes[2]) };
+			double h[3] = { box.Half.X, box.Half.Y, box.Half.Z };
+			p = box.Centre;
+			for (int i = 0; i < 3; i++) p = p + box.Axes[i] * std::max(-h[i], std::min(h[i], l[i]));
+		}
+		return onSeg;
 	}
 
 	SectionContact SectionColliders::Contact(const CollisionBody& a, const CollisionBody& b)
 	{
 		SectionContact best;
 		// Phase 1: bounding spheres.
-		if ((a.Volume.Pos - b.Volume.Pos).Length() > a.Volume.BoundingRadiusKm() + b.Volume.BoundingRadiusKm()) return best;
+		if ((a.Volume.Pos - b.Volume.Pos).Length() > a.BroadRadiusKm() + b.BroadRadiusKm()) return best;
 		if (a.Sections.empty() && b.Sections.empty())
 		{
 			DVec3 n, p;
@@ -167,7 +193,7 @@ namespace SpaceGod::Core
 		{
 			for (size_t i = 0; i < a.Sections.size(); i++)
 			{
-				DVec3 c = NearestOnCore(b.Volume, a.Sections[i].Centre);
+				DVec3 c = NearestOnCore(b.Volume, a.Sections[i]);
 				bool hit = BoxSphere(a.Sections[i], c, b.Volume.RadiusKm, n, depth, p);
 				keep(hit, n, depth, p, (int)i, -1);
 			}
@@ -176,7 +202,7 @@ namespace SpaceGod::Core
 		{
 			for (size_t j = 0; j < b.Sections.size(); j++)
 			{
-				DVec3 c = NearestOnCore(a.Volume, b.Sections[j].Centre);
+				DVec3 c = NearestOnCore(a.Volume, b.Sections[j]);
 				bool hit = BoxSphere(b.Sections[j], c, a.Volume.RadiusKm, n, depth, p);
 				keep(hit, -n, depth, p, -1, (int)j); // box-to-sphere is b-to-a: flip it
 			}
@@ -228,16 +254,34 @@ namespace SpaceGod::Core
 	{
 		std::stable_sort(bodies.begin(), bodies.end(), [](const CollisionBody& x, const CollisionBody& y) { return x.Id < y.Id; });
 		std::vector<SectionImpact> impacts;
+		auto canMove = [](const CollisionBody& x) { return !x.Volume.Immovable() && !x.Volume.Pinned; };
 		for (int pass = 0; pass < Passes; pass++)
 		{
 			bool any = false;
 			for (size_t i = 0; i < bodies.size(); i++)
 				for (size_t j = i + 1; j < bodies.size(); j++)
 				{
-					SectionImpact r = Resolve(bodies[i], bodies[j]);
-					if (!r.Hit.Hit) continue;
+					auto& a = bodies[i];
+					auto& b = bodies[j];
+					if (!canMove(a) && !canMove(b)) continue; // nothing to push apart
+					if (pass == 0)
+					{
+						SectionImpact r = Resolve(a, b);
+						if (!r.Hit.Hit) continue;
+						any = true;
+						impacts.push_back(r);
+						continue;
+					}
+					// Later passes only finish the separation: no second impulse, no second damage, no second report.
+					SectionContact c = Contact(a, b);
+					if (!c.Hit) continue;
 					any = true;
-					impacts.push_back(r);
+					CollisionVolume va = a.Volume, vb = b.Volume;
+					Collisions::ResolveContact(va, vb, c.Normal, c.DepthKm, c.Point);
+					DVec3 da = va.Pos - a.Volume.Pos, db = vb.Pos - b.Volume.Pos;
+					a.Volume.Pos = va.Pos; b.Volume.Pos = vb.Pos;
+					for (auto& s : a.Sections) s.Centre = s.Centre + da;
+					for (auto& s : b.Sections) s.Centre = s.Centre + db;
 				}
 			if (!any) break;
 		}
