@@ -171,7 +171,14 @@ private:
 
 	/// A ship's name beside it. <paramref name="iconName"/>: an icon's name (U.SPC-T376), drawn only while the ship is
 	/// an icon and only where it overlaps no name already drawn. Every name is clickable, like the icon.
-	void DrawShipName(const cs::Ref<Core::Ship>& ship, const cs::Ref<Core::Contact>& contact, double ppu, bool iconName);
+	/// <paramref name="must"/> (US-T157): the hovered, selected, followed or locked hull, named where it is whatever else is
+	/// there; any other name (a flagship on sight, a dogfight's raiders) steps down a line or two to clear the names
+	/// already drawn, and is left off if it still cannot.
+	void DrawShipName(const cs::Ref<Core::Ship>& ship, const cs::Ref<Core::Contact>& contact, double ppu, bool iconName, bool must = true);
+
+	/// US-T157: the names that are not a must, nearest first, and at most this many of them (the rest show as hulls).
+	static constexpr int MaxOptionalNames = 6;
+	cs::List<IconName> optionalNamed;
 
 	/// Unconfirmed worlds are marked as such wherever they are named.
 	static cs::String StatusMark(const cs::Ref<Core::BodyDefinition>& b);

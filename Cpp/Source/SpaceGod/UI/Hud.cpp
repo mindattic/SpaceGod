@@ -59,6 +59,7 @@
 #include "Systems/VoidRaiders.h"
 #include "Shared/Profiles/ProfileStore.h"
 
+#include <algorithm>
 #include <tuple>
 
 using namespace SpaceGod::Core;
@@ -703,13 +704,18 @@ namespace SpaceGod::UI
 			// icon name (U.SPC-T376) only where it does not run into one already drawn, so a crowded port stays legible.
 			shipLabelRects.Clear();
 			iconNamed.Clear();
+			optionalNamed.Clear();
+			// US-T157: the hull locked in a fight is always named, like the hovered and selected ones.
+			auto meUnit = app->PilotUnit();
+			cs::Ref<Ship> lockedShip = meUnit != nullptr && meUnit->PlayerLockTarget != nullptr && meUnit->PlayerLockTarget->Present() ? meUnit->PlayerLockTarget->Ship : nullptr;
 			for (const auto& ship : ships)
 			{
 				if (ship->Destroyed) continue;
 				cs::Ref<Contact> contact = picture != nullptr && ship != app->Piloted.Ship ? picture->Of(ship) : nullptr;
 				if (picture != nullptr && ship != app->Piloted.Ship && contact == nullptr) continue;
 				auto t = Target::OfShip(ship);
-				bool named = t == app->Hovered || t == app->Selected || app->SpaceCamera->FocusTarget == t;
+				bool must = t == app->Hovered || t == app->Selected || app->SpaceCamera->FocusTarget == t || (lockedShip != nullptr && ship == lockedShip);
+				bool named = must;
 				bool identified = contact == nullptr || contact->Level == ContactLevel::Identified;
 				// A flagship is named on sight only once the scanners have identified it.
 				if (!named && !ship->IsEscort() && ship->Spec->IsMilitary && identified)
@@ -727,8 +733,16 @@ namespace SpaceGod::UI
 					if (identified && (contact == nullptr || !contact->Cold()) && !app->FoldedShips.Contains(ship) && ShipLod::NamesIcon(ship->Spec->IsMilitary, ship->IsEscort())) iconNamed.Add(IconName{ ship, contact });
 					continue;
 				}
-				DrawShipName(ship, contact, ppu, false);
+				if (must) DrawShipName(ship, contact, ppu, false);
+				else optionalNamed.Add(IconName{ ship, contact });
 			}
+			// US-T157: the names that are not a must after the musts, nearest the camera first and only the nearest few, each
+			// stepping clear of the names already down (a dogfight's raiders bunched on screen no longer run together).
+			auto camAt = app->SpaceCamera->ScenePosition;
+			std::stable_sort(optionalNamed.begin(), optionalNamed.end(), [&](const IconName& a, const IconName& b)
+				{ return (app->ShipScene(a.ship) - camAt).LengthSquared() < (app->ShipScene(b.ship) - camAt).LengthSquared(); });
+			for (int i = 0; i < optionalNamed.Count() && i < MaxOptionalNames; i++)
+				DrawShipName(optionalNamed[i].ship, optionalNamed[i].contact, ppu, false, false);
 			for (const auto& n : iconNamed)
 				DrawShipName(n.ship, n.contact, ppu, true);
 		}
@@ -746,7 +760,7 @@ namespace SpaceGod::UI
 		return g;
 	}
 
-	void Hud::DrawShipName(const cs::Ref<Ship>& ship, const cs::Ref<Contact>& contact, double ppu, bool iconName)
+	void Hud::DrawShipName(const cs::Ref<Ship>& ship, const cs::Ref<Contact>& contact, double ppu, bool iconName, bool must)
 	{
 		DVec3 at;
 		Vector2 p;
@@ -776,9 +790,29 @@ namespace SpaceGod::UI
 		}
 		auto size = (minor ? minorLabel : label)->CalcSize(GUIContent(text_));
 		auto r = Rect(at2.x, at2.y, size.x, size.y);
-		if (iconName)
+		auto clear = [&](const Rect& q)
+		{
 			for (const auto& other : shipLabelRects)
-				if (other.Overlaps(r)) return;
+				if (other.Overlaps(q)) return false;
+			return true;
+		};
+		if (iconName && !clear(r)) return;
+		if (!iconName && !must && !clear(r))
+		{
+			// US-T157: step down beside the hull a line at a time (then up), and leave it off if no step is clear.
+			bool placed = false;
+			const float steps[] = { 1, 2, -1, 3, -2 };
+			for (float s : steps)
+			{
+				auto q = Rect(r.x, r.y + s * (size.y + 1), r.width, r.height);
+				if (!clear(q)) continue;
+				r = q;
+				at2 = Vector2(q.x, q.y);
+				placed = true;
+				break;
+			}
+			if (!placed) return;
+		}
 		shipLabelRects.Add(r);
 		app->ShipNameRects.Add(std::make_tuple(r, ship));
 		DrawLabel(text_, at2, tint, minor);
