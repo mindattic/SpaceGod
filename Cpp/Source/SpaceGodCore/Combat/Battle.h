@@ -54,6 +54,24 @@ namespace SpaceGod::Core
 
 		/// <summary>A hard turn away from a hostile on its tail.</summary>
 		Break,
+
+		/// <summary>US-T164 (Choreography): a strafing run on a capital, burning hard for a point off one end of the hull.</summary>
+		StrafeBurn,
+
+		/// <summary>US-T164: the run's drive cut (flight assist off), coasting down the hull's length with the guns on it.</summary>
+		StrafeCoast,
+
+		/// <summary>US-T164: past the far end, flipped onto the retrograde and burning back for the next pass.</summary>
+		StrafeFlip,
+
+		/// <summary>US-T164: through the merge, the nose pulled up and over the top to come round on the target's tail.</summary>
+		Loop,
+
+		/// <summary>US-T164: a rolling break, hard over one way.</summary>
+		Roll,
+
+		/// <summary>US-T164: a capital steaming across the enemy's line on one broadside until it comes about.</summary>
+		Crossing,
 	};
 	SPACEGODCORE_API const char* ToString(DogfightManeuver v);
 
@@ -831,7 +849,10 @@ namespace SpaceGod::Core
 		/// turn rate, the throttle at <paramref name="throttle"/> of top speed and the boost held on <paramref name="boost"/>
 		/// (drawing on the hull's own charge), all scaled by its engines.
 		/// </summary>
-		static void FlyCrewed(const cs::Ref<BattleUnit>& u, ShipClass cls, const PilotTuning& tune, const HullDynamics& hull, double engines, DVec3 goal, double throttle, bool boost, double dt);
+		/// US-T164: <paramref name="coast"/> cuts the drive with flight assist off (the strafing run's free fall), and
+		/// <paramref name="roll"/> is the crew's roll input; the roof the model leaves it with is the one it is drawn with.
+		static void FlyCrewed(const cs::Ref<BattleUnit>& u, ShipClass cls, const PilotTuning& tune, const HullDynamics& hull, double engines, DVec3 goal, double throttle, bool boost, double dt,
+			bool coast = false, double roll = 0);
 
 		/// <summary>A hostile close behind <paramref name="u"/> with its nose on it, or null.</summary>
 		cs::Ref<BattleUnit> OnItsTail(const cs::Ref<BattleUnit>& u);

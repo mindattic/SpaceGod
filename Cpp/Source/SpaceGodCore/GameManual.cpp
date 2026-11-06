@@ -276,7 +276,17 @@ namespace SpaceGod::Core
 				  "the day its forts are silenced. It always has its own FTL drive."),
 				T("Capital handling",
 				  "All capitals fly the engine telegraph and turn slowly; a destroyer comes about in about 6 seconds at Half, "
-				  "a carrier in 18. Big ships shed heat through radiator panels that gunners can shoot away.")),
+				  "a carrier in 18. Big ships shed heat through radiator panels that gunners can shoot away."),
+				T("How a fleet action flies", // US-T164
+				  "A battle is never two parked lines. Fighters on a capital fly the strafing run: they burn hard for a point "
+				  "off one end of the hull, cut the drive and coast down its whole length with flight assist off, the nose "
+				  "kept on the plating so the guns rake it end to end, then flip, burn and come round for the next pass. "
+				  "Fighters on fighters chase tails, pull loops through the merge and throw rolling breaks. Corvettes, "
+				  "frigates and destroyers make passes at speed, their noses weaving. Capitals steam across the enemy's line "
+				  "broadside-on at their slow turn rate and come about from time to time, or when the side they have been "
+				  "showing is worn, so the fresh broadside and its shield arrays take the fire; hits land on whichever "
+				  "shield patch faces them, so the turn really spares the damaged side. Dev menu, Combat: Start a big "
+				  "battle and watch.")),
 
 			cs::New<ManualChapter>("Ships: escorts and sub-capitals", "Cruisers, destroyers, frigates, corvettes and gate pickets", Keys(),
 				T("Cruiser",
@@ -661,8 +671,8 @@ namespace SpaceGod::Core
 				  "category: Spawn (any hull beside you, friendly or neutral), Enemies (pirate raiders small, medium and "
 				  "large, any pirate hull, a hostile navy's warships, a Bio Mass globule; at a helm they open a fight with "
 				  "you), Travel (the cruise drive and Cruise to, teleports to a world or station, the other stars), Helm "
-				  "(take a helm, the nearest ship, seats, guns, launched craft), Combat (the dogfight demo in each kit, mend "
-				  "the hull flown) and Time & scale (pause, warp, the realistic or game scale). Type to filter everything, "
+				  "(take a helm, the nearest ship, seats, guns, launched craft), Combat (the dogfight demo in each kit, a big "
+				  "battle to watch, mend the hull flown) and Time & scale (pause, warp, the realistic or game scale). Type to filter everything, "
 				  "Up and Down pick, Enter or a click runs, Right opens a submenu, Left backs out, Tab steps the categories, "
 				  "Esc closes. While it is open it has the keys and the mouse; the game runs on and the craft holds its "
 				  "heading. The console's sg.Cheat runs any entry by its path."),

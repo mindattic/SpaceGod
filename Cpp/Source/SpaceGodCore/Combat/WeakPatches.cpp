@@ -6,6 +6,7 @@
 #include "Combat/ArmourAngling.h"
 #include "Combat/Battle.h"
 #include "Combat/Broadsides.h"
+#include "Combat/Choreography.h"
 #include "Combat/CombatSpecs.h"
 #include "Combat/CombatState.h"
 #include "Combat/PilotFlight.h"
@@ -348,6 +349,10 @@ namespace SpaceGod::Core
 		int bestBearing = keys[0];
 		double bestDeg = 0;
 		double step = 360.0 / RollSteps;
+		// US-T164: a crossing capital would rather lay its bow along its course (Choreography::Crossing), by a little more
+		// than the hysteresis, so when it comes about it does turn its other broadside to the enemy.
+		auto course = Choreography::Course(u);
+		bool steaming = bearings != nullptr && course.LengthSquared() > 1e-12;
 		for (int bearing : keys)
 		{
 			double battery = bearings == nullptr ? 1 : most > 0 ? (*bearings)[bearing] / most : 1;
@@ -375,8 +380,9 @@ namespace SpaceGod::Core
 					Transport(actual, f2, up2);
 					carried = battery - Cost(c, samples, weak, fire, protect, slant, f2, up2);
 				}
-				own += bonus - at0;
-				carried += bonus - at0;
+				double along = steaming ? Choreography::CourseBias * DVec3::Dot(f, course) : 0;
+				own += bonus - at0 + along;
+				carried += bonus - at0 + along;
 				if (own > ownBest) ownBest = own;
 				if (carried > rollBest + 1e-12)
 				{

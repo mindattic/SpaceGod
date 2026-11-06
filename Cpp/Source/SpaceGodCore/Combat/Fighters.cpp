@@ -11,6 +11,7 @@
 #include "Combat/PilotFlight.h"
 #include "Combat/PilotTuning.h"
 #include "Combat/StrandedWings.h"
+#include "Combat/WeakPatches.h"
 #include "Settings/GameSetting.h"
 #include "Ships.h"
 #include "Astro.h"
@@ -369,6 +370,9 @@ namespace SpaceGod::Core
 		auto t = u->Target;
 		DVec3 goal;
 		double speed = u->Combat->Spec->MaxSpeed;
+		u->ManeuverLeft -= dt;
+		// US-T164: a run or a trick belongs to the phase it was flown in; anywhere else it starts afresh.
+		if (f->Phase != FighterPhase::AttackRun && Choreography::Strafing(u)) Choreography::EndRun(u);
 
 		switch (f->Phase)
 		{
@@ -390,6 +394,13 @@ namespace SpaceGod::Core
 					goal = t->Pos;
 					break;
 				}
+				// US-T164: a fighter's strafing run lines itself up (Choreography::StrafeRun's burn), straight from here.
+				if (!f->Bomber && Choreography::Strafeable(t))
+				{
+					Switch(f, FighterPhase::AttackRun);
+					goal = t->Pos;
+					break;
+				}
 				if (f->RunEntry.LengthSquared() == 0 || f->PhaseTime < dt * 1.5) f->RunEntry = PickEntry(b, u, t);
 				goal = t->Pos + f->RunEntry;
 				if ((u->Pos - goal).Length() < 1.0 || f->PhaseTime > 60) Switch(f, FighterPhase::AttackRun);
@@ -402,6 +413,21 @@ namespace SpaceGod::Core
 					Switch(f, FighterPhase::Approach);
 					goal = u->Pos + u->Forward;
 					break;
+				}
+				// US-T164: a fighter on a capital flies the strafing run: burn in, coast down the hull's length with the
+				// drive cut and the guns on it, flip and burn out; then round again from a fresh entry.
+				if (!f->Bomber && Choreography::Strafeable(t))
+				{
+					auto run = Choreography::StrafeRun(b, u, t, u->Combat->Spec->TurnRateDegS, dt);
+					FlyRun(b, u, run, speed, dt);
+					if (!Choreography::Strafing(u) || f->PhaseTime > 90)
+					{
+						Choreography::EndRun(u);
+						f->RunEntry = DVec3::Zero;
+						Switch(f, FighterPhase::Approach);
+					}
+					Torpedo(b, u);
+					return;
 				}
 				// Dive at the target, aiming to pass a few hundred metres off its hull.
 				auto to = t->Pos - u->Pos;
@@ -442,6 +468,14 @@ namespace SpaceGod::Core
 					goal = u->Pos + u->Forward;
 					break;
 				}
+				// US-T164: through the merge a loop back onto it, and now and then a rolling break.
+				Choreography::Flight trick;
+				if (Choreography::FighterTurn(b, u, t, u->Combat->Spec->TurnRateDegS, dt, trick))
+				{
+					FlyRun(b, u, trick, speed, dt);
+					Torpedo(b, u);
+					return;
+				}
 				double dist = (t->Pos - u->Pos).Length();
 				auto jink = DVec3(cs::Math::Sin(b->Seconds * 1.7 + f->Seed), cs::Math::Sin(b->Seconds * 1.3 + f->Seed * 2), cs::Math::Sin(b->Seconds * 0.9 + f->Seed * 3)) * 0.15;
 				goal = t->Pos + t->Vel * Min(dist / speed, 3.0) + jink;
@@ -449,7 +483,24 @@ namespace SpaceGod::Core
 			}
 		}
 		Steer(b, u, goal, speed, dt);
+		Choreography::Bank(u, 0, dt);
 		Torpedo(b, u);
+	}
+
+	void FighterAI::FlyRun(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& u, const Choreography::Flight& run, double speed, double dt)
+	{
+		if (run.Coast)
+		{
+			// Drive cut: the nose swings onto the hull while the craft falls on down its length on the way it had.
+			Battle::TurnToward(u, run.Goal, u->Combat->Spec->TurnRateDegS, dt);
+			u->Pos = u->Pos + u->Vel * dt;
+		}
+		else
+		{
+			auto dir = run.Goal.LengthSquared() > 1e-12 ? run.Goal.Normalized() : u->Forward;
+			Steer(b, u, u->Pos + dir * 10, speed * run.Throttle * (run.Boost ? BurnBoost : 1), dt);
+		}
+		Choreography::Bank(u, run.Roll * RollDegS, dt);
 	}
 
 	void FighterAI::Recon(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& u, double dt, const cs::Ref<BattleUnit>& pinned)
@@ -893,9 +944,22 @@ namespace SpaceGod::Core
 			return;
 		}
 		u->Target = lead->Target;
-		// Station: the slot in the lead's frame, stretched on the run, plus this pilot's own wander.
-		DVec3 right, up;
-		lead->Basis(right, up);
+		// US-T164: the lead has cut its drive and is raking the hull: the flight cuts theirs too and lays their guns on it.
+		if (lf->Phase == FighterPhase::AttackRun && Choreography::Coasting(lead) && u->Target != nullptr && Choreography::Strafeable(u->Target))
+		{
+			Choreography::Flight coast;
+			coast.Coast = true;
+			coast.Throttle = 0;
+			auto runDir = lead->Vel.LengthSquared() > 1e-12 ? lead->Vel.Normalized() : lead->Forward;
+			coast.Goal = Choreography::RakePoint(u->Target, u->Pos, runDir) - u->Pos;
+			FlyRun(b, u, coast, u->Combat->Spec->MaxSpeed, dt);
+			Torpedo(b, u);
+			return;
+		}
+		// Station: the slot in the lead's frame, stretched on the run, plus this pilot's own wander. The frame is held level
+		// (US-T164): the lead banking and rolling (Choreography::Bank) must not swing its wingmen's slots round it.
+		auto up = WeakPatches::LevelRoof(lead->Forward);
+		auto right = DVec3::Cross(lead->Forward, up).Normalized();
 		double spread = lf->Phase == FighterPhase::AttackRun ? 2.6 : lf->Phase == FighterPhase::Dogfight ? 4.0 : 1.0;
 		spread *= 1.6 - f->Discipline;
 		auto slot = SlotOffset(f->Slot) * spread;
@@ -919,6 +983,7 @@ namespace SpaceGod::Core
 			Steer(b, u, u->Pos + lead->Forward, speed, dt);
 		else
 			Steer(b, u, u->Pos + want, speed, dt);
+		Choreography::Bank(u, 0, dt); // US-T164: banked into its turns
 		Torpedo(b, u);
 	}
 

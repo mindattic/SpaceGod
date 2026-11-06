@@ -3,6 +3,7 @@
 #include "DVec3.h"
 #include "Combat/Dogfighting.h"
 #include "Combat/CarrierWings.h"
+#include "Combat/Choreography.h" // Choreography::Flight (by value), US-T164
 
 namespace SpaceGod::Core
 {
@@ -324,5 +325,14 @@ namespace SpaceGod::Core
 
 		/// <summary>Flies toward a point: the nose turns at the craft's rate and the craft goes where it points.</summary>
 		static void Steer(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& u, DVec3 goal, double speed, double dt, cs::Nullable<DVec3> match = std::nullopt, bool homing = false);
+
+		/// <summary>US-T164: how much harder than its cruise a craft burns on a run's boost, and how fast it rolls through a
+		/// flip or a rolling break, deg/s.</summary>
+		static constexpr double BurnBoost = 1.3; static constexpr double RollDegS = 200;
+
+		/// <summary>US-T164: one step of a strafing run or a dogfight trick (<see cref="Choreography"/>): coasting with the
+		/// drive cut and the nose swinging onto the hull, or steering on the run's heading under its throttle and boost;
+		/// banked and rolled as it flies.</summary>
+		static void FlyRun(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& u, const Choreography::Flight& run, double speed, double dt);
 	};
 }

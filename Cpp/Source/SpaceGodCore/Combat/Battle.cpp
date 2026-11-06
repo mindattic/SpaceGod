@@ -11,6 +11,7 @@
 #include "Combat/BreacherBays.h"
 #include "Combat/Broadsides.h"
 #include "Combat/CarrierWings.h"
+#include "Combat/Choreography.h"
 #include "Combat/CombatSpecs.h"
 #include "Combat/CombatState.h"
 #include "Combat/Crews.h"
@@ -73,6 +74,12 @@ namespace SpaceGod::Core
 			case DogfightManeuver::Attack: return "Attack";
 			case DogfightManeuver::Extend: return "Extend";
 			case DogfightManeuver::Break: return "Break";
+			case DogfightManeuver::StrafeBurn: return "StrafeBurn";
+			case DogfightManeuver::StrafeCoast: return "StrafeCoast";
+			case DogfightManeuver::StrafeFlip: return "StrafeFlip";
+			case DogfightManeuver::Loop: return "Loop";
+			case DogfightManeuver::Roll: return "Roll";
+			case DogfightManeuver::Crossing: return "Crossing";
 		}
 		return "";
 	}
@@ -657,7 +664,11 @@ namespace SpaceGod::Core
 			auto spot = t->Pos + dir * range;
 			auto around = DVec3::Cross(DVec3::UnitZ, dir);
 			if (around.LengthSquared() < 1e-6) around = DVec3::UnitY;
-			desired = (spot - u->Pos) * 0.02 + around.Normalized() * (maxSpeed * 0.35 * u->Circle);
+			// US-T164: a capital steams across the enemy's line broadside-on and comes about to fight its fresh side; a
+			// corvette, frigate or destroyer makes passes at speed. Anything else circles at range as before.
+			if (Choreography::IsCapital(u)) desired = Choreography::Crossing(shared_from_this(), u, t, range, maxSpeed, dt);
+			else if (Choreography::IsLightWarship(u)) desired = Choreography::LightPass(shared_from_this(), u, t, range, maxSpeed);
+			else desired = (spot - u->Pos) * 0.02 + around.Normalized() * (maxSpeed * 0.35 * u->Circle);
 			if (u->Leader != nullptr && u->Leader->Present() && !u->Leader->Fleeing)
 			{
 				// Escorts hold loose station on their flagship while it fights.
@@ -694,6 +705,8 @@ namespace SpaceGod::Core
 			: strikeFace.has_value() ? *strikeFace
 			: u->Target == nullptr ? (held ? u->Leader->Forward : u->Vel)
 			: BroadsideFacing(u, (u->Target->Pos - u->Pos).Normalized());
+		// US-T164: a light warship's nose weaves off its line, jinking, rather than sitting dead steady on it.
+		if (broadside && Choreography::IsLightWarship(u)) face = Choreography::Weave(shared_from_this(), u, face);
 		if (WeakPatches::Steers(u))
 		{
 			// A capital's captain rolls and turns its hull to keep its weak patches out of the heaviest fire (U.SPC-T502).
@@ -739,24 +752,58 @@ namespace SpaceGod::Core
 
 		auto threat = OnItsTail(u);
 		u->ManeuverLeft -= dt;
+		double crewTurn = tune.TurnRateDegS * DogfightTurnShare * engines;
 		if (threat != nullptr && u->Maneuver != DogfightManeuver::Break)
 		{
 			u->Maneuver = DogfightManeuver::Break;
 			u->ManeuverLeft = 1.6 + rng.NextDouble();
 			u->BreakSide = rng.Next(2) == 0 ? -1 : 1;
 		}
-		else if (u->ManeuverLeft <= 0 && u->Maneuver != DogfightManeuver::Attack)
-			u->Maneuver = DogfightManeuver::Attack;
+		else if (u->ManeuverLeft <= 0 && (u->Maneuver == DogfightManeuver::Break || u->Maneuver == DogfightManeuver::Extend))
+		{
+			// US-T164: out of an extension, half the time it pulls a loop back onto the target rather than turning flat.
+			bool loop = u->Maneuver == DogfightManeuver::Extend && t != nullptr && !Choreography::Strafeable(t) && rng.NextDouble() < 0.5;
+			u->Maneuver = loop ? DogfightManeuver::Loop : DogfightManeuver::Attack;
+			u->ManeuverLeft = loop ? 180.0 / cs::Math::Max(crewTurn, 1.0) + 1.5 : 0;
+		}
+
+		// US-T164: on a capital, the strafing run (burn, coast down its length with the guns on it, flip and burn);
+		// on a fighter, the loops and rolling breaks of a furball. A break off its tail comes first all the same.
+		if (u->Maneuver != DogfightManeuver::Break && u->Maneuver != DogfightManeuver::Extend)
+		{
+			Choreography::Flight trick;
+			bool flown = false;
+			if (t != nullptr && Choreography::Strafeable(t))
+			{
+				trick = Choreography::StrafeRun(shared_from_this(), u, t, crewTurn, dt);
+				flown = true;
+			}
+			else
+			{
+				if (Choreography::Strafing(u)) Choreography::EndRun(u);
+				flown = Choreography::FighterTurn(shared_from_this(), u, t, crewTurn, dt, trick);
+			}
+			if (flown)
+			{
+				auto steer = trick.Goal;
+				if (u->Pos.Length() > EscapeKm * 0.8) steer = steer.Normalized() + (-u->Pos).Normalized() * 1.5;
+				FlyCrewed(u, cls, tune, hull, engines, steer, trick.Throttle, trick.Boost, dt, trick.Coast, trick.Roll);
+				return;
+			}
+		}
+		else if (Choreography::Strafing(u)) Choreography::EndRun(u);
 
 		DVec3 right, up;
 		u->Basis(right, up);
 		DVec3 goal;
+		double roll = 0;
 		switch (u->Maneuver)
 		{
 			case DogfightManeuver::Break:
-				// Hard over to one side and a little up, under boost.
+				// Hard over to one side and a little up, under boost, rolling into it (US-T164).
 				goal = right * u->BreakSide + up * 0.35 + u->Forward * 0.2;
 				boost = true;
+				roll = u->BreakSide;
 				break;
 			case DogfightManeuver::Extend:
 				goal = u->Forward + (t != nullptr ? (u->Pos - t->Pos).Normalized() * 0.4 : DVec3::Zero);
@@ -794,10 +841,11 @@ namespace SpaceGod::Core
 		}
 		// Never out of the fight altogether: past most of the escape radius, it turns back in.
 		if (u->Pos.Length() > EscapeKm * 0.8) goal = goal.Normalized() + (-u->Pos).Normalized() * 1.5;
-		FlyCrewed(u, cls, tune, hull, engines, goal, top > 0 ? speed / top : 0, boost, dt);
+		FlyCrewed(u, cls, tune, hull, engines, goal, top > 0 ? speed / top : 0, boost, dt, false, roll);
 	}
 
-	void Battle::FlyCrewed(const cs::Ref<BattleUnit>& u, ShipClass cls, const PilotTuning& tune, const HullDynamics& hull, double engines, DVec3 goal, double throttle, bool boost, double dt)
+	void Battle::FlyCrewed(const cs::Ref<BattleUnit>& u, ShipClass cls, const PilotTuning& tune, const HullDynamics& hull, double engines, DVec3 goal, double throttle, bool boost, double dt,
+		bool coast, double roll)
 	{
 		auto crew = PilotTuning(tune.MaxSpeed * engines, tune.TurnRateDegS * DogfightTurnShare * engines, tune.BoostSpeedMultiplier,
 			tune.BoostDurationS, 1, 0);
@@ -813,14 +861,18 @@ namespace SpaceGod::Core
 		state.AngularVelocity = u->TurnSpin;
 		PilotInput input{};
 		input.DesiredForward = goal.LengthSquared() > 1e-12 ? goal.Normalized() : DVec3::Zero;
-		input.Throttle = cs::Math::Max(0.0, cs::Math::Min(1.0, throttle));
-		input.Boost = boost;
+		input.Throttle = coast ? 0 : cs::Math::Max(0.0, cs::Math::Min(1.0, throttle));
+		input.Boost = boost && !coast;
+		input.FlightAssistOff = coast;
+		input.Roll = cs::Math::Max(-1.0, cs::Math::Min(1.0, roll));
 		input.InCombat = true;
 		FlightModelRegistry::Default()->For(cls)->Step(state, u->Combat, drives, crew, input, DVec3::Zero, dt);
 		u->Pos = state.Pos;
 		u->Vel = state.Vel;
 		u->Forward = state.Forward;
 		u->Up = state.Up;
+		// US-T164: drawn with the roll its crew flies it at (Basis reads Roof for a hull the battle flies), not held level.
+		u->Roof = state.Up;
 		u->TurnSpin = state.AngularVelocity;
 	}
 
@@ -860,10 +912,19 @@ namespace SpaceGod::Core
 		if (byBearing == nullptr) return toTarget;
 		int bestBearing = 0;
 		double best = -1;
+		// US-T164: a crossing capital lays its bow along its course between broadsides that bear alike, so coming about
+		// (Choreography::Crossing) turns its other side, and that side's shield arrays, to the enemy.
+		auto course = Choreography::Course(u);
+		bool steaming = course.LengthSquared() > 1e-12;
 		if (!slant)
 		{
+			double top = 0;
+			for (auto [key, value] : *byBearing) top = cs::Math::Max(top, value);
 			for (auto [key, value] : *byBearing)
-				if (value > best + 1e-9) { best = value; bestBearing = key; }
+			{
+				double score = steaming ? value + top * 0.02 * DVec3::Dot(BowFor(toTarget, key).Normalized(), course) : value;
+				if (score > best + 1e-9) { best = score; bestBearing = key; }
+			}
 			return BowFor(toTarget, bestBearing);
 		}
 		// Slanting the hull to its target's fire turns part of every hit aside on its armour (U.SPC-T534): the captain
@@ -880,7 +941,8 @@ namespace SpaceGod::Core
 			auto up = WeakPatches::LevelRoof(f);
 			auto right = DVec3::Cross(f, up).Normalized();
 			auto local = DVec3(DVec3::Dot(t, right), DVec3::Dot(t, up), DVec3::Dot(t, f));
-			double score = value / most - weight * ArmourAngling::Harm(u->Combat->Spec, local) + 1e-3 * DVec3::Dot(f, u->Forward);
+			double score = value / most - weight * ArmourAngling::Harm(u->Combat->Spec, local) + 1e-3 * DVec3::Dot(f, u->Forward)
+				+ (steaming ? 0.02 * DVec3::Dot(f, course) : 0);
 			if (score > best + 1e-9) { best = score; bestBearing = key; }
 		}
 		return BowFor(toTarget, bestBearing);
@@ -1174,7 +1236,9 @@ namespace SpaceGod::Core
 			}
 			// Every mount aims within its fire cone (U.SPC-T533): a turret's wide one round its mount's normal, a spinal
 			// mount's or fixed tube's narrow one along the keel. It engages only a target that lies inside it, in 3D.
-			if (target != nullptr && !u->Bears(s->Def, target->Pos)) target = nullptr;
+			// A crewed small craft's guns bear on a capital anywhere along its keel, so a strafer raking the hull's far end
+			// fires at the hull rather than holding for its centre (US-T164, Choreography::BearingPoint).
+			if (target != nullptr && !u->Bears(s->Def, u->PlayerControlled() ? target->Pos : Choreography::BearingPoint(u, target))) target = nullptr;
 			// A capital ship's mounts fire under their own orders (U.SPC-T425, given to the guns that bear where the captain
 			// looks): held, not at all; in a volley, a gun holds until every gun of the volley bearing on the same hull is
 			// loaded, and they go together, surer and harder.
