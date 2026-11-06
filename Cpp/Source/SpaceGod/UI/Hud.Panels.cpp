@@ -1004,12 +1004,14 @@ namespace SpaceGod::UI
 
 		float w = 410;
 		float linesH = lines.Count() * 19;
-		// A long card (a boarded hull lists every compartment) never runs off the top of the screen: its lines scroll.
-		float maxLinesH = Mathf::Max(19 * 4, Screen::height - 140 - (64 + 30));
+		// A long card (a boarded hull lists every compartment) never runs into the right-hand column's other panels (the
+		// reactor and sensors under it, the opportunities or market and the HUNTED list over it, US-T152): it takes what
+		// BottomRight has left up to TopRight, and its lines scroll in that.
+		float maxLinesH = Mathf::Max(19.0f * 2, layout.FreeRight() - (64 + 30));
 		bool scrolls = linesH > maxLinesH;
 		float shownH = scrolls ? maxLinesH : linesH;
 		float h = 64 + shownH + 30;
-		auto r = Panel(Rect(SafeRight() - w - 10, Screen::height - h - 10, w, h));
+		auto r = Panel(layout.Take(HudRegion::BottomRight, w, h));
 		auto old = GUI::contentColor;
 		GUI::contentColor = headingColor;
 		GUI::Label(Rect(r.x + 14, r.y + 8, w - 28, 24), heading, title);

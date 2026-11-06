@@ -71,6 +71,21 @@ private:
 	/// The Help screen (H / F1, or Help in the Esc menu), made the first time it is opened.
 	cs::Ref<HelpScreen> helpScreen;
 
+	/// US-T152..T155: where every docked panel goes this draw (HudLayout.h has the rule), reset at the top of Draw.
+	HudLayout layout;
+	/// The news ticker's or the open news panel's rect, taken from TopCentre first thing in Draw so every alert and
+	/// banner stacks under it (empty when neither is drawn).
+	Rect newsRect;
+
+	/// Takes TopCentre's first slot for the news (the ticker or the open feed) before anything else is drawn.
+	void LayoutNews();
+
+	/// The Bio Mass contact warning (US-T125) in the TopCentre stack, under the news (US-T154).
+	void DrawBioMassWarning();
+
+	/// Text cut to fit maxW in style, with an ellipsis (unchanged when it fits).
+	static cs::String FitText(const cs::String& s, const cs::Ref<GUIStyle>& style, float maxW);
+
 public:
 	void Draw();
 

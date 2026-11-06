@@ -101,6 +101,8 @@ namespace SpaceGod::UI
 			app->UiRects.Clear();
 			app->ShipNameRects.Clear();
 		}
+		// US-T152..T155: every docked panel takes its place from the layout's regions (HudLayout.h), afresh each event.
+		layout.Begin(SafeLeft(), SafeRight(), static_cast<float>(Screen::width), static_cast<float>(Screen::height));
 
 		// F11 (U.SPC-T496): a clear screen, nothing on it but the reticle in use.
 		if (app->ScreenCleared)
@@ -1000,16 +1002,18 @@ namespace SpaceGod::UI
 
 	void Hud::DrawReactor()
 	{
-		if (Event::current().type != EventType::Repaint || app->Travel->Active) return;
+		if (app->Travel->Active) return;
 		auto seat = app->HeldSeat();
 		if (seat == nullptr || !CraftPower::Shares(seat)) return;
+		// Screen space, a fixed size: the same at the gameplay and the realistic scale. BottomRight's first slot, the
+		// sensors and then the selection card stacked over it (US-T152); taken on every event so they are placed alike
+		// in the Layout pass and the Repaint. Not registered as UI, so it never eats a click.
+		constexpr float w = 232, h = 142, segW = 56, segH = 9, gap = 3, step = 76;
+		auto r = layout.Take(HudRegion::BottomRight, w, h);
+		if (Event::current().type != EventType::Repaint) return;
 		auto held = CraftPower::Of(seat, false);
 		PowerDistribution even; // nothing moved yet: the even share it runs at
 		const PowerDistribution& p = held != nullptr ? *held : even;
-		// Screen space, a fixed size: the same at the gameplay and the realistic scale. Lower right, clear of the gauges,
-		// the seat's readout and the flight line along the bottom middle; not registered as UI, so it never eats a click.
-		constexpr float w = 232, h = 142, segW = 56, segH = 9, gap = 3, step = 76;
-		auto r = Rect(SafeRight() - w - 16, Screen::height - h - 120, w, h);
 		GUI::Box(r, GUIContent::none(), panel);
 		cs::String preset = p.PresetName();
 		// Powered down (US-T93): the split waits for the restart, nothing runs on it now.
@@ -1041,14 +1045,15 @@ namespace SpaceGod::UI
 
 	void Hud::DrawSensors()
 	{
-		if (Event::current().type != EventType::Repaint || app->Travel->Active || !app->IsPiloting()) return;
+		if (app->Travel->Active || !app->IsPiloting()) return;
 		auto ship = app->Piloted.Ship;
 		auto sensors = app->World()->Sensors;
 		if (ship == nullptr || ship->Combat == nullptr || sensors == nullptr) return;
 		auto c = ship->Combat;
-		// Above the reactor's panel, the same width; screen space, the same at either scale.
+		// Stacked over the reactor's panel in BottomRight (US-T152), the same width; screen space, the same at either scale.
 		constexpr float w = 232, h = 62;
-		auto r = Rect(SafeRight() - w - 16, Screen::height - 142 - 120 - h - 8, w, h);
+		auto r = layout.Take(HudRegion::BottomRight, w, h);
+		if (Event::current().type != EventType::Repaint) return;
 		GUI::Box(r, GUIContent::none(), panel);
 		auto state = SensorPosture::StateOf(c);
 		float pulse = 0.65f + 0.35f * Mathf::Abs(Mathf::Sin(Time::unscaledTime * 4.0f));

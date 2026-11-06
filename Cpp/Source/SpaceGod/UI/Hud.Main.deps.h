@@ -10,6 +10,7 @@
 #include "UnityCompat/UnityGui.h"
 #include "Target.h"
 #include "RenderLod.h" // LodMark, held by value in iconMarks
+#include "UI/HudLayout.h" // US-T152..T155: the docking regions, held by value in layout
 
 namespace SpaceGod::Core
 {
