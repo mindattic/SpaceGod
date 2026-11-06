@@ -405,7 +405,7 @@ namespace SpaceGod::UI
 		constexpr float rowH = 17;
 		float w = canTrade ? 600.0f : 430.0f;
 		float h = marketOpen ? 62 + GoodInfo::Count * rowH + (canTrade ? 20 : 0) + extra + lawRow : 34;
-		auto r = Panel(Rect(SafeRight() - w - 10, 72, w, h));
+		auto r = Panel(layout.Take(HudRegion::TopRight, w, h)); // TopRight's first slot (US-T153)
 		cs::String heading = market != nullptr ? cs::Cat("MARKET  ·  ", market->Name) : cs::String("MARKET  ·  system average");
 		if (GUI::Button(Rect(r.x + 8, r.y + 6, w - 16, 22), cs::Cat(marketOpen ? "[-]  " : "[+]  ", heading), title)) marketOpen = !marketOpen;
 		if (!marketOpen) return;

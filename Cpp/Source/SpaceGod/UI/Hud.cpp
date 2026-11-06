@@ -161,13 +161,16 @@ namespace SpaceGod::UI
 		DrawFlightMarkers();
 		DrawOffscreenArrows(); // US-T128: targets off the screen, at its edge
 		DrawCombatHud();
-		DrawReactor(); // US-T94
-		DrawSensors(); // US-T93
-		DrawHunters();
+		DrawReactor(); // US-T94: BottomRight's first slot
+		DrawSensors(); // US-T93: stacked over the reactor
 		DrawTopBar();
 		if (app->ShowNews) DrawNews();
 		else DrawTicker();
 		DrawNavigator();
+		// TopRight before the selection card, which takes what the right-hand column has left between its stacks.
+		if (!app->ShowMarket) DrawOpportunityBoard();
+		if (app->ShowMarket) DrawMarket();
+		DrawHunters();
 		DrawSelection();
 		DrawStatus();
 		DrawSalvage();
@@ -179,8 +182,6 @@ namespace SpaceGod::UI
 		DrawHelmAbilities(); // US-T106
 		DrawCourseMarker();
 		DrawInterdiction();
-		if (!app->ShowMarket) DrawOpportunityBoard();
-		if (app->ShowMarket) DrawMarket();
 		if (app->ShowCargo) DrawCargo();
 		if (app->ShowOutfit) DrawOutfit();
 		if (app->ShowBounties) DrawBounties();
@@ -499,6 +500,38 @@ namespace SpaceGod::UI
 					p + Vector2(10, -8), system ? Accent : Color(c.r, c.g, c.b, 0.75f), !system);
 			}
 		}
+	}
+
+	void Hud::LayoutNews()
+	{
+		// The same conditions and sizes DrawTicker and DrawNews draw by, so the slot is the panel's.
+		newsRect = Rect(0, 0, 0, 0);
+		if (!app->ShowHud) return;
+		if (app->ShowNews)
+		{
+			newsRect = layout.Take(HudRegion::TopCentre, 760, Mathf::Min(Screen::height * 0.5f, 420.0f));
+			return;
+		}
+		int n = cs::Math::Min(4, app->World()->Events.Count());
+		if (n > 0) newsRect = layout.Take(HudRegion::TopCentre, 640, 10 + n * 17.0f);
+	}
+
+	cs::String Hud::FitText(const cs::String& s, const cs::Ref<GUIStyle>& style, float maxW)
+	{
+		if (style->CalcSize(GUIContent(s)).x <= maxW) return s;
+		// Binary search on the length that still fits with the ellipsis (UTF-8: cut only at a character's first byte).
+		const std::string& raw = s;
+		size_t lo = 0, hi = raw.size();
+		while (lo < hi)
+		{
+			size_t mid = (lo + hi + 1) / 2;
+			while (mid > 0 && mid < raw.size() && (static_cast<unsigned char>(raw[mid]) & 0xC0) == 0x80) mid--;
+			if (mid <= lo) { hi = lo; break; }
+			if (style->CalcSize(GUIContent(cs::String(raw.substr(0, mid)) + "\xE2\x80\xA6")).x <= maxW) lo = mid;
+			else hi = mid - 1;
+		}
+		while (lo > 0 && lo < raw.size() && (static_cast<unsigned char>(raw[lo]) & 0xC0) == 0x80) lo--;
+		return cs::String(raw.substr(0, lo)) + "\xE2\x80\xA6";
 	}
 
 	void Hud::DrawBanner(const cs::String& banner)
@@ -897,13 +930,17 @@ namespace SpaceGod::UI
 
 	void Hud::DrawHunters()
 	{
-		if (!app->IsPiloting() || Event::current().type != EventType::Repaint) return;
+		if (!app->IsPiloting()) return;
 		auto pursuit = app->World()->Pursuit;
 		if (pursuit == nullptr || !pursuit->Active()) return;
+		// TopRight, under the opportunities or the market (US-T153): its own slot, taken on every event so the selection
+		// card under it is sized alike in the Layout pass and the Repaint.
+		auto slot = layout.Take(HudRegion::TopRight, 380, 22.0f + 18.0f * pursuit->Groups.Count());
+		if (Event::current().type != EventType::Repaint) return;
 		auto me = app->PilotOffsetKm();
 		auto myVel = app->PilotVelocityKmS();
-		float y = 118;
-		DrawLabel("HUNTED", Vector2(SafeRight() - 380, y), HostileColor, false);
+		float y = slot.y;
+		DrawLabel("HUNTED", Vector2(slot.x, y), HostileColor, false);
 		y += 22;
 		for (const auto& g : pursuit->Groups)
 		{
@@ -915,7 +952,7 @@ namespace SpaceGod::UI
 			if (g->EmpCharge >= 0)
 				line += cs::Cat("   EMP ", cs::Fmt(cs::Math::Max(0.0, Pursuit::EmpChargeSeconds - g->EmpCharge), "0.0"), " s (clear ",
 					Mathf::RoundToInt(static_cast<float>(Pursuit::EmpRangeKm * 1.25)), " km)");
-			DrawLabel(line, Vector2(SafeRight() - 380, y), g->EmpCharge >= 0 ? LockColor : Dim, true);
+			DrawLabel(FitText(line, minorLabel, slot.width), Vector2(slot.x, y), g->EmpCharge >= 0 ? LockColor : Dim, true);
 			y += 18;
 		}
 	}

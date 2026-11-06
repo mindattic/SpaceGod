@@ -295,9 +295,7 @@ namespace SpaceGod::UI
 		double jd = app->Clock->Jd;
 		list.Sort([](const cs::Ref<Opportunity>& a, const cs::Ref<Opportunity>& b) { return cs::CompareTo(a->ExpiresJd, b->ExpiresJd); });
 		int n = Mathf::Min(5, list.Count());
-		float w = 380, rowH = 40;
-		auto r = Panel(Rect(SafeRight() - w - 10, 72, w, 30 + n * rowH));
-		GUI::Label(Rect(r.x + 12, r.y + 6, w - 24, 18), cs::Cat("OPPORTUNITIES", app->IsPiloting() ? "" : "   (pilot a ship to answer)"), small);
+		float w = 380, textW = w - 24;
 		auto player = app->PlayerHelioKm();
 		auto old = GUI::contentColor;
 		if (!opportunityHook)
@@ -306,15 +304,32 @@ namespace SpaceGod::UI
 			opportunityHook->wordWrap = true;
 			opportunityHook->clipping = TextClipping::Clip;
 		}
+		// US-T153: each entry as tall as its text wraps to (the headline can run to two lines, the hook to several), so a
+		// line never prints over the next entry and the panel is as tall as what it holds.
+		cs::List<cs::String> heads;
+		cs::List<float> headH, hookH;
+		float h = 30;
 		for (int i = 0; i < n; i++)
 		{
 			auto op = list[i];
-			float y = r.y + 26 + i * rowH;
+			heads.Add(cs::Cat(op->MarkerLabel(), "   ", op->Title, "   ", Km((op->HelioKm - player).Length()), "   ",
+				Duration(op->DaysLeft(jd)), " left", op->Engaged ? "   · on scene" : ""));
+			headH.Add(Mathf::Max(16.0f, opportunityHook->CalcHeight(GUIContent(heads[i]), textW)));
+			hookH.Add(op->Hook.empty() ? 0.0f : opportunityHook->CalcHeight(GUIContent(op->Hook), textW));
+			h += headH[i] + hookH[i] + 4;
+		}
+		auto r = Panel(layout.Take(HudRegion::TopRight, w, h)); // TopRight's first slot (HudLayout.h)
+		GUI::Label(Rect(r.x + 12, r.y + 6, textW, 18), cs::Cat("OPPORTUNITIES", app->IsPiloting() ? "" : "   (pilot a ship to answer)"), small);
+		float y = r.y + 26;
+		for (int i = 0; i < n; i++)
+		{
+			auto op = list[i];
 			GUI::contentColor = OpportunityColor(op);
-			GUI::Label(Rect(r.x + 12, y, w - 24, 16), cs::Cat(op->MarkerLabel(), "   ", op->Title, "   ", Km((op->HelioKm - player).Length()), "   ",
-				Duration(op->DaysLeft(jd)), " left", op->Engaged ? "   · on scene" : ""), small);
+			GUI::Label(Rect(r.x + 12, y, textW, headH[i]), heads[i], opportunityHook);
+			y += headH[i];
 			GUI::contentColor = Dim;
-			GUI::Label(Rect(r.x + 12, y + 15, w - 24, rowH - 16), op->Hook, opportunityHook);
+			if (hookH[i] > 0) GUI::Label(Rect(r.x + 12, y, textW, hookH[i]), op->Hook, opportunityHook);
+			y += hookH[i] + 4;
 		}
 		GUI::contentColor = old;
 	}
