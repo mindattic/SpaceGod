@@ -305,7 +305,7 @@ namespace SpaceGod::UI
 				return;
 			}
 			app->Select(it.target);
-			if (!app->IsPiloting()) app->SpaceCamera->FocusOn(it.target);
+			if (!app->AtControls()) app->SpaceCamera->FocusOn(it.target);
 			else app->ShowToast(cs::Cat("Can't hail ", it.name, ": ", it.why));
 			return;
 		}
@@ -314,7 +314,7 @@ namespace SpaceGod::UI
 		else
 		{
 			app->Select(it.target);
-			app->SpaceCamera->FocusOn(it.target);
+			if (!app->AtControls()) app->SpaceCamera->FocusOn(it.target); // US-T205: a seat keeps its own view
 		}
 	}
 
