@@ -37,6 +37,7 @@
 #include "Misc/App.h"
 #include "Misc/Paths.h"
 #include "RHI.h"
+#include "ShaderCompiler.h"
 #include "UnrealClient.h"
 
 #include <algorithm>
@@ -363,6 +364,10 @@ namespace
 				{
 					// Framed again once the focus has flown in (the hull drawn at its size now).
 					if (t < 0.1 && !*failed) scene.Framing(app, *state);
+					// Not before the shaders are in: from the editor binaries a material first drawn here (the lit hulls on a
+					// fresh run, or with no shader cache to write to) draws as the default grey until its compile finishes, so
+					// the first scene's shot and frame times were of a grey, untextured hull.
+					if (GShaderCompilingManager != nullptr && GShaderCompilingManager->GetNumRemainingJobs() > 0) return *failed;
 					return *failed || t >= 3.0;
 				} });
 				auto meter = std::make_shared<Meter>();

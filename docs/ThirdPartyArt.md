@@ -211,7 +211,13 @@ packs' metals were authored under Unity's skybox reflections, and a full metal i
 The thumbnails' and lineup's fixed light (`RenderBackend::OverrideLighting`, US-T116) drives the key and fill while it
 holds, with the sky, planetshine and lamps off. `-LegacyHullLighting` (or `sg.HullLighting 0` before the first hull)
 keeps the self-lit path; `sg.HullLighting.Key/Fill/Sky/Planetshine/Lamps/Shadows/NavLights` tune it; `sg.Lighting`
-reports it and `sg.Lighting shots <dir>` shoots and times its five scenes at both scales.
+reports it and `sg.Lighting shots <dir>` shoots and times its five scenes at both scales (each shot waits for the
+shader compiles to drain, or a lit material first drawn from the editor binaries is the default grey).
+
+Measured (editor binaries, 1600 x 900, vsync-capped at 16.7 ms, the GPU's own time per frame, game / realistic scale;
+`-LegacyHullLighting` the before): fighter 4.6 / 7.0 ms before, 3.7 / 5.1 after; Battle of Io 3.3 / 6.3 and 4.4 / 5.0;
+SSC station 5.7 / 7.0 and 4.0 / 7.2; night side 4.8 / 6.8 and 3.6 / 6.6; Void Station 9.6 / 9.2 and 9.6 / 10.2. The lit
+path costs nothing measurable here: the run-to-run spread on a shared GPU is wider than any difference.
 
 ## Alien Space Nebula 1 (Skybox), by Jungle Jim (US-T145)
 
