@@ -180,11 +180,32 @@ namespace SpaceGod::Core
 		/// <summary>How far ahead (days) ships look for a close pass: about an hour and a quarter.</summary>
 		static constexpr double AvoidanceHorizonDays = 0.05;
 
+		/// <summary>
+		/// Where a hull flown from a helm really is right now (US-T151): it runs no schedule (see <see cref="IsHeld"/>), so the
+		/// sidestepping in <see cref="StepAvoidance"/> cannot know its pose, yet every free ship must still keep clear of it.
+		/// The app reports the hull it flies once a frame; a report goes stale after <see cref="HeldReportDays"/>, or as soon
+		/// as the hull is no longer held. Not saved: the helm reports again on its first frame after a load.
+		/// </summary>
+		void ReportHeld(const cs::Ref<Ship>& ship, DVec3 helioKm, DVec3 velocityKmS, double jd);
+
+		/// <summary>How long (days) a held hull's reported pose stands for it: about two minutes, extrapolated on its velocity.</summary>
+		static constexpr double HeldReportDays = 0.0015;
+
 	private:
 		// (DVec3 offset, DVec3 velocity): .first is the offset, .second the velocity.
 		cs::Dictionary<cs::Ref<Ship>, std::pair<DVec3, DVec3>> evasion = cs::Dictionary<cs::Ref<Ship>, std::pair<DVec3, DVec3>>();
 		cs::Dictionary<cs::Ref<Ship>, cs::Ref<Ship>> evadingFrom = cs::Dictionary<cs::Ref<Ship>, cs::Ref<Ship>>();
 		double lastAvoidanceJd = cs::Double::NaN;
+
+		/// <summary>A held hull's last reported pose (US-T151, <see cref="ReportHeld"/>); transient, never saved.</summary>
+		struct HeldPose
+		{
+			cs::Ref<Ship> Hull;
+			DVec3 HelioKm;
+			DVec3 VelocityKmPerDay;
+			double Jd = 0;
+		};
+		cs::List<HeldPose> heldPoses;
 
 	public:
 		/// <summary>How far (km) a ship has stepped aside from its planned path to keep clear of another.</summary>

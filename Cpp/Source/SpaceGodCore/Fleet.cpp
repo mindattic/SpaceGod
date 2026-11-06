@@ -161,6 +161,47 @@ namespace SpaceGod::Core
 				evadingFrom[b] = a;
 			}
 		}
+		// US-T151: a hull flown from a helm is left out above (its schedule is a ghost), but it is still a hull in space, where
+		// the helm reported it. Every free ship gives it the same berth it gives any other, the whole sidestep its own: the
+		// helm is not steered by the fleet. (None in a run without a helm, the Bench's: nothing here then.)
+		for (int k = heldPoses.Count() - 1; k >= 0; k--)
+		{
+			const auto& h = heldPoses[k];
+			if (h.Hull == nullptr || h.Hull->Destroyed || h.Jd > jd || jd - h.Jd > HeldReportDays || IsHeld == nullptr || !IsHeld(h.Hull)) heldPoses.RemoveAt(k);
+		}
+		for (const auto& h : heldPoses)
+		{
+			auto heldAt = h.HelioKm + h.VelocityKmPerDay * (jd - h.Jd);
+			for (int i = 0; i < n; i++)
+			{
+				auto a = list[i];
+				double safe = SafeDistanceKm(a, h.Hull) * 1.25;
+				auto r = heldAt - pos[i];
+				auto dv = h.VelocityKmPerDay - vel[i];
+				double reach = safe + dv.Length() * AvoidanceHorizonDays;
+				if (r.LengthSquared() > reach * reach) continue;
+				double v2 = dv.LengthSquared();
+				double tca = v2 > 1e-12 ? cs::Math::Max(0.0, cs::Math::Min(AvoidanceHorizonDays, -DVec3::Dot(r, dv) / v2)) : 0;
+				auto miss = r + dv * tca;
+				double dmin = miss.Length();
+				if (dmin >= safe)
+				{
+					if (dmin < safe * 1.6) nearby[static_cast<size_t>(i)] = true;
+					continue;
+				}
+				DVec3 away;
+				if (dmin > 1e-6) away = miss / dmin;
+				else
+				{
+					auto side = DVec3::Cross(dv.LengthSquared() > 0 ? dv : DVec3::UnitX, DVec3::UnitZ);
+					away = side.LengthSquared() > 1e-12 ? side.Normalized() : DVec3::UnitY;
+				}
+				double push = (safe - dmin) * (1 - 0.5 * tca / AvoidanceHorizonDays);
+				target[i] = target[i] - away * push;
+				threatened[static_cast<size_t>(i)] = true;
+				evadingFrom[a] = h.Hull;
+			}
+		}
 		// Ease each ship toward its sidestep (or back to its path): a critically damped turn that
 		// settles in about a quarter of an hour, never harder than its drive can push.
 		constexpr double omega = 4 / 0.0104;
@@ -204,6 +245,24 @@ namespace SpaceGod::Core
 		auto stale = cs::List<cs::Ref<Ship>>();
 		for (auto kv : evasion) if (!Manoeuvrable(kv.first) || (IsHeld != nullptr && IsHeld(kv.first))) stale.Add(kv.first);
 		for (const auto& s : stale) evasion.Remove(s);
+	}
+
+	void Fleet::ReportHeld(const cs::Ref<Ship>& ship, DVec3 helioKm, DVec3 velocityKmS, double jd)
+	{
+		// US-T151: one pose per held hull, the latest.
+		if (ship == nullptr) return;
+		HeldPose p;
+		p.Hull = ship;
+		p.HelioKm = helioKm;
+		p.VelocityKmPerDay = velocityKmS * Astro::SecondsPerDay;
+		p.Jd = jd;
+		for (auto& h : heldPoses)
+			if (h.Hull == ship)
+			{
+				h = p;
+				return;
+			}
+		heldPoses.Add(p);
 	}
 
 	bool Fleet::RunsSchedule(cs::Ref<Ship> ship) { return !ship->IsEscort() && !ship->Destroyed && (IsHeld == nullptr || !IsHeld(ship)); }

@@ -387,9 +387,10 @@ namespace SpaceGod::Core
 
 		/// <summary>
 		/// A ship leaving its group keeps the group's orbit, but a little way along it (where it was
-		/// flying in formation), not on top of its old flagship.
+		/// flying in formation), not on top of its old flagship. Behind it, or ahead of it (<paramref name="ahead"/>, US-T151)
+		/// when the old flagship has stopped where it was taken at a helm: the orbit then carries the heir away from it.
 		/// </summary>
-		static cs::Ref<ParkingOrbit> OwnSpot(const cs::Ref<ParkingOrbit>& orbit, const cs::Ref<Ship>& ship, const cs::Ref<Ship>& lead);
+		static cs::Ref<ParkingOrbit> OwnSpot(const cs::Ref<ParkingOrbit>& orbit, const cs::Ref<Ship>& ship, const cs::Ref<Ship>& lead, bool ahead = false);
 
 		/// <summary>The rest of a ship's motion state that a group's escorts and heirs take over with it (lane shape, ring).</summary>
 		static void CopyRest(const cs::Ref<Ship>& from, const cs::Ref<Ship>& to);

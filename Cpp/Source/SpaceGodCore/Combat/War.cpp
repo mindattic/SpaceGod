@@ -890,13 +890,15 @@ namespace SpaceGod::Core
 		CopyRest(lead, ship);
 	}
 
-	cs::Ref<ParkingOrbit> War::OwnSpot(const cs::Ref<ParkingOrbit>& orbit, const cs::Ref<Ship>& ship, const cs::Ref<Ship>& lead)
+	cs::Ref<ParkingOrbit> War::OwnSpot(const cs::Ref<ParkingOrbit>& orbit, const cs::Ref<Ship>& ship, const cs::Ref<Ship>& lead, bool ahead)
 	{
 		if (orbit == nullptr || orbit->Fixed || orbit->RadiusKm <= 0) return orbit;
 		double gap = Core::Fleet::SafeDistanceKm(ship, lead) * 1.5;
+		// US-T151: ahead is the way the orbit turns (a retrograde one turns the other way).
+		double shift = ahead ? (orbit->RateRadPerDay < 0 ? -gap : gap) : -gap;
 		auto o = cs::New<ParkingOrbit>();
 		o->Body = orbit->Body; o->RadiusKm = orbit->RadiusKm; o->U = orbit->U; o->V = orbit->V; o->Center = orbit->Center;
-		o->EpochJd = orbit->EpochJd; o->PhaseAtEpoch = orbit->PhaseAtEpoch - gap / orbit->RadiusKm; o->RateRadPerDay = orbit->RateRadPerDay;
+		o->EpochJd = orbit->EpochJd; o->PhaseAtEpoch = orbit->PhaseAtEpoch + shift / orbit->RadiusKm; o->RateRadPerDay = orbit->RateRadPerDay;
 		return o;
 	}
 
@@ -1872,7 +1874,9 @@ namespace SpaceGod::Core
 		heir->Phase = dead->Phase;
 		// The old flagship is not always gone (a capture leaves it flying on under new colours): take
 		// over a little way along its orbit rather than sharing its exact spot with it indefinitely.
-		heir->Orbit = OwnSpot(dead->Orbit, heir, dead);
+		// US-T151: an old flagship taken at a helm stops where it was taken (the helm starts at rest in its frame), so an heir
+		// behind it on its orbit would fly straight into it: ahead, the orbit carries the heir clear. (Never so in the Bench.)
+		heir->Orbit = OwnSpot(dead->Orbit, heir, dead, dead == world->PilotedShip && !dead->Destroyed);
 		heir->DepartureOrbit = dead->DepartureOrbit;
 		heir->DestinationBody = dead->DestinationBody;
 		heir->OriginBody = dead->OriginBody;

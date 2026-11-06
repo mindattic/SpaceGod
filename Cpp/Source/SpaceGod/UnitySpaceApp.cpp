@@ -862,6 +862,16 @@ namespace SpaceGod
 		std::tie(frame, offsetKm) = CurrentFrame(ship, Clock->Jd);
 		auto facing = Fleet()->StateOf(ship, Clock->Jd).Facing;
 		auto velocity = DVec3::Zero;
+		// US-T151: an escort's schedule is its leader's own centre, but it flies (and is drawn) at its formation slot: its helm
+		// is taken there, as a battle places it (War::Join), not inside the leader's hull.
+		if (ship->IsEscort() && ship->Battle == nullptr && facing.LengthSquared() > 1e-18)
+		{
+			auto f = facing.Normalized();
+			auto up = PilotState::LevelUp(f);
+			auto right = DVec3::Cross(f, up).Normalized();
+			auto slot = ship->FormationSlot * ship->Leader->LengthKm();
+			offsetKm = offsetKm + right * slot.X + up * slot.Y + f * slot.Z;
+		}
 		// Riding a lane through to its far ramp: the ride goes on, now at the helm (U.SPC-T41). One
 		// that means to stop part-way (a raider's lurk) is taken where it is, as any other flight.
 		bool riding = !ship->IsEscort() && ship->Battle == nullptr && ship->Phase == ShipPhase::Lane && ship->LaneEndProgress >= 1;
@@ -1283,6 +1293,8 @@ namespace SpaceGod
 		// Hulls, stations, rocks and wreckage have volume: what the hull flies into, it hits (U.SPC-T60).
 		if (!KeepPilotAboveSurfaces(ship)) return;
 		if (!UpdatePilotCollisions(ship, posBefore, dt)) return;
+		// US-T151: where the hull flown really is (its schedule is only a pin), so every free ship keeps clear of it.
+		Fleet()->ReportHeld(ship, Ephemeris()->HelioAt(pilotFrameBody, Clock->Jd) + pilotOffsetKm(), pilot().Vel + FrameVelocityKmS(pilotFrameBody, Clock->Jd), Clock->Jd);
 		UpdateSystemCruise(ship, dt); // US-T127: Shift+J, and the cruise drive's leg this frame (past the swept collision test)
 		UpdatePropellant(ship, dt);
 
