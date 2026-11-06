@@ -238,6 +238,20 @@ namespace SpaceGod::Views
 				e.Color = Color(1.0f, 0.75f, 0.3f) * 1.8f;
 				e.Life = 0.5f;
 				break;
+			case FxKind::FtlSpool:
+				// An FTL drive charging to jump out (US-T98): a cold blue-white pulse, a touch of the faction in it.
+				e.Color = Color::Lerp(Color(0.55f, 0.8f, 1.0f), faction, 0.2f) * 1.4f;
+				e.Life = 1.0f;
+				break;
+			case FxKind::FtlAbort:
+				// The charge broken: the field spits out hot and collapses.
+				e.Color = Color(1.0f, 0.5f, 0.25f) * 1.6f;
+				e.Life = 0.8f;
+				break;
+			case FxKind::FtlJump:
+				e.Color = Color(0.7f, 0.88f, 1.0f) * 2.2f;
+				e.Life = 0.9f;
+				break;
 			default:
 				return;
 		}
@@ -442,6 +456,11 @@ namespace SpaceGod::Views
 				}
 				break;
 			}
+			case FxKind::FtlSpool:
+			case FxKind::FtlAbort:
+			case FxKind::FtlJump:
+				DrawEscapeJump(e, age, t, fade);
+				break;
 			case FxKind::Pulse:
 			{
 				// The interdiction pulse: a shell racing outward far past the battle.
@@ -479,6 +498,45 @@ namespace SpaceGod::Views
 				float rr = Mathf::Max(r, PixelSize(c, minPx));
 				if (cap > 0) rr = Mathf::Min(rr, Mathf::Max(cap, PixelSize(c, minPx)));
 				Sprite(c, rr, e.Color * fade, Shape::Radial);
+				break;
+			}
+		}
+	}
+
+	void BattleFx::DrawEscapeJump(const Effect& e, float age, float t, float fade)
+	{
+		// US-T98: a hull spooling its FTL drive to jump out of the fight, and how the charge ends. Each pulse of the charge
+		// is a ring drawing in on the hull, wider and brighter the fuller the charge, with a glow at its heart; a broken
+		// charge is the ring flickering out; the jump is a white flash where the hull was and a streak along its nose.
+		auto at = e.Unit != nullptr && e.Unit->Present() ? e.Unit->Pos : e.A;
+		auto c = Point(e.Battle, at);
+		float hull = e.Unit != nullptr ? static_cast<float>(app->Scale()->ShipLength(e.Unit->LengthKm)) : PixelSize(c, 20);
+		switch (e.Kind)
+		{
+			case FxKind::FtlSpool:
+			{
+				float charge = Mathf::Clamp01(static_cast<float>(e.Size));
+				float r = Mathf::Max(hull * (0.75f + 0.6f * charge) * (1.0f - 0.3f * t), PixelSize(c, 14.0f + 16.0f * charge));
+				Sprite(c, r, e.Color * fade * (0.45f + 1.1f * charge), Shape::Ring);
+				Sprite(c, Mathf::Max(hull * 0.4f, PixelSize(c, 6.0f)), e.Color * fade * (0.15f + 0.6f * charge), Shape::Radial);
+				break;
+			}
+			case FxKind::FtlAbort:
+			{
+				float flick = Mathf::Sin(age * 55.0f) > 0 ? 1.0f : 0.3f;
+				Sprite(c, Mathf::Max(hull * (1.2f - 0.9f * t), PixelSize(c, 8.0f)), e.Color * fade * flick, Shape::Ring);
+				if (age < 0.1f) Sprite(c, Mathf::Max(hull * 0.6f, PixelSize(c, 12.0f)), e.Color * (1 - age / 0.1f), Shape::Radial);
+				break;
+			}
+			default:
+			{
+				auto a = Point(e.Battle, e.A);
+				auto b = Point(e.Battle, e.B);
+				if (age < 0.2f) Sprite(a, Mathf::Max(hull * 1.5f, PixelSize(a, 40.0f)) * (1 - age / 0.2f), Color::white() * 2.0f, Shape::Radial);
+				auto head = Vector3::Lerp(a, b, Mathf::Min(1.0f, t * 3.0f));
+				Ribbon(a, head, 7.0f * fade, e.Color * fade);
+				Ribbon(a, head, 2.0f * fade, Color::white() * fade);
+				Sprite(a, Mathf::Max(hull, PixelSize(a, 20.0f)) * (0.5f + t), e.Color * fade * 0.6f, Shape::Ring);
 				break;
 			}
 		}

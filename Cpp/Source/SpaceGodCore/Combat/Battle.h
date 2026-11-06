@@ -166,6 +166,11 @@ namespace SpaceGod::Core
 		bool Fled = false, Dead = false;
 		bool Fleeing = false;
 
+		/// <summary>US-T98, the escape jump of a hull that breaks off (<see cref="EscapeJumps"/>): seconds its FTL drive has
+		/// charged and the charge it needs (0 while it is not spooling), its hull's and drive's hit points when the charge
+		/// began (damage enough past them cancels it), and seconds before a cancelled drive can begin again.</summary>
+		double JumpChargeS = 0, JumpNeedS = 0, JumpHullAt = 0, JumpDriveAt = 0, JumpRestartS = 0;
+
 		/// <summary>True once this hull has struck its colours: holds fire and waits on its captor's
 		/// terms (<see cref="SurrenderOutcome"/>) rather than fighting to the last. See <see cref="Morale"/>.</summary>
 		bool Surrendering = false;
@@ -584,6 +589,17 @@ namespace SpaceGod::Core
 
 		/// <summary>A hive round splitting (A, heading towards B): a flash and its swarm fanning out, Size the micro-missiles.</summary>
 		HiveSplit,
+
+		// The escape jump (US-T98, see EscapeJumps), appended.
+
+		/// <summary>A hull's FTL drive charging to jump out: a ring of light round <see cref="CombatFx.Unit"/>, Size the charge (0-1).</summary>
+		FtlSpool,
+
+		/// <summary>The charge broken (by damage or a stun): the ring collapsing in a flicker, Size the hull's radius, km.</summary>
+		FtlAbort,
+
+		/// <summary>The hull jumping out: a flash where it was (A) and a streak along its nose (towards B), Size its radius, km.</summary>
+		FtlJump,
 	};
 	SPACEGODCORE_API const char* ToString(FxKind v);
 

@@ -19,6 +19,7 @@
 #include "Combat/DriftingRounds.h"
 #include "Combat/ElectronicWarfare.h"
 #include "Combat/EnergyWeapons.h"
+#include "Combat/EscapeJumps.h"
 #include "Combat/FireCones.h"
 #include "Combat/Fighters.h"
 #include "Combat/FleetCoordination.h"
@@ -138,6 +139,9 @@ namespace SpaceGod::Core
 			case FxKind::FlakBurst: return "FlakBurst";
 			case FxKind::Vulcan: return "Vulcan";
 			case FxKind::HiveSplit: return "HiveSplit";
+			case FxKind::FtlSpool: return "FtlSpool";
+			case FxKind::FtlAbort: return "FtlAbort";
+			case FxKind::FtlJump: return "FtlJump";
 		}
 		return "";
 	}
@@ -393,9 +397,14 @@ namespace SpaceGod::Core
 			// The player's split on a hull they hold counts the same way, and sets how much field it holds (US-T94).
 			else c->RegenShields(Seconds, dt * PowerFactor(u, PowerSystem::Shields) * TachyonLances::ShieldRegenFactor(c), ShieldCapacityOf(u));
 			// No escape with boarders fighting aboard (or latched to a hull it is boarding), nor for a hull that has struck
-			// its colours or been taken: drifting off with its drives cold is not running.
-			if (u->Kind == UnitKind::Ship && u->Latched == nullptr && !c->Disabled() && !c->Interior->UnderBoarding() && !u->Surrendering && !u->Captured && (u->Pos.Length() > EscapeKm || (u->Fleeing && NearestHostileDistance(u) > 30)))
-				u->Fled = true;
+			// its colours or been taken: drifting off with its drives cold is not running. A hull that has left the battle
+			// space is gone; one that breaks off jumps out once its FTL drive has spooled, in sight of everyone, and enough
+			// damage to its drive or hull while it charges cancels the jump (US-T98, EscapeJumps).
+			if (u->Kind == UnitKind::Ship && u->Latched == nullptr && !c->Disabled() && !c->Interior->UnderBoarding() && !u->Surrendering && !u->Captured)
+			{
+				if (u->Pos.Length() > EscapeKm || EscapeJumps::Step(self, u, dt)) u->Fled = true;
+			}
+			else if (EscapeJumps::Spooling(u)) EscapeJumps::Abort(self, u);
 		}
 		if (Fx.Count() > 600) Fx.RemoveRange(0, Fx.Count() - 600);
 		CheckOver();
@@ -2215,7 +2224,8 @@ namespace SpaceGod::Core
 				// As are a dreadnought's spinal guns (U.SPC-T490).
 				case SubsystemKind::Coilgun: w = 4; break;
 				case SubsystemKind::ShieldGenerator: w = s->Shield > 0 ? 2.5 : 0.5; break;
-				case SubsystemKind::Engine: w = 1.4; break;
+				// A hull spooling to jump out is stopped at its drive (US-T98).
+				case SubsystemKind::Engine: w = EscapeJumps::Spooling(target) ? EscapeJumps::DriveAimWeight : 1.4; break;
 				case SubsystemKind::Hangar: w = target->Combat->Fighters() > 0 ? 1.8 : 0.4; break;
 				case SubsystemKind::Bridge: w = 1.1; break;
 				case SubsystemKind::PointDefense: w = 0.8; break;

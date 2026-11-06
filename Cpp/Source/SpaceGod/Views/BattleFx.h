@@ -119,6 +119,9 @@ namespace SpaceGod::Views
 		/// narrows as it fades, a charge flare at the emitter and, on a hit, a burst where it struck.</summary>
 		void DrawLance(const Effect& e, float age, float fade);
 
+		/// <summary>US-T98: a hull's FTL drive spooling to jump out of the fight, the charge broken, and the jump itself.</summary>
+		void DrawEscapeJump(const Effect& e, float age, float t, float fade);
+
 		void DrawShieldHit(const Effect& e, float t, float fade);
 
 		void DrawMissiles(const cs::Ref<Core::Battle>& b);
