@@ -296,6 +296,89 @@ choreographing ten seconds, then let it run on as one take.
 
 Revisit once US-T99's short rewind (dense battle ring, per-frame input log) is built and measured.
 
+## Parked: split timelines, a tree of futures (US-T104)
+
+This is a design note only and nothing is built. The user's call on US-T99 (2026-11-05) stands: the first version has
+one timeline, and changing the past replaces the old future. This note records what keeping the old future would take,
+so the US-T99 build stays branch-friendly and does not need a rewrite to grow it.
+
+**The idea.** When the player rewinds and acts, the future they left is not thrown away. It becomes a **branch**: a
+sibling of the new line of play, still reachable. A timeline panel shows the session as a tree (like git): the trunk,
+each fork point marked with the tick and the action that split it, and each branch's tip with its game date. The
+player can switch to any branch tip (or any moment on it) and play on from there. "What if I had not declared that
+war" stops being a one-way choice.
+
+**The data model.** Everything US-T99 stores already has a time and a parent, so a tree adds a branch id and nothing
+else structural.
+
+- *Keyframes form a tree, not a list.* A keyframe is keyed by (branch, tick) with a parent link to the retained
+  keyframe before it (Storage, above). The delta encoding already works against "the previous retained keyframe", so
+  it needs no change: a branch's first keyframe is a delta against the keyframe at its fork point, which is on its
+  parent branch. Shared history before a fork is stored once.
+- *The intervention log forks too.* A branch is "the parent's log up to the fork tick, then its own entries". Store it
+  as segments: each branch owns the entries from its fork tick to its tip and names its parent and fork tick. Replay
+  of any moment walks up the parent chain to collect the entries. The log is kilobytes, so copying it would also be
+  fine, but segments keep "what changed here" explicit.
+- *A branch record* holds: id, parent id, fork tick, the action that forked it (the first log entry after the fork, for
+  the panel's label), tip tick and game date, a player label, and last-visited wall time.
+- *The current branch* is one id in the session. Rewinding to tick T on branch B and then doing nothing is still a seek;
+  the fork happens only at the first intervention after the seek (the first log entry that differs from B's own entry
+  at that tick). Seeking around without acting must not litter the tree with empty branches.
+
+**Thinning across branches.** The budget is shared by the whole tree, not per branch, or a session with many forks
+would multiply the 512 MB / 4 GB budget.
+
+- The current branch (and its ancestors back to the root) is thinned exactly as the single-timeline schedule above.
+- An inactive branch is thinned by the age since it was last visited, not by game age: it keeps its fork-point
+  keyframe (which lives on the parent anyway), its tip keyframe, and keyframes at the coarse tiers (1 game-day, then
+  1 game-week) in between. Seeking inside an old branch then costs one restore plus a replay of at most a tier
+  spacing, which at warp 4 and above is under a second (Rewind latency, above).
+- The tip keyframe of every kept branch is pinned (the same pin the checkpoint loop needs, requirement 2 of US-T169),
+  so "return to that future" is always one restore and never a long replay.
+- When the budget still overflows, drop whole branches, oldest-visited first, never the trunk the player is on and
+  never a branch the player labelled or starred. Before dropping, the panel can offer to export the branch tip as a
+  normal save (it is one keyframe, already the save format).
+- Re-encoding after a drop works as now: a keyframe whose dictionary was dropped is re-encoded against its new
+  predecessor. A branch's first keyframe depends on its fork point, so a fork-point keyframe is not dropped while any
+  child branch still needs it as a dictionary (or the child's first keyframe is re-encoded whole first).
+
+**Persistence.** A normal save stays what it is: one world, one `SaveData`, and the files in `SaveSlots` are unchanged.
+The rewind store (keyframes and log under the save folder's spill directory) already lives beside the saves, not in
+them. The tree is that store's own index (the branch records above). Loading a save starts a new tree rooted at that
+save. Whether a save should carry its tree (so loading it restores the branches) is an open question: it would make
+saves as large as the spill.
+
+**Co-op.** A rewind is already a lockstep command that any player can issue (US-T99 note, 2026-11-05). Switching
+branch is the same kind of command: the host orders it, and every client jumps through the existing resync
+(`CoopPeer::RequestResync`). The tree is part of the host's session state, so every player sees the same tree. Two
+players forking at once resolve in host order: the later command wins, and the earlier player's new future becomes a
+branch like any other instead of being lost, which is gentler than the single-timeline rule.
+
+**What it puts on the US-T99 build** (cheap now, costly to retrofit):
+
+1. Key keyframes and log entries by (branch, tick), even while there is only branch 0.
+2. Give every keyframe a parent link, and encode deltas against the parent, not against "the last one written".
+3. Put the fork decision at the first intervention after a seek, not at the seek itself.
+4. Make keyframe pinning a general mechanism (US-T169 needs it too) and keep the budget accounting global.
+5. Keep the timeline bar's preview (analytic positions) a function of (branch, tick), so it can draw any branch.
+
+**Open questions / risks.**
+
+- *Is it fun, or bookkeeping?* A tree of futures is powerful for a god game and can also become a chore: the player
+  manages branches instead of playing. Keep it out of the way: the first version shows the tree only in the rewind
+  panel, keeps at most a few recent branches by default (setting: keep none / last 3 / all within budget), and drops
+  old unlabelled ones quietly.
+- *Comparing branches.* "Return to the old future" is the core. Showing two branches side by side (the same system's
+  date in both) would need two worlds loaded, at 2x memory, and is out of scope.
+- *Merging.* Branches never merge: two worlds that differ cannot be combined meaningfully. Carrying a single thing
+  across (a design, a discovered blueprint) would be a separate feature.
+- *Checkpoint loops (US-T169).* The loop's takes could each be a branch, which would let a player keep alternative
+  choreographies. The pass tracks stay the persistent thing either way.
+- *Determinism is the whole basis.* Every branch is rebuilt by replay, so it needs the same bit-exact restore as
+  rewind (the Determinism table above, and the per-frame dt in the log).
+
+Revisit after the single-timeline rewind (US-T99) is built and players have used it.
+
 ## Reproducing
 
 ```powershell
