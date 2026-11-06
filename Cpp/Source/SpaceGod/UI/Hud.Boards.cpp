@@ -1155,17 +1155,23 @@ namespace SpaceGod::UI
 	{
 		auto cam = app->SpaceCamera;
 		cs::String s;
+		// US-T155: the key list goes with the facts only while the whole line fits the bottom band; past that it is cut to
+		// "H all keys" (Help and ControlsHelp list every one), and the facts themselves are shortened with an ellipsis.
+		cs::String keys, shortKeys;
 		if (cam->Mode == Cameras::SpaceCamera::CameraMode::Focus && cam->PilotLocked)
 		{
 			s = cs::Cat("PILOTING  ·  ", TargetName(cam->FocusTarget),
 				app->Piloted.Ship != nullptr ? cs::Cat("  ·  PROPELLANT ", app->Piloted.Ship->Propellant() <= 1e-6 ? cs::String("DRY") : Percent(app->Piloted.Ship->PropellantFraction())) : cs::String(),
 				app->World()->Law != nullptr && app->World()->Law->Player->Wanted() ? cs::Cat("  ·  WANTED ", Credits(app->World()->Law->Player->TotalBounty())) : cs::String(),
-				SensorText(),
-				"   (", ControlHint(app->PilotControlMode), ", Z/X roll, F flight assist, Shift boost, F3 silent running, P to release)");
+				SensorText());
+			keys = cs::Cat("   (", ControlHint(app->PilotControlMode), ", Z/X roll, F flight assist, Shift boost, F3 silent running, P to release)");
+			shortKeys = "   (H all keys, P to release)";
 		}
 		else if (cam->Mode == Cameras::SpaceCamera::CameraMode::Focus)
 		{
-			s = cs::Cat("FOCUS  ·  ", TargetName(cam->FocusTarget), "   (WASD to swim free, wheel to zoom, right-drag to orbit)");
+			s = cs::Cat("FOCUS  ·  ", TargetName(cam->FocusTarget));
+			keys = "   (WASD to swim free, wheel to zoom, right-drag to orbit)";
+			shortKeys = "   (H all keys)";
 		}
 		else if (cam->Mode == Cameras::SpaceCamera::CameraMode::Travel)
 		{
@@ -1177,22 +1183,36 @@ namespace SpaceGod::UI
 			s = cs::Cat("FREE  ·  swim x", cs::Fmt(cam->SpeedMultiplier, "0.##"), "  ·  ", SpeedText(kmPerSec),
 				"  ·  near ", (*app->Catalog())[cam->FrameBody()]->Name);
 		}
-		auto content = GUIContent(s);
+		// The band the bottom line has (HudLayout::BottomBand): beside the right-hand column, less the tanker call and the
+		// reorient toggle either side of it. Centred on the screen when it fits there, else in the band.
+		cs::Ref<Ship> flown = app->IsPiloting() ? app->Piloted.Ship : nullptr;
+		bool tanker = flown != nullptr && flown->Battle == nullptr && (flown->PropellantFraction() < 0.15 || app->TankerDueS >= 0);
+		constexpr float tankerW = 170, levelW = 200, sideGap = 8;
+		float bx0 = 0, bx1 = 0;
+		layout.BottomBand(bx0, bx1);
+		float leftExtra = tanker ? tankerW + sideGap : 0, rightExtra = levelW + sideGap;
+		float maxText = Mathf::Max(80.0f, bx1 - bx0 - leftExtra - rightExtra - 28);
+		cs::String line = s + keys;
+		if (text->CalcSize(GUIContent(line)).x > maxText) line = s + shortKeys;
+		line = FitText(line, text, maxText);
+		auto content = GUIContent(line);
 		float w = text->CalcSize(content).x + 28;
-		auto r = Panel(Rect((Screen::width - w) * 0.5f, Screen::height - 40, w, 30));
+		float total = leftExtra + w + rightExtra;
+		float gx = (Screen::width - total) * 0.5f;
+		if (gx < bx0 || gx + total > bx1) gx = Mathf::Max(bx0, bx0 + (bx1 - bx0 - total) * 0.5f);
+		auto r = Panel(Rect(gx + leftExtra, Screen::height - 40, w, 30));
 		GUI::Label(Rect(r.x + 14, r.y + 6, w, 20), content, text);
 
 		// Tanks running low under the player's own hand: an emergency tanker can be called out.
-		cs::Ref<Ship> flown = app->IsPiloting() ? app->Piloted.Ship : nullptr;
-		if (flown != nullptr && flown->Battle == nullptr && (flown->PropellantFraction() < 0.15 || app->TankerDueS >= 0))
+		if (tanker)
 		{
-			auto call = Panel(Rect(r.x - 178, r.y, 170, 30));
+			auto call = Panel(Rect(r.x - tankerW - sideGap, r.y, tankerW, 30));
 			cs::String callLabel = app->TankerDueS >= 0 ? cs::Cat("TANKER IN ", Mathf::CeilToInt(app->TankerDueS), " s") : cs::String("CALL A TANKER");
 			if (GUI::Button(Rect(call.x + 4, call.y + 4, call.width - 8, 22), callLabel, app->TankerDueS >= 0 ? buttonActive : button)) app->CallTanker();
 		}
 
 		// Auto-reorient: keep the active system's own plane level (a smooth swing, not a snap).
-		auto level = Panel(Rect(r.xMax() + 8, r.y, 200, 30));
+		auto level = Panel(Rect(r.xMax() + sideGap, r.y, levelW, 30));
 		cs::String reorient = cam->Levelling() ? "REORIENTING…" : app->AutoReorient() ? "AUTO-REORIENT  ON  [R]" : "AUTO-REORIENT  OFF  [R]";
 		if (GUI::Button(Rect(level.x + 4, level.y + 4, level.width - 8, 22), reorient, app->AutoReorient() ? buttonActive : button))
 			app->ToggleAutoReorient();
