@@ -61,6 +61,21 @@ namespace
 			app->StartDogfightDemo(heavy, kit);
 		}));
 
+	/// US-T173: the craft the dogfight demo last put the player at the helm of, and how it was asked for, so the tour's stops
+	/// can fly it, keep it alive for the shot and find it again at the other scale.
+	struct DogfightTourCraft
+	{
+		cs::Ref<SpaceGod::Core::Ship> Ship;
+		bool Heavy = false;
+		cs::String Kit;
+		int Respawns = 0;
+	};
+	DogfightTourCraft& TourCraft()
+	{
+		static DogfightTourCraft c;
+		return c;
+	}
+
 	/// US-T147: the dogfight demo's showcase tour stops, a light fighter's and a heavy fighter's.
 	SpaceGod::Tour::TourRegistration GDogfightTourStops([]
 	{
@@ -69,10 +84,10 @@ namespace
 		auto atHelm = [](SpaceGod::UnitySpaceApp& app, double t) { return app.IsPiloting() && t > 4; };
 		TourRegistry::Add(TourStop::Make("Flight and combat", "dogfight-cockpit", "Dogfight from the helm",
 			"A light fighter against four pirates: the lead reticle on the target ahead, and arrows at the screen's edge pointing to the rest")
-			.At(10).WithSetup([](SpaceGod::UnitySpaceApp& app) { app.StartDogfightDemo(false); return cs::String(); }).Until(atHelm, 30).For(10).AtBothScales());
+			.At(10).WithSetup([](SpaceGod::UnitySpaceApp& app) { TourCraft().Respawns = 0; app.StartDogfightDemo(false); return cs::String(); }).Until(atHelm, 30).WithHelm([](SpaceGod::UnitySpaceApp& app, double) { app.FlyDogfightTourCraft(); }).For(10).AtBothScales());
 		TourRegistry::Add(TourStop::Make("Flight and combat", "dogfight-heavy", "Heavy fighter",
 			"The same fight at a heavy fighter's helm with the full arsenal: slower to turn, harder hitting, vulcans and hive missiles")
-			.At(20).WithSetup([](SpaceGod::UnitySpaceApp& app) { app.StartDogfightDemo(true, "arsenal"); return cs::String(); }).Until(atHelm, 30).For(10));
+			.At(20).WithSetup([](SpaceGod::UnitySpaceApp& app) { TourCraft().Respawns = 0; app.StartDogfightDemo(true, "arsenal"); return cs::String(); }).Until(atHelm, 30).WithHelm([](SpaceGod::UnitySpaceApp& app, double) { app.FlyDogfightTourCraft(); }).For(10));
 	});
 }
 
@@ -300,6 +315,12 @@ namespace SpaceGod
 		}
 
 		EnterPiloting(Target::OfShip(ship));
+		{
+			auto& tc = TourCraft();
+			tc.Ship = ship;
+			tc.Heavy = heavy;
+			tc.Kit = kit;
+		}
 		auto battle = World()->War->TryStartPlayerBattle(ship, pilotFrameBody, pilotOffsetKm(), pilotForward(), jd);
 		int seated = 0;
 		if (battle != nullptr)
@@ -323,5 +344,45 @@ namespace SpaceGod
 		ShowToast(cs::Cat("DOGFIGHT DEMO off ", def->Name, ": ", heavy ? "heavy" : "light", " fighter", armed.empty() ? cs::String() : cs::Cat(" with ", armed),
 			" vs a pirate interceptor, fighter, corvette and destroyer",
 			"  (Left-click fires, right-click the missiles or rockets, T locks, F flight assist, Alt flip, Shift+strafe dash, P to release)"));
+	}
+
+	/// US-T173: the tour idles the player's input, so a dogfight stop's helm is flown here: the nose laid on the nearest
+	/// raider, the guns held, a slow approach that stops short of ramming; the hull and shields held up so the pirates'
+	/// opening fire cannot scuttle it before the shot; and, if the helm was lost (the other scale's pass, a respawn), taken
+	/// again or the demo started over rather than showing an empty free camera.
+	void UnitySpaceApp::FlyDogfightTourCraft()
+	{
+		auto& c = TourCraft();
+		auto ship = c.Ship;
+		if (ship == nullptr || ship->Destroyed || ship->Combat == nullptr)
+		{
+			if (c.Respawns++ < 3) StartDogfightDemo(c.Heavy, c.Kit);
+			return;
+		}
+		if (!IsPiloting() && World()->PilotedShip == nullptr) EnterPiloting(SpaceGod::Target::OfShip(ship));
+		auto combat = ship->Combat;
+		if (combat->Spec != nullptr)
+		{
+			double floor = combat->Spec->Hull * 0.7;
+			if (combat->Hull < floor) combat->Hull = floor;
+		}
+		for (const auto& sub : combat->Subsystems)
+			if (sub->MaxShield > 0 && sub->Shield < sub->MaxShield * 0.7) sub->Shield = sub->MaxShield * 0.7;
+		auto battle = ship->Battle;
+		if (battle == nullptr) return;
+		auto me = battle->UnitOf(ship);
+		if (me == nullptr) return;
+		cs::Ref<SpaceGod::Core::BattleUnit> nearest;
+		double best = 1e30;
+		for (const auto& u : battle->Units)
+		{
+			if (u == me || !u->Present() || u->Kind != SpaceGod::Core::UnitKind::Ship || !battle->Hostile(me, u)) continue;
+			double d = (u->Pos - me->Pos).Length();
+			if (d < best) { best = d; nearest = u; }
+		}
+		if (nearest == nullptr) return;
+		pilotAim = (nearest->Pos - me->Pos).Normalized();
+		Input.Fire = true;
+		Input.Move.z = best > 2.5 ? 0.7f : best < 1.0 ? -0.6f : 0.0f;
 	}
 }

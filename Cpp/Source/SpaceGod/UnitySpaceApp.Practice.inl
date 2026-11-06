@@ -41,6 +41,10 @@ public:
 	/// </summary>
 	void StartDogfightDemo(bool heavy, const cs::String& kit = cs::String());
 
+	/// <summary>US-T173: once a frame while a showcase tour dogfight stop runs (the tour idles the input): flies the demo craft at
+	/// the nearest raider, holds its hull up, and takes the helm again or restarts the demo if it was lost.</summary>
+	void FlyDogfightTourCraft();
+
 private:
 	/// <summary>Frames left before a dogfight demo asked for at launch starts (-1: none due); the scene settles first.</summary>
 	int dogfightDemoDueFrames = -1;

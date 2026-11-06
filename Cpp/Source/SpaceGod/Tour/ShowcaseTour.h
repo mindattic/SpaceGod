@@ -71,6 +71,12 @@ namespace SpaceGod::Tour
 		/// time does not count). It runs again from 0 for the other scale's pass.</summary>
 		std::function<void(UnitySpaceApp&, double)> Camera;
 
+		/// <summary>US-T173: flies the craft the stop put the helm in. The tour idles the player's input every frame it runs
+		/// (the keys are its own), so a stop at a helm would otherwise drift; this runs after that idling, each frame from the
+		/// setup on (ready wait, shown, shot and the other scale's pass), and writes the frame's input (<c>app.Input</c>, the
+		/// aim) itself, <paramref name="t"/> real seconds since the stop was set up.</summary>
+		std::function<void(UnitySpaceApp&, double)> Helm;
+
 		static TourStop Make(const cs::String& chapter, const cs::String& id, const cs::String& title, const cs::String& caption);
 
 		/// <summary>A stop set up by a console command (<c>sg.BioMass here</c>): the feature's own setup, by one line. It says it
@@ -84,6 +90,7 @@ namespace SpaceGod::Tour
 		TourStop& WithSetup(std::function<cs::String(UnitySpaceApp&)> f) { Setup = std::move(f); return *this; }
 		TourStop& Until(std::function<bool(UnitySpaceApp&, double)> f, double timeout = 60) { Ready = std::move(f); ReadyTimeout = timeout; return *this; }
 		TourStop& WithCamera(std::function<void(UnitySpaceApp&, double)> f) { Camera = std::move(f); return *this; }
+		TourStop& WithHelm(std::function<void(UnitySpaceApp&, double)> f) { Helm = std::move(f); return *this; }
 		TourStop& For(double seconds) { Seconds = seconds; return *this; }
 		TourStop& In(const cs::String& system) { System = system; return *this; }
 		TourStop& AtScale(int scale) { Scale = scale; return *this; }

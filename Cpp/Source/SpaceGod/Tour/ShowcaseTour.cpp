@@ -635,6 +635,15 @@ namespace SpaceGod::Tour
 			}
 			default: break;
 		}
+		// US-T173: a stop that flies its craft (a dogfight at a helm) idles the frame's input itself, then writes the
+		// stick, so the caller's blanket handover (which would leave the helm unflown) does not run for it.
+		if (s.running && stop->Helm && s.setupRan && s.skipped.empty() && stop->Pending.empty() && s.index >= 0 && Current() == stop)
+		{
+			app.Input.Handover();
+			try { stop->Helm(app, s.phase == Phase::Prepare ? 0 : s.phaseT); }
+			catch (const std::exception& e) { UE_LOG(LogSpaceGod, Warning, TEXT("sg.Tour: %s helm: %s"), *F(stop->Id), UTF8_TO_TCHAR(e.what())); }
+			return false;
+		}
 		return s.running;
 	}
 
