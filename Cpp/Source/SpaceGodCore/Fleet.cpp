@@ -177,13 +177,52 @@ namespace SpaceGod::Core
 				auto a = list[i];
 				double safe = SafeDistanceKm(a, h.Hull) * 1.25;
 				auto r = heldAt - pos[i];
-				auto dv = h.VelocityKmPerDay - vel[i];
+				// The sidestep's own velocity is left out of the guess: it dies away as the turn settles, and counting it as coasting on
+				// for the whole horizon had a ship that was already turning count clearance it never got (US-T182).
+				std::pair<DVec3, DVec3> turn{};
+				evasion.TryGetValue(a, turn);
+				auto dv = h.VelocityKmPerDay - (vel[i] - turn.second);
 				double reach = safe + dv.Length() * AvoidanceHorizonDays;
 				if (r.LengthSquared() > reach * reach) continue;
 				double v2 = dv.LengthSquared();
 				double tca = v2 > 1e-12 ? cs::Math::Max(0.0, cs::Math::Min(AvoidanceHorizonDays, -DVec3::Dot(r, dv) / v2)) : 0;
 				auto miss = r + dv * tca;
 				double dmin = miss.Length();
+				// US-T182: the straight line above has a ship hold its velocity, but one flying its plan curves off it (a flip-and-burn
+				// at 0.06 g is 25 km off the line five minutes out; a parking orbit bends off it too), so a hull sitting on the plan
+				// looked clear until it was too late to turn: probed at 44 km/s the closest pass was 4 km of an 18 km berth. Follow the
+				// plan itself over the horizon instead (straight between samples, so the closest approach of each leg is exact).
+				auto ctl = a->Controller();
+				if (ctl->Phase == ShipPhase::Transit || ctl->Phase == ShipPhase::Parked)
+				{
+					constexpr int legs = 48;
+					constexpr double hh = 1e-4;
+					auto base0 = BaseStateOf(a, jd).HelioKm;
+					auto baseV = (BaseStateOf(a, jd + hh).HelioKm - BaseStateOf(a, jd - hh).HelioKm) / (2 * hh);
+					auto prev = r;
+					double tPrev = 0;
+					miss = r;
+					dmin = r.Length();
+					tca = 0;
+					for (int k = 1; k <= legs; k++)
+					{
+						double t = AvoidanceHorizonDays * k / legs;
+						auto curve = BaseStateOf(a, jd + t).HelioKm - base0 - baseV * t;
+						auto rel = r + dv * t - curve;
+						auto leg = rel - prev;
+						double l2 = leg.LengthSquared();
+						double u = l2 > 1e-12 ? cs::Math::Max(0.0, cs::Math::Min(1.0, -DVec3::Dot(prev, leg) / l2)) : 0;
+						auto at = prev + leg * u;
+						if (at.Length() < dmin)
+						{
+							dmin = at.Length();
+							miss = at;
+							tca = tPrev + (t - tPrev) * u;
+						}
+						prev = rel;
+						tPrev = t;
+					}
+				}
 				if (dmin >= safe)
 				{
 					if (dmin < safe * 1.6) nearby[static_cast<size_t>(i)] = true;
