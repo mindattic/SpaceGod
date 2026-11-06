@@ -11,6 +11,7 @@
 #include "Persistence/ObjectGraph.h"
 #include "Ships.h"
 #include "Systems/Galaxy.h"
+#include "Systems/GalaxyLife.h" // US-T100
 #include "Systems/Polities.h"
 #include "World.h"
 
@@ -316,5 +317,6 @@ namespace SpaceGod::Core
 		SG_F(System), SG_F(Holder))
 
 	SG_SERIALIZE(Territory, "SpaceGod.Core.Territory",
-		SG_F(Standings), SG_F(Changes), SG_F(holders), SG_F(nextDailyJd))
+		SG_F(Standings), SG_F(Changes), SG_F(holders), SG_F(nextDailyJd),
+		SG_OPT(Life)) // US-T100, absent from older saves
 }

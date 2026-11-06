@@ -21,6 +21,7 @@ namespace SpaceGod::Core
 	class Economy;
 	class Faction;
 	class Galaxy;
+	class GalaxyLife;
 	class Settlement;
 	class Ship;
 	class StarSystem;
@@ -144,6 +145,10 @@ namespace SpaceGod::Core
 
 		/// <summary>Runs the daily review when its day has come (see the class summary).</summary>
 		void Update(Galaxy& galaxy, double jd);
+
+		/// <summary>US-T100: the galaxy's monthly works and secessions (see <see cref="GalaxyLife"/>), kept here so they are saved
+		/// with the territory; null until the first update (and in older saves).</summary>
+		cs::Ref<GalaxyLife> Life;
 
 	private:
 		/// <summary>Who held each system at the last review.</summary>

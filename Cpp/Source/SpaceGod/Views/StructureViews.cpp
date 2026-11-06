@@ -167,6 +167,10 @@ namespace SpaceGod::Views
 		auto scale = app->Scale();
 		const auto& scene = app->BodyScenes();
 		double jd = app->Clock->Jd;
+		// US-T100: stations the simulation builds as the system grows are drawn from the frame they are put up.
+		if (auto infra = app->World() != nullptr ? app->World()->Infrastructure : nullptr)
+			if (infra->Structures.Count() > views.Count())
+				for (const auto& s : infra->Structures) Add(s);
 		Scenes.Clear();
 		RingScenes.Clear();
 		Sizes.Clear();

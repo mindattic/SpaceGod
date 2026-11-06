@@ -18,15 +18,40 @@ namespace SpaceGod::Views
 	using Rendering::Materials;
 
 	SatelliteSwarm::SatelliteSwarm(UnitySpaceApp* app_, const cs::Ref<Transform>& parent)
-		: app(app_)
+		: app(app_), cloudParent(parent)
 	{
 		auto infra = app->World()->Infrastructure;
 		if (infra == nullptr) return;
+		for (const auto& c : infra->Constellations) Add(c);
+	}
+
+	void SatelliteSwarm::Sync()
+	{
+		// US-T100: a network the simulation puts up over a growing colony, or a shell it adds to one, is drawn from then on.
+		auto world = app->World();
+		auto infra = world != nullptr ? world->Infrastructure : nullptr;
+		if (infra == nullptr) return;
 		for (const auto& c : infra->Constellations)
+		{
+			cs::Ref<Cloud> drawn = nullptr;
+			for (const auto& cl : clouds)
+				if (cl->C == c) { drawn = cl; break; }
+			if (drawn != nullptr && drawn->Offsets.Count() == c->Count()) continue;
+			if (drawn != nullptr)
+			{
+				Destroy(drawn->T->gameObject());
+				clouds.Remove(drawn);
+			}
+			Add(c);
+		}
+	}
+
+	void SatelliteSwarm::Add(const cs::Ref<Constellation>& c)
+	{
 		{
 			int n = c->Count();
 			auto go = NewGameObject(c->Name);
-			go->transform->SetParent(parent, false);
+			go->transform->SetParent(cloudParent, false);
 			auto m = cs::New<Mesh>(c->Name); // new Mesh { name = c.Name, indexFormat = IndexFormat.UInt32 }
 			m->indexFormat = IndexFormat::UInt32;
 			auto mesh = Materials::Own(m);
@@ -63,6 +88,7 @@ namespace SpaceGod::Views
 
 	void SatelliteSwarm::Update(bool visible)
 	{
+		Sync();
 		auto scale = app->Scale();
 		double jd = app->Clock->Jd;
 		for (const auto& cl : clouds)

@@ -37,6 +37,14 @@ namespace SpaceGod::Views
 
 		UnitySpaceApp* app;
 		cs::List<cs::Ref<Cloud>> clouds;
+		/// <summary>What the clouds hang off (US-T100: a network put up later is added under it).</summary>
+		cs::Ref<Transform> cloudParent;
+
+		/// <summary>Draws <paramref name="c"/> as a cloud.</summary>
+		void Add(const cs::Ref<Core::Constellation>& c);
+
+		/// <summary>US-T100: draws the constellations the simulation has put up (or grown) since the clouds were made.</summary>
+		void Sync();
 
 	public:
 		SatelliteSwarm(UnitySpaceApp* app, const cs::Ref<Transform>& parent);
