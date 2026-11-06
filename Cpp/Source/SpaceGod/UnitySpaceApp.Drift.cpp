@@ -74,25 +74,10 @@ namespace SpaceGod
 		DVec3 forward, up, spin;
 		double turnDegS = 0;
 		bool drifting = false;
-		if (IsPiloting() && PilotControlMode != PilotControl::Helm && Piloted.IsShip() && Piloted.Ship != nullptr)
+		// A ship's helm needs none of these: every ship view carries its own thrusters now, on its hull's own plating
+		// (US-T231, ShipView::Thrust), firing with the helm's swing, burn and braking.
+		if (IsPiloting() && Piloted.IsShip())
 		{
-			// A fighter's helm (light or heavy, a bomber; a hauler's too, its thrusters trimming its swing): its ship view.
-			for (const auto& v : shipViews)
-				if (v != nullptr && v->Ship == Piloted.Ship)
-				{
-					if (v->Shown() && v->Root)
-					{
-						on = v->Root->transform;
-						box = v->HullBox();
-					}
-					break;
-				}
-			const auto& s = helmFlight->State;
-			forward = s.Forward;
-			up = s.Up;
-			spin = s.AngularVelocity;
-			turnDegS = PilotTuning::Of(Piloted.Ship->Spec->Class).TurnRateDegS;
-			drifting = helmFlight->Input.Drift;
 		}
 		else if (auto f = cs::As<FighterSeat>(HeldSeat()))
 		{

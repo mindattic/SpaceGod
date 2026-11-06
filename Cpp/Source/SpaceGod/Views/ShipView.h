@@ -15,6 +15,8 @@ namespace SpaceGod::Core
 
 namespace SpaceGod::Views
 {
+	class HullThrusters;
+
 	/// <summary>
 	/// The 3D model of one ship. Warships carry their hardpoints as separate parts: turrets traverse
 	/// and elevate onto whatever they are shooting, a hardpoint that is shot away leaves a blackened
@@ -61,6 +63,15 @@ namespace SpaceGod::Views
 		/// <summary>Whether the full model is drawn (U.SPC-T415): false draws the hull alone, without hardpoints, scars, glows, shields or exhaust.</summary>
 		bool detailed = true;
 		float wreckSpin = 0;
+
+		/// <summary>Its thrusters (US-T231), built from the hull as drawn the first time it is shown in full; null until then.
+		/// Once built they draw the drive's flame and exhaust (on the stern's own nozzles) in place of the one plume.</summary>
+		cs::Ref<HullThrusters> thrusters;
+		/// <summary>The speed last frame and its smoothed rate of change, 1/s of itself: what tells a burn that speeds the hull
+		/// up from one that brakes it (a transit's braking half is flown nose first, on its retros).</summary>
+		double lastSpeed = 0;
+		float speedRate = 0;
+		bool hasSpeed = false;
 
 		// Shield fields: one disc per shield emitter over the patch of hull it covers (U.SPC-T501), built once
 		// (geometry is fixed) and recoloured each frame from that emitter's own field. Built for every ship, not
@@ -120,6 +131,19 @@ namespace SpaceGod::Views
 		void ApplyCombat(const cs::Ref<Core::ShipCombat>& combat, bool fighting, bool thrusting, float now, float dt);
 
 		/// <summary>
+		/// Fires its thrusters (US-T231), after <see cref="Apply"/> placed it this frame: the main engines while
+		/// <paramref name="burning"/> speeds it up, the bow's retros while it brakes, the RCS as its drawn rotation swings,
+		/// rolls and stops. <paramref name="speed"/> is its speed (any unit; only its change is read); a hull that is
+		/// <paramref name="driven"/> (a battle unit, the helm's) also burns or brakes as its speed changes without a scheduled
+		/// burn. <paramref name="intensity"/> scales the RCS's flame. Shown only with the full model.
+		/// </summary>
+		void Thrust(bool burning, double speed, bool driven, float intensity, float dt, float now);
+
+		/// <summary>How many thrusters it carries (main engines, all of them), 0 before they are built.</summary>
+		int MainThrusters() const;
+		int Thrusters() const;
+
+		/// <summary>
 		/// A destroyed ship: bow and stern drift apart and tumble, the hull blackens, fires burn at
 		/// the break and on the wreck, then the pieces burn out and vanish.
 		/// </summary>
@@ -162,6 +186,7 @@ namespace SpaceGod::Views
 		void Billboard(float now);
 		void PlaceBrokenHalves(float age);
 		void HardStopExhaust();
+		void HideThrusters();
 		void SetBlock();
 	};
 }

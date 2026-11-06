@@ -6,8 +6,10 @@
 #include "Rendering/ShipModels.h"
 #include "Rendering/StarSparrowKit.h"
 #include "Rendering/UscKit.h"
+#include "Views/HullThrusters.h"
 
 #include "Combat/CombatSpecs.h"
+#include "Combat/PilotTuning.h"
 #include "Combat/CombatState.h"
 #include "Economy/BeltMining.h"
 #include "Ships.h"
@@ -449,8 +451,61 @@ namespace SpaceGod::Views
 		block.SetColor(ColorId, Color::white());
 		SetBlock();
 		if (towRenderer) towRenderer->SetPropertyBlock(block);
-		plume->enabled = visible && burning;
-		SetExhaust(visible && detailed && burning);
+		// Once its thrusters are built (US-T231) its stern nozzles draw the drive and Thrust runs the exhaust.
+		if (thrusters) plume->enabled = false;
+		else
+		{
+			plume->enabled = visible && burning;
+			SetExhaust(visible && detailed && burning);
+		}
+	}
+
+	void ShipView::Thrust(bool burning, double speed, bool driven, float intensity, float dt, float now)
+	{
+		if (!(dt > 0)) return;
+		// The speed's change, smoothed, as a share of the speed itself per second: braking reads the same at any scale.
+		if (hasSpeed && dt < 0.25f)
+		{
+			double raw = (speed - lastSpeed) / dt / cs::Math::Max(cs::Math::Abs(speed), 1e-9);
+			float k = 1 - Mathf::Exp(-dt * 6.0f);
+			speedRate += (static_cast<float>(cs::Math::Clamp(raw, -10.0, 10.0)) - speedRate) * k;
+		}
+		else speedRate = 0;
+		lastSpeed = speed;
+		hasSpeed = true;
+
+		if (!visible || !detailed || !Root)
+		{
+			HideThrusters();
+			return;
+		}
+		if (!thrusters)
+		{
+			cs::List<Vector3> engines;
+			for (const auto& s : Ship->Combat->Subsystems)
+				if (s->Kind() == SubsystemKind::Engine)
+					engines.Add(Vector3(static_cast<float>(s->Def->X), static_cast<float>(s->Def->Y), static_cast<float>(s->Def->Z)));
+			thrusters = cs::New<HullThrusters>(Root->transform, renderers, engines);
+			// The exhaust's embers leave from the stern's own nozzles, not a fixed point behind the root.
+			exhaust->transform()->localPosition = thrusters->SternCentre();
+			plume->enabled = false;
+			exhaustPlaying = false;
+			exhaust->Stop(true, UnityCompat::ParticleSystemStopBehavior::StopEmittingAndClear);
+		}
+		// A burn that is shedding speed is a braking one, flown on the retros; one that holds or gains it, on the mains.
+		bool braking = speedRate < -0.01f && (burning || (driven && speedRate < -0.05f));
+		bool pushing = !braking && (burning || (driven && speedRate > 0.05f));
+		float fullAccel = static_cast<float>(cs::Math::Max(0.2, Core::PilotTuning::Of(Ship->Spec->Class).TurnRateDegS * Mathf::Deg2Rad / 0.25));
+		thrusters->Update(Root->transform->localRotation, pushing ? 1.0f : 0.0f, braking ? 1.0f : 0.0f, fullAccel, intensity, dt, now);
+		SetExhaust(thrusters->MainLit());
+	}
+
+	int ShipView::MainThrusters() const { return thrusters ? thrusters->MainCount() : 0; }
+	int ShipView::Thrusters() const { return thrusters ? thrusters->JetCount() : 0; }
+
+	void ShipView::HideThrusters()
+	{
+		if (thrusters) thrusters->Hide();
 	}
 
 	/// <summary>
@@ -617,6 +672,7 @@ namespace SpaceGod::Views
 		SetBlock();
 		plume->enabled = false;
 		HardStopExhaust();
+		HideThrusters();
 		return true;
 	}
 
@@ -667,6 +723,7 @@ namespace SpaceGod::Views
 		SetBlock();
 		plume->enabled = false;
 		HardStopExhaust();
+		HideThrusters();
 	}
 
 	/// <summary>A wrecked or derelict hull cuts its exhaust immediately rather than letting it fade
@@ -700,6 +757,7 @@ namespace SpaceGod::Views
 		if (!full)
 		{
 			HardStopExhaust();
+			HideThrusters();
 			for (const auto& g : glows) g->R->enabled = false;
 			for (const auto& g : breaches) g->R->enabled = false;
 			if (shieldRingRenderer) shieldRingRenderer->enabled = false;
@@ -722,6 +780,7 @@ namespace SpaceGod::Views
 		{
 			plume->enabled = false;
 			HardStopExhaust();
+			HideThrusters();
 			for (const auto& g : glows) g->R->enabled = false;
 			if (shieldRingRenderer) shieldRingRenderer->enabled = false;
 		}

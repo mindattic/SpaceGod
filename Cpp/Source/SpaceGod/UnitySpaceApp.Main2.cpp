@@ -1407,6 +1407,11 @@ namespace SpaceGod
 			shipViews[i]->Apply(rel, shipRotation[i], static_cast<float>(shipLength[i]), shipStates[i].Burning,
 				target == Selected || target == Hovered);
 			shipViews[i]->ApplyCombat(ship->Combat, ship->Battle != nullptr, thrusting, Time::unscaledTime, dt);
+			// US-T231: its thrusters, on its own hull, firing with its burn, its braking and its drawn swing; the helm's
+			// hull burns its RCS bright while it drifts, as the thrusters are then all it has.
+			bool flown = ship == World()->PilotedShip && IsPiloting();
+			double speed = unit != nullptr ? unit->Vel.Length() : shipStates[i].SpeedKmS;
+			shipViews[i]->Thrust(shipStates[i].Burning, speed, unit != nullptr || flown, flown && PilotDrifting() ? 1.0f : 0.6f, dt, Time::unscaledTime);
 		}
 		for (int g = glowIndex; g < entryGlows.Count(); g++) std::get<0>(entryGlows[g])->gameObject()->SetActive(false);
 
