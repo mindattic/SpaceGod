@@ -1066,6 +1066,17 @@ namespace SpaceGod::Core
 		void EmpBurst(DVec3 at, int side, double seconds, double radiusKm);
 
 	private:
+		/// <summary>
+		/// US-T177: no two hulls overlap. Every present unit is a collision body (a ship a capsule that switches to its
+		/// sections' boxes once another body is within <see cref="SectionColliders.ProximityKm"/>, a platform or fort
+		/// immovable, a fighter a capsule; a craft never collides with the carrier it flies from nor its squadron mates), and
+		/// <see cref="SectionColliders.Step"/> pushes them apart and exchanges the impulse. The damage lands on the section
+		/// struck: the hull through <see cref="ApplyImpact"/>, and its structure (<see cref="SectionColliders.StrikeStructure"/>,
+		/// US-T91), so a section knocked loose breaks away. The hull the player flies and a latched boarder are left to their
+		/// own drivers (the pilot loop's collisions, the latch).
+		/// </summary>
+		void StepCollisions();
+
 		/// <summary>Mines arm, wait and run out; an armed one with a hostile hull inside its trigger blows, hurting
 		/// everything hostile in its blast, harder the nearer the centre.</summary>
 		void StepMines(double dt);

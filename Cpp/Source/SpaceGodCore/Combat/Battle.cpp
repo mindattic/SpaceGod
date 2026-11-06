@@ -42,6 +42,7 @@
 #include "Combat/WeakPatches.h"
 #include "Combat/WeaponSystems.h"
 #include "Combat/Collisions.h"
+#include "Combat/SectionColliders.h"
 #include "Combat/BoardingCommand.h"
 #include "Combat/BuriedBridges.h"
 #include "Combat/MarineHabitats.h"
@@ -352,6 +353,8 @@ namespace SpaceGod::Core
 		}
 		// Craft down on a flight deck ride with their hull, are turned round and launched again (U.SPC-T518).
 		FlightDecks::Step(self, dt);
+		// Nothing overlaps: hulls push apart and take the knock on the section struck (US-T177).
+		StepCollisions();
 		for (int i = 0; i < Units.Count(); i++)
 		{
 			auto u = Units[i];
@@ -2342,6 +2345,60 @@ namespace SpaceGod::Core
 			target->Dead = true;
 			Emit(FxKind::UnitDestroyed, target->Pos, target->Pos, target->LengthKm, target->Side, target, -1);
 			if (UnitDestroyed) UnitDestroyed(shared_from_this(), target);
+		}
+	}
+
+	void Battle::StepCollisions()
+	{
+		std::vector<cs::Ref<BattleUnit>> who;
+		std::vector<CollisionBody> bodies;
+		for (const auto& u : Units)
+		{
+			if (!u->Present() || u->Combat == nullptr || u->Combat->Spec == nullptr) continue;
+			// The flown hull is the pilot loop's to collide (it has the frame's own sweep); a latched boarder rides its hull.
+			if (u->PlayerControlled() || u->Latched != nullptr) continue;
+			DVec3 right, up;
+			u->Basis(right, up);
+			auto body = SectionColliders::HullBody((int)who.size(), u->Combat, u->Pos, u->Vel, u->Forward, up, u->LengthKm, false);
+			if (u->Kind == UnitKind::Platform) body.Volume.MassKt = 0; // a station's platform: a wall
+			// A craft and the hull it lands on (and its squadron mates, who fly in formation) never collide.
+			cs::Ref<BattleUnit> home = u->Kind == UnitKind::Fighter && u->Fighter != nullptr ? u->Fighter->LandsOn() : nullptr;
+			body.Group = (home != nullptr ? home->Id : u->Id) + 1;
+			who.push_back(u);
+			bodies.push_back(std::move(body));
+		}
+		if (bodies.size() < 2) return;
+		// Narrow phase only where it is due: sections for the bodies inside another's proximity.
+		auto inReach = SectionColliders::NearOthers(bodies);
+		for (size_t i = 0; i < bodies.size(); i++)
+		{
+			if (!inReach[i]) continue;
+			const auto& u = who[i];
+			DVec3 right, up;
+			u->Basis(right, up);
+			bodies[i].Sections = SectionColliders::Build(u->Combat, u->Pos, bodies[i].Volume.Axis, up, u->LengthKm);
+		}
+		auto impacts = SectionColliders::Step(bodies);
+		for (const auto& b : bodies)
+		{
+			const auto& u = who[b.Id];
+			if (u->Kind == UnitKind::Platform) continue;
+			u->Pos = b.Volume.Pos;
+			u->Vel = b.Volume.Vel;
+		}
+		auto strike = [&](int id, int section, double hp, DVec3 at)
+		{
+			if (hp <= 0) return;
+			const auto& u = who[id];
+			const auto& b = bodies[id];
+			if (!u->Present()) return;
+			ApplyImpact(u, at, hp);
+			if (section >= 0 && section < (int)b.Sections.size()) SectionColliders::StrikeStructure(u->Combat, b.Sections[section].ModuleId, hp);
+		};
+		for (const auto& hit : impacts)
+		{
+			strike(hit.IdA, hit.SectionA, hit.HpA, hit.Hit.Point);
+			strike(hit.IdB, hit.SectionB, hit.HpB, hit.Hit.Point);
 		}
 	}
 

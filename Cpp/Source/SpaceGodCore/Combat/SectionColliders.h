@@ -1,6 +1,7 @@
 #pragma once
 // Two-phase collision with per-section convex colliders (US-T177, ties to US-T91 / ModularHull).
 
+#include <utility>
 #include <vector>
 
 #include "Cs/Cs.h"
@@ -10,6 +11,7 @@
 namespace SpaceGod::Core
 {
 	class ShipCombat;
+	class World;
 
 	/// <summary>One section of a hull as its own convex collider (an oriented box) with its own hit points; a hull's
 	/// sections' <see cref="MaxHp"/> sum to its hull strength.</summary>
@@ -40,6 +42,10 @@ namespace SpaceGod::Core
 		/// <summary>Hull points and armour, for damage; zero hull points means nothing to damage (a rock, a station).</summary>
 		double HullHp = 0, Armor = 0;
 
+		/// <summary>Bodies sharing a nonzero group never collide with each other (a carrier and the craft it launches
+		/// out of its own hangar, a squadron flying in formation).</summary>
+		int Group = 0;
+
 		double SectionHpTotal() const;
 
 		/// <summary>The radius of a sphere about <see cref="CollisionVolume.Pos"/> holding the volume and every section's box.</summary>
@@ -64,9 +70,50 @@ namespace SpaceGod::Core
 		double HpA = 0, HpB = 0;
 	};
 
+	/// <summary>Something solid a drifting piece bounces off (a station), as a sphere about <see cref="Centre"/>.</summary>
+	struct SPACEGODCORE_API SphereObstacle
+	{
+		DVec3 Centre;
+		double RadiusKm = 0;
+	};
+
 	class SPACEGODCORE_API SectionColliders
 	{
 	public:
+		/// <summary>The share of its speed a piece of debris keeps when it bounces off a station.</summary>
+		static constexpr double DebrisRestitution = 0.5;
+
+		/// <summary>A hull as a collision body: a capsule as long as <paramref name="lengthKm"/> (the caller's own scale)
+		/// and as thick as its beam, carrying its hull points and armour, its sections only when
+		/// <paramref name="withSections"/> (built for bodies inside another's proximity, so far-apart hulls cost nothing).</summary>
+		static CollisionBody HullBody(int id, const cs::Ref<ShipCombat>& c, DVec3 pos, DVec3 vel, DVec3 forward, DVec3 up, double lengthKm, bool withSections);
+
+		/// <summary>For each body, whether another it can collide with (not both immovable or pinned, not sharing a group)
+		/// is inside its proximity radius: the bodies whose sections a caller should build before <see cref="Step"/>.</summary>
+		static std::vector<bool> NearOthers(const std::vector<CollisionBody>& bodies);
+
+		/// <summary>
+		/// Writes <paramref name="hp"/> of collision damage on section <paramref name="moduleId"/> back into the hull's
+		/// structure (US-T91): the module takes it as structure (a section's hit points are its share of the hull's, so the
+		/// damage is scaled to the module's own), the joints round it are loaded, and every piece that breaks away is
+		/// applied to the hull (<see cref="ModularHulls.ApplyBreak"/>). Returns how many pieces came away.
+		/// </summary>
+		static int StrikeStructure(const cs::Ref<ShipCombat>& c, int moduleId, double hp);
+
+		/// <summary>
+		/// Where something that set out from <paramref name="origin"/> and travelled <paramref name="travel"/> in a straight
+		/// line ends up if it bounces off the first of <paramref name="obstacles"/> in its way: from the point it struck,
+		/// mirrored about the surface, the rest of its travel times <paramref name="restitution"/>. Stateless (the same
+		/// path always bounces the same way), for debris whose drift is a function of time. A start inside an obstacle is
+		/// put on its surface.
+		/// </summary>
+		static DVec3 BounceOff(DVec3 origin, DVec3 travel, const std::vector<SphereObstacle>& obstacles, double restitution = DebrisRestitution);
+
+		/// <summary>The stations within <paramref name="reachKm"/> of <paramref name="helioKm"/> (km, past their own
+		/// radius) at <paramref name="jd"/>, centres relative to it: structures in orbit and the defence platforms and forts
+		/// of fights under way at a body, what a wreck's debris bounces off.</summary>
+		static std::vector<SphereObstacle> StationsNear(const cs::Ref<World>& world, DVec3 helioKm, double reachKm, double jd);
+
 		/// <summary>Narrow-phase colliders switch on when the broad-phase spheres are this close (km beyond touching),
 		/// so a caller builds sections only for bodies inside it.</summary>
 		static constexpr double ProximityKm = 0.5;
@@ -103,7 +150,13 @@ namespace SpaceGod::Core
 		static bool Strike(CollisionBody& body, int index, double hp);
 
 		/// <summary>Every pair, in id order, relaxed over <see cref="Passes"/> passes: afterwards nothing overlaps (to the
-		/// extent pinned and immovable bodies allow). Bodies are reordered by id. Returns the impacts, in resolution order.</summary>
+		/// extent pinned and immovable bodies allow). Bodies are reordered by id. Returns the impacts, in resolution order.
+		/// Pairs are found by sweep and prune along x on the broad spheres (only those that overlap are tested), so a step
+		/// costs about n log n plus the contacts, not n squared.</summary>
 		static std::vector<SectionImpact> Step(std::vector<CollisionBody>& bodies);
+
+	private:
+		/// <summary>The pairs (i &lt; j, lexicographic) whose broad spheres overlap and that can collide.</summary>
+		static std::vector<std::pair<int, int>> Candidates(const std::vector<CollisionBody>& bodies, double padKm);
 	};
 }

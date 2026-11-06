@@ -6,6 +6,11 @@
 #include "Combat/CombatSpecs.h"
 #include "Combat/CombatState.h"
 #include "Combat/ModularHull.h"
+#include "Combat/Battle.h"
+#include "Combat/War.h"
+#include "Ephemeris.h"
+#include "Infrastructure/Infrastructure.h"
+#include "World.h"
 
 namespace SpaceGod::Core
 {
@@ -250,20 +255,164 @@ namespace SpaceGod::Core
 		return out;
 	}
 
+	CollisionBody SectionColliders::HullBody(int id, const cs::Ref<ShipCombat>& c, DVec3 pos, DVec3 vel, DVec3 forward, DVec3 up, double lengthKm, bool withSections)
+	{
+		CollisionBody body;
+		body.Id = id;
+		auto spec = c->Spec;
+		double length = std::max(1e-6, lengthKm);
+		double r = length * std::max(0.01, std::min(1.0, spec->BeamFraction)) * 0.5;
+		DVec3 axis = forward.LengthSquared() > 1e-18 ? forward.Normalized() : DVec3::UnitX;
+		body.Volume.Pos = pos;
+		body.Volume.Vel = vel;
+		body.Volume.Axis = axis;
+		body.Volume.HalfLengthKm = std::max(0.0, length * 0.5 - r);
+		body.Volume.RadiusKm = r;
+		body.Volume.MassKt = Collisions::MassOf(spec);
+		body.HullHp = spec->Hull;
+		body.Armor = spec->Armor;
+		if (withSections) body.Sections = Build(c, pos, axis, up, length);
+		return body;
+	}
+
+	static bool CanMove(const CollisionBody& x) { return !x.Volume.Immovable() && !x.Volume.Pinned; }
+
+	static bool CanCollide(const CollisionBody& a, const CollisionBody& b)
+	{
+		if (!CanMove(a) && !CanMove(b)) return false; // nothing to push apart
+		return a.Group == 0 || a.Group != b.Group;
+	}
+
+	std::vector<std::pair<int, int>> SectionColliders::Candidates(const std::vector<CollisionBody>& bodies, double padKm)
+	{
+		int n = (int)bodies.size();
+		std::vector<double> r(n);
+		std::vector<int> order(n);
+		for (int i = 0; i < n; i++) { r[i] = bodies[i].BroadRadiusKm() + padKm * 0.5; order[i] = i; }
+		auto lo = [&](int i) { return bodies[i].Volume.Pos.X - r[i]; };
+		std::sort(order.begin(), order.end(), [&](int x, int y) { double a = lo(x), b = lo(y); return a < b || (a == b && x < y); });
+		std::vector<std::pair<int, int>> pairs;
+		for (int k = 0; k < n; k++)
+		{
+			int i = order[k];
+			double hi = bodies[i].Volume.Pos.X + r[i];
+			for (int m = k + 1; m < n; m++)
+			{
+				int j = order[m];
+				if (lo(j) > hi) break;
+				const auto& a = bodies[i];
+				const auto& b = bodies[j];
+				if (!CanCollide(a, b)) continue;
+				if ((a.Volume.Pos - b.Volume.Pos).Length() > r[i] + r[j]) continue;
+				pairs.emplace_back(std::min(i, j), std::max(i, j));
+			}
+		}
+		std::sort(pairs.begin(), pairs.end());
+		return pairs;
+	}
+
+	std::vector<bool> SectionColliders::NearOthers(const std::vector<CollisionBody>& bodies)
+	{
+		std::vector<bool> inReach(bodies.size(), false);
+		for (const auto& [i, j] : Candidates(bodies, ProximityKm))
+		{
+			inReach[i] = true;
+			inReach[j] = true;
+		}
+		return inReach;
+	}
+
+	int SectionColliders::StrikeStructure(const cs::Ref<ShipCombat>& c, int moduleId, double hp)
+	{
+		if (c == nullptr || hp <= 0 || c->Spec == nullptr || c->Spec->Hull <= 0) return 0;
+		auto h = c->Structure();
+		if (moduleId < 0 || moduleId >= h->Modules.Count()) return 0;
+		double total = 0;
+		for (int i = 0; i < h->Modules.Count(); i++) total += h->Modules[i]->MaxStructure;
+		if (total <= 0) return 0;
+		auto m = h->Module(moduleId);
+		if (m->Detached) return 0;
+		// The section's hit points are hull points (Hull * MaxStructure / total); the module's structure is its own.
+		auto pieces = h->Strike(m->Centre, hp * total / c->Spec->Hull);
+		for (const auto& p : pieces) ModularHulls::ApplyBreak(c, p);
+		return pieces.Count();
+	}
+
+	DVec3 SectionColliders::BounceOff(DVec3 origin, DVec3 travel, const std::vector<SphereObstacle>& obstacles, double restitution)
+	{
+		for (const auto& o : obstacles)
+		{
+			DVec3 d = origin - o.Centre;
+			double dist = d.Length();
+			if (o.RadiusKm > 0 && dist < o.RadiusKm)
+				origin = o.Centre + (dist > 1e-12 ? d / dist : DVec3::UnitX) * o.RadiusKm;
+		}
+		double length = travel.Length();
+		if (length < 1e-12) return origin;
+		DVec3 dir = travel / length;
+		double first = 1e300;
+		int hit = -1;
+		for (size_t k = 0; k < obstacles.size(); k++)
+		{
+			const auto& o = obstacles[k];
+			if (o.RadiusKm <= 0) continue;
+			DVec3 oc = origin - o.Centre;
+			double b = DVec3::Dot(oc, dir);
+			double cc = DVec3::Dot(oc, oc) - o.RadiusKm * o.RadiusKm;
+			double disc = b * b - cc;
+			if (disc < 0) continue;
+			double t = -b - std::sqrt(disc);
+			if (t < 0 || t > length || t >= first) continue;
+			first = t;
+			hit = (int)k;
+		}
+		if (hit < 0) return origin + travel;
+		DVec3 at = origin + dir * first;
+		DVec3 n = (at - obstacles[hit].Centre) / obstacles[hit].RadiusKm;
+		DVec3 out = dir - n * (2 * DVec3::Dot(dir, n));
+		return at + out * ((length - first) * restitution);
+	}
+
+	std::vector<SphereObstacle> SectionColliders::StationsNear(const cs::Ref<World>& world, DVec3 helioKm, double reachKm, double jd)
+	{
+		std::vector<SphereObstacle> out;
+		if (world == nullptr || world->Ephemeris == nullptr) return out;
+		if (world->Infrastructure != nullptr)
+			for (const auto& st : world->Infrastructure->Structures)
+			{
+				double r = std::max(0.01, st->LengthKm * 0.5);
+				DVec3 c = st->HelioAt(world->Ephemeris, jd) - helioKm;
+				if (c.Length() > reachKm + r) continue;
+				out.push_back(SphereObstacle{ c, r });
+			}
+		if (world->War != nullptr)
+			for (const auto& b : world->War->Battles)
+			{
+				if (b->Over || b->Site != nullptr) continue;
+				DVec3 anchor = world->Ephemeris->HelioAt(b->Body, jd) + b->Anchor - helioKm;
+				if (anchor.Length() > reachKm + Battle::EscapeKm) continue;
+				for (const auto& u : b->Units)
+				{
+					if (u->Kind != UnitKind::Platform || !u->Present()) continue;
+					DVec3 c = anchor + u->Pos;
+					if (c.Length() > reachKm + u->Radius()) continue;
+					out.push_back(SphereObstacle{ c, u->Radius() });
+				}
+			}
+		return out;
+	}
+
 	std::vector<SectionImpact> SectionColliders::Step(std::vector<CollisionBody>& bodies)
 	{
 		std::stable_sort(bodies.begin(), bodies.end(), [](const CollisionBody& x, const CollisionBody& y) { return x.Id < y.Id; });
 		std::vector<SectionImpact> impacts;
-		auto canMove = [](const CollisionBody& x) { return !x.Volume.Immovable() && !x.Volume.Pinned; };
 		for (int pass = 0; pass < Passes; pass++)
 		{
 			bool any = false;
-			for (size_t i = 0; i < bodies.size(); i++)
-				for (size_t j = i + 1; j < bodies.size(); j++)
+			for (const auto& [i, j] : Candidates(bodies, 0))
 				{
 					auto& a = bodies[i];
 					auto& b = bodies[j];
-					if (!canMove(a) && !canMove(b)) continue; // nothing to push apart
 					if (pass == 0)
 					{
 						SectionImpact r = Resolve(a, b);

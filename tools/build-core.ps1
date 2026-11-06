@@ -8,7 +8,7 @@ param(
   [ValidateSet('Release', 'Debug')][string]$Configuration = 'Release',
   # Recompile everything instead of only sources newer than their .obj (or older than a changed header).
   [switch]$Rebuild,
-  # Build CsParity.exe but don't run it against Tests/CsParity/expected.txt.
+  # Build CsParity.exe (and SectionCollidersTests.exe) but don't run them.
   [switch]$SkipParity
 )
 
@@ -199,4 +199,16 @@ if (-not $SkipParity) {
   & $exe (Join-Path $parityDir 'expected.txt')
   if ($LASTEXITCODE -ne 0) { Write-Host 'CsParity: the C++ layer differs from .NET (see above).' -ForegroundColor Red; exit $LASTEXITCODE }
 }
-exit 0
+
+# ---------------------------------------------------------------- SectionCollidersTests (US-T177)
+$scDir = Join-Path $core 'Tests\SectionColliders'
+$sc = Invoke-Compile @(Get-Item -LiteralPath (Join-Path $scDir 'SectionCollidersTests.cpp')) $parityObjRoot
+if ($sc.Failed.Count -gt 0) { exit 1 }
+$scExe = Join-Path $out 'SectionCollidersTests.exe'
+& link.exe /nologo /DEBUG @linkOpt "/OUT:$scExe" $sc.Objs $lib
+if ($LASTEXITCODE -ne 0) { throw 'link.exe failed (SectionCollidersTests).' }
+Write-Host "exe     $scExe"
+if (-not $SkipParity) {
+  & $scExe
+  if ($LASTEXITCODE -ne 0) { Write-Host 'SectionCollidersTests: failures (see above).' -ForegroundColor Red; exit $LASTEXITCODE }
+}exit 0

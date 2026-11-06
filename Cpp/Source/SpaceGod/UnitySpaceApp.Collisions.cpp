@@ -13,7 +13,10 @@
 #include "SimClock.h"
 #include "World.h"
 #include "Combat/Battle.h"
+#include "Combat/BioMass.h"
+#include "Combat/CargoPods.h"
 #include "Combat/Collisions.h"
+#include "Combat/SectionColliders.h"
 #include "Combat/CombatState.h"
 #include "Combat/PilotFlight.h"
 #include "Combat/War.h"
@@ -27,6 +30,57 @@ using namespace SpaceGod::Core;
 
 namespace SpaceGod
 {
+	namespace
+	{
+		/// Moves a body (and its sections with it) to <paramref name="to"/>.
+		void MoveBody(CollisionBody& b, DVec3 to)
+		{
+			DVec3 d = to - b.Volume.Pos;
+			b.Volume.Pos = to;
+			for (auto& s : b.Sections) s.Centre = s.Centre + d;
+		}
+
+		/// US-T177: the two-phase contact (bounding spheres, then the hulls' section boxes) between the piloted hull and
+		/// another body, caught even on a fast pass the way <see cref="UnitySpaceApp::Collide"/> catches it: tested where
+		/// they end the frame and, if apart there but their broad spheres crossed on the way, at steps from first touch on.
+		SectionImpact CollideBodies(CollisionBody& me, CollisionBody& other, DVec3 meBefore, double dt)
+		{
+			SectionImpact hit = SectionColliders::Resolve(me, other);
+			if (hit.Hit.Hit) return hit;
+			DVec3 otherBefore = other.Volume.Pos - other.Volume.Vel * dt;
+			DVec3 relStart = otherBefore - meBefore;
+			DVec3 move = (other.Volume.Pos - me.Volume.Pos) - relStart;
+			if (move.Length() < cs::Math::Min(me.Volume.RadiusKm, other.Volume.RadiusKm)) return hit;
+			double t = Collisions::TimeOfImpact(relStart, move, me.BroadRadiusKm() + other.BroadRadiusKm());
+			if (t < 0) return hit;
+			DVec3 meEnd = me.Volume.Pos, otherEnd = other.Volume.Pos;
+			constexpr int steps = 8;
+			for (int k = 0; k <= steps; k++)
+			{
+				double s = t + (1 - t) * k / steps;
+				MoveBody(me, DVec3::Lerp(meBefore, meEnd, s));
+				MoveBody(other, DVec3::Lerp(otherBefore, otherEnd, s));
+				if (SectionColliders::Contact(me, other).Hit) return SectionColliders::Resolve(me, other);
+			}
+			MoveBody(me, meEnd);
+			MoveBody(other, otherEnd);
+			return hit;
+		}
+
+		/// A body for something with no sections: a sphere.
+		CollisionBody SphereBody(DVec3 pos, DVec3 vel, double radiusKm, double massKt, bool pinned)
+		{
+			CollisionBody b;
+			b.Id = 1;
+			b.Volume = CollisionVolume::Sphere(pos, vel, radiusKm, massKt);
+			b.Volume.Pinned = pinned;
+			return b;
+		}
+
+		/// A drifting pod's canister, km (CargoPodsView::PodLengthKm long): what the hull shoulders aside.
+		constexpr double PodRadiusKm = 0.007;
+	}
+
 	bool UnitySpaceApp::UpdatePilotCollisions(const cs::Ref<Core::Ship>& ship, DVec3 posBefore, float dt)
 	{
 		// Riding a hulk on the clamps is not flying into it.
@@ -35,13 +89,22 @@ namespace SpaceGod
 		double jd = Clock->Jd;
 		DVec3 frameHelio = Ephemeris()->HelioAt(pilotFrameBody, jd);
 		DVec3 frameVel = FrameVelocityKmS(pilotFrameBody, jd);
-		auto spec = ship->Combat->Spec;
 		double pad = (pilot().Pos - posBefore).Length() + 1;
-		CollisionVolume me = CollisionVolume::Hull(spec, pilot().Pos, pilot().Vel, pilot().Forward);
+		// US-T177: the hull is its sections' boxes (one per module still attached), each with its own hit points; the
+		// battle leaves this hull to this loop (Battle::StepCollisions skips the flown unit), so nothing is resolved twice.
+		CollisionBody me = SectionColliders::HullBody(0, ship->Combat, pilot().Pos, pilot().Vel, pilot().Forward, pilot().Up, ship->LengthKm(), true);
 		cs::Ref<Core::Battle> battle = ship->Battle;
 		cs::Ref<BattleUnit> mine = battle ? battle->UnitOf(ship) : nullptr;
 
-		auto Near = [&](DVec3 pos, double radius) { return (pos - me.Pos).Length() <= me.BoundingRadiusKm() + radius + pad; };
+		auto Near = [&](DVec3 pos, double radius) { return (pos - me.Volume.Pos).Length() <= me.BroadRadiusKm() + radius + pad; };
+		// The flown hull's side of a contact: the section struck takes it into its structure (a piece may break away,
+		// US-T91), then the hull and its hardpoints through Struck. False if the hull was lost.
+		auto HitMe = [&](const SectionImpact& hit, const ContactKey& what, const cs::String& name)
+		{
+			if (hit.SectionA >= 0 && hit.SectionA < (int)me.Sections.size())
+				SectionColliders::StrikeStructure(ship->Combat, me.Sections[hit.SectionA].ModuleId, Collisions::DamageHp(ship->Combat->Spec, hit.Hit.EnergyShareTJ()));
+			return Struck(ship, me.Volume, hit.Hit, what, name);
+		};
 
 		if (battle != nullptr)
 		{
@@ -50,18 +113,23 @@ namespace SpaceGod
 				if (u == mine || !u->Present()) continue;
 				DVec3 pos = battle->Anchor + u->Pos;
 				if (!Near(pos, u->LengthKm * 0.5)) continue;
-				CollisionVolume other = CollisionVolume::Hull(u->Combat->Spec, pos, u->Vel, u->Forward);
-				if (u->Kind == UnitKind::Platform) other.MassKt = 0;
-				Impact hit = Collide(me, other, posBefore, dt);
-				if (!hit.Hit) continue;
+				DVec3 right, up;
+				u->Basis(right, up);
+				CollisionBody other = SectionColliders::HullBody(1, u->Combat, pos, u->Vel, u->Forward, up, u->LengthKm, true);
+				if (u->Kind == UnitKind::Platform) other.Volume.MassKt = 0;
+				SectionImpact hit = CollideBodies(me, other, posBefore, dt);
+				if (!hit.Hit.Hit) continue;
 				if (u->Kind != UnitKind::Platform)
 				{
-					u->Pos = other.Pos - battle->Anchor;
-					u->Vel = other.Vel;
+					u->Pos = other.Volume.Pos - battle->Anchor;
+					u->Vel = other.Volume.Vel;
 				}
-				if (hit.EnergyTJ <= 0) continue;
-				battle->ApplyImpact(u, hit.Point - battle->Anchor, Collisions::DamageHp(u->Combat->Spec, hit.EnergyShareTJ()));
-				if (!Struck(ship, me, hit, ContactKey::Of(u), u->Kind == UnitKind::Fighter ? cs::String("a fighter") : cs::Cat("the ", u->Name()))) return false;
+				if (hit.Hit.EnergyTJ <= 0) continue;
+				double hp = Collisions::DamageHp(u->Combat->Spec, hit.Hit.EnergyShareTJ());
+				battle->ApplyImpact(u, hit.Hit.Point - battle->Anchor, hp);
+				if (hit.SectionB >= 0 && hit.SectionB < (int)other.Sections.size() && u->Present())
+					SectionColliders::StrikeStructure(u->Combat, other.Sections[hit.SectionB].ModuleId, hp);
+				if (!HitMe(hit, ContactKey::Of(u), u->Kind == UnitKind::Fighter ? cs::String("a fighter") : cs::Cat("the ", u->Name()))) return false;
 			}
 		}
 		else
@@ -79,32 +147,42 @@ namespace SpaceGod
 				if (!Near(pos, s->LengthKm() * 0.5)) continue;
 				DVec3 vel = VelocityKmS(helioAt, jd) - frameVel;
 				DVec3 facing = Fleet()->StateOf(s, jd).Facing;
-				CollisionVolume other = CollisionVolume::Hull(s->Combat->Spec, pos, vel, facing);
-				other.Pinned = true; // on its schedule (or adrift where it was left): it holds its track
-				Impact hit = Collide(me, other, posBefore, dt);
-				if (!hit.Hit || hit.EnergyTJ <= 0) continue;
-				DVec3 local = Collisions::ToLocal(hit.Point, other.Pos, other.Axis, PilotState::LevelUp(other.Axis), s->LengthKm());
-				Collisions::ApplyDamage(s->Combat, local, Collisions::DamageHp(s->Combat->Spec, hit.EnergyShareTJ()));
-				if (!s->Combat->Alive() && World()->War->LoseInCollision(s, pilotFrameBody, other.Pos, jd, cs::Cat("the ", ship->Name)))
+				CollisionBody other = SectionColliders::HullBody(1, s->Combat, pos, vel, facing, PilotState::LevelUp(facing), s->LengthKm(), true);
+				other.Volume.Pinned = true; // on its schedule (or adrift where it was left): it holds its track
+				SectionImpact hit = CollideBodies(me, other, posBefore, dt);
+				if (!hit.Hit.Hit || hit.Hit.EnergyTJ <= 0) continue;
+				double hp = Collisions::DamageHp(s->Combat->Spec, hit.Hit.EnergyShareTJ());
+				DVec3 local = Collisions::ToLocal(hit.Hit.Point, other.Volume.Pos, other.Volume.Axis, PilotState::LevelUp(other.Volume.Axis), s->LengthKm());
+				Collisions::ApplyDamage(s->Combat, local, hp);
+				if (hit.SectionB >= 0 && hit.SectionB < (int)other.Sections.size() && s->Combat->Alive())
+					SectionColliders::StrikeStructure(s->Combat, other.Sections[hit.SectionB].ModuleId, hp);
+				if (!s->Combat->Alive() && World()->War->LoseInCollision(s, pilotFrameBody, other.Volume.Pos, jd, cs::Cat("the ", ship->Name)))
 					ShowToast(cs::Cat("The ", s->Name, " breaks up under the impact"));
-				if (!Struck(ship, me, hit, ContactKey::Of(s), cs::Cat(derelict ? "the derelict " : "the ", s->Name))) return false;
+				if (!HitMe(hit, ContactKey::Of(s), cs::Cat(derelict ? "the derelict " : "the ", s->Name))) return false;
 			}
 		}
 
-		// Wreckage: every piece of a wreck's drifting debris field.
+		// Wreckage: every piece of a wreck's drifting debris field, bounced off any station in its way (US-T177, as
+		// DebrisFields draws it).
 		// (Iterated by value: a hull lost in Struck adds its own wreck to the list, and the loop ends right there.)
 		for (cs::Ref<Wreck> w : World()->War->Wrecks->Items)
 		{
-			DVec3 centre = World()->WreckHelio(w, jd) - frameHelio;
+			DVec3 wreckHelio = World()->WreckHelio(w, jd);
+			DVec3 centre = wreckHelio - frameHelio;
 			if (!Near(centre, w->DebrisRadiusKm(jd) + w->LengthKm)) continue;
 			if (w->DebrisPieceRadiusKm(jd) <= 0) continue;
 			DVec3 vel = VelocityKmS([this, w](double j) { return World()->WreckHelio(w, j); }, jd) - frameVel;
+			auto stations = SectionColliders::StationsNear(World(), wreckHelio, w->DebrisRadiusKm(jd) + w->LengthKm, jd);
 			for (int k = 0; k < w->DebrisPieces(); k++)
 			{
 				CollisionVolume piece = w->DebrisCollider(k, jd, centre, vel);
-				Impact hit = Collide(me, piece, posBefore, dt);
-				if (!hit.Hit || hit.EnergyTJ <= 0) continue;
-				if (!Struck(ship, me, hit, ContactKey::Of(w), cs::Cat("debris from the wreck of ", w->Name))) return false;
+				piece.Pos = centre + SectionColliders::BounceOff(DVec3::Zero, w->DebrisOffsetKm(k, jd), stations);
+				CollisionBody body;
+				body.Id = 1;
+				body.Volume = piece;
+				SectionImpact hit = CollideBodies(me, body, posBefore, dt);
+				if (!hit.Hit.Hit || hit.Hit.EnergyTJ <= 0) continue;
+				if (!HitMe(hit, ContactKey::Of(w), cs::Cat("debris from the wreck of ", w->Name))) return false;
 			}
 		}
 
@@ -114,15 +192,39 @@ namespace SpaceGod
 			DVec3 pos = st->HelioAt(Ephemeris(), jd) - frameHelio;
 			double r = cs::Math::Max(0.01, st->LengthKm * 0.5);
 			if (!Near(pos, r)) continue;
-			CollisionVolume other = CollisionVolume::Sphere(pos, VelocityKmS([this, st](double j) { return st->HelioAt(Ephemeris(), j); }, jd) - frameVel, r, 0);
-			Impact hit = Collide(me, other, posBefore, dt);
-			if (!hit.Hit || hit.EnergyTJ <= 0) continue;
-			if (!Struck(ship, me, hit, ContactKey::Of(st), st->Name)) return false;
+			CollisionBody other = SphereBody(pos, VelocityKmS([this, st](double j) { return st->HelioAt(Ephemeris(), j); }, jd) - frameVel, r, 0, false);
+			SectionImpact hit = CollideBodies(me, other, posBefore, dt);
+			if (!hit.Hit.Hit || hit.Hit.EnergyTJ <= 0) continue;
+			if (!HitMe(hit, ContactKey::Of(st), st->Name)) return false;
 		}
+
+		// US-T177: drifting cargo pods and the Bio Mass are shouldered aside rather than flown through. Neither is on a
+		// path the hull can knock it off (a pod drifts on its spill, a globule creeps on the Bio Mass's own coarse steps),
+		// so the contact only puts it back outside the hull's sections, by its tow or its local offset: no impulse, no
+		// damage (a pod is a tin can; the Bio Mass does its own biting).
+		auto Shoulder = [&](DVec3 pos, double radiusKm) -> DVec3
+		{
+			if (!Near(pos, radiusKm)) return DVec3::Zero;
+			CollisionBody other = SphereBody(pos, DVec3::Zero, radiusKm, 1, false);
+			SectionContact c = SectionColliders::Contact(me, other);
+			return c.Hit ? c.Normal * c.DepthKm : DVec3::Zero;
+		};
+		if (World()->War->Wrecks->Pods != nullptr)
+			for (cs::Ref<CargoPod> p : World()->War->Wrecks->Pods->Items)
+			{
+				if (p->Expired(jd)) continue;
+				p->TowKm = p->TowKm + Shoulder(p->Helio(World(), jd) - frameHelio, PodRadiusKm);
+			}
+		if (World()->BioMass != nullptr)
+			for (cs::Ref<BioGlobule> g : World()->BioMass->Globules)
+			{
+				if (!g->Alive() || g->Attached()) continue;
+				g->Local = g->Local + Shoulder(World()->BioMass->Helio(g, jd) - frameHelio, g->RadiusKm());
+			}
 
 		// The belt's real rocks (Sol).
 		cs::Ref<Core::AsteroidField> field = IsSol() ? (AsteroidBelt != nullptr ? AsteroidBelt->Field : nullptr) : nullptr;
-		ScanBelt(field, frameHelio + me.Pos, jd);
+		ScanBelt(field, frameHelio + me.Volume.Pos, jd);
 		if (field != nullptr)
 		{
 			DVec3 sun = Ephemeris()->HelioAt(0, jd);
@@ -132,15 +234,15 @@ namespace SpaceGod
 				double r = field->DiameterKm(i) * 0.5;
 				if (!Near(pos, r)) continue;
 				DVec3 vel = VelocityKmS([this, field, i](double j) { return Ephemeris()->HelioAt(0, j) + field->PositionAu(i, j) * Astro::AuKm; }, jd) - frameVel;
-				CollisionVolume rock = CollisionVolume::Sphere(pos, vel, r, 0);
-				Impact hit = Collide(me, rock, posBefore, dt);
-				if (!hit.Hit || hit.EnergyTJ <= 0) continue;
-				if (!Struck(ship, me, hit, ContactKey::Of(field->Number[i]), cs::Cat("the asteroid (", field->Number[i], ")"))) return false;
+				CollisionBody rock = SphereBody(pos, vel, r, 0, false);
+				SectionImpact hit = CollideBodies(me, rock, posBefore, dt);
+				if (!hit.Hit.Hit || hit.Hit.EnergyTJ <= 0) continue;
+				if (!HitMe(hit, ContactKey::Of(field->Number[i]), cs::Cat("the asteroid (", field->Number[i], ")"))) return false;
 			}
 		}
 
-		pilot().Pos = me.Pos;
-		pilot().Vel = me.Vel;
+		pilot().Pos = me.Volume.Pos;
+		pilot().Vel = me.Volume.Vel;
 		return true;
 	}
 
