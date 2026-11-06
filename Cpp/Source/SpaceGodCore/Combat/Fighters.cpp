@@ -8,6 +8,7 @@
 #include "Combat/ElectronicWarfare.h"
 #include "Combat/FlightDecks.h"
 #include "Combat/FlightModels.h"
+#include "Combat/Formations.h"
 #include "Combat/PilotFlight.h"
 #include "Combat/PilotTuning.h"
 #include "Combat/StrandedWings.h"
@@ -908,9 +909,7 @@ namespace SpaceGod::Core
 
 	DVec3 FighterAI::SlotOffset(int slot)
 	{
-		int rank = (slot + 1) / 2;
-		double side = slot % 2 == 1 ? 1 : -1;
-		return DVec3(side * 0.16 * rank, 0.03 * rank, -0.14 * rank);
+		return Formations::Slot(FormationShape::Wedge, slot, false); // US-T198: the wedge, one shape of several
 	}
 
 	bool FighterAI::Independent(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& u, cs::Ref<BattleUnit>& pinned)
@@ -949,11 +948,25 @@ namespace SpaceGod::Core
 			Lead(b, u, dt, pinned);
 			return;
 		}
+		// US-T198: the squadron has engaged enemy fighters (Formations::BreakTarget): the wingman breaks out of formation
+		// into a dogfight of its own, and forms up on its lead again once the furball is over. Not while the lead strafes a
+		// capital: then every wingman flies its own run (US-T180, below).
+		bool strafe = lf->Phase == FighterPhase::AttackRun && !f->Bomber && lead->Target != nullptr && Choreography::Strafeable(lead->Target);
+		if (!strafe)
+		{
+			if (auto foe = Formations::BreakTarget(b, u))
+			{
+				Formations::Break(u, foe);
+				Lead(b, u, dt, foe);
+				return;
+			}
+		}
+		Formations::Rejoin(u);
 		u->Target = lead->Target;
 		// US-T180: the lead is on a capital: the flight breaks up and each fighter flies its own strafing run down the hull
 		// (Choreography::StrafeRun, from whichever end it is nearer), so the hull is swarmed rather than passed by one vee
 		// (US-T164 had the wingmen hold their slots and only coast when the lead did). A bomber keeps station for its run.
-		if (lf->Phase == FighterPhase::AttackRun && !f->Bomber && u->Target != nullptr && Choreography::Strafeable(u->Target))
+		if (strafe)
 		{
 			u->ManeuverLeft -= dt;
 			auto run = Choreography::StrafeRun(b, u, u->Target, u->Combat->Spec->TurnRateDegS, dt);
@@ -966,9 +979,10 @@ namespace SpaceGod::Core
 		// (US-T164): the lead banking and rolling (Choreography::Bank) must not swing its wingmen's slots round it.
 		auto up = WeakPatches::LevelRoof(lead->Forward);
 		auto right = DVec3::Cross(lead->Forward, up).Normalized();
-		double spread = lf->Phase == FighterPhase::AttackRun ? 2.6 : lf->Phase == FighterPhase::Dogfight ? 4.0 : 1.0;
+		// US-T198: closing on enemy fighters the squadron only loosens a little; it breaks once they are near (above).
+		double spread = lf->Phase == FighterPhase::AttackRun ? 2.6 : lf->Phase == FighterPhase::Dogfight ? 1.5 : 1.0;
 		spread *= 1.6 - f->Discipline;
-		auto slot = SlotOffset(f->Slot) * spread;
+		auto slot = Formations::SlotOf(u) * spread; // US-T198: the squadron's own shape (wedge, line, echelon)
 		double t = b->Seconds;
 		auto wander = DVec3(
 			cs::Math::Sin(t * 0.37 + f->Seed) + 0.5 * cs::Math::Sin(t * 1.13 + f->Seed * 1.7),
