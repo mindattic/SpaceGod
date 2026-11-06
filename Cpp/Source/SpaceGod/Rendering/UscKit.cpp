@@ -426,6 +426,13 @@ namespace SpaceGod::Rendering
 		bow = nullptr;
 		if (!Available()) return false;
 		cs::String model = ModelOf(cls, civil, id, faction);
+		// US-T161: a pirate's own Void Whale hull not imported falls back to the navy hull of its class (re-liveried black),
+		// never to the procedural truss and boxes.
+		if (!ModelInfo(model).Ok && Pirate(faction))
+		{
+			cs::String navy = cs::String(PickOf(cls, civil, id).Model);
+			if (navy != model && ModelInfo(navy).Ok) model = navy;
+		}
 		if (!ModelInfo(model).Ok)
 		{
 			UE_LOG(LogSpaceGod, Warning, TEXT("UscKit: %s is not imported; falling back"), UTF8_TO_TCHAR(model.c_str()));

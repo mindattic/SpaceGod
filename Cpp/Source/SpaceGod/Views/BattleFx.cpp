@@ -9,6 +9,7 @@
 #include "Combat/CombatState.h"
 #include "Combat/War.h"
 #include "Settings/GameSetting.h"
+#include "ScaleModel.h"
 #include "Ships.h"
 #include "World.h"
 
@@ -461,7 +462,20 @@ namespace SpaceGod::Views
 				auto c = Point(e.Battle, e.A);
 				float r = static_cast<float>(Mathf::Max(0.05f, static_cast<float>(e.Size) * (e.Kind == FxKind::Impact ? 0.002f : 1.0f)) * app->BattleKmScale()) * (0.5f + t);
 				float minPx = e.Kind == FxKind::SubsystemDestroyed ? 14.0f : e.Kind == FxKind::Impact ? 5.0f : 6.0f;
-				Sprite(c, Mathf::Max(r, PixelSize(c, minPx)), e.Color * fade, Shape::Radial);
+				float cap = 0;
+				if (e.Unit != nullptr)
+				{
+					// US-T161: sized from the struck hull's drawn size (hardware is one linear 7 units/km now, so the
+					// old km floor and damage-scaled disc swamped a small hull): an impact is a fraction of the hull,
+					// growing a little with the damage, and nothing here outgrows the hull.
+					float hull = static_cast<float>(app->Scale()->ShipLength(e.Unit->LengthKm));
+					if (e.Kind == FxKind::Impact) r = hull * Mathf::Clamp(0.06f + static_cast<float>(e.Size) * 0.00003f, 0.06f, 0.25f) * (0.5f + t);
+					else r = Mathf::Min(r, hull * 0.5f);
+					cap = hull * 0.5f;
+				}
+				float rr = Mathf::Max(r, PixelSize(c, minPx));
+				if (cap > 0) rr = Mathf::Min(rr, Mathf::Max(cap, PixelSize(c, minPx)));
+				Sprite(c, rr, e.Color * fade, Shape::Radial);
 				break;
 			}
 		}
@@ -488,17 +502,17 @@ namespace SpaceGod::Views
 		if (gen == nullptr || u == nullptr || !u->Present())
 		{
 			auto c0 = u != nullptr && u->Present() ? Point(e.Battle, u->Pos) : Point(e.Battle, e.B);
-			float r0 = static_cast<float>(e.Size * 0.75 * app->BattleKmScale());
+			float r0 = static_cast<float>(app->Scale()->ShipLength(e.Size) * 0.75);
 			Sprite(c0, Mathf::Max(r0, PixelSize(c0, 10)), e.Color * fade, Shape::Ring);
 			return;
 		}
 		float charge = static_cast<float>(gen->ShieldFraction());
 		if (charge <= 0) return;
 		auto tint = ShipView::ShieldColor(charge);
-		auto color = Color(tint.r, tint.g, tint.b, 1.0f) * (tint.a * fade * 1.6f);
+		auto color = Color(tint.r, tint.g, tint.b, 1.0f) * (tint.a * fade);
 
 		auto centre = Point(e.Battle, u->Pos);
-		float shellR = static_cast<float>(u->LengthKm * BubbleRadius * app->BattleKmScale());
+		float shellR = static_cast<float>(app->Scale()->ShipLength(u->LengthKm) * BubbleRadius);
 		if (shellR < PixelSize(centre, 14))
 		{
 			Sprite(centre, Mathf::Max(shellR, PixelSize(centre, 10)), color, Shape::Ring);
