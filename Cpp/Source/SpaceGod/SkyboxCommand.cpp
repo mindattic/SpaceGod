@@ -7,7 +7,9 @@
 #include "GameLaunch.h"
 #include "Rendering/SystemSkies.h"
 #include "Rendering/SystemSkyBake.h"
+#include "BodyCatalog.h"
 #include "Fleet.h"
+#include "ScaleModel.h"
 #include "Ships.h"
 #include "SimClock.h"
 #include "SpaceGodLog.h"
@@ -123,6 +125,19 @@ namespace
 		return nullptr;
 	}
 
+	/// US-T159: a ship to frame at every stop: a freshly realised system has none yet, so one is placed in front of the camera.
+	cs::Ref<Ship> ShipInShot(SpaceGod::UnitySpaceApp& app)
+	{
+		if (!app.World() || !app.Fleet()) return nullptr;
+		int frame = app.SpaceCamera->FrameAt(app.SpaceCamera->ScenePosition);
+		auto offsetKm = app.Scale()->InverseLocalOffset((*app.Catalog())[frame], app.SpaceCamera->ScenePosition - app.BodyScene(frame));
+		auto fu = app.SpaceCamera->Rotation * Vector3::forward();
+		auto forward = DVec3(fu.x, fu.y, fu.z).SwapYZ();
+		auto ship = app.Fleet()->SpawnAt("Skybox ship", ShipClass::Freighter, app.World()->Sol, frame, offsetKm, forward, app.Clock->Jd);
+		ship->Ports = app.World()->FreeShipPorts();
+		return ship;
+	}
+
 	/// The view turned to the painted sky's bright heart, with the ship (or the star) off-centre in front of it.
 	void FaceSkyHeart(SpaceGod::UnitySpaceApp& app, const cs::Ref<StarSystem>& system, const cs::Ref<Ship>& ship)
 	{
@@ -185,7 +200,7 @@ namespace
 					if (*focusedOn != *system)
 					{
 						*focusedOn = *system;
-						*ship = AShip(app);
+						*ship = ShipInShot(app);
 						app.SpaceCamera->FocusOn(*ship ? SpaceGod::Target::OfShip(*ship) : SpaceGod::Target::OfBody(0), *ship ? 3.0 : 40.0);
 					}
 					return t > 4 && SpaceGod::Rendering::SystemSkies::IsReady((*system)->Name);
@@ -249,7 +264,7 @@ namespace
 			run->steps.push_back({ TEXT("focused on a ship"), [system, ship](SpaceGod::UnitySpaceApp& app, double)
 			{
 				if (*system == nullptr) return true;
-				*ship = AShip(app);
+				*ship = ShipInShot(app);
 				app.SpaceCamera->FocusOn(*ship ? SpaceGod::Target::OfShip(*ship) : SpaceGod::Target::OfBody(0), *ship ? 3.0 : 40.0);
 				return true;
 			} });
