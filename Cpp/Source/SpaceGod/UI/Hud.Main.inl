@@ -25,7 +25,7 @@ private:
 	bool spawnHostile = false;
 
 	/// Collapse state for panels that can sit over the 3D view and get in the way --
-	/// same "[-]/[+] TITLE" bar <see cref="DrawNavigator"/> already uses, so Market/Cargo/Help can
+	/// same fold-marked title bar (UiStyle::Fold, US-T199) <see cref="DrawNavigator"/> uses, so Market/Cargo/Help can
 	/// be shrunk to just their title bar without closing them outright.
 	bool marketOpen = true, cargoOpen = true;
 

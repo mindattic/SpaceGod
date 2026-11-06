@@ -57,6 +57,8 @@ namespace SpaceGod::UI::UiStyle
 	/// How opaque a panel is: the HUD's over the live view, a menu's over the paused view, a full screen's.
 	enum class Depth
 	{
+		/// A hint plate, barely there (the dev-menu key hint).
+		Faint,
 		Hud,
 		Overlay,
 		Menu,
@@ -67,6 +69,7 @@ namespace SpaceGod::UI::UiStyle
 	{
 		switch (d)
 		{
+		case Depth::Faint: return 0.55f;
 		case Depth::Hud: return 0.8f;
 		case Depth::Overlay: return 0.88f;
 		case Depth::Menu: return 0.93f;
@@ -101,6 +104,7 @@ namespace SpaceGod::UI::UiStyle
 		inline constexpr float Margin = 10; // from the screen's edge (HudLayout::Margin)
 		inline constexpr float Inset = 12;  // a menu's inner padding
 		inline constexpr int TextPad = 6;   // a row's or button's text inset
+		inline constexpr int Indent = 10;   // a list entry's text inset (Help contents, catalog hulls)
 	}
 
 	// ---------------------------------------------------------------- glyphs
@@ -145,6 +149,11 @@ namespace SpaceGod::UI::UiStyle
 	cs::Ref<GUIStyle> ButtonStyle(int size, const cs::Ref<Texture2D>& normal, const cs::Ref<Texture2D>& on);
 	/// The chosen one of a set: the button lit and bold.
 	cs::Ref<GUIStyle> ButtonOnStyle(const cs::Ref<GUIStyle>& button, const cs::Ref<Texture2D>& on);
+
+	/// A list entry: a button, left-aligned and indented (a full screen's contents list); the chosen one lit, its text the
+	/// accent.
+	cs::Ref<GUIStyle> EntryStyle(int size, const cs::Ref<Texture2D>& normal, const cs::Ref<Texture2D>& on);
+	cs::Ref<GUIStyle> EntrySelectedStyle(const cs::Ref<GUIStyle>& entry, const cs::Ref<Texture2D>& on);
 
 	/// A list row: plain, tinted on hover; and the chosen row.
 	cs::Ref<GUIStyle> RowStyle(int size, const cs::Ref<Texture2D>& hover);

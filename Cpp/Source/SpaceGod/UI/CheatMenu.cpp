@@ -6,6 +6,7 @@
 #include "Input/InputDevice.h"
 #include "SpaceGodLog.h"
 #include "UI/Hud.h"
+#include "UI/UiStyle.h"
 #include "UnitySpaceApp.h"
 #include "UnitySpaceAppActor.h"
 
@@ -464,80 +465,43 @@ namespace SpaceGod::UI
 	{
 		if (stylesReady) return;
 		stylesReady = true;
-		// The HUD's look, as the pause menu's, a touch more opaque: it sits over the view.
-		panelTexture = Hud::Solid(Color(0.03f, 0.05f, 0.08f, 0.94f), Color(0.45f, 0.85f, 1.0f, 0.7f));
-		rowHoverTexture = Hud::Solid(Color(0.2f, 0.45f, 0.6f, 0.22f), Color::clear());
-		rowSelectedTexture = Hud::Solid(Color(0.2f, 0.55f, 0.75f, 0.5f), Color(0.45f, 0.85f, 1.0f, 0.6f));
-		tabTexture = Hud::Solid(Color(0.1f, 0.15f, 0.2f, 0.9f), Color(0.3f, 0.5f, 0.6f, 0.5f));
-		tabSelectedTexture = Hud::Solid(Color(0.1f, 0.3f, 0.42f, 0.95f), Color(0.45f, 0.85f, 1.0f, 0.9f));
-		fieldTexture = Hud::Solid(Color(0.02f, 0.03f, 0.05f, 0.95f), Color(0.45f, 0.85f, 1.0f, 0.8f));
-		hintTexture = Hud::Solid(Color(0.03f, 0.05f, 0.08f, 0.55f), Color(0.3f, 0.5f, 0.6f, 0.4f));
+		// The shared look (US-T199, UiStyle.h) at menu depth, as the pause menu's: it sits over the view.
+		namespace S = UiStyle;
+		namespace T = UiStyle::Type;
+		panelTexture = S::PanelFrame(S::Depth::Menu);
+		rowHoverTexture = S::Flat(S::RowHover, Color::clear());
+		rowSelectedTexture = S::Flat(S::RowSelected, S::ControlOnEdge);
+		tabTexture = S::ControlTexture();
+		tabSelectedTexture = S::ControlOnTexture();
+		fieldTexture = S::FieldTexture();
+		hintTexture = S::Flat(S::InkAt(S::Depth::Faint), S::Edge);
 
-		panel = cs::New<GUIStyle>();
-		panel->normal.background = panelTexture;
-		panel->border = RectOffset(2, 2, 2, 2);
-		title = cs::New<GUIStyle>();
-		title->fontSize = 15;
-		title->fontStyle = FontStyle::Bold;
-		title->normal.textColor = Color::white();
+		panel = S::PanelStyle(panelTexture);
+		title = S::TitleStyle(T::Title);
 		title->clipping = TextClipping::Clip;
-		text = cs::New<GUIStyle>();
-		text->fontSize = 13;
-		text->normal.textColor = Color::white();
+		text = S::TextStyle(T::Body);
 		text->clipping = TextClipping::Clip;
-		small = cs::New<GUIStyle>();
-		small->fontSize = 11;
-		small->normal.textColor = Hud::Dim;
+		small = S::TextStyle(T::Caption, S::Dim);
 		small->clipping = TextClipping::Clip;
 		blocked = cs::New<GUIStyle>(*small);
-		blocked->normal.textColor = Color(1.0f, 0.72f, 0.35f);
-		state = cs::New<GUIStyle>();
-		state->fontSize = 12;
-		state->fontStyle = FontStyle::Bold;
+		blocked->normal.textColor = S::Warning;
+		state = S::TextStyle(T::Label, S::Accent, FontStyle::Bold);
 		state->alignment = TextAnchor::UpperRight;
-		state->normal.textColor = Hud::Accent;
 		state->clipping = TextClipping::Clip;
-		keys = cs::New<GUIStyle>(*state);
-		keys->fontStyle = FontStyle::Normal;
-		keys->fontSize = 11;
-		keys->normal.textColor = Hud::Dim;
-		row = cs::New<GUIStyle>();
-		row->normal.background = rowHoverTexture;
-		rowSelected = cs::New<GUIStyle>();
-		rowSelected->normal.background = rowSelectedTexture;
-		rowSelected->border = RectOffset(1, 1, 1, 1);
-		tab = cs::New<GUIStyle>();
-		tab->fontSize = 13;
+		keys = S::TextStyle(T::Caption, S::Dim);
+		keys->alignment = TextAnchor::UpperRight;
+		keys->clipping = TextClipping::Clip;
+		row = S::PanelStyle(rowHoverTexture, 0);
+		rowSelected = S::PanelStyle(rowSelectedTexture, 1);
+		tab = S::ButtonStyle(T::Body, tabTexture, tabSelectedTexture);
 		tab->alignment = TextAnchor::MiddleLeft;
-		tab->padding = RectOffset(12, 6, 0, 0);
-		tab->border = RectOffset(2, 2, 2, 2);
-		tab->normal.background = tabTexture;
-		tab->normal.textColor = Color::white();
-		tab->hover.background = tabSelectedTexture;
-		tab->hover.textColor = Color::white();
-		tab->active.background = tabSelectedTexture;
-		tab->active.textColor = Hud::Accent;
-		tabSelected = cs::New<GUIStyle>(*tab);
-		tabSelected->normal.background = tabSelectedTexture;
-		tabSelected->fontStyle = FontStyle::Bold;
-		field = cs::New<GUIStyle>();
-		field->fontSize = 13;
-		field->alignment = TextAnchor::MiddleLeft;
-		field->padding = RectOffset(8, 8, 0, 0);
-		field->border = RectOffset(2, 2, 2, 2);
-		field->clipping = TextClipping::Clip;
-		field->normal.background = fieldTexture;
-		field->normal.textColor = Color::white();
-		field->focused.background = fieldTexture;
-		field->focused.textColor = Color::white();
-		field->hover.background = fieldTexture;
-		field->hover.textColor = Color::white();
-		hint = cs::New<GUIStyle>();
-		hint->fontSize = 11;
+		tab->padding = RectOffset(static_cast<int>(S::Space::Inset), S::Space::TextPad, 0, 0);
+		tabSelected = S::ButtonOnStyle(tab, tabSelectedTexture);
+		field = S::FieldStyle(T::Body, fieldTexture);
+		hint = S::TextStyle(T::Caption, S::Dim);
 		hint->alignment = TextAnchor::MiddleCenter;
 		hint->border = RectOffset(1, 1, 1, 1);
 		hint->normal.background = hintTexture;
-		hint->normal.textColor = Hud::Dim;
 	}
 
 	void CheatMenu::DestroyOwnedTextures()

@@ -140,7 +140,7 @@ namespace SpaceGod::UI
 		auto idle = IdleFreighter();
 		for (const auto& lead : leads)
 		{
-			GUI::contentColor = lead->BackDoor ? Color(1.0f, 0.72f, 0.4f) : lead->Risk >= 0.35 ? Color(1.0f, 0.85f, 0.5f) : Color::white();
+			GUI::contentColor = lead->BackDoor ? UiStyle::Warning : lead->Risk >= 0.35 ? Color(1.0f, 0.85f, 0.5f) : Color::white();
 			cs::String line = cs::Cat(GoodInfo::Of(lead->Good)->Name, ":  ", lead->From->Name, " ", cs::Fmt(lead->BuyPrice, "N0"),
 				"  ->  ", lead->To->Name, " ", cs::Fmt(lead->SellPrice, "N0"), "   ", Tonnes(lead->Tonnes),
 				"  ·  ", Credits(lead->Profit), "  ·  ", MarketIntel::AgeText(lead->AgeDays),
@@ -177,7 +177,7 @@ namespace SpaceGod::UI
 		}
 		for (const auto& t : tips)
 		{
-			GUI::contentColor = t->Weight >= 4 ? Color(1.0f, 0.72f, 0.4f) : Color::white();
+			GUI::contentColor = t->Weight >= 4 ? UiStyle::Warning : Color::white();
 			GUI::Label(Rect(x, y, view.width - 8, rowH), cs::Cat(Astro::ToDateTime(t->Jd).ToString("yyyy-MM-dd"), "  ", t->Text), small);
 			y += rowH;
 		}
@@ -237,7 +237,7 @@ namespace SpaceGod::UI
 			const cs::Func<cs::Ref<InsurancePolicy>>& insure, const cs::String& coopKey) // US-T44 (US-T43): coopKey, what it insures for a co-op entry
 		{
 			const auto& [cover, premium, risk] = q;
-			GUI::contentColor = policy != nullptr ? Color(0.55f, 1.0f, 0.6f) : risk >= TradeInsurance::Uninsurable ? Color(1.0f, 0.55f, 0.45f) : Color::white();
+			GUI::contentColor = policy != nullptr ? UiStyle::Good : risk >= TradeInsurance::Uninsurable ? UiStyle::Danger : Color::white();
 			cs::String state = policy != nullptr ? cs::Cat("insured for ", Credits(policy->Cover), " at ", Credits(policy->PremiumPerDay), " a day")
 				: risk >= TradeInsurance::Uninsurable ? cs::Cat("uninsurable here (risk ", Percent(risk), ")")
 				: cs::Cat("quote: ", Credits(cover), " for ", Credits(premium), " a day (risk ", Percent(risk), ")");
@@ -291,7 +291,7 @@ namespace SpaceGod::UI
 		{
 			auto s = p->Settlement;
 			auto risk = desk->Assess(s);
-			GUI::contentColor = risk.Total >= 0.35 ? Color(1.0f, 0.72f, 0.4f) : Accent;
+			GUI::contentColor = risk.Total >= 0.35 ? UiStyle::Warning : Accent;
 			GUI::Label(Rect(4, y, content.width - 8, rowH), cs::Cat(p->Name, "  ·  ", Tonnes(p->StoredTonnes()), " of ", Tonnes(p->CapacityTonnes), "  ·  ", risk.Summary(),
 				desk->Insurance->Of(p) != nullptr ? "  ·  insured" : "  ·  uninsured"), small);
 			y += rowH;
@@ -321,7 +321,7 @@ namespace SpaceGod::UI
 	void Hud::DrawBackDoor(const cs::Ref<TradeDesk>& desk, const cs::Ref<Ship>& ship, const cs::Ref<Settlement>& port, Rect r, float rowH, double jd)
 	{
 		auto sm = desk->Smuggling;
-		GUI::contentColor = Color(1.0f, 0.72f, 0.4f);
+		GUI::contentColor = UiStyle::Warning;
 		GUI::Label(Rect(r.x, r.y, r.width, rowH), cs::Cat("BACK DOOR  ·  ", port->Name, "  (off the books: no port tax, but customs may be waiting)"), small);
 		float y = r.y + rowH + 2;
 		auto seen = cs::HashSet<Good>();

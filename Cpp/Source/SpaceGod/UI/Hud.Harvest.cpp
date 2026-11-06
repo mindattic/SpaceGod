@@ -88,9 +88,9 @@ namespace SpaceGod::UI
 			GUI::Label(Rect(r.x + 14, r.y + 5, w, 20), a, text);
 			GUI::contentColor = Color::white();
 			GUI::Label(Rect(r.x + 14, r.y + 27, w, 18), b, small);
-			GUI::contentColor = alarm ? Color(1.0f, 0.4f, 0.3f) : Dim;
+			GUI::contentColor = alarm ? UiStyle::Danger : Dim;
 			GUI::Label(Rect(r.x + 14, r.y + 45, w, 18), m, small);
-			GUI::contentColor = onStation ? Color(0.5f, 1.0f, 0.6f) : Color(1.0f, 0.45f, 0.3f);
+			GUI::contentColor = onStation ? UiStyle::Good : UiStyle::Danger;
 			GUI::Label(Rect(r.x + 14, r.y + 63, w, 18), d, small);
 			GUI::contentColor = Color::white();
 			return;

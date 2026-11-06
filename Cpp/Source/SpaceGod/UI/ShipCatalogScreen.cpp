@@ -5,7 +5,7 @@
 #include "Combat/Outfitting.h"
 #include "Combat/PilotTuning.h"
 #include "Combat/ShipCatalog.h"
-#include "UI/Hud.h"
+#include "UI/UiStyle.h"
 
 using namespace SpaceGod::Core;
 
@@ -175,44 +175,22 @@ namespace SpaceGod::UI
 		if (stylesReady) return;
 		stylesReady = true;
 		// The Help screen's look (HelpScreen::EnsureStyles), so the catalog reads as one of its pages.
-		rowTexture = Hud::Solid(Color(0.12f, 0.18f, 0.24f, 0.95f), Color(0.3f, 0.5f, 0.6f, 0.6f));
-		rowActiveTexture = Hud::Solid(Color(0.1f, 0.3f, 0.42f, 0.95f), Color(0.45f, 0.85f, 1.0f, 0.8f));
+		// Its styles from the shared look (US-T199, UiStyle.h), the same factories the Help screen builds its own from.
+		namespace S = UiStyle;
+		namespace T = UiStyle::Type;
+		rowTexture = S::ControlTexture();
+		rowActiveTexture = S::ControlOnTexture();
 		ruleTexture = rowActiveTexture;
-		title = cs::New<GUIStyle>();
-		title->fontSize = 19;
-		title->fontStyle = FontStyle::Bold;
-		title->normal.textColor = Color::white();
-		heading = cs::New<GUIStyle>();
-		heading->fontSize = 14;
-		heading->fontStyle = FontStyle::Bold;
-		heading->normal.textColor = Hud::Accent;
-		label = cs::New<GUIStyle>();
-		label->fontSize = 13;
-		label->normal.textColor = Hud::Dim;
+		title = S::TitleStyle(T::Chapter);
+		heading = S::TextStyle(T::Heading, S::Accent, FontStyle::Bold);
+		label = S::TextStyle(T::Body, S::Dim);
 		label->clipping = TextClipping::Clip;
-		value = cs::New<GUIStyle>();
-		value->fontSize = 13;
-		value->normal.textColor = Color(0.86f, 0.9f, 0.94f);
+		value = S::TextStyle(T::Body);
 		value->clipping = TextClipping::Clip;
-		small = cs::New<GUIStyle>(*value);
-		small->normal.textColor = Hud::Dim;
-		small->fontStyle = FontStyle::Italic;
-		entry = cs::New<GUIStyle>();
-		entry->fontSize = 13;
-		entry->alignment = TextAnchor::MiddleLeft;
-		entry->border = RectOffset(2, 2, 2, 2);
-		entry->padding = RectOffset(10, 6, 0, 0);
-		entry->normal.background = rowTexture;
-		entry->normal.textColor = Color::white();
-		entry->hover.background = rowActiveTexture;
-		entry->hover.textColor = Color::white();
-		entry->active.background = rowActiveTexture;
-		entry->active.textColor = Hud::Accent;
-		entrySelected = cs::New<GUIStyle>(*entry);
-		entrySelected->normal.background = rowActiveTexture;
-		entrySelected->normal.textColor = Hud::Accent;
-		entrySelected->hover.background = rowActiveTexture;
-		entrySelected->hover.textColor = Hud::Accent;
+		small = S::TextStyle(T::Body, S::Dim, FontStyle::Italic);
+		small->clipping = TextClipping::Clip;
+		entry = S::EntryStyle(T::Body, rowTexture, rowActiveTexture);
+		entrySelected = S::EntrySelectedStyle(entry, rowActiveTexture);
 	}
 
 	void ShipCatalogScreen::DestroyOwnedTextures()

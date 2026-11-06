@@ -1037,9 +1037,7 @@ namespace SpaceGod::UI
 	{
 		if (!panelStyle)
 		{
-			panelStyle = cs::New<GUIStyle>();
-			panelStyle->normal.background = panelTex;
-			panelStyle->border = RectOffset(2, 2, 2, 2);
+			panelStyle = UiStyle::PanelStyle(panelTex);
 		}
 		return panelStyle;
 	}
@@ -1166,44 +1164,24 @@ namespace SpaceGod::UI
 	void GalaxyMapScreen::EnsureStyles()
 	{
 		if (title != nullptr) return;
-		panelTex = Hud::Solid(Color(0.03f, 0.05f, 0.08f, 0.86f), Color(0.3f, 0.6f, 0.75f, 0.45f));
-		buttonTex = Hud::Solid(Color(0.12f, 0.18f, 0.24f, 0.95f), Color(0.3f, 0.5f, 0.6f, 0.6f));
-		buttonOnTex = Hud::Solid(Color(0.1f, 0.3f, 0.42f, 0.95f), Color(0.45f, 0.85f, 1.0f, 0.8f));
+		// The shared look (US-T199, UiStyle.h) at overlay depth: the side panels sit over the chart. Map text is the dense
+		// label size; the star labels are white (Heading) so they read over the chart, the panel body off-white.
+		namespace S = UiStyle;
+		namespace T = UiStyle::Type;
+		panelTex = S::PanelFrame(S::Depth::Overlay);
+		buttonTex = S::ControlTexture();
+		buttonOnTex = S::ControlOnTexture();
 		glow = SoftDisc();
-		title = cs::New<GUIStyle>();
-		title->fontSize = 15;
-		title->fontStyle = FontStyle::Bold;
-		title->normal.textColor = Color::white();
-		text = cs::New<GUIStyle>();
-		text->fontSize = 12;
-		text->normal.textColor = Color::white();
+		title = S::TitleStyle(T::Title);
+		text = S::TextStyle(T::Label);
 		text->wordWrap = true;
-		small = cs::New<GUIStyle>();
-		small->fontSize = 11;
-		small->normal.textColor = Dim;
-		small->wordWrap = true;
-		label = cs::New<GUIStyle>();
-		label->fontSize = 12;
-		label->fontStyle = FontStyle::Bold;
-		label->normal.textColor = Color::white();
-		labelDim = cs::New<GUIStyle>();
-		labelDim->fontSize = 11;
-		labelDim->normal.textColor = Color::white();
-		button = cs::New<GUIStyle>();
-		button->fontSize = 12;
+		small = S::CaptionStyle(T::Caption);
+		label = S::TextStyle(T::Label, S::Heading, FontStyle::Bold);
+		labelDim = S::TextStyle(T::Caption, S::Heading);
+		button = S::ButtonStyle(T::Label, buttonTex, buttonOnTex);
 		button->alignment = TextAnchor::MiddleLeft;
-		button->padding = RectOffset(8, 6, 0, 0);
-		button->border = RectOffset(2, 2, 2, 2);
-		button->normal.background = buttonTex;
-		button->normal.textColor = Color::white();
-		button->hover.background = buttonOnTex;
-		button->hover.textColor = Color::white();
-		button->active.background = buttonOnTex;
-		button->active.textColor = Accent;
-		buttonOn = cs::New<GUIStyle>(*button);
-		buttonOn->normal.background = buttonOnTex;
-		buttonOn->normal.textColor = Color::white();
-		buttonOn->fontStyle = FontStyle::Bold;
+		button->padding = RectOffset(static_cast<int>(S::Space::Pad), S::Space::TextPad, 0, 0);
+		buttonOn = S::ButtonOnStyle(button, buttonOnTex);
 	}
 
 	cs::Ref<Texture2D> GalaxyMapScreen::SoftDisc()

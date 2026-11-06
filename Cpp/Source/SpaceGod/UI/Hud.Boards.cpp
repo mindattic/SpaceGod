@@ -92,7 +92,7 @@ namespace SpaceGod::UI
 		for (int i = 0; i < rows; i++)
 		{
 			auto p = board[i];
-			GUI::contentColor = p->IsPlayer() ? Color(1.0f, 0.55f, 0.45f) : p->Outlaw != nullptr && p->Outlaw->Feared ? Color(1.0f, 0.78f, 0.35f) : Color::white();
+			GUI::contentColor = p->IsPlayer() ? UiStyle::Danger : p->Outlaw != nullptr && p->Outlaw->Feared ? UiStyle::Warning : Color::white();
 			GUI::Label(Rect(r.x + 12, r.y + 48 + i * rowH, w - 24, rowH), Outlaws::Describe(p, app->Clock->Jd), small);
 		}
 		float y = r.y + 56 + Mathf::Max(1, rows) * rowH;
@@ -161,7 +161,7 @@ namespace SpaceGod::UI
 		{
 			auto c = board[i];
 			float y = r.y + 48 + i * rowH;
-			GUI::contentColor = c->Urgency >= 0.6 ? Color(1.0f, 0.78f, 0.35f) : Color::white();
+			GUI::contentColor = c->Urgency >= 0.6 ? UiStyle::Warning : Color::white();
 			GUI::Label(Rect(r.x + 12, y, w - 110, rowH), Contracts::Describe(c, jd), small);
 			if (alongside && GUI::Button(Rect(r.xMax() - 90, y, 78, rowH - 2), "Take", button) &&
 				!CoopSends("ctake", K(port), i)) // US-T44 (US-T43): an entry in co-op
@@ -176,7 +176,7 @@ namespace SpaceGod::UI
 			{
 				auto c = mine[i];
 				float y = y0 + 22 + i * rowH;
-				GUI::contentColor = c->DueJd - jd < 1 ? Color(1.0f, 0.55f, 0.45f) : Color(0.6f, 0.9f, 1.0f);
+				GUI::contentColor = c->DueJd - jd < 1 ? UiStyle::Danger : Color(0.6f, 0.9f, 1.0f);
 				GUI::Label(Rect(r.x + 12, y, w - 110, rowH), Contracts::Describe(c, jd), small);
 				if (GUI::Button(Rect(r.xMax() - 90, y, 78, rowH - 2), "Abandon", button) && !CoopSends("cabandon", i) && contracts->Abandon(c, jd)) // US-T44 (US-T43): an entry in co-op
 					app->ShowToast(cs::Cat("Contract abandoned: ", c->Title()));
@@ -288,7 +288,7 @@ namespace SpaceGod::UI
 		for (const auto& o : h->Ships)
 		{
 			if (o->Lost) continue;
-			GUI::contentColor = o->Ship == flown ? Color(0.55f, 1.0f, 0.6f) : Color::white();
+			GUI::contentColor = o->Ship == flown ? UiStyle::Good : Color::white();
 			cs::String captain = cs::Cat(o->Captain != nullptr ? cs::Cat("Capt. ", o->Captain->Name) : cs::String("no captain"),
 				world->Trade != nullptr && world->Trade->Insurance->Of(o) != nullptr ? "  ·  insured" : "");
 			GUI::Label(Rect(4, ly, 540, rowH), cs::Cat(o->Name(), "  (", o->Ship->Spec->DisplayName, ")  ·  ", captain, "  ·  ", o->Orders->Describe(world->Catalog()),
@@ -407,7 +407,7 @@ namespace SpaceGod::UI
 		float h = marketOpen ? 62 + GoodInfo::Count * rowH + (canTrade ? 20 : 0) + extra + lawRow : 34;
 		auto r = Panel(layout.Take(HudRegion::TopRight, w, h)); // TopRight's first slot (US-T153)
 		cs::String heading = market != nullptr ? cs::Cat("MARKET  ·  ", market->Name) : cs::String("MARKET  ·  system average");
-		if (GUI::Button(Rect(r.x + 8, r.y + 6, w - 16, 22), cs::Cat(marketOpen ? "[-]  " : "[+]  ", heading), title)) marketOpen = !marketOpen;
+		if (GUI::Button(Rect(r.x + 8, r.y + 6, w - 16, 22), UiStyle::Fold(marketOpen, heading), title)) marketOpen = !marketOpen;
 		if (!marketOpen) return;
 		auto old = GUI::contentColor;
 		GUI::contentColor = Dim;
@@ -419,12 +419,12 @@ namespace SpaceGod::UI
 			app->ShowOutfit = !app->ShowOutfit;
 		if (shocks.has_value())
 		{
-			GUI::contentColor = Color(1.0f, 0.72f, 0.4f);
+			GUI::contentColor = UiStyle::Warning;
 			GUI::Label(Rect(r.x + 12, r.y + 48, w - 24, 18), cs::Cat("NOW:  ", *shocks), small);
 		}
 		if (lawRow > 0)
 		{
-			GUI::contentColor = Color(1.0f, 0.55f, 0.45f);
+			GUI::contentColor = UiStyle::Danger;
 			GUI::Label(Rect(r.x + 12, r.y + 50 + extra, w - 230, 18), refused ? cs::Cat("DOCKING REFUSED: ", market->Owner->Name, " will not let you in")
 				: cs::Cat("WANTED by ", market->Owner->Name), small);
 			// Fines are paid at the port's office even when it will not let the ship dock to trade.
@@ -469,7 +469,7 @@ namespace SpaceGod::UI
 				GUI::contentColor = net > 0 ? Color(0.55f, 0.9f, 0.6f) : net < 0 ? Color(1.0f, 0.7f, 0.45f) : Dim;
 				GUI::Label(Rect(r.x + 340, y, 90, rowH), cs::Cat(net > 0 ? "+" : "", Tonnes(net)), small);
 			}
-			GUI::contentColor = ratio > 1.5 ? Color(1.0f, 0.55f, 0.45f) : ratio < 0.6 ? Color(0.55f, 0.85f, 1.0f) : Color::white();
+			GUI::contentColor = ratio > 1.5 ? UiStyle::Danger : ratio < 0.6 ? Color(0.55f, 0.85f, 1.0f) : Color::white();
 			cs::String price = cs::Fmt(market != nullptr ? market->Price[g] : info->BasePrice * ratio, "N0");
 			GUI::Label(Rect(r.x + 250, y, 90, rowH), price, small);
 			if (market == nullptr) GUI::Label(Rect(r.x + 340, y, 90, rowH), cs::Cat("x", cs::Fmt(ratio, "0.00")), small);
@@ -887,7 +887,7 @@ namespace SpaceGod::UI
 		float h = cargoOpen ? 74 + hold->Height * cell + (cargoSelected != nullptr ? 28 : 0) : 34;
 		auto r = Panel(Rect(SafeLeft() + 10, Screen::height - h - 56, w, h));
 
-		if (GUI::Button(Rect(r.x + 8, r.y + 6, w - 16, 22), cs::Cat(cargoOpen ? "[-]  " : "[+]  ", "CARGO HOLD  ·  ", ship->Name), title)) cargoOpen = !cargoOpen;
+		if (GUI::Button(Rect(r.x + 8, r.y + 6, w - 16, 22), UiStyle::Fold(cargoOpen, cs::Cat("CARGO HOLD", UiStyle::Glyph::Separator, ship->Name)), title)) cargoOpen = !cargoOpen;
 		if (!cargoOpen) return;
 		GUI::contentColor = Dim;
 		GUI::Label(Rect(r.x + 12, r.y + 28, w - 24, 32),
@@ -1075,7 +1075,7 @@ namespace SpaceGod::UI
 		float h = Mathf::Min(Screen::height * 0.5f, 420.0f);
 		auto r = Panel(newsRect); // TopCentre's first slot, taken in LayoutNews (US-T154)
 		const auto& events = app->World()->Events;
-		if (GUI::Button(Rect(r.x + 8, r.y + 6, 120, 22), "[-]  NEWS", title)) app->ShowNews = false;
+		if (GUI::Button(Rect(r.x + 8, r.y + 6, 120, 22), UiStyle::Fold(true, "NEWS"), title)) app->ShowNews = false;
 		auto old = GUI::contentColor;
 		GUI::contentColor = Dim;
 		GUI::Label(Rect(r.x + 130, r.y + 9, w - 140, 18), "as it happens  ·  click a report to select where it happened  ·  X to close", small);
@@ -1090,9 +1090,9 @@ namespace SpaceGod::UI
 		if (!newsRow)
 		{
 			newsRow = cs::New<GUIStyle>(*row);
-			newsRow->fontSize = 11;
+			newsRow->fontSize = UiStyle::Type::Caption;
 			newsRow->wordWrap = true;
-			newsRow->padding = RectOffset(6, 4, 2, 2);
+			newsRow->padding = RectOffset(UiStyle::Space::TextPad, 4, 2, 2);
 		}
 		newsShown.Clear();
 		for (int i = events.Count() - 1; i >= 0 && newsShown.Count() < 200; i--)
@@ -1245,7 +1245,7 @@ namespace SpaceGod::UI
 		auto line = GUIContent(s);
 		float lw = text->CalcSize(line).x + 28;
 		auto r = Panel(Rect((Screen::width - lw) * 0.5f, Screen::height - 112, lw, 30));
-		GUI::contentColor = hail->Interdiction ? Color(1.0f, 0.55f, 0.45f) : Color(1.0f, 0.85f, 0.4f);
+		GUI::contentColor = hail->Interdiction ? UiStyle::Danger : Color(1.0f, 0.85f, 0.4f);
 		GUI::Label(Rect(r.x + 14, r.y + 6, lw, 20), line, text);
 		GUI::contentColor = Color::white();
 	}
@@ -1326,7 +1326,7 @@ namespace SpaceGod::UI
 		{
 			auto c = inside->Compartments[i];
 			cs::String mark = cs::Cat(i == app->BoardingPick ? "> " : "   ", order == BoardingOrder::Push && i == objective ? "[objective] " : "");
-			GUI::contentColor = c->Contested() ? Color(1.0f, 0.55f, 0.45f) : c->Taken ? Color(1.0f, 0.85f, 0.4f) : Color::white();
+			GUI::contentColor = c->Contested() ? UiStyle::Danger : c->Taken ? Color(1.0f, 0.85f, 0.4f) : Color::white();
 			GUI::Label(Rect(r.x + 12, r.y + 30 + i * rowH, w - 24, rowH), cs::Cat(mark, c->Name, ":  ", SpaceText(c)), small);
 		}
 		GUI::contentColor = Color::white();

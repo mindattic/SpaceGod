@@ -94,6 +94,24 @@ namespace SpaceGod::UI::UiStyle
 		return s;
 	}
 
+	cs::Ref<GUIStyle> EntryStyle(int size, const cs::Ref<Texture2D>& normal, const cs::Ref<Texture2D>& on)
+	{
+		auto s = ButtonStyle(size, normal, on);
+		s->alignment = TextAnchor::MiddleLeft;
+		s->padding = RectOffset(Space::Indent, Space::TextPad, 0, 0);
+		return s;
+	}
+
+	cs::Ref<GUIStyle> EntrySelectedStyle(const cs::Ref<GUIStyle>& entry, const cs::Ref<Texture2D>& on)
+	{
+		auto s = cs::New<GUIStyle>(*entry);
+		s->normal.background = on;
+		s->normal.textColor = Accent;
+		s->hover.background = on;
+		s->hover.textColor = Accent;
+		return s;
+	}
+
 	cs::Ref<GUIStyle> RowStyle(int size, const cs::Ref<Texture2D>& hover)
 	{
 		auto s = cs::New<GUIStyle>();

@@ -9,6 +9,7 @@
 #include "Systems/StrategicCommand.h" // CommandScope, ObjectiveKind (held by value)
 #include "UnityCompat/UnityTypes.h"
 #include "UnityCompat/UnityGui.h"
+#include "UI/UiStyle.h"
 
 #include <vector> // US-T47
 
@@ -142,8 +143,9 @@ namespace SpaceGod::UI
 		cs::Ref<GUIStyle> title, text, small, label, labelDim, button, buttonOn;
 		cs::Ref<Texture2D> panelTex, buttonTex, buttonOnTex, glow;
 
-		static constexpr Color Accent = Color(0.45f, 0.85f, 1.0f);
-		static constexpr Color Dim = Color(0.62f, 0.7f, 0.78f);
+		/// The shared palette's accent and caption colours (US-T199, UiStyle.h).
+		static constexpr Color Accent = UiStyle::Accent;
+		static constexpr Color Dim = UiStyle::Dim;
 		static constexpr Color Unknown = Color(0.5f, 0.54f, 0.6f);
 		static constexpr Color FlowColor = Color(1.0f, 0.82f, 0.4f);
 		static constexpr Color FrontColor = Color(1.0f, 0.3f, 0.26f);

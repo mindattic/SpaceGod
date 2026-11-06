@@ -4,6 +4,7 @@
 #include "GameManual.h"
 #include "UI/Hud.h"
 #include "UI/ShipCatalogScreen.h"
+#include "UI/UiStyle.h"
 
 using namespace SpaceGod::Core;
 
@@ -149,55 +150,25 @@ namespace SpaceGod::UI
 	{
 		if (stylesReady) return;
 		stylesReady = true;
-		// The HUD's look, near opaque: the screen is the whole view.
-		panelTexture = Hud::Solid(Color(0.02f, 0.035f, 0.06f, 0.96f), Color::clear());
-		buttonTexture = Hud::Solid(Color(0.12f, 0.18f, 0.24f, 0.95f), Color(0.3f, 0.5f, 0.6f, 0.6f));
-		buttonActiveTexture = Hud::Solid(Color(0.1f, 0.3f, 0.42f, 0.95f), Color(0.45f, 0.85f, 1.0f, 0.8f));
-		panel = cs::New<GUIStyle>();
-		panel->normal.background = panelTexture;
-		title = cs::New<GUIStyle>();
-		title->fontSize = 24;
-		title->fontStyle = FontStyle::Bold;
-		title->normal.textColor = Color::white();
-		chapterTitle = cs::New<GUIStyle>();
-		chapterTitle->fontSize = 19;
-		chapterTitle->fontStyle = FontStyle::Bold;
-		chapterTitle->normal.textColor = Color::white();
-		heading = cs::New<GUIStyle>();
-		heading->fontSize = 14;
-		heading->fontStyle = FontStyle::Bold;
-		heading->normal.textColor = Hud::Accent;
-		keys = cs::New<GUIStyle>();
-		keys->fontSize = 13;
-		keys->fontStyle = FontStyle::Bold;
-		keys->normal.textColor = Color::white();
+		// The shared look (US-T199, UiStyle.h) at full-screen depth: the screen is the whole view, framed at its corners.
+		namespace S = UiStyle;
+		namespace T = UiStyle::Type;
+		panelTexture = S::PanelFrame(S::Depth::Screen);
+		buttonTexture = S::ControlTexture();
+		buttonActiveTexture = S::ControlOnTexture();
+		panel = S::PanelStyle(panelTexture);
+		title = S::TitleStyle(T::Screen);
+		chapterTitle = S::TitleStyle(T::Chapter);
+		heading = S::TextStyle(T::Heading, S::Accent, FontStyle::Bold);
+		keys = S::TextStyle(T::Body, S::Heading, FontStyle::Bold);
 		keys->wordWrap = true;
-		text = cs::New<GUIStyle>();
-		text->fontSize = 13;
-		text->normal.textColor = Color(0.86f, 0.9f, 0.94f);
+		text = S::TextStyle(T::Body);
 		text->wordWrap = true;
-		small = cs::New<GUIStyle>(*text);
-		small->normal.textColor = Hud::Dim;
+		small = S::CaptionStyle(T::Body);
 		small->fontStyle = FontStyle::Italic;
-		button = cs::New<GUIStyle>();
-		button->fontSize = 14;
-		button->alignment = TextAnchor::MiddleCenter;
-		button->border = RectOffset(2, 2, 2, 2);
-		button->normal.background = buttonTexture;
-		button->normal.textColor = Color::white();
-		button->hover.background = buttonActiveTexture;
-		button->hover.textColor = Color::white();
-		button->active.background = buttonActiveTexture;
-		button->active.textColor = Hud::Accent;
-		entry = cs::New<GUIStyle>(*button);
-		entry->alignment = TextAnchor::MiddleLeft;
-		entry->fontSize = 13;
-		entry->padding = RectOffset(10, 6, 0, 0);
-		entrySelected = cs::New<GUIStyle>(*entry);
-		entrySelected->normal.background = buttonActiveTexture;
-		entrySelected->normal.textColor = Hud::Accent;
-		entrySelected->hover.background = buttonActiveTexture;
-		entrySelected->hover.textColor = Hud::Accent;
+		button = S::ButtonStyle(T::Heading, buttonTexture, buttonActiveTexture);
+		entry = S::EntryStyle(T::Body, buttonTexture, buttonActiveTexture);
+		entrySelected = S::EntrySelectedStyle(entry, buttonActiveTexture);
 	}
 
 	void HelpScreen::DestroyOwnedTextures()

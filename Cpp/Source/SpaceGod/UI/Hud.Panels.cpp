@@ -464,7 +464,7 @@ namespace SpaceGod::UI
 		float w = 268;
 		float h = navigatorOpen ? Mathf::Min(Screen::height - 24, 640) : 34;
 		auto r = Panel(Rect(SafeLeft() + 10, 10, w, h));
-		if (GUI::Button(Rect(r.x + 8, r.y + 6, w - 16, 22), cs::Cat(navigatorOpen ? "[-]  " : "[+]  ", "NAVIGATOR"), title)) navigatorOpen = !navigatorOpen;
+		if (GUI::Button(Rect(r.x + 8, r.y + 6, w - 16, 22), UiStyle::Fold(navigatorOpen, "NAVIGATOR"), title)) navigatorOpen = !navigatorOpen;
 		if (!navigatorOpen) return;
 
 		// Star systems: one button each; the active one is where the body tree below belongs.
