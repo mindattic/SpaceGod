@@ -158,10 +158,11 @@ namespace
 			double jd = app.Clock->Jd;
 			auto dir = DVec3(1, 0.15, 0.4).Normalized();
 			auto side = DVec3::Cross(dir, DVec3::UnitZ).Normalized();
+			double standoff = Battle::AnchorDistanceKm(uranus); // US-T213: outside Uranus, where the fight is laid out
 			for (int i = 0; i < 2; i++)
 			{
-				app.Fleet()->SpawnAt(cs::Cat("EVA demo ", app.World()->Sol->Name, " ", i + 1), ShipClass::Battleship, app.World()->Sol, uranus->Index, dir * (2000 + i * 400), dir * -1.0, jd);
-				app.Fleet()->SpawnAt(cs::Cat("EVA demo ", app.World()->Reach->Name, " ", i + 1), ShipClass::Battleship, app.World()->Reach, uranus->Index, dir * (2000 + i * 400) + side * 3000, dir, jd);
+				app.Fleet()->SpawnAt(cs::Cat("EVA demo ", app.World()->Sol->Name, " ", i + 1), ShipClass::Battleship, app.World()->Sol, uranus->Index, dir * (standoff + i * 400), dir * -1.0, jd);
+				app.Fleet()->SpawnAt(cs::Cat("EVA demo ", app.World()->Reach->Name, " ", i + 1), ShipClass::Battleship, app.World()->Reach, uranus->Index, dir * (standoff + i * 400) + side * 3000, dir, jd);
 			}
 			app.World()->War->TryStartBattle(uranus->Index, app.World()->Sol, jd);
 			if (!FindHull(app, *scene)) throw std::runtime_error("the skirmish did not start");

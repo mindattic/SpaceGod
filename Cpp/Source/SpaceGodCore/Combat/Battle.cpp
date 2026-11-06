@@ -3253,4 +3253,33 @@ namespace SpaceGod::Core
 		}
 		return cs::Math::Max(hi, body->RadiusKm * 6);
 	}
+
+	DVec3 Battle::ClearOfBody(const cs::Ref<BodyDefinition>& body, DVec3 anchorKm)
+	{
+		if (body == nullptr) return anchorKm;
+		double d = anchorKm.Length();
+		auto out = d > 1e-9 ? anchorKm / d : DVec3::UnitX;
+		// Out of the world: the whole battle space above its surface.
+		double surface = body->RadiusKm + SurfaceClearanceKm;
+		if (d < surface)
+		{
+			anchorKm = out * surface;
+			d = surface;
+		}
+		// Out of the rings: a fight within the ring plane's slab is moved, in the plane, past their outer edge.
+		if (body->HasRings())
+		{
+			auto pole = body->Pole.LengthSquared() > 1e-12 ? body->Pole.Normalized() : DVec3::UnitZ;
+			double h = DVec3::Dot(anchorKm, pole);
+			auto inPlane = anchorKm - pole * h;
+			double rho = inPlane.Length();
+			double edge = body->RingOuterKm + SurfaceClearanceKm;
+			if (cs::Math::Abs(h) < SurfaceClearanceKm && rho < edge)
+			{
+				auto across = rho > 1e-9 ? inPlane / rho : DVec3::Cross(pole, DVec3::UnitZ).LengthSquared() > 1e-12 ? DVec3::Cross(pole, DVec3::UnitZ).Normalized() : DVec3::UnitX;
+				anchorKm = across * edge + pole * h;
+			}
+		}
+		return anchorKm;
+	}
 }

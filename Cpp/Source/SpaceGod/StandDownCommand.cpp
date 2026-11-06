@@ -194,10 +194,11 @@ namespace
 				auto dir = DVec3(1, 0.15, 0.4).Normalized();
 				auto side = DVec3::Cross(dir, DVec3::UnitZ).Normalized();
 				cs::Ref<Ship> first;
+				double standoff = Battle::AnchorDistanceKm(uranus); // US-T213: outside Uranus, where the fight is laid out
 				for (int i = 0; i < 2; i++)
 				{
-					auto a = app.Fleet()->SpawnAt(cs::Cat("Limits demo ", app.World()->Sol->Name, " ", i + 1), ShipClass::Battleship, app.World()->Sol, uranus->Index, dir * (2000 + i * 400), dir * -1.0, jd);
-					app.Fleet()->SpawnAt(cs::Cat("Limits demo ", app.World()->Reach->Name, " ", i + 1), ShipClass::Battleship, app.World()->Reach, uranus->Index, dir * (2000 + i * 400) + side * 3000, dir, jd);
+					auto a = app.Fleet()->SpawnAt(cs::Cat("Limits demo ", app.World()->Sol->Name, " ", i + 1), ShipClass::Battleship, app.World()->Sol, uranus->Index, dir * (standoff + i * 400), dir * -1.0, jd);
+					app.Fleet()->SpawnAt(cs::Cat("Limits demo ", app.World()->Reach->Name, " ", i + 1), ShipClass::Battleship, app.World()->Reach, uranus->Index, dir * (standoff + i * 400) + side * 3000, dir, jd);
 					if (first == nullptr) first = a;
 				}
 				app.World()->War->TryStartBattle(uranus->Index, app.World()->Sol, jd);

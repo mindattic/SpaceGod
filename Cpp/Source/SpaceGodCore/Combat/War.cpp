@@ -461,6 +461,9 @@ namespace SpaceGod::Core
 
 	void War::Hook(const cs::Ref<Battle>& b)
 	{
+		// US-T213: every battle is fought clear of its world (and its rings), however its anchor was chosen; Hook sees each
+		// battle as it opens and each one a save holds, so an old save's anchor inside the body is pushed out on load.
+		if (b->Site == nullptr && b->Body >= 0 && b->Body < Catalog()->Count()) b->Anchor = Battle::ClearOfBody((*Catalog())[b->Body], b->Anchor);
 		b->UnitDestroyed = [this](cs::Ref<Battle> battle, cs::Ref<BattleUnit> u) { OnUnitDestroyed(battle, u); };
 		// Bounty hunters board, and hold their fire on a disabled quarry to take its captain alive (U.SPC-T63).
 		b->Boards = [this](cs::Ref<BattleUnit> u) { return u->Ship != nullptr && Hunter(u->Ship); };
@@ -1028,7 +1031,8 @@ namespace SpaceGod::Core
 		// (as TryStartBattle, U.SPC-T94).
 		auto present = PresentGroups(body, body == Catalog()->Root()->Index ? cs::Nullable<DVec3>(offsetFromBodyKm) : cs::Nullable<DVec3>(), jd);
 		auto b = NewBattle(body, jd, present, cs::Nullable<DVec3>(offsetFromBodyKm));
-		auto unit = b->AddShip(ship, 0, DVec3::Zero, forward);
+		// Where the ship really is (the anchor, unless it had to be lifted clear of the world, US-T213).
+		auto unit = b->AddShip(ship, 0, offsetFromBodyKm - b->Anchor, forward);
 		unit->SetPlayerControlled(true);
 		Join(b, leader, 1, false);
 		for (const auto& s : present)
@@ -1108,7 +1112,7 @@ namespace SpaceGod::Core
 			Hook(b);
 			auto approach = g->Pos - offsetFromBodyKm;
 			b->ApproachAxis = approach.LengthSquared() > 1e-9 ? approach.Normalized() : DVec3::UnitX;
-			auto unit = b->AddShip(ship, 0, DVec3::Zero, forward);
+			auto unit = b->AddShip(ship, 0, offsetFromBodyKm - b->Anchor, forward);
 			unit->SetPlayerControlled(true);
 			side = 1;
 			Battles.Add(b);
@@ -1139,7 +1143,7 @@ namespace SpaceGod::Core
 		Hook(b);
 		auto approach = DVec3::Cross(offsetFromBodyKm.LengthSquared() > 1e-9 ? offsetFromBodyKm.Normalized() : DVec3::UnitX, DVec3::UnitZ);
 		b->ApproachAxis = approach.LengthSquared() > 1e-6 ? approach.Normalized() : DVec3::UnitX;
-		auto unit = b->AddShip(ship, 0, DVec3::Zero, forward);
+		auto unit = b->AddShip(ship, 0, offsetFromBodyKm - b->Anchor, forward);
 		unit->SetPlayerControlled(true);
 		Join(b, leader, 1, false);
 		Battles.Add(b);

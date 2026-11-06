@@ -1428,6 +1428,17 @@ namespace SpaceGod::Core
 		/// </summary>
 		static double AnchorDistanceKm(const cs::Ref<BodyDefinition>& body);
 
+		/// <summary>US-T213: how far above a body's surface (true km) a battle's anchor must sit at the least: the whole
+		/// battle space (<see cref="EscapeKm"/> about the anchor) and a margin, so no unit fights inside the world.</summary>
+		static constexpr double SurfaceClearanceKm = EscapeKm + 25;
+
+		/// <summary>
+		/// US-T213: <paramref name="anchorKm"/> (an offset from <paramref name="body"/>'s centre) pushed out, if it must be,
+		/// to clear the body's surface by <see cref="SurfaceClearanceKm"/> and, near its ring plane, the rings' outer edge by
+		/// as much. Unchanged when already clear; deterministic.
+		/// </summary>
+		static DVec3 ClearOfBody(const cs::Ref<BodyDefinition>& body, DVec3 anchorKm);
+
 		// ================================================================ the partial in Combat/BoardingShuttles.cs
 		// (defined in Combat/BoardingShuttles.cpp)
 

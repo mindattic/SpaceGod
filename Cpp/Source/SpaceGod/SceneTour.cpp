@@ -483,10 +483,13 @@ namespace SpaceGod
 		double jd = app.Clock->Jd;
 		auto dir = DVec3(1, 0.15, 0.4).Normalized();
 		auto side = Side(dir);
+		// US-T213: held out where the fight is laid out (Battle::AnchorDistanceKm, clear of the world and its rings at both
+		// scales), not a few thousand km from the centre, inside the world.
+		double standoff = Battle::AnchorDistanceKm((*app.Catalog())[body]);
 		for (int i = 0; i < classes.Count(); i++)
-			app.Fleet()->SpawnAt(cs::Cat("Showcase ", aggressor->Name, " ", i + 1), classes[i], aggressor, body, dir * (2000 + i * 400), -dir, jd);
+			app.Fleet()->SpawnAt(cs::Cat("Showcase ", aggressor->Name, " ", i + 1), classes[i], aggressor, body, dir * (standoff + i * 400), -dir, jd);
 		for (int i = 0; i < classes.Count(); i++)
-			app.Fleet()->SpawnAt(cs::Cat("Showcase ", defender->Name, " ", i + 1), classes[i], defender, body, dir * (2000 + i * 400) + side * 3000, dir, jd);
+			app.Fleet()->SpawnAt(cs::Cat("Showcase ", defender->Name, " ", i + 1), classes[i], defender, body, dir * (standoff + i * 400) + side * 3000, dir, jd);
 		return app.World()->War->TryStartBattle(body, aggressor, jd);
 	}
 

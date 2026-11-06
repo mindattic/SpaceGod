@@ -169,10 +169,11 @@ namespace SpaceGod::Race
 			auto side = DVec3::Cross(DVec3(0, 1, 0), dir).Normalized();
 			cs::List<ShipClass> classes{ ShipClass::Battleship, ShipClass::Battleship, ShipClass::Cruiser };
 			cs::Ref<Faction> a = app->World()->Sol, d = app->World()->Reach;
+			double standoff = Battle::AnchorDistanceKm((*app->Catalog())[uranus]); // US-T213: outside Uranus, where the fight is laid out
 			for (int i = 0; i < classes.Count(); i++)
-				app->Fleet()->SpawnAt(cs::Cat("Showcase ", a->Name, " ", i + 1), classes[i], a, uranus, dir * (2000 + i * 400), -dir, jd);
+				app->Fleet()->SpawnAt(cs::Cat("Showcase ", a->Name, " ", i + 1), classes[i], a, uranus, dir * (standoff + i * 400), -dir, jd);
 			for (int i = 0; i < classes.Count(); i++)
-				app->Fleet()->SpawnAt(cs::Cat("Showcase ", d->Name, " ", i + 1), classes[i], d, uranus, dir * (2000 + i * 400) + side * 3000, dir, jd);
+				app->Fleet()->SpawnAt(cs::Cat("Showcase ", d->Name, " ", i + 1), classes[i], d, uranus, dir * (standoff + i * 400) + side * 3000, dir, jd);
 			auto battle = app->World()->War->TryStartBattle(uranus, a, jd);
 			if (battle != nullptr)
 			{

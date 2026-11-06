@@ -962,6 +962,11 @@ namespace SpaceGod
 
 				auto st = Fleet()->StateOf(ship, jd);
 				shipStates[i] = st;
+				// US-T213: a hull in a battle is where its unit fights (the battle's anchor plus its place in it), not at the
+				// point its schedule holds, so the HUD's altitude and anything reading ShipStateOf see the fight's true place.
+				if (ship->Battle != nullptr && World()->Law != nullptr)
+					if (auto u = ship->Battle->UnitOf(ship))
+						shipStates[i].HelioKm = World()->Law->BattleHelio(ship->Battle, jd) + u->Pos;
 
 				if (ship->IsEscort())
 				{
