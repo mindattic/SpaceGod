@@ -285,6 +285,39 @@ namespace SpaceGod::Core
 			}
 			bodies.push_back(sb);
 		}
+		// US-T222: a hull flown from a helm runs no schedule and is left out above, but it is still a hull in space, where the
+		// helm last reported it (or, before its first report, where the helm was taken and its schedule pinned): every free
+		// ship is kept off it as off a station, the whole push the free ship's. Left out, a ship that had only been parted from
+		// it fell back onto it the moment the helm was taken (the SFS Dauntless, parked at Earth, onto the SFS Resolute), and
+		// one whose plan crosses the held hull flew straight through it. (None without a helm: the Bench.)
+		cs::List<cs::Ref<Ship>> held;
+		std::vector<int> heldWorlds;
+		if (IsHeld != nullptr)
+			for (const auto& s : ships)
+			{
+				if (s->Destroyed || s->Battle != nullptr || s->Phase == ShipPhase::Landed || !IsHeld(s)) continue;
+				bool reported = false;
+				DVec3 at;
+				for (const auto& h : heldPoses)
+					if (h.Hull == s && h.Jd <= jd && jd - h.Jd <= HeldReportDays)
+					{
+						at = h.HelioKm + h.VelocityKmPerDay * (jd - h.Jd);
+						reported = true;
+					}
+				if (!reported)
+				{
+					if (s->IsEscort()) continue; // its schedule is its leader's
+					at = BaseStateOf(s, jd).HelioKm;
+				}
+				SepBody sb;
+				sb.Pos = at;
+				sb.RadiusKm = 0.5 * s->LengthKm() * ShipLod::ExtentFactor(s);
+				sb.Key = s->Id;
+				bodies.push_back(sb);
+				held.Add(s);
+				heldWorlds.push_back(s->Orbit != nullptr ? s->Orbit->Body : 0);
+			}
+		int nh = held.Count();
 		for (const auto& o : obstacles)
 		{
 			SepBody sb;
@@ -316,10 +349,17 @@ namespace SpaceGod::Core
 			sb.RadiusKm = cs::Math::Max(sb.RadiusKm, drawnHalf / perKm);
 			if (lead > 0) sb.RadiusKm = cs::Math::Max(sb.RadiusKm, lead * cs::Math::Max(1.0, grow));
 		}
+		for (int k = 0; k < nh; k++)
+		{
+			auto s = held[k];
+			auto& sb = bodies[static_cast<size_t>(n + k)];
+			double drawnHalf = 0.5 * ScaleModel::LogLerp(s->LengthKm() / ScaleModel::KmPerUnit, ScaleModel::GameShipScale * s->LengthKm(), DrawnBlend) * ShipLod::ExtentFactor(s);
+			sb.RadiusKm = cs::Math::Max(sb.RadiusKm, drawnHalf / SceneUnitsPerKm(heldWorlds[static_cast<size_t>(k)], sb.Pos, DrawnBlend));
+		}
 		for (int k = 0; k < obstacles.Count(); k++)
 		{
 			const auto& o = obstacles[k];
-			auto& sb = bodies[static_cast<size_t>(n + k)];
+			auto& sb = bodies[static_cast<size_t>(n + nh + k)];
 			double drawnHalf = 0.5 * ScaleModel::LogLerp(o.LengthKm / ScaleModel::KmPerUnit, ScaleModel::GameShipScale * o.LengthKm, DrawnBlend);
 			sb.RadiusKm = cs::Math::Max(sb.RadiusKm, drawnHalf / SceneUnitsPerKm(o.Body, o.HelioKm, DrawnBlend));
 		}

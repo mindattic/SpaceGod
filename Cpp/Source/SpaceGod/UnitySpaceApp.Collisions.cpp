@@ -45,9 +45,28 @@ namespace SpaceGod
 		/// they end the frame and, if apart there but their broad spheres crossed on the way, at steps from first touch on.
 		SectionImpact CollideBodies(CollisionBody& me, CollisionBody& other, DVec3 meBefore, double dt)
 		{
+			DVec3 otherBefore = other.Volume.Pos - other.Volume.Vel * dt;
+			// US-T222: already inside one another where the frame began (a helm just taken where its schedule had it, beside
+			// a ship that had only been parted from it), they are not meeting now: the hull is put back outside, with no
+			// impulse and no damage. An impact is a meeting, caught the frame it happens; only that one does harm.
+			if (SectionColliders::Contact(me, other).Hit)
+			{
+				DVec3 meEnd = me.Volume.Pos, otherEnd = other.Volume.Pos;
+				MoveBody(me, meBefore);
+				MoveBody(other, otherBefore);
+				bool already = SectionColliders::Contact(me, other).Hit;
+				MoveBody(me, meEnd);
+				MoveBody(other, otherEnd);
+				if (already)
+				{
+					// (Contact's normal points from me to the other; a little past the depth, so the next frame starts apart.)
+					SectionContact c = SectionColliders::Contact(me, other);
+					if (c.Hit) MoveBody(me, me.Volume.Pos - c.Normal * (c.DepthKm * 1.01 + 1e-6));
+					return SectionImpact();
+				}
+			}
 			SectionImpact hit = SectionColliders::Resolve(me, other);
 			if (hit.Hit.Hit) return hit;
-			DVec3 otherBefore = other.Volume.Pos - other.Volume.Vel * dt;
 			DVec3 relStart = otherBefore - meBefore;
 			DVec3 move = (other.Volume.Pos - me.Volume.Pos) - relStart;
 			if (move.Length() < cs::Math::Min(me.Volume.RadiusKm, other.Volume.RadiusKm)) return hit;
@@ -145,7 +164,11 @@ namespace SpaceGod
 					: cs::Func<DVec3, double>([this, s](double j) { return Fleet()->StateOf(s, j).HelioKm; });
 				DVec3 pos = helioAt(jd) - frameHelio;
 				if (!Near(pos, s->LengthKm() * 0.5)) continue;
-				DVec3 vel = VelocityKmS(helioAt, jd) - frameVel;
+				// US-T222: a scheduled ship's velocity is its schedule's (Fleet::HelioVelocityOf). Differenced from StateOf it lost
+				// its world's own motion round the Sun (a parked hull is placed in that world's cached frame, which holds still
+				// across the difference), so a warship parked at Earth beside the helm came at it at 29 km/s: the SFS Resolute,
+				// taken still beside the SFS Dauntless, met it "at 1.1 km/s" and broke up.
+				DVec3 vel = derelict ? VelocityKmS(helioAt, jd) - frameVel : Fleet()->HelioVelocityOf(s, jd) / Astro::SecondsPerDay - frameVel;
 				DVec3 facing = Fleet()->StateOf(s, jd).Facing;
 				CollisionBody other = SectionColliders::HullBody(1, s->Combat, pos, vel, facing, PilotState::LevelUp(facing), s->LengthKm(), true);
 				other.Volume.Pinned = true; // on its schedule (or adrift where it was left): it holds its track

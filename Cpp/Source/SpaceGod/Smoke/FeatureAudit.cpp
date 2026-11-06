@@ -34,6 +34,7 @@
 #include "Combat/Battle.h"
 #include "Combat/CombatSpecs.h"
 #include "Combat/CombatState.h"
+#include "Combat/ModularHull.h"
 #include "Combat/War.h"
 #include "Systems/FtlNavigation.h"
 #include "Systems/Galaxy.h"
@@ -386,6 +387,11 @@ namespace SpaceGod::Smoke::FeatureAudit
 		void HelmProbes()
 		{
 			if (!SelectAShip()) { Result("helm.pilot", false, "Tab found no ship to select"); return; }
+			// US-T222: a hull out flying free, not one on a hyperlane (its helm rides the lane on, where F and F3 are the ride's)
+			// or in a fight: which the first Tab finds is the hour's traffic (the SFS Resolute is on the Venus-Earth lane at some).
+			for (int i = 0; i < 12 && app->Selected.IsShip() && (app->Selected.Ship->Phase == ShipPhase::Lane || app->Selected.Ship->Battle != nullptr); i++)
+				Tap(Key::Tab);
+			if (!app->Selected.IsShip() && !SelectAShip()) { Result("helm.pilot", false, "Tab found no ship to select"); return; }
 			cs::String name = app->Selected.Ship->Name;
 			Tap(Key::P);
 			frames(5);
@@ -561,6 +567,7 @@ namespace SpaceGod::Smoke::FeatureAudit
 			CloseEverything();
 		}
 
+
 		// ---------------------------------------------------------------- diplomacy
 
 		void DiplomacyProbes()
@@ -589,6 +596,72 @@ namespace SpaceGod::Smoke::FeatureAudit
 		{
 			for (int i = 0; i < 3 && app->AtControls(); i++) { Tap(Key::P); frames(3); }
 			CloseEverything();
+		}
+
+		// ---------------------------------------------------------------- US-T222: traffic beside a helm
+
+		int DetachedModules(const cs::Ref<Ship>& s)
+		{
+			int n = 0;
+			if (s != nullptr && s->Combat != nullptr)
+				for (const auto& m : s->Combat->Structure()->Modules)
+					if (m->Detached) n++;
+			return n;
+		}
+
+		/// A helm taken in a parked ship's path does it no harm (US-T222): a battleship on an orbit at 1.1 km/s, 4 km short of
+		/// the spot, and a second one parked there whose helm is taken at once and held still, as the audit's own P on the
+		/// SFS Resolute once was beside the SFS Dauntless (which broke it up). Ten seconds on, the passer has gone by: the
+		/// fleet must have kept it off the held hull, and neither may have lost hull or a section.
+		void TrafficProbes()
+		{
+			ToCommand();
+			int earth = BodyIndex("Earth");
+			if (earth < 0) { Result("traffic.no-collision-damage", false, "no Earth"); return; }
+			double jd = app->Clock->Jd;
+			DVec3 at(0, 0, 60000);
+			constexpr double speedKmS = 1.1, leadKm = 4, radiusKm = 2000;
+			auto passer = app->Fleet()->SpawnAt("Audit Passing Warship", ShipClass::Battleship, app->World()->Sol, earth, at, DVec3::UnitY, jd);
+			passer->Ports = app->World()->FreeShipPorts();
+			// Its orbit: at phase 0 it is `leadKm` short of `at`, heading (V) straight for it.
+			auto orbit = passer->Orbit;
+			orbit->U = DVec3::UnitX;
+			orbit->V = DVec3::UnitY;
+			orbit->RadiusKm = radiusKm;
+			orbit->Center = at - DVec3::UnitY * leadKm - DVec3::UnitX * radiusKm;
+			orbit->EpochJd = jd;
+			orbit->PhaseAtEpoch = 0;
+			orbit->RateRadPerDay = speedKmS * Astro::SecondsPerDay / radiusKm;
+			auto ship = StageAtHelm("Audit Held Warship", ShipClass::Battleship, earth, at, DVec3::UnitX);
+			if (!ship) { Result("traffic.no-collision-damage", false, cs::Cat("P on the staged battleship: piloting ", B(app->IsPiloting()))); return; }
+			double hullShip = ship->Combat->HullFraction(), hullPasser = passer->Combat->HullFraction();
+			int lostShip = DetachedModules(ship), lostPasser = DetachedModules(passer);
+			double reach = 0.5 * (ship->LengthKm() + passer->LengthKm());
+			double closestPlan = 1e300, closest = 1e300;
+			for (int f = 0; f < 600 && app->IsPiloting() && !passer->Destroyed; f++)
+			{
+				frames(1);
+				double now = app->Clock->Jd;
+				// (Where the helm has the hull, not the spot its schedule was pinned at.)
+				DVec3 held = app->Ephemeris()->Helio(app->PilotFrameBody()) + app->PilotOffsetKm();
+				DVec3 plan = app->Ephemeris()->Helio(earth) + orbit->OffsetAt(now);
+				closestPlan = cs::Math::Min(closestPlan, (plan - held).Length());
+				closest = cs::Math::Min(closest, (app->Fleet()->StateOf(passer, now).HelioKm - held).Length());
+			}
+			bool piloting = app->IsPiloting() && PilotedShip() == ship;
+			bool clean = !ship->Destroyed && !passer->Destroyed && ship->Combat->HullFraction() >= hullShip && passer->Combat->HullFraction() >= hullPasser &&
+				DetachedModules(ship) == lostShip && DetachedModules(passer) == lostPasser;
+			Result("traffic.no-collision-damage", piloting && clean && closestPlan < reach && closest >= reach,
+				cs::Cat("helm of the ", ship->Name, " taken in the path of the ", passer->Name, " (", F(speedKmS, "0.0"), " km/s, ", F(leadKm, "0"), " km short): its plan passed ",
+					F(closestPlan * 1000, "0"), " m from the held hull, it flew by ", F(closest * 1000, "0"), " m off (hulls ", F(reach * 1000, "0"), " m centre to centre); piloting ", B(piloting),
+					"; hull ", F(hullShip * 100, "0.0"), "% -> ", F(ship->Combat->HullFraction() * 100, "0.0"), "%, passer ", F(hullPasser * 100, "0.0"), "% -> ",
+					F(passer->Combat->HullFraction() * 100, "0.0"), "%; sections lost ", DetachedModules(ship) - lostShip, " and ", DetachedModules(passer) - lostPasser,
+					"; toast '", Toast(), "'"));
+			ToCommand();
+			// The passer stops where it is, out of the way of the probes after.
+			orbit->Center = orbit->OffsetAt(app->Clock->Jd);
+			orbit->RadiusKm = 0;
+			orbit->RateRadPerDay = 0;
 		}
 
 		/// Stages a hull for a probe: a home-side `cls` parked at `offsetKm` from `body`, nose on `forward` (Fleet.SpawnAt,
@@ -1209,6 +1282,7 @@ namespace SpaceGod::Smoke::FeatureAudit
 		Probe("practice", PracticeProbes);
 		Probe("seats", SeatProbes);
 		Probe("diplomacy", DiplomacyProbes);
+		Probe("traffic", TrafficProbes); // US-T222
 		// US-T52, US-T53: checks of this copy's own GUI facade (UnityCompat's TextEditor) and model viewer camera, which the
 		// C# copies get from Unity or the C# facade. US-T70: opt-in (-SpaceGodAuditFacade), so the default audit is the 85
 		// probes every copy runs, in the same order, and its log compares row for row with the C# copies'.
