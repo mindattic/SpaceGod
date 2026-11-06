@@ -812,6 +812,13 @@ namespace SpaceGod::Core
 	}
 }
 
+namespace SpaceGod::Core
+{
+	// US-T192's saved enums: without these the autosave throws "Cannot save the enum BioForm: not registered".
+	SG_ENUM(BioForm, "Unity.SpaceGod.Core.BioForm")
+	SG_ENUM(BioHost, "Unity.SpaceGod.Core.BioHost")
+}
+
 SG_SERIALIZE(SpaceGod::Core::BioGlobule, "Unity.SpaceGod.Core.BioGlobule",
 	SG_F(Anchor), SG_F(Body), SG_F(BornJd), SG_F(Consumed), SG_F(Drift), SG_F(ExitedJd), SG_F(GoalBody), SG_F(GoalGate),
 	SG_F(Hp), SG_F(Id), SG_F(Local), SG_F(Mass), SG_F(Seed),
