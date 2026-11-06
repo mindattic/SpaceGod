@@ -12,10 +12,13 @@ namespace SpaceGod
 namespace SpaceGod::Core
 {
 	class Lane;
+	class Ship;
 }
 
 namespace SpaceGod::Views
 {
+	class LaneTunnel;
+
 	/// <summary>
 	/// Draws the hyperlane network: each lane a glowing ribbon along its curve between its two ramps,
 	/// a ring gate at each ramp, and pulses of light streaming both ways so it reads as a highway.
@@ -24,7 +27,8 @@ namespace SpaceGod::Views
 	/// to its lane, for a pilot to fly through; it flashes as a hull goes in or comes out (U.SPC-T41).
 	/// Between the ramps each lane is a chain of rings (U.SPC-T379, <see cref="RingChain"/>), and the spurs
 	/// that lead the network on to the jump gates (<see cref="Hyperlanes.GateSpurs"/>) are drawn the same
-	/// way in amber.
+	/// way in amber. Each lane is also drawn as a tunnel of light round its rings (US-T195, <see cref="LaneTunnel"/>), at the
+	/// tunnel's drawn radius (<see cref="TubeRadius"/>), which the rings share.
 	/// </summary>
 	class LaneView final
 	{
@@ -39,6 +43,7 @@ namespace SpaceGod::Views
 		UnitySpaceApp* app;
 		cs::Ref<Mesh> mesh;
 		cs::Ref<MeshRenderer> renderer;
+		cs::Ref<LaneTunnel> tunnel;
 		cs::List<Vector3> vertices;
 		cs::List<Color> colors;
 		cs::List<Vector3> uvs;
@@ -61,12 +66,23 @@ namespace SpaceGod::Views
 
 		void Update(bool visible);
 
+		/// <summary>
+		/// The lane tube's drawn radius along <paramref name="lane"/> as drawn now (scene units, after <see cref="Update"/> has
+		/// sampled its curve): the true <see cref="Hyperlanes.GateRadiusKm"/> mapped along the lane, opened up at the gameplay
+		/// scale to <see cref="LaneTunnel.DrawnRadius"/> so the tunnel is wider than the hulls riding it (US-T195).
+		/// </summary>
+		float TubeRadius(const cs::Ref<Core::Lane>& lane);
+
+		/// <summary>The player's hull when it is riding <paramref name="lane"/> at the helm, else null.</summary>
+		cs::Ref<Core::Ship> Rider(const cs::Ref<Core::Lane>& lane);
+
 	private:
 		/// <summary>
 		/// A ramp's ring gate: a hoop square to the lane, its true radius as mapped near its planet (never
-		/// under a few pixels), brightening and swelling for a moment when it flashes.
+		/// under a few pixels), brightening and swelling for a moment when it flashes. Returns its true drawn radius
+		/// (before the pixel floor and the flash), which the tunnel funnels into.
 		/// </summary>
-		void Gate(const cs::Ref<Core::Lane>& lane, int at, Core::DVec3 rampKm, Vector3 centre, Vector3 inward, float now);
+		float Gate(const cs::Ref<Core::Lane>& lane, int at, Core::DVec3 rampKm, Vector3 centre, Vector3 inward, float now);
 
 		/// <summary>
 		/// The lane's chain of rings (U.SPC-T379): <see cref="Hyperlanes.RingCount"/> hoops of the ring gates' size strung
@@ -76,7 +92,7 @@ namespace SpaceGod::Views
 		/// a chain of hoops. The lane being ridden at the helm strings its rings along the rider's own curve, so the hull
 		/// threads them, and the rings just flown through glow.
 		/// </summary>
-		void RingChain(const cs::Ref<Core::Lane>& lane, Color color, float now);
+		void RingChain(const cs::Ref<Core::Lane>& lane, Color color, float now, float ringRadius);
 
 		/// <summary>A hoop of ribbon square to <paramref name="axis"/>.</summary>
 		void Hoop(Vector3 centre, Vector3 axis, float radius, float width, Color color);

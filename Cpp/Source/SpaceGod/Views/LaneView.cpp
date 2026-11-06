@@ -1,5 +1,6 @@
 // Port of Unity.SpaceGod Runtime/Views/LaneView.cs (US-T30).
 #include "Views/LaneView.h"
+#include "Views/LaneTunnel.h"
 
 #include "UnitySpaceApp.h"
 #include "Rendering/Materials.h"
@@ -41,12 +42,14 @@ namespace SpaceGod::Views
 		renderer = AddComponent<MeshRenderer>(go);
 		renderer->SetSharedMaterial(Materials::Create(Materials::Fx(), "Hyperlanes"));
 		renderer->shadowCastingMode = ShadowCastingMode::Off;
+		tunnel = cs::New<LaneTunnel>(app, parent);
 	}
 
 	void LaneView::Update(bool visible)
 	{
 		renderer->enabled = visible;
 		auto lanes = app->Fleet()->Lanes;
+		tunnel->Begin(visible && lanes != nullptr);
 		if (!visible || lanes == nullptr) return;
 		vertices.Clear();
 		colors.Clear();
@@ -76,9 +79,11 @@ namespace SpaceGod::Views
 			}
 			Sprite(curve[0], 16, color * 0.7f, 2);
 			Sprite(curve[Samples], 16, color * 0.7f, 2);
-			Gate(lane, lane->A, aKm, curve[0], curve[1], now);
-			Gate(lane, lane->B, bKm, curve[Samples], curve[Samples - 1], now);
-			RingChain(lane, color, now);
+			float gateA = Gate(lane, lane->A, aKm, curve[0], curve[1], now);
+			float gateB = Gate(lane, lane->B, bKm, curve[Samples], curve[Samples - 1], now);
+			float tube = TubeRadius(lane);
+			RingChain(lane, color, now, tube);
+			tunnel->Draw(lane, curve, Samples, tube, gateA, gateB, Rider(lane), now);
 			// Ambient flow: a faint pulse each way, just to read as a live highway at any zoom,
 			// even when nothing is actually riding it right now.
 			for (int k = 0; k < 2; k++)
@@ -110,12 +115,28 @@ namespace SpaceGod::Views
 		mesh->SetUVs(0, uvs);
 		mesh->SetIndices(indices, MeshTopology::Triangles, 0, false);
 		mesh->SetBounds(Bounds(Vector3::zero(), Vector3::one() * 1e9f));
+		tunnel->End();
 	}
 
-	void LaneView::Gate(const cs::Ref<Lane>& lane, int at, DVec3 rampKm, Vector3 centre, Vector3 inward, float now)
+	float LaneView::TubeRadius(const cs::Ref<Lane>& lane)
+	{
+		double trueKm = app->Fleet()->Lanes->LaneLengthKm(lane, app->Ephemeris()->Jd);
+		if (trueKm <= 0) return 0;
+		float sceneLen = 0;
+		for (int i = 0; i < Samples; i++) sceneLen += (curve[i + 1] - curve[i]).magnitude();
+		float trueRadius = static_cast<float>(Hyperlanes::GateRadiusKm * sceneLen / trueKm);
+		return trueRadius > 0 ? LaneTunnel::DrawnRadius(trueRadius, app->Scale()->Blend()) : 0.0f;
+	}
+
+	cs::Ref<Ship> LaneView::Rider(const cs::Ref<Lane>& lane)
+	{
+		return app->RidingLane() && app->Piloted.Ship->LaneLeg.Lane == lane ? app->Piloted.Ship : nullptr;
+	}
+
+	float LaneView::Gate(const cs::Ref<Lane>& lane, int at, DVec3 rampKm, Vector3 centre, Vector3 inward, float now)
 	{
 		auto axis = inward - centre;
-		if (axis.sqrMagnitude() < 1e-12f) return;
+		if (axis.sqrMagnitude() < 1e-12f) return 0;
 		axis.Normalize();
 		auto eph = app->Ephemeris();
 		auto radial = app->Fleet()->Lanes->RampDirection(lane, at, eph->Jd);
@@ -124,7 +145,8 @@ namespace SpaceGod::Views
 		auto c = app->Scale()->MapNear(eph, app->BodyScenes(), at, rampKm);
 		auto e = app->Scale()->MapNear(eph, app->BodyScenes(), at, rampKm + across * Hyperlanes::GateRadiusKm);
 		float flash = FlashOf(lane, at, now);
-		float radius = Mathf::Max(static_cast<float>((e - c).Length()), PixelSize(centre, 9)) * (1.0f + 0.25f * flash);
+		float trueRadius = static_cast<float>((e - c).Length());
+		float radius = Mathf::Max(trueRadius, PixelSize(centre, 9)) * (1.0f + 0.25f * flash);
 		auto u = Vector3::Cross(axis, Mathf::Abs(Vector3::Dot(axis, Vector3::up())) > 0.98f ? Vector3::right() : Vector3::up()).normalized();
 		auto v = Vector3::Cross(axis, u);
 		auto color = GateColor * (0.75f + 2.5f * flash);
@@ -138,20 +160,18 @@ namespace SpaceGod::Views
 			prev = p;
 		}
 		if (flash > 0) Sprite(centre, 18 + 70 * flash, PulseColor * (2.2f * flash), 0);
+		return trueRadius;
 	}
 
-	void LaneView::RingChain(const cs::Ref<Lane>& lane, Color color, float now)
+	void LaneView::RingChain(const cs::Ref<Lane>& lane, Color color, float now, float ringRadius)
 	{
 		auto lanes = app->Fleet()->Lanes;
 		auto eph = app->Ephemeris();
 		double trueKm = lanes->LaneLengthKm(lane, eph->Jd);
-		if (trueKm <= 0) return;
-		float sceneLen = 0;
-		for (int i = 0; i < Samples; i++) sceneLen += (curve[i + 1] - curve[i]).magnitude();
-		float ringRadius = static_cast<float>(Hyperlanes::GateRadiusKm * sceneLen / trueKm);
-		if (ringRadius <= 0) return;
+		if (trueKm <= 0 || ringRadius <= 0) return;
 
-		cs::Ref<Ship> rider = app->RidingLane() && app->Piloted.Ship->LaneLeg.Lane == lane ? app->Piloted.Ship : nullptr;
+		// The rings sit on the tunnel's wall (US-T195): the tube's drawn radius, not the bare true one.
+		cs::Ref<Ship> rider = Rider(lane);
 		int rings = Hyperlanes::RingCount(rider != nullptr ? rider->LaneLengthKm : trueKm);
 		int passed = rider != nullptr ? Hyperlanes::RingsPassed(Core::Fleet::LaneProgress(rider, eph->Jd), rings) : -10;
 		for (int k = 0; k < rings; k++)
