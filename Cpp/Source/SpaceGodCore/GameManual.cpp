@@ -500,6 +500,14 @@ namespace SpaceGod::Core
 				  "they run (and you can run them down), or they turn to fight. Robbery is piracy, booked by whoever saw it. "
 				  "A hull losing a fight strikes its colours and hails you: accept what it offers, plunder it, let it go, or "
 				  "refuse quarter. A pirate taken alive by a lawful hull is turned in."),
+				T("Raiders on the trade routes",
+				  "Pirate bands lie in wait beside the lanes and off the ports for loaded freighters. They pull one out, strip "
+				  "its shields and engines, and once it lies dead they demand its cargo; it jettisons the hold, their drones "
+				  "collect it, and they leave. That cargo never reaches the market it was bound for. The freighter runs while "
+				  "it can and calls for help the moment it is set upon: the nearest armed navy patrols at either end of the "
+				  "lane, or parked at the same world, answer, and arrive a minute or a few later depending on how far they "
+				  "have to come. Raiders who see more guns arrive than they bargained for break off before they have the "
+				  "loot."),
 				T("You are no one",
 				  "The SpaceGod is never one pilot. Whatever you say and do is said and done by the unit you hold, and the "
 				  "consequences land on that pilot, that hull and that faction: the bounty, the grudges, the bad blood between "

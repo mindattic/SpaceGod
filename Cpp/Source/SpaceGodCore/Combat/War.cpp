@@ -37,6 +37,7 @@
 #include "Combat/RaidDoctrine.h"
 #include "Combat/Salvage.h"
 #include "Combat/SquadOrders.h" // US-T140
+#include "Combat/RaidDistress.h" // US-T194
 #include "Embodiment/ShipHelm.h" // US-T140: ShipHelm::FrameOf, where a mark is
 #include "Combat/StrandedWings.h"
 #include "Combat/Wreck.h"
@@ -208,6 +209,7 @@ namespace SpaceGod::Core
 		Interdictions(jd);
 		GateAmbushes(jd);
 		if (Squads != nullptr) SquadOrders::Advance(world, jd); // US-T140: bands closing on their marks (none in the Bench)
+		RaidDistress::Advance(world, jd); // US-T194: freighters set upon by raiders call for help, patrols answer
 		if (jd >= nextPodSweepJd)
 		{
 			double days = cs::Math::Min(1.0, jd - nextPodSweepJd + PodSweepDays);

@@ -28,6 +28,7 @@ namespace SpaceGod::Core
 	class Hyperlanes;
 	class BuildPlan;
 	class SquadOrders;
+	class RaidDistress; // US-T194
 	enum class Good : int;
 	enum class ShipClass : int;
 	enum class SurrenderTerms : int;
@@ -108,6 +109,8 @@ namespace SpaceGod::Core
 			cs::Ref<Lane> lane;
 			double at = 0;
 		};
+		// US-T194: the distress calls send patrols into fights (Join) and tell the pilot (pilotNotices).
+		friend class RaidDistress;
 	private:
 
 		cs::Ref<World> world;
@@ -435,6 +438,10 @@ namespace SpaceGod::Core
 
 		/// <summary>The squads' book (US-T140): bands closing on marks, and those stood down. Null until first used (older saves).</summary>
 		cs::Ref<SquadOrders> Squads;
+
+		/// <summary>The distress calls of the fights under way (US-T194): freighters set upon by raiders, and the patrols
+		/// answering them. Null until the first call (older saves).</summary>
+		cs::Ref<RaidDistress> Distress;
 
 		/// <summary>
 		/// A patrol interdicts the player's wanted ship (see <see cref="Law.UpdatePilot"/>): a fight off

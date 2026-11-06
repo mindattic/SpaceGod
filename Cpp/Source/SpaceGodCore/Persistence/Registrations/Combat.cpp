@@ -30,6 +30,7 @@
 #include "Combat/PilotFlight.h"
 #include "Combat/Pursuit.h"
 #include "Combat/SquadOrders.h" // US-T140: War.Squads
+#include "Combat/RaidDistress.h" // US-T194: War.Distress
 #include "Combat/War.h"
 #include "Combat/Wreck.h"
 #include "DVec3.h"
@@ -365,7 +366,8 @@ namespace SpaceGod::Core
 		SG_F(lastBattleEndJd), SG_F(lastJd), SG_F(losses), SG_F(nextBattleId), SG_F(nextDailyJd),
 		SG_F(nextPodSweepJd), SG_F(pilotNotices), SG_F(pulseReady), SG_F(raidersRaised), SG_F(retreating), SG_F(rng),
 		SG_F(siegeDays), SG_F(warStartJd), SG_F(world),
-		SG_OPT(Squads)) // US-T140: bands closing on marks and those stood down, absent from older saves
+		SG_OPT(Squads), // US-T140: bands closing on marks and those stood down, absent from older saves
+		SG_OPT(Distress)) // US-T194: distress calls and the patrols answering them, absent from older saves
 
 	SG_SERIALIZE(WeaponSpec, "Unity.SpaceGod.Core.WeaponSpec",
 		SG_F(Accuracy), SG_F(Ammo), SG_F(AntiSmall), SG_F(BurstKm), SG_F(Cooldown), SG_F(Damage), SG_F(Deploy),
