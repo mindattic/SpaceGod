@@ -49,6 +49,10 @@ namespace SpaceGod::Views
 			cs::Ref<LineStrip> Stern, Bow, Path;
 		};
 
+		/// <summary>Screen-space minimum (US-T202): the spark shows from this many pixels of hull, at full size from MarkFullPx,
+		/// and fades out as the hull passes MarkFadePx (then its mesh is readable and only its engine halo stays).</summary>
+		static constexpr double MarkFloorPx = 0.1, MarkFullPx = 0.5, MarkFadePx = 12.0;
+
 		static constexpr int TrailLength = 24;
 		static constexpr float SampleSeconds = 0.12f;
 

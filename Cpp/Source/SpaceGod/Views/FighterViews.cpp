@@ -84,7 +84,11 @@ namespace SpaceGod::Views
 				// Its model while big enough, then a glow impostor, then nothing below a pixel (U.SPC-T415): a battle
 				// seen from across the system is its ships' icons, not a cloud of sparks.
 				auto tier = RenderLod::Tier(RenderLod::Fighter(), RenderLod::ApparentPx(app->Scale()->ShipLength(u->LengthKm), rel.magnitude(), ppu));
-				bool model = RenderLod::DrawsModel(tier), shown = tier != LodTier::Culled;
+				double hullPx = RenderLod::ApparentPx(app->Scale()->ShipLength(u->LengthKm), rel.magnitude(), ppu);
+				// Screen-space minimum (US-T202): the hull keeps its true size, but a small craft keeps a spark a few
+				// pixels wide below the model's cull size too, so a wing stays visible beside capitals; it shrinks away
+				// below a tenth of a pixel and gives way to the halo of the mesh as the hull grows past MarkFadePx.
+				bool model = RenderLod::DrawsModel(tier), shown = tier != LodTier::Culled || hullPx >= MarkFloorPx;
 				if (v->Hull->activeSelf != model) v->Hull->SetActive(model);
 				if (v->Glow->gameObject()->activeSelf != shown) v->Glow->gameObject()->SetActive(shown);
 				if (!shown)
@@ -105,7 +109,10 @@ namespace SpaceGod::Views
 				}
 				v->Hull->transform->localScale = Vector3::one() * static_cast<float>(app->Scale()->ShipLength(u->LengthKm));
 
-				float px = 5.0f * Mathf::Max(rel.magnitude(), 1e-6f) / static_cast<float>(ppu);
+				float hp = static_cast<float>(hullPx);
+				float markPx = 5.0f * (Mathf::Clamp01((hp - static_cast<float>(MarkFloorPx)) / static_cast<float>(MarkFullPx - MarkFloorPx)) * 0.6f + 0.4f)
+					* (1.0f - Mathf::Clamp01((hp - static_cast<float>(MarkFadePx)) / static_cast<float>(MarkFadePx)));
+				float px = markPx * Mathf::Max(rel.magnitude(), 1e-6f) / static_cast<float>(ppu);
 				v->Glow->localPosition = rel - fwd.normalized() * static_cast<float>(app->Scale()->ShipLength(u->LengthKm)) * 0.55f;
 				v->Glow->SetRotation(Quaternion::LookRotation(v->Glow->position() - cam->position(), cam->up()));
 				v->Glow->localScale = Vector3::one() * Mathf::Max(px, static_cast<float>(app->Scale()->ShipLength(u->LengthKm)) * 0.8f);
