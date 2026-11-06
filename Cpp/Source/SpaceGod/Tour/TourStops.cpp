@@ -439,8 +439,8 @@ namespace SpaceGod::Tour
 			TourRegistry::Add(YardStop("derelict-station", "Derelict station",
 				"A station left dark and holed, its modules broken off: salvageable, and later explorable",
 				[](const Graveyard& g) { return g.Stations.Count() > 0; }, true).At(42));
-			TourRegistry::Add(TourStop::Placeholder("Places", "gas-giant-harvesters", "Gas giant harvesters",
-				"every gas giant's gas-harvesting platforms and ships, the contracts to guard them and the raids on them", "US-T146").At(90));
+			// "gas-giant-harvesters" (US-T146) registers from HarvestPlay.cpp. Its placeholder is gone: registrations run in
+			// static-init order, so a placeholder added after the real stop (same chapter and order) would replace it.
 
 			// ---- Presentation.
 			TourRegistry::Add(TourStop::Make("Presentation", "orbits-fade", "Orbit lines fade with distance",
