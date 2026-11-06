@@ -1481,6 +1481,8 @@ namespace SpaceGod
 	{
 		// The flown hull's own fight, wherever the camera is (the map included).
 		if (Piloted.Ship != nullptr && Piloted.Ship->Battle != nullptr && !Piloted.Ship->Battle->Over) return true;
+		// The fight being watched at battle time (sg.BigBattle, the tours), wherever the camera is: not just a close one.
+		if (battleTimeFor != nullptr && !battleTimeFor->Over) return true;
 		// A live fight the camera is at: a seat in it (fighter, turret, station), a chase on one of its ships,
 		// or just flying close. Battle-km through the scale's ship mapping, so "close" is the same at both scales.
 		constexpr double NearBattleKm = 3000.0;
@@ -1501,6 +1503,8 @@ namespace SpaceGod
 
 		// US-T134: orbits add nothing in a fight -- out in ~0.4 s when one starts nearby, back in ~1.5 s after.
 		bool battle = BattleNearPlayer();
+		// Real frame time, not the capped step: a heavy battle frame (dt held at 0.1 s) would stretch the 0.4 s fade over seconds.
+		dt = Mathf::Min(Time::unscaledDeltaTime, 1.0f);
 		orbitBattleFade = battle ? Mathf::Max(0.0f, orbitBattleFade - dt / 0.4f) : Mathf::Min(1.0f, orbitBattleFade + dt / 1.5f);
 		bool show = ShowOrbits && orbitBattleFade > 0.001f;
 		float battleEase = orbitBattleFade * orbitBattleFade * (3 - 2 * orbitBattleFade);
