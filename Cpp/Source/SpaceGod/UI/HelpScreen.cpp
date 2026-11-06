@@ -3,14 +3,34 @@
 #include "ControlsHelp.h"
 #include "GameManual.h"
 #include "UI/Hud.h"
+#include "UI/ShipCatalogScreen.h"
 
 using namespace SpaceGod::Core;
 
 namespace SpaceGod::UI
 {
+	HelpScreen::HelpScreen() = default;
+
+	HelpScreen::~HelpScreen() = default;
+
 	bool HelpScreen::Draw(const cs::String& closeHint)
 	{
 		EnsureStyles();
+
+		// The ship catalog (US-T193): every hull's handling, slots and compartments, in place of the manual.
+		if (showCatalog)
+		{
+			if (!catalog) catalog = cs::New<ShipCatalogScreen>();
+			auto whole = Rect(0, 0, static_cast<float>(Screen::width), static_cast<float>(Screen::height));
+			GUI::Box(whole, GUIContent::none(), panel);
+			GUI::Label(Rect(Margin, 22, whole.width - 2 * Margin, 30), "SHIP CATALOG", title);
+			GUI::Label(Rect(Margin, 54, whole.width - 2 * Margin, 18),
+				cs::Cat("Every hull in the game: handling, equipment slots and compartments  ·  Up / Down for the next hull  ·  ", closeHint), small);
+			catalog->Draw(Rect(Margin, 86, whole.width - 2 * Margin, whole.height - 64 - 86));
+			if (GUI::Button(Rect(Margin, whole.height - 50, 150, 32), "Manual", button)) showCatalog = false;
+			return GUI::Button(Rect(whole.width - Margin - 120, whole.height - 50, 120, 32), "Back", button);
+		}
+
 		const auto& chapters = GameManual::Chapters();
 		chapter = Mathf::Clamp(chapter, 0, chapters.Count() - 1);
 		HandleKeys(chapters.Count());
@@ -31,6 +51,7 @@ namespace SpaceGod::UI
 
 		if (chapter > 0 && GUI::Button(Rect(x, screen.height - 50, 120, 32), "Previous", button)) Select(chapter - 1);
 		if (chapter < chapters.Count() - 1 && GUI::Button(Rect(x + 132, screen.height - 50, 120, 32), "Next", button)) Select(chapter + 1);
+		if (GUI::Button(Rect(screen.width - Margin - 120 - 12 - 150, screen.height - 50, 150, 32), "Ship catalog", button)) showCatalog = true;
 		return GUI::Button(Rect(screen.width - Margin - 120, screen.height - 50, 120, 32), "Back", button);
 	}
 
@@ -185,5 +206,6 @@ namespace SpaceGod::UI
 		buttonTexture = nullptr;
 		buttonActiveTexture = nullptr;
 		stylesReady = false;
+		if (catalog) catalog->DestroyOwnedTextures();
 	}
 }

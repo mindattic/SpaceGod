@@ -32,7 +32,8 @@ namespace SpaceGod::Core
 	/// How a hull handles under a human's hands, independent of <see cref="CombatSpec"/>'s AI-battle
 	/// balance numbers -- a Freighter tuned to feel fine as a slow AI hauler (three degrees a second)
 	/// is not a Freighter that's fun to actually fly. Keyed by <see cref="ShipClass"/> rather than by
-	/// design, since the arcade feel is a class-wide call, not a per-hull balance knob.
+	/// design, since the arcade feel is a class-wide call, not a per-hull balance knob. The numbers are
+	/// authored in one place, the ship catalog's table (US-T193, <see cref="ShipCatalog"/>).
 	///
 	/// Since U.SPC-T59 the hull's push and spin come from its own design (mass, thrust, torque and
 	/// inertia on <see cref="CombatSpec"/>, see <see cref="HullDynamics"/>); what is left here is what
@@ -63,26 +64,35 @@ namespace SpaceGod::Core
 		/// <summary>Seconds of spooling up from rest to full cruise thrust once engaged.</summary>
 		double CruiseRampS = 0;
 
-		/// <summary>The fastest flight assist lets the hull roll, deg/s (a multiple of the turn rate:
-		/// a long hull rolls far more readily than it turns, see <see cref="CombatSpec.RollInertia"/>).</summary>
-		double RollRateDegS() const { return TurnRateDegS * RollRateFactor; }
+		/// <summary>The hull's roll rate as a multiple of its turn rate (a long hull rolls far more readily than it
+		/// turns, see <see cref="CombatSpec.RollInertia"/>): each hull's own, from its catalog row (US-T193,
+		/// <see cref="ShipCatalog"/>), and carried along when a flight model narrows the turn, so the roll narrows with it.</summary>
+		double RollFactor = DefaultRollFactor;
 
-		static constexpr double RollRateFactor = 1.5;
+		/// <summary>The fastest flight assist lets the hull roll, deg/s.</summary>
+		double RollRateDegS() const { return TurnRateDegS * RollFactor; }
+
+		/// <summary>The roll factor of a tuning with none of its own.</summary>
+		static constexpr double DefaultRollFactor = 1.5;
 
 		constexpr PilotTuning() = default;
 
-		constexpr PilotTuning(double maxSpeed, double turnRateDegS, double boostSpeedMultiplier, double boostDurationS, double cruiseSpeedMultiplier, double cruiseRampS)
+		constexpr PilotTuning(double maxSpeed, double turnRateDegS, double boostSpeedMultiplier, double boostDurationS, double cruiseSpeedMultiplier, double cruiseRampS,
+			double rollFactor = DefaultRollFactor)
 			: MaxSpeed(maxSpeed), TurnRateDegS(turnRateDegS), BoostSpeedMultiplier(boostSpeedMultiplier), BoostDurationS(boostDurationS),
-			  CruiseSpeedMultiplier(cruiseSpeedMultiplier), CruiseRampS(cruiseRampS)
+			  CruiseSpeedMultiplier(cruiseSpeedMultiplier), CruiseRampS(cruiseRampS), RollFactor(rollFactor)
 		{
 		}
 
+		/// <summary>The tuning of a hull of class <paramref name="c"/>: its row in the ship catalog (US-T193).</summary>
 		static PilotTuning Of(ShipClass c);
 
-		/// <summary>How a hull of class <paramref name="c"/> is flown at the helm (U.SPC-T269).</summary>
+		/// <summary>How a hull of class <paramref name="c"/> is flown at the helm (U.SPC-T269): its catalog row's.</summary>
 		static PilotControl ControlOf(ShipClass c);
 
 	private:
+		/// <summary>The catalog's rows as tunings by class (US-T193: built from <see cref="ShipCatalog"/>, which owns the numbers;
+		/// kept as the C# build's static, which the persistence walk names, Persistence/Registrations/StaticTables.cpp).</summary>
 		static const cs::Dictionary<ShipClass, PilotTuning>& ByClass();
 	};
 }

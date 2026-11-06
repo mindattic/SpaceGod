@@ -850,7 +850,7 @@ namespace SpaceGod::Core
 		bool coast, double roll)
 	{
 		auto crew = PilotTuning(tune.MaxSpeed * engines, tune.TurnRateDegS * DogfightTurnShare * engines, tune.BoostSpeedMultiplier,
-			tune.BoostDurationS, 1, 0);
+			tune.BoostDurationS, 1, 0, tune.RollFactor);
 		auto drives = HullDynamics(hull.MassKt, hull.MainAccel * engines, hull.RetroAccel * engines, hull.LateralAccel * engines,
 			hull.VerticalAccel * engines, hull.PitchYawAngularAccel, hull.RollAngularAccel);
 		auto f = u->Forward;

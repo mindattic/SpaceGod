@@ -115,7 +115,7 @@ namespace SpaceGod::Core
 		// Firing this frame: held, with charge left (as PilotFlight.DriveMultiplier has it).
 		bool boosting = input.Boost && tuning.BoostDurationS > 0 && combat != nullptr && combat->BoostFraction > 0;
 		auto turning = PilotTuning(tuning.MaxSpeed, TurnRateAt(h, s.Vel.Length(), tuning, boosting), tuning.BoostSpeedMultiplier,
-			tuning.BoostDurationS, tuning.CruiseSpeedMultiplier, tuning.CruiseRampS);
+			tuning.BoostDurationS, tuning.CruiseSpeedMultiplier, tuning.CruiseRampS, tuning.RollFactor);
 		auto forwardBeforeTurn = s.Forward;
 		bool snap = input.Piloted && Feel.SpinUpS > 0;
 		if (input.Piloted && input.DesiredForward.LengthSquared() > 1e-12)
@@ -311,7 +311,7 @@ namespace SpaceGod::Core
 	PilotTuning HeavyFighterFlightModel::Surged(const PilotTuning& tuning) const
 	{
 		double boost = 1 + (Max(1.0, tuning.BoostSpeedMultiplier) - 1) * Max(1.0, Feel.BoostSurge);
-		return PilotTuning(tuning.MaxSpeed, tuning.TurnRateDegS, boost, tuning.BoostDurationS, tuning.CruiseSpeedMultiplier, tuning.CruiseRampS);
+		return PilotTuning(tuning.MaxSpeed, tuning.TurnRateDegS, boost, tuning.BoostDurationS, tuning.CruiseSpeedMultiplier, tuning.CruiseRampS, tuning.RollFactor);
 	}
 
 	void HeavyFighterFlightModel::Fly(PilotState& s, const cs::Ref<ShipCombat>& combat, const HullDynamics& hull, const PilotTuning& tuning, const PilotInput& input, DVec3 gravityKmS2, double dt, double kickS) const

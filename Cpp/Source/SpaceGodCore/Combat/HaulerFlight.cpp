@@ -38,7 +38,7 @@ namespace SpaceGod::Core
 		double turn = tuning.TurnRateDegS / k * (docking ? Clamp01(Handling.DockingTurnFraction) : 1);
 		double speed = docking ? tuning.MaxSpeed * Clamp01(Handling.DockingSpeedFraction) : tuning.MaxSpeed;
 		double boost = tuning.BoostDurationS * Max(0.0, Handling.BoostDurationFraction);
-		return PilotTuning(speed, turn, tuning.BoostSpeedMultiplier, boost, tuning.CruiseSpeedMultiplier, tuning.CruiseRampS);
+		return PilotTuning(speed, turn, tuning.BoostSpeedMultiplier, boost, tuning.CruiseSpeedMultiplier, tuning.CruiseRampS, tuning.RollFactor);
 	}
 
 	HaulerStop HaulerFlightModel::StopPoint(const PilotState& s, const HullDynamics& hull, const PilotInput& input) const
