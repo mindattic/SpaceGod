@@ -560,6 +560,8 @@ namespace SpaceGod::Core
 			// A gate breaker is there to break the gate's forts (U.SPC-T478).
 			score -= GateBreakers::TargetBias(u, o);
 			if (o->Kind == UnitKind::Platform) score += 6;
+			// US-T180: a crewed fighter goes for the capitals, an interceptor for the craft round them.
+			score -= Choreography::TargetBias(u, o);
 			if (flagship != nullptr && flagship != u && flagship->Target == o) score -= 6;
 			if (focus != nullptr && focus == o) score -= FleetCoordination::Focus()->Value;
 			score *= 0.85 + rng.NextDouble() * 0.3;
@@ -1362,6 +1364,8 @@ namespace SpaceGod::Core
 			// A tachyon lance's shot lands the instant it is fired, so it is as sure at the end of its reach as close in (U.SPC-T487).
 			double falloff = w->Lance ? 1 : 1 - 0.4 * dist / w->RangeKm * (1 - picture);
 			double chance = w->Accuracy * accuracyScale * size * falloff * (volley > 1 ? 1 + Broadsides::CrewVolleyAccuracyBonus : 1);
+			// US-T180: a small craft crossing the gunner's line fast is hard to track; one sat on its tail is not.
+			chance *= Choreography::Evasion(u, target, origin);
 			bool hit = rng.NextDouble() < chance;
 			auto energy = EnergyWeapons::FxOf(s->Kind(), hit);
 			auto kind = energy.has_value() ? *energy
@@ -2037,7 +2041,9 @@ namespace SpaceGod::Core
 			return;
 		}
 		double burst = cs::Math::Max(w->BurstKm, 0.05) * ScreenWeapons::FlakBurst()->Value;
-		if (rng.NextDouble() >= w->Accuracy * accuracyScale)
+		// US-T180: a shell fused for where a fast-crossing craft was bursts behind it more often than not.
+		double evade = round == nullptr ? Choreography::Evasion(u, craft, origin) : 1.0;
+		if (rng.NextDouble() >= w->Accuracy * accuracyScale * evade)
 		{
 			// Wide: the shell bursts a burst and a half or two off its mark.
 			double ox = rng.NextDouble() - 0.5;

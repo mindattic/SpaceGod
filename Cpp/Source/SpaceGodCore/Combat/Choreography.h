@@ -46,7 +46,11 @@ namespace SpaceGod::Core
 		static constexpr double StandoffShare = 0.15; static constexpr double StandoffKm = 0.3;
 
 		/// <summary>How far past the hull's end the run lines up before it cuts the drive, km plus a share of the length.</summary>
-		static constexpr double EntryLeadKm = 1.0; static constexpr double EntryLeadShare = 0.3;
+		static constexpr double EntryLeadKm = 0.6; static constexpr double EntryLeadShare = 0.2; // US-T180: tighter (1.0, 0.3)
+
+		/// <summary>US-T180: how far out from the keel line a strafer swings in its flip before the next pass, km beyond its
+		/// standoff (was 2): close enough that the passes come round on the hull, not out in the dark.</summary>
+		static constexpr double FlipOutKm = 1.0;
 
 		/// <summary>Seconds a strafer burns back after its flip before lining up the next pass.</summary>
 		static constexpr double FlipSeconds = 3.5;
@@ -63,6 +67,11 @@ namespace SpaceGod::Core
 		/// as a share of its battery: just over the choice's hysteresis, so coming about does swing the other broadside in,
 		/// and far under what a holed face costs, so a worn side is still turned away whatever the course.</summary>
 		static constexpr double CourseBias = 0.06;
+
+		/// <summary>US-T180 (two nests of hornets): how much nearer than it is a capital counts, km, when a small craft that
+		/// strafes (a fighter, a heavy fighter, a bomber) picks its mark, so a healthy share of every squadron is down on the
+		/// hulls; and an enemy craft, when a crewed interceptor picks its mark, so the interceptors fight the escorts.</summary>
+		static constexpr double HullBiasKm = 8; static constexpr double HuntBiasKm = 5;
 
 		/// <summary>One step of a crew's stick: where it wants the nose, its throttle and boost, the drive cut (flight assist
 		/// off, coasting), and a roll input.</summary>
@@ -83,6 +92,28 @@ namespace SpaceGod::Core
 
 		/// <summary>A target a fighter strafes rather than dogfights: a hull big enough to run down the length of.</summary>
 		static bool Strafeable(const cs::Ref<BattleUnit>& t);
+
+		/// <summary>
+		/// US-T180: the km an AI small craft <paramref name="u"/> takes off <paramref name="o"/>'s target score (nearer is
+		/// better): <see cref="HullBiasKm"/> for a capital to a craft that strafes, <see cref="HuntBiasKm"/> for a small craft to
+		/// a crewed interceptor (a carrier's interceptors already hunt by FighterCraft::HuntsFightersKm). Zero for anything
+		/// else, and for a hull the player holds, who picks their own mark.
+		/// </summary>
+		static double TargetBias(const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& o);
+
+		/// <summary>US-T180: the crossing speed (km/s, across the gunner's line of sight) at which a small craft's
+		/// <see cref="Evasion"/> bottoms out, and the least share of a gunner's chance it leaves.</summary>
+		static constexpr double EvadeKmS = 1.0; static constexpr double EvadeFloor = 0.4;
+
+		/// <summary>
+		/// US-T180: the share of an AI gunner's chance to hit that is left when <paramref name="target"/> is a small craft
+		/// crossing its line of sight from <paramref name="origin"/>: 1 for a target flying straight at or away from the gun
+		/// (a dogfighter on its tail), falling linearly with the crossing speed to <see cref="EvadeFloor"/> at
+		/// <see cref="EvadeKmS"/>. So a strafer coasting fast down a capital's flank is hard for its point defence to track,
+		/// and the faster craft live through more than one pass. 1 for any other target, and for a shot at the player's hull
+		/// (aimed for real, Battle::AimAt, not rolled).
+		/// </summary>
+		static double Evasion(const cs::Ref<BattleUnit>& shooter, const cs::Ref<BattleUnit>& target, DVec3 origin);
 
 		/// <summary>The unit is somewhere in a strafing run (burning in, coasting down the hull, or flipping out).</summary>
 		static bool Strafing(const cs::Ref<BattleUnit>& u);

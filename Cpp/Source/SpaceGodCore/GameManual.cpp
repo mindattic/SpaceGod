@@ -285,7 +285,11 @@ namespace SpaceGod::Core
 				  "frigates and destroyers make passes at speed, their noses weaving. Capitals steam across the enemy's line "
 				  "broadside-on at their slow turn rate and come about from time to time, or when the side they have been "
 				  "showing is worn, so the fresh broadside and its shield arrays take the fire; hits land on whichever "
-				  "shield patch faces them, so the turn really spares the damaged side. Dev menu, Combat: Start a big "
+				  "shield patch faces them, so the turn really spares the damaged side. The fleets open about 14 km apart, "
+				  "so contact comes at once. Every fighter in a squadron flies its own runs on a capital (the fighters, heavy "
+				  "fighters and bombers go for the hulls, the interceptors for the craft round them), and with their missile "
+				  "racks empty they fight on with their guns: only the badly hurt, bombers out of torpedoes and craft with no "
+				  "gun left fly home, and a flight deck turns one round in about 10 s. Dev menu, Combat: Start a big "
 				  "battle and watch.")),
 
 			cs::New<ManualChapter>("Ships: escorts and sub-capitals", "Cruisers, destroyers, frigates, corvettes and gate pickets", Keys(),

@@ -818,8 +818,9 @@ namespace SpaceGod::Core
 		// ---------------------------------------------------------------- dogfighting (U.SPC-T274)
 
 		/// <summary>The share of a hull's own turn rate at the helm (<see cref="PilotTuning.TurnRateDegS"/>) its crew
-		/// flies it at in a dogfight: a human's hands are quicker than a crew's reactions.</summary>
-		static constexpr double DogfightTurnShare = 0.6;
+		/// flies it at in a dogfight: a human's hands are quicker than a crew's reactions. US-T180: 0.8 (was 0.6), so the
+		/// crewed fighters carve round the capitals with the carriers' squadrons, still a shade under the player's hands.</summary>
+		static constexpr double DogfightTurnShare = 0.8;
 
 		/// <summary>How close the merge is, km (inside it the attacker extends), how far it extends before coming
 		/// round, and how near a hostile behind must be to count as on its tail.</summary>

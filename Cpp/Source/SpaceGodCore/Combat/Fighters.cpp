@@ -556,6 +556,8 @@ namespace SpaceGod::Core
 				// A capital its own recon fighters are painting is where its torpedoes run truest (U.SPC-T485).
 				if (bomber && ElectronicWarfare::Painted(b, o, u->Side)) score -= ElectronicWarfare::PaintBonusKm;
 			}
+			// US-T180: the fighters, heavy fighters and bombers go for the hulls, so the capitals are swarmed.
+			score -= Choreography::TargetBias(u, o);
 			score *= 0.8 + b->Rng().NextDouble() * 0.4;
 			if (score < bestScore)
 			{
@@ -944,18 +946,18 @@ namespace SpaceGod::Core
 			return;
 		}
 		u->Target = lead->Target;
-		// US-T164: the lead has cut its drive and is raking the hull: the flight cuts theirs too and lays their guns on it.
-		if (lf->Phase == FighterPhase::AttackRun && Choreography::Coasting(lead) && u->Target != nullptr && Choreography::Strafeable(u->Target))
+		// US-T180: the lead is on a capital: the flight breaks up and each fighter flies its own strafing run down the hull
+		// (Choreography::StrafeRun, from whichever end it is nearer), so the hull is swarmed rather than passed by one vee
+		// (US-T164 had the wingmen hold their slots and only coast when the lead did). A bomber keeps station for its run.
+		if (lf->Phase == FighterPhase::AttackRun && !f->Bomber && u->Target != nullptr && Choreography::Strafeable(u->Target))
 		{
-			Choreography::Flight coast;
-			coast.Coast = true;
-			coast.Throttle = 0;
-			auto runDir = lead->Vel.LengthSquared() > 1e-12 ? lead->Vel.Normalized() : lead->Forward;
-			coast.Goal = Choreography::RakePoint(u->Target, u->Pos, runDir) - u->Pos;
-			FlyRun(b, u, coast, u->Combat->Spec->MaxSpeed, dt);
+			u->ManeuverLeft -= dt;
+			auto run = Choreography::StrafeRun(b, u, u->Target, u->Combat->Spec->TurnRateDegS, dt);
+			FlyRun(b, u, run, u->Combat->Spec->MaxSpeed, dt);
 			Torpedo(b, u);
 			return;
 		}
+		if (Choreography::Strafing(u)) Choreography::EndRun(u);
 		// Station: the slot in the lead's frame, stretched on the run, plus this pilot's own wander. The frame is held level
 		// (US-T164): the lead banking and rolling (Choreography::Bank) must not swing its wingmen's slots round it.
 		auto up = WeakPatches::LevelRoof(lead->Forward);

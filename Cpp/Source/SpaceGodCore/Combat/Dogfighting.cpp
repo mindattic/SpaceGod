@@ -119,10 +119,15 @@ namespace SpaceGod::Core
 		if (st.Started) return;
 		st.Started = true;
 
+		// US-T180 (two nests of hornets): every combat craft below flies 1.4x the speed and thrust and 1.25x the turn it had
+		// (the shuttle excepted), the same for each so the interceptor is still the quickest and the bomber the slowest; and
+		// 2.5x the hull and shield (1.5x the regeneration), so a squadron lives through more than one merge: at the old plate
+		// a pair of the opening salvoes and a few seconds of flak wiped whole squadrons out within a minute, and the nest
+		// emptied.
 		st.SquadronMix = { FighterRole::Interceptor, FighterRole::SpaceSuperiority, FighterRole::Bomber, FighterRole::HeavyFighter };
 
-		st.Interceptor = Add(FighterRole::Interceptor, "interceptor", ShipClass::Interceptor, 0.016, 0.012, 400, 1.6, 6,
-			NewSpec(/*Hull*/ 70, /*Shield*/ 30, /*ShieldRegen*/ 2, /*Armor*/ 0, /*MaxSpeed*/ 0.35, /*Accel*/ 0.25, /*TurnRateDegS*/ 120,
+		st.Interceptor = Add(FighterRole::Interceptor, "interceptor", ShipClass::Interceptor, 0.016, 0.012, 500, 1.6, 6,
+			NewSpec(/*Hull*/ 175, /*Shield*/ 75, /*ShieldRegen*/ 3, /*Armor*/ 0, /*MaxSpeed*/ 0.49, /*Accel*/ 0.35, /*TurnRateDegS*/ 150,
 			{
 				Def(SubsystemKind::FighterGuns, 0.2, 0, 0.4, false, FireCones::Bow, 14),
 				Def(SubsystemKind::FighterGuns, -0.2, 0, 0.4, false, FireCones::Bow, 14),
@@ -133,8 +138,8 @@ namespace SpaceGod::Core
 
 		/// <summary>The balanced workhorse (U.SPC-T484): a little slower and wider in the turn than the interceptor, tougher,
 		/// and with twice its missiles, as ready to strafe a hull as to fight a craft.</summary>
-		st.SpaceSuperiority = Add(FighterRole::SpaceSuperiority, "fighter", ShipClass::Fighter, 0.018, 0.018, 260, 1.55, 5.5,
-			NewSpec(100, 45, 2.5, 0.5, 0.32, 0.22, 100,
+		st.SpaceSuperiority = Add(FighterRole::SpaceSuperiority, "fighter", ShipClass::Fighter, 0.018, 0.018, 325, 1.55, 5.5,
+			NewSpec(250, 110, 3.75, 0.5, 0.45, 0.31, 125,
 			{
 				Def(SubsystemKind::FighterGuns, 0.22, 0, 0.4, false, FireCones::Bow, 14),
 				Def(SubsystemKind::FighterGuns, -0.22, 0, 0.4, false, FireCones::Bow, 14),
@@ -144,8 +149,8 @@ namespace SpaceGod::Core
 				Def(SubsystemKind::ShieldGenerator, 0, 0, -0.3),
 			}));
 
-		st.HeavyFighter = Add(FighterRole::HeavyFighter, "heavy fighter", ShipClass::Gunship, 0.02, 0.025, 160, 1.5, 5,
-			NewSpec(140, 60, 3, 1, 0.3, 0.2, 90,
+		st.HeavyFighter = Add(FighterRole::HeavyFighter, "heavy fighter", ShipClass::Gunship, 0.02, 0.025, 200, 1.5, 5,
+			NewSpec(350, 150, 4.5, 1, 0.42, 0.28, 112,
 			{
 				Def(SubsystemKind::FighterGuns, 0.25, 0, 0.4, false, FireCones::Bow, 14),
 				Def(SubsystemKind::FighterGuns, -0.25, 0, 0.4, false, FireCones::Bow, 14),
@@ -155,8 +160,8 @@ namespace SpaceGod::Core
 				Def(SubsystemKind::ShieldGenerator, 0, 0, -0.3),
 			}));
 
-		st.Bomber = Add(FighterRole::Bomber, "bomber", ShipClass::Bomber, 0.024, 0.03, 120, 1.4, 5,
-			NewSpec(130, 50, 2, 1, 0.26, 0.15, 80,
+		st.Bomber = Add(FighterRole::Bomber, "bomber", ShipClass::Bomber, 0.024, 0.03, 150, 1.4, 5,
+			NewSpec(325, 125, 3, 1, 0.36, 0.21, 100,
 			{
 				Def(SubsystemKind::FighterGuns, 0, 0.05, 0.4, false, FireCones::Bow, 14),
 				Def(SubsystemKind::Torpedo, 0, -0.1, 0),
@@ -167,8 +172,8 @@ namespace SpaceGod::Core
 		/// <summary>The recon / EW fighter (U.SPC-T485): an interceptor's pace, a light gun for its own defence, flares, and
 		/// the rest of it sensors and jammers (<see cref="ElectronicWarfare"/>). It never hunts fighters: it holds off its
 		/// mark, jamming and painting.</summary>
-		st.Recon = Add(FighterRole::Recon, "recon fighter", ShipClass::Recon, 0.017, 0.014, 360, 1.6, 7,
-			NewSpec(65, 40, 2.5, 0, 0.34, 0.24, 110,
+		st.Recon = Add(FighterRole::Recon, "recon fighter", ShipClass::Recon, 0.017, 0.014, 450, 1.6, 7,
+			NewSpec(160, 100, 3.75, 0, 0.48, 0.34, 138,
 			{
 				Def(SubsystemKind::FighterGuns, 0, -0.05, 0.4, false, FireCones::Bow, 14),
 				Def(SubsystemKind::Countermeasures, 0, 0, -0.4, /*facesAft:*/ true),

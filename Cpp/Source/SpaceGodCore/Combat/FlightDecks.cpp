@@ -4,6 +4,7 @@
 #include "Combat/CarrierWings.h"
 #include "Combat/CombatSpecs.h"
 #include "Combat/CombatState.h"
+#include "Combat/Dogfighting.h"
 #include "Combat/Fighters.h"
 #include "Combat/StrandedWings.h"
 #include "Settings/GameSetting.h"
@@ -87,7 +88,7 @@ namespace SpaceGod::Core
 	const cs::Ref<RangeSetting>& FlightDecks::ServiceSeconds()
 	{
 		static const cs::Ref<RangeSetting> setting = cs::New<RangeSetting>("dogfight.deckService", SettingGroups::Dogfighting,
-			"Flight deck turnaround", 30, 5, 180, 5,
+			"Flight deck turnaround", 10, 5, 180, 5, // US-T180: 10 s, not 30, so a squadron is mostly in the fight
 			cs::Cat("How long (seconds) a craft down on a carrier's flight deck takes to be refuelled, rearmed and repaired before it is ",
 				"launched again out of the bow."), cs::Func<cs::String, double>([](double v) { return cs::Cat(cs::Fmt(v, "0"), " s"); }),
 			"flight deck carrier land landing rearm refuel repair turnaround hangar");
@@ -98,7 +99,8 @@ namespace SpaceGod::Core
 	{
 		static const cs::Ref<ToggleSetting> setting = cs::New<ToggleSetting>("dogfight.deckRearm", SettingGroups::Dogfighting,
 			"Pilots land to rearm", true,
-			cs::Cat("Carrier pilots who are badly hurt or out of torpedoes and missiles fly home mid-fight, land on the flight deck, ",
+			cs::Cat("Carrier pilots who are badly hurt, bombers out of torpedoes and craft out of missiles with no gun left fly home ",
+				"mid-fight, land on the flight deck, ",
 				"rearm and repair, and launch again. Off, they land only when recalled."),
 			"flight deck carrier land rearm repair pilot ai");
 		return setting;
@@ -238,7 +240,22 @@ namespace SpaceGod::Core
 		if (home == nullptr || !home->Present() || home->Captured || home->Fleeing || home->Surrendering || !HasOpenDeck(home)) return false;
 		auto c = u->Combat;
 		if (c->HullFraction() < ServiceHull()->Value) return true;
+		// US-T180: racks empty, a craft with its guns still working stays in the fight and strafes and dogfights on them;
+		// only a bomber (its torpedoes are its whole point) or one with no guns left flies home for more. Flying home for
+		// every pair of missiles kept half of each squadron out of the fight.
+		if (!f->Bomber && HasGuns(c)) return false;
 		return OutOfOrdnance(c);
+	}
+
+	bool FlightDecks::HasGuns(const cs::Ref<ShipCombat>& c)
+	{
+		for (const auto& s : c->Subsystems)
+		{
+			auto w = s->Def->Weapon;
+			if (w == nullptr || w->Missile || w->Damage <= 0 || s->Destroyed()) continue;
+			if (WeaponGroups::Of(s->Kind()) == WeaponGroup::Guns) return true;
+		}
+		return false;
 	}
 
 	bool FlightDecks::OutOfOrdnance(const cs::Ref<ShipCombat>& c)

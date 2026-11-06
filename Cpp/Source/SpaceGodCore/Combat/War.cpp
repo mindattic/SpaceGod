@@ -1030,7 +1030,7 @@ namespace SpaceGod::Core
 			for (int i = 0; i < st->Platforms.Count(); i++)
 			{
 				double a = Astro::TwoPi * i / cs::Math::Max(1, st->Platforms.Count());
-				b->AddPlatform(st, st->Platforms[i], 1, Spot(b, 1) * 0.4 + DVec3(cs::Math::Cos(a), cs::Math::Sin(a), 0.1) * 6);
+				b->AddPlatform(st, st->Platforms[i], 1, StationSpot(b, 1) + DVec3(cs::Math::Cos(a), cs::Math::Sin(a), 0.1) * 6);
 			}
 		}
 		Battles.Add(b);
@@ -1202,7 +1202,7 @@ namespace SpaceGod::Core
 			for (int i = 0; i < st->Platforms.Count(); i++)
 			{
 				double a = Astro::TwoPi * i / cs::Math::Max(1, st->Platforms.Count());
-				auto pos = Spot(b, side) * 0.4 + DVec3(cs::Math::Cos(a), cs::Math::Sin(a), 0.1) * 6;
+				auto pos = StationSpot(b, side) + DVec3(cs::Math::Cos(a), cs::Math::Sin(a), 0.1) * 6;
 				b->AddPlatform(st, st->Platforms[i], side, pos);
 			}
 		}
@@ -1279,7 +1279,7 @@ namespace SpaceGod::Core
 			for (int i = 0; i < gate->Forts.Count(); i++)
 			{
 				double a = Astro::TwoPi * i / cs::Math::Max(1, gate->Forts.Count());
-				auto pos = Spot(b, 1) * 0.4 + DVec3(cs::Math::Cos(a), cs::Math::Sin(a), 0.1) * 6;
+				auto pos = StationSpot(b, 1) + DVec3(cs::Math::Cos(a), cs::Math::Sin(a), 0.1) * 6;
 				b->AddFort(gate, gate->Forts[i], 1, pos);
 			}
 		Battles.Add(b);
@@ -1485,7 +1485,12 @@ namespace SpaceGod::Core
 
 	int War::Shown(const cs::Ref<Battle>& b) { return HidesHaven(b->Body) ? -1 : b->Body; }
 
-	DVec3 War::Spot(const cs::Ref<Battle>& b, int side) { return b->ApproachAxis * (side == 0 ? 13 : -13); }
+	// US-T180: the two sides open 14 km apart (it was 26), inside a capital's gun range and a minute less for the craft to
+	// close, so contact comes at once.
+	DVec3 War::Spot(const cs::Ref<Battle>& b, int side) { return b->ApproachAxis * (side == 0 ? OpenKm : -OpenKm); }
+
+	// A station's defences ring where they always did (0.4 of the old 13 km line): the closer opening is the fleets', not theirs.
+	DVec3 War::StationSpot(const cs::Ref<Battle>& b, int side) { return b->ApproachAxis * (side == 0 ? 5.2 : -5.2); }
 
 	void War::Join(const cs::Ref<Battle>& b, const cs::Ref<Ship>& ship, int side, bool late)
 	{

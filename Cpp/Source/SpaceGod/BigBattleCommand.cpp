@@ -62,8 +62,10 @@ namespace
 		};
 	}
 
-	/// <summary>Seconds of the fight run before it is shown (see StartBigBattle).</summary>
-	constexpr double PrerollSeconds = 50;
+	/// <summary>Seconds of the fight run before it is shown (see StartBigBattle). US-T180: 20 (was 50): the fleets now open
+	/// 14 km apart and the first craft are in contact within ten seconds, so 20 s puts the watching at the squadrons' first
+	/// passes rather than a minute into the fight.</summary>
+	constexpr double PrerollSeconds = 20;
 
 	/// <summary>Starts it off Uranus (empty, so the live war's own traffic keeps out of the picture), Sol against the Reach,
 	/// and drops to battle time. Null if the fight did not start.</summary>
@@ -74,7 +76,7 @@ namespace
 		auto battle = SpaceGod::SceneTour::TriggerSkirmish(app, body, app.World()->Sol, app.World()->Reach, BigFleet());
 		if (battle != nullptr)
 		{
-			// The fleets open 26 km apart: the fight is run on to contact (the squadrons out, the first runs lined up),
+			// The fleets open 14 km apart (US-T180): the fight is run on to contact (the squadrons out, the first runs lined up),
 			// on the battle's own clock, so the watching starts in the thick of it rather than a minute of closing in.
 			battle->Advance(PrerollSeconds, false);
 			app.Clock->SetPaused(false);
@@ -276,20 +278,33 @@ namespace
 
 		void LogState(double t)
 		{
-			int coast = 0, strafe = 0, loop = 0, roll = 0, crossing = 0, present = 0, onHulls = 0, onCraft = 0;
+			int coast = 0, strafe = 0, loop = 0, roll = 0, crossing = 0, present = 0, onHulls = 0, onCraft = 0, engaged = 0;
 			for (const auto& u : Dir.Fight->Units)
 			{
 				if (!u->Present()) continue;
 				present++;
 				if (u->LengthKm < 0.2 && u->Target != nullptr) (Choreography::Strafeable(u->Target) ? onHulls : onCraft)++;
+				// US-T180's measure: a small craft within 3 km of its mark (a capital's keel), or coasting down a hull.
+				if (u->LengthKm < 0.2 && u->Target != nullptr && u->Target->Present())
+				{
+					auto mark = u->Target;
+					double d = (mark->Pos - u->Pos).Length();
+					if (Choreography::Strafeable(mark))
+					{
+						auto keel = mark->Forward.LengthSquared() > 1e-18 ? mark->Forward.Normalized() : DVec3::UnitX;
+						double half = mark->LengthKm * 0.5, along = cs::Math::Max(-half, cs::Math::Min(half, DVec3::Dot(u->Pos - mark->Pos, keel)));
+						d = (mark->Pos + keel * along - u->Pos).Length();
+					}
+					if (d < 3 || (Choreography::Coasting(u) && Choreography::Strafeable(mark))) engaged++;
+				}
 				if (Choreography::Coasting(u)) coast++;
 				if (Choreography::Strafing(u)) strafe++;
 				if (u->Maneuver == DogfightManeuver::Loop) loop++;
 				if (u->Maneuver == DogfightManeuver::Roll) roll++;
 				if (u->Maneuver == DogfightManeuver::Crossing) crossing++;
 			}
-			UE_LOG(LogSpaceGod, Display, TEXT("sg.BigBattle: t=%.0f shot %d (%d): %d present, small craft on hulls %d / on craft %d, %d strafing (%d coasting), %d looping, %d rolling, %d capitals crossing"),
-				t, Dir.Shot % 3, Taken, present, onHulls, onCraft, strafe, coast, loop, roll, crossing);
+			UE_LOG(LogSpaceGod, Display, TEXT("sg.BigBattle: t=%.0f battle %.0f s shot %d (%d): %d present, small craft on hulls %d / on craft %d, %d engaged, %d strafing (%d coasting), %d looping, %d rolling, %d capitals crossing"),
+				t, Dir.Fight->Seconds, Dir.Shot % 3, Taken, present, onHulls, onCraft, engaged, strafe, coast, loop, roll, crossing);
 		}
 
 		bool Finish(const TCHAR* failure)

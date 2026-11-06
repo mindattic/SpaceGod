@@ -229,12 +229,16 @@ namespace SpaceGod::Core
 
 		/// <summary>
 		/// Whether a pilot flies home mid-fight to land, rearm and repair: its home has a deck open and is not running, and
-		/// its hull is under <see cref="ServiceHull"/>, or it carried torpedoes or missiles and has none left.
+		/// its hull is under <see cref="ServiceHull"/>, or it carried torpedoes or missiles and has none left and is a bomber
+		/// or has no working gun to fight on with (US-T180).
 		/// </summary>
 		static bool WantsService(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& u);
 
 		/// <summary>It was built with guided rounds (torpedoes, missiles) and every one of them is spent.</summary>
 		static bool OutOfOrdnance(const cs::Ref<ShipCombat>& c);
+
+		/// <summary>US-T180: it still has a working gun (an unguided, damaging mount in the guns group) to fight on with.</summary>
+		static bool HasGuns(const cs::Ref<ShipCombat>& c);
 
 		// ---------------------------------------------------------------- inbound
 

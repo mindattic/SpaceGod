@@ -1,8 +1,8 @@
 {
   "_comment": "The digestHash every scenario must produce (Bench/README.md, 'Digest format'). Recorded from Unity.SpaceGod's own C# Core (Bench.CSharp, US-T23) and matched bit for bit by the C++ Core since US-T37; tools/bench.ps1 checks against these.",
-  "sol-idle": "627043C3E0EF3709",
-  "high-warp": "A486C3FCC334718C",
-  "economy-year": "1AA18DD9314A3F3B",
-  "battle": "ECE9D3359FA3E2E4",
-  "galaxy-ftl": "99F349A63E86F97A"
+  "sol-idle": "0F21C87D858423CD",
+  "high-warp": "2D5879F3D51DE9D9",
+  "economy-year": "588B73242252B1CB",
+  "battle": "AAC20E2B824E7237",
+  "galaxy-ftl": "51047789C2A02F64"
 }

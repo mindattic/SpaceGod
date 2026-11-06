@@ -8,6 +8,7 @@
 #include "Combat/CombatSpecs.h"
 #include "Combat/CombatState.h"
 #include "Combat/Dogfighting.h"
+#include "Combat/Fighters.h"
 #include "Combat/PilotFlight.h"
 #include "Combat/WeakPatches.h"
 #include "Ships.h"
@@ -53,6 +54,39 @@ namespace SpaceGod::Core
 	}
 
 	bool Choreography::Strafeable(const cs::Ref<BattleUnit>& t) { return WeakPoints::IsCapital(t); }
+
+	double Choreography::TargetBias(const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& o)
+	{
+		if (u == nullptr || o == nullptr || u->PlayerControlled() || !WeakPoints::IsSmallCraft(u)) return 0;
+		bool strafer, hunter;
+		if (u->Fighter != nullptr)
+		{
+			auto role = u->Fighter->Role;
+			strafer = role == FighterRole::SpaceSuperiority || role == FighterRole::HeavyFighter || role == FighterRole::Bomber;
+			hunter = false;
+		}
+		else
+		{
+			auto cls = u->Ship != nullptr ? u->Ship->Spec->Class : ShipClass::Fighter;
+			strafer = cls != ShipClass::Interceptor;
+			hunter = cls == ShipClass::Interceptor;
+		}
+		if (strafer && Strafeable(o)) return HullBiasKm;
+		if (hunter && WeakPoints::IsSmallCraft(o)) return HuntBiasKm;
+		return 0;
+	}
+
+	double Choreography::Evasion(const cs::Ref<BattleUnit>& shooter, const cs::Ref<BattleUnit>& target, DVec3 origin)
+	{
+		if (shooter == nullptr || target == nullptr || target->PlayerControlled() || !WeakPoints::IsSmallCraft(target)) return 1;
+		auto los = target->Pos - origin;
+		double d = los.Length();
+		if (d < 1e-9) return 1;
+		los = los / d;
+		auto rel = target->Vel - shooter->Vel;
+		double crossing = (rel - los * DVec3::Dot(rel, los)).Length();
+		return Clamp(1 - (1 - EvadeFloor) * crossing / EvadeKmS, EvadeFloor, 1.0);
+	}
 
 	bool Choreography::Strafing(const cs::Ref<BattleUnit>& u)
 	{
@@ -161,7 +195,7 @@ namespace SpaceGod::Core
 			default: // StrafeFlip
 			{
 				// Flip onto the retrograde and burn, swinging back out to the flank for the next pass, rolling as it goes.
-				auto back = (t->Pos + n * (standoff + 2.0)) - u->Pos;
+				auto back = (t->Pos + n * (standoff + FlipOutKm)) - u->Pos;
 				auto retro = speed > 0.06 ? -u->Vel / speed : DVec3::Zero;
 				out.Goal = retro + (back.LengthSquared() > 1e-12 ? back.Normalized() * 0.6 : DVec3::Zero);
 				if (out.Goal.LengthSquared() < 1e-12) out.Goal = back;

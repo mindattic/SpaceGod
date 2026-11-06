@@ -563,8 +563,14 @@ namespace SpaceGod::Core
 		/// <summary>The body a battle's news names: none while it is fought over an undiscovered haven.</summary>
 		int Shown(const cs::Ref<Battle>& b);
 
-		/// <summary>Where a side's line starts: the two sides open about 26 km apart.</summary>
+		/// <summary>Where a side's line starts: the two sides open about 2 x <see cref="OpenKm"/> apart (US-T180: 14 km, was 26).</summary>
 		static DVec3 Spot(const cs::Ref<Battle>& b, int side);
+
+		/// <summary>US-T180: how far off the battle's centre each side's line opens, km.</summary>
+		static constexpr double OpenKm = 7;
+
+		/// <summary>The centre of the ring a station's defence platforms are placed on for a side, as before US-T180.</summary>
+		static DVec3 StationSpot(const cs::Ref<Battle>& b, int side);
 
 		void Join(const cs::Ref<Battle>& b, const cs::Ref<Ship>& ship, int side, bool late);
 
