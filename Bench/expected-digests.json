@@ -1,8 +1,8 @@
 {
-  "_comment": "The digestHash every scenario must produce (Bench/README.md, 'Digest format'). Recorded from Unity.SpaceGod's own C# Core (Bench.CSharp, US-T23) and matched bit for bit by the C++ Core since US-T37; tools/bench.ps1 checks against these.",
-  "sol-idle": "0F21C87D858423CD",
-  "high-warp": "2D5879F3D51DE9D9",
-  "economy-year": "588B73242252B1CB",
-  "battle": "AAC20E2B824E7237",
-  "galaxy-ftl": "51047789C2A02F64"
+  "_comment": "The digestHash every scenario must produce (Bench/README.md, 'Digest format'). First recorded from Unity.SpaceGod's C# Core (Bench.CSharp, US-T23); this repo is C++-only since c965508, so the C++ Core is the reference and these are re-recorded from it whenever a sim change legitimately moves them (last: US-T229). tools/bench.ps1 checks against these.",
+  "sol-idle": "14CF3950A426A4A2",
+  "high-warp": "CC6F82EC99CCE401",
+  "economy-year": "47E99136E2166522",
+  "battle": "91D433A62B3AF515",
+  "galaxy-ftl": "7D3DD9696E3F429F"
 }
