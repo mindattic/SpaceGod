@@ -158,12 +158,16 @@ namespace
 					auto here = app.ActiveSystem != nullptr ? app.ActiveSystem->PositionLy : DVec3::Zero;
 					double best = cs::Double::PositiveInfinity;
 					cs::String name;
-					for (const auto& s : app.Galaxy->Systems)
+					// Any star on the charts (running or not: a new game's Systems holds few); Realize builds it on arrival.
+					auto consider = [&](const cs::String& n, const DVec3& pos)
 					{
-						if (!SpaceGod::Rendering::SystemSkies::IsWild(s->Name) || Biomes::KindOf(s->Name) != kind) continue;
-						double d = (s->PositionLy - here).LengthSquared();
-						if (d < best) { best = d; name = s->Name; }
-					}
+						if (!SpaceGod::Rendering::SystemSkies::IsWild(n) || Biomes::KindOf(n) != kind) return;
+						double d = (pos - here).LengthSquared();
+						if (d < best) { best = d; name = n; }
+					};
+					for (const auto& s : app.Galaxy->Systems) consider(s->Name, s->PositionLy);
+					for (const auto& n : app.Galaxy->NearbyStars) consider(n.Name, n.PositionLy);
+					for (const auto& n : app.Galaxy->Undiscovered()) consider(n.Name, n.PositionLy);
 					if (name.empty()) return "no system of this biome near enough";
 					SpaceGod::Rendering::SystemSkies::Prefetch(name);
 					*system = app.Galaxy->Realize(name, app.Clock->Jd);

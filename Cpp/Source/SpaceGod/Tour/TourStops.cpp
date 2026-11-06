@@ -165,19 +165,24 @@ namespace SpaceGod::Tour
 		Yard FindYard(UnitySpaceApp& app, const std::function<bool(const Graveyard&)>& wanted)
 		{
 			auto here = app.ActiveSystem != nullptr ? app.ActiveSystem->PositionLy : DVec3::Zero;
-			std::vector<cs::Ref<StarSystem>> systems(app.Galaxy->Systems.begin(), app.Galaxy->Systems.end());
-			std::sort(systems.begin(), systems.end(), [&](const cs::Ref<StarSystem>& a, const cs::Ref<StarSystem>& b)
+			// Every star the charts hold, running or not (a new game's Systems holds few): name and place, nearest first.
+			std::vector<std::pair<cs::String, DVec3>> stars;
+			for (const auto& s : app.Galaxy->Systems) stars.emplace_back(s->Name, s->PositionLy);
+			for (const auto& n : app.Galaxy->NearbyStars) stars.emplace_back(n.Name, n.PositionLy);
+			for (const auto& n : app.Galaxy->Undiscovered()) stars.emplace_back(n.Name, n.PositionLy);
+			std::sort(stars.begin(), stars.end(), [&](const auto& a, const auto& b)
 			{
-				return (a->PositionLy - here).LengthSquared() < (b->PositionLy - here).LengthSquared();
+				return (a.second - here).LengthSquared() < (b.second - here).LengthSquared();
 			});
 			int realized = 0;
-			for (auto s : systems)
+			for (const auto& star : stars)
 			{
-				if (s->Catalog == nullptr)
+				auto s = app.Galaxy->Find(star.first);
+				if (s == nullptr || s->Catalog == nullptr)
 				{
 					// Not built yet: the nearest few are, to look (their plan comes from the root star).
 					if (realized++ >= 12) continue;
-					s = app.Galaxy->Realize(s->Name, app.Clock->Jd);
+					s = app.Galaxy->Realize(star.first, app.Clock->Jd);
 					if (s == nullptr || s->Catalog == nullptr) continue;
 				}
 				const auto& yards = Graveyards::Of(s->Catalog->Root());
@@ -274,6 +279,24 @@ namespace SpaceGod::Tour
 		}
 
 		bool AtVoidStop(UnitySpaceApp& app) { return app.FtlCruise != nullptr && app.FtlCruise->AtVoidStop(app.Clock->Jd); }
+
+		/// Keeps the void stop open while the tour is in it (US-T175): the stop is only a few real seconds long (the drive
+		/// spools out of it on its own), so the showing and the ambush stop after it would find it over. Each call tops what
+		/// is left of the spool back up to most of the stop's own first length. True while at a void stop.
+		bool HoldVoidStop(UnitySpaceApp& app)
+		{
+			if (!AtVoidStop(app)) return false;
+			static double heldStopJd = -1, span = 0;
+			auto c = app.FtlCruise;
+			double jd = app.Clock->Jd, left = c->EngageJd() - jd;
+			if (c->StopJd != heldStopJd || !(span > 0))
+			{
+				heldStopJd = c->StopJd;
+				span = left;
+			}
+			if (left < span * 0.8) c->DelayCharge(span - left);
+			return true;
+		}
 
 		/// The jump's Ready: the autopilot engaged a moment after the helm was taken (again every few seconds until it takes),
 		/// then <paramref name="done"/>.
@@ -524,14 +547,15 @@ namespace SpaceGod::Tour
 				"Seven light-years a jump: the drive drops out in the dark between the stars to cool and spool again, nothing for light-years round")
 				.At(20).In(cs::String()).KeepingSeat()
 				.WithSetup([](UnitySpaceApp& app) { return TakeJumpHelm(app); })
-				.Until(JumpUntil([](UnitySpaceApp& app) { return AtVoidStop(app); }), 180)
+				.Until(JumpUntil([](UnitySpaceApp& app) { return HoldVoidStop(app); }), 180)
+				.WithCamera([](UnitySpaceApp& app, double) { HoldVoidStop(app); })
 				.For(8));
 			TourRegistry::Add(TourStop::Make("Travel", "void-raider-ambush", "A Void Raider ambush",
 				"Stranded at the stop: an unidentified sensor ghost closes and strikes while the drive spools (Tab pings, Shift+F3 runs dark)")
 				.At(30).In(cs::String()).KeepingSeat()
 				.WithSetup([](UnitySpaceApp& app) -> cs::String
 				{
-					if (!AtVoidStop(app)) return "not at a void stop (play the jump first)";
+					if (!HoldVoidStop(app)) return "not at a void stop (play the jump first)";
 					auto c = app.FtlCruise;
 					// A ghost found the hull: it closes for a short while and strikes (the raiders' own step does the rest).
 					c->RaidStrikeJd = app.Clock->Jd + VoidRaiders::StalkDays * 0.3;
@@ -539,7 +563,8 @@ namespace SpaceGod::Tour
 					c->RaidStruck = false;
 					return cs::String();
 				})
-				.Until([](UnitySpaceApp& app, double t) { return t > 2 && (app.FtlCruise == nullptr || app.FtlCruise->RaidStruck || t > 20); }, 30)
+				.Until([](UnitySpaceApp& app, double t) { HoldVoidStop(app); return t > 2 && (app.FtlCruise == nullptr || app.FtlCruise->RaidStruck || t > 20); }, 30)
+				.WithCamera([](UnitySpaceApp& app, double) { HoldVoidStop(app); })
 				.For(8));
 			TourRegistry::Add(TourStop::Placeholder("Travel", "sky-modes", "Skybox, Milky Way and the edge",
 				"each system inside its biome skybox, the Milky Way between the stars, the drop-out at the system edge already inside it", "US-T145").At(80));
