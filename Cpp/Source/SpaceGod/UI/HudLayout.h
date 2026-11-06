@@ -54,6 +54,7 @@ namespace SpaceGod::UI
 			bottomRightY = screenH - Margin - DevHintStrip;
 			bottomColumnX = screenW;
 			bottomLeftX = safeLeft + Margin;
+			publishedColumnX = screenW;
 		}
 
 		/// US-T200: a w x h slot at the bottom left of the status band (the bottom drawer's handle), sitting on the bottom
@@ -91,6 +92,7 @@ namespace SpaceGod::UI
 				auto r = Rect(right - Margin - w, bottomRightY - h, w, h);
 				bottomRightY -= h + Gap;
 				bottomColumnX = std::min(bottomColumnX, r.x);
+				publishedColumnX = bottomColumnX;
 				return r;
 			}
 			}
@@ -110,10 +112,15 @@ namespace SpaceGod::UI
 			x1 = std::min(bottomColumnX, width - DevHintWidth) - Margin;
 		}
 
+		/// US-T217: the left edge of the right-hand column as the last Hud::Draw laid it (the screen's right edge when it held
+		/// nothing), for panels drawn after the Hud (the showcase tour's strip) that must stop short of it.
+		static float PublishedColumnLeft() { return publishedColumnX; }
+
 		/// CheatMenu's "Shift+F1  DEV MENU" hint: 196 px in from the right edge of the screen.
 		static constexpr float DevHintWidth = 196;
 
 	private:
+		static inline float publishedColumnX = 100000;
 		float left = 0, right = 0, width = 0, height = 0;
 		float topCentreY = 0, topRightY = 0, bottomRightY = 0, bottomColumnX = 0, bottomLeftX = 0;
 	};

@@ -830,7 +830,8 @@ namespace SpaceGod::UI
 			if (!placed) return;
 		}
 		if (LabelUnderPanel(r)) return; // US-T210
-		shipLabelRects.Add(r);
+		// US-T217: kept with a margin round it, so names in a tight cluster step a line apart instead of touching.
+		shipLabelRects.Add(Rect(r.x - 3, r.y - 3, r.width + 6, r.height + 6));
 		app->ShipNameRects.Add(std::make_tuple(r, ship));
 		DrawLabel(text_, at2, tint, minor);
 	}

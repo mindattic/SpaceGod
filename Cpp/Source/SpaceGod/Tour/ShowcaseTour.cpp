@@ -11,6 +11,7 @@
 #include "Systems/Galaxy.h"
 #include "UI/CheatMenu.h"
 #include "UI/Hud.h"
+#include "UI/HudLayout.h"
 #include "UnitySpaceApp.h"
 #include "UnitySpaceAppActor.h"
 
@@ -715,9 +716,18 @@ namespace SpaceGod::Tour
 		const auto& chapters = TourRegistry::Chapters();
 		int chapter = s.stops[s.index].first;
 
-		float w = std::min(static_cast<float>(Screen::width) - 32, 980.0f);
-		float h = 92;
-		float x = (Screen::width - w) * 0.5f;
+		// US-T217: the strip stops at the right-hand column's left edge (HudLayout's bottom band: the selection card's Focus
+		// and Deselect buttons stay clear), and is as tall as its wrapped caption.
+		float colLeft = Mathf::Min(UI::HudLayout::PublishedColumnLeft(), static_cast<float>(Screen::width));
+		float bandX0 = UI::HudLayout::Margin, bandX1 = colLeft - UI::HudLayout::Margin;
+		float w = std::max(320.0f, std::min(bandX1 - bandX0, 980.0f));
+		float x = std::max(bandX0, bandX0 + (bandX1 - bandX0 - w) * 0.5f);
+		cs::String caption = stop->Caption;
+		if (!s.skipped.empty()) caption = cs::Cat("Not shown here: ", s.skipped);
+		else if (!stop->Pending.empty()) caption = cs::Cat("Coming with ", stop->Pending, ": ", stop->Caption);
+		else if (!s.waiting.empty()) caption = cs::Cat(stop->Caption, "   (", s.waiting, "...)");
+		float capH = Mathf::Max(22.0f, st.caption->CalcHeight(GUIContent(caption), w - 32));
+		float h = 48 + capH + 6 + 16 + 8; // header, title, caption, gap, key hints, margin
 		float y = Screen::height - h - 40;
 		GUI::Box(Rect(x, y, w, h), GUIContent::none(), st.panel);
 		// How far through the stop it is, along the top edge.
@@ -731,14 +741,10 @@ namespace SpaceGod::Tour
 		if (s.autoShots) where = cs::Cat(where, "  ·  AUTO");
 		GUI::Label(Rect(x + 16, y + 9, w - 32, 16), where, st.chapter);
 		GUI::Label(Rect(x + 16, y + 25, w - 32, 22), stop->Title, st.title);
-		cs::String caption = stop->Caption;
-		if (!s.skipped.empty()) caption = cs::Cat("Not shown here: ", s.skipped);
-		else if (!stop->Pending.empty()) caption = cs::Cat("Coming with ", stop->Pending, ": ", stop->Caption);
-		else if (!s.waiting.empty()) caption = cs::Cat(stop->Caption, "   (", s.waiting, "...)");
-		GUI::Label(Rect(x + 16, y + 48, w - 32, 22), caption, st.caption);
-		GUI::Label(Rect(x + 16, y + h - 20, w - 32, 16),
-			cs::Cat("Right / N next   ·   Left / B previous   ·   S skip chapter   ·   Space ", s.paused ? "resume" : "pause",
-				"   ·   1-", std::min(9, static_cast<int>(chapters.size())), " chapter   ·   O other scale: ", s.otherScale ? "ON" : "OFF", "   ·   Esc end"),
+		GUI::Label(Rect(x + 16, y + 48, w - 32, capH), caption, st.caption);
+		GUI::Label(Rect(x + 16, y + h - 24, w - 32, 16),
+			UI::Hud::FitText(cs::Cat("Right / N next   ·   Left / B previous   ·   S skip chapter   ·   Space ", s.paused ? "resume" : "pause",
+				"   ·   1-", std::min(9, static_cast<int>(chapters.size())), " chapter   ·   O other scale: ", s.otherScale ? "ON" : "OFF", "   ·   Esc end"), st.keys, w - 32),
 			st.keys);
 
 		// A stop still to come (or one that cannot be shown here) is a card in the middle of the screen.
