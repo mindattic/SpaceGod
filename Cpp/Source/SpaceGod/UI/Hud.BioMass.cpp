@@ -38,6 +38,7 @@ namespace SpaceGod::UI
 
 	void Hud::DrawBioMassMarkers()
 	{
+		WorldLabels wl(worldLabelPass); // US-T214
 		auto world = app->World();
 		auto bio = world ? world->BioMass : nullptr;
 		if (bio == nullptr || bio->Globules.Count() == 0 || app->Catalog() == nullptr) return;

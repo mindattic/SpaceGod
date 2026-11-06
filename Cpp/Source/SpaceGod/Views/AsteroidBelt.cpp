@@ -171,6 +171,11 @@ namespace SpaceGod::Views
 			float depth;
 			if (!app->ToGui(scene, p, depth) || app->Occluded(scene)) continue;
 			Rect r(p.x + 5, p.y - 8, 120, 18);
+			// US-T214: like every world label, not drawn under a docked HUD panel (news, opportunities, selection card...).
+			bool under = false;
+			for (const auto& u : app->UiRects)
+				if (u.Overlaps(r)) { under = true; break; }
+			if (under) continue;
 			GUI::Label(Rect(r.x + 1, r.y + 1, r.width, r.height), Named()[i].Name, shadowStyle);
 			GUI::Label(r, Named()[i].Name, labelStyle);
 		}

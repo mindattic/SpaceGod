@@ -51,6 +51,7 @@ namespace SpaceGod::UI
 				Color c = p->Down(jd) ? Color(1.0f, 0.35f, 0.25f, 0.85f) : guarded ? Color(0.45f, 1.0f, 0.55f, 0.95f) : dim;
 				DrawBrackets(Rect(g.x - 9, g.y - 9, 18, 18), c, 1.0f);
 				double km = (works->PlatformHelio(here, i, jd) - player).Length();
+				WorldLabels wl(worldLabelPass); // US-T214
 				DrawLabel(cs::Cat(cs::Strings::ToUpperInvariant(p->Name), "  ", Km(km), p->Down(jd) ? "  DOWN (raided)" : cs::Cat("  tanks ", cs::Fmt(p->TankTonnes(), "N0"), " t"),
 					guarded ? "  GUARDING" : ""), g + Vector2(12, 4), c, true);
 			}

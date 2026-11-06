@@ -152,6 +152,7 @@ namespace SpaceGod::UI
 		GUI::matrix = matrix;
 		if (ringed) DrawRing(p, size * 0.5f + 5, LockColor);
 		if (text_.empty()) return;
+		WorldLabels wl(worldLabelPass); // US-T214
 		float w = minorLabel->CalcSize(GUIContent(text_)).x;
 		auto at = p - dir * (size * 0.5f + 8);
 		DrawLabel(text_, Vector2(dir.x > 0.3f ? at.x - w : dir.x < -0.3f ? at.x : at.x - w * 0.5f, dir.y > 0.3f ? at.y - 18 : dir.y < -0.3f ? at.y + 2 : at.y - 8),

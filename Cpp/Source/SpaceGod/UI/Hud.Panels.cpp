@@ -353,6 +353,7 @@ namespace SpaceGod::UI
 
 	void Hud::DrawOffscreenPointer(DVec3 scene, const cs::String& name)
 	{
+		WorldLabels wl(worldLabelPass); // US-T214
 		if (DrawSelectionArrow(scene, name)) return; // US-T128: at the controls, an edge arrow like the targets'
 		auto rel = app->Relative(scene);
 		auto local = Quaternion::Inverse(app->SpaceCamera->Rotation) * rel;

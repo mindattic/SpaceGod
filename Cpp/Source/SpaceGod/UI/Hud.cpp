@@ -484,6 +484,7 @@ namespace SpaceGod::UI
 		DrawLine(p + Vector2(0, -r), p + Vector2(r, 0), c, 1.5f);
 		DrawLine(p + Vector2(r, 0), p + Vector2(0, r), c, 1.5f);
 		DrawLine(p + Vector2(0, r), p + Vector2(-r, 0), c, 1.5f);
+		WorldLabels wl(worldLabelPass); // US-T214
 		DrawLabel(cs::Cat(cs::Strings::ToUpperInvariant(app->PlottedCourse->Target->Name), "  ", app->Distance(app->PlottedCourse->Target)), p + Vector2(r + 5, -8), c, false);
 		DrawLine(p + Vector2(-r, 0), p + Vector2(0, -r), c, 1.5f);
 	}
@@ -914,7 +915,7 @@ namespace SpaceGod::UI
 			{
 				if (noseOn && (pro - nose).sqrMagnitude() > 400) DrawLine(nose, pro, Color(ProgradeColor.r, ProgradeColor.g, ProgradeColor.b, 0.45f), 1.5f);
 				DrawIcon(Icons::Prograde(), pro, 28, ProgradeColor);
-				DrawLabel(SpeedText(speed), pro + Vector2(17, -8), ProgradeColor, true);
+				{ WorldLabels wl(worldLabelPass); DrawLabel(SpeedText(speed), pro + Vector2(17, -8), ProgradeColor, true); }
 			}
 			Vector2 retro;
 			if (DirectionToGui(-dir, retro)) DrawIcon(Icons::Retrograde(), retro, 28, RetrogradeColor);
@@ -934,6 +935,7 @@ namespace SpaceGod::UI
 			if (st.Reachable() && st.DistanceKm() > 1e-9 && DirectionToGui(st.OffsetKm / st.DistanceKm(), sp))
 			{
 				DrawRing(sp, 9, RetrogradeColor);
+				WorldLabels wl(worldLabelPass); // US-T214
 				DrawLabel(cs::Cat("STOP ", RangeText(st.DistanceKm())), sp + Vector2(12, 6), RetrogradeColor, true);
 			}
 		}
@@ -1024,6 +1026,7 @@ namespace SpaceGod::UI
 			float half = Mathf::Lerp(46.0f, 18.0f, static_cast<float>(me->LockProgress));
 			DrawBrackets(Rect(lp.x - half, lp.y - half, half * 2, half * 2), made ? LockColor : HostileColor, made ? 2.5f : 1.5f);
 			cs::String state = made ? cs::String("LOCKED") : cs::Cat("LOCKING ", Mathf::RoundToInt(static_cast<float>(me->LockProgress) * 100), "%");
+			WorldLabels wl(worldLabelPass); // US-T214
 			DrawLabel(cs::Cat(state, "  ", RangeText((locked->Pos - me->Pos).Length())), lp + Vector2(half + 6, -8), made ? LockColor : HostileColor, true);
 		}
 

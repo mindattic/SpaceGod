@@ -821,7 +821,12 @@ namespace SpaceGod
 			DVec3 scene = BodyScene(p->Body) + Scale()->LocalOffset((*Catalog())[p->Body], p->OffsetKm);
 			Vector2 g;
 			float depth;
-			if (ToGui(scene, g, depth)) GUI::Label(Rect(g.x - 4, g.y - 10, 220, 20), cs::Cat("+ P", p->Seat + 1, " ", p->Name));
+			if (!ToGui(scene, g, depth)) continue;
+			auto tagRect = Rect(g.x - 4, g.y - 10, 220, 20);
+			bool under = false; // US-T214: a world tag stays out from under the docked panels
+			for (const auto& u : UiRects)
+				if (u.Overlaps(tagRect)) { under = true; break; }
+			if (!under) GUI::Label(tagRect, cs::Cat("+ P", p->Seat + 1, " ", p->Name));
 		}
 		GUI::color = color;
 	}

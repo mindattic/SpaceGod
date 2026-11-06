@@ -1476,6 +1476,7 @@ namespace SpaceGod::UI
 
 	void Hud::DrawDeckGuide()
 	{
+		WorldLabels wl(worldLabelPass); // US-T214
 		if (Event::current().type != EventType::Repaint) return;
 		auto f = cs::As<FighterSeat>(app->Seat());
 		if (f == nullptr) return;

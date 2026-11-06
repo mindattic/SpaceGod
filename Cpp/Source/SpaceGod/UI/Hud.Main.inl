@@ -144,6 +144,13 @@ private:
 	/// through a panel.
 	bool worldLabelPass = false;
 	bool LabelUnderPanel(const Rect& r) const;
+	/// US-T214: scopes worldLabelPass on for a world-anchored label drawn outside DrawWorldOverlay (markers, arrows, sights).
+	struct WorldLabels
+	{
+		bool& f; bool old;
+		explicit WorldLabels(bool& flag) : f(flag), old(flag) { f = true; }
+		~WorldLabels() { f = old; }
+	};
 
 	/// C# (Ship ship, Texture2D icon, float size, Color tint, Vector2 p): one far-off ship's icon this repaint.
 	struct IconDraw
