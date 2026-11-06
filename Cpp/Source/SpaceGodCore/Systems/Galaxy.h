@@ -29,6 +29,7 @@ namespace SpaceGod::Core
 	class InterstellarWars;
 	class StarEntry;
 	class StarDiscoveredEvent;
+	class Territory;
 
 	/// <summary>
 	/// One star system as a self-contained world: its own bodies (body 0 is its root, the Sun or a
@@ -254,6 +255,13 @@ namespace SpaceGod::Core
 		/// hold, with one diplomacy table between them all.
 		/// </summary>
 		cs::Ref<SpaceGod::Core::Polities> Polities;
+
+		/// <summary>
+		/// Faction territory driven by the economy (US-T190, see <see cref="Territory"/>): reviewed daily, rich states paying
+		/// colonists out, indebted ones selling stations, and every change of hands logged for the map. Made on the first
+		/// <see cref="Update"/>; absent from older saves.
+		/// </summary>
+		cs::Ref<SpaceGod::Core::Territory> Territory;
 
 		/// <summary>
 		/// The system simulated at full detail (U.SPC-T104): the one the player is in. Every other system keeps

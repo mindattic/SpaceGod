@@ -90,6 +90,7 @@
 #include "Systems/StarSystemSpec.h"
 #include "Systems/Statecraft.h"
 #include "Systems/StrategicCommand.h"
+#include "Systems/Territory.h" // US-T190
 #include "Trajectories.h"
 #include "World.h"
 #include "Persistence/Registrations/Registrations.h"
@@ -234,7 +235,9 @@ namespace SpaceGod::Core
 		SG_P(Polities), SG_P(Traffic), SG_P(Wars), SG_F(CoarseStepDays), SG_F(Discoveries), SG_F(NearbyStars),
 		SG_F(Seed), SG_F(StarDiscovered), SG_F(SystemAdded), SG_F(SystemOpened), SG_F(SystemRemoved), SG_F(Systems),
 		SG_F(Viewpoint), SG_F(charted), SG_F(exploredAtLy), SG_F(lookedJd), SG_F(streamed), SG_F(undiscovered),
-		SG_F(undiscoveredNames), b.Loaded(&::SpaceGod::Core::Registrations::RewireGalaxy))
+		SG_F(undiscoveredNames),
+		SG_OPT(Territory), // US-T190: faction territory, absent from older saves (made on the first update)
+		b.Loaded(&::SpaceGod::Core::Registrations::RewireGalaxy))
 
 	SG_SERIALIZE(GateConstruction, "Unity.SpaceGod.Core.GateConstruction",
 		SG_P(Built), SG_P(Opened), SG_P(Repaired), SG_F(Completed), SG_F(galaxy), SG_F(nextDailyJd),

@@ -726,6 +726,8 @@ namespace SpaceGod::Core
 		clan->Treasury += value * 0.3;
 		Plundered.Invoke(clan, value, lastJd);
 		ship->HasCargo = false;
+		// US-T190: robbed cargo is lost to the market it was bound for, and counted against its owners.
+		if (ship->HasCargo) Economy()->LoseCargo(ship, ship->CargoTonnes, "robbed", clan);
 		ship->CargoDestination = nullptr;
 		ship->Cargo = cs::String();
 	}

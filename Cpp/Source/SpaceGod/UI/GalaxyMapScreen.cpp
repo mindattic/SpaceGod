@@ -23,6 +23,7 @@
 #include "Systems/JumpGate.h"
 #include "Systems/Polities.h"
 #include "Systems/Statecraft.h"
+#include "Systems/Territory.h" // US-T190
 #include "Systems/TravelCourse.h"
 
 #include <iterator>
@@ -355,6 +356,14 @@ namespace SpaceGod::UI
 			if (m->System == selected) Brackets(p, 17, Accent);
 			else if (m->System == hovered) Brackets(p, 15, Color(1, 1, 1, 0.6f));
 			if (showFronts && (m->Contested || m->Threats.Count() > 0)) Ring(p, 20 + 2 * Mathf::Sin(Time::unscaledTime * 4), FrontColor, 2.0f);
+			// Changed hands lately, as the news has it (US-T190): a slow ring in the new holder's colour, fading with the news.
+			if (showTerritory && m->ChangedWithin(jd, Territory::RecentDays))
+			{
+				float fresh = 1.0f - static_cast<float>((jd - m->HolderChangedJd) / Territory::RecentDays);
+				float pulse = 0.5f + 0.5f * Mathf::Sin(Time::unscaledTime * 2.5f);
+				auto ringColor = m->Holder != nullptr ? Tint(m->Holder->Color, 1) : UiStyle::Warning;
+				Ring(p, 25 + 5 * pulse, Color(ringColor.r, ringColor.g, ringColor.b, (0.35f + 0.5f * pulse) * (0.35f + 0.65f * fresh)), 2.0f);
+			}
 			if (showPirates && m->Pirates != PirateActivity::None)
 			{
 				float size = m->Pirates == PirateActivity::High ? 15 : 11;
@@ -472,6 +481,7 @@ namespace SpaceGod::UI
 		Swatch(y, x, w, CourseColor, "plotted FTL course, through open space", true);
 		Swatch(y, x, w, FrontColor, "war front (dashed) or shut gate (bar)", true);
 		Swatch(y, x, w, PirateColor, "raiders about", false);
+		Swatch(y, x, w, UiStyle::Warning, "changed hands lately (pulsing ring)", false);
 		y += 6;
 
 		Heading(y, x, w, "WARS KNOWN");
@@ -480,6 +490,20 @@ namespace SpaceGod::UI
 		{
 			if (y > r.yMax() - 110) break;
 			Line(y, x, w, cs::Cat(war.A->Name, "  vs  ", war.B->Name), FrontColor);
+		}
+		y += 6;
+
+		// Who has gained and lost ground lately, as the news has it (US-T190).
+		Heading(y, x, w, "TERRITORY LATELY");
+		if (model->Lately.Count() == 0) Line(y, x, w, "no system known to have changed hands", Dim);
+		for (int i = 0; i < model->Lately.Count() && i < 4; i++)
+		{
+			if (y > r.yMax() - 130) break;
+			const auto& c = model->Lately[i];
+			cs::String who = c->To != nullptr ? c->To->Name : cs::String("nobody");
+			cs::String from = c->From != nullptr ? c->From->Name : cs::String("unclaimed");
+			Line(y, x, w, cs::Cat(c->System->Name, ": ", from, " \xE2\x86\x92 ", who, UiStyle::Glyph::Separator, c->How, ", ", Days(model->Jd - c->Jd), " ago"),
+				c->To != nullptr ? Tint(c->To->Color, 1) : UiStyle::Warning);
 		}
 		y += 6;
 
@@ -493,7 +517,14 @@ namespace SpaceGod::UI
 			int held = 0;
 			for (const auto& n : model->Systems)
 				if (n->Holder == m->Holder) held++;
-			Line(y, x, w, cs::Cat("■  ", m->Holder->Name, "   ", held, (held == 1 ? " system" : " systems")), Tint(m->Holder->Color, 1));
+			// Its strength over the last month (US-T190): rising, falling or holding.
+			cs::String trend;
+			if (auto st = model->StandingOf(m->Holder))
+			{
+				double t = st->Trend();
+				trend = t > 0.05 ? cs::Cat("   \xE2\x96\xB2 ", cs::Fmt(t, "0.0")) : t < -0.05 ? cs::Cat("   \xE2\x96\xBC ", cs::Fmt(-t, "0.0")) : cs::String("   steady");
+			}
+			Line(y, x, w, cs::Cat("■  ", m->Holder->Name, "   ", held, (held == 1 ? " system" : " systems"), trend), Tint(m->Holder->Color, 1));
 		}
 
 		auto old = GUI::contentColor;
@@ -550,6 +581,11 @@ namespace SpaceGod::UI
 			for (const auto& h : m->Holdings)
 				Line(y, x, w, cs::Cat(h->Faction->Name, (h->Faction == m->Holder ? "  (holds it)" : ""), "   ", h->Ports, (h->Ports == 1 ? " port, " : " ports, "), People(h->Population)), Tint(h->Faction->Color, 1));
 			if (m->Contested) Line(y, x, w, cs::Cat("Contested: ", m->ContestedBy.A->Name, " and ", m->ContestedBy.B->Name, " are at war here"), FrontColor);
+			// The last change of hands the news has brought (US-T190).
+			if (!cs::Double::IsNaN(m->HolderChangedJd))
+				Line(y, x, w, cs::Cat("Changed hands ", Days(jd - m->HolderChangedJd), " ago: ", m->HowChanged, ", from ",
+					(m->PreviousHolder != nullptr ? cs::Cat("the ", m->PreviousHolder->Name) : cs::String("nobody"))),
+					m->ChangedWithin(jd, Territory::RecentDays) ? UiStyle::Warning : Dim);
 			for (const auto& t : m->Threats)
 			{
 				cs::String what = t.BesiegedBy != nullptr ? cs::Cat("under siege by the ", t.BesiegedBy->Name) : cs::Cat("blockaded by the ", t.BlockadedBy->Name);

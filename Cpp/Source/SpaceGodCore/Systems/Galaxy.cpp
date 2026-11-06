@@ -17,6 +17,7 @@
 #include "Systems/InterstellarWars.h"
 #include "Systems/StrategicCommand.h"
 #include "Systems/Statecraft.h"
+#include "Systems/Territory.h" // US-T190
 #include "Systems/VoidBaseBuilder.h"
 #include "Systems/VoidSites.h"
 #include "Combat/GatePickets.h"
@@ -239,6 +240,8 @@ namespace SpaceGod::Core
 		LookForStars(jd);
 		if (Construction) Construction->Update(jd);
 		if (Wars) Wars->Update(jd);
+		// Borders follow the money (US-T190): rich states settle new ground, indebted ones sell up, changes go out as news.
+		SpaceGod::Core::Territory::Of(*this)->Update(*this, jd);
 		// The polities' standing directives: research accrues, and groups given objectives elsewhere are sent (U.SPC-T423).
 		Polities->Command->Update(jd);
 		// The diplomacy game: opinions, pacts kept, allies called to arms, and the AI's proposals (U.SPC-T427).

@@ -473,6 +473,25 @@ namespace SpaceGod::Core
 			ship->CargoDestination->Inbound[static_cast<int>(ship->CargoGood)] = cs::Math::Max(0.0, ship->CargoDestination->Inbound[static_cast<int>(ship->CargoGood)] - ship->CargoTonnes);
 	}
 
+	double Economy::LoseCargo(const cs::Ref<Ship>& ship, double tonnes, const cs::String& cause, const cs::Ref<Faction>& by)
+	{
+		if (ship == nullptr || !ship->HasCargo || !(tonnes > 0)) return 0;
+		double lost = cs::Math::Min(tonnes, ship->CargoTonnes);
+		auto good = ship->CargoGood;
+		Release(ship);
+		ship->CargoTonnes -= lost;
+		if (ship->CargoTonnes <= 1e-6)
+		{
+			ship->HasCargo = false;
+			ship->CargoDestination = nullptr;
+			ship->Cargo = cs::String();
+		}
+		else if (ship->CargoDestination != nullptr)
+			ship->CargoDestination->Inbound[static_cast<int>(good)] += ship->CargoTonnes; // what is left is still on its way
+		if (CargoLost) CargoLost(ship, good, lost, cause, by);
+		return lost;
+	}
+
 	void Economy::RecountInbound(const cs::List<cs::Ref<Ship>>& ships)
 	{
 		for (const auto& s : Settlements) FillList(s->Inbound, 0);

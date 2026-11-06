@@ -8,6 +8,7 @@
 #include "Systems/GateNetwork.h"
 #include "Systems/InterstellarTraffic.h"
 #include "Systems/JumpGate.h"
+#include "Systems/Territory.h" // US-T190
 
 namespace SpaceGod::Core
 {
@@ -37,6 +38,13 @@ namespace SpaceGod::Core
 	{
 		for (const auto& l : Links)
 			if ((l->A == a && l->B == b) || (l->A == b && l->B == a)) return l;
+		return nullptr;
+	}
+
+	cs::Ref<FactionStanding> GalaxyMapModel::StandingOf(const cs::Ref<Faction>& f) const
+	{
+		for (const auto& s : Standings)
+			if (s->Faction == f) return s;
 		return nullptr;
 	}
 
@@ -135,6 +143,29 @@ namespace SpaceGod::Core
 			l->A = w->A; l->B = w->B; l->UnderConstruction = true; l->Progress = cs::Math::Max(0.0, cs::Math::Min(1.0, w->Progress)); l->Builder = w->Builder;
 			l->KnownAsOfJd = cs::Math::Max(a->Known() ? a->Report->AsOfJd : cs::Double::NegativeInfinity, b->Known() ? b->Report->AsOfJd : cs::Double::NegativeInfinity);
 			model->Links.Add(l);
+		}
+
+		// Territory (US-T190): who held each system before, as far as its news goes, and the changes heard of lately.
+		if (auto territory = galaxy->Territory)
+		{
+			model->Standings.AddRange(territory->Standings);
+			for (const auto& m : model->Systems)
+			{
+				if (m->Report == nullptr) continue;
+				auto c = territory->LastChange(m->System, m->Here ? jd : m->Report->AsOfJd);
+				if (c == nullptr) continue;
+				m->PreviousHolder = c->From;
+				m->HolderChangedJd = c->Jd;
+				m->HowChanged = c->How;
+			}
+			for (int i = territory->Changes.Count() - 1; i >= 0; i--)
+			{
+				const auto& c = territory->Changes[i];
+				if (jd - c->Jd > Territory::RecentDays) break;
+				auto m = model->Of(c->System);
+				if (m == nullptr || m->Report == nullptr || c->Jd > (m->Here ? jd : m->Report->AsOfJd)) continue;
+				model->Lately.Add(c);
+			}
 		}
 
 		for (const auto& l : model->Links) model->BusiestCrossings = cs::Math::Max(model->BusiestCrossings, l->Crossings);

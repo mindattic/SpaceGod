@@ -7,7 +7,9 @@
 namespace SpaceGod::Core
 {
 	class Faction;
+	class FactionStanding;
 	class Galaxy;
+	class TerritoryChange;
 	class GateCrossing;
 	class GateLink;
 	class JumpGate;
@@ -80,6 +82,17 @@ namespace SpaceGod::Core
 
 		/// <summary>Who is fighting over it, when <see cref="Contested"/>.</summary>
 		FactionPair ContestedBy;
+
+		/// <summary>
+		/// The last time it changed hands as far as the news goes (US-T190, <see cref="Territory.Changes"/>): who held it before,
+		/// when and how. Only a change at or before its report's date is known; NaN, null and empty when none is.
+		/// </summary>
+		cs::Ref<Faction> PreviousHolder;
+		double HolderChangedJd = cs::Double::NaN;
+		cs::String HowChanged;
+
+		/// <summary>Whether it is known to have changed hands within <paramref name="days"/> of <paramref name="jd"/>.</summary>
+		bool ChangedWithin(double jd, double days) const { return !cs::Double::IsNaN(HolderChangedJd) && jd - HolderChangedJd <= days; }
 
 		cs::String ToString() const;
 	};
@@ -169,6 +182,15 @@ namespace SpaceGod::Core
 
 		/// <summary>The most crossings any link on the map has in the window (what <see cref="MapLink.Flow"/> is a share of).</summary>
 		int BusiestCrossings = 0;
+
+		/// <summary>The systems known to have changed hands in the last <see cref="Territory.RecentDays"/>, newest first (US-T190).</summary>
+		cs::List<cs::Ref<TerritoryChange>> Lately;
+
+		/// <summary>Every polity's strength and its trend at the last daily review (US-T190); empty before the first.</summary>
+		cs::List<cs::Ref<FactionStanding>> Standings;
+
+		/// <summary>The standing of <paramref name="f"/>, or null.</summary>
+		cs::Ref<FactionStanding> StandingOf(const cs::Ref<Faction>& f) const;
 
 		cs::Ref<MapSystem> Of(const cs::Ref<StarSystem>& s) const;
 

@@ -233,6 +233,18 @@ namespace SpaceGod::Core
 		/// <summary>Cancels a ship's booking of its cargo at its destination (it arrived, died or changed plans).</summary>
 		void Release(const cs::Ref<Ship>& ship);
 
+		/// <summary>
+		/// Cargo lost on the way (US-T190): up to <paramref name="tonnes"/> of what <paramref name="ship"/> carries is gone
+		/// (robbed by <paramref name="by"/>, jettisoned, spoiled: <paramref name="cause"/> says which), so it never reaches the
+		/// market it was bound for. The market's book of deliveries on the way forgets it; what is left aboard stays booked,
+		/// and a hold emptied is cleared. Raises <see cref="CargoLost"/>. Returns the tonnes lost.
+		/// </summary>
+		double LoseCargo(const cs::Ref<Ship>& ship, double tonnes, const cs::String& cause, const cs::Ref<Faction>& by);
+
+		/// <summary>Raised when cargo is lost on the way (ship, good, tonnes, cause, by whom or null), see <see cref="LoseCargo"/>.
+		/// Not saved: its subscribers (the galaxy's <see cref="Territory"/>) wire it again after a load.</summary>
+		cs::Delegate<cs::Ref<Ship>, Good, double, cs::String, cs::Ref<Faction>> CargoLost;
+
 		/// <summary>Rebuilds every market's book of deliveries on the way from what ships are actually carrying.</summary>
 		void RecountInbound(const cs::List<cs::Ref<Ship>>& ships);
 
