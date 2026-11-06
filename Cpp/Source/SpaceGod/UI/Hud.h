@@ -10,6 +10,7 @@
 //   Hud.Boards  - Hud.cs lines 2383-3745 (bounties, contracts, fleet, market, outfitting, spawn, cargo, news, picker)
 //                                                                               -> Hud.Boards.cpp
 //   Hud.Trade   - Hud.Trade.cs (the trade desk)                                 -> Hud.Trade.cpp
+//   Hud.Drawer  - US-T200's bottom drawer (navigation, ships in the area)       -> Hud.Drawer.cpp
 // Members a fragment uses but another declares are found at compile time (a class body is one scope).
 
 #include "Cs/Cs.h"
@@ -23,6 +24,7 @@
 #include "UI/Hud.Boards.deps.h"
 #include "UI/Hud.Trade.deps.h"
 #include "UI/Hud.Coop.deps.h" // US-T44
+#include "UI/Hud.Drawer.deps.h" // US-T200
 
 namespace SpaceGod
 {
@@ -50,5 +52,6 @@ namespace SpaceGod::UI
 #include "UI/Hud.Boards.inl"
 #include "UI/Hud.Trade.inl"
 #include "UI/Hud.Coop.inl" // US-T44: co-op (the C# track's Hud.Coop.cs)
+#include "UI/Hud.Drawer.inl" // US-T200: the bottom drawer (navigation, ships in the area)
 	};
 }

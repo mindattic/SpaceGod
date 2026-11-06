@@ -467,6 +467,7 @@ namespace SpaceGod
 		// craft and the camera get an idle frame (the simulation runs on).
 		if (UpdateCheatMenu()) Input.Handover();
 		if (UpdateComms()) Input.Handover(); // US-T137: the comms panel (Shift+H) has the keys while open; US-T138: the held pilot
+		if (hud != nullptr && hud->UpdateDrawer(!cheatMenu->IsOpen && !commsOpen)) Input.Handover(); // US-T200: the bottom drawer (Shift+U) has the keys while open
 		UpdateInfluence(); // US-T140: the embody gate's world, this frame
 		if (Tour::ShowcaseTour::Update(*this, !cheatMenu->IsOpen)) Input.Handover(); // US-T147: the showcase tour has the keys while it runs
 		ArbitrateInput(true); // US-T90: one owner per input this frame (the craft held, else the command view)
@@ -534,6 +535,7 @@ namespace SpaceGod
 		ToastAge += dt;
 		bool lockCursor = (Input.LookHeld || (AtControls() && !ClickPanelOpen())) && !ModelViewer::CapturesInput() && !cheatMenu->IsOpen; // US-T126
 		if (commsOpen) lockCursor = false; // US-T137: the comms panel takes clicks
+		if (hud != nullptr && hud->DrawerOpen()) lockCursor = false; // US-T200: so does the bottom drawer
 		Cursor::lockState = lockCursor ? CursorLockMode::Locked : CursorLockMode::None;
 		Cursor::visible = !lockCursor;
 	}

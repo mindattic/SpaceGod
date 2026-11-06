@@ -12,7 +12,8 @@
 //   - The right-hand column's two stacks share one height: a panel that can scroll (the selection card) asks how much
 //     is free between them (FreeRight) and sizes itself to fit, instead of running into the other stack.
 //   - The bottom line only uses the band between the left edge and the right-hand column (BottomBand) and shortens its
-//     text to fit, so it never runs off the screen or under the column.
+//     text to fit, so it never runs off the screen or under the column. A bottom-left slot (TakeBottomLeft: the bottom
+//     drawer's handle, US-T200) is taken from that band's left end first, so the line starts past it.
 //   - Begin() resets the regions at the top of every Hud::Draw call (every IMGUI event), and every panel takes its space
 //     whatever the event, so a Layout pass and the Repaint after it place every panel (and its buttons) alike.
 // Screen space, in GUI pixels: the same at the gameplay and the realistic scale.
@@ -52,7 +53,20 @@ namespace SpaceGod::UI
 			topRightY = TopBarBottom + Margin;
 			bottomRightY = screenH - Margin - DevHintStrip;
 			bottomColumnX = screenW;
+			bottomLeftX = safeLeft + Margin;
 		}
+
+		/// US-T200: a w x h slot at the bottom left of the status band (the bottom drawer's handle), sitting on the bottom
+		/// margin like the status line; the band BottomBand hands the status line starts past it.
+		Rect TakeBottomLeft(float w, float h)
+		{
+			auto r = Rect(bottomLeftX, height - Margin - h, w, h);
+			bottomLeftX += w + Gap;
+			return r;
+		}
+
+		/// US-T200: the left edge of whatever BottomRight holds (the screen's right edge while it holds nothing).
+		float BottomColumnLeft() const { return bottomColumnX; }
 
 		/// A w x h panel docked in a region: under (top regions) or over (bottom regions) what the region holds already.
 		/// Centred in TopCentre, against the right edge in the right-hand regions.
@@ -92,7 +106,7 @@ namespace SpaceGod::UI
 		/// (TopRight never reaches the bottom), and never over the dev menu's hint in the bottom right corner.
 		void BottomBand(float& x0, float& x1) const
 		{
-			x0 = left + Margin;
+			x0 = bottomLeftX; // left + Margin, past any bottom-left slot (US-T200)
 			x1 = std::min(bottomColumnX, width - DevHintWidth) - Margin;
 		}
 
@@ -101,6 +115,6 @@ namespace SpaceGod::UI
 
 	private:
 		float left = 0, right = 0, width = 0, height = 0;
-		float topCentreY = 0, topRightY = 0, bottomRightY = 0, bottomColumnX = 0;
+		float topCentreY = 0, topRightY = 0, bottomRightY = 0, bottomColumnX = 0, bottomLeftX = 0;
 	};
 }

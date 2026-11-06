@@ -177,6 +177,7 @@ namespace SpaceGod::UI
 		if (app->ShowMarket) DrawMarket();
 		DrawHunters();
 		DrawSelection();
+		DrawDrawerHandle(); // US-T200: the status band's bottom-left slot, before the status line takes the rest
 		DrawStatus();
 		DrawSalvage();
 		DrawBoarding();
@@ -194,6 +195,7 @@ namespace SpaceGod::UI
 		if (app->ShowFleet) DrawFleet();
 		if (app->ShowTrade) DrawTradeDesk();
 		if (app->ShowPicker) DrawPicker();
+		DrawDrawer(); // US-T200: pulled up over the docked panels
 		if (app->ShowSaves) DrawSaves();
 		DrawToast();
 	}

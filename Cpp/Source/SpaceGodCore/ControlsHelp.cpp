@@ -166,6 +166,7 @@ namespace SpaceGod::Core
 				L("Esc", "pause menu (straight away at the helm): Resume, Help, Save / Load, Settings > Display (resolution, window mode, VSync), Main Menu, Quit"),
 				L("[", "galaxy map: every system, who holds it, gate traffic, war fronts, blockades and raiders, as far as the news goes; click a star to inspect, double-click to travel"),
 				L("U", "HUD panels and readouts on / off (the names and markers on the view stay)"),
+				L("Shift+U", "the bottom drawer (or its handle, bottom left), pulled up over the view: Navigation lists the star systems (travel, or plot the course at a helm) and this system's worlds, rings and stations (cruise there at a helm, else fly the view there); Ships in area lists the hulls about with range, faction, class and role, a click hailing one in range. Tab the tabs, Up / Down and Enter the rows, PgUp / PgDn the height, Esc closes"), // US-T200
 				L("F11", "clear the screen: every bit of UI gone but the reticle in use; F11 again (or opening a panel) brings it all back"),
 				L("F5", "quicksave"),
 				L("F8", "quickload"),
