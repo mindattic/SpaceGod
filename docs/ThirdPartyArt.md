@@ -196,7 +196,7 @@ packs' metals were authored under Unity's skybox reflections, and a full metal i
   world between the camera and the star eclipses it, with a penumbra;
 - the companion star, or US-T132's fill from the sky's bright heart, as an unshadowed far point light (1000 km out, no
   inverse-square falloff, re-placed round the camera each frame): the forward renderer shades only **one** directional
-  light, and a second competes with it (Unreal's on-screen \Multiple directional lights are competing\ warning) and is
+  light, and a second competes with it (Unreal's on-screen `Multiple directional lights are competing` warning) and is
   dropped, so the star is the only one;
 - a **sky light** captured from the sky alone (`SkyDistanceThreshold` 1e13 uu: the sky and stars drawn at 1e15, never a
   world or a star's face), recaptured on a new place and every 8 s, so the shadow side takes the nebula's colour;
