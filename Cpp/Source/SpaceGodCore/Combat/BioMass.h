@@ -24,6 +24,29 @@ namespace SpaceGod::Core
 		Ship,
 	};
 
+	/// <summary>What shape of the Bio Mass a <see cref="BioGlobule"/> is (US-T192). Saved.</summary>
+	enum class BioForm : int
+	{
+		/// <summary>A drifting globule (US-T125): creeps for the gates and the worlds, feeds, buds.</summary>
+		Globule,
+		/// <summary>A small, fast bloom: erupts in a cluster beside a hull or station, darts in and latches on, bites,
+		/// and withers in a day or two unless it takes root on a station or asteroid (then it grows into a tumor).</summary>
+		Bloom,
+		/// <summary>A large, slow tumor: roots on a station, asteroid or hull, grows on what it drains, broods blooms, and
+		/// sheds a seed that creeps to the next station or asteroid once it is big enough.</summary>
+		Tumor,
+	};
+
+	/// <summary>What a bloom or tumor has latched onto (US-T192). Saved.</summary>
+	enum class BioHost : int
+	{
+		None,
+		/// <summary>A hull: <see cref="BioGlobule.HostId"/> is its Ship.Id; the growth rides it.</summary>
+		Ship,
+		/// <summary>A station or asteroid body (or a world): <see cref="BioGlobule.HostId"/> is its catalog index.</summary>
+		Body,
+	};
+
 	/// <summary>
 	/// One globule of the Bio Mass (US-T125): a pulsing, viscous lump of flesh, bone, tissue, mouths and hair, adrift in
 	/// space. Placed as a wreck is: an <see cref="Anchor"/> in its body's frame (true km, shown through the scale model's
@@ -63,6 +86,21 @@ namespace SpaceGod::Core
 		/// <summary>Wrecks and stations it has eaten.</summary>
 		int Consumed = 0;
 
+		// US-T192: blooms and tumors (absent from older saves: a globule, free).
+		BioForm Form = BioForm::Globule;
+		BioHost Host = BioHost::None;
+		/// <summary>The host's Ship.Id or body index (<see cref="Host"/>).</summary>
+		int HostId = -1;
+		/// <summary>When it latched on (NaN free).</summary>
+		double AttachedJd = cs::Double::NaN;
+		/// <summary>The earliest date it erupts its next cluster of blooms (a globule near a hull, a tumor).</summary>
+		double NextBroodJd = 0;
+		/// <summary>A bloom withers at this date unless it has taken root (NaN never).</summary>
+		double WithersJd = cs::Double::NaN;
+
+		bool Attached() const { return Host != BioHost::None; }
+		const char* FormName() const { return Form == BioForm::Bloom ? "bloom" : Form == BioForm::Tumor ? "tumor" : "globule"; }
+
 		// Not saved: what hit it in its last update, for the views' tracers and the HUD.
 		BioShooter LastShooter = BioShooter::None;
 		/// <summary>Which one: the body's index (orbital guns), the gate's in World.Gates, or the hull's Id.</summary>
@@ -93,6 +131,15 @@ namespace SpaceGod::Core
 	/// <see cref="BiteHullFloor"/>), and one that reaches a station eats into its population. It is bounded: at most
 	/// <see cref="MaxGlobules"/> per system, at most <see cref="MaxMass"/> each (a big one splits instead), and it seeds
 	/// from its own random stream so a run stays deterministic.
+	///
+	/// US-T192: it attacks in two more shapes (<see cref="BioForm"/>). Blooms are small and fast: a cluster erupts out of a
+	/// globule or a tumor when a hull or station is near, darts in, latches on and bites (hull, a station's platforms and
+	/// people), and withers in a day or two, unless one latched on a station or asteroid with no tumor takes root there and
+	/// grows into one. Tumors are large and slow: one seeds onto a station or asteroid now and then (or roots from a bloom,
+	/// or latches onto a hull that brushes past a free seed), drains what it is on (hull, people) and grows on it, broods
+	/// blooms, and, once big, sheds a seed that creeps off to root on the next station or asteroid. Both are shot as a
+	/// globule is (the guns that would hit their host hold most of their fire, <see cref="HostCover"/>), both are bounded
+	/// (<see cref="MaxBlooms"/>, <see cref="MaxTumors"/>), and both draw on the same random stream.
 	/// </summary>
 	class SPACEGODCORE_API BioMass final
 	{
@@ -147,10 +194,70 @@ namespace SpaceGod::Core
 		static constexpr double StepS = 600;
 		static constexpr int MaxSteps = 48;
 
+		// ---------------------------------------------------------------- blooms and tumors (US-T192)
+
+		/// <summary>Blooms (small, fast): at most this many per system, a cluster of 3 to <see cref="BloomCluster"/> at a time.</summary>
+		static constexpr int MaxBlooms = 18;
+		static constexpr int BloomCluster = 5;
+		static constexpr double BloomMass = 9e3;
+		/// <summary>How fast a bloom darts (km/s), how far it sees a hull or station to go for (km), and when it is on.</summary>
+		static constexpr double BloomKmS = 140;
+		static constexpr double BloomSeekKm = 6000;
+		static constexpr double LatchKm = 1.0;
+		/// <summary>A free or latched bloom withers after this (days) unless it roots.</summary>
+		static constexpr double BloomLifeDays = 1.5;
+		/// <summary>A bloom latched on a station or asteroid with no tumor there roots into one after this (days).</summary>
+		static constexpr double BloomRootDays = 0.5;
+		/// <summary>A latched bloom's bite (hull points a second), never below <see cref="BloomHullFloor"/> of the hull.</summary>
+		static constexpr double BloomBiteDps = 14;
+		static constexpr double BloomHullFloor = 0.1;
+		/// <summary>Population a latched bloom eats a day (share), and the platforms' hull it gnaws (points a second).</summary>
+		static constexpr double BloomEatPerDay = 0.004;
+
+		/// <summary>Tumors (large, slow): at most this many per system, seeding in about this often (days) while there is room.</summary>
+		static constexpr int MaxTumors = 4;
+		static constexpr double TumorSeepDays = 110;
+		static constexpr double TumorSeedMass = 2.5e5;
+		static constexpr double TumorMaxMass = 4e6;
+		/// <summary>A tumor this big sheds a seed (<see cref="TumorSeedMass"/>) that creeps to the next station or asteroid.</summary>
+		static constexpr double TumorShedMass = 1.2e6;
+		/// <summary>Growth a day while rooted (share of its mass; twice on an asteroid's rock), and how fast a free one creeps.</summary>
+		static constexpr double TumorGrowthPerDay = 0.03;
+		static constexpr double TumorKmS = 6;
+		/// <summary>Tumors are tougher than globules (hit points per tonne, a multiple) and heal faster.</summary>
+		static constexpr double TumorToughness = 1.5;
+		static constexpr double TumorRegenPerS = 30;
+		/// <summary>A rooted tumor's drain: hull points a second (never below <see cref="TumorHullFloor"/>), tonnes gained a point.</summary>
+		static constexpr double TumorDrainDps = 40;
+		static constexpr double TumorHullFloor = 0.05;
+		static constexpr double TumorMassPerHull = 40;
+		/// <summary>A station's population a rooted tumor eats a day (share), never below <see cref="StationFloor"/>.</summary>
+		static constexpr double TumorEatPerDay = 0.03;
+		/// <summary>How often a tumor (or a globule beside a hull) erupts a cluster of blooms (days, on average).</summary>
+		static constexpr double TumorBroodDays = 0.4;
+		static constexpr double GlobuleBroodDays = 0.25;
+		/// <summary>Guns that would hit the host to hit a growth on it hold most of their fire: their share (orbital, gate, platform).</summary>
+		static constexpr double HostCover = 0.3;
+
 		BioMass() = default;
 		BioMass(const cs::Ref<World>& world, int seed, double jd);
 
 		void Update(double jd);
+
+		/// <summary>Live ones of a form here.</summary>
+		int CountOf(BioForm form) const;
+
+		/// <summary>A tumor rooted on <paramref name="host"/> (or a free seed when host is None): the sg.BioMass command and the seeding.</summary>
+		cs::Ref<BioGlobule> SpawnTumor(BioHost host, int hostId, int body, DVec3 anchorKm, double mass, double jd);
+
+		/// <summary>A cluster of blooms erupting at <paramref name="helioKm"/> (as many as there is room for): how many came.</summary>
+		int EruptBlooms(DVec3 helioKm, int count, double jd);
+
+		/// <summary>The growths latched onto a hull (Ship.Id): blooms and tumors.</summary>
+		int OnShip(int shipId, BioForm form) const;
+
+		/// <summary>The station or asteroid bodies a tumor can root on (catalog indices).</summary>
+		cs::List<int> RootBodies() const;
 
 		/// <summary>Where a globule is (heliocentric km).</summary>
 		DVec3 Helio(const cs::Ref<BioGlobule>& g, double jd) const;
@@ -176,9 +283,28 @@ namespace SpaceGod::Core
 		cs::Random rng;
 		int nextId = 1;
 		double lastJd = cs::Double::NaN, nextSeepJd = 0;
+		/// <summary>US-T192: the next tumor's seeding (NaN not yet drawn: absent from older saves).</summary>
+		double nextTumorJd = cs::Double::NaN;
+
+		/// <summary>The hulls in open space this update and where they are (a growth's hosts and prey), not saved.</summary>
+		struct Hull { cs::Ref<Ship> ship; DVec3 helio; };
+		/// <summary>The station and asteroid bodies (catalog indices), worked out once an update; not saved.</summary>
+		cs::List<int> roots = cs::List<int>();
 
 		void Seep(double jd);
-		void Step(double jd, double dt, const cs::List<DVec3>& bodies, const cs::List<DVec3>& shipHelio, const cs::List<cs::Ref<Ship>>& armed);
+		void SeepTumor(double jd);
+		void Grow(const cs::Ref<BioGlobule>& g, double jd, double dt, const cs::List<DVec3>& bodies, const cs::List<Hull>& hulls);
+		void Brood(const cs::Ref<BioGlobule>& g, double jd, DVec3 here, const cs::List<Hull>& hulls);
+		void FeedTumor(const cs::Ref<BioGlobule>& g, double jd, double days, DVec3 here, const cs::List<DVec3>& bodies);
+		cs::String HostName(const cs::Ref<BioGlobule>& g) const;
+		void Latch(const cs::Ref<BioGlobule>& g, BioHost host, int hostId, DVec3 hostHelio, double hostRadiusKm, double jd);
+		void Detach(const cs::Ref<BioGlobule>& g, const cs::List<DVec3>& bodies, double jd);
+		void Drain(const cs::Ref<BioGlobule>& g, double jd, double dt, const cs::Ref<Ship>& ship);
+		void DrainBody(const cs::Ref<BioGlobule>& g, double jd, double dt);
+		int NearestRootBody(DVec3 helioKm, const cs::List<DVec3>& bodies, int except) const;
+		bool TumorOn(int body) const;
+		double HostCoverFor(const cs::Ref<BioGlobule>& g) const { return g->Attached() ? HostCover : 1.0; }
+		void Step(double jd, double dt, const cs::List<DVec3>& bodies, const cs::List<DVec3>& shipHelio, const cs::List<cs::Ref<Ship>>& armed, const cs::List<Hull>& hulls);
 		void Creep(const cs::Ref<BioGlobule>& g, double jd, double dt, const cs::List<DVec3>& bodies);
 		void Feed(double jd, double dt, const cs::List<DVec3>& bodies);
 		void TryCross(const cs::Ref<BioGlobule>& g, double jd);
