@@ -38,3 +38,4 @@ Vendor/**/obj/
 Data/Prose/*.json
 !Data/Prose/universe.schema.json
 Data/Lore/.outbox/
+Data/Prose/*.import-batches/

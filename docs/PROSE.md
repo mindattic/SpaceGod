@@ -86,18 +86,31 @@ invent a stub entity); the exporter drops any it cannot resolve and says how man
 tools/prose-sync.ps1 -Export        # export (seed 1977, 30 days), push, export back, diff, leak check
 tools/prose-sync.ps1                # push the file already exported
 tools/prose-sync.ps1 -Idempotency   # ...and import twice, requiring the second to change nothing
+tools/prose-sync.ps1 -Export -AllowStale   # after Core changed: entities only an older export held are listed, not failed
 ```
+
+Ids are stable for a given seed and build. When Core changes the simulation, the generated pilots and ships can change
+too (US-T146's harvesters renamed 28 pilots by moving the run's history), and Prose keeps the old ones because it never
+deletes on import (proposed change 1 below). `-AllowStale` reports those instead of failing; the leak check still fails
+on anything that is neither in the file nor in Prose's own export of `spacegod`.
 
 `tools/prose-sync.ps1` talks to the Prose Hub at `http://127.0.0.1:5900` only, with the `X-Prose-Key` header (the key
 the Hub keeps in `%LOCALAPPDATA%\MindAttic\Prose\Settings.json`):
 
-1. `POST /api/universes/spacegod/import` with the file (idempotent upsert by id; the universe is created on first push).
+1. `POST /api/universes/spacegod/import` (idempotent upsert by id; the universe is created on first push), in batches of
+   `-BatchSize` (400) entities: first every entity without its relations, then every entity whole, so no relation ever
+   points at an entity Prose has not got yet (no stubs). One request for the whole file runs for half an hour (Prose saves
+   each entity and each edge on its own) and the first push lost its Hub part way through; a batch that fails is retried
+   once on a restarted Hub, and every batch is itself a valid, idempotent interchange import.
 2. Exports it back with Prose's own exporter: the `export_universe_file` MCP tool, run by the Hub (`/api/mcp-invoke`),
    which is what `prose --universe-export spacegod <path>` runs, to `Data/Prose/spacegod.prose-export.json`.
 3. `tools/prose_universe.py diff`: every entity, relation, tag and detail must match, and the counts by type and by
    edge kind must be equal.
 4. `tools/prose_universe.py leak` against `GET /api/universes/spacegod/snapshot?scope=all`: Prose's graph view (the service
-   the EVE post-mortem caught serving other universes' rows) must hold no node that is not one of the file's entities.
+   the EVE post-mortem caught serving other universes' rows) must hold no node that is not one of the file's entities,
+   and its edges must be exactly the file's relations. This is the only check that sees Prose's edge rows: the exporter in
+   step 2 writes each entity's relations back from the JSON it stored, not from the edges, so an import cut short still
+   exports as complete. The graph keys its nodes by name slug (not by our ids), so the check compares in those terms.
 
 If the Hub is down (it stops itself after a few idle minutes) the script starts Prose's deployed
 `C:\Apps\MindAttic\Prose\Hub.exe`, as Prose's own `.prose/hooks/start-prose-hub.ps1` does.
@@ -158,5 +171,14 @@ Recorded on US-T171; none of these was changed in Prose.
    `position` with a declared frame and unit, so Prose (and other consumers) can place things without knowing SpaceGod.
 5. **Import cost.** Every entity and every edge is its own query and `SaveChanges`, so a universe of ~10k entities and
    ~25k edges takes minutes. Proposed: batch the upsert per type and the edges per source.
-6. **Edge provenance.** Edges carry `Source = "interchange"` for every consumer; with several game universes, a per-file
+6. **The export does not read the edges.** `ExportAsync` writes each entity's relations from its stored `Record.Json`, so
+   an import that died during its edge pass (the first push here did) exports identical to the file: RFC 0007's
+   import/export/diff check cannot see lost edges. Proposed: export relations from the `Edges` rows, or report both.
+7. **The graph merges same-named entities.** `UniverseGraphService` ids are `Slugify(Name)`, so the ~4,800 entities here
+   are ~3,550 graph nodes (two pilots called the same, a hundred "Earth Orbital Cab"s); the snapshot's `edgeCount` and
+   neighbours mix them. Proposed: key graph nodes by `Entity.Slug`.
+8. **Outbox noise.** Every import request enqueues an `interchange-import` notice for the consumer, so one batched push
+   leaves ~27 near-identical events. Proposed: coalesce notices per consumer within a minute, or let the import request
+   opt out (`?notify=false`) and the client post one summary.
+9. **Edge provenance.** Edges carry `Source = "interchange"` for every consumer; with several game universes, a per-file
    source would let a replace-import touch only its own edges.
