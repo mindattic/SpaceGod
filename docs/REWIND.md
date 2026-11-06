@@ -235,6 +235,67 @@ session, defaulting to whole session. The numbers show no need to cap it.
 3. **The intervention log must record each frame's dt**, or the game must step a fixed dt, or replays will not be
    bit-exact.
 
+## Parked: checkpoint loops with ghost replays (US-T169)
+
+This is a design note only and nothing is built. It is parked until the US-T99 rewind lands, but the rewind build
+must not rule it out.
+
+**The idea.** The player marks a checkpoint, and from then on a short window (about 10 game-s) is recorded. At the end
+of the window the world rewinds to the checkpoint and the player plays the same window again, this time embodying a
+different unit. Every earlier pass plays back as a **ghost**: the unit it embodied repeats that pass's recorded
+inputs. After N passes, N units in one battle are flown by the player's own past selves. The player can spend hours
+choreographing ten seconds, then let it run on as one take.
+
+**How it maps onto the rewind design.**
+
+- *The checkpoint is a keyframe.* "Mark" forces a keyframe into the dense short-rewind ring and pins it so thinning
+  cannot drop it while the loop is open. Each pass starts with a restore (0.18-0.46 s, measured above) and needs no
+  replay, so starting a new pass costs about the same as a short rewind.
+- *A ghost is a seat held by a recording.* Co-op already flies a hull from someone else's hands:
+  `Coop::PilotFrame` (Cpp/Source/SpaceGod/Coop/CoopInput.h) is one frame of a helm holder's input, carried per tick
+  in the lockstep stream and applied in place of the local poll, and `SeatAuthority` decides who holds which seat. A
+  ghost is the same thing with the frames coming from a recorded track instead of a network peer, so playback reuses
+  the co-op path rather than adding a second input route.
+- *The recording is the intervention log, keyed per unit.* The log US-T99 needs (every input frame, order and clock
+  change, stamped with its tick and its frame dt) has to record **which embodiable each input frame drove**
+  (`EmbodiableKey`) and not only "the player's input". Then one pass's track is the log filtered to that unit inside
+  the window, and a ghost set is several such tracks replayed together. Commands inside `EmbodimentInput` (power
+  split, self-destruct, helm ability, sensor) are already commands that land the same when carried twice, so they
+  replay safely.
+- *Branches.* Each pass overwrites the window's future. With the single-timeline first version, a pass replaces the
+  last take's future, and the pass tracks, not the timeline, are what persist. The keyframe tree kept
+  branch-friendly (see Storage above) would let a later version keep takes side by side.
+
+**Requirements this puts on the US-T99 build** (cheap now, costly to retrofit):
+
+1. Log input per embodiable (`EmbodiableKey` + tick + dt + `PilotFrame`), not per player.
+2. Allow a keyframe to be pinned against thinning, and keep a dense ring around a pinned one.
+3. Let a seat be held by a track player as well as a local or remote human, going through `SeatAuthority`, so that
+   the AI hand-back (`IEmbodiable::HandBack`) runs when a track ends.
+4. Real-time combat has to re-simulate bit-exactly (the battle-warp0 row above, fixed by US-T111). A ghost loop is
+   real-time combat by definition.
+
+**Open questions / risks.**
+
+- *Drift and causality.* A ghost replays inputs, not outcomes. When a later pass changes the battle (it kills the
+  ship a ghost was chasing), the ghost flies its old stick movements into a new situation and stops matching what
+  the player recorded. Options: accept it (inputs are the truth, so the result is emergent), freeze earlier ghosts
+  as outcome tracks (positions forced, which breaks determinism and physics), or warn when a ghost's replayed state
+  drifts from its recording by more than a threshold and offer to re-record that pass. Recommended first cut: accept
+  drift and show the divergence. Determinism makes it reproducible, at least.
+- *Pacing (the Phantom Brigade risk).* Ten seconds replayed dozens of times can turn a dogfight into a spreadsheet.
+  Keep it opt-in and off the main loop: a cap on passes or a soft budget, a fast "commit the take" that hands every
+  unit not yet flown back to the AI, and a scrub bar over the window so the player is never forced to sit through
+  a full pass to fix one moment. The normal game should never need it.
+- *Window length.* 10 s is the pitch. Seek cost does not matter here (every pass restores the pinned keyframe), so
+  the limit is player patience and the log size of N tracks, which is kilobytes.
+- *Co-op.* Several players could each record passes into the same loop. A rewind is already a lockstep command, so
+  a pass restart is too. Who owns which ghost and whether passes interleave stay open.
+- *Visuals.* Ghosts need to read as ghosts (a tint or trail on units flown by a track), distinct from the occluder
+  ghost material (US-T185), which means something else.
+
+Revisit once US-T99's short rewind (dense battle ring, per-frame input log) is built and measured.
+
 ## Reproducing
 
 ```powershell
