@@ -14,6 +14,9 @@ public:
 	/// <summary>The Influence meter and, while one is fresh, the refusal banner and the squad's line (US-T140).</summary>
 	void DrawInfluence();
 
+	/// <summary>US-T215: the squad banner's text (empty when none), drawn by the Hud in its TopCentre stack.</summary>
+	cs::String SquadLine();
+
 	/// <summary>The embody gate said no (US-T140): the banner shows it for a few seconds, and a toast says it.</summary>
 	void NoteEmbodyRefusal(const cs::String& what, const Core::EmbodyVerdict& verdict);
 

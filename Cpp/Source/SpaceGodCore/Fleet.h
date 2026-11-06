@@ -718,6 +718,8 @@ namespace SpaceGod::Core
 		cs::Ref<Faction> AddFaction(cs::Ref<Faction> f);
 
 		cs::Ref<Ship> AddShip(cs::String name, ShipClass c, cs::Ref<Faction> faction, ShipRole role);
+		/// <summary>US-T215: strips a doubled faction prefix (an escort named from its leader's already-prefixed name) from every hull's name; for saves made before the fix.</summary>
+		void NormaliseNames();
 
 		/// <summary>
 		/// Adds a ship built elsewhere than <see cref="AddShip"/> straight into this fleet's list: a jump gate's

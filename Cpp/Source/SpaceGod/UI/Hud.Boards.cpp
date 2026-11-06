@@ -1239,7 +1239,7 @@ namespace SpaceGod::UI
 	void Hud::DrawHail()
 	{
 		cs::Ref<PatrolHail> hail = app->IsPiloting() && app->World()->Law != nullptr ? app->World()->Law->Hail : nullptr;
-		if (hail == nullptr) return;
+		if (hail == nullptr || app->CommsOpen()) return; // US-T215: the comms panel takes precedence over the patrol hail line (it drew behind it)
 		int seconds = Mathf::CeilToInt(static_cast<float>(hail->SecondsLeft(app->Clock->Jd)));
 		cs::String s = cs::Cat("HAILED  ·  ", cs::Strings::ToUpperInvariant(hail->By->Name), " PATROL ", cs::Strings::ToUpperInvariant(hail->Patrol->Name), "  ·  ",
 			hail->Interdiction ? cs::Cat("HEAVE TO:  1 pay the ", Credits(hail->Fine), " fine, or be fired on in ", seconds, " s")

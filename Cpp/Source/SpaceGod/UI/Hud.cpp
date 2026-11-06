@@ -147,6 +147,7 @@ namespace SpaceGod::UI
 		{
 			DrawWorldOverlay();
 			DrawBioMassWarning(); // US-T125, under the news (US-T154)
+			DrawSquadBanner(); // US-T215: stacked under it, not over it
 			// A plotted course over the gates: the way and the next leg (U.SPC-T516).
 			auto courseLine = app->CourseLine();
 			if (!courseLine.empty()) DrawBanner(courseLine);
@@ -543,6 +544,12 @@ namespace SpaceGod::UI
 		}
 		while (lo > 0 && lo < raw.size() && (static_cast<unsigned char>(raw[lo]) & 0xC0) == 0x80) lo--;
 		return cs::String(raw.substr(0, lo)) + "\xE2\x80\xA6";
+	}
+
+	void Hud::DrawSquadBanner()
+	{
+		auto line = app->SquadLine();
+		if (!line.empty()) DrawBanner(line);
 	}
 
 	void Hud::DrawBanner(const cs::String& banner)

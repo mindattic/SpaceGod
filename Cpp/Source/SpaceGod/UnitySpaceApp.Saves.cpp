@@ -210,6 +210,8 @@ namespace SpaceGod
 		DropSession();
 		Clock = data->Clock;
 		Galaxy = data->Galaxy;
+		for (const auto& sys : Galaxy->Systems) // US-T215: escort names saved with a doubled faction prefix
+			if (sys != nullptr && sys->World != nullptr && sys->World->Fleet != nullptr) sys->World->Fleet->NormaliseNames();
 		Rendering::Materials::DestroyOwned(Interstellar->Root->transform);
 		GameObject::Destroy(Interstellar->Root);
 		Interstellar = cs::New<Views::InterstellarView>(Galaxy, worldRoot);

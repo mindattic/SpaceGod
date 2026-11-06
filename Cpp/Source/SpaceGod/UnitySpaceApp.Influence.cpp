@@ -80,6 +80,16 @@ namespace SpaceGod
 
 	// ---------------------------------------------------------------- the HUD
 
+	cs::String UnitySpaceApp::SquadLine()
+	{
+		if (ScreenCleared || World() == nullptr || !IsPiloting() || Piloted.Ship == nullptr || SquadOrders::SquadOf(World(), Piloted.Ship).Count() == 0) return cs::String();
+		cs::String state, why;
+		bool can = SquadOrders::CanOrder(World(), Piloted.Ship, World()->Jd, state, why);
+		int slot = StandDownSlot(Piloted.Ship, World());
+		cs::String key = slot > 0 ? cs::Cat("Shift+", slot == 10 ? 0 : slot) : cs::String("Shift+n");
+		return cs::Cat("YOUR SQUAD  \xC2\xB7  ", cs::Strings::ToUpperInvariant(state), can ? cs::Cat("  \xC2\xB7  ", key, " orders them to stand down") : cs::String());
+	}
+
 	void UnitySpaceApp::DrawInfluence()
 	{
 		if (ScreenCleared || World() == nullptr) return;
@@ -142,24 +152,6 @@ namespace SpaceGod
 				foot = cs::Cat("+", cs::Fmt(inf->LastGainXp, "N0"), " XP  \xC2\xB7  ", inf->LastGain);
 			GUI::Label(Rect(r.x + 8, r.y + 29, w - 16, 15), foot, influenceSmall);
 			}
-		}
-
-		// The squad a band captain held is closing with, and the key that orders it to stand down.
-		if (IsPiloting() && Piloted.Ship != nullptr && SquadOrders::SquadOf(World(), Piloted.Ship).Count() > 0)
-		{
-			cs::String state, why;
-			bool can = SquadOrders::CanOrder(World(), Piloted.Ship, World()->Jd, state, why);
-			int slot = StandDownSlot(Piloted.Ship, World());
-			cs::String key = slot > 0 ? cs::Cat("Shift+", slot == 10 ? 0 : slot) : cs::String("Shift+n");
-			cs::String line = cs::Cat("YOUR SQUAD  \xC2\xB7  ", cs::Strings::ToUpperInvariant(state), can ? cs::Cat("  \xC2\xB7  ", key, " orders them to stand down") : cs::String());
-			float w = 640, h = 26;
-			auto r = Rect((Screen::width - w) * 0.5f, 158, w, h);
-			if (!UiRects.Contains(r)) UiRects.Add(r); // US-T212: world names skip it
-			GUI::Box(r, GUIContent::none(), influencePanel);
-			auto old = influenceTitle->alignment;
-			influenceTitle->alignment = TextAnchor::MiddleCenter;
-			GUI::Label(Rect(r.x + 6, r.y + 3, w - 12, h - 6), line, influenceTitle);
-			influenceTitle->alignment = old;
 		}
 
 		// The refusal, while fresh: what was refused, and why.

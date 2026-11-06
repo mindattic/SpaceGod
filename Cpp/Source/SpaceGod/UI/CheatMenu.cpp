@@ -444,11 +444,14 @@ namespace SpaceGod::UI
 			GUI::contentColor = blockedRow ? Color(1, 1, 1, 0.45f) : Color::white();
 			cs::String label = r.Entry.IsMenu() ? cs::Cat(r.Entry.Label, "  >") : r.Entry.Label;
 			float labelW = std::min(340.0f, lw * 0.38f);
-			GUI::Label(Rect(rr.x + 10, rr.y + 5, labelW - 12, 18), label, sel ? title : text);
+			GUI::Label(Rect(rr.x + 10, rr.y + 5, labelW - 12, 18), UI::Hud::FitText(label, sel ? title : text, labelW - 12), sel ? title : text);
 			GUI::contentColor = Color::white();
 			cs::String detail = blockedRow ? r.Blocker : !r.Where.empty() ? cs::Cat(r.Where, "  ·  ", r.Entry.Detail) : r.Entry.Detail;
 			float rightW = 230;
-			GUI::Label(Rect(rr.x + labelW, rr.y + 6, rr.width - labelW - rightW - 10, 18), detail, blockedRow ? blocked : small);
+			{ // US-T215: cut with the shared ellipsis, not mid-word
+				float detailW = rr.width - labelW - rightW - 10;
+				GUI::Label(Rect(rr.x + labelW, rr.y + 6, detailW, 18), UI::Hud::FitText(detail, blockedRow ? blocked : small, detailW), blockedRow ? blocked : small);
+			}
 			cs::String right = !r.State.empty() ? r.State : r.Entry.Keys;
 			if (!right.empty()) GUI::Label(Rect(rr.xMax() - rightW - 8, rr.y + 5, rightW, 18), right, !r.State.empty() ? state : keys);
 			if (GUI::Button(rr, GUIContent::none(), GUIStyle::none()))

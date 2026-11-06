@@ -2243,11 +2243,24 @@ namespace SpaceGod::Core
 		return f;
 	}
 
+	void Fleet::NormaliseNames()
+	{
+		for (const auto& s : ships)
+		{
+			if (s == nullptr || s->Faction == nullptr || s->Faction->Prefix.size() == 0) continue;
+			cs::String twice = cs::Cat(s->Faction->Prefix, " ", s->Faction->Prefix, " ");
+			while (cs::Strings::StartsWith(s->Name, twice))
+				s->Name = cs::Strings::Substring(s->Name, static_cast<int>(s->Faction->Prefix.size()) + 1);
+		}
+	}
+
 	cs::Ref<Ship> Fleet::AddShip(cs::String name, ShipClass c, cs::Ref<Faction> faction, ShipRole role)
 	{
 		auto ship = cs::New<Ship>();
 		ship->Id = ships.Count();
-		ship->Name = static_cast<int>(faction->Prefix.size()) > 0 ? cs::Cat(faction->Prefix, " ", name) : name;
+		// US-T215: a name that already carries the prefix (an escort named from its leader) is not prefixed twice.
+		bool prefixed = static_cast<int>(faction->Prefix.size()) > 0 && !cs::Strings::StartsWith(name, cs::Cat(faction->Prefix, " "));
+		ship->Name = prefixed ? cs::Cat(faction->Prefix, " ", name) : name;
 		ship->Spec = ShipClassSpec::Of(c);
 		ship->Faction = faction;
 		ship->Role = role;

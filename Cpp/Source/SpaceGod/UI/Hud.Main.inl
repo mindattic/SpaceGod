@@ -84,10 +84,13 @@ private:
 	/// The Bio Mass contact warning (US-T125) in the TopCentre stack, under the news (US-T154).
 	void DrawBioMassWarning();
 
-	/// Text cut to fit maxW in style, with an ellipsis (unchanged when it fits).
-	static cs::String FitText(const cs::String& s, const cs::Ref<GUIStyle>& style, float maxW);
+	/// US-T215: the squad's banner, a TopCentre slot under the Bio Mass contact line.
+	void DrawSquadBanner();
+
 
 public:
+	/// Text cut to fit maxW in style, with an ellipsis (unchanged when it fits).
+	static cs::String FitText(const cs::String& s, const cs::Ref<GUIStyle>& style, float maxW);
 	void Draw();
 
 private:
