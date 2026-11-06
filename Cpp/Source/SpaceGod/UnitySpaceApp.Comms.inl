@@ -7,6 +7,11 @@
 // speaker); the answers are Core::Comms's, from the simulation as it stands. While open the panel has the keys and the
 // mouse (the cheat menu's pattern, US-T126) and the craft holds its heading.
 //
+// US-T201: hailing as a conversation. HailShip opens the panel straight on one hull's channel and says the hail (Shift+H does
+// it for the hull locked or selected, US-T200's ships list for a clicked row), and the options now include asking about
+// rumours, each voice telling its own trade (see Core::Comms::Rumours): who answers, and how, is their faction, role and
+// stance toward the unit held.
+//
 // US-T138: the named pilots. Every frame the unit held is watched: taking a hull meets its pilot (Characters::Embodied),
 // leaving it hands the pilot every act done meanwhile as their own (Characters::Released, the rationalization rule), a
 // fight the held hull comes out of is one they survived, and turning on one's own side in it is a betrayal.
@@ -18,6 +23,15 @@ public:
 	/// <summary>Opens the panel (on <paramref name="target"/> when it is given and in range), or says why it cannot.</summary>
 	void OpenComms(const Core::CommsParty& target = Core::CommsParty());
 	void CloseComms();
+
+	/// <summary>
+	/// US-T201's entry point: hail <paramref name="ship"/> and open the conversation with it (the comms panel on that channel,
+	/// the hail said, its options offered: rumours, the area, news, trade, threaten...). What a "ships in the area" list
+	/// (US-T200) calls when a row is clicked; Core::Comms::CanHail tells it beforehand which rows can be. False, with a toast
+	/// saying why, when it cannot be hailed (out of range, off the sensors, no unit held). Shift+H hails the hull locked at
+	/// the helm or selected the same way, when it can be hailed.
+	/// </summary>
+	bool HailShip(const cs::Ref<Core::Ship>& ship);
 
 	/// <summary>Who is speaking now and from where: the unit held, its hull, faction and pose, the scale's ruler.</summary>
 	Core::CommsContext CommsHere();

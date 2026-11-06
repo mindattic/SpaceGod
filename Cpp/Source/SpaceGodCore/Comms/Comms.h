@@ -48,6 +48,10 @@ namespace SpaceGod::Core
 		Plunder,
 		LetGo,
 		SignOff,
+		/// <summary>US-T201: what they have heard. Each voice tells its own trade: a freighter the prices, a patrol who is wanted,
+		/// a raider the fattest prize about (or, to a lawful hull, a threat). Last in the enum so a recorded command's numbers
+		/// keep their meaning; the panel's order is <see cref="Comms.Verbs"/>'s.</summary>
+		AskRumours,
 	};
 	SPACEGODCORE_API const char* ToString(CommsVerb v);
 	SPACEGODCORE_API cs::String VerbLabel(CommsVerb v);
@@ -192,6 +196,11 @@ namespace SpaceGod::Core
 		/// first, then the stations at the world the speaker is at (at most <paramref name="max"/> all told).</summary>
 		static cs::List<CommsParty> Contacts(const CommsContext& c, int max = 12);
 
+		/// <summary>US-T201: whether <paramref name="s"/> can be hailed from here now (the rule <see cref="Contacts"/> lists by: a
+		/// unit held, the hull afloat in space, in <see cref="HailRangeKm"/> and on the speaker's sensors). False with
+		/// <paramref name="why"/> set ("out of hailing range") when it cannot, for a list (US-T200's ships in the area) to grey a row.</summary>
+		static bool CanHail(const CommsContext& c, const cs::Ref<Ship>& s, cs::String* why = nullptr);
+
 		/// <summary>How well the speaker makes out <paramref name="s"/>: its own side fully, anyone else by its picture's track
 		/// or its own scanners' look now, whichever is better. None: not seen, so not hailable.</summary>
 		static ContactLevel Seen(const CommsContext& c, const cs::Ref<Ship>& s);
@@ -233,6 +242,7 @@ namespace SpaceGod::Core
 		static cs::String Greeting(const CommsContext& c, const CommsParty& to, CommsStance stance, const cs::Ref<NamedPilot>& p);
 		static cs::String Advice(const CommsContext& c, const CommsParty& to, CommsStance stance, const cs::Ref<NamedPilot>& p);
 		static cs::String News(const CommsContext& c, const CommsParty& to);
+		static cs::String Rumours(const CommsContext& c, const CommsParty& to, CommsStance stance, const cs::Ref<NamedPilot>& p);
 		static cs::String TradeOffer(const CommsContext& c, const CommsParty& to, CommsStance stance, const cs::Ref<NamedPilot>& p, double& pricePerTonne);
 		static CommsReply Buy(const CommsContext& c, const CommsParty& to, CommsStance stance, const cs::Ref<NamedPilot>& p);
 		static CommsReply Threaten(const CommsContext& c, const CommsParty& to, CommsStance stance, const cs::Ref<NamedPilot>& p);

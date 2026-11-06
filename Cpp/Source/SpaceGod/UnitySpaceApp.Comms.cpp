@@ -1,4 +1,4 @@
-// US-T137 comms panel and US-T138 named-pilot tracking (declarations in UnitySpaceApp.Comms.inl).
+// US-T137 comms panel, US-T138 named-pilot tracking and US-T201's hail entry point (declarations in UnitySpaceApp.Comms.inl).
 
 #include "UnitySpaceApp.h"
 
@@ -115,6 +115,24 @@ namespace SpaceGod
 				if (want != nullptr && commsContacts[i].Ship == want) commsRow = i;
 		}
 		commsRefresh = 0.5f;
+	}
+
+	bool UnitySpaceApp::HailShip(const cs::Ref<Ship>& ship)
+	{
+		auto c = CommsHere();
+		cs::String why;
+		if (!Comms::CanHail(c, ship, &why))
+		{
+			ShowToast(cs::Cat("Can't hail ", ship != nullptr ? cs::Cat("the ", ship->Name) : cs::String("that"), ": ", why));
+			return false;
+		}
+		auto target = CommsParty::OfShip(ship);
+		OpenComms(target);
+		if (!commsOpen) return false;
+		commsTarget = target;
+		commsTalking = true;
+		CommsSay(CommsVerb::Hail);
+		return true;
 	}
 
 	void UnitySpaceApp::CloseComms()
@@ -302,7 +320,13 @@ namespace SpaceGod
 		if (!commsOpen)
 		{
 			if (!toggle) return false;
-			OpenComms(hailing != nullptr && hailing->Ship != nullptr ? CommsParty::OfShip(hailing->Ship) : CommsParty());
+			if (hailing != nullptr && hailing->Ship != nullptr) OpenComms(CommsParty::OfShip(hailing->Ship));
+			else
+			{
+				// US-T201: the hull locked at the helm, or selected, is hailed straight away when it can be; else the list.
+				auto want = pilotLockTarget.IsShip() ? pilotLockTarget.Ship : Selected.IsShip() ? Selected.Ship : nullptr;
+				if (want == nullptr || !Comms::CanHail(c, want) || !HailShip(want)) OpenComms();
+			}
 			return true; // the key is spent (it is H: the help screen does not open under it)
 		}
 		if (toggle || !c.Piloted)

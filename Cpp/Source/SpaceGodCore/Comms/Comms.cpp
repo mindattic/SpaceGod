@@ -13,6 +13,7 @@
 #include "Economy/Goods.h"
 #include "Economy/Settlement.h"
 #include "Ephemeris.h"
+#include "Events/EventSources.h" // PirateCaptains (US-T201's wanted rumours)
 #include "Fleet.h"
 #include "Information/Ranges.h" // US-T156
 #include "Law/Law.h"
@@ -40,6 +41,7 @@ namespace SpaceGod::Core
 		case CommsVerb::Plunder: return "Plunder";
 		case CommsVerb::LetGo: return "LetGo";
 		case CommsVerb::SignOff: return "SignOff";
+		case CommsVerb::AskRumours: return "AskRumours";
 		}
 		return "?";
 	}
@@ -60,6 +62,7 @@ namespace SpaceGod::Core
 		case CommsVerb::Plunder: return "Plunder: board and strip it";
 		case CommsVerb::LetGo: return "Let them go";
 		case CommsVerb::SignOff: return "Sign off";
+		case CommsVerb::AskRumours: return "Ask about rumours";
 		}
 		return "?";
 	}
@@ -157,7 +160,7 @@ namespace SpaceGod::Core
 
 	CommsReply Comms::Apply(const CommsContext& c, int targetKey, int verb)
 	{
-		if (verb < 0 || verb > static_cast<int>(CommsVerb::SignOff))
+		if (verb < 0 || verb > static_cast<int>(CommsVerb::AskRumours)) // the last verb (US-T201)
 		{
 			CommsReply r;
 			r.Lines.Add({ "comms", "Garbled transmission.", false });
@@ -282,6 +285,25 @@ namespace SpaceGod::Core
 		return list;
 	}
 
+	bool Comms::CanHail(const CommsContext& c, const cs::Ref<Ship>& s, cs::String* why)
+	{
+		auto no = [&](const char* reason)
+		{
+			if (why != nullptr) *why = reason;
+			return false;
+		};
+		if (why != nullptr) *why = cs::String();
+		if (c.World == nullptr || !c.Piloted) return no("take a ship, a gun or a station first");
+		if (Gone(s)) return no("gone");
+		if (s == c.Speaker) return no("that is the hull you hold");
+		if (s->Planetside()) return no("down on the surface");
+		if (s->Derelict) return no("a derelict: nobody aboard to answer");
+		// The same rule Contacts lists by, so a row it greys is a row the panel would not offer.
+		if ((c.World->Sensors->HelioOf(s, c.Jd) - c.HelioKm).Length() > HailRangeKm) return no("out of hailing range");
+		if (Seen(c, s) == ContactLevel::None) return no("not on your sensors");
+		return true;
+	}
+
 	CommsStance Comms::StanceOf(const CommsContext& c, const CommsParty& to)
 	{
 		auto them = to.Faction();
@@ -337,9 +359,13 @@ namespace SpaceGod::Core
 			return v;
 		}
 		v.Add(CommsVerb::Hail);
+		v.Add(CommsVerb::AskRumours); // US-T201
 		v.Add(CommsVerb::AskAdvice);
 		v.Add(CommsVerb::AskNews);
-		v.Add(CommsVerb::AskTrade);
+		// A lawful warship is no market: trade is offered to stations, merchants, independents and raiders (US-T201).
+		bool lawfulWarship = to.Ship != nullptr && to.Ship->Spec != nullptr && to.Ship->Spec->IsMilitary
+			&& !(to.Ship->Faction != nullptr && to.Ship->Faction->IsPirate);
+		if (!lawfulWarship) v.Add(CommsVerb::AskTrade);
 		if (to.Ship != nullptr && to.Ship->HasCargo && to.Ship->CargoTonnes > 0.5 && c.Speaker != nullptr) v.Add(CommsVerb::Buy);
 		if (to.Ship != nullptr) v.Add(CommsVerb::AskStory);
 		if (to.Ship != nullptr && c.Speaker != nullptr) v.Add(CommsVerb::Threaten);
@@ -390,7 +416,18 @@ namespace SpaceGod::Core
 		else if (stance == CommsStance::Neutral) pool = chatty ? &neutralChat : &neutralTerse;
 		else if (stance == CommsStance::Wary) pool = &wary;
 		else pool = &hostile;
-		return cs::Cat(intro, Pick(*pool, seed));
+		cs::String line = cs::Cat(intro, Pick(*pool, seed));
+		// US-T201: who they are colours the first word. A merchant with a hold to sell says so; a raider that outguns a laden
+		// speaker names its price.
+		auto ship = to.Ship;
+		if (pirate && stance == CommsStance::Hostile && c.Speaker != nullptr && c.Speaker->HasCargo && c.Speaker->CargoTonnes > 0.5
+			&& GroupStrength(c.World, ship) > GroupStrength(c.World, c.Speaker))
+			line = cs::Cat(line, " That's ", cs::Fmt(c.Speaker->CargoTonnes, "N0"), " t of ", GoodName(c.Speaker->CargoGood),
+				" you're hauling. Dump it and burn, and we never met.");
+		else if (!pirate && stance != CommsStance::Hostile && ship->HasCargo && ship->CargoTonnes > 0.5
+			&& (ship->Role == ShipRole::Trader || ship->Role == ShipRole::Courier || ship->Role == ShipRole::Free))
+			line = cs::Cat(line, " Carrying ", GoodName(ship->CargoGood), ", if you're buying.");
+		return line;
 	}
 
 	cs::String Comms::Advice(const CommsContext& c, const CommsParty& to, CommsStance stance, const cs::Ref<NamedPilot>& p)
@@ -500,6 +537,180 @@ namespace SpaceGod::Core
 			told++;
 		}
 		return said.empty() ? cs::String("Nothing worth repeating. Quiet week.") : said;
+	}
+
+	// ---------------------------------------------------------------- rumours (US-T201)
+
+	namespace
+	{
+		/// Whose trade a voice talks: what a hull hears depends on what it does.
+		enum class RumourVoice { Station, Raider, Warship, Merchant, Miner, Drifter };
+
+		RumourVoice VoiceOf(const CommsParty& to)
+		{
+			if (to.IsStation()) return RumourVoice::Station;
+			auto s = to.Ship;
+			if (s->Faction != nullptr && s->Faction->IsPirate) return RumourVoice::Raider;
+			if ((s->Spec != nullptr && s->Spec->IsMilitary) || s->Role == ShipRole::Patrol || s->Role == ShipRole::Escort) return RumourVoice::Warship;
+			if (s->Role == ShipRole::Trader || s->Role == ShipRole::Courier) return RumourVoice::Merchant;
+			if (s->Role == ShipRole::Miner || s->Role == ShipRole::Tug) return RumourVoice::Miner;
+			return RumourVoice::Drifter;
+		}
+
+		bool OnTheChart(const cs::Ref<Settlement>& s, const cs::Ref<Faction>& by)
+		{
+			return s != nullptr && !s->Fallen && (!s->Hidden || (by != nullptr && s->KnownBy(by)));
+		}
+
+		/// A market tip as a trader hears it: where a good fetches most against its base price, and where one is going cheap.
+		/// Only minerals when <paramref name="mineralsOnly"/> (a miner's ear is for ore); both ends when <paramref name="both"/>.
+		/// Empty when no charted market strays far enough from base to be worth telling.
+		cs::String PriceTip(const CommsContext& c, const cs::Ref<Faction>& teller, bool mineralsOnly, bool both)
+		{
+			cs::Ref<Settlement> dear, cheap;
+			int dearGood = -1, cheapGood = -1;
+			double dearRatio = 1.15, cheapRatio = 0.85;
+			for (const auto& s : c.World->Economy->Settlements)
+			{
+				if (!OnTheChart(s, teller)) continue;
+				for (int g = 0; g < GoodInfo::Count; g++)
+				{
+					const auto& info = GoodInfo::Of(static_cast<Good>(g));
+					if (info->BasePrice <= 0 || (mineralsOnly && info->Category != GoodCategory::Mineral)) continue;
+					double r = s->Price[g] / info->BasePrice;
+					if (r > dearRatio) { dearRatio = r; dear = s; dearGood = g; }
+					if (s->Stock[g] > 50 && r < cheapRatio) { cheapRatio = r; cheap = s; cheapGood = g; }
+				}
+			}
+			cs::String said;
+			if (dear != nullptr)
+				said = cs::Cat("Heard ", dear->Name, "'s paying ", cs::Fmt(dear->Price[dearGood], "N0"), " a tonne for ", GoodName(static_cast<Good>(dearGood)), ".");
+			if (cheap != nullptr && (both || said.empty()))
+			{
+				auto line = cs::Cat(cheap->Name, " has ", GoodName(static_cast<Good>(cheapGood)), " going cheap, ", cs::Fmt(cheap->Price[cheapGood], "N0"), " a tonne.");
+				said = said.empty() ? line : cs::Cat(said, " And ", line);
+			}
+			return said;
+		}
+	}
+
+	cs::String Comms::Rumours(const CommsContext& c, const CommsParty& to, CommsStance stance, const cs::Ref<NamedPilot>& p)
+	{
+		auto them = to.Faction();
+		auto voice = VoiceOf(to);
+		uint32_t seed = static_cast<uint32_t>((p != nullptr ? p->Seed + p->TimesHailed * 17 : to.Key() * 97) + static_cast<int>(c.Jd));
+		bool speakerLaden = c.Speaker != nullptr && c.Speaker->HasCargo && c.Speaker->CargoTonnes > 0.5;
+
+		// Hostile: a raider answers with a threat of its own, anyone else with nothing.
+		if (stance == CommsStance::Hostile)
+		{
+			if (voice == RumourVoice::Raider)
+			{
+				static const std::vector<const char*> threat{ "Here's one: a hull like yours went quiet out here last week. Nobody found the crew.",
+					"Word is these lanes aren't safe. Word is right.", "Heard a rumour you're about to have a very bad day." };
+				cs::String line = Pick(threat, seed);
+				if (speakerLaden)
+					line = cs::Cat(line, " Dump that ", GoodName(c.Speaker->CargoGood), " and maybe it isn't you.");
+				return line;
+			}
+			static const std::vector<const char*> no{ "I don't trade gossip with your kind.", "The only rumour you'll get from me is about my guns.",
+				"Ask someone who likes you." };
+			return Pick(no, seed);
+		}
+
+		cs::String said;
+		switch (voice)
+		{
+		case RumourVoice::Raider:
+		{
+			// Among thieves: the fattest laden lawful hull their side has a fresh track on.
+			auto book = them != nullptr ? c.World->Sensors->PictureOf(them) : nullptr;
+			cs::Ref<Contact> prize;
+			double best = 0;
+			if (book != nullptr)
+				for (const auto& t : book->Contacts())
+				{
+					auto s = t->Ship;
+					if (Gone(s) || s == c.Speaker || s == to.Ship || s->Planetside() || !s->HasCargo || s->CargoTonnes <= 0.5) continue;
+					if (s->Faction == nullptr || s->Faction->IsPirate || (s->Spec != nullptr && s->Spec->IsMilitary) || c.Jd - t->LastSeenJd > 0.5) continue;
+					if ((t->LastHelioKm - c.HelioKm).Length() > 10 * HailRangeKm) continue;
+					double worth = s->CargoTonnes * GoodInfo::Of(s->CargoGood)->BasePrice;
+					// Ties go to the lower id: the book's order is a dictionary's, and every peer must name the same hull.
+					if (worth > best || (worth == best && prize != nullptr && s->Id < prize->Ship->Id)) { best = worth; prize = t; }
+				}
+			if (prize != nullptr)
+				said = cs::Cat("There's a fat one about: the ", prize->Ship->Name, ", ", cs::Fmt(prize->Ship->CargoTonnes, "N0"), " t of ", GoodName(prize->Ship->CargoGood),
+					", ", c.Ruler.Range(c.HelioKm, prize->LastHelioKm), " out at ", Bearing(c.HelioKm, c.Forward, c.Up, prize->LastHelioKm), ". Thin escort, I hear.");
+			else said = "Pickings are thin. The patrols have been busy.";
+			break;
+		}
+		case RumourVoice::Warship:
+		{
+			// Who command wants: the captain with the largest bounty still afloat (in fleet order, so every peer names the same).
+			cs::Ref<Ship> wanted;
+			double bounty = 0;
+			for (const auto& s : c.World->Fleet->Ships())
+			{
+				if (Gone(s) || s->Controller() != s) continue;
+				cs::Ref<LawRecord> rec;
+				if (!c.World->Law->Captains.TryGetValue(s, rec) || rec == nullptr) continue;
+				double b = them != nullptr ? rec->BountyBy(them) : rec->TotalBounty();
+				if (b <= 0) b = rec->TotalBounty();
+				if (b > bounty) { bounty = b; wanted = s; }
+			}
+			if (wanted != nullptr && c.Speaker != nullptr && wanted == c.Speaker->Controller())
+				said = cs::Cat("Funny you should ask. Command's posted ", cs::Fmt(bounty, "N0"), " credits on a hull a lot like yours.");
+			else if (wanted != nullptr)
+			{
+				bool raider = wanted->Faction != nullptr && wanted->Faction->IsPirate;
+				said = cs::Cat("Command's posting ", cs::Fmt(bounty, "N0"), " credits on ", raider ? cs::Cat(PirateCaptains::NameFor(wanted), " of the ") : cs::String("the captain of the "),
+					wanted->Name, ".");
+				auto book = them != nullptr ? c.World->Sensors->PictureOf(them) : nullptr;
+				auto track = book != nullptr ? book->Of(wanted) : nullptr;
+				if (track != nullptr && c.Jd - track->LastSeenJd < 1)
+					said = cs::Cat(said, " Last seen ", c.Ruler.Range(c.HelioKm, track->LastHelioKm), " out at ", Bearing(c.HelioKm, c.Forward, c.Up, track->LastHelioKm), ".");
+				else said = cs::Cat(said, " Nobody knows where they're lying up.");
+			}
+			else said = "Nobody worth a bounty in these parts. Long may it last.";
+			if (stance == CommsStance::Wary) said = cs::Cat("Officially, nothing. ", said);
+			break;
+		}
+		case RumourVoice::Merchant:
+		case RumourVoice::Station:
+			said = PriceTip(c, them, false, stance == CommsStance::Friendly || voice == RumourVoice::Station);
+			if (said.empty()) said = "Prices are flat everywhere. Nobody's making money.";
+			break;
+		case RumourVoice::Miner:
+			said = PriceTip(c, them, true, stance == CommsStance::Friendly);
+			if (said.empty()) said = "Ore's selling at what ore sells at. Same as ever.";
+			break;
+		default:
+		{
+			// An independent hears the gossip: something older than the news, still talked about.
+			for (int i = c.World->Events.Count() - 1; i >= 0; i--)
+			{
+				const auto& ev = c.World->Events[i];
+				double age = c.Jd - ev.Jd;
+				if (age < 2) continue;
+				if (age > 30) break;
+				if (ev.Kind != WorldEventKind::Law && ev.Kind != WorldEventKind::Battle && ev.Kind != WorldEventKind::Loss && ev.Kind != WorldEventKind::Capture) continue;
+				said = cs::Cat("People are still talking about it: ", ev.Text, ".");
+				break;
+			}
+			if (said.empty()) said = PriceTip(c, them, false, false);
+			if (said.empty()) said = "Nothing but the hum of the drive out here.";
+			break;
+		}
+		}
+		// A guarded voice hedges; a friendly chatterbox throws in the gossip besides.
+		if (stance == CommsStance::Wary && voice != RumourVoice::Warship) said = cs::Cat("Can't vouch for it, but... ", said);
+		if (stance == CommsStance::Friendly && p != nullptr && p->Chatter > 0.6 && voice != RumourVoice::Drifter && voice != RumourVoice::Raider)
+		{
+			auto tip = voice == RumourVoice::Merchant || voice == RumourVoice::Miner ? cs::String() : PriceTip(c, them, false, false);
+			if (!tip.empty()) said = cs::Cat(said, " ", tip);
+			else said = cs::Cat(said, " You didn't hear it from me.");
+		}
+		return said;
 	}
 
 	cs::String Comms::TradeOffer(const CommsContext&, const CommsParty& to, CommsStance stance, const cs::Ref<NamedPilot>& p, double& pricePerTonne)
@@ -942,6 +1153,10 @@ namespace SpaceGod::Core
 		{
 		case CommsVerb::Hail:
 			r.Lines.Add({ who, Greeting(c, to, stance, p), false });
+			break;
+		case CommsVerb::AskRumours:
+			r.Lines.Add({ SpeakerName(c), "Heard anything interesting?", true });
+			r.Lines.Add({ who, Rumours(c, to, stance, p), false });
 			break;
 		case CommsVerb::AskAdvice:
 			r.Lines.Add({ SpeakerName(c), "What's it like out there?", true });
