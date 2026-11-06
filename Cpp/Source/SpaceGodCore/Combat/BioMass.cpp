@@ -432,22 +432,59 @@ namespace SpaceGod::Core
 		}
 	}
 
-	void BioMass::Grow(const cs::Ref<BioGlobule>& g, double jd, double dt, const cs::List<DVec3>& bodies, const cs::List<Hull>& hulls)
+	bool BioMass::InOpenSpace(const cs::Ref<Ship>& s)
+	{
+		return s != nullptr && !s->Destroyed && s->Combat != nullptr && s->Spec != nullptr && !s->Planetside() && s->Phase != ShipPhase::Lane;
+	}
+
+	const cs::List<BioMass::Hull>& BioMass::Hulls(double jd)
+	{
+		// Worked out on first need, once an update: a free bloom or seed hunting, a brood looking round (US-T192).
+		if (hullsReady && hullsJd == jd) return hullCache;
+		hullCache.Clear();
+		for (const auto& s : world->Fleet->Ships())
+		{
+			if (!InOpenSpace(s)) continue;
+			try { hullCache.Add(Hull{ s, world->Fleet->StateOf(s, jd).HelioKm }); }
+			catch (const std::exception&) {}
+		}
+		hullsReady = true;
+		hullsJd = jd;
+		return hullCache;
+	}
+
+	bool BioMass::HostHull(int shipId, double jd, Hull& out)
+	{
+		if (hullsReady && hullsJd == jd)
+		{
+			for (const auto& h : hullCache)
+				if (h.ship->Id == shipId) { out = h; return true; }
+			return false;
+		}
+		for (const auto& s : world->Fleet->Ships())
+		{
+			if (s == nullptr || s->Id != shipId) continue;
+			if (!InOpenSpace(s)) return false;
+			try { out = Hull{ s, world->Fleet->StateOf(s, jd).HelioKm }; return true; }
+			catch (const std::exception&) { return false; }
+		}
+		return false;
+	}
+
+	void BioMass::Grow(const cs::Ref<BioGlobule>& g, double jd, double dt, const cs::List<DVec3>& bodies)
 	{
 		bool bloom = g->Form == BioForm::Bloom;
 		if (bloom && !cs::Double::IsNaN(g->WithersJd) && jd >= g->WithersJd) { g->Hp = 0; return; } // withered
 		auto cat = world->Catalog();
 
-		// Latched on: it rides its host and drains it.
+		// Latched on: it rides its host and drains it (only its host's position is needed).
 		if (g->Host == BioHost::Ship)
 		{
-			const Hull* host = nullptr;
-			for (const auto& h : hulls)
-				if (h.ship->Id == g->HostId) { host = &h; break; }
-			if (host == nullptr) { Detach(g, bodies, jd); return; }
+			Hull host;
+			if (!HostHull(g->HostId, jd, host)) { Detach(g, bodies, jd); return; }
 			g->Body = 0;
-			g->Anchor = host->helio - bodies[0];
-			Drain(g, jd, dt, host->ship);
+			g->Anchor = host.helio - bodies[0];
+			Drain(g, jd, dt, host.ship);
 			return;
 		}
 		if (g->Host == BioHost::Body)
@@ -479,6 +516,7 @@ namespace SpaceGod::Core
 		const Hull* prey = nullptr;
 		double preyD = cs::Double::PositiveInfinity;
 		double reach = bloom ? BloomSeekKm : 0;
+		const auto& hulls = Hulls(jd);
 		for (const auto& h : hulls)
 		{
 			double len = h.ship->Combat->Spec ? h.ship->Combat->Spec->LengthKm * 0.5 : 0.1;
@@ -533,17 +571,18 @@ namespace SpaceGod::Core
 		g->Local = g->Local + g->Drift * dt;
 	}
 
-	void BioMass::Brood(const cs::Ref<BioGlobule>& g, double jd, DVec3 here, const cs::List<Hull>& hulls)
+	void BioMass::Brood(const cs::Ref<BioGlobule>& g, double jd, DVec3 here)
 	{
 		// A globule or a tumor erupts a cluster of blooms when a hull is near (not the one it is on), now and then.
 		if (g->Form == BioForm::Bloom || jd < g->NextBroodJd || CountOf(BioForm::Bloom) >= MaxBlooms) return;
 		bool near = false;
-		for (const auto& h : hulls)
+		for (const auto& h : Hulls(jd))
 		{
 			if (g->Host == BioHost::Ship && h.ship->Id == g->HostId) continue;
 			if ((h.helio - here).Length() < BloomSeekKm) { near = true; break; }
 		}
-		if (!near) return;
+		// None near: it looks round again in a while, not every update (the hulls' positions are the cost).
+		if (!near) { g->NextBroodJd = jd + BroodLookS / 86400.0; return; }
 		double days = g->Form == BioForm::Tumor ? TumorBroodDays : GlobuleBroodDays;
 		g->NextBroodJd = jd + days * (0.5 + rng.NextDouble());
 		int count = 3 + rng.Next(BloomCluster - 2);
@@ -590,20 +629,20 @@ namespace SpaceGod::Core
 		}
 	}
 
-	void BioMass::Step(double jd, double dt, const cs::List<DVec3>& bodies, const cs::List<DVec3>& shipHelio, const cs::List<cs::Ref<Ship>>& armed, const cs::List<Hull>& hulls)
+	void BioMass::Step(double jd, double dt, const cs::List<DVec3>& bodies, const cs::List<DVec3>& shipHelio, const cs::List<cs::Ref<Ship>>& armed)
 	{
 		for (int i = 0; i < Globules.Count(); i++)
 		{
 			auto g = Globules[i];
 			if (!g->Alive()) continue;
 			if (g->Form == BioForm::Globule) Creep(g, jd, dt, bodies);
-			else Grow(g, jd, dt, bodies, hulls); // US-T192
+			else Grow(g, jd, dt, bodies); // US-T192
 			if (!g->Alive()) continue;
 			DVec3 here = bodies[g->Body] + g->Anchor + g->Local;
 			double r = g->RadiusKm();
 			// US-T192: the guns that would hit a growth's host hold most of their fire.
 			double cover = HostCoverFor(g);
-			Brood(g, jd, here, hulls);
+			Brood(g, jd, here);
 
 			// Every stellar body's orbital guns, and its settlements' platforms beside them.
 			for (int b = 0; b < bodies.Count() && g->Alive(); b++)
@@ -744,19 +783,18 @@ namespace SpaceGod::Core
 		cs::List<DVec3> bodies = cs::List<DVec3>();
 		for (int b = 0; b < n; b++) bodies.Add(world->Ephemeris->HelioAt(b, jd));
 
-		// The hulls in open space (not landed, not riding a lane), and where they are, once an update: the armed ones
-		// fire on it, any of them is a bloom's prey or a tumor's host (US-T192).
+		// The armed hulls in open space (not landed, not riding a lane), and where they are, once an update: they fire on
+		// it. The rest of the hulls (a bloom's prey, a tumor's host, US-T192) are worked out only when one is wanted
+		// (Hulls, HostHull), so a system with no growth hunting pays only for its warships, as before.
 		cs::List<cs::Ref<Ship>> armed = cs::List<cs::Ref<Ship>>();
 		cs::List<DVec3> shipHelio = cs::List<DVec3>();
-		cs::List<Hull> hulls = cs::List<Hull>();
+		hullsReady = false;
 		for (const auto& s : world->Fleet->Ships())
 		{
-			if (s == nullptr || s->Destroyed || s->Combat == nullptr || s->Spec == nullptr || s->Planetside() || s->Phase == ShipPhase::Lane) continue;
+			if (!InOpenSpace(s) || WeaponDps(s->Combat) <= 0) continue;
 			try
 			{
 				auto st = world->Fleet->StateOf(s, jd);
-				hulls.Add(Hull{ s, st.HelioKm });
-				if (WeaponDps(s->Combat) <= 0) continue;
 				armed.Add(s);
 				shipHelio.Add(st.HelioKm);
 			}
@@ -765,8 +803,10 @@ namespace SpaceGod::Core
 
 		int steps = cs::Math::Min(MaxSteps, cs::Math::Max(1, static_cast<int>(cs::Math::Ceiling(dt / StepS))));
 		double h = dt / steps;
-		for (int k = 0; k < steps; k++) Step(jd, h, bodies, shipHelio, armed, hulls);
+		for (int k = 0; k < steps; k++) Step(jd, h, bodies, shipHelio, armed);
 		Feed(jd, dt, bodies);
+		hullCache.Clear(); // holds no hull past the update
+		hullsReady = false;
 		for (int i = Globules.Count() - 1; i >= 0; i--)
 			if (!Globules[i]->Alive()) Globules.RemoveAt(i);
 	}

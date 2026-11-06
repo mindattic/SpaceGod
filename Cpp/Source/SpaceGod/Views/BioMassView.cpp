@@ -1,8 +1,9 @@
-// US-T125: the Bio Mass drawn (see BioMassView.h).
+// US-T125: the Bio Mass drawn (see BioMassView.h); US-T192 its blooms and tumors, and the growths riding a hull.
 #include "Views/BioMassView.h"
 
 #include "UnitySpaceApp.h"
 #include "Rendering/Materials.h"
+#include "Target.h"
 #include "Views/LineStrip.h"
 
 #include "BodyCatalog.h"
@@ -11,6 +12,7 @@
 #include "Fleet.h"
 #include "RenderLod.h"
 #include "ScaleModel.h"
+#include "Ships.h"
 #include "SimClock.h"
 #include "Systems/JumpGate.h"
 #include "World.h"
@@ -47,6 +49,13 @@ namespace SpaceGod::Views
 		std::vector<Lobe> lobes;
 		std::vector<Bone> bones;
 		std::vector<Hair> hairs;
+		/// US-T192: a tumor's roots, sunk into what it is on (its local -Y faces its host).
+		std::vector<Bone> roots;
+
+		// US-T192: what it is, and how it moves: a bloom writhes fast on thick tendrils, a tumor pulses like a heart.
+		BioForm form = BioForm::Globule;
+		float timeScale = 1, beatAmp = 0, hairWidth = 0.012f, swayAmp = 0.35f;
+		Color hairColor{0.10f, 0.06f, 0.04f}, hairTip{0.10f, 0.06f, 0.04f};
 
 		// The mesh's streams, rewritten each shaping.
 		std::vector<Vector3> v, n;
@@ -104,9 +113,18 @@ namespace SpaceGod::Views
 		// The palette (alpha 0 marks an emissive face on the ship shader: the wet glow deep in a mouth).
 		constexpr Color Flesh(0.50f, 0.09f, 0.08f), Tissue(0.86f, 0.44f, 0.40f), Fat(0.80f, 0.62f, 0.34f), Vein(0.22f, 0.04f, 0.13f),
 			Bruise(0.38f, 0.10f, 0.22f), BoneWhite(0.88f, 0.84f, 0.72f), Tooth(0.95f, 0.92f, 0.80f), HairBrown(0.10f, 0.06f, 0.04f),
-			Gullet(0.40f, 0.02f, 0.03f, 0.0f), Lip(0.62f, 0.12f, 0.14f);
+			Gullet(0.40f, 0.02f, 0.03f, 0.0f), Lip(0.62f, 0.12f, 0.14f), BloomPink(0.95f, 0.38f, 0.52f), RootDark(0.18f, 0.03f, 0.08f);
 
 		float Smooth(float x) { x = Mathf::Clamp01(x); return x * x * (3 - 2 * x); }
+
+		/// US-T192: a tumor's beat, a double thump (lub-dub) about once a second and a half, 0 between beats.
+		float Heartbeat(float t)
+		{
+			float lub = std::max(0.0f, std::sin(t * 7.0f));
+			float dub = std::max(0.0f, std::sin(t * 7.0f - 0.9f));
+			float gate = Smooth(std::sin(t * 3.5f) * 4.0f); // one pair a cycle, then rest
+			return gate * (std::pow(lub, 10.0f) + 0.6f * std::pow(dub, 10.0f));
+		}
 
 		/// How far the surface is (unit radii) along unit direction d at time t: the lumps swelling and sagging, the
 		/// peristaltic wave, the mouths sunk into it, and a hit's ripple.
@@ -169,9 +187,10 @@ namespace SpaceGod::Views
 		}
 	}
 
-	std::shared_ptr<BioMassView::Shape> BioMassView::Build(int seed)
+	std::shared_ptr<BioMassView::Shape> BioMassView::Build(int seed, BioForm form)
 	{
 		auto s = std::make_shared<Shape>();
+		s->form = form;
 		std::mt19937 rng(static_cast<uint32_t>(seed) * 2654435761u + 12345u);
 		std::uniform_real_distribution<float> u01(0.0f, 1.0f);
 		auto dir = [&]
@@ -179,36 +198,104 @@ namespace SpaceGod::Views
 			float z = u01(rng) * 2 - 1, a = u01(rng) * 6.2832f, r = std::sqrt(std::max(0.0f, 1 - z * z));
 			return Vector3(r * std::cos(a), r * std::sin(a), z);
 		};
-		Icosphere(3, s->sphere, s->sphereTris);
-		Icosphere(2, s->lobeSphere, s->lobeTris);
+		bool bloom = form == BioForm::Bloom, tumor = form == BioForm::Tumor;
+		// A bloom is small on screen and there are many: a coarser body.
+		Icosphere(bloom ? 2 : 3, s->sphere, s->sphereTris);
+		Icosphere(bloom ? 1 : 2, s->lobeSphere, s->lobeTris);
 
-		int lumps = 5 + static_cast<int>(u01(rng) * 3);
-		for (int i = 0; i < lumps; i++)
-			s->lumps.push_back({ dir(), 0.12f + 0.2f * u01(rng), 0.12f + 0.25f * u01(rng), 0.18f + 0.35f * u01(rng), u01(rng) * 6.2832f });
-		int mouths = 2 + static_cast<int>(u01(rng) * 2);
-		for (int i = 0; i < mouths; i++)
+		if (bloom)
 		{
+			// A small, fast, writhing cluster: a knot of bulbs round one gaping mouth, on long thick tendrils that lash.
+			s->timeScale = 3.2f;
+			s->hairWidth = 0.05f;
+			s->swayAmp = 0.9f;
+			s->hairColor = Color(0.62f, 0.14f, 0.30f);
+			s->hairTip = Color(1.0f, 0.42f, 0.55f, 0.0f); // the tips glow
+			int lumps = 3 + static_cast<int>(u01(rng) * 2);
+			for (int i = 0; i < lumps; i++)
+				s->lumps.push_back({ dir(), 0.18f + 0.2f * u01(rng), 0.2f + 0.25f * u01(rng), 0.35f + 0.4f * u01(rng), u01(rng) * 6.2832f });
 			Vector3 d = dir();
 			Vector3 a = AnyPerpendicular(d);
-			s->mouths.push_back({ d, a, Vector3::Cross(d, a), 0.28f + 0.14f * u01(rng), u01(rng) * 6.2832f, 0.12f + 0.15f * u01(rng) });
-		}
-		int lobes = 3 + static_cast<int>(u01(rng) * 2);
-		for (int i = 0; i < lobes; i++)
-			s->lobes.push_back({ dir(), 0.62f + 0.22f * u01(rng), 0.32f + 0.2f * u01(rng), 0.08f + 0.12f * u01(rng), u01(rng) * 6.2832f });
-		int bones = 3 + static_cast<int>(u01(rng) * 3);
-		for (int i = 0; i < bones; i++)
-		{
-			Vector3 d = dir();
-			s->bones.push_back({ d, AnyPerpendicular(d), 0.35f + 0.45f * u01(rng), 0.035f + 0.03f * u01(rng) });
-		}
-		// Hair in a few matted patches.
-		for (int p = 0; p < 3; p++)
-		{
-			Vector3 centre = dir();
-			for (int i = 0; i < 24; i++)
+			s->mouths.push_back({ d, a, Vector3::Cross(d, a), 0.45f + 0.12f * u01(rng), u01(rng) * 6.2832f, 0.3f + 0.2f * u01(rng) });
+			int lobes = 4 + static_cast<int>(u01(rng) * 3);
+			for (int i = 0; i < lobes; i++)
+				s->lobes.push_back({ dir(), 0.85f + 0.3f * u01(rng), 0.36f + 0.16f * u01(rng), 0.25f + 0.25f * u01(rng), u01(rng) * 6.2832f });
+			int tendrils = 6 + static_cast<int>(u01(rng) * 4);
+			for (int i = 0; i < tendrils; i++)
 			{
-				Vector3 d = (centre + dir() * 0.35f).normalized();
-				s->hairs.push_back({ d, AnyPerpendicular(d), 0.25f + 0.35f * u01(rng), u01(rng) * 6.2832f });
+				Vector3 t = dir();
+				s->hairs.push_back({ t, AnyPerpendicular(t), 0.9f + 0.7f * u01(rng), u01(rng) * 6.2832f });
+			}
+		}
+		else if (tumor)
+		{
+			// A large, slow growth: a cauliflower of swellings over a heart-like beat, veined thick, rooted in its host.
+			s->timeScale = 0.55f;
+			s->beatAmp = 0.07f;
+			int lumps = 9 + static_cast<int>(u01(rng) * 4);
+			for (int i = 0; i < lumps; i++)
+				s->lumps.push_back({ dir(), 0.1f + 0.16f * u01(rng), 0.06f + 0.12f * u01(rng), 0.1f + 0.2f * u01(rng), u01(rng) * 6.2832f });
+			int mouths = 1 + static_cast<int>(u01(rng) * 2);
+			for (int i = 0; i < mouths; i++)
+			{
+				Vector3 d = dir();
+				if (d.y < 0) d.y = -d.y; // on its free side, away from its host
+				d = d.normalized();
+				Vector3 a = AnyPerpendicular(d);
+				s->mouths.push_back({ d, a, Vector3::Cross(d, a), 0.2f + 0.1f * u01(rng), u01(rng) * 6.2832f, 0.06f + 0.08f * u01(rng) });
+			}
+			int lobes = 5 + static_cast<int>(u01(rng) * 3);
+			for (int i = 0; i < lobes; i++)
+			{
+				Vector3 d = dir();
+				d.y = std::fabs(d.y) * 0.8f - 0.1f; // swelling up and out from where it is rooted
+				s->lobes.push_back({ d.normalized(), 0.55f + 0.2f * u01(rng), 0.36f + 0.22f * u01(rng), 0.05f + 0.07f * u01(rng), u01(rng) * 6.2832f });
+			}
+			int bones = 1 + static_cast<int>(u01(rng) * 2);
+			for (int i = 0; i < bones; i++)
+			{
+				Vector3 d = dir();
+				s->bones.push_back({ d, AnyPerpendicular(d), 0.25f + 0.3f * u01(rng), 0.04f + 0.03f * u01(rng) });
+			}
+			int roots = 6 + static_cast<int>(u01(rng) * 4);
+			for (int i = 0; i < roots; i++)
+			{
+				Vector3 d = dir();
+				d.y = -0.35f - 0.6f * std::fabs(d.y); // the lower side, the host's
+				d = d.normalized();
+				s->roots.push_back({ d, AnyPerpendicular(d), 0.55f + 0.5f * u01(rng), 0.07f + 0.06f * u01(rng) });
+			}
+		}
+		else
+		{
+			int lumps = 5 + static_cast<int>(u01(rng) * 3);
+			for (int i = 0; i < lumps; i++)
+				s->lumps.push_back({ dir(), 0.12f + 0.2f * u01(rng), 0.12f + 0.25f * u01(rng), 0.18f + 0.35f * u01(rng), u01(rng) * 6.2832f });
+			int mouths = 2 + static_cast<int>(u01(rng) * 2);
+			for (int i = 0; i < mouths; i++)
+			{
+				Vector3 d = dir();
+				Vector3 a = AnyPerpendicular(d);
+				s->mouths.push_back({ d, a, Vector3::Cross(d, a), 0.28f + 0.14f * u01(rng), u01(rng) * 6.2832f, 0.12f + 0.15f * u01(rng) });
+			}
+			int lobes = 3 + static_cast<int>(u01(rng) * 2);
+			for (int i = 0; i < lobes; i++)
+				s->lobes.push_back({ dir(), 0.62f + 0.22f * u01(rng), 0.32f + 0.2f * u01(rng), 0.08f + 0.12f * u01(rng), u01(rng) * 6.2832f });
+			int bones = 3 + static_cast<int>(u01(rng) * 3);
+			for (int i = 0; i < bones; i++)
+			{
+				Vector3 d = dir();
+				s->bones.push_back({ d, AnyPerpendicular(d), 0.35f + 0.45f * u01(rng), 0.035f + 0.03f * u01(rng) });
+			}
+			// Hair in a few matted patches.
+			for (int p = 0; p < 3; p++)
+			{
+				Vector3 centre = dir();
+				for (int i = 0; i < 24; i++)
+				{
+					Vector3 d = (centre + dir() * 0.35f).normalized();
+					s->hairs.push_back({ d, AnyPerpendicular(d), 0.25f + 0.35f * u01(rng), u01(rng) * 6.2832f });
+				}
 			}
 		}
 
@@ -233,14 +320,20 @@ namespace SpaceGod::Views
 				col = Mix(col, Lip, Smooth(1 - std::fabs(k - edge) / 0.08f));
 				if (k > edge + 0.04f) col = Mix(Lip, Gullet, Smooth((k - edge) / (1 - edge) * 2.0f));
 			}
-			col = Mix(col, Vein, vein * 0.75f);
+			col = Mix(col, Vein, vein * (tumor ? 0.95f : 0.75f));
+			// US-T192: a bloom is raw and bright (pink, bruised purple); a tumor pale and swollen, darkening to its roots.
+			if (bloom) col = Mix(col, Mix(BloomPink, Bruise, 0.5f - 0.5f * a), 0.45f);
+			if (tumor) col = Mix(Mix(col, Fat, 0.25f * tissue), Bruise, Smooth(-d.y * 1.4f) * 0.55f);
 			s->bodyColors.push_back(col);
 		}
 		for (int k = 0; k < 4; k++)
 			for (const auto& d : s->lobeSphere)
 			{
 				float a = std::sin(Vector3::Dot(d, w2) + p1 + k);
-				s->lobeColors[k].push_back(Mix(Mix(Tissue, Flesh, 0.5f + 0.5f * a), Vein, Smooth(1 - std::fabs(a) * 4) * 0.6f));
+				Color col = Mix(Mix(Tissue, Flesh, 0.5f + 0.5f * a), Vein, Smooth(1 - std::fabs(a) * 4) * (tumor ? 0.85f : 0.6f));
+				if (bloom) col = Mix(col, BloomPink, 0.4f);
+				if (tumor) col = Mix(col, Fat, 0.3f);
+				s->lobeColors[k].push_back(col);
 			}
 		return s;
 	}
@@ -250,6 +343,9 @@ namespace SpaceGod::Views
 		s.v.clear();
 		s.c.clear();
 		s.tris.clear();
+		// US-T192: a bloom moves fast, a tumor slow; a tumor's whole mass swells with its beat (in real seconds).
+		float beat = 1 + s.beatAmp * Heartbeat(t);
+		t *= s.timeScale;
 
 		// The body.
 		for (size_t i = 0; i < s.sphere.size(); i++)
@@ -306,24 +402,41 @@ namespace SpaceGod::Views
 			Cone(s, root, b.Dir * (r + 0.05f), b.Side, b.Width * 2.2f, Mix(BoneWhite, Flesh, 0.3f), BoneWhite);
 		}
 
-		// Hair, swaying slowly as the meat under it moves.
+		// US-T192: a tumor's roots, thick and dark, sunk down into its host (its local -Y), creeping as it beats.
+		for (const auto& b : s.roots)
+		{
+			float r = Surface(s, b.Dir, 0, t, flinch, hitDir);
+			Vector3 root = b.Dir * (r - 0.15f);
+			float creep = 0.12f * std::sin(t * 0.8f + b.Length * 9.0f);
+			Vector3 bend = (b.Dir + Vector3(0, -1.0f, 0) + b.Side * creep).normalized();
+			Vector3 knee = root + bend * (b.Length * 0.55f);
+			Vector3 tip = knee + (bend + Vector3(0, -0.6f, 0) - b.Side * creep).normalized() * (b.Length * 0.5f);
+			Cone(s, root, knee, b.Side, b.Width, Bruise, Mix(Bruise, RootDark, 0.6f));
+			Cone(s, knee - bend * (b.Length * 0.08f), tip, b.Side, b.Width * 0.55f, Mix(Bruise, RootDark, 0.6f), RootDark);
+		}
+
+		// Hair, swaying slowly as the meat under it moves; on a bloom, thick tendrils that lash and curl (US-T192).
+		bool bloom = s.form == BioForm::Bloom;
+		int segments = bloom ? 7 : HairSegments;
 		for (const auto& h : s.hairs)
 		{
 			float r = Surface(s, h.Dir, 0, t, flinch, hitDir);
 			Vector3 side = h.Side, other = Vector3::Cross(h.Dir, side);
 			Vector3 prev[3], point = h.Dir * (r - 0.01f);
-			float w = 0.012f;
+			float w = s.hairWidth;
 			for (int k = 0; k < 3; k++)
 			{
 				float a = k * 2.094f;
 				prev[k] = point + (side * std::cos(a) + other * std::sin(a)) * w;
 			}
-			for (int seg = 1; seg <= HairSegments; seg++)
+			Color cPrev = s.hairColor;
+			for (int seg = 1; seg <= segments; seg++)
 			{
-				float f = static_cast<float>(seg) / HairSegments;
-				float sway = std::sin(t * 0.7f + h.Phase + f * 1.6f) * 0.35f * f * f;
-				Vector3 along = (h.Dir + side * sway + other * (0.25f * f * std::sin(h.Phase * 3))).normalized();
-				point = point + along * (h.Length / HairSegments);
+				float f = static_cast<float>(seg) / segments;
+				float sway = std::sin(t * 0.7f + h.Phase + f * 1.6f) * s.swayAmp * f * f;
+				float curl = bloom ? 0.7f * f * std::sin(t * 1.1f + h.Phase * 2 + f * 3.0f) : 0.25f * f * std::sin(h.Phase * 3);
+				Vector3 along = (h.Dir + side * sway + other * curl).normalized();
+				point = point + along * (h.Length / segments);
 				Vector3 ring[3];
 				float wk = w * (1 - 0.8f * f);
 				for (int k = 0; k < 3; k++)
@@ -331,10 +444,15 @@ namespace SpaceGod::Views
 					float a = k * 2.094f;
 					ring[k] = point + (side * std::cos(a) + other * std::sin(a)) * wk;
 				}
-				Prism(s, prev, ring, HairBrown, HairBrown);
+				Color c = bloom ? Mix(s.hairColor, s.hairTip, f * f) : s.hairColor;
+				Prism(s, prev, ring, cPrev, c);
+				cPrev = c;
 				for (int k = 0; k < 3; k++) prev[k] = ring[k];
 			}
 		}
+
+		if (beat != 1)
+			for (auto& p : s.v) p = p * beat;
 
 		mesh.indexFormat = s.v.size() > 65000 ? IndexFormat::UInt32 : IndexFormat::UInt16;
 		mesh.SetVertices(s.v);
@@ -343,7 +461,7 @@ namespace SpaceGod::Views
 		mesh.RecalculateNormals();
 		Bounds b;
 		b.center = Vector3::zero();
-		b.extents = Vector3::one() * 2.0f;
+		b.extents = Vector3::one() * (bloom ? 3.0f : s.form == BioForm::Tumor ? 2.4f : 2.0f);
 		mesh.SetBounds(b);
 	}
 
@@ -369,10 +487,75 @@ namespace SpaceGod::Views
 
 	BioMassView::~BioMassView() = default;
 
-	DVec3 BioMassView::SceneOf(UnitySpaceApp* app, const BioGlobule& g)
+	cs::Ref<Ship> BioMassView::HostShip(UnitySpaceApp* app, const BioGlobule& g)
 	{
-		return app->BodyScene(g.Body) + app->Scale()->LocalOffset((*app->Catalog())[g.Body], g.Anchor) + g.Local.SwapYZ() * app->BattleKmScale();
+		if (g.Host != BioHost::Ship) return nullptr;
+		auto world = app->World();
+		if (world == nullptr || world->Fleet == nullptr) return nullptr;
+		const auto& ships = world->Fleet->Ships();
+		// A hull's Id is its index in the fleet: the quick look first, the search only if that ever stops holding.
+		cs::Ref<Ship> s;
+		if (g.HostId >= 0 && g.HostId < ships.Count() && ships[g.HostId] != nullptr && ships[g.HostId]->Id == g.HostId) s = ships[g.HostId];
+		else
+			for (const auto& c : ships)
+				if (c != nullptr && c->Id == g.HostId) { s = c; break; }
+		return s != nullptr && !s->Destroyed ? s : nullptr;
 	}
+
+	BioMassView::Placement BioMassView::Place(UnitySpaceApp* app, const BioGlobule& g)
+	{
+		Placement p;
+		p.Radius = static_cast<float>(app->Scale()->ShipLength(g.RadiusKm()));
+		// US-T192: a growth on a hull rides the hull as it is drawn: a spot on its skin (from its seed) in the hull's own
+		// frame, so it turns with it, half sunk in, and no bigger than the hull can carry.
+		if (auto ship = HostShip(app, g))
+		{
+			auto target = Target::OfShip(ship);
+			DVec3 centre = app->FocusScene(target);
+			Quaternion rot = app->TargetRotation(target);
+			float len = static_cast<float>(app->ShipDisplayLength(ship));
+			uint32_t h = static_cast<uint32_t>(g.Seed) * 2654435761u;
+			float z = ((h & 0xffffu) / 65535.0f) * 2 - 1, a = ((h >> 16) / 65535.0f) * 6.2832f, rr = std::sqrt(std::max(0.0f, 1 - z * z));
+			Vector3 d(rr * std::cos(a), rr * std::sin(a), z);
+			const Vector3 half(0.11f, 0.08f, 0.42f); // the hull taken as a long ellipsoid, nose along +Z
+			Vector3 skin(d.x * half.x, d.y * half.y, d.z * half.z);
+			Vector3 normal = Vector3(d.x / half.x, d.y / half.y, d.z / half.z).normalized();
+			p.Radius = std::min(p.Radius, len * (g.Form == BioForm::Bloom ? 0.14f : 0.42f));
+			Vector3 local = skin * len + normal * (p.Radius * 0.35f);
+			Vector3 off = rot * local;
+			p.Scene = centre + DVec3(off.x, off.y, off.z);
+			p.Down = -(rot * normal);
+			p.Rooted = true;
+			return p;
+		}
+		// On a station or asteroid: on the body as it is drawn, on the side it came in from.
+		if (g.Host == BioHost::Body && g.HostId >= 0 && g.HostId < app->Catalog()->Count() && g.Anchor.LengthSquared() > 0)
+		{
+			double R = app->BodyDisplayRadius(g.HostId);
+			if (R > 0)
+			{
+				DVec3 out = g.Anchor.Normalized().SwapYZ();
+				p.Scene = app->BodyScene(g.HostId) + out * (R + p.Radius * 0.45);
+				p.Down = Vector3(static_cast<float>(-out.X), static_cast<float>(-out.Y), static_cast<float>(-out.Z));
+				p.Rooted = true;
+				return p;
+			}
+		}
+		p.Scene = app->BodyScene(g.Body) + app->Scale()->LocalOffset((*app->Catalog())[g.Body], g.Anchor) + g.Local.SwapYZ() * app->BattleKmScale();
+		if (g.Host == BioHost::Body && g.HostId >= 0 && g.HostId < app->Catalog()->Count())
+		{
+			DVec3 to = app->BodyScene(g.HostId) - p.Scene;
+			if (to.LengthSquared() > 0)
+			{
+				to = to.Normalized();
+				p.Down = Vector3(static_cast<float>(to.X), static_cast<float>(to.Y), static_cast<float>(to.Z));
+				p.Rooted = true;
+			}
+		}
+		return p;
+	}
+
+	DVec3 BioMassView::SceneOf(UnitySpaceApp* app, const BioGlobule& g) { return Place(app, g).Scene; }
 
 	BioMassView::View BioMassView::Create(BioGlobule* g)
 	{
@@ -381,7 +564,8 @@ namespace SpaceGod::Views
 		v.Go->transform->SetParent(parent, false);
 		v.Body = Materials::Own(cs::New<::SpaceGod::UnityCompat::Mesh>(cs::Cat("Bio Mass ", g->Id)));
 		v.Body->MarkDynamic();
-		v.Form = Build(g->Seed);
+		v.Kind = g->Form;
+		v.Form = Build(g->Seed, g->Form);
 		Animate(*v.Form, *v.Body, Time::unscaledTime + (g->Seed % 1000) * 0.01f, 0, Vector3(0, 1, 0));
 		AddComponent<MeshFilter>(v.Go)->sharedMesh = v.Body;
 		auto mr = AddComponent<MeshRenderer>(v.Go);
@@ -423,9 +607,18 @@ namespace SpaceGod::Views
 					it->second.Owner = g;
 				}
 				auto& v = it->second;
-				DVec3 scene = SceneOf(app, *g);
+				// US-T192: a bloom that took root is a tumor now: a new model for its new shape.
+				if (v.Kind != g->Form)
+				{
+					v.Kind = g->Form;
+					v.Form = Build(g->Seed, g->Form);
+					v.LastShaped = -1;
+					Animate(*v.Form, *v.Body, now + (g->Seed % 1000) * 0.01f, 0, Vector3(0, 1, 0));
+				}
+				auto place = Place(app, *g);
+				DVec3 scene = place.Scene;
 				Vector3 rel = app->Relative(scene);
-				float radius = static_cast<float>(app->Scale()->ShipLength(g->RadiusKm()));
+				float radius = place.Radius;
 				float px = static_cast<float>(radius * 2 * ppu / Mathf::Max(rel.magnitude(), 1e-6f));
 				bool shown = px > 1.5f;
 				if (v.Go->activeSelf != shown) v.Go->SetActive(shown);
@@ -469,10 +662,24 @@ namespace SpaceGod::Views
 					Animate(*v.Form, *v.Body, t, flinch, hitDir);
 					v.LastShaped = now;
 				}
-				float breathe = near ? 1.0f : 1.0f + 0.06f * std::sin(t * 1.3f);
+				// A small one breathes (a tumor beats, a bloom quivers fast); a big one moves in its mesh.
+				float breathe = near ? 1.0f
+					: g->Form == BioForm::Tumor ? 1.0f + 0.07f * Heartbeat(t)
+					: g->Form == BioForm::Bloom ? 1.0f + 0.08f * std::sin(t * 6.5f)
+					: 1.0f + 0.06f * std::sin(t * 1.3f);
 				auto tr = v.Go->transform;
 				tr->localPosition = rel;
-				tr->localRotation = Quaternion::Euler(t * 1.5f, t * 2.3f + g->Seed % 360, 0);
+				float spin = static_cast<float>(g->Seed % 360);
+				if (place.Rooted && place.Down.sqrMagnitude() > 0)
+				{
+					// Latched on: its roots (local -Y) into its host; a bloom twists where it bites, a tumor holds still.
+					float twist = g->Form == BioForm::Bloom ? spin + 40.0f * std::sin(t * 2.1f) : spin;
+					tr->localRotation = Quaternion::FromToRotation(Vector3(0, -1, 0), place.Down.normalized()) * Quaternion::AngleAxis(twist, Vector3(0, 1, 0));
+				}
+				else if (g->Form == BioForm::Bloom)
+					tr->localRotation = Quaternion::Euler(t * 31.0f, t * 47.0f + spin, t * 13.0f); // darting, tumbling
+				else
+					tr->localRotation = Quaternion::Euler(t * 1.5f, t * 2.3f + spin, 0);
 				tr->localScale = Vector3::one() * (radius * breathe);
 
 				// Tracers: from a ring of gun satellites round the body, from the gate, or from the hull.

@@ -236,6 +236,9 @@ namespace SpaceGod::Core
 		/// <summary>How often a tumor (or a globule beside a hull) erupts a cluster of blooms (days, on average).</summary>
 		static constexpr double TumorBroodDays = 0.4;
 		static constexpr double GlobuleBroodDays = 0.25;
+		/// <summary>A globule or tumor with no hull near looks again after this (seconds), so the hulls' positions are not
+		/// worked out every update for a brood that is not coming.</summary>
+		static constexpr double BroodLookS = 600;
 		/// <summary>Guns that would hit the host to hit a growth on it hold most of their fire: their share (orbital, gate, platform).</summary>
 		static constexpr double HostCover = 0.3;
 
@@ -290,11 +293,22 @@ namespace SpaceGod::Core
 		struct Hull { cs::Ref<Ship> ship; DVec3 helio; };
 		/// <summary>The station and asteroid bodies (catalog indices), worked out once an update; not saved.</summary>
 		cs::List<int> roots = cs::List<int>();
+		/// <summary>Every open-space hull (armed or not) and where it is at <see cref="hullsJd"/>: worked out only when a free
+		/// bloom or seed hunts, or a brood looks round, and then once an update (<see cref="Hulls"/>); cleared after it.</summary>
+		cs::List<Hull> hullCache = cs::List<Hull>();
+		bool hullsReady = false;
+		double hullsJd = cs::Double::NaN;
+
+		/// <summary>Whether a hull is one a growth can ride, be fed on or hunt (in open space: not landed, not in a lane).</summary>
+		static bool InOpenSpace(const cs::Ref<Ship>& s);
+		const cs::List<Hull>& Hulls(double jd);
+		/// <summary>The one hull a growth rides (by Ship.Id), without working out the rest: false if it is gone or not in open space.</summary>
+		bool HostHull(int shipId, double jd, Hull& out);
 
 		void Seep(double jd);
 		void SeepTumor(double jd);
-		void Grow(const cs::Ref<BioGlobule>& g, double jd, double dt, const cs::List<DVec3>& bodies, const cs::List<Hull>& hulls);
-		void Brood(const cs::Ref<BioGlobule>& g, double jd, DVec3 here, const cs::List<Hull>& hulls);
+		void Grow(const cs::Ref<BioGlobule>& g, double jd, double dt, const cs::List<DVec3>& bodies);
+		void Brood(const cs::Ref<BioGlobule>& g, double jd, DVec3 here);
 		void FeedTumor(const cs::Ref<BioGlobule>& g, double jd, double days, DVec3 here, const cs::List<DVec3>& bodies);
 		cs::String HostName(const cs::Ref<BioGlobule>& g) const;
 		void Latch(const cs::Ref<BioGlobule>& g, BioHost host, int hostId, DVec3 hostHelio, double hostRadiusKm, double jd);
@@ -304,7 +318,7 @@ namespace SpaceGod::Core
 		int NearestRootBody(DVec3 helioKm, const cs::List<DVec3>& bodies, int except) const;
 		bool TumorOn(int body) const;
 		double HostCoverFor(const cs::Ref<BioGlobule>& g) const { return g->Attached() ? HostCover : 1.0; }
-		void Step(double jd, double dt, const cs::List<DVec3>& bodies, const cs::List<DVec3>& shipHelio, const cs::List<cs::Ref<Ship>>& armed, const cs::List<Hull>& hulls);
+		void Step(double jd, double dt, const cs::List<DVec3>& bodies, const cs::List<DVec3>& shipHelio, const cs::List<cs::Ref<Ship>>& armed);
 		void Creep(const cs::Ref<BioGlobule>& g, double jd, double dt, const cs::List<DVec3>& bodies);
 		void Feed(double jd, double dt, const cs::List<DVec3>& bodies);
 		void TryCross(const cs::Ref<BioGlobule>& g, double jd);

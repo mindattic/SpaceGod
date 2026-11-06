@@ -1,4 +1,5 @@
-// US-T125: sg.BioMass, a Bio Mass globule spawned beside the player (and its screenshots at game scale).
+// US-T125: sg.BioMass, a Bio Mass globule spawned beside the player (and its screenshots at game scale); US-T192 its
+// blooms and tumors (sg.BioMass bloom, sg.BioMass tumor).
 
 #include "UnitySpaceApp.h"
 
@@ -12,6 +13,7 @@
 
 #include "BodyCatalog.h"
 #include "Combat/BioMass.h"
+#include "Ephemeris.h"
 #include "Fleet.h"
 #include "ScaleModel.h"
 #include "Ships.h"
@@ -212,10 +214,14 @@ namespace
 		FString scale = TEXT("game"), shots;
 		double radii = 7;
 		bool quit = false, keepScale = false;
+		// US-T192: what to spawn: a globule (the default), a cluster of blooms off the hull, or a tumor on it.
+		BioForm form = BioForm::Globule;
 		for (int i = 0; i < args.Num(); i++)
 		{
 			const FString& a = args[i];
-			if (a.Equals(TEXT("game"), ESearchCase::IgnoreCase) || a.Equals(TEXT("real"), ESearchCase::IgnoreCase)) scale = a.ToLower();
+			if (a.Equals(TEXT("bloom"), ESearchCase::IgnoreCase) || a.Equals(TEXT("blooms"), ESearchCase::IgnoreCase)) form = BioForm::Bloom;
+			else if (a.Equals(TEXT("tumor"), ESearchCase::IgnoreCase)) form = BioForm::Tumor;
+			else if (a.Equals(TEXT("game"), ESearchCase::IgnoreCase) || a.Equals(TEXT("real"), ESearchCase::IgnoreCase)) scale = a.ToLower();
 			else if (a.Equals(TEXT("here"), ESearchCase::IgnoreCase)) keepScale = true;
 			else if (a.StartsWith(TEXT("radii="), ESearchCase::IgnoreCase)) radii = FCString::Atod(*a.Mid(6));
 			else if (a.Equals(TEXT("shots"), ESearchCase::IgnoreCase) && i + 1 < args.Num()) shots = args[++i];
@@ -246,6 +252,39 @@ namespace
 			return true;
 		} });
 		run->steps.push_back({ TEXT("camera settled"), wait(3.0) });
+
+		if (form != BioForm::Globule)
+		{
+			// US-T192: blooms erupt a short dart off the hull (they see it, close and latch on in seconds); a tumor is
+			// set rooted on it. Both are then left to the sim (and the guns).
+			run->steps.push_back({ form == BioForm::Bloom ? TEXT("blooms erupted beside the hull") : TEXT("tumor rooted on the hull"),
+				[ship, form](SpaceGod::UnitySpaceApp& app, double)
+				{
+					auto world = app.World();
+					double jd = app.Clock->Jd;
+					auto bio = world->EnsureBioMass(jd);
+					DVec3 helio = world->Fleet->StateOf(*ship, jd).HelioKm;
+					if (form == BioForm::Bloom)
+					{
+						int made = bio->EruptBlooms(helio + DVec3(1, 0.4, 0.25).Normalized() * 600.0, BioMass::BloomCluster, jd);
+						if (made == 0) throw std::runtime_error("no room for blooms in this system (at the cap)");
+						UE_LOG(LogSpaceGod, Display, TEXT("sg.BioMass: %d blooms, 600 km off"), made);
+					}
+					else
+					{
+						auto t = bio->SpawnTumor(BioHost::Ship, (*ship)->Id, 0, helio - world->Ephemeris->HelioAt(0, jd), BioMass::TumorSeedMass, jd);
+						if (!t->Attached()) throw std::runtime_error("the tumor could not latch onto the hull");
+						UE_LOG(LogSpaceGod, Display, TEXT("sg.BioMass: tumor %d, %.0f kt, on the hull"), t->Id, t->Mass / 1000);
+					}
+					return true;
+				} });
+			FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([run](float)
+			{
+				try { return run->Tick(); }
+				catch (const std::exception& e) { return run->Finish(*FString(UTF8_TO_TCHAR(e.what()))); }
+			}));
+			return;
+		}
 
 		// Beside the hull: off to the camera's right, about a third of the view away, a little smaller than the gap.
 		auto beside = [ship, globule](SpaceGod::UnitySpaceApp& app, double)
@@ -317,9 +356,12 @@ namespace
 	/// US-T125: <c>sg.BioMass [game|real|here] [radii=R]</c> spawns a Bio Mass globule beside the piloted (or selected)
 	/// hull, at game scale unless told otherwise, and drops time to real time so the guns' work can be watched.
 	/// <c>shots &lt;dir&gt; [quit]</c> also takes biomass-game-near.png and biomass-game-close.png into dir.
+	/// US-T192: <c>sg.BioMass bloom</c> erupts a cluster of blooms just off the hull (they latch on and bite);
+	/// <c>sg.BioMass tumor</c> roots a tumor on it.
 	FAutoConsoleCommand GBioMassCommand(
 		TEXT("sg.BioMass"),
 		TEXT("US-T125: spawn a Bio Mass globule beside your hull: sg.BioMass [game|real|here] [radii=R]; "
-			"sg.BioMass shots <dir> [quit] screenshots it near the hull and close up."),
+			"sg.BioMass shots <dir> [quit] screenshots it near the hull and close up. "
+			"US-T192: sg.BioMass bloom erupts blooms off your hull; sg.BioMass tumor roots a tumor on it."),
 		FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& args) { Start(args); }));
 }
