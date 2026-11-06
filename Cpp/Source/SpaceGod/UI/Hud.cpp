@@ -1094,6 +1094,7 @@ namespace SpaceGod::UI
 		// in the Layout pass and the Repaint. Not registered as UI, so it never eats a click.
 		constexpr float w = 232, h = 142, segW = 56, segH = 9, gap = 3, step = 76;
 		auto r = layout.Take(HudRegion::BottomRight, w, h);
+		RegisterUi(r); // US-T212
 		if (Event::current().type != EventType::Repaint) return;
 		auto held = CraftPower::Of(seat, false);
 		PowerDistribution even; // nothing moved yet: the even share it runs at
@@ -1137,6 +1138,7 @@ namespace SpaceGod::UI
 		// Stacked over the reactor's panel in BottomRight (US-T152), the same width; screen space, the same at either scale.
 		constexpr float w = 232, h = 62;
 		auto r = layout.Take(HudRegion::BottomRight, w, h);
+		RegisterUi(r); // US-T212
 		if (Event::current().type != EventType::Repaint) return;
 		GUI::Box(r, GUIContent::none(), panel);
 		auto state = SensorPosture::StateOf(c);
@@ -1224,6 +1226,7 @@ namespace SpaceGod::UI
 		auto oldColor = GUI::color;
 		float w = 520, y = Mathf::Max(Screen::height * 0.22f, 120.0f);
 		auto r = Rect((Screen::width - w) * 0.5f, y, w, 118);
+		RegisterUi(r); // US-T212
 		GUI::Box(r, GUIContent::none(), panel);
 		if (left >= 0)
 		{

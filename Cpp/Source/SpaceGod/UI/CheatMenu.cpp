@@ -374,6 +374,7 @@ namespace SpaceGod::UI
 			// US-T208: a full-screen screen (spawn, manual, galaxy map) owns the corner: the hint would sit on its buttons and borders.
 			if (app.ShowSpawn || app.ShowHelp || (app.ShowGalaxyMap && !app.Travel->Active)) return;
 			auto r = Rect(Screen::width - 196.0f, Screen::height - 24.0f, 186, 18);
+			if (!app.UiRects.Contains(r)) app.UiRects.Add(r); // US-T212
 			GUI::Box(r, GUIContent::none(), hint);
 			GUI::Label(r, "Shift+F1  DEV MENU", hint);
 			return;

@@ -958,7 +958,24 @@ namespace SpaceGod::UI
 					: cs::Cat(c->Orbit->Fixed ? "Holding position at " : "Holding orbit at ", body->Name) });
 				// From where it actually is: a held position (a released or spawned hull) is a fixed point
 				// with no orbit radius, and a ring's holding point sits off the body's centre.
-				lines.Add(SelectionLine{ "Altitude", Km(c->Orbit->OffsetAt(app->Clock->Jd).Length() - body->RadiusKm) });
+				// US-T212: a ship in battle fights where the battle is, not at its schedule's held point, so its height is
+				// measured from where it really is, off the world it is nearest, and never below the surface.
+				{
+					auto where = body;
+					double dist = c->Orbit->OffsetAt(app->Clock->Jd).Length();
+					if (ship->Battle != nullptr)
+					{
+						dist = cs::Double::MaxValue;
+						for (const auto& b : app->Catalog()->Bodies())
+						{
+							if (!b->IsVisible() || b->IsStar()) continue;
+							double d = (st.HelioKm - app->Ephemeris()->Helio(b->Index)).Length();
+							if (d < dist) { dist = d; where = b; }
+						}
+					}
+					if (dist >= where->RadiusKm) lines.Add(SelectionLine{ "Altitude", Km(dist - where->RadiusKm) });
+					else lines.Add(SelectionLine{ "Range", cs::Cat(Km(dist), " from ", where->Name) });
+				}
 				lines.Add(SelectionLine{ "Orbital speed", cs::Cat(cs::Fmt(c->Orbit->SpeedKmS(), "0.00"), " km/s") });
 				// A freshly spawned or not-yet-scheduled ship has no destination yet (-1).
 				if (c->DestinationBody >= 0 && !(c->WaitingForPropellant && c->DestinationBody == c->Orbit->Body))

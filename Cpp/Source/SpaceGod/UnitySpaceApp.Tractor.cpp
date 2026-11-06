@@ -261,6 +261,7 @@ namespace SpaceGod
 		cs::String tail = bar == cs::String::npos ? cs::String() : tractorReadout.substr(bar + 1);
 		float w = 760, h = tail.empty() ? 28.0f : 46.0f;
 		auto r = Rect((Screen::width - w) * 0.5f, Screen::height - 124 - h, w, h);
+		if (!UiRects.Contains(r)) UiRects.Add(r); // US-T212: world names skip it
 		GUI::Box(r, GUIContent::none(), tractorPanel);
 		GUI::Label(Rect(r.x, r.y + 4, w, 20), head, tractorStyle);
 		if (!tail.empty()) GUI::Label(Rect(r.x, r.y + 24, w, 18), tail, tractorSmall);

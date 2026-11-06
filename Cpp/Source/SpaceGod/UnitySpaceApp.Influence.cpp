@@ -128,6 +128,7 @@ namespace SpaceGod
 			bool fullScreen = ShowSpawn || ShowHelp || (ShowGalaxyMap && !Travel->Active);
 			if (!fullScreen)
 			{
+			if (!UiRects.Contains(r)) UiRects.Add(r); // US-T212: world names skip it
 			GUI::Box(r, GUIContent::none(), influencePanel);
 			cs::String head = cs::Cat("INFLUENCE  ", level, "  \xC2\xB7  ", cs::Strings::ToUpperInvariant(SpaceGodInfluence::Title(level)),
 				inf != nullptr && inf->Waived ? cs::String("  \xC2\xB7  LIMITS OFF (dev)") : cs::String());
@@ -153,6 +154,7 @@ namespace SpaceGod
 			cs::String line = cs::Cat("YOUR SQUAD  \xC2\xB7  ", cs::Strings::ToUpperInvariant(state), can ? cs::Cat("  \xC2\xB7  ", key, " orders them to stand down") : cs::String());
 			float w = 640, h = 26;
 			auto r = Rect((Screen::width - w) * 0.5f, 158, w, h);
+			if (!UiRects.Contains(r)) UiRects.Add(r); // US-T212: world names skip it
 			GUI::Box(r, GUIContent::none(), influencePanel);
 			auto old = influenceTitle->alignment;
 			influenceTitle->alignment = TextAnchor::MiddleCenter;
@@ -165,6 +167,7 @@ namespace SpaceGod
 		{
 			float w = 780, h = 58;
 			auto r = Rect((Screen::width - w) * 0.5f, 192, w, h);
+			if (!UiRects.Contains(r)) UiRects.Add(r); // US-T212: world names skip it
 			GUI::Box(r, GUIContent::none(), influenceRefusePanel);
 			cs::String tag = embodyRefusalRule == static_cast<int>(EmbodyRefusal::InBattle) ? cs::String("EMBODY REFUSED  \xC2\xB7  IN BATTLE")
 				: embodyRefusalRule == static_cast<int>(EmbodyRefusal::Influence) ? cs::Cat("EMBODY REFUSED  \xC2\xB7  INFLUENCE ", embodyRefusalHave, " OF ", embodyRefusalNeed)

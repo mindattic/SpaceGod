@@ -643,6 +643,7 @@ namespace SpaceGod
 		}
 		float w = 760, h = 48;
 		auto r = Rect((Screen::width - w) * 0.5f, 78, w, h);
+		if (!UiRects.Contains(r)) UiRects.Add(r); // US-T212: world names skip it
 		GUI::Box(r, GUIContent::none(), cruisePanel);
 		GUI::Label(Rect(r.x, r.y + 4, w, 22), head, cruiseStyle);
 		GUI::Label(Rect(r.x, r.y + 26, w, 18), tail, cruiseSmall);

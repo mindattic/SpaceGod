@@ -1361,6 +1361,7 @@ namespace SpaceGod::UI
 		auto content = GUIContent(line);
 		float w = toast->CalcSize(content).x + 40;
 		auto r = Rect((Screen::width - w) * 0.5f, Screen::height - 96, w, 34);
+		RegisterUi(r); // US-T212
 		GUI::Box(r, GUIContent::none(), panel);
 		GUI::Label(Rect(r.x + 20, r.y + 7, w, 22), content, toast);
 	}
@@ -1404,6 +1405,7 @@ namespace SpaceGod::UI
 		widest = Mathf::Max(widest, small->CalcSize(GUIContent(heading)).x);
 		float w = widest + 2 * pad, h = pad * 2 + rowH * (rows + 1);
 		auto r = Rect((Screen::width - w) * 0.5f, Screen::height - 104 - h, w, h);
+		RegisterUi(r); // US-T212
 		GUI::Box(r, GUIContent::none(), panel);
 		auto old = GUI::contentColor;
 		GUI::contentColor = Dim;
