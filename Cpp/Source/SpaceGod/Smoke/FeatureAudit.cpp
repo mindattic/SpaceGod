@@ -180,6 +180,111 @@ namespace SpaceGod::Smoke::FeatureAudit
 			Result("view.sky", s1 != s0 && s2 == s0, cs::Cat("Shift+K '", s0, "' -> '", s1, "', Shift+Alt+K -> '", s2, "'"));
 		}
 
+		// ---------------------------------------------------------------- swim (US-T221: US-T184, swim never hooks on a planet)
+
+		int BodyIndex(const char* name);
+
+		struct SwimRun
+		{
+			double startAlt = 0, endAlt = 0, minAlt = 1e300, moved = 0, commanded = 0, worstRatio = 1e300, minSpeedFrac = 1e300;
+			int frames = 0;
+		};
+
+		/// Holds W in the free camera from a pose beside a body, `n` frames, measuring altitude above the displayed surface each
+		/// frame against the swim rate the camera itself commands (CurrentSpeed). From frame `warm` on (the velocity eases up to
+		/// the commanded one first) each frame must make at least its share of that rate along `along`.
+		SwimRun SwimFrom(int body, DVec3 normal, DVec3 along, double startAlt, int n, int warm)
+		{
+			SwimRun r;
+			double radius = app->Scale()->DisplayRadius((*app->Catalog())[body]);
+			double dt = Time::deltaTime > 0 ? Time::deltaTime : 1.0 / 60;
+			DVec3 centre = app->TargetScene(Target::OfBody(body));
+			DVec3 pos = centre + normal * (radius + startAlt);
+			auto fwd = Vector3(static_cast<float>(along.X), static_cast<float>(along.Y), static_cast<float>(along.Z));
+			app->SpaceCamera->SetPose(pos, Quaternion::LookRotation(fwd, Vector3::up()));
+			r.startAlt = startAlt;
+			DVec3 last = app->SpaceCamera->ScenePosition - centre; // relative to the body: it rides its orbit (and the warp) under the camera
+			kb->Hold(Key::W);
+			for (int i = 0; i < n; i++)
+			{
+				frames(1);
+				dt = Time::deltaTime > 0 ? Time::deltaTime : dt;
+				DVec3 now = app->SpaceCamera->ScenePosition - app->TargetScene(Target::OfBody(body));
+				double alt = now.Length() - radius;
+				r.minAlt = cs::Math::Min(r.minAlt, alt);
+				r.endAlt = alt;
+				if (i >= warm)
+				{
+					double step = (now - last).Length(), want = app->SpaceCamera->CurrentSpeed * dt;
+					r.moved += step;
+					r.commanded += want;
+					if (want > 0) r.worstRatio = cs::Math::Min(r.worstRatio, step / want);
+				}
+				last = now;
+				r.frames++;
+			}
+			kb->Release(Key::W);
+			frames(1);
+			return r;
+		}
+
+		DVec3 AwayFrom(int body, int other)
+		{
+			DVec3 d = app->TargetScene(Target::OfBody(body)) - app->TargetScene(Target::OfBody(other));
+			return d.LengthSquared() > 0 ? d.Normalized() : DVec3::UnitY;
+		}
+
+		void SwimProbes()
+		{
+			CloseEverything();
+			app->SpaceCamera->ExitFocus();
+			int earth = BodyIndex("Earth"), moon = BodyIndex("Moon");
+			if (earth < 0 || moon < 0) { Result("swim.escape", false, "no Earth or Moon in the catalog"); return; }
+			DVec3 savedPos = app->SpaceCamera->ScenePosition;
+			Quaternion savedRot = app->SpaceCamera->Rotation;
+			double goal0 = app->ScaleGoal;
+			constexpr int N = 180, Warm = 30;
+			for (double goal : { 1.0, 0.0 })
+			{
+				if (app->ScaleGoal != goal) Tap(Key::G);
+				for (int i = 0; i < 900 && cs::Math::Abs(app->Scale()->Blend() - app->ScaleGoal) > 1e-9; i++) frames(1);
+				cs::String scale = goal > 0.5 ? "gameplay" : "realistic";
+				for (int body : { earth, moon })
+				{
+					int other = body == earth ? moon : earth;
+					cs::String name = (*app->Catalog())[body]->Name;
+					double radius = app->Scale()->DisplayRadius((*app->Catalog())[body]);
+					double startAlt = radius * 0.01;
+					DVec3 up = AwayFrom(body, other);
+					// Straight away from the skin: altitude must climb steadily and many times over, never stalling.
+					{
+						SwimRun r = SwimFrom(body, up, up, startAlt, N, Warm);
+						bool ok = r.endAlt > r.startAlt * 5 && r.worstRatio >= 0.5 && r.minAlt >= startAlt * 0.99;
+						Result(cs::Cat("swim.escape.", scale, ".", name), ok,
+							cs::Cat("W held ", r.frames, " frames from ", cs::Fmt(startAlt, "G4"), " units above ", name, ": altitude ", cs::Fmt(r.endAlt, "G4"), " (x",
+								cs::Fmt(r.endAlt / startAlt, "F1"), "), moved ", cs::Fmt(r.moved, "G4"), " of ", cs::Fmt(r.commanded, "G4"), " commanded, worst frame ",
+								cs::Fmt(r.worstRatio, "F2"), " of its commanded step, lowest altitude ", cs::Fmt(r.minAlt, "G4")));
+					}
+					// Along the skin: keeps swimming, whatever the push, and never ends inside the body.
+					{
+						DVec3 t = DVec3::Cross(up, DVec3::UnitY);
+						if (t.LengthSquared() < 1e-6) t = DVec3::Cross(up, DVec3::UnitX);
+						t = t.Normalized();
+						SwimRun r = SwimFrom(body, up, t, startAlt, N, Warm);
+						bool ok = r.commanded > 0 && r.moved >= r.commanded * 0.8 && r.worstRatio >= 0.5 && r.minAlt >= -1e-9 * radius;
+						Result(cs::Cat("swim.skim.", scale, ".", name), ok,
+							cs::Cat("W held ", r.frames, " frames along the surface of ", name, " from ", cs::Fmt(startAlt, "G4"), " units up: moved ", cs::Fmt(r.moved, "G4"),
+								" of ", cs::Fmt(r.commanded, "G4"), " commanded, worst frame ", cs::Fmt(r.worstRatio, "F2"), " of its commanded step, lowest altitude ",
+								cs::Fmt(r.minAlt, "G4"), " (radius ", cs::Fmt(radius, "G4"), ")"));
+					}
+				}
+			}
+			if (app->ScaleGoal != goal0) Tap(Key::G);
+			for (int i = 0; i < 900 && cs::Math::Abs(app->Scale()->Blend() - app->ScaleGoal) > 1e-9; i++) frames(1);
+			app->SpaceCamera->SetPose(savedPos, savedRot);
+			frames(2);
+		}
+
 		// ---------------------------------------------------------------- screens and panels
 
 		void ScreenProbes()
@@ -1096,6 +1201,7 @@ namespace SpaceGod::Smoke::FeatureAudit
 		Probe("display", [] { MsaaProbes(Result, frames); DisplayModeProbes(Result, frames); }); // US-T55, US-T56
 		Probe("time", TimeProbes);
 		Probe("view", ViewProbes);
+		Probe("swim", SwimProbes); // US-T221
 		Probe("screens", ScreenProbes);
 		Probe("nav", NavProbes);
 		Probe("saves", SaveProbes);
