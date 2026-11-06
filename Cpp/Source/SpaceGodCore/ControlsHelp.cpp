@@ -19,10 +19,10 @@ namespace SpaceGod::Core
 				L("F", "focus the selection"),
 				L("Home", "system view"),
 				L("1-9, 0", "planets (twice to focus)"),
-				L("Tab", "cycle ships"),
+				L("Tab  /  Shift+Tab", "cycle ships forward / back"),
 				L("B", "watch a battle"),
-				L("Space", "pause (eases to a stop and back)"),
-				L(",  .", "time warp slower / faster"),
+				L("Space  or  Pause", "pause (eases to a stop and back)"),
+				L(",  .  or  -  =  or  numpad -  +", "time warp slower / faster"),
 				L("T", "back to now"),
 				L("G  or  `", "toggle GAMEPLAY / REALISTIC scale"),
 				L("R", "auto-reorient on / off (keep this system's plane level); at a fighter's controls, held, R is drift"),
@@ -62,7 +62,8 @@ namespace SpaceGod::Core
 				L("Ctrl", "interdiction (riding): drop out short of the field"),
 				L("Y", "back into the lane where you left it"),
 				L("Shift+J", "cruise drive, inside a system: spools a few seconds (longer the heavier the hull), then carries you along the nose at up to about 1000 c, for the world or station the nose is on (or the hull locked); the mouse steers, it slows as it closes and drops out off the target -- Earth to Mars in about half a minute. Shift+J again drops out; a fight, a hit or a world's gravity well drop it too"), // US-T127
-				L("Enter", "FTL (capital ships, survey hulls): beyond the system's outer rim, put the nose on another star, Enter to spool (hold it there); it engages for that star"),
+				L("J (hold)", "tactical cruise: a stronger drive tier ramps up while it is held, with the nose straight and the throttle up, out of a fight; it snaps off at a hit, a fight or a hard turn"),
+				L("Enter  or  numpad Enter", "FTL (capital ships, survey hulls): beyond the system's outer rim, put the nose on another star, Enter to spool (hold it there); it engages for that star"),
 				More("a jump reaches about 7 ly (survey drive 9, jump ring 5); farther stars are flown in even jumps with a stop in the void between each: the drive cools, then spools, then jumps on -- the HUD shows the stop, the cooldown and the spool"),
 				More("small craft: dock a jump ring at a shipyard (F2, outfitting) to jump like a capital hull; most traffic still goes by the gates"),
 				L("Tab  (void stop)", "between jumps: an active ping -- a ghost closing on you shows at once and may break off, but you are lit up a while and easier to find"),
@@ -136,7 +137,7 @@ namespace SpaceGod::Core
 				More("no embodying in battle: a hull marked in a fight under way can't be taken (no starting a fight, then hijacking the enemy); take it before it engages, or once the fight is over; what is on a hull you already hold (its guns, EVA crews, launched craft) stays yours"),
 				More("Influence (the meter top left) is the SpaceGod's own, never a pilot's: it grows with XP from interventions (acts a pilot owns once you leave, a squad talked down), missions (contracts) and careers you steered (a pilot you flew promoted)"),
 				More("it gates what you can take: small craft and working hulls 1, gunships and corvettes 2, frigates and destroyers 3, cruisers 4, carriers and battleships 5, command cruisers 6, gate breakers 7; a defence platform 3, a gate fort 5; a named Epic entity (a feared outlaw's flagship, a pirate warlord or king, a captain at the top of their ladder) more"),
-				L("Shift+n (squad)", "at a band captain's helm, before a fight: order the squad to stand down (the bar's last entry); by your Influence and the captain's hold on the crews (rank, reputation, loyalty, history) they obey, hesitate, argue, or mutiny and put someone else at the head of the band"),
+				L("Shift + the bar's last number (squad)", "at a band captain's helm, before a fight: order the squad to stand down (the bar's last entry); by your Influence and the captain's hold on the crews (rank, reputation, loyalty, history) they obey, hesitate, argue, or mutiny and put someone else at the head of the band"),
 				More("a refusal shows on the HUD with its reason; the dev menu (Shift+F1, SpaceGod) grants Influence, lifts the limits for testing, and sets up the stand-down scenario")),
 
 			cs::New<HelpSection>("FLEET AND COMMAND",
@@ -171,6 +172,7 @@ namespace SpaceGod::Core
 				L("F6", "save slots"),
 				More("autosaves every 5 minutes and on quit; -continue resumes the latest")),
 		};
+				L("Alt+F9 / F10 / F11", "only while capture runs: screenshot, start / stop recording, save the replay (instead of the picker, the fleet and clear screen; docs/CAPTURE.md)"),
 		return value;
 	}
 
