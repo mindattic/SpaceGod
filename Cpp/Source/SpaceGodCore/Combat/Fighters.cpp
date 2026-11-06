@@ -948,17 +948,17 @@ namespace SpaceGod::Core
 			return;
 		}
 		// US-T198: the squadron has engaged enemy fighters (Formations::BreakTarget): the wingman breaks out of formation
-		// into a dogfight of its own, and forms up on its lead again once the furball is over. Not while the lead strafes a
-		// capital: then every wingman flies its own run (US-T180, below).
-		bool strafe = lf->Phase == FighterPhase::AttackRun && !f->Bomber && lead->Target != nullptr && Choreography::Strafeable(lead->Target);
-		if (!strafe)
+		// into a dogfight of its own, and forms up on its lead again once the furball is over. While the lead strafes a
+		// capital every wingman flies its own run (US-T180, below), but only once the lead is near the hull: on the way in
+		// the squadron holds its shape (US-T225). On a run the lead's target is the hull, so only an enemy fighter jumping
+		// this wingman (Formations::JumpedKm) breaks it, and it goes back to its run once that fight is over.
+		bool strafe = lf->Phase == FighterPhase::AttackRun && !f->Bomber && lead->Target != nullptr && Choreography::Strafeable(lead->Target)
+			&& (lead->Pos - lead->Target->Pos).Length() < Formations::StrafeBreakKm + lead->Target->Radius();
+		if (auto foe = Formations::BreakTarget(b, u))
 		{
-			if (auto foe = Formations::BreakTarget(b, u))
-			{
-				Formations::Break(u, foe);
-				Lead(b, u, dt, foe);
-				return;
-			}
+			Formations::Break(u, foe);
+			Lead(b, u, dt, foe);
+			return;
 		}
 		Formations::Rejoin(u);
 		u->Target = lead->Target;
@@ -994,7 +994,9 @@ namespace SpaceGod::Core
 		// rather than pointing the nose at a near-zero gap vector (U.SPC-T559).
 		auto gap = station - u->Pos;
 		auto want = lead->Vel + gap * 1.2;
-		double maxSpeed = u->Combat->Spec->MaxSpeed * 1.3;
+		// US-T225: with headroom over the lead's own pace: a lead on its run burns at BurnBoost, and a wingman capped at that
+		// same pace held whatever gap it had for good (behind its slot in the vee, or km astern after a dogfight).
+		double maxSpeed = u->Combat->Spec->MaxSpeed * 1.3 * BurnBoost;
 		// Steer scales the requested speed by engine power; undo that here so the feed-forward stays the lead's own speed.
 		double engines = Max(1e-6, PowerDistribution::FactorOf(u, PowerSystem::Engines));
 		double speed = Min(maxSpeed, want.Length() / engines);

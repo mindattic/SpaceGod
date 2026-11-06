@@ -48,6 +48,10 @@ namespace SpaceGod::Core
 		/// <summary>How near a wingman an armed enemy fighter must be for it to break on its own, km.</summary>
 		static constexpr double JumpedKm = 1.5;
 
+		/// <summary>US-T225: how near its capital target (beyond the hull's own radius) a lead on an attack run must be before
+		/// its wingmen split off onto strafing runs of their own, km; further out the squadron flies in formation.</summary>
+		static constexpr double StrafeBreakKm = 6;
+
 		/// <summary>The length the slot spacings are drawn for (an interceptor's), km: a longer lead's slots open out with
 		/// it, up to twice as wide.</summary>
 		static constexpr double SpacingLengthKm = 0.016;
