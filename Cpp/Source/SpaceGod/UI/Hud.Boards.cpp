@@ -387,7 +387,7 @@ namespace SpaceGod::UI
 		if (canTrade && Event::current().type == EventType::Layout && !CoopObserve(market) && app->World()->Trade != nullptr) // US-T44 (US-T43): an entry in co-op
 			app->World()->Trade->Intel->Observe(market, app->Clock->Jd, "seen in port");
 		auto law = app->World()->Law;
-		cs::Ref<LawRecord> pilotRecord = app->IsPiloting() && law != nullptr ? law->Player : nullptr;
+		cs::Ref<LawRecord> pilotRecord = app->IsPiloting() && law != nullptr ? law->PlayerRecord() : nullptr; // the embodied pilot's (US-T148)
 		bool lawful = market != nullptr && market->Owner != nullptr && !market->Owner->IsPirate;
 		// A row for the law at this port: the bounty to pay off here, or why it will not dock the ship.
 		bool atPort = market != nullptr && pilotRecord != nullptr && lawful && app->NearPort(market);
@@ -1160,9 +1160,10 @@ namespace SpaceGod::UI
 		cs::String keys, shortKeys;
 		if (cam->Mode == Cameras::SpaceCamera::CameraMode::Focus && cam->PilotLocked)
 		{
+			auto pilotRecord = app->World()->Law != nullptr ? app->World()->Law->PlayerRecord() : nullptr; // the embodied pilot's (US-T148)
 			s = cs::Cat("PILOTING  ·  ", TargetName(cam->FocusTarget),
 				app->Piloted.Ship != nullptr ? cs::Cat("  ·  PROPELLANT ", app->Piloted.Ship->Propellant() <= 1e-6 ? cs::String("DRY") : Percent(app->Piloted.Ship->PropellantFraction())) : cs::String(),
-				app->World()->Law != nullptr && app->World()->Law->Player->Wanted() ? cs::Cat("  ·  WANTED ", Credits(app->World()->Law->Player->TotalBounty())) : cs::String(),
+				pilotRecord != nullptr && pilotRecord->Wanted() ? cs::Cat("  ·  WANTED ", Credits(pilotRecord->TotalBounty())) : cs::String(),
 				SensorText());
 			keys = cs::Cat("   (", ControlHint(app->PilotControlMode), ", Z/X roll, F flight assist, Shift boost, F3 silent running, P to release)");
 			shortKeys = "   (H all keys, P to release)";

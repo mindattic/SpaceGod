@@ -120,7 +120,16 @@ namespace SpaceGod::Core
 		{
 			Log(op->ResolvedJd, cs::Cat(op->MarkerLabel(), op->State == OpportunityState::Completed ? " done: " : " lost: ", op->Outcome),
 				WorldEventKind::Opportunity, op->Ship && op->Ship->Orbit ? op->Ship->Orbit->Body : op->Body);
+			CreditAdventure(op);
 		};
+	}
+
+	void World::CreditAdventure(const cs::Ref<Opportunity>& op)
+	{
+		// The standing an adventure earns is the pilot's who saw it through (US-T148), not the SpaceGod's.
+		if (Law == nullptr || op == nullptr || op->State != OpportunityState::Completed) return;
+		if (op->Reward.ReputationWith != nullptr && op->Reward.Reputation != 0)
+			Law->Credit(op->EngagedBy, op->Reward.ReputationWith, op->Reward.Reputation);
 	}
 
 	bool World::Coarse() const { return Fleet->Coarse(); }
@@ -390,8 +399,9 @@ namespace SpaceGod::Core
 		War = cs::New<WarT>(shared_from_this(), startJd, seed + 2);
 		auto war = War;
 		Sensors = cs::New<SensorsT>(shared_from_this());
-		// The player's standing is one table: adventures seen through raise it, crimes lower it.
-		Law = cs::New<LawT>(shared_from_this(), Adventures->Reputation);
+		// Standing is the pilot's, by the hull they command (US-T148): adventures seen through raise it (see Construct's
+		// Resolved handler), crimes lower it. The event system's Reputation is only its own tally now.
+		Law = cs::New<LawT>(shared_from_this());
 		// The law judges a battle first; then the outlaws' records take in what their bands did in it.
 		Outlaws = cs::New<OutlawsT>(shared_from_this(), seed + 11);
 		Pursuit = cs::New<PursuitT>(shared_from_this(), seed + 13);

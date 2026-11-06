@@ -85,7 +85,8 @@ namespace SpaceGod::Core
 			case ContractKind::Escort: return cs::Cat("Escort the ", (Client != nullptr ? Client->Name : cs::String("merchant")), " in to ", BodyLabel);
 			case ContractKind::Patrol: return cs::Cat("Patrol ", BodyLabel, " for ", cs::Fmt(PatrolDays, "0.#"), " d");
 			case ContractKind::Survey: return cs::Cat("Survey ", BodyLabel);
-			default: return cs::Cat("Bounty on ", (Target != nullptr ? (Target->IsPlayer() ? cs::String("you") : Target->Name) : cs::String("a wanted captain")));
+			// (Never posted on the pilot the player is embodied in, Contracts.PostBounties: a target is always a captain by name.)
+			default: return cs::Cat("Bounty on ", (Target != nullptr ? Target->Name : cs::String("a wanted captain")));
 		}
 	}
 
@@ -523,8 +524,10 @@ namespace SpaceGod::Core
 
 	cs::Ref<LawRecord> Contracts::RecordFor(const cs::Ref<Ship>& ship, bool player) const
 	{
+		// The taker's own pilot, whoever flies it (US-T148): the player at a helm answers to that hull's record.
+		static_cast<void>(player);
 		auto law = Law();
-		return player ? (law ? law->Player : nullptr) : (law ? law->RecordOf(ship->Controller()) : nullptr);
+		return law ? law->RecordOf(ship->Controller()) : nullptr;
 	}
 
 	Contracts::TakeOutcome Contracts::CanTake(const cs::Ref<Contract>& c, const cs::Ref<Ship>& ship, bool player, double jd) const
@@ -532,7 +535,7 @@ namespace SpaceGod::Core
 		if (c == nullptr || !c->IsOpen()) return TakeOutcome::NotOpen;
 		if (ship == nullptr || ship->Destroyed) return TakeOutcome::NotHere;
 		auto law = Law();
-		auto rec = player ? (law ? law->Player : nullptr) : (law ? law->FindRecord(ship->Controller()) : nullptr);
+		auto rec = law ? law->FindRecord(ship->Controller()) : nullptr; // (US-T148: the hull's pilot's, the player's or not)
 		if (rec != nullptr && !Law::OffersContracts(rec, c->Patron)) return TakeOutcome::NotOffered;
 		if (player && !PlayerNear(ship, c->Board->Body, jd)) return TakeOutcome::NotHere;
 		switch (c->Kind)

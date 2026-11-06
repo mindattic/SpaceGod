@@ -98,7 +98,9 @@ namespace SpaceGod::Core
 		}
 		auto law = World()->Law;
 		auto watcher = Watcher(s, reason);
-		if (law != nullptr && law->Player->WantedBy(watcher)) c *= 1.5;
+		// The pilot the player is embodied in (US-T148): a clean one draws no extra eyes.
+		auto rec = law != nullptr ? law->PlayerRecord() : nullptr;
+		if (rec != nullptr && rec->WantedBy(watcher)) c *= 1.5;
 		return cs::Math::Max(0.0, cs::Math::Min(0.95, c));
 	}
 
@@ -140,7 +142,7 @@ namespace SpaceGod::Core
 			auto by = Watcher(s, reason);
 			desk->TimesCaught++;
 			cs::String what = cs::Cat(lot.Count(), " crate", lot.Count() == 1 ? "" : "s", " of ", cs::Strings::ToLowerInvariant(GoodInfo::Of(g)->Name));
-			if (World()->Law != nullptr) World()->Law->Commit(World()->Law->Player, CrimeKind::Smuggling, by, by, s->Body, jd, cs::Cat("customs at ", s->Name), cs::Cat(what, " through the back door"));
+			if (World()->Law != nullptr) World()->Law->Commit(World()->Law->RecordOf(ship), CrimeKind::Smuggling, by, by, s->Body, jd, cs::Cat("customs at ", s->Name), cs::Cat(what, " through the back door"));
 			desk->Notice(cs::Cat("Customs at ", s->Name, " seize ", what, ": you are charged with smuggling"));
 			return Outcome::Caught;
 		}

@@ -705,5 +705,7 @@ namespace SpaceGod::Core
 		SG_SERIALIZABLE(World); // ObjectGraph registration (Persistence/Registrations)
 		/// A loaded world wires its delegates again (Persistence/Registrations/Wiring.cpp, which repeats Construct and Wire's wiring).
 		void RewireAfterLoad();
+		/// An adventure seen through: its standing goes on the record of the pilot who did it (US-T148, Law.Credit).
+		void CreditAdventure(const cs::Ref<Opportunity>& op);
 	};
 }

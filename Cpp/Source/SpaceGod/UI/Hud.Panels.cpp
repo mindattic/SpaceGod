@@ -992,7 +992,7 @@ namespace SpaceGod::UI
 					else
 					{
 						auto targetOutlaw = outlaws->Of(target);
-						after = cs::Cat("hunting ", targetOutlaw ? targetOutlaw->Title() : (target->IsPlayer() ? cs::String("YOU") : target->Name));
+						after = cs::Cat("hunting ", targetOutlaw ? targetOutlaw->Title() : (app->World()->Law != nullptr && app->World()->Law->IsPlayer(target) ? cs::String("YOU") : target->Name));
 					}
 					lines.Add(SelectionLine{ "Bounty hunter", cs::Cat(after, hunter->Takes > 0 ? cs::Cat(",  ", hunter->Takes, " taken for ", Credits(hunter->Collected)) : cs::String()) });
 				}
@@ -1014,7 +1014,10 @@ namespace SpaceGod::UI
 			auto law = app->World()->Law;
 			cs::Ref<LawRecord> record = law ? law->FindRecord(ship) : nullptr;
 			if (record != nullptr && (record->Wanted() || record->Crimes.Count() > 0))
-				lines.Add(SelectionLine{ record->IsPlayer() ? "Your record" : "Captain", cs::Cat(record->IsPlayer() ? cs::String() : cs::Cat(record->Name, ", "), RecordText(record)) });
+			{
+				bool mine = law->IsPlayer(record); // the pilot the player is embodied in (US-T148)
+				lines.Add(SelectionLine{ mine ? "Your record" : "Captain", cs::Cat(mine ? cs::String() : cs::Cat(record->Name, ", "), RecordText(record)) });
+			}
 		}
 
 		float w = 410;

@@ -80,11 +80,8 @@ namespace SpaceGod::Core
 
 	// ================================================================ Law
 
-	Law::Law(cs::Ref<World> world, cs::Ref<cs::Dictionary<cs::Ref<Faction>, double>> playerStanding)
-	{
-		this->world = std::move(world);
-		Player = cs::New<LawRecord>("you", nullptr, playerStanding);
-	}
+	// US-T148: no record of the SpaceGod's: the player answers to the record of whichever pilot they are embodied in.
+	Law::Law(cs::Ref<World> world) { this->world = std::move(world); }
 
 	std::tuple<double, double, double> Law::Severity(CrimeKind k)
 	{
@@ -115,23 +112,84 @@ namespace SpaceGod::Core
 	cs::Ref<LawRecord> Law::RecordOf(const cs::Ref<Ship>& ship)
 	{
 		if (ship == nullptr) return nullptr;
-		if (ship == (world ? world->PilotedShip : nullptr)) return Player;
-		auto captain = ship->Controller();
-		cs::Ref<LawRecord> r;
-		if (!Captains.TryGetValue(captain, r))
-		{
-			r = cs::New<LawRecord>(CaptainName(captain), captain);
-			Captains[captain] = r;
-		}
-		return r;
+		AdoptLegacy();
+		return RecordOfCaptain(ship);
 	}
 
 	cs::Ref<LawRecord> Law::FindRecord(const cs::Ref<Ship>& ship)
 	{
 		if (ship == nullptr) return nullptr;
-		if (ship == (world ? world->PilotedShip : nullptr)) return Player;
+		AdoptLegacy();
 		cs::Ref<LawRecord> r;
 		return Captains.TryGetValue(ship->Controller(), r) ? r : nullptr;
+	}
+
+	cs::Ref<LawRecord> Law::PlayerRecord()
+	{
+		auto piloted = world ? world->PilotedShip : nullptr;
+		return piloted != nullptr ? FindRecord(piloted) : nullptr;
+	}
+
+	bool Law::IsPlayer(const cs::Ref<LawRecord>& r) const
+	{
+		auto piloted = world ? world->PilotedShip : nullptr;
+		return r != nullptr && r->Captain != nullptr && piloted != nullptr && r->Captain == piloted->Controller();
+	}
+
+	void Law::Credit(const cs::Ref<Ship>& ship, const cs::Ref<Faction>& f, double delta)
+	{
+		if (ship == nullptr || f == nullptr || f->IsPirate || delta == 0) return;
+		Adjust(RecordOf(ship), f, delta);
+	}
+
+	void Law::AdoptLegacy()
+	{
+		if (legacyPlayer == nullptr) return;
+		auto piloted = world ? world->PilotedShip : nullptr;
+		if (piloted == nullptr || piloted->Destroyed) return;
+		auto old = legacyPlayer;
+		legacyPlayer = nullptr;
+		auto captain = piloted->Controller();
+		// Its own table: the old record's standing was the event system's reputation table itself.
+		auto standing = cs::New<cs::Dictionary<cs::Ref<Faction>, double>>();
+		if (old->Standing != nullptr)
+			for (auto [f, v] : *old->Standing) (*standing)[f] = v;
+		cs::Ref<LawRecord> open;
+		if (!Captains.TryGetValue(captain, open) || open == nullptr)
+		{
+			old->Captain = captain;
+			old->Name = CaptainName(captain);
+			old->Standing = standing;
+			Captains[captain] = old;
+		}
+		else
+		{
+			// The hull's pilot already has a record: the old one's account is added to it.
+			for (auto [f, v] : *standing)
+			{
+				double s = open->StandingWith(f) + v;
+				(*open->Standing)[f] = s;
+			}
+			for (auto [f, v] : old->Bounty)
+			{
+				double b = open->BountyBy(f) + v;
+				open->Bounty[f] = b;
+			}
+			for (auto [f, until] : old->BountyUntil)
+			{
+				double mine = 0;
+				double lasts = open->BountyUntil.TryGetValue(f, mine) ? cs::Math::Max(mine, until) : until;
+				open->BountyUntil[f] = lasts;
+			}
+			for (const auto& c : old->Crimes)
+			{
+				c->Offender = open;
+				open->Crimes.Add(c);
+			}
+			while (open->Crimes.Count() > 40) open->Crimes.RemoveAt(0);
+			open->Notoriety += old->Notoriety;
+			open->Unwitnessed += old->Unwitnessed;
+		}
 	}
 
 	cs::String Law::CaptainName(const cs::Ref<Ship>& s) { return s->Faction != nullptr && s->Faction->IsPirate ? PirateCaptains::NameFor(s) : cs::Cat("the master of the ", s->Name); }
@@ -240,7 +298,7 @@ namespace SpaceGod::Core
 		if (Recent.Count() > 100) Recent.RemoveAt(0);
 		cs::String where = body >= 0 && body < world->Catalog()->Count() ? cs::Cat(" near ", (*world->Catalog())[body]->Name) : cs::String("");
 		world->Log(jd, cs::Cat(poster->Name, " posts ", Cr(bounty), " cr on ", offender->Name, " for ", Describe(kind), where, ", seen by ", witness), WorldEventKind::Law, body);
-		if (offender->IsPlayer())
+		if (IsPlayer(offender))
 			Notice(cs::Cat("CRIME: ", Describe(kind), ", seen by ", witness, ". ", poster->Name, " posts a bounty of ", Cr(bounty), " cr (now ", Cr(offender->BountyBy(poster)), ")"));
 		Committed.Invoke(crime);
 		return crime;
@@ -248,7 +306,9 @@ namespace SpaceGod::Core
 
 	bool Law::PayFine(const cs::Ref<Ship>& ship, const cs::Ref<Faction>& f, double jd, double& paid)
 	{
-		paid = Player->BountyBy(f);
+		// The pilot of the hull that pays (US-T148): the bounty is on them, not on the SpaceGod.
+		auto rec = FindRecord(ship);
+		paid = rec != nullptr ? rec->BountyBy(f) : 0;
 		if ((ship ? ship->Faction : nullptr) == nullptr || paid <= 0 || ship->Faction->Treasury < paid)
 		{
 			paid = 0;
@@ -256,8 +316,8 @@ namespace SpaceGod::Core
 		}
 		ship->Faction->Treasury -= paid;
 		if (f != ship->Faction) f->Treasury += paid; // a fine to one's own faction is burned as court costs (U.SPC-T389)
-		ClearBounty(Player, f);
-		if (Player->StandingWith(f) < DockMinStanding) (*Player->Standing)[f] = DockMinStanding;
+		ClearBounty(rec, f);
+		if (rec->StandingWith(f) < DockMinStanding) (*rec->Standing)[f] = DockMinStanding;
 		if (Hail != nullptr && Hail->By == f) Hail = nullptr;
 		scannedUntil[f] = jd + ScanCooldownDays;
 		world->Log(jd, cs::Cat("The ", ship->Name, " pays ", Cr(paid), " cr in fines to ", f->Name), WorldEventKind::Law, ship->Orbit ? ship->Orbit->Body : -1);
@@ -281,7 +341,9 @@ namespace SpaceGod::Core
 		if (dt <= 0) return;
 		lastJd = jd;
 		double fade = cs::Math::Pow(0.5, dt / NotorietyHalfLifeDays);
-		Fade(Player, fade, jd);
+		AdoptLegacy();
+		// (An older save's record no hull has taken yet fades with the rest.)
+		if (legacyPlayer != nullptr) Fade(legacyPlayer, fade, jd);
 		for (const auto& r : Captains.Values()) Fade(r, fade, jd);
 		PruneCaptains();
 	}
@@ -324,14 +386,14 @@ namespace SpaceGod::Core
 		for (int side = 0; side < 2; side++)
 		{
 			if (side == b->EnforcingSide) continue;
-			// Each commander once: the player (keyed by null) for a hull they flew, else the group's captain.
+			// Each commander once: the group's captain (for a hull the player flew, its own pilot: US-T148).
 			cs::Dictionary<OffenderKey, cs::Ref<Faction>> offenders;
 			for (const auto& u : b->Units)
 			{
 				if (u->Side != side || u->Kind != UnitKind::Ship || u->Ship == nullptr) continue;
 				// A prize taken by this side is not one of its fighters: its own captain (taken with it) did nothing here.
 				if (u->Captured && u->FoughtOn() != side) continue;
-				OffenderKey key = u->PlayerFlown ? OffenderKey{ Player, nullptr } : OffenderKey{ nullptr, u->Ship->Controller() };
+				OffenderKey key{ nullptr, u->Ship->Controller() };
 				if (!offenders.ContainsKey(key)) offenders[key] = u->Faction;
 			}
 			for (auto [key, byRef] : offenders)
@@ -357,7 +419,7 @@ namespace SpaceGod::Core
 				// a navy against raiders, with that navy's enemies on the raiders' side), unless anyone was hurt.
 				if (b->EnforcingSide == 1 - side) { if (!harmed) continue; }
 				else if ((side != b->AggressorSide || (by != b->SideLeaders[side] && !harmed)) && !pirate && !robbed) continue;
-				auto rec = key.Record ? key.Record : RecordOfCaptain(key.Ship);
+				auto rec = RecordOf(key.Ship);
 				// The one they attacked who lived to tell it, else anyone close enough to see.
 				cs::String witness; // (null is empty)
 				for (const auto& v : victims)
@@ -381,7 +443,7 @@ namespace SpaceGod::Core
 			if (u->Kind != UnitKind::Ship || u->Ship == nullptr || !(u->Dead || u->Captured)) continue;
 			bool player = u->PlayerFlown;
 			// An escort answers only for a wanted captain of its own aboard (a band merged into another group).
-			cs::Ref<LawRecord> rec = player ? Player
+			cs::Ref<LawRecord> rec = player ? FindRecord(u->Ship)
 				: u->Ship->IsEscort() ? (world && world->Outlaws ? world->Outlaws->RecordCommanding(u->Ship) : nullptr)
 				: FindRecord(u->Ship);
 			if (rec == nullptr || !rec->Wanted()) continue;
@@ -436,7 +498,7 @@ namespace SpaceGod::Core
 			// By the side it fought on: a hull taken by boarders has moved to its captor's side.
 			if (v->FoughtOn() != side || v->Kind == UnitKind::Fighter || v->Faction == nullptr || v->Faction->IsPirate || v->Faction == by) continue;
 			if (by != nullptr && world->Diplomacy()->Get(by, v->Faction) == Relation::War) continue;
-			cs::Ref<LawRecord> rec = v->PlayerFlown ? Player : v->Ship != nullptr ? FindRecord(v->Ship) : nullptr;
+			cs::Ref<LawRecord> rec = v->Ship != nullptr ? FindRecord(v->Ship) : nullptr;
 			if (rec != nullptr && (juris != nullptr ? rec->WantedBy(juris) : rec->Wanted())) continue;
 			list.Add(v);
 		}
@@ -472,6 +534,8 @@ namespace SpaceGod::Core
 			Hail = nullptr;
 			return;
 		}
+		// A hail was for the pilot of the hull it hailed (US-T148): taking another ship leaves it behind.
+		if (Hail != nullptr && Hail->Hull != nullptr && Hail->Hull != ship) Hail = nullptr;
 		auto helio = world->Ephemeris->HelioAt(body, jd) + offsetKm;
 		CheckTrespass(ship, body, offsetKm, jd);
 		if (Hail != nullptr)
@@ -479,13 +543,15 @@ namespace SpaceGod::Core
 			AnswerHail(ship, body, offsetKm, forward, helio, jd);
 			return;
 		}
+		// The record of this hull's pilot, not the SpaceGod's (US-T148): null for a clean one.
+		auto rec = FindRecord(ship);
 		for (const auto& p : world->Fleet->Ships())
 		{
 			if (!IsPatrol(p, ship)) continue;
 			auto f = p->Faction;
 			double until = 0;
 			if (scannedUntil.TryGetValue(f, until) && jd < until) continue;
-			bool wanted = Player->WantedBy(f);
+			bool wanted = rec != nullptr && rec->WantedBy(f);
 			// Scans are routine only in a patrol's own space; and a navy does not stop its own warships.
 			if (!wanted && (JurisdictionAt(body) != f || (ship->Faction == f && ship->Spec->IsMilitary))) continue;
 			double range = (world->Fleet->StateOf(p, jd).HelioKm - helio).Length();
@@ -497,7 +563,8 @@ namespace SpaceGod::Core
 			hail->By = f;
 			hail->Interdiction = wanted;
 			hail->StartJd = jd;
-			hail->Fine = Player->BountyBy(f);
+			hail->Fine = rec != nullptr ? rec->BountyBy(f) : 0;
+			hail->Hull = ship;
 			hail->DueJd = jd + (wanted ? HailSeconds : ScanSeconds) / Astro::SecondsPerDay;
 			Hail = hail;
 			Notice(wanted
@@ -535,7 +602,8 @@ namespace SpaceGod::Core
 			Hail = nullptr;
 			return;
 		}
-		if (h->Interdiction && !Player->WantedBy(f))
+		auto rec = FindRecord(ship);
+		if (h->Interdiction && (rec == nullptr || !rec->WantedBy(f)))
 		{
 			Hail = nullptr;
 			return;
@@ -546,7 +614,7 @@ namespace SpaceGod::Core
 		{
 			Hail = nullptr;
 			scannedUntil[f] = jd + ScanCooldownDays;
-			Commit(Player, CrimeKind::FleeingScan, f, f, body, jd, cs::Cat("the ", p->Name), h->Interdiction ? "ran from an interdiction" : "ran from a scan");
+			Commit(RecordOf(ship), CrimeKind::FleeingScan, f, f, body, jd, cs::Cat("the ", p->Name), h->Interdiction ? "ran from an interdiction" : "ran from a scan");
 			return;
 		}
 		if (jd < h->DueJd) return;
@@ -572,7 +640,7 @@ namespace SpaceGod::Core
 		}
 		Notice(cs::Cat(f->Name, " patrol ", p->Name, " finds contraband and confiscates ", contraband.Count(), " crate", (contraband.Count() == 1 ? "" : "s"), " (", cs::Strings::Join(", ", goods), ")"));
 		auto here = JurisdictionAt(body);
-		Commit(Player, CrimeKind::Smuggling, here ? here : f, f, body, jd, cs::Cat("the ", p->Name), cs::Strings::Join(", ", goods));
+		Commit(RecordOf(ship), CrimeKind::Smuggling, here ? here : f, f, body, jd, cs::Cat("the ", p->Name), cs::Strings::Join(", ", goods));
 	}
 
 	void Law::CheckTrespass(const cs::Ref<Ship>& ship, int body, DVec3 offsetKm, double jd)
@@ -583,11 +651,12 @@ namespace SpaceGod::Core
 			if (!s->Fallen && s->Owner != nullptr && !s->Owner->IsPirate && (port == nullptr || s->Population > port->Population)) port = s;
 		if (port == nullptr) return;
 		auto f = port->Owner;
-		if (world->Diplomacy()->Hostile(f, ship->Faction) || Player->StandingWith(f) >= DockMinStanding) return;
+		auto rec = FindRecord(ship); // (a clean pilot, with no record, stands at 0: never barred)
+		if (world->Diplomacy()->Hostile(f, ship->Faction) || rec == nullptr || rec->StandingWith(f) >= DockMinStanding) return;
 		double until = 0;
 		if (trespassUntil.TryGetValue(f, until) && jd < until) return;
 		trespassUntil[f] = jd + TrespassCooldownDays;
-		Commit(Player, CrimeKind::Trespass, f, f, body, jd, port->Name, cs::Cat("barred from ", port->Name));
+		Commit(rec, CrimeKind::Trespass, f, f, body, jd, port->Name, cs::Cat("barred from ", port->Name));
 	}
 
 	void Law::Notice(const cs::String& text)
@@ -618,10 +687,12 @@ namespace SpaceGod::Core
 		SG_F(Name), SG_P(Captain), SG_F(Standing), SG_F(Bounty), SG_F(BountyUntil), SG_F(Crimes), SG_F(Notoriety), SG_F(Unwitnessed))
 
 	SG_SERIALIZE(PatrolHail, "Unity.SpaceGod.Core.PatrolHail",
-		SG_F(Patrol), SG_F(By), SG_F(Interdiction), SG_F(StartJd), SG_F(DueJd), SG_F(Fine))
+		SG_F(Patrol), SG_F(By), SG_F(Interdiction), SG_F(StartJd), SG_F(DueJd), SG_F(Fine),
+		SG_OPT(Hull)) // US-T148: the hull it hailed, absent from older saves
 
 	SG_SERIALIZE(Law, "Unity.SpaceGod.Core.Law",
-		SG_F(world), SG_F(Player), SG_F(Captains), SG_F(Recent), SG_F(notices), SG_P(Hail), SG_F(Committed),
+		// US-T148: "Player" was the player's one record; it loads into legacyPlayer for a hull to adopt (null once adopted).
+		SG_F(world), SG_FN("Player", legacyPlayer), SG_F(Captains), SG_F(Recent), SG_F(notices), SG_P(Hail), SG_F(Committed),
 		SG_F(PatrolHailKm), SG_F(PatrolHoldKm), SG_F(ScanSeconds), SG_F(HailSeconds), SG_F(ScanCooldownDays), SG_F(TrespassCooldownDays),
 		// (Committed's subscriber, Outlaws.OnCrime, is World's wiring: World's SG_LOADED hook makes it again.)
 		SG_F(lastJd), SG_F(scannedUntil), SG_F(trespassUntil),

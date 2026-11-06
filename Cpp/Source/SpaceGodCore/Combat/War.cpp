@@ -305,7 +305,9 @@ namespace SpaceGod::Core
 		if (lurker->Faction->IsPirate) return !rider->Faction->IsPirate;
 		if (rider->Faction == lurker->Faction) return false;
 		if (Diplomacy() != nullptr && Diplomacy()->Hostile(lurker->Faction, rider->Faction)) return true;
-		return rider == world->PilotedShip && world->Law != nullptr && world->Law->Player->WantedBy(lurker->Faction);
+		if (rider != world->PilotedShip || world->Law == nullptr) return false;
+		auto rec = world->Law->FindRecord(rider); // its pilot's (US-T148)
+		return rec != nullptr && rec->WantedBy(lurker->Faction);
 	}
 
 	void War::Interdict(const cs::Ref<Ship>& lurker, double station, cs::List<cs::Ref<Ship>>& victims, double jd)

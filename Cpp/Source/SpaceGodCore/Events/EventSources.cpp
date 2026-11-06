@@ -44,7 +44,8 @@ namespace SpaceGod::Core
 		r->BodyName = [catalog](int b) { return (*catalog)[b]->Name; };
 		r->IsMerchant = [world](const cs::Ref<Ship>& s) { return world->IsTrader(s); };
 		r->PirateHunters = world->Belt;
-		r->WillHire = [world](const cs::Ref<Faction>& f) { return Law::OffersContracts(world->Law->Player, f); };
+		// The pilot the player is embodied in (US-T148): a clean one (no record) is hired by anyone.
+		r->WillHire = [world](const cs::Ref<Faction>& f) { return Law::OffersContracts(world->Law->PlayerRecord(), f); };
 		// C# `PostedBounty = world.Law.BountyOn`: a method group, bound to the Law instance now.
 		auto law = world->Law;
 		r->PostedBounty = [law](const cs::Ref<Ship>& s) { return law->BountyOn(s); };

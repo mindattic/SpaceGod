@@ -176,6 +176,7 @@ namespace SpaceGod::Core
 		{
 			Log(op->ResolvedJd, cs::Cat(op->MarkerLabel(), op->State == OpportunityState::Completed ? " done: " : " lost: ", op->Outcome),
 				WorldEventKind::Opportunity, op->Ship && op->Ship->Orbit ? op->Ship->Orbit->Body : op->Body);
+			CreditAdventure(op); // US-T148
 		};
 		if (Shocks) Graph::Access<1>::Shocks(*Shocks);
 		// A world World::Wire never ran on (no war) has nothing more.

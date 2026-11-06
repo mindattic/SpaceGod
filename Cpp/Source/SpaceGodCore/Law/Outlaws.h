@@ -218,6 +218,9 @@ namespace SpaceGod::Core
 		/// <summary>The hunter that has taken a contract on the target, or null.</summary>
 		cs::Ref<BountyHunter> HuntedBy;
 
+		/// <summary>Whether the target is the pilot the player was embodied in when the board was read (US-T148).</summary>
+		bool Player = false;
+
 		bool IsPlayer() const;
 	};
 

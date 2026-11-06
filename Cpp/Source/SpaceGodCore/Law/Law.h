@@ -3,8 +3,11 @@
 //
 // C++ notes:
 // - A C# null string is an empty cs::String here (Crime.Witness, Crime.Detail, FindWitness's result).
-// - LawRecord.Standing is shared with the event system's reputation table (Law's playerStanding argument), so it is
-//   a cs::Ref<cs::Dictionary>; EventDirector.Reputation must be one too (World.cpp passes Adventures->Reputation).
+// - LawRecord.Standing is a cs::Ref<cs::Dictionary> (it was shared with the event system's reputation table while the
+//   player had one record; an older save's record still holds that table until Law adopts it, see Law::AdoptLegacy).
+// - US-T148: there is no record of the SpaceGod's. Consequences belong to the body: every record is a captain's, keyed
+//   by the hull they command (Law.Captains), and the player's record is whichever one the embodied hull's captain holds
+//   (Law::PlayerRecord). A wanted pilot keeps the bounty when the player leaves; a clean one the player takes is clean.
 // - OnBattleEnded's `Dictionary<object, Faction>` keyed by "the player's record or a captain's ship" is keyed by
 //   OffenderKey (either a record or a ship), enumerated in the same insertion order.
 
@@ -76,8 +79,8 @@ namespace SpaceGod::Core
 	};
 
 	/// <summary>
-	/// A party's standing in the eyes of the law: the player's (one record, whatever hull they fly) or an NPC
-	/// captain's (the master of a ship or the leader of a group). Standing with each faction (positive is
+	/// A party's standing in the eyes of the law: a captain's (the master of a ship or the leader of a group,
+	/// whoever flies it: the player embodied at its helm answers to it while there, US-T148). Standing with each faction (positive is
 	/// trusted, below <see cref="Law.DockMinStanding"/> barred from its ports), notoriety (how widely known a
 	/// criminal it is, fading with time) and the bounties posted on it by each faction.
 	/// </summary>
@@ -86,12 +89,12 @@ namespace SpaceGod::Core
 	public:
 		cs::String Name; // (readonly in C#; not const here so ObjectGraph can load it)
 
-		/// <summary>The captain's ship (the group leader's), or null for the player.</summary>
+		/// <summary>The captain's ship (the group leader's): the key it is kept by in <see cref="Law.Captains"/>. Null only
+		/// for an older save's single player record not yet adopted by a hull (US-T148). Whether it is the player's
+		/// record is the law's to say (<see cref="Law.IsPlayer"/>): it is while the player is embodied at that helm.</summary>
 		cs::Ref<Ship> Captain;
-		bool IsPlayer() const { return Captain == nullptr; }
 
 		/// <summary>Standing with each faction (0 neutral; crimes lower it, good deeds raise it).</summary>
-		// Shared with the event system's reputation table for the player (see the file comment).
 		cs::Ref<cs::Dictionary<cs::Ref<Faction>, double>> Standing;
 
 		/// <summary>Bounties posted on this party, credits, by the faction that posted each.</summary>
@@ -141,6 +144,10 @@ namespace SpaceGod::Core
 		/// <summary>The fine an interdiction asks (the bounty the hailing faction has posted).</summary>
 		double Fine = 0;
 
+		/// <summary>The hull it hailed (US-T148): a hail is for the pilot of that ship, and lapses when the player
+		/// takes another. Null in older saves (it then lapses on the next hail check only by its own rules).</summary>
+		cs::Ref<Ship> Hull;
+
 		double SecondsLeft(double jd) const;
 	};
 
@@ -160,11 +167,8 @@ namespace SpaceGod::Core
 	class SPACEGODCORE_API Law final
 	{
 	public:
-		/// <summary>The player's record: one, whatever hull they fly. Its standing is the event system's
-		/// reputation table, so adventures seen through raise the same standing crimes lower.</summary>
-		cs::Ref<LawRecord> Player;
-
-		/// <summary>NPC captains' records, by the ship they command (a group's leader), made on their first crime.</summary>
+		/// <summary>Captains' records, by the ship they command (a group's leader), made on their first crime. The
+		/// player's is among them (US-T148): the record of the hull they are embodied in (<see cref="PlayerRecord"/>).</summary>
 		cs::Dictionary<cs::Ref<Ship>, cs::Ref<LawRecord>> Captains = cs::Dictionary<cs::Ref<Ship>, cs::Ref<LawRecord>>();
 
 		/// <summary>Recorded crimes system-wide, newest last.</summary>
@@ -217,7 +221,7 @@ namespace SpaceGod::Core
 		/// victim's faction, when that is someone else.</summary>
 		static constexpr double VictimStandingShare = 0.6;
 
-		Law(cs::Ref<World> world, cs::Ref<cs::Dictionary<cs::Ref<Faction>, double>> playerStanding = nullptr);
+		explicit Law(cs::Ref<World> world);
 		/// For ObjectGraph.
 		Law() = default;
 
@@ -228,12 +232,23 @@ namespace SpaceGod::Core
 
 		// ---------------------------------------------------------------- records and standing
 
-		/// <summary>The record of whoever commands <paramref name="ship"/>: the player's for the ship they fly,
-		/// else its captain's (the group leader's), made the first time it is asked for.</summary>
+		/// <summary>The record of whoever commands <paramref name="ship"/>: its captain's (the group leader's), made the
+		/// first time it is asked for. The ship the player flies is no exception (US-T148): its pilot's record is theirs.</summary>
 		cs::Ref<LawRecord> RecordOf(const cs::Ref<Ship>& ship);
 
-		/// <summary>The record of a ship's captain if one has been opened (never for the player's ship), else null.</summary>
+		/// <summary>The record of a ship's captain if one has been opened, else null (a clean pilot).</summary>
 		cs::Ref<LawRecord> FindRecord(const cs::Ref<Ship>& ship);
+
+		/// <summary>The record of the pilot the player is embodied in (<see cref="World.PilotedShip"/>'s captain), or null
+		/// when no hull is held or its pilot has no record yet (clean). US-T148: never a record of the SpaceGod's own.</summary>
+		cs::Ref<LawRecord> PlayerRecord();
+
+		/// <summary>Whether <paramref name="r"/> is the record of the hull the player is embodied in right now.</summary>
+		bool IsPlayer(const cs::Ref<LawRecord>& r) const;
+
+		/// <summary>Standing earned by whoever commands <paramref name="ship"/> (an adventure seen through, US-T148: the
+		/// pilot who did it, not the SpaceGod). Nothing for a null ship or a pirate faction.</summary>
+		void Credit(const cs::Ref<Ship>& ship, const cs::Ref<Faction>& f, double delta);
 
 		/// <summary>The bounties posted on the captain of <paramref name="ship"/>, credits (0 if none).</summary>
 		double BountyOn(const cs::Ref<Ship>& ship);
@@ -299,8 +314,8 @@ namespace SpaceGod::Core
 		/// </summary>
 		cs::Ref<Crime> Commit(const cs::Ref<LawRecord>& offender, CrimeKind kind, cs::Ref<Faction> jurisdiction, const cs::Ref<Faction>& victim, int body, double jd, const cs::String& witness, const cs::String& detail = cs::String());
 
-		/// <summary>Pays off the bounty <paramref name="f"/> has posted on the player, from the purse of the ship
-		/// they fly: the bounty is cleared and standing is restored as far as docking there again.
+		/// <summary>Pays off the bounty <paramref name="f"/> has posted on the pilot of <paramref name="ship"/> (the hull the
+		/// player flies), from that ship's purse: the bounty is cleared and standing is restored as far as docking there again.
 		/// False (nothing paid) if there is no bounty or the purse cannot cover it.</summary>
 		bool PayFine(const cs::Ref<Ship>& ship, const cs::Ref<Faction>& f, double jd, double& paid);
 
@@ -362,6 +377,16 @@ namespace SpaceGod::Core
 		};
 
 		cs::Ref<World> world;
+
+		/// <summary>An older save's single player record (saved as "Player"), until a hull adopts it (US-T148): the first
+		/// time the law looks at the player's hull it becomes that pilot's record (<see cref="AdoptLegacy"/>). Always
+		/// null in a new game, and written as null once adopted.</summary>
+		cs::Ref<LawRecord> legacyPlayer;
+
+		/// <summary>Hands an older save's player record (<see cref="legacyPlayer"/>) to the pilot of the hull the player is
+		/// embodied in: it becomes that captain's record (folded into one already open for it). Nothing while no hull is
+		/// held: it waits for the first one. Its standing table is copied off the event system's, which it shared.</summary>
+		void AdoptLegacy();
 
 		/// <summary>Messages for the player (their own crimes, hails, scans), drained by the HUD (<see cref="TakeNotices"/>).</summary>
 		cs::List<cs::String> notices = cs::List<cs::String>();

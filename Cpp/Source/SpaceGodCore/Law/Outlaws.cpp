@@ -85,7 +85,7 @@ namespace SpaceGod::Core
 
 	// ================================================================ BountyPosting
 
-	bool BountyPosting::IsPlayer() const { return Target->IsPlayer(); }
+	bool BountyPosting::IsPlayer() const { return Player; }
 
 	// ================================================================ Outlaws
 
@@ -239,8 +239,9 @@ namespace SpaceGod::Core
 			// A flagship merged into another band goes where that band's leader goes.
 			Sight(o->Record, Locate(o->Ship->Controller()), jd, witness);
 		}
-		auto p = Law()->Player;
-		if (p->Wanted() && world->PilotedShip != nullptr && pilotBody >= 0 && !cs::Double::IsNaN(pilotJd) && jd - pilotJd < 1)
+		// The pilot the player is embodied in (US-T148): a wanted hull is seen where the helm last reported it.
+		auto p = Law()->PlayerRecord();
+		if (p != nullptr && p->Wanted() && world->PilotedShip != nullptr && pilotBody >= 0 && !cs::Double::IsNaN(pilotJd) && jd - pilotJd < 1)
 		{
 			double sig = world->Sensors != nullptr && world->Sensors->PilotSignature() > 0 ? world->Sensors->PilotSignature() : Signatures::Battle;
 			cs::String witness = Law()->FindWitness(pilotHelio, jd, nullptr, sig);
@@ -434,9 +435,11 @@ namespace SpaceGod::Core
 		if (hunter == nullptr) return false;
 		double total = Pay(rec, u->Dead ? DeadShare : 1, hunter->Ship);
 		auto outlaw = Of(rec);
-		cs::String name = outlaw != nullptr ? outlaw->Title() : rec->IsPlayer() ? cs::Cat("the ", u->Ship ? u->Ship->Name : cs::String()) : rec->Name;
+		// (The hull the player flew in that fight: the helm may have let go of it since.)
+		bool player = u->PlayerFlown;
+		cs::String name = outlaw != nullptr ? outlaw->Title() : player ? cs::Cat("the ", u->Ship ? u->Ship->Name : cs::String()) : rec->Name;
 		world->Log(jd, cs::Cat("The bounty hunter ", hunter->Name(), " collects ", Cr(total), " cr on ", name, ", ", (u->Dead ? "dead (the wreck scanned for proof)" : "taken"), " at ", b->Name), WorldEventKind::Law, -1);
-		if (rec->IsPlayer()) Law()->Notice(cs::Cat("The bounty hunter ", hunter->Name(), " has collected the ", Cr(total), " cr on your head"));
+		if (player) Law()->Notice(cs::Cat("The bounty hunter ", hunter->Name(), " has collected the ", Cr(total), " cr on your head"));
 		return true;
 	}
 
@@ -864,9 +867,11 @@ namespace SpaceGod::Core
 			auto o = Of(r);
 			if (o != nullptr && !o->AtLarge()) return;
 			// (A captain adrift in the pods or ashore is wanted all the same.)
-			if (!r->IsPlayer() && (o == nullptr || o->Aboard()) && (r->Captain == nullptr || r->Captain->Destroyed)) return;
+			bool player = Law()->IsPlayer(r);
+			if (!player && (o == nullptr || o->Aboard()) && (r->Captain == nullptr || r->Captain->Destroyed)) return;
 			auto p = cs::New<BountyPosting>();
 			p->Target = r;
+			p->Player = player;
 			p->Outlaw = o;
 			p->Bounty = r->TotalBounty();
 			p->TotalBounty = r->TotalBounty();
@@ -874,7 +879,8 @@ namespace SpaceGod::Core
 			p->HuntedBy = HunterOn(r);
 			list.Add(p);
 		};
-		add(Law()->Player);
+		// (The player's is among the captains' now: the record of the hull they are embodied in, US-T148.)
+		Law()->PlayerRecord(); // an older save's record taken up by that hull first
 		for (const auto& r : Law()->Captains.Values()) add(r);
 		list.Sort([](const cs::Ref<BountyPosting>& a, const cs::Ref<BountyPosting>& b) { return cs::Compare(b->TotalBounty, a->TotalBounty); });
 		return list;
@@ -1008,7 +1014,8 @@ namespace SpaceGod::Core
 	bool Outlaws::Huntable(const cs::Ref<LawRecord>& r)
 	{
 		if (r == nullptr || !r->Wanted() || r->TotalBounty() < MinContract * 0.5) return false;
-		if (r->IsPlayer()) return world->PilotedShip != nullptr && !world->PilotedShip->Destroyed;
+		// The hull the player is embodied in (US-T148): its pilot is fair game while the player holds it.
+		if (Law()->IsPlayer(r)) return !world->PilotedShip->Destroyed;
 		auto o = Of(r);
 		return o != nullptr && o->Aboard() && !o->Ship->Destroyed;
 	}
@@ -1104,9 +1111,10 @@ namespace SpaceGod::Core
 		if (best != nullptr)
 		{
 			auto o = Of(best->Target);
-			cs::String who = o != nullptr ? o->Title() : best->Target->IsPlayer() ? cs::String("the player's ship") : best->Target->Name;
+			bool player = Law()->IsPlayer(best->Target);
+			cs::String who = o != nullptr ? o->Title() : player ? cs::String("the player's ship") : best->Target->Name;
 			world->Log(jd, cs::Cat("The bounty hunter ", h->Name(), " takes the contract on ", who, " (", Cr(best->Target->TotalBounty()), " cr)"), WorldEventKind::Law, -1);
-			if (best->Target->IsPlayer()) Law()->Notice(cs::Cat("The bounty hunter ", h->Name(), " has taken the contract on you: ", Cr(best->Target->TotalBounty()), " cr on your head"));
+			if (player) Law()->Notice(cs::Cat("The bounty hunter ", h->Name(), " has taken the contract on you: ", Cr(best->Target->TotalBounty()), " cr on your head"));
 		}
 		return best;
 	}
@@ -1135,16 +1143,18 @@ namespace SpaceGod::Core
 		pilotHelio = world->Ephemeris->HelioAt(body, jd) + offsetKm;
 		pilotJd = jd;
 		ProveKills(ship, jd);
-		if (ship->Battle != nullptr || !Law()->Player->Wanted()) return nullptr;
+		// The pilot of the hull the player flies (US-T148): a hunter's contract is on them, not on the SpaceGod.
+		auto rec = Law()->FindRecord(ship);
+		if (ship->Battle != nullptr || rec == nullptr || !rec->Wanted()) return nullptr;
 		for (const auto& h : Hunters)
 		{
 			// A hunter off abroad through a gate or its own cruise drive (U.SPC-T453) reads as not Alive here
 			// (Fleet.IsPresent): nothing here gives a position for it to engage from.
-			if (!h->Alive() || (h->Contract ? h->Contract->Target : nullptr) != Law()->Player || h->Ship->Battle != nullptr || h->Ship == ship) continue;
+			if (!h->Alive() || (h->Contract ? h->Contract->Target : nullptr) != rec || h->Ship->Battle != nullptr || h->Ship == ship) continue;
 			if ((world->Fleet->StateOf(h->Ship, jd).HelioKm - pilotHelio).Length() > EngageKm) continue;
 			auto b = world->War->TryStartHunt(ship, h->Ship, body, offsetKm, forward, jd);
 			if (b == nullptr) continue;
-			Law()->Notice(cs::Cat("Bounty hunter ", h->Name(), ": \"", ship->Name, ", there's ", Cr(Law()->Player->TotalBounty()), " on your head. Nothing personal.\""));
+			Law()->Notice(cs::Cat("Bounty hunter ", h->Name(), ": \"", ship->Name, ", there's ", Cr(rec->TotalBounty()), " on your head. Nothing personal.\""));
 			return b;
 		}
 		return nullptr;
@@ -1176,7 +1186,8 @@ namespace SpaceGod::Core
 		SG_F(Outlaw), SG_F(Wreck), SG_F(Jd), SG_F(Battle))
 
 	SG_SERIALIZE(BountyPosting, "Unity.SpaceGod.Core.BountyPosting",
-		SG_F(Target), SG_F(Outlaw), SG_F(PostedBy), SG_F(Bounty), SG_F(TotalBounty), SG_F(LastSeen), SG_F(HuntedBy))
+		SG_F(Target), SG_F(Outlaw), SG_F(PostedBy), SG_F(Bounty), SG_F(TotalBounty), SG_F(LastSeen), SG_F(HuntedBy),
+		SG_OPT(Player)) // US-T148: absent from older saves
 
 	SG_SERIALIZE(Outlaws, "Unity.SpaceGod.Core.Outlaws",
 		SG_F(world), SG_F(rng), SG_F(All), SG_F(Hunters), SG_F(LastSeen), SG_F(byShip), SG_F(byRecord), SG_F(byHunter),
