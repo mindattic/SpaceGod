@@ -674,6 +674,9 @@ namespace SpaceGod::Smoke::FeatureAudit
 			app->Select(Target::OfShip(ship));
 			Tap(Key::P);
 			frames(2);
+			// Full tanks whatever the fleet did with the hull in the frames before the helm took it (a free hull with nothing
+			// holding it is given a trip, charged to its tanks, and may spring a leak: a probe that flies on must not run dry, US-T223).
+			ship->SetPropellant(ship->PropellantCapacity());
 			return app->IsPiloting() && PilotedShip() == ship ? ship : cs::Ref<Ship>();
 		}
 
@@ -944,6 +947,7 @@ namespace SpaceGod::Smoke::FeatureAudit
 			kb->Release(Key::W);
 			frames(1);
 			cs::String range = Toast();
+			double tank = ship->PropellantFraction();
 			auto destination = gate->Destination();
 			// Y; the toast read after the jump's own frame (the next one says the far gate is in range, as the hull comes out beside it).
 			kb->Tap(Key::Y);
@@ -952,7 +956,7 @@ namespace SpaceGod::Smoke::FeatureAudit
 			frames(5);
 			bool there = app->ActiveSystem == destination && app->IsPiloting() && destination->World->Fleet->IsPresent(PilotedShip());
 			Result("transit.gate", there && StartsWith(jumped, "Jumped to"),
-				cs::Cat("W held ", f, " frames: '", range, "'; Y: in ", app->ActiveSystem->Name, " (bound for ", destination->Name, "), piloting ", B(app->IsPiloting()),
+				cs::Cat("W held ", f, " frames (tanks ", F(tank * 100, "F1"), "%): '", range, "'; Y: in ", app->ActiveSystem->Name, " (bound for ", destination->Name, "), piloting ", B(app->IsPiloting()),
 					" (", PilotedName(), ", in its fleet ", B(there), "); toast '", jumped, "', then '", Toast(), "'"));
 			// Left at the helm: the FTL probe stages its hull beside where this one came out.
 		}
