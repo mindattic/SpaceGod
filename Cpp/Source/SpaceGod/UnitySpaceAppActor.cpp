@@ -13,6 +13,7 @@
 #include "Coop/CoopPeer.h"
 #include "Smoke/SpaceGodRace.h"
 #include "Rendering/HullLighting.h"
+#include "Rendering/HyperspaceToll.h"
 
 #include "Camera/CameraComponent.h"
 #include "Engine/Engine.h"
@@ -146,6 +147,7 @@ void AUnitySpaceAppActor::Step(float RealDelta)
 		if (SceneUpdate) SceneUpdate();
 		UnityScene::Sync();
 		Rendering::HullLighting::Tick(nullptr, RealDelta); // US-T172
+		Rendering::HyperspaceToll::Tick(nullptr, RealDelta); // US-T191
 		ApplyCamera();
 		ApplyCursor();
 		ApplyAudio();
@@ -168,6 +170,8 @@ void AUnitySpaceAppActor::Step(float RealDelta)
 	UnityScene::Sync();
 	// US-T172: the hulls' lights for what was just placed (eclipse, planetshine, shadow reach, nav lights, lamps).
 	Rendering::HullLighting::Tick(App.get(), RealDelta);
+	// US-T191: time in warp takes its toll on the view (the veins and darkness at the edges, drained colour).
+	Rendering::HyperspaceToll::Tick(App.get(), RealDelta);
 	ApplyCamera();
 	ApplyCursor();
 	ApplyAudio();
