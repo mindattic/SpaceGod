@@ -1,5 +1,6 @@
 // US-T143: stations drawn from Ebal Studios' Space Station Creator Remastered (see SscKit.h, docs/ThirdPartyArt.md).
 #include "Rendering/SscKit.h"
+#include "Rendering/HullLighting.h"
 #include "Rendering/Materials.h"
 #include "Rendering/ShipMeshFactory.h"
 #include "SpaceGodLog.h"
@@ -136,7 +137,8 @@ namespace SpaceGod::Rendering
 			AddComponent<MeshFilter>(at->gameObject())->sharedMesh = mesh;
 			auto mr = AddComponent<MeshRenderer>(at->gameObject());
 			mr->SetSharedMaterial(material);
-			mr->shadowCastingMode = ShadowCastingMode::Off;
+			// US-T172: a lit hull shadows itself (its greebles); the self-lit one never did.
+			mr->shadowCastingMode = HullLighting::Enabled() ? ShadowCastingMode::On : ShadowCastingMode::Off;
 			mr->receiveShadows = false;
 			return mr;
 		}
@@ -180,7 +182,7 @@ namespace SpaceGod::Rendering
 			cs::String colour = derelict ? cs::String("Grey") : ColourOf(faction);
 			cs::String leaf = cs::Cat("MI_SSC_", atlas, "_", colour);
 			if (!HasInstance(leaf)) leaf = cs::Cat("MI_SSC_", atlas, "_Grey");
-			m = Materials::MarkShared(cs::New<Material>(Shader::Find(cs::Cat(MaterialRoot, "/", leaf)),
+			m = Materials::MarkShared(cs::New<Material>(Shader::Find(HullLighting::LitVariant(cs::Cat(MaterialRoot, "/", leaf))),
 				cs::Cat("SSC_", atlas, "_", faction ? faction->Prefix : cs::String("Neutral"), derelict ? "_Derelict" : "")));
 			Color tint = Color::white();
 			if (derelict) tint = Color(0.34f, 0.32f, 0.3f);

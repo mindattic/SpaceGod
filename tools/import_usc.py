@@ -16,6 +16,12 @@ What it builds (see docs/ThirdPartyArt.md):
   Materials/M_USCShip                                         the in-game material (lit from MPC_SpaceGod, unlit)
   Materials/MI_USC_<Atlas>_<Colour>                           one per atlas and unified colour (Grey, Red, Blue,
                                                               Green, Purple, White, Black when the set has it)
+  Materials/M_USCShipLit, MI_USC_<Atlas>_<Colour>_Lit         US-T172: the same atlases as real lit PBR (Unreal's
+                                                              Default Lit: the star as a shadowing key light, the
+                                                              system's sky as image-based light, emissive on top)
+
+USC_LIT_ONLY=1 rebuilds only the lit material and its instances from the textures already imported (no Blender pieces,
+no source pack needed), which is all US-T172's lighting needs on a machine that imported the pack before it.
 """
 
 import os
@@ -31,6 +37,8 @@ MESHES = ROOT + "/Meshes"
 TEXTURES = ROOT + "/Textures"
 MATERIALS = ROOT + "/Materials"
 GAME_MATERIAL = "M_SSCStation" if SSC else "M_USCShip"
+LIT_MATERIAL = GAME_MATERIAL + "Lit"  # US-T172
+LIT_ONLY = os.environ.get("USC_LIT_ONLY", "") == "1"
 MPC = "/SpaceGodRender/Materials/MPC_SpaceGod"
 
 # Atlas -> family folder. Galactic Leopard and Void Whale paint their hull (Main) and fittings (Parts) from two atlases.
@@ -343,6 +351,210 @@ def build_instances(parent, atlases):
     return made
 
 
+# ---------------------------------------------------------------- the lit material (US-T172)
+
+# The self-lit material above fakes the star with no shadows, no image-based light and a Blinn lobe, which is what made
+# hulls look flat. This one is Unreal's Default Lit PBR on the same atlases: base colour times the livery tints, the
+# pack's metallic, roughness and normal maps, so the star (a movable directional light with cascaded self-shadows,
+# Rendering/HullLighting) picks out every greeble, the system's sky (a captured sky light) fills the shadow side, and
+# GGX speculars catch the panels. Emissive carries what no light gives: the pack's windows and panel lights (brighter,
+# so they bloom), ShipView's highlight rim, a faint cool rim so a silhouette never melts into black space, and a floor
+# of ambient so the night side is never pure black. Lights reach it at any scale (directional lights have no range);
+# the emissive goes through SG_Expose3 as every game material does.
+LIT_BASE_CODE = r"""
+return max(Base * Tint * _Tint, 0.0);
+"""
+LIT_ROUGH_CODE = r"""
+float r = lerp(R, 1.0 - R, InvertRoughness) * RoughnessScale;
+return clamp(r, 0.12, 1.0);
+"""
+LIT_NORMAL_CODE = r"""
+float2 nxy = N.xy;
+nxy.y *= FlipGreen; // the pack's maps are OpenGL-style (Unity/Blender); Unreal's tangent frame wants DirectX green
+nxy *= NormalStrength;
+float3 tn = float3(nxy, sqrt(saturate(1.0 - dot(N.xy, N.xy))));
+return any(isnan(tn)) ? float3(0, 0, 1) : normalize(tn);
+"""
+LIT_EMISSIVE_CODE = r"""
+float2 nxy = N.xy;
+nxy.y *= FlipGreen;
+float3 tn = normalize(float3(nxy * NormalStrength, sqrt(saturate(1.0 - dot(N.xy, N.xy)))));
+float3 n = mul(tn, (float3x3)Parameters.TangentToWorld);
+if (!(dot(n, n) > 1e-8) || any(isnan(n))) n = Parameters.TangentToWorld[2];
+n = normalize(n);
+float fres = pow(1.0 - saturate(dot(n, Parameters.CameraVector)), 4.0);
+float3 col = E * EmissiveIntensity * (0.55 + 0.45 * saturate(_EngineGlow)) * _Tint;
+col += float3(0.35, 0.7, 1.0) * fres * _Highlight * 0.6;
+col += RimColor * (fres * RimStrength) + Albedo * AmbientFloor;
+col = any(isnan(col)) ? float3(0, 0, 0) : col;
+return SG_Expose3(col, Exposure, SceneLuminance);
+"""
+
+
+def _engine_texture(*paths):
+    for p in paths:
+        t = unreal.load_asset(p)
+        if t is not None:
+            return t
+    return None
+
+
+def _fallback(key):
+    """An engine texture standing in for a map an atlas lacks: no glow, a flat normal. (Metal and roughness keep the
+    parent's: an engine stand-in of another sampler type would not compile.)"""
+    if key == "Normal":
+        return _engine_texture("/Engine/EngineMaterials/FlatNormal", "/Engine/EngineMaterials/DefaultNormal")
+    if key == "Emission":
+        return _engine_texture("/Engine/EngineResources/Black", "/Engine/EngineMaterials/BlackSquareTexture",
+                               "/Engine/EngineResources/BlackSquareTexture")
+    return None
+
+
+def build_lit_material(default_atlas):
+    path = f"{MATERIALS}/{LIT_MATERIAL}"
+    mat = unreal.load_asset(path) if eal.does_asset_exist(path) else None
+    if mat is None:
+        mat = tools.create_asset(LIT_MATERIAL, MATERIALS, unreal.Material, unreal.MaterialFactoryNew())
+    else:
+        mel.delete_all_material_expressions(mat)
+    mat.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_DEFAULT_LIT)
+    mat.set_editor_property("blend_mode", unreal.BlendMode.BLEND_OPAQUE)
+    mat.set_editor_property("two_sided", False)
+    mpc = unreal.load_asset(MPC)
+    if mpc is None:
+        raise RuntimeError(f"missing {MPC} (the SpaceGodRender plugin)")
+    S = unreal.MaterialSamplerType
+    y = [0]
+
+    def node(cls, x=-1600):
+        e = mel.create_material_expression(mat, cls, x, y[0])
+        y[0] += 140
+        return e
+
+    def sample(name, key, sampler):
+        e = node(unreal.MaterialExpressionTextureSampleParameter2D)
+        e.set_editor_property("parameter_name", name)
+        # The default atlas's map, else any atlas's (a parameter must have a default texture of its sampler type).
+        keys = ["Roughness", "Glossiness"] if key == "Roughness" else [key]
+        t = next((x for a in [default_atlas] + list(ATLASES) for k in keys for x in [_tex(a, k)] if x is not None), None) \
+            or _fallback(key)
+        if t is not None:
+            e.set_editor_property("texture", t)
+        e.set_editor_property("sampler_type", sampler)
+        # Shared wrap samplers: the forward renderer's lights, shadows and sky take samplers of their own.
+        e.set_editor_property("sampler_source", unreal.SamplerSourceMode.SSM_WRAP_WORLD_GROUP_SETTINGS)
+        return e
+
+    def vec(name, rgb):
+        e = node(unreal.MaterialExpressionVectorParameter)
+        e.set_editor_property("parameter_name", name)
+        e.set_editor_property("default_value", unreal.LinearColor(rgb[0], rgb[1], rgb[2], 1.0))
+        return _rgb(mat, e, "", -1300, y[0]), ""
+
+    def scalar(name, value):
+        e = node(unreal.MaterialExpressionScalarParameter)
+        e.set_editor_property("parameter_name", name)
+        e.set_editor_property("default_value", value)
+        return e, ""
+
+    def custom(desc, code, out_type, inputs, x, include=False):
+        c = mel.create_material_expression(mat, unreal.MaterialExpressionCustom, x, y[0])
+        y[0] += 140
+        c.set_editor_property("description", desc)
+        c.set_editor_property("code", code)
+        c.set_editor_property("output_type", out_type)
+        if include:
+            c.set_editor_property("include_file_paths", ["/Plugin/SpaceGodRender/SpaceGodCommon.ush"])
+        cis = []
+        for n, _ in inputs:
+            ci = unreal.CustomInput()
+            ci.set_editor_property("input_name", n)
+            cis.append(ci)
+        c.set_editor_property("inputs", cis)
+        for n, (source, out) in inputs:
+            if not mel.connect_material_expressions(source, out, c, n):
+                raise RuntimeError(f"{LIT_MATERIAL}: could not connect {desc} input {n}")
+        return c
+
+    base = sample("BaseColor", "Grey", S.SAMPLERTYPE_COLOR)
+    metallic = sample("Metallic", "Metallic", S.SAMPLERTYPE_MASKS)
+    rough = sample("Roughness", "Roughness", S.SAMPLERTYPE_MASKS)
+    normal = sample("Normal", "Normal", S.SAMPLERTYPE_NORMAL)
+    emission = sample("Emission", "Emission", S.SAMPLERTYPE_COLOR)
+    tint, tint_ = vec("Tint", (1, 1, 1)), vec("_Tint", (1, 1, 1))
+    flip, strength = scalar("FlipGreen", -1.0), scalar("NormalStrength", 1.0)
+    F1, F3 = unreal.CustomMaterialOutputType.CMOT_FLOAT1, unreal.CustomMaterialOutputType.CMOT_FLOAT3
+
+    albedo = custom("USC/Lit BaseColor", LIT_BASE_CODE, F3, [("Base", (base, "RGB")), ("Tint", tint), ("_Tint", tint_)], -900)
+    mel.connect_material_property(albedo, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    # The packs' metals were authored under Unity's skybox reflections; in black space a full metal has no diffuse and
+    # reads black off its highlights, so they are taken partway back to dielectric (MetallicScale).
+    metal = custom("USC/Lit Metallic", "return saturate(M * MetallicScale);", F1, [("M", (metallic, "R")), ("MetallicScale", scalar("MetallicScale", 0.7))], -900)
+    mel.connect_material_property(metal, "", unreal.MaterialProperty.MP_METALLIC)
+    roughness = custom("USC/Lit Roughness", LIT_ROUGH_CODE, F1, [
+        ("R", (rough, "R")), ("InvertRoughness", scalar("InvertRoughness", 0.0)), ("RoughnessScale", scalar("RoughnessScale", 1.0))], -900)
+    mel.connect_material_property(roughness, "", unreal.MaterialProperty.MP_ROUGHNESS)
+    tangent = custom("USC/Lit Normal", LIT_NORMAL_CODE, F3, [("N", (normal, "RGB")), ("FlipGreen", flip), ("NormalStrength", strength)], -900)
+    mel.connect_material_property(tangent, "", unreal.MaterialProperty.MP_NORMAL)
+    exposure = node(unreal.MaterialExpressionEyeAdaptation)
+    luminance = node(unreal.MaterialExpressionCollectionParameter)
+    luminance.set_editor_property("collection", mpc)
+    luminance.set_editor_property("parameter_name", "_UnitySpaceSceneLuminance")
+    glow = custom("USC/Lit Emissive", LIT_EMISSIVE_CODE, F3, [
+        ("E", (emission, "RGB")), ("EmissiveIntensity", scalar("EmissiveIntensity", 3.0)), ("_EngineGlow", scalar("_EngineGlow", 0.6)),
+        ("_Tint", tint_), ("_Highlight", scalar("_Highlight", 0.0)), ("N", (normal, "RGB")), ("FlipGreen", flip),
+        ("NormalStrength", strength), ("Albedo", (albedo, "")), ("RimColor", vec("RimColor", (0.42, 0.56, 0.8))),
+        ("RimStrength", scalar("RimStrength", 0.07)), ("AmbientFloor", scalar("AmbientFloor", 0.012)),
+        ("Exposure", (exposure, "")), ("SceneLuminance", (luminance, ""))], -500, include=True)
+    mel.connect_material_property(glow, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    mel.recompile_material(mat)
+    eal.save_asset(path, only_if_is_dirty=False)
+    _log(f"built {path}")
+    return mat
+
+
+def build_lit_instances(parent, atlases):
+    """MI_<TAG>_<Atlas>_<Colour>_Lit beside each self-lit instance: the same maps on the lit parent. A map the atlas lacks
+    is set to its neutral stand-in, so no atlas borrows the default atlas's windows or metal."""
+    made = 0
+    for atlas, maps in atlases.items():
+        for colour in COLOURS:
+            if colour not in maps:
+                continue
+            name = f"MI_{TAG}_{atlas}_{colour}_Lit"
+            path = f"{MATERIALS}/{name}"
+            mi = unreal.load_asset(path) if eal.does_asset_exist(path) else None
+            if mi is None:
+                mi = tools.create_asset(name, MATERIALS, unreal.MaterialInstanceConstant,
+                                        unreal.MaterialInstanceConstantFactoryNew())
+            mel.set_material_instance_parent(mi, parent)
+            for param, key in (("BaseColor", colour), ("Normal", "Normal"), ("Metallic", "Metallic"), ("Emission", "Emission")):
+                t = (_tex(atlas, key) if key in maps else None) or _fallback(key)
+                if t is not None:
+                    mel.set_material_instance_texture_parameter_value(mi, param, t)
+            rough = "Roughness" if "Roughness" in maps else "Glossiness" if "Glossiness" in maps else None
+            if rough:
+                mel.set_material_instance_texture_parameter_value(mi, "Roughness", _tex(atlas, rough))
+            mel.set_material_instance_scalar_parameter_value(mi, "InvertRoughness", 1.0 if rough == "Glossiness" else 0.0)
+            mel.update_material_instance(mi)
+            eal.save_asset(path, only_if_is_dirty=False)
+            made += 1
+    _log(f"built {made} lit material instance(s)")
+    return made
+
+
+def atlases_imported():
+    """{atlas: {map or colour: True}} from the textures already imported (USC_LIT_ONLY needs no source pack)."""
+    out = {}
+    for atlas in ATLASES:
+        maps = {}
+        for key in COLOURS + list(MAPS):
+            if eal.does_asset_exist(f"{TEXTURES}/T_{TAG}_{atlas}_{key}"):
+                maps[key] = True
+        out[atlas] = maps
+    return out
+
+
 # ---------------------------------------------------------------- meshes
 
 def _mesh_settings(sm):
@@ -460,7 +672,23 @@ def import_meshes(pieces):
     return meshes
 
 
+def build_lit(atlases):
+    """US-T172: the lit material and its instances; a failure is named in the summary and leaves the rest standing."""
+    try:
+        return build_lit_instances(build_lit_material("Storage" if SSC else "GalacticLeopard_Main"), atlases)
+    except Exception as error:
+        _fail(f"{LIT_MATERIAL}: {error}")
+        return 0
+
+
 def main():
+    if LIT_ONLY:
+        lit = build_lit(atlases_imported())
+        eal.save_directory(MATERIALS, only_if_is_dirty=True, recursive=True)
+        _log(f"SUMMARY lit instances={lit} failures={len(failures)}")
+        for f in failures:
+            unreal.log_error(f"{TAG}: FAILURE {f}")
+        return
     src = os.environ.get("USC_SOURCE")
     pieces = os.environ.get("USC_PIECES")
     if not src or not os.path.isdir(src) or not pieces or not os.path.isdir(pieces):
@@ -474,9 +702,10 @@ def main():
         instances = build_instances(parent, atlases)
     except Exception as error:  # the summary names it; the meshes still import
         _fail(f"{GAME_MATERIAL}: {error}")
+    lit = build_lit(atlases)
     meshes = import_meshes(pieces)
     eal.save_directory(ROOT, only_if_is_dirty=True, recursive=True)
-    _log(f"SUMMARY meshes={len(meshes)} textures={textures} instances={instances} failures={len(failures)}")
+    _log(f"SUMMARY meshes={len(meshes)} textures={textures} instances={instances} lit={lit} failures={len(failures)}")
     for f in failures:
         unreal.log_error(f"{TAG}: FAILURE {f}")
 

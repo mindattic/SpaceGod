@@ -75,5 +75,10 @@ namespace SpaceGod::UnityCompat
 
 		/// The Unreal component drawing one renderer (null before its first Sync, or while it draws nothing).
 		static UPrimitiveComponent* ComponentOf(const Renderer& renderer);
+
+		/// US-T172: the components casting shadows: a renderer whose shadowCastingMode is not Off drawn with a lit (not
+		/// Unlit) material, the prebuilt hulls' PBR ones. Every self-lit SpaceGodRender material is Unlit, so nothing else
+		/// casts. Entries whose component is gone are left for the reader to skip.
+		static const TArray<TWeakObjectPtr<UPrimitiveComponent>>& ShadowCasters();
 	};
 }

@@ -172,6 +172,47 @@ model the classes use.
   Grey) with a light wash of its owner's colour. Without the pack, headless, or with `-NoSSC`, every station is
   procedural as before. The lineup adds `ssc-stations` and `ssc-archetypes` sheets.
 
+## Lighting the prebuilt hulls (US-T172)
+
+`M_USCShip`, `M_SSCStation` and `M_StarSparrowShip` are self-lit (Unlit materials lighting themselves from the star in
+`MPC_SpaceGod`, as every SpaceGodRender shader does): no shadows, no light from the sky, a Blinn highlight and a flat
+night-side fill. That path was chosen to port Unity.SpaceGod's hand-written shaders pixel for pixel, with the game's
+own exposure (`SG_Expose`) and no Unreal lights at all; a point light could not span the system anyway (a hull is a
+millimetre across at the realistic scale and the star 1e13 uu away). It is why the hulls looked flat.
+
+Each import now also builds a **lit** set beside the self-lit one (`USC_LIT_ONLY=1` / `STARSPARROW_LIT_ONLY=1` rebuild
+just these from the textures already imported): `M_USCShipLit` and `MI_USC_<Atlas>_<Colour>_Lit`, `M_SSCStationLit` and
+`MI_SSC_<Atlas>_<Colour>_Lit`, `M_StarSparrowShipLit`. They are Unreal's Default Lit PBR on the packs' own maps (base
+colour times the liveries, metallic, roughness or 1 - glossiness, the normal map with its green flipped), with an
+emissive of the pack's windows and panel lights (brighter than before, so they bloom), ShipView's highlight, a faint cool
+fresnel rim and a small ambient floor, through `SG_Expose3`. Their metallic is scaled by `MetallicScale` (0.7): the
+packs' metals were authored under Unity's skybox reflections, and a full metal in black space has no diffuse at all. The kits pick the `_Lit` asset when it is there.
+
+`Rendering/HullLighting` lights them with real Unreal lights that work at any scale:
+
+- the star as a movable **directional** key light (no range to run out of), Lambert-matched to the old shaders
+  (pi lux for a star of 1), with cascaded shadows whose distance is refitted every frame to the lit hulls big enough on
+  screen to matter (so a millimetre fighter and a 2 km carrier both self-shadow) and screen-space contact shadows; a
+  world between the camera and the star eclipses it, with a penumbra;
+- the companion star, or US-T132's fill from the sky's bright heart, as an unshadowed far point light (1000 km out, no
+  inverse-square falloff, re-placed round the camera each frame): the forward renderer shades only **one** directional
+  light, and a second competes with it (Unreal's on-screen \Multiple directional lights are competing\ warning) and is
+  dropped, so the star is the only one;
+- a **sky light** captured from the sky alone (`SkyDistanceThreshold` 1e13 uu: the sky and stars drawn at 1e15, never a
+  world or a star's face), recaptured on a new place and every 8 s, so the shadow side takes the nebula's colour;
+- **planetshine**: a second far point light from the world that bounces the most (its colour, its apparent size, the
+  share of its lit face the camera sees);
+- **nav lights** on every prebuilt hull, on its own extremes (read from the mesh's CPU vertex positions, which editor
+  builds keep): red port, green starboard, a white strobe on top, a white stern light, a red beacon underneath hulls
+  over 150 m; never smaller than a couple of pixels;
+- **lamps**: spotlights on the four small craft nearest the camera and a point light at each of a Void Station's
+  Embers (US-T150), lighting the station in the Ember's colour.
+
+The thumbnails' and lineup's fixed light (`RenderBackend::OverrideLighting`, US-T116) drives the key and fill while it
+holds, with the sky, planetshine and lamps off. `-LegacyHullLighting` (or `sg.HullLighting 0` before the first hull)
+keeps the self-lit path; `sg.HullLighting.Key/Fill/Sky/Planetshine/Lamps/Shadows/NavLights` tune it; `sg.Lighting`
+reports it and `sg.Lighting shots <dir>` shoots and times its five scenes at both scales.
+
 ## Alien Space Nebula 1 (Skybox), by Jungle Jim (US-T145)
 
 The one third-party piece that **is** committed: its licence allows redistribution with credit.

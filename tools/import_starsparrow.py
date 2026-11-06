@@ -384,6 +384,142 @@ def build_game_material():
     return mat
 
 
+# ---------------------------------------------------------------- the lit material (US-T172)
+
+LIT_MATERIAL = "M_StarSparrowShipLit"
+
+# M_StarSparrowShip above lights itself from MPC_SpaceGod (no shadows, no sky light, a Blinn lobe): hulls looked flat.
+# This is the same livery as Unreal's Default Lit PBR (as tools/import_usc.py's M_USCShipLit): the star is a directional
+# light with cascaded self-shadows, the system's sky a captured sky light (Rendering/HullLighting), and the emissive
+# carries the accent lights, ShipView's highlight, a faint rim and a floor of ambient, through SG_Expose3.
+LIT_BASE_CODE = r"""
+float3 tint = float3(1, 1, 1);
+tint = lerp(tint, Tint1, M1);
+tint = lerp(tint, Tint2, M2);
+tint = lerp(tint, Tint3, M3);
+tint = lerp(tint, Tint4, M4);
+return max(Neutral * tint * _Tint, 0.0);
+"""
+LIT_NORMAL_CODE = r"""
+float2 nxy = float2(N.x, -N.y); // the pack's maps are OpenGL-style (Unity); Unreal's tangent frame wants DirectX green
+nxy *= NormalStrength;
+float3 tn = float3(nxy, sqrt(saturate(1.0 - dot(N.xy, N.xy))));
+return any(isnan(tn)) ? float3(0, 0, 1) : normalize(tn);
+"""
+LIT_EMISSIVE_CODE = r"""
+float2 nxy = float2(N.x, -N.y);
+float3 tn = normalize(float3(nxy * NormalStrength, sqrt(saturate(1.0 - dot(N.xy, N.xy)))));
+float3 n = mul(tn, (float3x3)Parameters.TangentToWorld);
+if (!(dot(n, n) > 1e-8) || any(isnan(n))) n = Parameters.TangentToWorld[2];
+n = normalize(n);
+float fres = pow(1.0 - saturate(dot(n, Parameters.CameraVector)), 4.0);
+float3 col = E * EmissiveIntensity * (0.55 + 0.45 * saturate(_EngineGlow)) * _Tint;
+col += float3(0.35, 0.7, 1.0) * fres * _Highlight * 0.6;
+col += RimColor * (fres * RimStrength) + Albedo * AmbientFloor;
+col = any(isnan(col)) ? float3(0, 0, 0) : col;
+return SG_Expose3(col, Exposure, SceneLuminance);
+"""
+
+
+def build_lit_game_material():
+    path = f"{MATERIALS}/{LIT_MATERIAL}"
+    mat = unreal.load_asset(path) if eal.does_asset_exist(path) else None
+    if mat is None:
+        mat = tools.create_asset(LIT_MATERIAL, MATERIALS, unreal.Material, unreal.MaterialFactoryNew())
+    else:
+        mel.delete_all_material_expressions(mat)
+    mat.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_DEFAULT_LIT)
+    mat.set_editor_property("blend_mode", unreal.BlendMode.BLEND_OPAQUE)
+    mat.set_editor_property("two_sided", False)
+    mpc = unreal.load_asset(MPC)
+    if mpc is None:
+        raise RuntimeError(f"missing {MPC} (the SpaceGodRender plugin)")
+    S = unreal.MaterialSamplerType
+    y = [0]
+
+    def sample(name, base, sampler):
+        e = _tex_param(mat, name, _tex(base), sampler, -1600, y[0])
+        y[0] += 140
+        return e
+
+    def vec(name, rgb):
+        e = _vector(mat, name, rgb, -1600, y[0])
+        y[0] += 140
+        return _rgb(mat, e, "", -1300, y[0]), ""
+
+    def scalar(name, value):
+        e = _scalar(mat, name, value, -1600, y[0])
+        y[0] += 140
+        return e, ""
+
+    def custom(desc, code, out_type, inputs, x, include=False):
+        c = _expr(mat, unreal.MaterialExpressionCustom, x, y[0])
+        y[0] += 140
+        c.set_editor_property("description", desc)
+        c.set_editor_property("code", code)
+        c.set_editor_property("output_type", out_type)
+        if include:
+            c.set_editor_property("include_file_paths", ["/Plugin/SpaceGodRender/SpaceGodCommon.ush"])
+        cis = []
+        for n, _ in inputs:
+            ci = unreal.CustomInput()
+            ci.set_editor_property("input_name", n)
+            cis.append(ci)
+        c.set_editor_property("inputs", cis)
+        for n, (source, out) in inputs:
+            if not mel.connect_material_expressions(source, out, c, n):
+                raise RuntimeError(f"{LIT_MATERIAL}: could not connect {desc} input {n}")
+        return c
+
+    grey = LIVERY_TINTS["Grey"]
+    neutral = sample("Neutral", "Neutral", S.SAMPLERTYPE_COLOR)
+    masks = [sample(f"Mask{i}", f"Mask{i}", S.SAMPLERTYPE_MASKS) for i in range(1, 5)]
+    metallic = sample("Metallic", "Metallic", S.SAMPLERTYPE_MASKS)
+    gloss = sample("Glossiness", "Glossiness", S.SAMPLERTYPE_MASKS)
+    normal = sample("Normal", "Normal", S.SAMPLERTYPE_NORMAL)
+    emission = sample("Emission", "Emission", S.SAMPLERTYPE_COLOR)
+    tint_ = vec("_Tint", (1, 1, 1))
+    strength = scalar("NormalStrength", 1.0)
+    F3 = unreal.CustomMaterialOutputType.CMOT_FLOAT3
+
+    inputs = [("Neutral", (neutral, "RGB"))] + [(f"M{i + 1}", (masks[i], "R")) for i in range(4)] + \
+        [(f"Tint{i + 1}", vec(f"Tint{i + 1}", _linear(grey[i]))) for i in range(4)] + [("_Tint", tint_)]
+    albedo = custom("StarSparrow/Lit BaseColor", LIT_BASE_CODE, F3, inputs, -900)
+    mel.connect_material_property(albedo, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    # As M_USCShipLit: metals partway back to dielectric, or in black space they read black off their highlights.
+    metal = custom("StarSparrow/Lit Metallic", "return saturate(M * MetallicScale);", unreal.CustomMaterialOutputType.CMOT_FLOAT1,
+                   [("M", (metallic, "R")), ("MetallicScale", scalar("MetallicScale", 0.7))], -900)
+    mel.connect_material_property(metal, "", unreal.MaterialProperty.MP_METALLIC)
+    rough = _expr(mat, unreal.MaterialExpressionOneMinus, -900, y[0])
+    y[0] += 140
+    mel.connect_material_expressions(gloss, "R", rough, "")
+    clamp = _expr(mat, unreal.MaterialExpressionClamp, -700, y[0])
+    y[0] += 140
+    clamp.set_editor_property("min_default", 0.12)
+    clamp.set_editor_property("max_default", 1.0)
+    mel.connect_material_expressions(rough, "", clamp, "")
+    mel.connect_material_property(clamp, "", unreal.MaterialProperty.MP_ROUGHNESS)
+    tangent = custom("StarSparrow/Lit Normal", LIT_NORMAL_CODE, F3, [("N", (normal, "RGB")), ("NormalStrength", strength)], -900)
+    mel.connect_material_property(tangent, "", unreal.MaterialProperty.MP_NORMAL)
+    exposure = _expr(mat, unreal.MaterialExpressionEyeAdaptation, -900, y[0])
+    y[0] += 140
+    luminance = _expr(mat, unreal.MaterialExpressionCollectionParameter, -900, y[0])
+    y[0] += 140
+    luminance.set_editor_property("collection", mpc)
+    luminance.set_editor_property("parameter_name", "_UnitySpaceSceneLuminance")
+    glow = custom("StarSparrow/Lit Emissive", LIT_EMISSIVE_CODE, F3, [
+        ("E", (emission, "RGB")), ("EmissiveIntensity", scalar("EmissiveIntensity", 3.0)), ("_EngineGlow", scalar("_EngineGlow", 0.6)),
+        ("_Tint", tint_), ("_Highlight", scalar("_Highlight", 0.0)), ("N", (normal, "RGB")), ("NormalStrength", strength),
+        ("Albedo", (albedo, "")), ("RimColor", vec("RimColor", (0.42, 0.56, 0.8))), ("RimStrength", scalar("RimStrength", 0.07)),
+        ("AmbientFloor", scalar("AmbientFloor", 0.012)), ("Exposure", (exposure, "")), ("SceneLuminance", (luminance, ""))],
+        -500, include=True)
+    mel.connect_material_property(glow, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    mel.recompile_material(mat)
+    eal.save_asset(path, only_if_is_dirty=False)
+    _log(f"built {path}")
+    return mat
+
+
 def _instance(parent, name):
     path = f"{MATERIALS}/{name}"
     mi = unreal.load_asset(path) if eal.does_asset_exist(path) else None
@@ -627,9 +763,16 @@ def finish_meshes(meshes, instance):
 
 def main():
     if os.environ.get("STARSPARROW_MATERIAL_ONLY"):
-        # Just the in-game material (needs the imported textures, not the source art).
+        # Just the in-game materials (need the imported textures, not the source art).
         build_game_material()
+        build_lit_game_material()
         _log(f"SUMMARY material only, failures={len(failures)}")
+        return
+    if os.environ.get("STARSPARROW_LIT_ONLY"):
+        build_lit_game_material()  # US-T172
+        _log(f"SUMMARY lit material only, failures={len(failures)}")
+        for f in failures:
+            unreal.log_error(f"StarSparrow: FAILURE {f}")
         return
     src = _source_dir()
     _log(f"source {src}")
@@ -640,7 +783,11 @@ def main():
         build_game_material()
     except Exception as error:  # the summary names it; the meshes still import
         _fail(f"{GAME_MATERIAL}: {error}")
-    default = unreal.load_asset(f"{MATERIALS}/{DEFAULT_INSTANCE}")
+    try:
+        build_lit_game_material()
+    except Exception as error:
+        _fail(f"{LIT_MATERIAL}: {error}")
+    default =unreal.load_asset(f"{MATERIALS}/{DEFAULT_INSTANCE}")
     meshes = import_meshes(src)
     finish_meshes(meshes, default)
     eal.save_directory(ROOT, only_if_is_dirty=True, recursive=True)

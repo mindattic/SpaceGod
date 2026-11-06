@@ -1,5 +1,6 @@
 // US-T110: every ship drawn from Ebal Studios' Star Sparrow kit (see StarSparrowKit.h, docs/ThirdPartyArt.md).
 #include "Rendering/StarSparrowKit.h"
+#include "Rendering/HullLighting.h"
 #include "Rendering/Materials.h"
 #include "Rendering/ShipMeshFactory.h"
 #include "SpaceGodLog.h"
@@ -589,7 +590,8 @@ namespace SpaceGod::Rendering
 			AddComponent<MeshFilter>(go)->sharedMesh = info.Drawn;
 			auto mr = AddComponent<MeshRenderer>(go);
 			mr->SetSharedMaterial(material);
-			mr->shadowCastingMode = ShadowCastingMode::Off;
+			// US-T172: a lit hull shadows itself (its greebles); the self-lit one never did.
+			mr->shadowCastingMode = HullLighting::Enabled() ? ShadowCastingMode::On : ShadowCastingMode::Off;
 			mr->receiveShadows = false;
 			return mr;
 		}
@@ -707,7 +709,7 @@ namespace SpaceGod::Rendering
 		auto faction = ShipMeshFactory::Canon(faction_);
 		cs::Ref<Material> m;
 		if (faction ? cache.TryGetValue(faction, m) && Alive(m) : Alive(neutral)) return faction ? m : neutral;
-		m = Materials::MarkShared(cs::New<Material>(Shader::Find(MaterialPath), cs::Cat("StarSparrow_", faction ? faction->Prefix : cs::String("Neutral"))));
+		m = Materials::MarkShared(cs::New<Material>(Shader::Find(HullLighting::LitVariant(MaterialPath, "Lit")), cs::Cat("StarSparrow_", faction ? faction->Prefix : cs::String("Neutral"))));
 		// Tints multiply the pack's Neutral atlas inside each mask (main hull, dark trim, light panels, accent lights), as
 		// its own colour variants do (the Grey fit is 0.54 / 0.33 / 1.08 / 0.94).
 		Color f = faction ? Color(faction->Color.R, faction->Color.G, faction->Color.B) : Color(0.6f, 0.6f, 0.62f);

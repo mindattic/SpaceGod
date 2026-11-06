@@ -1,6 +1,7 @@
 // Port of Unity.SpaceGod Runtime/Rendering/ShipModels.cs (US-T30).
 #include "Rendering/ShipModels.h"
 #include "Rendering/AssetStreamer.h"
+#include "Rendering/HullLighting.h"
 #include "Rendering/Materials.h"
 #include "Rendering/ShipMeshFactory.h"
 #include "Rendering/StarSparrowKit.h"
@@ -53,6 +54,8 @@ namespace SpaceGod::Rendering
 		cs::Ref<Transform>& stern, cs::Ref<Transform>& bow)
 	{
 		BuildHull(ship, parent, renderers, stern, bow);
+		// US-T172: red to port, green to starboard, a strobe on top, on the hull's own extremes (prebuilt hulls only).
+		HullLighting::AddNavLights(ship, parent, renderers);
 		// Heavy equipment shows on whatever hull carries it (U.SPC-T507): a field projector's ring amidships. A yard's
 		// refit gives the ship a new combat state and its view is rebuilt, so the ring comes and goes with the fitting.
 		if (LaneInterdictors::Carries(ship))

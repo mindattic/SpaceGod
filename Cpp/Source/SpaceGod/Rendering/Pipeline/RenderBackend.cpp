@@ -1,6 +1,7 @@
 // Port of Unity.SpaceGod Runtime/Rendering/Pipeline/RenderBackend.cs, RenderPipelineSelection.cs (RenderPipelineSettings)
 // and Urp/UrpPostProcessSettings.cs, with UrpRenderBackend.cs's look on Unreal's post-process volume (US-T30).
 #include "Rendering/Pipeline/RenderBackend.h"
+#include "Rendering/HullLighting.h"
 #include "Rendering/RenderPipelineProfiles.h"
 #include "Settings/GameSetting.h"
 #include "UnityCompat/UnityScene.h"
@@ -139,6 +140,7 @@ namespace SpaceGod::Rendering
 	void NeutralRenderBackend::SetSystemGrade(const SystemGrade& value)
 	{
 		grade = value;
+		HullLighting::SetGrade(value); // US-T172: the sky light recaptures the new place's sky
 		if (!lightingOverride && gameLightingSet) ApplyLighting(Graded(gameLighting));
 	}
 
@@ -168,6 +170,8 @@ namespace SpaceGod::Rendering
 		Shader::SetGlobalVector(RenderGlobals::SunColor, value.SunColor);
 		Shader::SetGlobalVector(RenderGlobals::Sun2Position, value.Sun2Position);
 		Shader::SetGlobalVector(RenderGlobals::Sun2Color, value.Sun2Color);
+		// US-T172: the same light, as the Unreal lights the prebuilt hulls' lit materials see (an override's too).
+		HullLighting::SetStars(value, lightingOverride.has_value());
 	}
 
 	// ---------------------------------------------------------------- UnrealRenderBackend

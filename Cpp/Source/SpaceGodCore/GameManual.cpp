@@ -68,6 +68,13 @@ namespace SpaceGod::Core
 				T("What is drawn",
 				  "Orbits, labels, hyperlanes and satellites each toggle on their own. Far or small things fade from model to "
 				  "simpler model, to icon, to one marker for a fleet, so the view stays readable at any distance."),
+				T("Light on the hulls", // US-T172
+				  "Ships and stations are lit as space lights them: one hard star, whose light throws each hull's own shadows across "
+				  "its plating, and the dark. The shadow side is never quite black: it takes the colour of the system's sky, a faint "
+				  "cool rim picks out the silhouette, and near a world its lit face bounces light on to you. Behind a world, in its "
+				  "shadow, the star goes out and a hull is drawn by its own lights: lit windows and panels, red nav lights to port, "
+				  "green to starboard, a white strobe on top, engine glows. Small craft carry headlights, and a Void Station's "
+				  "Embers light the station round them. It is the same at both scales."),
 				T("The sky",
 				  "Every system has a skybox behind it. Shift+K (or numpad *) moves the system in view on to the next sky and "
 				  "Shift+Alt+K (or numpad /) back; each system keeps the sky you gave it, in your profile, Sol or any other. "

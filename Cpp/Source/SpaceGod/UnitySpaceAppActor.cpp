@@ -12,6 +12,7 @@
 #include "Views/AsteroidBelt.h"
 #include "Coop/CoopPeer.h"
 #include "Smoke/SpaceGodRace.h"
+#include "Rendering/HullLighting.h"
 
 #include "Camera/CameraComponent.h"
 #include "Engine/Engine.h"
@@ -144,6 +145,7 @@ void AUnitySpaceAppActor::Step(float RealDelta)
 		// A scene without the app: its own Update (the main menu's; its OnGUI runs in the GUI host's passes).
 		if (SceneUpdate) SceneUpdate();
 		UnityScene::Sync();
+		Rendering::HullLighting::Tick(nullptr, RealDelta); // US-T172
 		ApplyCamera();
 		ApplyCursor();
 		ApplyAudio();
@@ -164,6 +166,8 @@ void AUnitySpaceAppActor::Step(float RealDelta)
 	CaptureEvents::Tick(App.get());
 	// End of the frame (Unity's render): every renderer the views placed to its Unreal component.
 	UnityScene::Sync();
+	// US-T172: the hulls' lights for what was just placed (eclipse, planetshine, shadow reach, nav lights, lamps).
+	Rendering::HullLighting::Tick(App.get(), RealDelta);
 	ApplyCamera();
 	ApplyCursor();
 	ApplyAudio();

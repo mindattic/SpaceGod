@@ -1,5 +1,6 @@
 // US-T142: every ship drawn from Ebal Studios' Ultimate Spaceships Creator (see UscKit.h, docs/ThirdPartyArt.md).
 #include "Rendering/UscKit.h"
+#include "Rendering/HullLighting.h"
 #include "Rendering/Materials.h"
 #include "Rendering/ShipMeshFactory.h"
 #include "Rendering/StarSparrowKit.h"
@@ -194,7 +195,8 @@ namespace SpaceGod::Rendering
 			AddComponent<MeshFilter>(at->gameObject())->sharedMesh = mesh;
 			auto mr = AddComponent<MeshRenderer>(at->gameObject());
 			mr->SetSharedMaterial(material);
-			mr->shadowCastingMode = ShadowCastingMode::Off;
+			// US-T172: a lit hull shadows itself (its greebles); the self-lit one never did.
+			mr->shadowCastingMode = HullLighting::Enabled() ? ShadowCastingMode::On : ShadowCastingMode::Off;
 			mr->receiveShadows = false;
 			return mr;
 		}
@@ -223,7 +225,7 @@ namespace SpaceGod::Rendering
 			cs::String colour = UscKit::ColourOf(faction);
 			if (!HasInstance(atlas, colour)) colour = colour == "Black" && HasInstance(atlas, "Red") ? cs::String("Red") : cs::String("Grey");
 			cs::String leaf = cs::Cat("MI_USC_", atlas, "_", colour);
-			m = Materials::MarkShared(cs::New<Material>(Shader::Find(cs::Cat(MaterialRoot, "/", leaf)), cs::Cat("USC_", atlas, "_", faction ? faction->Prefix : cs::String("Neutral"))));
+			m = Materials::MarkShared(cs::New<Material>(Shader::Find(HullLighting::LitVariant(cs::Cat(MaterialRoot, "/", leaf))), cs::Cat("USC_", atlas, "_", faction ? faction->Prefix : cs::String("Neutral"))));
 			// A light wash of the faction's own colour over the unified one, so two navies in the same colour still differ.
 			Color tint = Color::white();
 			if (faction)

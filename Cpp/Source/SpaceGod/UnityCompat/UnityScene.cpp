@@ -13,6 +13,7 @@
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 #include "Misc/CoreMisc.h"
 #include "UObject/StrongObjectPtr.h"
 #include "UObject/WeakObjectPtrTemplates.h"
@@ -627,6 +628,22 @@ namespace SpaceGod::UnityCompat
 			LitPushed.Add(mid, v);
 		}
 
+		/// US-T172: the components casting shadows (UnityScene::ShadowCasters), pruned of dead ones as it grows.
+		TArray<TWeakObjectPtr<UPrimitiveComponent>> Casters;
+
+		/// Whether a material is lit (not Unlit): worked out once per material.
+		bool LitMaterial(UMaterialInterface* m)
+		{
+			if (!m) return false;
+			static TMap<TWeakObjectPtr<UMaterialInterface>, bool> known;
+			TWeakObjectPtr<UMaterialInterface> key(m);
+			if (const bool* lit = known.Find(key)) return *lit;
+			if (known.Num() > 4096) known.Reset();
+			bool lit = m->GetShadingModels().IsLit();
+			known.Add(key, lit);
+			return lit;
+		}
+
 		void SyncRenderer(AActor* host, Renderer& r)
 		{
 			auto mesh = r.DrawnMesh();
@@ -752,6 +769,13 @@ namespace SpaceGod::UnityCompat
 			}
 			if (block) h->BlockPushedVersion = r.BlockVersion;
 			if (auto first = r.sharedMaterial()) c->TranslucencySortPriority = ShaderBinding::SortPriority(first->shader.get());
+			// US-T172: a lit hull casts its shadow (onto itself: its greebles); nothing self-lit does.
+			bool cast = r.shadowCastingMode != ShadowCastingMode::Off && !h->Bound.empty() && LitMaterial(h->Bound[0]);
+			if (c->CastShadow != cast)
+			{
+				c->SetCastShadow(cast);
+				if (cast) Casters.Add(c);
+			}
 
 			if (auto t = r.transform())
 			{
@@ -974,5 +998,11 @@ namespace SpaceGod::UnityCompat
 	{
 		auto* h = static_cast<RendererHandle*>(renderer.Engine.get());
 		return h && h->Component.IsValid() ? h->Component.Get() : nullptr;
+	}
+
+	const TArray<TWeakObjectPtr<UPrimitiveComponent>>& UnityScene::ShadowCasters()
+	{
+		if (Casters.Num() > 256) Casters.RemoveAll([](const TWeakObjectPtr<UPrimitiveComponent>& c) { return !c.IsValid() || !c->CastShadow; });
+		return Casters;
 	}
 }
