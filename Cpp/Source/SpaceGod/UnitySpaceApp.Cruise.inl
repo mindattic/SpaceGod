@@ -29,7 +29,16 @@ public:
 	/// <summary>Why the hull flown cannot cruise now, or empty.</summary>
 	cs::String SystemCruiseBlocker();
 
-	/// <summary>The HUD's cruise readout (from OnGUI): spool, speed, the target, how far, the drop-out's ETA.</summary>
+	/// <summary>US-T197: the one speed regime of the hull flown (Core::DriveRegime): ordinary flight, the cruise drive
+	/// spooling or engaged, riding a lane, or between the stars. The lane and FTL code reads the same answer.</summary>
+	Core::DriveRegime PilotDriveRegime();
+
+	/// <summary>US-T197: the regime as it changed frame to frame and the cue the last change gave (the screen's flash on
+	/// engaging and dropping out reads it; it is where a sound would hook in too).</summary>
+	const Core::DriveRegimeWatch& DriveRegimeNow() const { return driveRegime; }
+
+	/// <summary>The HUD's cruise readout (from OnGUI): spool, speed, the target, how far, the drop-out's ETA; and the
+	/// drive's look (US-T197): the spool's charging glow, the flash as it engages and drops out, streaks while it cruises.</summary>
 	void DrawSystemCruise();
 
 	/// <summary>The dev menu's Travel entries for the drive (US-T126's registry).</summary>
@@ -53,6 +62,22 @@ private:
 	/// <summary>The hull the drive is on (another hull flown drops it), and its hull points last frame (a hit drops it).</summary>
 	cs::Ref<Core::Ship> cruiseShip;
 	double cruiseHull = -1;
+
+	/// <summary>US-T197: the hull's shields last frame (a hit on them drops it too, before the hull is touched).</summary>
+	double cruiseShield = -1;
+
+	/// <summary>US-T197: hulls already close by when the drive engaged (a wingman off the nose): never a collision alert.</summary>
+	cs::List<cs::Ref<Core::Ship>> cruiseCleared;
+
+	/// <summary>US-T197: what in the path holds a spooled drive back from engaging this frame (empty: nothing).</summary>
+	cs::String cruiseBlockedBy;
+
+	/// <summary>US-T197: the regime frame to frame, and the cue its last change gave.</summary>
+	Core::DriveRegimeWatch driveRegime;
+
+	/// <summary>US-T197: the nearest station or hull in the cruise's path (not the target), km along the nose (infinite:
+	/// none), how near it the drive drops out, and its name.</summary>
+	double CruiseObstacleAheadKm(Core::DVec3 helio, Core::DVec3 forward, double& alertKm, cs::String& name);
 
 	/// <summary>This frame's reckoning, for the readout: km to the target and to its drop point (infinite: none), its name.</summary>
 	double cruiseTargetKm = cs::Double::PositiveInfinity, cruiseToDropKm = cs::Double::PositiveInfinity;

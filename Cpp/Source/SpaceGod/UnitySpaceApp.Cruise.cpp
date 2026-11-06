@@ -23,11 +23,14 @@
 #include "SimClock.h"
 #include "UI/CheatMenu.h"
 #include "UI/Hud.h"
+#include "UI/Icons.h"
+#include "UnityCompat/UnityRuntime.h"
 #include "World.h"
 
 #include <cmath>
 
 using namespace SpaceGod::Core;
+using SpaceGod::UI::Icons;
 
 namespace SpaceGod
 {
@@ -52,11 +55,91 @@ namespace SpaceGod
 			if (!(s < cs::Double::PositiveInfinity)) return "--";
 			return s >= 10 ? cs::Cat(cs::Fmt(s, "N0"), " S") : cs::Cat(cs::Fmt(s, "0.0"), " S");
 		}
+
+		// US-T197: the drive's look, drawn in screen pixels.
+		constexpr Color CruiseGlow{0.45f, 0.85f, 1.0f};
+		constexpr Color CruiseFlashColor{0.8f, 0.94f, 1.0f};
+		constexpr float CruiseEngageFlashS = 0.6f, CruiseDropFlashS = 0.45f, CruiseDropStreakS = 1.2f;
+
+		float CruiseFrac(float x) { return x - Mathf::Floor(x); }
+
+		void CruiseLine(Vector2 a, Vector2 b, Color color, float thickness)
+		{
+			auto d = b - a;
+			float length = d.magnitude();
+			if (length < 0.5f) return;
+			auto matrix = GUI::matrix;
+			auto old = GUI::color;
+			GUIUtility::RotateAroundPivot(Mathf::Atan2(d.y, d.x) * Mathf::Rad2Deg, a);
+			GUI::color = color;
+			GUI::DrawTexture(Rect(a.x, a.y - thickness * 0.5f, length, thickness), Icons::White());
+			GUI::color = old;
+			GUI::matrix = matrix;
+		}
+
+		void CruiseWash(Color color, float alpha)
+		{
+			if (alpha < 0.002f) return;
+			auto old = GUI::color;
+			GUI::color = Color(color.r, color.g, color.b, alpha);
+			GUI::DrawTexture(Rect(0, 0, static_cast<float>(Screen::width), static_cast<float>(Screen::height)), Icons::White());
+			GUI::color = old;
+		}
+
+		/// The drive's charging glow: the screen's edges lit, brighter and quicker to pulse as the spool fills.
+		void CruiseEdgeGlow(float fraction)
+		{
+			float t = Time::unscaledTime;
+			float a = (0.12f + 0.38f * fraction) * (0.65f + 0.35f * Mathf::Sin(t * (3.0f + 9.0f * fraction)));
+			float w = static_cast<float>(Screen::width), h = static_cast<float>(Screen::height);
+			auto old = GUI::color;
+			for (int i = 0; i < 4; i++)
+			{
+				float band = 6.0f + 10.0f * i;
+				GUI::color = Color(CruiseGlow.r, CruiseGlow.g, CruiseGlow.b, a / (1.0f + i * 1.6f));
+				GUI::DrawTexture(Rect(0, 0, w, band), Icons::White());
+				GUI::DrawTexture(Rect(0, h - band, w, band), Icons::White());
+				GUI::DrawTexture(Rect(0, band, band, h - 2 * band), Icons::White());
+				GUI::DrawTexture(Rect(w - band, band, band, h - 2 * band), Icons::White());
+			}
+			GUI::color = old;
+		}
+
+		/// Light streaming past from the point ahead, longer and quicker with <paramref name="strength"/> (0..1).
+		void CruiseStreaks(float strength)
+		{
+			if (strength < 0.01f) return;
+			auto centre = Vector2(Screen::width * 0.5f, Screen::height * 0.5f);
+			float reach = Vector2(static_cast<float>(Screen::width), static_cast<float>(Screen::height)).magnitude() * 0.6f;
+			float t = Time::unscaledTime;
+			for (int i = 0; i < 90; i++)
+			{
+				int k = i + 900; // its own pattern, apart from the lanes' and the jump drive's
+				float h1 = CruiseFrac(Mathf::Sin(k * 12.9898f) * 43758.55f);
+				float h2 = CruiseFrac(Mathf::Sin(k * 78.233f) * 12345.67f);
+				float h3 = CruiseFrac(Mathf::Sin(k * 37.719f) * 24634.63f);
+				float angle = h1 * Mathf::PI * 2.0f;
+				float phase = CruiseFrac(t * (0.4f + 2.2f * strength) * (0.6f + h2) + h3);
+				auto dir = Vector2(Mathf::Cos(angle), Mathf::Sin(angle));
+				float r = 40.0f + phase * phase * reach;
+				float length = (6.0f + 260.0f * strength) * (0.3f + phase);
+				CruiseLine(centre + dir * r, centre + dir * (r + length), Color(CruiseGlow.r, CruiseGlow.g, CruiseGlow.b, strength * phase * 0.7f), 1.0f + 1.4f * phase);
+			}
+		}
 	}
 
 	bool UnitySpaceApp::SystemCruiseActive() const
 	{
 		return systemCruise.Active() && IsPiloting() && Piloted.Ship != nullptr && Piloted.Ship == cruiseShip;
+	}
+
+	DriveRegime UnitySpaceApp::PilotDriveRegime()
+	{
+		if (InFtlCruise() || Travel->Active) return DriveRegime::Ftl;
+		if (!IsPiloting() || Piloted.Ship == nullptr) return DriveRegime::Normal;
+		if (Piloted.Ship->Phase == ShipPhase::Lane) return DriveRegime::Lane;
+		if (SystemCruiseActive()) return systemCruise.Cruising() ? DriveRegime::Cruise : DriveRegime::CruiseSpool;
+		return DriveRegime::Normal;
 	}
 
 	cs::String UnitySpaceApp::SystemCruiseBlocker()
@@ -101,7 +184,14 @@ namespace SpaceGod
 		}
 		systemCruise.Drop();
 		cruiseShip = ship;
-		cruiseHull = -1;
+		cruiseHull = cruiseShield = -1;
+		// US-T197: hulls already close by as it spools (a wingman off the nose) are never a collision alert.
+		cruiseCleared.Clear();
+		for (const auto& other : Fleet()->Ships())
+		{
+			if (other == nullptr || other == ship || other->Destroyed || !Fleet()->IsPresent(other)) continue;
+			if ((Fleet()->StateOf(other, Clock->Jd).HelioKm - helio).Length() < 4 * SystemCruise::MinKmS) cruiseCleared.Add(other);
+		}
 		if (!cruiseTargetPicked)
 		{
 			// A hull, world or station locked is the target; else whatever the nose is on.
@@ -158,6 +248,8 @@ namespace SpaceGod
 		cruiseTargetPicked = cruiseAlign = false;
 		cruiseTarget = Target::None();
 		cruiseTargetKm = cruiseToDropKm = cs::Double::PositiveInfinity;
+		cruiseBlockedBy = cs::String();
+		cruiseCleared.Clear();
 		if (cruising)
 		{
 			// Out at a gentle pace along the nose, in the frame of whatever it has come to; the fleet's record of the hull
@@ -208,6 +300,8 @@ namespace SpaceGod
 			cruiseTargetPicked = cruiseAlign = false;
 			cruiseTarget = Target::None();
 		}
+		// US-T197: the regime as it stood going into this frame, and the cue its change gave (the look reads it).
+		driveRegime.Update(PilotDriveRegime(), dt);
 		if (Input.ToggleSystemCruise) ToggleSystemCruise();
 		if (!systemCruise.Active() || cruiseShip != ship) return;
 
@@ -224,6 +318,14 @@ namespace SpaceGod
 			return;
 		}
 		cruiseHull = hull;
+		// US-T197: a hit on the shields drops it too (they only ever climb back of themselves, so any fall is a hit).
+		double shield = ship->Combat->Shield();
+		if (cruiseShield >= 0 && shield < cruiseShield - 1e-4 * cs::Math::Max(1.0, cruiseShield))
+		{
+			DropSystemCruise("Out of cruise: hit on the shields");
+			return;
+		}
+		cruiseShield = shield;
 
 		auto helio = Ephemeris()->Helio(pilotFrameBody) + pilotOffsetKm();
 		auto forward = pilotForward();
@@ -266,10 +368,23 @@ namespace SpaceGod
 		int nearest;
 		double clearance = CruiseClearanceKm(helio, nearest);
 		int targetBody = cruiseTarget.IsBody() ? cruiseTarget.Body : -1;
+		// US-T197: a station or hull in the path (not the target) holds the speed back like a world's well, keeps a
+		// spooled drive from engaging into it, and drops it out short of it.
+		double alertKm;
+		cs::String obstacle;
+		double obstacleKm = CruiseObstacleAheadKm(helio, forward, alertKm, obstacle);
+		bool blocked = obstacleKm <= alertKm;
+		double pathClearance = obstacleKm < cs::Double::PositiveInfinity ? cs::Math::Min(clearance, cs::Math::Max(0.0, obstacleKm - alertKm)) : clearance;
 		// Aligning for the menu's Cruise to, it engages once the nose is near enough on the target.
-		bool mayEngage = !cruiseAlign || aimDeg < 12;
+		bool mayEngage = (!cruiseAlign || aimDeg < 12) && !blocked;
 		bool wasCruising = systemCruise.Cruising();
-		double move = systemCruise.Step(helmFlight->Input, cruiseToDropKm, clearance, mayEngage, dt);
+		if (wasCruising && blocked)
+		{
+			DropSystemCruise(cs::Cat("Collision alert: out of cruise ", CruiseDistanceText(obstacleKm), " short of ", obstacle));
+			return;
+		}
+		cruiseBlockedBy = !wasCruising && blocked ? obstacle : cs::String();
+		double move = systemCruise.Step(helmFlight->Input, cruiseToDropKm, pathClearance, mayEngage, dt);
 		if (!systemCruise.Active())
 		{
 			DropSystemCruise(cs::String());
@@ -285,6 +400,11 @@ namespace SpaceGod
 		if (cruiseToDropKm < cs::Double::PositiveInfinity && cruiseToDropKm - move <= 1e-6)
 		{
 			DropSystemCruise(cs::Cat("Dropped out of cruise ", CruiseDistanceText(standoff), " off ", name));
+			return;
+		}
+		if (obstacleKm < cs::Double::PositiveInfinity && obstacleKm - move <= alertKm)
+		{
+			DropSystemCruise(cs::Cat("Collision alert: out of cruise ", CruiseDistanceText(cs::Math::Max(0.0, obstacleKm - move)), " short of ", obstacle));
 			return;
 		}
 		if (nearest >= 0 && nearest != targetBody && clearance < (*Catalog())[nearest]->RadiusKm * 0.25)
@@ -375,6 +495,40 @@ namespace SpaceGod
 		return best;
 	}
 
+	double UnitySpaceApp::CruiseObstacleAheadKm(DVec3 helio, DVec3 forward, double& alertKm, cs::String& name)
+	{
+		double best = cs::Double::PositiveInfinity;
+		alertKm = 0;
+		name = cs::String();
+		auto consider = [&](DVec3 at, double sizeKm, const cs::String& what)
+		{
+			auto to = at - helio;
+			double along = DVec3::Dot(to, forward);
+			if (!(along > 0) || along >= best) return; // behind, or farther than one already found
+			// In the path: the nose's line passes within a tube a few dozen hull lengths wide (at least 25 km).
+			if ((to - forward * along).Length() > cs::Math::Max(25.0, sizeKm * 40)) return;
+			best = along;
+			// Out a second and a half's slowest cruise short of it (more for a big station), in true km at either scale.
+			alertKm = cs::Math::Max(SystemCruise::MinKmS * 1.5, sizeKm * 60);
+			name = what;
+		};
+		double jd = Clock->Jd;
+		for (const auto& st : World()->Infrastructure->Structures)
+		{
+			if (st == nullptr || (cruiseTarget.IsStructure() && cruiseTarget.Structure == st)) continue;
+			consider(st->HelioAt(Ephemeris(), jd), st->LengthKm, st->Name);
+		}
+		auto me = Piloted.Ship;
+		for (const auto& other : Fleet()->Ships())
+		{
+			if (other == nullptr || other == me || other->Destroyed || cruiseCleared.Contains(other)) continue;
+			if (cruiseTarget.IsShip() && cruiseTarget.Ship == other) continue;
+			if (!Fleet()->IsPresent(other)) continue;
+			consider(Fleet()->StateOf(other, jd).HelioKm, other->LengthKm(), other->Name);
+		}
+		return best;
+	}
+
 	bool UnitySpaceApp::CruiseHolds(int body, DVec3 helio)
 	{
 		auto b = (*Catalog())[body];
@@ -420,7 +574,36 @@ namespace SpaceGod
 
 	void UnitySpaceApp::DrawSystemCruise()
 	{
-		if (!SystemCruiseActive() || ScreenCleared) return;
+		if (ScreenCleared || !IsPiloting()) return;
+		// US-T197: the drive's look, under its readout: the charging glow at the screen's edges, the flash as it engages
+		// (and a softer one as it drops out), and light streaming past while it cruises, faster the faster it goes.
+		if (Event::current().type == EventType::Repaint)
+		{
+			bool cruising = SystemCruiseActive() && systemCruise.Cruising();
+			if (SystemCruiseActive() && systemCruise.Spooling())
+			{
+				CruiseEdgeGlow(static_cast<float>(systemCruise.SpoolFraction()));
+				CruiseStreaks(0.12f * static_cast<float>(systemCruise.SpoolFraction()));
+			}
+			if (cruising)
+			{
+				double span = std::log10(SystemCruise::MaxKmS / SystemCruise::MinKmS);
+				double pace = cs::Math::Max(0.0, cs::Math::Min(1.0, std::log10(cs::Math::Max(SystemCruise::MinKmS, systemCruise.SpeedKmS) / SystemCruise::MinKmS) / span));
+				CruiseStreaks(0.25f + 0.75f * static_cast<float>(pace));
+			}
+			if (driveRegime.Was == DriveRegime::Cruise || driveRegime.Now == DriveRegime::Cruise)
+			{
+				float engage = static_cast<float>(driveRegime.Pulse(DriveCue::Engage, CruiseEngageFlashS));
+				CruiseWash(CruiseFlashColor, engage * engage * 0.75f);
+				if (!cruising && driveRegime.Was == DriveRegime::Cruise)
+				{
+					float drop = static_cast<float>(driveRegime.Pulse(DriveCue::Drop, CruiseDropFlashS));
+					CruiseWash(CruiseFlashColor, drop * drop * 0.4f);
+					CruiseStreaks(0.5f * static_cast<float>(driveRegime.Pulse(DriveCue::Drop, CruiseDropStreakS)));
+				}
+			}
+		}
+		if (!SystemCruiseActive()) return;
 		if (cruiseStyle == nullptr)
 		{
 			cruiseBack = UI::Hud::Solid(Color(0.03f, 0.05f, 0.08f, 0.82f), Color(0.45f, 0.85f, 1.0f, 0.7f));
@@ -444,7 +627,9 @@ namespace SpaceGod
 		if (systemCruise.Spooling())
 		{
 			bool aligning = systemCruise.SpoolLeftS <= 0 && cruiseAlign;
-			head = aligning ? cs::Cat("CRUISE DRIVE READY  ·  ALIGNING ON ", cs::Strings::ToUpperInvariant(cruiseTargetName))
+			bool held = systemCruise.SpoolLeftS <= 0 && !cruiseBlockedBy.empty();
+			head = held ? cs::Cat("CRUISE DRIVE READY  ·  PATH BLOCKED BY ", cs::Strings::ToUpperInvariant(cruiseBlockedBy), ": TURN THE NOSE OFF IT")
+				: aligning ? cs::Cat("CRUISE DRIVE READY  ·  ALIGNING ON ", cs::Strings::ToUpperInvariant(cruiseTargetName))
 				: cs::Cat("CRUISE DRIVE SPOOLING  ·  ", cs::Fmt(systemCruise.SpoolFraction() * 100, "N0"), "%  ·  ENGAGES IN ", CruiseSecondsText(systemCruise.SpoolLeftS));
 			tail = bound ? cs::Cat("bound for ", cruiseTargetName, ", ", CruiseDistanceText(cruiseTargetKm), "   ·   Shift+J calls it off")
 				: cs::String("no target: put the nose on a world or station to make for it   ·   Shift+J calls it off");
