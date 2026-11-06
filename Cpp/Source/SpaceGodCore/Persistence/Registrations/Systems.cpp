@@ -174,7 +174,8 @@ namespace SpaceGod::Core
 		SG_F(HoldUntilJd), SG_F(Holding), SG_F(InterdictedBy), SG_F(LegJd), SG_F(News), SG_F(Piloted), SG_F(Plan),
 		SG_F(Profile), SG_F(SetOutJd), SG_F(Ships), SG_F(Start), SG_F(Target), SG_F(To), SG_F(ToName),
 		SG_OPT(ChargeJd), SG_OPT(StopJd), SG_OPT(Stopover), SG_OPT(Stops), // US-T86: jumps and void stops, absent from older saves
-		SG_OPT(PingJd), SG_OPT(RaidSeen), SG_OPT(RaidStrikeJd), SG_OPT(RaidStruck), SG_OPT(RunDark)) // US-T124: the ghosts at a void stop, absent from older saves
+		SG_OPT(PingJd), SG_OPT(RaidSeen), SG_OPT(RaidStrikeJd), SG_OPT(RaidStruck), SG_OPT(RunDark), // US-T124: the ghosts at a void stop, absent from older saves
+		SG_OPT(DreadJumps), SG_OPT(WatcherSign), SG_OPT(WatcherSigns)) // US-T178: the Watcher in the void, absent from older saves
 
 	SG_SERIALIZE(CruiseDriveSpec, "Unity.SpaceGod.Core.CruiseDriveSpec",
 		SG_P(ChargePropellantShare), SG_P(CruiseC), SG_P(Name), SG_P(PropellantSharePerLy), SG_P(RampDays),
@@ -195,7 +196,8 @@ namespace SpaceGod::Core
 		SG_P(Rescued), SG_P(SurveyFindsMade), SG_F(Arrived), SG_F(Encounters), SG_F(ReachedStar), SG_F(RouteLife),
 		SG_F(ambushes), SG_F(cruises), SG_F(events), SG_F(galaxy), SG_F(lifeRng), SG_F(nextMarkJd), SG_F(objects),
 		SG_F(projectors), SG_F(rng), SG_F(routes), SG_F(seededRoutes), SG_F(surveyedStars),
-		SG_OPT(VoidRaidLore), SG_OPT(VoidRaids), SG_OPT(raidRng)) // US-T124: the Void Raiders, absent from older saves
+		SG_OPT(VoidRaidLore), SG_OPT(VoidRaids), SG_OPT(raidRng), // US-T124: the Void Raiders, absent from older saves
+		SG_OPT(WatcherLore), SG_OPT(WatcherSigns), SG_OPT(watcherRng)) // US-T178: the Watcher in the void, absent from older saves
 
 	SG_SERIALIZE(DeepSpaceAmbush, "Unity.SpaceGod.Core.DeepSpaceAmbush",
 		SG_F(Band), SG_F(LegJd), SG_F(Projector), SG_F(UntilJd), SG_F(Where))

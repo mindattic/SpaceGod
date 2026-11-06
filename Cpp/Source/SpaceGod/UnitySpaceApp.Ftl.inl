@@ -82,6 +82,15 @@ private:
 	/// escape, said on a toast.</summary>
 	void UpdateVoidStop(const cs::Ref<Core::Cruise>& c, double jd);
 
+	/// <summary>The Watcher in the void (US-T178): the signs of it on the player's own hull said once each, by the
+	/// crossing they came to and how many it had seen; and how much of its lore the player has been told of.</summary>
+	const Core::Cruise* watcherSignCruise = nullptr;
+	int watcherSignsSeen = 0;
+	int watcherLoreSeen = -1;
+
+	/// <summary>A new sign of the Watcher on the player's hull (US-T178) comes up on a toast.</summary>
+	void UpdateWatcherSigns(const cs::Ref<Core::Cruise>& c);
+
 public:
 	/// <summary>Something new learned of the Void Raiders anywhere in the galaxy (US-T124) comes to the player as news.</summary>
 	void UpdateVoidRaiderNews();

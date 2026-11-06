@@ -130,6 +130,12 @@ namespace SpaceGod::Core
 		bool RaidSeen = false;
 		bool RaidStruck = false;
 
+		/// <summary>The Watcher in the void (US-T178, see <see cref="VoidWatcher"/>): how many of this voyage's jumps have been
+		/// counted into its hulls' dread; and the signs of it seen by this group (how many, and the last, for the helm to say).</summary>
+		int DreadJumps = 0;
+		int WatcherSigns = 0;
+		cs::String WatcherSign;
+
 		/// <summary>Waiting at a void stop at <paramref name="jd"/>: dropped out between jumps, not yet under way again.</summary>
 		bool AtVoidStop(double jd) const;
 
@@ -537,7 +543,14 @@ namespace SpaceGod::Core
 		/// <summary>The Void Raiders' own numbers (US-T124), so nothing else out here draws differently for them.</summary>
 		cs::Random raidRng{ 6113 };
 
+		/// <summary>The Watcher's own numbers (US-T178), so nothing else out here draws differently for it.</summary>
+		cs::Random watcherRng{ 7349 };
+
 	public:
+		/// <summary>The Watcher in the void (US-T178): its signs on record anywhere out here, and how much of its
+		/// <see cref="VoidWatcher.Lore"/> has come out.</summary>
+		int WatcherSigns = 0;
+		int WatcherLore = 0;
 
 		/// <summary>How far sensors see inside a nebula, as a share of the open-space range.</summary>
 		static constexpr double NebulaSensorShare = 0.1;

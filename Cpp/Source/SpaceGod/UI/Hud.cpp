@@ -57,6 +57,7 @@
 #include "Systems/Galaxy.h"
 #include "Systems/HelmFtl.h"
 #include "Systems/VoidRaiders.h"
+#include "Systems/VoidWatcher.h"
 #include "Shared/Profiles/ProfileStore.h"
 
 #include <algorithm>
@@ -311,6 +312,7 @@ namespace SpaceGod::UI
 			DrawStreaks(centre, 0.25f + 0.75f * strength, WarpLineCount, WarpColor, 500, 320.0f);
 		}
 		DrawInterstellarLabels();
+		if (c->Piloted) DrawVoidDread(c);
 		double ly = c->LyToGo(jd);
 		double speedC = c->SpeedKmS(jd) / 299792.458;
 		if (c->Crossing)
@@ -338,6 +340,21 @@ namespace SpaceGod::UI
 		DrawBanner(cs::Cat("FTL  ·  ", jump, "BOUND FOR ", cs::Strings::ToUpperInvariant(c->ToName), "   ·   ", cs::Fmt(ly, "0.00"), " LY TO GO   ·   ",
 			cs::Fmt(speedC, "N0"), " C   ·   ETA ", Astro::ToDateTime(c->ArriveJd()).ToString("yyyy-MM-dd"),
 			"   ·   ", c->Stopover ? "VOID STOP" : "DROPPING OUT", " IN ", Mathf::CeilToInt(static_cast<float>(app->FtlSecondsLeft())), " S AT ", cs::Strings::ToUpperInvariant(app->Clock->Warp().Label), "  (, .)"));
+	}
+
+	void Hud::DrawVoidDread(const cs::Ref<Cruise>& c)
+	{
+		// The crew's dread of the void (US-T178): nothing shows until something has noticed the hull.
+		double d = VoidWatcher::DreadOf(*c);
+		int stage = VoidWatcher::StageOf(d);
+		if (stage == 0) return;
+		int lore = app->Galaxy != nullptr && app->Galaxy->DeepSpace != nullptr ? app->Galaxy->DeepSpace->WatcherLore : 0;
+		auto line = GUIContent(cs::Cat("DREAD ", Percent(d), "  ·  ", VoidWatcher::StageName(stage), "  ·  ",
+			cs::Strings::ToUpperInvariant(VoidWatcher::Called(lore)), c->WatcherSigns > 0 ? cs::Cat("  ·  ", c->WatcherSigns, " SIGN", c->WatcherSigns == 1 ? "" : "S", " THIS CROSSING") : cs::String()));
+		float w = small->CalcSize(line).x + 8;
+		GUI::contentColor = stage >= 3 ? RetrogradeColor : Dim;
+		GUI::Label(Rect((Screen::width - w) * 0.5f, Screen::height - 314, w, 18), line, small);
+		GUI::contentColor = Color::white();
 	}
 
 	void Hud::DrawVoidStopSensors(const cs::Ref<Cruise>& c, double jd)

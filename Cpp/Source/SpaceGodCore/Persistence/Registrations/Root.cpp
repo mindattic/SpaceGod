@@ -233,7 +233,8 @@ namespace SpaceGod::Core
 		SG_F(SilentRunning), SG_F(Spec), SG_F(StakeoutKm), SG_F(StakeoutUntilJd), SG_F(Stalled), SG_F(StrandJd),
 		SG_F(StrandedInFlight), SG_F(Tow), SG_F(TripsCompleted), SG_F(Voyage), SG_F(WaitingForPropellant),
 		SG_F(Wander), SG_F(personalHold), SG_F(propellant),
-		SG_OPT(JumpRing)) // US-T86: a small craft docked to a jump ring, absent from older saves
+		SG_OPT(JumpRing), // US-T86: a small craft docked to a jump ring, absent from older saves
+		SG_OPT(Dread), SG_OPT(DreadJd)) // US-T178: the crew's dread of the void, absent from older saves
 
 	SG_SERIALIZE(ShipClassSpec, "Unity.SpaceGod.Core.ShipClassSpec",
 		SG_P(AccelG), SG_P(Class), SG_P(DisplayName), SG_P(IsMilitary))

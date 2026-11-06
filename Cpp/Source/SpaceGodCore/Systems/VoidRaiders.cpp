@@ -10,6 +10,7 @@
 #include "Combat/CombatState.h"
 #include "Systems/DeepSpace.h"
 #include "Systems/Galaxy.h"
+#include "Systems/VoidWatcher.h"
 
 namespace SpaceGod::Core
 {
@@ -76,6 +77,8 @@ namespace SpaceGod::Core
 		double h = HazardPerDay2 * (b * b - a * a) / 2;
 		if (c.RunDark) h *= DarkHazard;
 		if (Lit(c, t0)) h *= LitHazard;
+		// The Watcher's heralds (US-T178): they come where it is looking (the player's hull, by its dread).
+		h *= VoidWatcher::HeraldFactor(c);
 		return h;
 	}
 

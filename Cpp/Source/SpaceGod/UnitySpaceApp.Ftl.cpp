@@ -26,6 +26,7 @@
 #include "Systems/Galaxy.h"
 #include "Systems/HelmFtl.h"
 #include "Systems/VoidRaiders.h"
+#include "Systems/VoidWatcher.h"
 
 #include "Camera/SpaceCamera.h"
 #include "Input/InputDevice.h"
@@ -282,6 +283,7 @@ namespace SpaceGod
 			}
 			ftlAtStop = atStop;
 			UpdateVoidStop(c, jd);
+			UpdateWatcherSigns(c);
 			double total = c->ArriveJd() - c->LegJd;
 			double share = total > 0 && !cs::Double::IsInfinity(total) ? (jd - c->LegJd) / total : 0;
 			// Built on the last jump only (US-T86): the far system is not yet anywhere near on the earlier ones.
@@ -360,16 +362,40 @@ namespace SpaceGod
 		}
 	}
 
+	void UnitySpaceApp::UpdateWatcherSigns(const cs::Ref<Core::Cruise>& c)
+	{
+		// The Watcher's signs on the player's own hull (US-T178), each said once.
+		if (c == nullptr || !c->Piloted) return;
+		if (watcherSignCruise != c.get())
+		{
+			watcherSignCruise = c.get();
+			watcherSignsSeen = c->WatcherSigns;
+			return;
+		}
+		if (c->WatcherSigns == watcherSignsSeen) return;
+		watcherSignsSeen = c->WatcherSigns;
+		if (!c->WatcherSign.empty()) ShowToast(cs::Cat("THE VOID  ·  ", c->WatcherSign));
+	}
+
 	void UnitySpaceApp::UpdateVoidRaiderNews()
 	{
 		if (Galaxy == nullptr || Galaxy->DeepSpace == nullptr) return;
 		int stage = Galaxy->DeepSpace->VoidRaidLore;
-		if (voidLoreGalaxy != Galaxy.get() || voidLoreSeen < 0 || stage < voidLoreSeen)
+		int watcher = Galaxy->DeepSpace->WatcherLore;
+		if (voidLoreGalaxy != Galaxy.get() || voidLoreSeen < 0 || stage < voidLoreSeen || watcherLoreSeen < 0 || watcher < watcherLoreSeen)
 		{
 			// A new galaxy (or a load): what is known already is not news.
 			voidLoreGalaxy = Galaxy.get();
 			voidLoreSeen = stage;
+			watcherLoreSeen = watcher;
 			return;
+		}
+		if (watcher > watcherLoreSeen)
+		{
+			// What comes out about the Watcher in the void (US-T178).
+			const auto& w = Core::VoidWatcher::Lore()[watcher - 1];
+			watcherLoreSeen = watcher;
+			ShowToast(cs::Cat("NEWS  ·  THE VOID WATCHES: ", cs::Strings::ToUpperInvariant(w.Title), "  ·  ", w.Text));
 		}
 		if (stage == voidLoreSeen) return;
 		const auto& l = Core::VoidRaiders::Lore()[stage - 1];

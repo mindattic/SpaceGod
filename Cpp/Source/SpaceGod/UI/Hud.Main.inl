@@ -124,6 +124,10 @@ private:
 	/// <summary>At a void stop between jumps (US-T124): the hull's sensor posture, any ghost closing, and the keys.</summary>
 	void DrawVoidStopSensors(const cs::Ref<Core::Cruise>& c, double jd);
 
+	/// <summary>Between the stars (US-T178): the crew's dread of the void, how far its attention has come, and what it is
+	/// called by what is known of it so far.</summary>
+	void DrawVoidDread(const cs::Ref<Core::Cruise>& c);
+
 	/// The helm's FTL drive (U.SPC-T417): the star the nose is on and the key to spool for it (or, inside the system's
 	/// gravity wells, how far out the rim is: canon, U.SPC-T455, no jump inside them), and the charge as it builds.
 	void DrawFtl();

@@ -671,6 +671,15 @@ namespace SpaceGod::Core
 				  "hull, reaction mass and a scrambled drive. Nobody knows at first what they are: unidentified sensor ghosts. "
 				  "What they are comes out as raids pile up, as news (OUT OF THE VOID), and the wrecks of the ones brought down "
 				  "are worth a salvager's while."),
+				T("Dread of the void",
+				  "Every FTL jump breaks the law the universe keeps, and something hears it. Each jump and each day in the dark "
+				  "between the stars adds to a crew's dread (DREAD on the HUD while you cross, once anything has noticed you); "
+				  "it fades again in a system's light. The more of it, the more often the signs come, and the worse: contacts "
+				  "that are not there, voices on dead channels, then stars going out and time slipping (a void stop's charge "
+				  "put back), then a course whose angles will not close (reaction mass burned) and crewmen losing their minds "
+				  "(hull damage), and at the last the Void Raiders sent where it is looking, likelier to find you the deeper "
+				  "your dread. Fewer, faster jumps and time in port keep it off you. What it is comes out only as its signs "
+				  "pile up across the galaxy, as news (THE VOID WATCHES)."),
 				T("Deep space",
 				  "Space between the stars is simulated: void stations, gravity projectors that pull ships out of FTL, and the "
 				  "traffic crossing it."),

@@ -22,6 +22,7 @@
 #include "Systems/InterstellarTraffic.h"
 #include "Systems/Polities.h"
 #include "Systems/VoidRaiders.h"
+#include "Systems/VoidWatcher.h"
 #include "Settings/GameSetting.h"
 
 namespace SpaceGod::Core
@@ -372,6 +373,8 @@ namespace SpaceGod::Core
 			// The ghosts at the void stops (US-T124), on their own numbers (not an encounter kind, so a save from before
 			// them runs them too).
 			VoidRaiders::Step(*this, mark - StepDays, mark, raidRng);
+			// The Watcher in the void (US-T178): dread gathered, and its signs, on its own numbers too.
+			VoidWatcher::Step(*this, mark - StepDays, mark, watcherRng);
 			nextMarkJd += StepDays;
 		}
 		Due(jd);

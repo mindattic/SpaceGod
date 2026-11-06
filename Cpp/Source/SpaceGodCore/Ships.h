@@ -626,6 +626,12 @@ namespace SpaceGod::Core
 		/// stars like a capital hull (<see cref="CruiseDrives.JumpRing"/>). Fitted only by the player at a yard.</summary>
 		bool JumpRing = false;
 
+		/// <summary>Its crew's dread of the void (US-T178, see <see cref="VoidWatcher"/>), 0..1: the attention its FTL jumps and
+		/// its days in the void have drawn from something that was old when the universe was young. It grows out there and
+		/// fades in a system's light; <see cref="DreadJd"/> is when it was last brought up to date (NaN: never).</summary>
+		double Dread = 0;
+		double DreadJd = cs::Double::NaN;
+
 		/// <summary>Ran dry in flight: drifting dead where the tanks gave out, calling for a tanker.</summary>
 		bool OutOfPropellant = false;
 		double OutOfPropellantSinceJd = 0;
