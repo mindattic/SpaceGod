@@ -806,6 +806,27 @@ namespace SpaceGod::UI
 		}
 		auto size = (minor ? minorLabel : label)->CalcSize(GUIContent(text_));
 		auto r = Rect(at2.x, at2.y, size.x, size.y);
+		// US-T227: a hull that fills the screen has its label off the visible body (half its apparent length puts it far to the
+		// side, or off screen). Anchor it on the visible part of the hull's projected bounds instead: just inside the top-right
+		// corner of those bounds cut to the screen, kept clear of the HUD panels. Small distant hulls keep the rule above.
+		{
+			const float sw = static_cast<float>(Screen::width), sh = static_cast<float>(Screen::height);
+			if (!iconName && (r.x + r.width > sw - 4 || r.x < 0 || r.y < 0 || r.y + r.height > sh))
+			{
+				const float half = px * 0.5f;
+				const float right = Mathf::Min(p.x + half, sw), top = Mathf::Max(p.y - half * 0.5f, 0.0f);
+				const float bottom = Mathf::Min(p.y + half * 0.5f, sh);
+				if (right > 0 && bottom > top)
+				{
+					float x = Mathf::Clamp(right - size.x - 8, 4.0f, Mathf::Max(4.0f, sw - size.x - 4));
+					float y0 = Mathf::Clamp(top + 6, 4.0f, Mathf::Max(4.0f, sh - size.y - 4));
+					Rect q(x, y0, size.x, size.y);
+					for (int k = 0; k < 12 && LabelUnderPanel(q); k++) q.y = Mathf::Min(q.y + size.y + 1, sh - size.y - 4);
+					r = q;
+					at2 = Vector2(r.x, r.y);
+				}
+			}
+		}
 		auto clear = [&](const Rect& q)
 		{
 			for (const auto& other : shipLabelRects)
