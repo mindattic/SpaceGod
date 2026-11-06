@@ -38,8 +38,9 @@ private:
 	Target selectionScrollFor = Target::None();
 
 public:
-	static constexpr Color Accent{0.45f, 0.85f, 1.0f};
-	static constexpr Color Dim{0.62f, 0.7f, 0.78f};
+	/// The shared palette's accent and caption colours (US-T199, UiStyle.h), under the names the panels already use.
+	static constexpr Color Accent = UiStyle::Accent;
+	static constexpr Color Dim = UiStyle::Dim;
 
 private:
 	/// An unidentified contact: no faction colour until the scanners know whose it is.

@@ -373,62 +373,28 @@ namespace SpaceGod::UI
 	{
 		if (stylesReady) return;
 		stylesReady = true;
-		// The pause menu's look (and so the HUD's), over the sky.
-		panelTexture = Hud::Solid(Color(0.03f, 0.05f, 0.08f, 0.88f), Color(0.3f, 0.6f, 0.75f, 0.6f));
-		buttonTexture = Hud::Solid(Color(0.12f, 0.18f, 0.24f, 0.95f), Color(0.3f, 0.5f, 0.6f, 0.6f));
-		buttonActiveTexture = Hud::Solid(Color(0.1f, 0.3f, 0.42f, 0.95f), Color(0.45f, 0.85f, 1.0f, 0.8f));
-		rowTexture = Hud::Solid(Color(0.08f, 0.12f, 0.16f, 0.7f), Color::clear());
-		fieldTexture = Hud::Solid(Color(0.02f, 0.03f, 0.05f, 0.95f), Color(0.45f, 0.85f, 1.0f, 0.8f));
+		// The shared look (US-T199, UiStyle.h), over the sky: the front end's bigger buttons and fields take the heading size.
+		namespace S = UiStyle;
+		namespace T = UiStyle::Type;
+		panelTexture = S::PanelFrame(S::Depth::Overlay);
+		buttonTexture = S::ControlTexture();
+		buttonActiveTexture = S::ControlOnTexture();
+		rowTexture = S::Flat(Color(0.08f, 0.12f, 0.16f, 0.7f), Color::clear());
+		fieldTexture = S::FieldTexture();
 
-		panel = cs::New<GUIStyle>();
-		panel->normal.background = panelTexture;
-		panel->border = RectOffset(2, 2, 2, 2);
-		heading = cs::New<GUIStyle>();
-		heading->fontSize = 40;
-		heading->fontStyle = FontStyle::Bold;
+		panel = S::PanelStyle(panelTexture);
+		heading = S::TitleStyle(T::Display);
 		heading->alignment = TextAnchor::MiddleCenter;
-		heading->normal.textColor = Color::white();
-		title = cs::New<GUIStyle>();
-		title->fontSize = 15;
-		title->fontStyle = FontStyle::Bold;
-		title->normal.textColor = Color::white();
+		title = S::TitleStyle(T::Title);
 		title->clipping = TextClipping::Clip;
-		text = cs::New<GUIStyle>();
-		text->fontSize = 13;
-		text->normal.textColor = Color::white();
+		text = S::TextStyle(T::Body);
 		text->clipping = TextClipping::Clip;
-		small = cs::New<GUIStyle>();
-		small->fontSize = 11;
-		small->normal.textColor = Hud::Dim;
-		small->wordWrap = true;
+		small = S::CaptionStyle(T::Caption);
 		small->clipping = TextClipping::Clip;
-		button = cs::New<GUIStyle>();
-		button->fontSize = 14;
-		button->alignment = TextAnchor::MiddleCenter;
-		button->border = RectOffset(2, 2, 2, 2);
-		button->normal.background = buttonTexture;
-		button->normal.textColor = Color::white();
-		button->hover.background = buttonActiveTexture;
-		button->hover.textColor = Color::white();
-		button->active.background = buttonActiveTexture;
-		button->active.textColor = Hud::Accent;
-		buttonActive = cs::New<GUIStyle>(*button);
-		buttonActive->normal.background = buttonActiveTexture;
-		buttonActive->normal.textColor = Color::white();
-		buttonActive->fontStyle = FontStyle::Bold;
+		button = S::ButtonStyle(T::Heading, buttonTexture, buttonActiveTexture);
+		buttonActive = S::ButtonOnStyle(button, buttonActiveTexture);
 		row = cs::New<GUIStyle>();
 		row->normal.background = rowTexture;
-		field = cs::New<GUIStyle>();
-		field->fontSize = 14;
-		field->alignment = TextAnchor::MiddleLeft;
-		field->padding = RectOffset(8, 8, 0, 0);
-		field->border = RectOffset(2, 2, 2, 2);
-		field->clipping = TextClipping::Clip;
-		field->normal.background = fieldTexture;
-		field->normal.textColor = Color::white();
-		field->focused.background = fieldTexture;
-		field->focused.textColor = Color::white();
-		field->hover.background = fieldTexture;
-		field->hover.textColor = Color::white();
+		field = S::FieldStyle(T::Heading, fieldTexture);
 	}
 }

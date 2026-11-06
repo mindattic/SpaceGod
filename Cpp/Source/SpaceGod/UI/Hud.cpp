@@ -1589,90 +1589,44 @@ namespace SpaceGod::UI
 	{
 		if (stylesReady) return;
 		stylesReady = true;
-		panelTexture = Solid(Color(0.03f, 0.05f, 0.08f, 0.78f), Color(0.3f, 0.6f, 0.75f, 0.45f));
-		rowHoverTexture = Solid(Color(0.2f, 0.45f, 0.6f, 0.3f), Color::clear());
-		rowSelectedTexture = Solid(Color(0.2f, 0.55f, 0.75f, 0.45f), Color::clear());
-		buttonTexture = Solid(Color(0.12f, 0.18f, 0.24f, 0.95f), Color(0.3f, 0.5f, 0.6f, 0.6f));
-		buttonActiveTexture = Solid(Color(0.1f, 0.3f, 0.42f, 0.95f), Color(0.45f, 0.85f, 1.0f, 0.8f));
+		// US-T199: every style from the shared look (UiStyle.h): the panel framed with corner ticks over the live view,
+		// sizes from the type scale, body text off-white, captions dim.
+		namespace S = UiStyle;
+		namespace T = UiStyle::Type;
+		panelTexture = S::PanelFrame(S::Depth::Hud);
+		rowHoverTexture = S::Flat(S::RowHover, Color::clear());
+		rowSelectedTexture = S::Flat(S::RowSelected, Color::clear());
+		buttonTexture = S::ControlTexture();
+		buttonActiveTexture = S::ControlOnTexture();
 
-		panel = cs::New<GUIStyle>();
-		panel->normal.background = panelTexture;
-		panel->border = RectOffset(2, 2, 2, 2);
+		panel = S::PanelStyle(panelTexture);
 
-		title = cs::New<GUIStyle>();
-		title->fontSize = 15;
-		title->fontStyle = FontStyle::Bold;
-		title->normal.textColor = Color::white();
+		title = S::TitleStyle(T::Title);
 
-		text = cs::New<GUIStyle>();
-		text->fontSize = 13;
-		text->normal.textColor = Color::white();
+		text = S::TextStyle(T::Body);
 		text->clipping = TextClipping::Clip;
 
-		small = cs::New<GUIStyle>();
-		small->fontSize = 11;
-		small->normal.textColor = Dim;
-		small->wordWrap = true;
+		small = S::CaptionStyle(T::Caption);
 
-		label = cs::New<GUIStyle>();
-		label->fontSize = 12;
-		label->fontStyle = FontStyle::Bold;
-		label->normal.textColor = Color::white();
+		label = S::TextStyle(T::Label, S::Heading, FontStyle::Bold);
 
-		minorLabel = cs::New<GUIStyle>();
-		minorLabel->fontSize = 11;
-		minorLabel->normal.textColor = Color::white();
+		minorLabel = S::TextStyle(T::Caption);
 
 		labelShadow = cs::New<GUIStyle>(*label);
 		labelShadow->normal.textColor = Color(0, 0, 0, 0.85f);
 
-		button = cs::New<GUIStyle>();
-		button->fontSize = 12;
-		button->alignment = TextAnchor::MiddleCenter;
-		button->border = RectOffset(2, 2, 2, 2);
-		button->normal.background = buttonTexture;
-		button->normal.textColor = Color::white();
-		button->hover.background = buttonActiveTexture;
-		button->hover.textColor = Color::white();
-		button->active.background = buttonActiveTexture;
-		button->active.textColor = Accent;
+		button = S::ButtonStyle(T::Label, buttonTexture, buttonActiveTexture);
+		buttonActive = S::ButtonOnStyle(button, buttonActiveTexture);
 
-		buttonActive = cs::New<GUIStyle>(*button);
-		buttonActive->normal.background = buttonActiveTexture;
-		buttonActive->normal.textColor = Color::white();
-		buttonActive->fontStyle = FontStyle::Bold;
+		row = S::RowStyle(T::Label, rowHoverTexture);
+		rowSelected = S::RowSelectedStyle(row, rowSelectedTexture);
 
-		row = cs::New<GUIStyle>();
-		row->fontSize = 12;
-		row->alignment = TextAnchor::MiddleLeft;
-		row->padding = RectOffset(6, 4, 0, 0);
-		row->clipping = TextClipping::Clip;
-		row->normal.textColor = Color::white();
-		row->hover.background = rowHoverTexture;
-		row->hover.textColor = Color::white();
-
-		rowSelected = cs::New<GUIStyle>(*row);
-		rowSelected->normal.background = rowSelectedTexture;
-		rowSelected->normal.textColor = Color::white();
-		rowSelected->fontStyle = FontStyle::Bold;
-
-		toast = cs::New<GUIStyle>();
-		toast->fontSize = 14;
-		toast->fontStyle = FontStyle::Bold;
-		toast->normal.textColor = Accent;
+		toast = S::TextStyle(T::Heading, S::Accent, FontStyle::Bold);
 	}
 
 	cs::Ref<Texture2D> Hud::Solid(Color fill, Color edge)
 	{
-		constexpr int n = 8;
-		auto t = cs::New<Texture2D>(n, n, TextureFormat::RGBA32, false);
-		t->hideFlags = HideFlags::DontSave;
-		t->filterMode = FilterMode::Point;
-		for (int y = 0; y < n; y++)
-			for (int x = 0; x < n; x++)
-				t->SetPixel(x, y, x == 0 || y == 0 || x == n - 1 || y == n - 1 ? (edge.a > 0 ? edge : fill) : fill);
-		t->Apply();
-		return t;
+		return UiStyle::Flat(fill, edge);
 	}
 
 	void Hud::DestroyOwnedTextures()

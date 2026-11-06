@@ -18,6 +18,7 @@
 // Screen space, in GUI pixels: the same at the gameplay and the realistic scale.
 
 #include "UnityCompat/UnityTypes.h"
+#include "UI/UiStyle.h"
 
 #include <algorithm>
 
@@ -33,8 +34,9 @@ namespace SpaceGod::UI
 	class HudLayout final
 	{
 	public:
-		static constexpr float Gap = 6;
-		static constexpr float Margin = 10;
+		/// On the shared spacing grid (US-T199, UiStyle::Space): 6 between stacked panels, 10 from the screen's edge.
+		static constexpr float Gap = UiStyle::Space::Gap;
+		static constexpr float Margin = UiStyle::Space::Margin;
 		/// Under the clock and scale bar at the top middle (Hud::DrawTopBar: y 10, 52 tall).
 		static constexpr float TopBarBottom = 62;
 		/// The strip along the bottom right left to the dev menu's hint (CheatMenu: "Shift+F1  DEV MENU", 18 tall).
