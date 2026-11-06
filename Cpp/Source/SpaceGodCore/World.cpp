@@ -448,6 +448,8 @@ namespace SpaceGod::Core
 		// Civilian hulls fly on real propellant and buy it in port; traders price every run by it.
 		// (Navies' own supply -- tankers and depots -- is a war-logistics matter, left to their stores for now.)
 		fleet->BurnsPropellant = [this](const cs::Ref<Ship>& s) { return BurnsPropellant(s); };
+		// Scheduled hulls keep clear of the stations and yards in orbit (US-T209).
+		fleet->Obstacles = [this](double jd) { return ::SpaceGod::Core::Fleet::StructuresOf(Infrastructure, Ephemeris, jd); };
 		fleet->CanRefuelAt = [economy](cs::Ref<Ship> ship, int body) { return economy->HasPropellantAt(ship, body); };
 		fleet->ForceTopUp = [economy](cs::Ref<Ship> ship, int body, double jd) { economy->Refuel(ship, body, jd, /*force:*/ true); };
 		economy->EstimateTrip = [fleet](cs::Ref<Ship> ship, int from, int to, double jd) { return fleet->EstimateTrip(ship, from, to, jd); };

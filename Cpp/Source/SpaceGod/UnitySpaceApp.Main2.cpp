@@ -893,6 +893,8 @@ namespace SpaceGod
 		const auto& ships = Fleet()->Ships();
 		double jd = Clock->Jd;
 		float response = 1.0f - Mathf::Exp(-dt * 3.0f);
+		// The fleet keeps hulls clear at the size they are drawn at this blend (US-T209).
+		Fleet()->DrawnBlend = Scale()->Blend();
 
 		for (int pass = 0; pass < 2; pass++)
 		{
@@ -1009,8 +1011,9 @@ namespace SpaceGod
 					facing = travel;
 				}
 
-				// Stepping aside to keep clear of another ship: the sidestep (true km) in scene units here.
-				auto evasion = Fleet()->EvasionOf(ship);
+				// Stepping aside to keep clear of another ship: the sidestep (true km) in scene units here, with the separation that
+				// keeps hulls from overlapping at the size they are drawn (US-T209).
+				auto evasion = Fleet()->DrawnOffsetOf(ship);
 				if (evasion.LengthSquared() > 0) shipScene[i] += evasion.SwapYZ() * KmToSceneNear(ship, st.HelioKm);
 
 				auto f = Vector3(static_cast<float>(facing.X), static_cast<float>(facing.Y), static_cast<float>(facing.Z));

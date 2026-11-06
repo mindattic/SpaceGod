@@ -3,6 +3,7 @@
 
 #include "Fleet.h"
 
+#include <algorithm>
 #include <vector>
 
 #include "Astro.h"
@@ -14,6 +15,7 @@
 #include "Hyperlanes.h"
 #include "Kepler.h"
 #include "ScaleModel.h"
+#include "ShipLod.h"
 #include "Ships.h"
 #include "Trajectories.h"
 #include "Combat/CombatSpecs.h"
@@ -49,8 +51,18 @@ namespace SpaceGod::Core
 
 	DVec3 Fleet::EvasionOf(cs::Ref<Ship> ship)
 	{
+		auto c = ship->Controller();
 		std::pair<DVec3, DVec3> e;
-		return evasion.TryGetValue(ship->Controller(), e) ? e.first : DVec3::Zero;
+		DVec3 sep;
+		DVec3 off = evasion.TryGetValue(c, e) ? e.first : DVec3::Zero;
+		return separation.TryGetValue(c, sep) ? off + sep : off;
+	}
+
+	DVec3 Fleet::DrawnOffsetOf(cs::Ref<Ship> ship)
+	{
+		DVec3 extra;
+		auto off = EvasionOf(ship);
+		return drawnSeparation.TryGetValue(ship->Controller(), extra) ? off + extra : off;
 	}
 
 	cs::Ref<Ship> Fleet::EvadingFrom(cs::Ref<Ship> ship)
@@ -87,6 +99,234 @@ namespace SpaceGod::Core
 			AdvancePhase(next);
 		}
 		StepAvoidance(jd);
+		StepSeparation(jd);
+	}
+
+	namespace
+	{
+		/// <summary>One hull (or a station) in the separation solve (US-T209).</summary>
+		struct SepBody
+		{
+			DVec3 Pos;
+			double RadiusKm = 0;
+			/// <summary>Its size, for who gives way: the smaller moves more. Zero for something that never moves (a station).</summary>
+			double Weight = 0;
+			/// <summary>The world it is near and how far from that world's centre its plan has it: it is never pushed below that.</summary>
+			DVec3 WorldKm;
+			double FloorKm = 0;
+			int Key = 0;
+		};
+
+		/// <summary>
+		/// Pushes overlapping bodies apart (offsets into <paramref name="off"/>): each pass finds the pairs whose spheres overlap by
+		/// sweep and prune along x and resolves them in index order, so the same positions always give the same offsets.
+		/// </summary>
+		void Separate(const std::vector<SepBody>& b, std::vector<DVec3>& off, int passes, double margin)
+		{
+			size_t n = b.size();
+			off.assign(n, DVec3::Zero);
+			if (n < 2) return;
+			std::vector<int> order(n);
+			std::vector<std::pair<int, int>> pairs;
+			std::vector<int> active;
+			for (int pass = 0; pass < passes; pass++)
+			{
+				for (size_t i = 0; i < n; i++) order[i] = static_cast<int>(i);
+				auto lo = [&](int i) { return b[i].Pos.X + off[i].X - b[i].RadiusKm * (1 + margin); };
+				std::stable_sort(order.begin(), order.end(), [&](int x, int y) { return lo(x) < lo(y); });
+				pairs.clear();
+				active.clear();
+				for (int i : order)
+				{
+					double start = lo(i);
+					for (size_t k = 0; k < active.size();)
+					{
+						int j = active[k];
+						if (b[j].Pos.X + off[j].X + b[j].RadiusKm * (1 + margin) < start)
+						{
+							active[k] = active.back();
+							active.pop_back();
+							continue;
+						}
+						if (b[i].Weight > 0 || b[j].Weight > 0) pairs.emplace_back(cs::Math::Min(i, j), cs::Math::Max(i, j));
+						k++;
+					}
+					active.push_back(i);
+				}
+				if (pairs.empty()) return;
+				std::sort(pairs.begin(), pairs.end());
+				bool any = false;
+				for (const auto& [i, j] : pairs)
+				{
+					const auto& a = b[static_cast<size_t>(i)];
+					const auto& c = b[static_cast<size_t>(j)];
+					double need = (a.RadiusKm + c.RadiusKm) * (1 + margin);
+					auto d = (c.Pos + off[j]) - (a.Pos + off[i]);
+					double dist = d.Length();
+					if (dist >= need) continue;
+					DVec3 normal;
+					if (dist > need * 1e-9) normal = d / dist;
+					else
+					{
+						// Dead on: part along a direction fixed by the pair, the same every time.
+						double ang = (a.Key * 0.6180339887 + c.Key * 0.3819660113) * 6.283185307179586;
+						normal = DVec3(cs::Math::Cos(ang), cs::Math::Sin(ang), 0.25);
+						normal = normal.Normalized();
+					}
+					double pen = need - dist;
+					double wa = a.Weight, wc = c.Weight;
+					// The share each moves: the smaller hull more; something fixed not at all.
+					double sa = wa <= 0 ? 0 : wc <= 0 ? 1 : wc / (wa + wc);
+					double sc = wc <= 0 ? 0 : wa <= 0 ? 1 : wa / (wa + wc);
+					off[i] = off[i] - normal * (pen * sa);
+					off[j] = off[j] + normal * (pen * sc);
+					any = true;
+				}
+				// Nobody is pushed down toward the world it is near: a hull keeps at least its planned distance from its centre.
+				for (size_t i = 0; i < n; i++)
+				{
+					if (b[i].FloorKm <= 0 || b[i].Weight <= 0) continue;
+					auto rel = b[i].Pos + off[i] - b[i].WorldKm;
+					double r = rel.Length();
+					if (r < b[i].FloorKm && r > 0) off[i] = b[i].WorldKm + rel * (b[i].FloorKm / r) - b[i].Pos;
+				}
+				if (!any) return;
+			}
+		}
+	}
+
+	cs::List<Fleet::HullObstacle> Fleet::StructuresOf(const cs::Ref<Infrastructure>& infrastructure, const cs::Ref<Ephemeris>& ephemeris, double jd)
+	{
+		cs::List<HullObstacle> out;
+		if (infrastructure == nullptr || ephemeris == nullptr) return out;
+		for (const auto& st : infrastructure->Structures)
+		{
+			HullObstacle o;
+			o.HelioKm = st->HelioAt(ephemeris, jd);
+			o.LengthKm = st->LengthKm;
+			o.RadiusKm = cs::Math::Max(0.01, st->LengthKm * 0.5); // as a hull meets it (SectionColliders::StationsNear)
+			o.Body = st->Body;
+			out.Add(o);
+		}
+		return out;
+	}
+
+	bool Fleet::Separable(cs::Ref<Ship> s)
+	{
+		return !s->IsEscort() && !s->Destroyed && !s->Derelict && s->Battle == nullptr && s->Phase != ShipPhase::Landed &&
+			(IsHeld == nullptr || !IsHeld(s));
+	}
+
+	double Fleet::SceneUnitsPerKm(int body, DVec3 helioKm, double blend)
+	{
+		// The same neighbourhood the view places the ship's sidestep in (UnitySpaceApp::KmToSceneNear).
+		ScaleModel scale;
+		scale.SetBlend(blend);
+		auto def = (*catalog)[body];
+		double d = (helioKm - ephemeris->Helio(body)).Length();
+		if (d > ScaleModel::NeighbourhoodKm(def))
+		{
+			def = catalog->Root();
+			d = (helioKm - ephemeris->Helio(0)).Length();
+		}
+		d = cs::Math::Max(d, cs::Math::Max(def->RadiusKm, 1.0));
+		double tangential = scale.LocalDistance(def, d) / d;
+		double radial = scale.LocalDistanceDerivative(def, d);
+		return cs::Math::Max(1e-12, cs::Math::Min(tangential, radial));
+	}
+
+	void Fleet::StepSeparation(double jd)
+	{
+		if (!SeparateHulls || coarse)
+		{
+			separation.Clear();
+			drawnSeparation.Clear();
+			return;
+		}
+		auto list = cs::List<cs::Ref<Ship>>();
+		for (const auto& s : ships) if (Separable(s)) list.Add(s);
+		// A leader's drawn hull carries its escorts' formation round it (they are drawn at slots scaled by its drawn length).
+		cs::Dictionary<cs::Ref<Ship>, double> formation;
+		for (const auto& s : ships)
+		{
+			if (!s->IsEscort() || s->Destroyed) continue;
+			auto lead = s->Controller();
+			double reach = s->FormationSlot.Length() * lead->LengthKm() + 0.5 * s->LengthKm();
+			double had = 0;
+			if (!formation.TryGetValue(lead, had) || reach > had) formation[lead] = reach;
+		}
+		auto obstacles = Obstacles ? Obstacles(jd) : cs::List<HullObstacle>();
+		int n = list.Count();
+		std::vector<SepBody> bodies;
+		bodies.reserve(static_cast<size_t>(n + obstacles.Count()));
+		std::vector<int> worlds(static_cast<size_t>(n));
+		for (int i = 0; i < n; i++)
+		{
+			auto s = list[i];
+			auto c = s->Controller();
+			std::pair<DVec3, DVec3> e{};
+			evasion.TryGetValue(s, e);
+			SepBody sb;
+			sb.Pos = BaseStateOf(s, jd).HelioKm + e.first;
+			sb.RadiusKm = 0.5 * s->LengthKm() * ShipLod::ExtentFactor(s);
+			sb.Weight = cs::Math::Max(1e-6, s->LengthKm());
+			sb.Key = s->Id;
+			int w = c->Ring != nullptr && (c->Phase == ShipPhase::Queued || c->Planetside()) ? c->Ring->Body : (c->Orbit != nullptr ? c->Orbit->Body : 0);
+			worlds[static_cast<size_t>(i)] = w;
+			if (w > 0)
+			{
+				auto world = ephemeris->Helio(w);
+				double r = (sb.Pos - world).Length();
+				if (r < ScaleModel::NeighbourhoodKm((*catalog)[w]))
+				{
+					sb.WorldKm = world;
+					sb.FloorKm = r;
+				}
+			}
+			bodies.push_back(sb);
+		}
+		for (const auto& o : obstacles)
+		{
+			SepBody sb;
+			sb.Pos = o.HelioKm;
+			sb.RadiusKm = o.RadiusKm;
+			sb.Key = -1 - static_cast<int>(bodies.size());
+			bodies.push_back(sb);
+		}
+
+		// The sim: hulls at their true size.
+		std::vector<DVec3> off;
+		Separate(bodies, off, SeparationPasses, SeparationMargin);
+		separation.Clear();
+		for (int i = 0; i < n; i++)
+			if (off[static_cast<size_t>(i)].LengthSquared() > 0) separation[list[i]] = off[static_cast<size_t>(i)];
+
+		// The view: the same hulls at the size they are drawn, from where the sim put them. At the realistic scale that is their
+		// true size again, so nothing more moves.
+		for (int i = 0; i < n; i++)
+		{
+			auto& sb = bodies[static_cast<size_t>(i)];
+			auto s = list[i];
+			sb.Pos = sb.Pos + off[static_cast<size_t>(i)];
+			double lead = 0;
+			formation.TryGetValue(s, lead);
+			double drawnHalf = 0.5 * ScaleModel::LogLerp(s->LengthKm() / ScaleModel::KmPerUnit, ScaleModel::GameShipScale * s->LengthKm(), DrawnBlend) * ShipLod::ExtentFactor(s);
+			double perKm = SceneUnitsPerKm(worlds[static_cast<size_t>(i)], sb.Pos, DrawnBlend);
+			double grow = s->LengthKm() > 0 ? drawnHalf / perKm / sb.RadiusKm : 1;
+			sb.RadiusKm = cs::Math::Max(sb.RadiusKm, drawnHalf / perKm);
+			if (lead > 0) sb.RadiusKm = cs::Math::Max(sb.RadiusKm, lead * cs::Math::Max(1.0, grow));
+		}
+		for (int k = 0; k < obstacles.Count(); k++)
+		{
+			const auto& o = obstacles[k];
+			auto& sb = bodies[static_cast<size_t>(n + k)];
+			double drawnHalf = 0.5 * ScaleModel::LogLerp(o.LengthKm / ScaleModel::KmPerUnit, ScaleModel::GameShipScale * o.LengthKm, DrawnBlend);
+			sb.RadiusKm = cs::Math::Max(sb.RadiusKm, drawnHalf / SceneUnitsPerKm(o.Body, o.HelioKm, DrawnBlend));
+		}
+		Separate(bodies, off, SeparationPasses, SeparationMargin);
+		drawnSeparation.Clear();
+		for (int i = 0; i < n; i++)
+			if (off[static_cast<size_t>(i)].LengthSquared() > 0) drawnSeparation[list[i]] = off[static_cast<size_t>(i)];
 	}
 
 	bool Fleet::Manoeuvrable(cs::Ref<Ship> s)

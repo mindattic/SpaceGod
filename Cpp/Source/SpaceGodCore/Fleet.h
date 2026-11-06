@@ -24,6 +24,7 @@ namespace SpaceGod::Core
 	class Ship;
 	class Faction;
 	class Ephemeris;
+	class Infrastructure;
 	class BodyCatalog;
 	class Hyperlanes;
 	class DockingRing;
@@ -208,7 +209,64 @@ namespace SpaceGod::Core
 		cs::List<HeldPose> heldPoses;
 
 	public:
-		/// <summary>How far (km) a ship has stepped aside from its planned path to keep clear of another.</summary>
+		/// <summary>
+		/// US-T209: no two hulls on schedules ever interpenetrate. The predictive sidestep above (<see cref="StepAvoidance"/>)
+		/// turns ships aside smoothly, but it is limited by their drives and counts only true km, while fleet traffic is drawn
+		/// through the scale model, where hardware is drawn at one linear scale (7 units/km, US-T179) in space whose km are
+		/// compressed many times over (a 1 km hull spans ~140 km of low orbit and tens of thousands of km of open space). So
+		/// each step, after the sidestep, every free hull is pushed clear of every other and of the stations: a stateless,
+		/// deterministic relaxation of the positions the schedule (and sidestep) put them at that date (overlapping pairs only,
+		/// found by sweep and prune; the smaller hull gives way more; never pushed down toward the world it is near; pairs in
+		/// a fixed order), so both co-op peers compute the same offsets from the same state. Two solves: one at true size, part
+		/// of <see cref="StateOf"/> (the sim), and one at the size hulls are drawn at <see cref="DrawnBlend"/>, which only
+		/// <see cref="DrawnOffsetOf"/> adds (the view). Not saved: it is recomputed from the state on the next step.
+		/// </summary>
+		bool SeparateHulls = true;
+
+		/// <summary>The scale blend the view draws at (<see cref="ScaleModel.Blend"/>: 0 realistic, 1 gameplay), for the drawn solve.</summary>
+		double DrawnBlend = 1.0;
+
+		/// <summary>Something solid that scheduled hulls keep clear of (a station or yard), at its true size and the body it orbits.</summary>
+		struct HullObstacle
+		{
+			DVec3 HelioKm;
+			double RadiusKm = 0;
+			double LengthKm = 0;
+			int Body = 0;
+		};
+
+		/// <summary>The stations and yards in the system at a date (true km), for <see cref="SeparateHulls"/>; null for none.</summary>
+		cs::Func<cs::List<HullObstacle>, double> Obstacles;
+
+		/// <summary>The orbital structures of <paramref name="infrastructure"/> as obstacles at <paramref name="jd"/> (what a world wires <see cref="Obstacles"/> to).</summary>
+		static cs::List<HullObstacle> StructuresOf(const cs::Ref<Infrastructure>& infrastructure, const cs::Ref<Ephemeris>& ephemeris, double jd);
+
+		/// <summary>Relaxation passes of the separation solve: a hull pushed out of one neighbour is checked against the rest.</summary>
+		static constexpr int SeparationPasses = 6;
+
+		/// <summary>Clearance kept beyond touching, as a share of the two hulls' radii.</summary>
+		static constexpr double SeparationMargin = 0.1;
+
+		/// <summary>Everything the view adds to a ship's scheduled position: its sidestep and both separations (true km).</summary>
+		DVec3 DrawnOffsetOf(cs::Ref<Ship> ship);
+
+	private:
+		cs::Dictionary<cs::Ref<Ship>, DVec3> separation = cs::Dictionary<cs::Ref<Ship>, DVec3>();
+		cs::Dictionary<cs::Ref<Ship>, DVec3> drawnSeparation = cs::Dictionary<cs::Ref<Ship>, DVec3>();
+
+		/// <summary>Runs the two separation solves at <paramref name="jd"/> (see <see cref="SeparateHulls"/>).</summary>
+		void StepSeparation(double jd);
+
+		/// <summary>Whether a ship is a hull of its own on its schedule here, for the separation: not an escort (drawn at its leader's
+		/// slot), not held, fighting, lost, derelict or down at a port.</summary>
+		bool Separable(cs::Ref<Ship> s);
+
+		/// <summary>Scene units per true km where a hull at <paramref name="helioKm"/> near <paramref name="body"/> is drawn at
+		/// <paramref name="blend"/>: the smaller of the scale model's tangential and radial rates there (the tighter one).</summary>
+		double SceneUnitsPerKm(int body, DVec3 helioKm, double blend);
+
+	public:
+		/// <summary>How far (km) a ship has stepped aside from its planned path to keep clear of another (its true-size separation included).</summary>
 		DVec3 EvasionOf(cs::Ref<Ship> ship);
 
 		/// <summary>The ship it is giving way to right now, or null.</summary>
