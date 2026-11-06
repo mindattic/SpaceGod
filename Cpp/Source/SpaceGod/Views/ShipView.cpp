@@ -273,10 +273,19 @@ namespace SpaceGod::Views
 		if (!shieldRingRenderer) return;
 		shieldRingRenderer->enabled = fighting && visible;
 		if (!fighting || !visible) return;
+		constexpr float ShieldPatchGain = 0.12f;
 		for (int gi = 0; gi < shieldGenerators.Count(); gi++)
 		{
 			const auto& gen = shieldGenerators[gi];
-			Color c = gen->Destroyed() ? Color::clear() : ShieldColor(static_cast<float>(gen->ShieldFraction()));
+			// US-T216: the Fx shader's radial shape is 2.5 at the shared centre UV and both windings draw, so the full
+			// ShieldColor was ~5x over white: a solid disc over every emitter's patch. A faint wash instead; a hit's
+			// bubble (BattleFx) is what flares.
+			Color c = Color::clear();
+			if (!gen->Destroyed())
+			{
+				c = ShieldColor(static_cast<float>(gen->ShieldFraction()));
+				c = Color(c.r * ShieldPatchGain, c.g * ShieldPatchGain, c.b * ShieldPatchGain, c.a);
+			}
 			int start = shieldWedgeStart[gi], count = shieldWedgeCount[gi];
 			for (int v = 0; v < count; v++) shieldVertexColors[start + v] = c;
 		}

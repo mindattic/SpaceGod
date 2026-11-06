@@ -52,7 +52,15 @@ float3 SG_Fx(float2 uvUE, float shapeSelect, float4 vertexColor)
         float fall = 1.0 - r * 0.6;
         shape = mask * (lines * (0.35 + ripple * 1.4) * fall + ripple * 0.35 + core * 1.5 + 0.08);
     }
-    return vertexColor.rgb * shape * vertexColor.a;
+    // Additive light must tone-map, not clip (US-T216): a hot core times a bright tint reads 2-3x over white, and a
+    // saturating channel loses its hue and goes to a solid white disc. Compress the brightest channel with a soft
+    // knee (unchanged below it, an asymptote of 1 above) and scale the other channels with it, so hot stays coloured.
+    float3 c = vertexColor.rgb * shape * vertexColor.a;
+    const float knee = 0.55;
+    float m = max(c.r, max(c.g, c.b));
+    if (m > knee)
+        c *= (knee + (1.0 - knee) * (1.0 - exp(-(m - knee) / (1.0 - knee)))) / m;
+    return c;
 }
 
 #endif

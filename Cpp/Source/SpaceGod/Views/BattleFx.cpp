@@ -377,7 +377,7 @@ namespace SpaceGod::Views
 				auto c = Point(e.Battle, e.A);
 				auto outward = Point(e.Battle, e.A + (e.A - e.B).Normalized() * (0.3 + 1.2 * t)) - c;
 				float r = static_cast<float>(e.Size * app->BattleKmScale()) * (0.3f + t);
-				Sprite(c, Mathf::Max(r, PixelSize(c, 10)), e.Color * fade * 0.8f, Shape::Radial);
+				Sprite(c, Mathf::Max(Mathf::Min(r, PixelSize(c, 40)), PixelSize(c, 10)), e.Color * fade * 0.8f, Shape::Radial);
 				Ribbon(c, c + outward, 3.0f, e.Color * fade);
 				break;
 			}
@@ -403,8 +403,8 @@ namespace SpaceGod::Views
 				// A fireball swelling to the blast's reach, and its shock ring racing past it.
 				auto c = Point(e.Battle, e.A);
 				float r = static_cast<float>(e.Size * app->BattleKmScale());
-				Sprite(c, Mathf::Max(r * (0.3f + 0.7f * Mathf::Sqrt(t)), PixelSize(c, 14)), e.Color * fade, Shape::Radial);
-				Sprite(c, Mathf::Max(r * (0.5f + t), PixelSize(c, 20)), e.Color * fade * 0.6f, Shape::Ring);
+				Sprite(c, Mathf::Max(Mathf::Min(r * (0.3f + 0.7f * Mathf::Sqrt(t)), PixelSize(c, 70)), PixelSize(c, 14)), e.Color * fade, Shape::Radial);
+				Sprite(c, Mathf::Max(Mathf::Min(r * (0.5f + t), PixelSize(c, 100)), PixelSize(c, 20)), e.Color * fade * 0.6f, Shape::Ring);
 				break;
 			}
 			case FxKind::EmpBurst:
@@ -434,7 +434,9 @@ namespace SpaceGod::Views
 				else
 				{
 					float bt = Mathf::Clamp01((age - flight) / (e.Life - flight));
-					float r = static_cast<float>(e.Size * app->BattleKmScale()) * (0.35f + 0.65f * Mathf::Sqrt(bt));
+					// US-T216: a burst is hundreds of metres across at realistic scale, a grey disc swallowing a fighter and the
+						// hull behind it: its reach is true, the drawn puff stops at a few dozen pixels.
+						float r = Mathf::Min(static_cast<float>(e.Size * app->BattleKmScale()) * (0.35f + 0.65f * Mathf::Sqrt(bt)), PixelSize(c, 34));
 					if (bt < 0.2f) Sprite(c, Mathf::Max(r * 0.6f, PixelSize(c, 7)), e.Color * 2.0f * (1 - bt / 0.2f), Shape::Radial);
 					Sprite(c, Mathf::Max(r, PixelSize(c, 5)), Color(0.55f, 0.5f, 0.45f) * (1 - bt) * 0.7f, Shape::Radial);
 				}
@@ -453,8 +455,9 @@ namespace SpaceGod::Views
 			{
 				auto c = Point(e.Battle, e.A);
 				float r = static_cast<float>(e.Size * app->BattleKmScale()) * (0.6f + 2.2f * Mathf::Sqrt(t));
-				Sprite(c, Mathf::Max(r, PixelSize(c, 24 * (0.5f + t))), e.Color * fade * fade, Shape::Radial);
-				if (age < 0.25f) Sprite(c, Mathf::Max(r * 3, PixelSize(c, 60)), Color::white() * (1 - age / 0.25f), Shape::Radial);
+				// US-T216: the fireball grows with the hull but never past ~160 px, its white flash ~240.
+					Sprite(c, Mathf::Max(Mathf::Min(r, PixelSize(c, 160)), PixelSize(c, 24 * (0.5f + t))), e.Color * fade * fade, Shape::Radial);
+				if (age < 0.25f) Sprite(c, Mathf::Max(Mathf::Min(r * 3, PixelSize(c, 240)), PixelSize(c, 60)), Color::white() * (1 - age / 0.25f) * 0.8f, Shape::Radial);
 				break;
 			}
 			default:

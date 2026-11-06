@@ -11,7 +11,14 @@ float3 SG_Glow(float2 uvUE, float4 vertexColor, float3 _Color, float _Intensity,
     float d = length(uv * 2.0 - 1.0);
     float a = saturate(1.0 - d);
     float glow = pow(a, _Falloff) + pow(a, 12.0) * 0.6;
-    return _Color * vertexColor.rgb * glow * _Intensity * vertexColor.a;
+    // Tone-mapped, not clipped (US-T216): a hot core times intensity reads over 1 and a clipped channel goes to a solid
+    // white disc. Soft knee on the brightest channel, hue kept (see Fx.ush).
+    float3 c = _Color * vertexColor.rgb * glow * _Intensity * vertexColor.a;
+    const float knee = 0.55;
+    float m = max(c.r, max(c.g, c.b));
+    if (m > knee)
+        c *= (knee + (1.0 - knee) * (1.0 - exp(-(m - knee) / (1.0 - knee)))) / m;
+    return c;
 }
 
 #endif
