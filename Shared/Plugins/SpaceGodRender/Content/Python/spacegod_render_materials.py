@@ -662,6 +662,17 @@ UNITY_SPECCUBE_SH = {
 LIT_LIGHTS = ["_MainLight", "_AdditionalLight0", "_AdditionalLight1"]
 
 
+def build_ghost(mpc):
+    """US-T185: the flat, unlit, translucent single colour an occluding model is drawn in while it hides the focused target."""
+    mat = new_material("M_Ghost", unreal.BlendMode.BLEND_TRANSLUCENT, False)
+    g = Graph(mat, mpc)
+    inputs = [vec4("_GhostColor", (0.35, 0.75, 1.0, 0.3))] + EXPOSE
+    c = g.custom("Unity.SpaceGod/Ghost", "Points.ush",
+                 "return SG_Expose(_GhostColor, Exposure, SceneLuminance);", F4, inputs)
+    finish(mat, g.mask(c, "", "rgb"), opacity=g.mask(c, "", "a"))
+    return mat
+
+
 def build_lit(mpc):
     mat = new_material("M_Lit", unreal.BlendMode.BLEND_OPAQUE, False)
     g = Graph(mat, mpc)
@@ -693,7 +704,7 @@ def _snake(name):
 
 
 BUILDERS = [build_planet, build_sun, build_ring, build_gas_giant, build_sky, build_stars, build_points, build_line,
-            build_glow, build_fx, build_asteroids, build_ship, build_lit, build_nebula, build_warp]
+            build_glow, build_fx, build_asteroids, build_ship, build_lit, build_nebula, build_warp, build_ghost]
 
 
 def main():

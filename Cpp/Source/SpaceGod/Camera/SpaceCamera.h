@@ -36,6 +36,11 @@ namespace SpaceGod::Cameras
 		/// is not its root (US-T78). TargetScene unless the world knows better.</summary>
 		virtual Core::DVec3 FocusScene(const Target& target) { return TargetScene(target); }
 
+		/// <summary>Whether the target is still there to look at (US-T185): a ship gone through a gate or destroyed, a structure,
+		/// ring or battle unit that despawned, a hidden body. Its scene position is meaningless otherwise (zero, or another
+		/// hull's slot), so the camera neither flies to it nor stays on it.</summary>
+		virtual bool TargetValid(const Target& target) { return !target.IsNone(); }
+
 		/// <summary>A target's framing radius in scene units (body radius, or half a ship's length).</summary>
 		virtual double TargetRadius(const Target& target) = 0;
 
@@ -270,7 +275,7 @@ namespace SpaceGod::Cameras
 		/// <summary>Frame hysteresis: enter a child's SOI below 92% of it, leave ours above 108%.</summary>
 		void UpdateFrame();
 
-		bool PushOutOfBodies();
+		bool PushOutOfBodies(Core::DVec3* normal = nullptr);
 	};
 
 	const char* ToString(SpaceCamera::CameraMode v);

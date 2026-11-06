@@ -124,7 +124,7 @@ namespace SpaceGod::Cameras
 
 	void SpaceCamera::FocusOn(const Target& target, double radii, cs::Nullable<float> pitchOverride)
 	{
-		if (target.IsNone()) return;
+		if (target.IsNone() || !world->TargetValid(target)) return; // US-T185: nothing real to fly to
 		auto targetScene = OrbitCentre(target);
 		double r = cs::Math::Max(world->TargetRadius(target), 1e-9);
 		auto offset = ScenePosition - targetScene;
@@ -197,6 +197,8 @@ namespace SpaceGod::Cameras
 	{
 		bool moving = input.Move.sqrMagnitude() > 0.01f;
 		if (Mode != CameraMode::Free && moving && !PilotLocked) ExitFocus();
+		// US-T185: the focused thing went (despawned, left the system): let go rather than orbit the origin or a stale slot.
+		if (Mode != CameraMode::Free && !PilotLocked && !world->TargetValid(FocusTarget)) ExitFocus();
 
 		switch (Mode)
 		{
@@ -247,7 +249,14 @@ namespace SpaceGod::Cameras
 		if (delta.LengthSquared() > 0) ApplySceneDelta(delta);
 
 		ScenePosition = FramePosition();
-		if (PushOutOfBodies()) velocity *= 0.3f;
+		// Pushed off a surface: drop only the velocity driving into it. Scaling all of it (as this once did) throttled a camera
+		// flying straight away to a fraction of its speed every frame it sat on the skin, so swim felt hooked on the planet.
+		DVec3 pushNormal;
+		if (PushOutOfBodies(&pushNormal))
+		{
+			double inward = -(velocity.x * pushNormal.X + velocity.y * pushNormal.Y + velocity.z * pushNormal.Z);
+			if (inward > 0) velocity += Vector3(static_cast<float>(pushNormal.X), static_cast<float>(pushNormal.Y), static_cast<float>(pushNormal.Z)) * static_cast<float>(inward);
+		}
 		UpdateFrame();
 		ScenePosition = FramePosition();
 	}
@@ -439,7 +448,7 @@ namespace SpaceGod::Cameras
 		}
 	}
 
-	bool SpaceCamera::PushOutOfBodies()
+	bool SpaceCamera::PushOutOfBodies(DVec3* normal)
 	{
 		auto pos = ScenePosition;
 		bool pushed = false;
@@ -451,7 +460,9 @@ namespace SpaceGod::Cameras
 			double len = d.Length();
 			if (len < minimum)
 			{
-				pos = c + (len > 0 ? d / len : DVec3::UnitY) * minimum;
+				auto n = len > 0 ? d / len : DVec3::UnitY;
+				pos = c + n * minimum;
+				if (normal) *normal = n;
 				pushed = true;
 			}
 		}

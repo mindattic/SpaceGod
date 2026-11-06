@@ -261,6 +261,13 @@ public:
 
 	double TargetRadius(const Target& target) override;
 
+	/// US-T185: the target is still there to look at (see ICameraWorld::TargetValid).
+	bool TargetValid(const Target& target) override;
+
+	/// US-T185: each frame while a focus is held, draws whatever model hides the focused target as a flat translucent
+	/// ghost (see UnitySpaceApp.Focus.cpp), and puts its own material back the moment it no longer does.
+	void UpdateOccluderGhost();
+
 	Quaternion TargetRotation(const Target& target) override;
 
 private:

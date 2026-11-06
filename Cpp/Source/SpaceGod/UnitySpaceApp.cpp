@@ -529,6 +529,7 @@ namespace SpaceGod
 		Sky->Update(dt);
 		UpdateSkyTravel(dt); // US-T145
 		UpdateViews(dt);
+		UpdateOccluderGhost(); // US-T185: the model hiding the focused target is drawn as a ghost
 		UpdateHover();
 		HandleSelectionClicks();
 
@@ -809,6 +810,8 @@ namespace SpaceGod
 	{
 		// The chase camera belongs to the pilot (the HUD's Focus button lands here too), or whoever holds a seat.
 		if (AtControls()) return;
+		// US-T185: with nothing selected, F takes what the pointer is over rather than doing nothing.
+		if (Selected.IsNone() && !Hovered.IsNone() && TargetValid(Hovered)) Select(Hovered);
 		if (Selected.IsNone())
 		{
 			if (SpaceCamera->Mode != Cameras::SpaceCamera::CameraMode::Free) SpaceCamera->ExitFocus();
