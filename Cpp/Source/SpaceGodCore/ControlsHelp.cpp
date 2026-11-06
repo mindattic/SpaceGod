@@ -62,8 +62,8 @@ namespace SpaceGod::Core
 				L("Shift", "interdiction (riding): a raider's field ahead, surge through"),
 				L("Ctrl", "interdiction (riding): drop out short of the field"),
 				L("Y", "back into the lane where you left it"),
-				L("Shift+J", "cruise drive, inside a system: spools a few seconds (longer the heavier the hull), then carries you along the nose at up to about 1000 c, for the world or station the nose is on (or the hull locked); the mouse steers, it slows as it closes and drops out off the target -- Earth to Mars in about half a minute. Shift+J again drops out; a fight, a hit or a world's gravity well drop it too"), // US-T127
 				L("J (hold)", "tactical cruise: a stronger drive tier ramps up while it is held, with the nose straight and the throttle up, out of a fight; it snaps off at a hit, a fight or a hard turn"),
+				L("Shift+J", "cruise drive, inside a system: spools a few seconds (longer the heavier the hull), then carries you along the nose at up to about 1000 c, for the world or station the nose is on (or the hull locked); the mouse steers, it slows as it closes and drops out off the target -- Earth to Mars in about half a minute. Shift+J again drops out; a fight, a hit or a world's gravity well drop it too"), // US-T127
 				L("Enter  or  numpad Enter", "FTL (capital ships, survey hulls): beyond the system's outer rim, put the nose on another star, Enter to spool (hold it there); it engages for that star"),
 				More("a jump reaches about 7 ly (survey drive 9, jump ring 5); farther stars are flown in even jumps with a stop in the void between each: the drive cools, then spools, then jumps on -- the HUD shows the stop, the cooldown and the spool"),
 				More("small craft: dock a jump ring at a shipyard (F2, outfitting) to jump like a capital hull; most traffic still goes by the gates"),
@@ -157,7 +157,7 @@ namespace SpaceGod::Core
 				More("in a fighter: mouse aims, W/S throttle (assist off: raw thrust), Alt flip, left mouse guns, right mouse torpedoes"),
 				More("at any seat the craft has the keys and mouse, the camera only follows it (the wheel zooms the chase); keys held through a switch wait to be let go"),
 				More("at every seat a role panel down the left lists that role's keys, greyed when they cannot be used now"),
-	
+				More("co-op or PvP: a hull another player embodies shines in their seat colour (P1 amber, P2 cyan, P3 rose, P4 lime): a rim glow, a glint sweeping its plating, now and then a star flare, a twinkling glint when it is far; one running dark shines only inside visual range. The other side of a fight is fair game, players or not"),
 				L("P", "hands the seat back to its AI and returns you to the free SpaceGod view")),
 
 			cs::New<HelpSection>("SCREENS AND PANELS",
@@ -173,9 +173,9 @@ namespace SpaceGod::Core
 				L("F5", "quicksave"),
 				L("F8", "quickload"),
 				L("F6", "save slots"),
+				L("Alt+F9 / F10 / F11", "only while capture runs: screenshot, start / stop recording, save the replay (instead of the picker, the fleet and clear screen; docs/CAPTURE.md)"),
 				More("autosaves every 5 minutes and on quit; -continue resumes the latest")),
 		};
-				L("Alt+F9 / F10 / F11", "only while capture runs: screenshot, start / stop recording, save the replay (instead of the picker, the fleet and clear screen; docs/CAPTURE.md)"),
 		return value;
 	}
 

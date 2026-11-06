@@ -615,9 +615,9 @@ namespace SpaceGod
 		hud->Draw();
 		DrawComms(); // US-T137: the comms panel, over the HUD
 		DrawSystemCruise(); // US-T127: the cruise drive's readout
+		DrawTractorHud(); // US-T95: the tractor beam's readout
 		DrawInfluence(); // US-T140: the Influence meter, the embody gate's refusals, the squad's line
 		Tour::ShowcaseTour::Draw(*this); // US-T147: the showcase tour's strip
-		DrawTractorHud(); // US-T95: the tractor beam's readout
 		cheatMenu->Draw(*this); // US-T126: the dev menu, or the HUD's hint for its key
 		GUI::enabled = true;
 		if (menu) pauseMenu->Draw();
