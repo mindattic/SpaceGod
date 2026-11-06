@@ -29,6 +29,7 @@ namespace SpaceGod::Input
 		// US-T87: Alt held is the manoeuvre key at the controls (a turn-and-burn's flip); with F9-F11 under capture, and
 		// Shift+Alt+K, Alt keeps its other meanings, which only read it with another key.
 		Manoeuvre = kb[Key::LeftAlt].isPressed || kb[Key::RightAlt].isPressed;
+		Drift = kb[Key::R].isPressed; // US-T165: held, at the controls (R alone toggles auto-reorient in command)
 		// US-T94: the arrows move reactor power at the controls (Core::PowerKey): Left weapons, Up shields, Right engines a
 		// pip at a time, Down an even share; Shift with one of the three, all the reactor can spare to it.
 		PowerKey = kb[Key::LeftArrow].wasPressedThisFrame ? (Boost ? 3 : 0)
@@ -194,10 +195,12 @@ namespace SpaceGod::Input
 			// The craft has F (flight assist), T (lock), Backspace (up to the host), B (boarding), X (roll), the number
 			// keys; the command view's meanings of them stand aside.
 			Focus = ResetTime = Home = WatchBattle = ToggleNews = CycleShips = CycleBackward = false;
+			ToggleReorient = false; // US-T165: R held is the craft's drift
 			return;
 		}
 		// In command nothing is flown: F focuses, T resets time, Backspace goes home, B watches a battle.
 		ToggleFlightAssist = LockTarget = MoveToHost = ToggleBoarding = Manoeuvre = JumpToCraft = false; // US-T106: no craft to jump from
+		Drift = false; // US-T165: R toggles auto-reorient
 		PowerKey = -1; // US-T94: nothing to share a reactor of in command
 		SelfDestructTap = SelfDestructArm = false; // US-T97: nothing to set off in command
 		SelfDestructHoldS = 0;
@@ -210,7 +213,7 @@ namespace SpaceGod::Input
 
 	bool InputState::HandsIdle() const
 	{
-		return Move.sqrMagnitude() < 0.0001f && Roll == 0 && !Fire && !FireEmp && !LookHeld && !Boost && !Manoeuvre && !Cruise;
+		return Move.sqrMagnitude() < 0.0001f && Roll == 0 && !Fire && !FireEmp && !LookHeld && !Boost && !Manoeuvre && !Cruise && !Drift;
 	}
 
 	void InputState::HoldHandsOff()
@@ -218,7 +221,7 @@ namespace SpaceGod::Input
 		Move = Vector3::zero();
 		Roll = 0;
 		ThrottleStep = 0;
-		Fire = FireEmp = Boost = Slow = Manoeuvre = Cruise = false;
+		Fire = FireEmp = Boost = Slow = Manoeuvre = Cruise = Drift = false;
 		LookHeld = false;
 		LookDelta = Vector2::zero();
 		SelectClicked = SelectDoubleClicked = RightClicked = false;
@@ -244,6 +247,7 @@ namespace SpaceGod::Input
 		Roll = 0;
 		ToggleFlightAssist = false;
 		Manoeuvre = false;
+		Drift = false; // US-T165
 		PowerKey = -1;
 		SelfDestructTap = SelfDestructArm = false;
 		SelfDestructHoldS = 0;

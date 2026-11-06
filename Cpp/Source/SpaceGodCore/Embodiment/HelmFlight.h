@@ -5,6 +5,7 @@
 #include "Cs/Cs.h"
 #include "DVec3.h"
 #include "Combat/PilotFlight.h" // PilotState, HullDynamics, PilotInput (by value)
+#include "Combat/Drift.h" // DriftControl (by value), US-T165
 
 namespace SpaceGod::Core
 {
@@ -38,6 +39,9 @@ namespace SpaceGod::Core
 
 		/// <summary>The hull is inside a port's approach, where a hauler's Ctrl is docking mode (U.SPC-T443).</summary>
 		bool DockingApproach = false;
+
+		/// <summary>Drift held and let go (US-T165): drifting, or boosting out of it. Not saved.</summary>
+		DriftControl Drift;
 
 		/// <summary>The model the last frame was flown by, the hull it was flown on, and the input it was given.</summary>
 		cs::Ref<IFlightModel> Model;

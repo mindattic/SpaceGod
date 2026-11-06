@@ -190,10 +190,17 @@ namespace SpaceGod::Core
 		// A capital ship's is the broadside stance instead (US-T81): the helm lays it beam-on to the locked hull (or holds
 		// its heading with none) while the turn keys, passed through as strafe, slide it sideways and up or down.
 		cs::String broadside;
+		// Drift (US-T165): a fighter's (light or heavy, a bomber's) dogfight model let go while it is held, the hull coasting
+		// and turning free onto the aim; let go, a boost-out. A capital's helm and a hauler's never drift.
+		bool powered = !f->DrivesDown && !SensorPosture::Offline(ship->Combat);
+		bool canDrift = capital == nullptr && controls.Stick != PilotControl::Helm && controls.Stick != PilotControl::Hauler;
+		if (!powered || !canDrift) f->Drift.Cancel();
+		else f->Drift.Update(e.Drift, dt);
+		f->Drift.Apply(input);
 		if (e.Manoeuvre && capital != nullptr) input.DesiredForward = BroadsideAim(f->State, broadside);
-		else if (e.Manoeuvre) input.DesiredForward = PilotFlight::FlipAim(f->State);
+		else if (e.Manoeuvre && !input.Drift) input.DesiredForward = PilotFlight::FlipAim(f->State);
 		// Powered down (US-T93): no drive, no thrusters; the hull drifts on its momentum, as with its drives knocked out.
-		if (f->DrivesDown || SensorPosture::Offline(ship->Combat))
+		if (!powered)
 		{
 			input.DesiredForward = f->State.Forward;
 			input.Throttle = input.StrafeRight = input.StrafeUp = input.Roll = 0;
@@ -218,7 +225,7 @@ namespace SpaceGod::Core
 		auto gravity = f->Gravity;
 		auto posBefore = f->State.Pos;
 		auto velBefore = f->State.Vel;
-		model->Step(f->State, ship->Combat, hull, tuning, input, gravity, dt);
+		Drift::Fly(model, f->State, ship->Combat, hull, tuning, input, gravity, dt); // the model, or drift (US-T165)
 		auto pos = f->State.Pos;
 		auto vel = f->State.Vel;
 		Propulsion::ApplyManoeuvre(ship, pos, vel, posBefore, velBefore + gravity * dt, dt);
@@ -234,6 +241,7 @@ namespace SpaceGod::Core
 		// With assist off nothing brakes for the pilot (US-T87): what stopping costs, a flip and a burn or the retros.
 		// Assist off, every model flies the Newtonian rules on the class's own turn rate, so that is the flip's rate.
 		f->Note = input.FlightAssistOff && !f->DrivesDown ? PilotFlight::Brake(f->State, hull, tuning.TurnRateDegS).Text() : broadside;
+		if (input.Drift) f->Note = "DRIFT: coasting on your way, the hull turns free on its thrusters; let go of R to boost out along the nose";
 	}
 
 	DVec3 ShipHelm::BroadsideAim(const PilotState& s, cs::String& note) const

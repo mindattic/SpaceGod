@@ -201,6 +201,13 @@ namespace SpaceGod::Views
 		strip->Root->transform->localPosition = Vector3::zero();
 	}
 
+	cs::Ref<Transform> FighterViews::ModelOf(const cs::Ref<Core::BattleUnit>& u) const
+	{
+		cs::Ref<View> v;
+		if (u == nullptr || !views.TryGetValue(u, v) || v == nullptr || !v->Hull || !v->Hull->activeSelf) return nullptr;
+		return v->Hull->transform;
+	}
+
 	cs::Ref<FighterViews::View> FighterViews::Create(const cs::Ref<BattleUnit>& u)
 	{
 		auto v = cs::New<View>();

@@ -23,6 +23,7 @@
 
 #include "UnitySpaceApp.Main.deps.h"
 #include "UnitySpaceApp.Main2.deps.h"
+#include "UnitySpaceApp.Drift.deps.h" // US-T165
 #include "UnitySpaceApp.Boarding.deps.h"
 #include "UnitySpaceApp.Broadsides.deps.h"
 #include "UnitySpaceApp.Collisions.deps.h"
@@ -84,6 +85,7 @@ namespace SpaceGod
 
 #include "UnitySpaceApp.Main.inl"
 #include "UnitySpaceApp.Main2.inl"
+#include "UnitySpaceApp.Drift.inl" // US-T165: drift, and the RCS jets on the hull flown
 #include "UnitySpaceApp.Boarding.inl"
 #include "UnitySpaceApp.Broadsides.inl"
 #include "UnitySpaceApp.Collisions.inl"

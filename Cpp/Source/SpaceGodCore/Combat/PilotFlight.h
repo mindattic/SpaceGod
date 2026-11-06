@@ -69,6 +69,12 @@ namespace SpaceGod::Core
 		/// <summary>How fast the boost charge refills, times the design's (US-T94): the engines' share of the reactor under
 		/// the player's hands (<see cref="CraftPower"/>). Set only with <see cref="Piloted"/>; 1 for every crew.</summary>
 		double BoostRecharge = 1;
+
+		/// <summary>Drift (US-T165, Chorus style; <see cref="Drift"/>): the dogfight model is suspended, the hull coasts on
+		/// the way it has and its attitude thrusters swing it freely onto <see cref="DesiredForward"/>. Only
+		/// <see cref="Drift.Fly"/> reads it. The player's helm and seat set it while R is held; a crew may set it too (an AI
+		/// strafing run, US-T164) through a <see cref="DriftControl"/>. Unset, every model flies exactly as before.</summary>
+		bool Drift = false;
 	};
 
 	/// <summary>

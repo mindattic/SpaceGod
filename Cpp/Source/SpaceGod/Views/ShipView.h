@@ -103,6 +103,13 @@ namespace SpaceGod::Views
 		/// </summary>
 		Vector3 HullCentre() const;
 
+		/// <summary>The box round the hull as drawn (see <see cref="HullCentre"/>), in the root's own frame where the ship is
+		/// one unit long: where its RCS thrusters sit (US-T165, <see cref="RcsJets"/>). Empty before the hull is placed.</summary>
+		Bounds HullBox() const;
+
+		/// <summary>The full model is on screen this frame (visible and detailed): what an FX on the hull rides on.</summary>
+		bool Shown() const { return visible && detailed; }
+
 		/// <summary>The hull's own renderers, the ones HullCentre measures.</summary>
 		const cs::List<cs::Ref<Renderer>>& HullRenderers() const { return renderers; }
 

@@ -711,10 +711,14 @@ namespace SpaceGod::Core
 		// Power to the engines refills the boost faster too (US-T94); speed and thrust already scale with it above.
 		input.BoostRecharge = engines;
 		if (stick->FlightAssistOff) input.Throttle = Max(-1.0, Min(1.0, stick->Burn));
-		if (stick->Flip) input.DesiredForward = PilotFlight::FlipAim(state);
+		// Drift (US-T165): held, the craft coasts and turns free onto the aim; let go, a boost-out along the new facing.
+		stick->Drift.Update(stick->DriftHeld, dt);
+		stick->Drift.Apply(input);
+		if (stick->Flip && !input.Drift) input.DesiredForward = PilotFlight::FlipAim(state);
 		auto tuning = craft->Tuning(engines);
-		craft->Model()->Step(state, u->Combat, hull, tuning, input, DVec3::Zero, dt);
+		Drift::Fly(craft->Model(), state, u->Combat, hull, tuning, input, DVec3::Zero, dt);
 		stick->Note = stick->FlightAssistOff ? PilotFlight::Brake(state, hull, tuning.TurnRateDegS).Text() : cs::String();
+		if (input.Drift) stick->Note = "DRIFT: coasting on your way, the craft turns free on its thrusters; let go of R to boost out along the nose";
 		u->Pos = state.Pos;
 		u->Vel = state.Vel;
 		u->Forward = state.Forward;

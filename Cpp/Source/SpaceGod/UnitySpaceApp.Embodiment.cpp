@@ -604,6 +604,7 @@ namespace SpaceGod
 		input.Roll = Mathf::Clamp(Input.Roll, -1.0f, 1.0f);
 		input.Boost = Input.Boost;
 		input.Manoeuvre = Input.Manoeuvre; // US-T87: the turn-and-burn's flip
+		input.Drift = Input.Drift; // US-T165: R held, a launched craft drifts (other seats ignore it)
 		input.Primary = Input.Fire && !ClickPanelOpen();
 		input.Secondary = Input.LookHeld && !ClickPanelOpen();
 		// The arrows share the reactor the seat draws on (US-T94): a craft's own, a gun's hull's, a station's.
@@ -639,6 +640,7 @@ namespace SpaceGod
 		// The string aim (US-T168): a light craft's is slack, the view anywhere (a full 180) and the craft whipping round
 		// after it; a heavy fighter's or bomber's taut, held within PilotAim::HeavyMaxLeadDeg of its nose. Drifting (US-T165)
 		// any craft's goes slack.
+		if (Input.Drift) return;
 		auto craft = f->Unit->Fighter != nullptr ? FighterCraft::Of(f->Unit->Fighter->Role) : FighterCraft::Interceptor();
 		if (craft == nullptr || cs::As<LightFighterFlightModel>(craft->Model()) != nullptr) return;
 		auto aim = DVec3(seatAim.x, seatAim.y, seatAim.z).SwapYZ();

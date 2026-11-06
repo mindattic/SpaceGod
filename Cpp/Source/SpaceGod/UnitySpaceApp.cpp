@@ -1173,19 +1173,23 @@ namespace SpaceGod
 		// float products, widened to double after (as C#).
 		double lookRight = look.x * PilotLookSensitivity() * Mathf::Deg2Rad, lookUp = look.y * PilotLookSensitivity() * Mathf::Deg2Rad;
 		double strafeRight = Input.Move.x, strafeUp = Input.Move.y;
+		// Drift (US-T165), R held: a fighter's (light or heavy, a bomber's) dogfight model let go; never a capital's or a
+		// hauler's, nor under the cruise drive or with the drives knocked out.
+		bool drifting = (Input.Drift || DriftHeldByScript) && (control == PilotControl::FreeAim || control == PilotControl::DirectNose)
+			&& !SystemCruiseActive() && PilotStunSeconds() <= 0;
 		switch (control)
 		{
 			default:
 			{
 				// Every fighter and hauler flies "pulled by a string" (US-T168): the camera looks where the mouse puts it and
 				// the hull chases it. A light fighter's string is slack (a full 180 at once, the hull whipping round after it,
-				// LightFighterFeel::Whip); a heavy hull's taut, its look barely faster than its own turn. Any
+				// LightFighterFeel::Whip); a heavy hull's taut, its look barely faster than its own turn. Drifting, any
 				// fighter's goes slack. A hauler's slow mouse (LookFactor) swings it less.
 				double hullTurnDegS = tuning.TurnRateDegS;
 				if (auto heavy = cs::As<HeavyFighterFlightModel>(model)) hullTurnDegS = heavy->TurnRateDegS(tuning);
 				double factor = controls.LookFactor;
 				PilotAim::Look(pilotAim, pilotViewUp, pilotLookOwedRight, pilotLookOwedUp, lookRight * factor, lookUp * factor,
-					pilot().Forward, pilot().Up, dt, PilotAim::StringFor(control, hullTurnDegS, false));
+					pilot().Forward, pilot().Up, dt, PilotAim::StringFor(control, hullTurnDegS, drifting));
 				break;
 			}
 			case PilotControl::Helm:
@@ -1244,6 +1248,8 @@ namespace SpaceGod
 		stick.Fine = Input.Slow;
 		// Alt, the manoeuvre key (US-T87): the turn-and-burn's flip onto the retrograde.
 		stick.Manoeuvre = Input.Manoeuvre;
+		// R held, drift (US-T165): the helm coasts the hull and turns it free; let go, it boosts out along the new facing.
+		stick.Drift = drifting;
 		// W and S ring a capital's engine telegraph a step at a time (U.SPC-T499).
 		stick.TelegraphStep = Input.ThrottleStep;
 		// The trigger and the crosshair; UpdatePilotBattle below gates them on what the hull can fire right now.

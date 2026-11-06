@@ -370,14 +370,16 @@ namespace SpaceGod::Views
 
 	// ---------------------------------------------------------------- per frame
 
-	Vector3 ShipView::HullCentre() const
+	Vector3 ShipView::HullCentre() const { return HullBox().center; }
+
+	Bounds ShipView::HullBox() const
 	{
 		// Each hull mesh's box corners through its own transform into the root's frame (unit length): the root's
 		// world placement taken back out, so the answer is the same whenever the root was last placed.
 		auto root = Root ? Root->transform : nullptr;
-		if (!root) return Vector3::zero();
+		if (!root) return Bounds();
 		float scale = root->localScale.x;
-		if (!(scale > 0)) return Vector3::zero();
+		if (!(scale > 0)) return Bounds();
 		auto toLocal = Quaternion::Inverse(root->rotation());
 		Vector3 origin = root->position();
 		bool any = false;
@@ -399,7 +401,7 @@ namespace SpaceGod::Views
 				any = true;
 			}
 		}
-		return any ? box.center : Vector3::zero();
+		return any ? box : Bounds();
 	}
 
 	void ShipView::Apply(Vector3 relative, Quaternion rotation, float length, bool burning, bool highlighted)

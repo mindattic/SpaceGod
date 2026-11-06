@@ -4,6 +4,7 @@
 #include "Combat/Dogfighting.h"
 #include "Combat/CarrierWings.h"
 #include "Combat/Choreography.h" // Choreography::Flight (by value), US-T164
+#include "Combat/Drift.h" // DriftControl (by value), US-T165
 
 namespace SpaceGod::Core
 {
@@ -109,6 +110,11 @@ namespace SpaceGod::Core
 
 		/// <summary>The turn-and-burn key held this step (US-T87, <see cref="PilotFlight.FlipAim"/>). Not saved.</summary>
 		bool Flip = false;
+
+		/// <summary>Drift held this step (R, US-T165), and the drift it drives: coasting while held, a boost-out once let
+		/// go (<see cref="Core::Drift"/>). Not saved.</summary>
+		bool DriftHeld = false;
+		DriftControl Drift;
 
 		/// <summary>The seat's flight line for the readout (US-T87): with assist off, what stopping costs. Not saved.</summary>
 		cs::String Note;

@@ -66,6 +66,10 @@ namespace SpaceGod::Views
 
 		void Update();
 
+		/// <summary>The model <paramref name="u"/> is drawn as (one unit long, nose +Z), while it is drawn as a model at all;
+		/// null otherwise. What an FX on the craft rides on (its RCS jets, US-T165).</summary>
+		cs::Ref<Transform> ModelOf(const cs::Ref<Core::BattleUnit>& u) const;
+
 	private:
 		/// <summary>Half the width and height of a deck's mouth, in its hull's lengths, and at least so many km.</summary>
 		static constexpr double MouthHalfWidth = 0.014, MouthHalfHeight = 0.007, MouthMinKm = 0.03;

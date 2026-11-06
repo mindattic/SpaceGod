@@ -54,6 +54,7 @@ namespace SpaceGod::Coop
 			static const std::vector<Field> fields = {
 				SG_FIELD(ActivateGate), SG_FIELD(Boost), SG_FIELD(ClearFtlCourse), SG_FIELD(ClearScreen), SG_FIELD(Cruise),
 				SG_FIELD(CycleBackward), SG_FIELD(CycleFtlTarget), SG_FIELD(CycleSeat), SG_FIELD(CycleShips), SG_FIELD(CycleSky),
+				SG_FIELD(Drift), // US-T165: R held at a fighter's controls
 				SG_FIELD(DropMine), SG_FIELD(EngageFtl), SG_FIELD(Escape), SG_FIELD(Fire), SG_FIELD(FireEmp), SG_FIELD(Focus),
 				SG_FIELD(HailPolity), SG_FIELD(Home), SG_FIELD(JumpToCraft), // US-T106: Shift+/
 				SG_FIELD(LockTarget), SG_FIELD(LookDelta), SG_FIELD(LookHeld), SG_FIELD(ManGun),
@@ -81,7 +82,7 @@ namespace SpaceGod::Coop
 		/// Held from one message to the next, as a stick stays where it is put (the rest are edges, deltas or picks).
 		bool Held(const char* n)
 		{
-			for (const char* h : { "Move", "Roll", "Boost", "Slow", "Cruise", "Manoeuvre", "Fire", "FireEmp", "LookHeld", "MousePosition" })
+			for (const char* h : { "Move", "Roll", "Boost", "Slow", "Cruise", "Manoeuvre", "Drift", "Fire", "FireEmp", "LookHeld", "MousePosition" })
 				if (std::strcmp(n, h) == 0) return true;
 			return false;
 		}

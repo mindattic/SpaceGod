@@ -1342,6 +1342,7 @@ namespace SpaceGod
 		laneView->Update(ShowLanes);
 		gateView->Update(true, nearGate);
 		fighterViews->Update();
+		UpdatePilotRcs(dt); // US-T165: the flown hull's RCS jets, on its view (a ship's, or a seat craft's) as placed above
 		embeddedPods->Update();
 		battleFx->Update();
 		debrisFields->Update();

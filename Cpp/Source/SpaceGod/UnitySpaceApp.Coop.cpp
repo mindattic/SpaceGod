@@ -299,6 +299,7 @@ namespace SpaceGod
 			input.Roll = Mathf::Clamp(Input.Roll, -1.0f, 1.0f);
 			input.Boost = Input.Boost;
 			input.Manoeuvre = Input.Manoeuvre; // US-T87: the turn-and-burn's flip
+			input.Drift = Input.Drift; // US-T165: R held, a launched craft drifts
 			input.Primary = Input.Fire && !ClickPanelOpen();
 			input.Secondary = Input.LookHeld && !ClickPanelOpen();
 			input.PowerSplit = CraftPower::After(held, Input.PowerKey); // US-T94: the arrows' reactor split, whole

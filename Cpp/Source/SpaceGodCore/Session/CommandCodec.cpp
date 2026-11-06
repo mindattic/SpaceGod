@@ -18,9 +18,10 @@ namespace SpaceGod::Core
 			// 2048 and 4096: the self-destruct asked for (US-T97, 1 arm, 2 abort), above the split's seven bits.
 			// 8192 and up: the helm ability ordered (US-T106, five bits, 0 for none).
 			// 262144 and 524288: the sensor and power command (US-T93, 1 ping, 2 go dark, 3 power up, 0 for none).
+			// 1048576: drift held (US-T165).
 			int flags = (i.Primary ? 1 : 0) | (i.Secondary ? 2 : 0) | (i.Boost ? 4 : 0) | (i.Manoeuvre ? 8 : 0)
 				| ((i.PowerSplit >= 0 ? i.PowerSplit + 1 : 0) << 4) | ((i.SelfDestruct & 3) << 11) | ((i.HelmAbility & 31) << 13)
-				| ((i.Sensor & 3) << 18);
+				| ((i.Sensor & 3) << 18) | (i.Drift ? 1 << 20 : 0);
 			return cs::Cat("control ", Int(c->Player().Seat), " ", Num(i.Aim.X), " ", Num(i.Aim.Y), " ", Num(i.Aim.Z), " ",
 				Num(i.Throttle), " ", Num(i.StrafeRight), " ", Num(i.StrafeUp), " ", Num(i.Roll), " ", Int(flags));
 		}
@@ -67,6 +68,7 @@ namespace SpaceGod::Core
 			input.SelfDestruct = (flags >> 11) & 3; // US-T97
 			input.HelmAbility = (flags >> 13) & 31; // US-T106
 			input.Sensor = (flags >> 18) & 3; // US-T93
+			input.Drift = (flags & (1 << 20)) != 0; // US-T165
 
 			return cs::New<SeatControlCommand>(p, input);
 		}

@@ -218,6 +218,10 @@ namespace SpaceGod::Core
 		/// hull (<see cref="CapitalFlightModel.BeamOn"/>).</summary>
 		bool Manoeuvre = false;
 
+		/// <summary>Drift held (R, US-T165, <see cref="Drift"/>): a fighter's dogfight model let go, the hull coasting on its
+		/// way while it turns free onto the aim; let go, a boost-out in the new facing. A capital's helm ignores it.</summary>
+		bool Drift = false;
+
 		/// <summary>The reactor split asked for this frame (US-T94, <see cref="PowerDistribution.Code"/>), -1 for no change:
 		/// whole, not a step, so a command carried twice (co-op, a replay) lands the same. See <see cref="CraftPower"/>.</summary>
 		int PowerSplit = -1;

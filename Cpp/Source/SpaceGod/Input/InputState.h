@@ -49,6 +49,10 @@ namespace SpaceGod::Input
 		/// the retrograde for a turn-and-burn (see <see cref="Unity.SpaceGod.Core.PilotFlight.FlipAim"/>).</summary>
 		bool Manoeuvre = false;
 
+		/// <summary>Held, at a fighter's controls (US-T165): R, drift (<see cref="Core.Drift"/>). Shares R with
+		/// <see cref="ToggleReorient"/>, which is the command view's alone (the chase camera is never re-levelled anyway).</summary>
+		bool Drift = false;
+
 		/// <summary>Edge, at the controls (US-T94): the arrow keys share the reactor (a <see cref="Core.PowerKey"/>): Left a pip
 		/// to weapons, Up to shields, Right to engines, Down an even share; with Shift, all it can spare to that one. -1 none.</summary>
 		int PowerKey = -1;

@@ -102,6 +102,7 @@ namespace SpaceGod::Core
 		// With assist off the same keys are raw thrust (US-T87): the lever only matters to the flight computer.
 		stick->Burn = input.Throttle;
 		stick->Flip = input.Manoeuvre;
+		stick->DriftHeld = input.Drift; // US-T165
 		stick->StrafeRight = input.StrafeRight;
 		stick->StrafeUp = input.StrafeUp;
 		stick->Roll = input.Roll;
