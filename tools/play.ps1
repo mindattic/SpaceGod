@@ -17,7 +17,19 @@ param(
   # -Mode coop-smoke only (US-T72, docs/CAPTURE.md section 7): the host also runs with "-capture video" (in a 960x540
   # window, not headless: MindAttic.Capture records the game's window), so the smoke's join, resync, trade, hail, party
   # trip and load raise their capture events; the script lists the [capture] event lines the host wrote.
-  [switch]$CaptureHost
+  [switch]$CaptureHost,
+  # US-T163: headless capture. -Offscreen runs -Mode solo or dogfight with -RenderOffScreen (the GPU renders, no window
+  # opens on anyone's screen, no sound plays) under "-capture $Capture"; MindAttic.Capture records the game's own frames
+  # (read back from the GPU into the capture host, Capture/README.md) into the usual session folder. -Seconds stops the
+  # game after that long (the host then exports the session); -ExecCmds runs a scenario (e.g. "sg.Tour auto");
+  # -CaptureStats logs the game's frame rate and the frame feed's cost every 5 s ([MindAttic.Capture] feed: ...).
+  [switch]$Offscreen,
+  [string]$Capture = 'video hq',
+  [int]$Seconds = 0,
+  [string]$ExecCmds = '',
+  [int]$ResX = 1600,
+  [int]$ResY = 900,
+  [switch]$CaptureStats
 )
 
 <#
@@ -39,6 +51,8 @@ quits; the log is Cpp/Saved/Logs/<project>.log.
   ./tools/play.ps1 -Mode coop-smoke         # headless: a host and a client on localhost, their digests compared (US-T44)
   ./tools/play.ps1 -Mode coop-smoke -PackageDir Builds/Cpp/Windows # the same from a package, Shipping too (US-T64)
   ./tools/play.ps1 -Mode audit              # headless: the smoke, then a probe per binding, PASS/FAIL each (US-T48)
+  ./tools/play.ps1 -Mode dogfight -Offscreen -Seconds 30          # no window: a 30 s video of the dogfight demo (US-T163)
+  ./tools/play.ps1 -Offscreen -ExecCmds "sg.Tour auto quit"       # no window: the showcase tour, recorded
 #>
 
 $ErrorActionPreference = 'Stop'
@@ -49,6 +63,57 @@ if (-not $project) { throw "No .uproject in $Track/." }
 $engine = Find-UnrealEngine $EngineVersion
 # Images are named after the track (cpp-ui-hud.png, csharp-ui-hud.png) so the two can be compared side by side.
 $prefix = $Track.ToLowerInvariant()
+
+if ($Offscreen) {
+  # US-T163: the game with no window, recorded from its own frames. The same as typing
+  #   UnrealEditor.exe Cpp/SpaceGod.uproject /Engine/Maps/Entry -game -RenderOffScreen -ResX=1600 -ResY=900 -nosound
+  #     -capture video hq [-dogfight] [-ExecCmds="sg.Tour auto quit"]
+  # Under -RenderOffScreen Unreal opens no window, so the game feeds the capture host its read-back frames instead of
+  # the host recording a window (Cpp/Source/SpaceGod/Capture/FrameFeed.h). -nullrhi would render nothing at all.
+  if ($Mode -notin 'solo', 'dogfight') { throw '-Offscreen runs -Mode solo or dogfight (-ExecCmds for a scenario, e.g. "sg.Tour auto quit").' }
+  $editor = Join-Path $engine 'Engine\Binaries\Win64\UnrealEditor.exe'
+  $gameArgs = @("`"$($project.FullName)`"", '/Engine/Maps/Entry', '-game', '-RenderOffScreen', "-ResX=$ResX", "-ResY=$ResY", '-nosound',
+    # -Multiprocess: the editor binaries skip their startup "UBT -Mode=ValidatePlatforms", which otherwise waits behind
+    # every UE build queued on the machine (Build.bat's lock) before the game even starts.
+    '-Multiprocess', '-unattended', '-nosplash', '-log')
+  # -Capture '' -CaptureStats: the same run with no capture at all, for the frame rate to compare against.
+  if ($Capture) { $gameArgs += @('-capture') + @($Capture -split '\s+' | Where-Object { $_ }) }
+  if ($Mode -eq 'dogfight') { $gameArgs += $(if ($Heavy) { '-dogfight-heavy' } else { '-dogfight' }) }
+  if ($ExecCmds) { $gameArgs += "`"-ExecCmds=$ExecCmds`"" }
+  if ($CaptureStats) { $gameArgs += '-CaptureStats' }
+  # A log of this run's own (other runs may share Saved/Logs/SpaceGod.log).
+  $logs = Join-Path $project.DirectoryName 'Saved\Logs'
+  New-Item -ItemType Directory -Force -Path $logs | Out-Null
+  $log = Join-Path $logs ("Offscreen-{0}-{1}.log" -f (Get-Date).ToString('yyyyMMdd-HHmmss'), $PID)
+  $gameArgs += "`"-abslog=$log`""
+  "offscreen capture: log $log"
+  $t0 = Get-Date
+  $p = Start-Process -FilePath $editor -PassThru -ArgumentList $gameArgs
+  try {
+    if ($Seconds -gt 0) {
+      # From the moment the capture host answers (the editor binaries take a while to load), so the video is that long.
+      $deadline = (Get-Date).AddMinutes(10)
+      while (-not $p.HasExited -and (Get-Date) -lt $deadline -and
+        -not ((Test-Path -LiteralPath $log) -and (Select-String -LiteralPath $log -Pattern 'Frame feed reading back|Capture disabled|capture is off|baseline:' -Quiet))) { Start-Sleep -Milliseconds 500 }
+      if (-not $p.WaitForExit($Seconds * 1000)) { Stop-Process -Id $p.Id -Force } # the host sees the game end and exports
+    }
+    else { $p.WaitForExit() }
+  }
+  finally { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } }
+  if (Test-Path -LiteralPath $log) { Select-String -LiteralPath $log -Pattern '\[MindAttic\.Capture\]' | ForEach-Object { $_.Line -replace '^\[[^\]]*\]\[\s*\d+\]', '' } }
+  # The host (and the detached "capture finalize" it hands the tape to) exports after the game ends.
+  $deadline = (Get-Date).AddMinutes(5)
+  while ((Get-Date) -lt $deadline -and (Get-Process -Name capture -ErrorAction SilentlyContinue | Where-Object { $_.StartTime -ge $t0 })) { Start-Sleep -Seconds 1 }
+  $roots = @('R:\MindAttic\Capture\SpaceGod.Unreal.Cpp', (Join-Path ([Environment]::GetFolderPath('MyVideos')) 'MindAttic\Capture\SpaceGod.Unreal.Cpp'))
+  $session = Get-ChildItem -LiteralPath $roots -Directory -ErrorAction SilentlyContinue | Where-Object LastWriteTime -ge $t0 |
+    Sort-Object LastWriteTime | Select-Object -Last 1
+  if ($session) {
+    "offscreen capture: session $($session.FullName)"
+    Get-ChildItem -LiteralPath $session.FullName -Recurse -File | Where-Object Extension -in '.mp4', '.mkv', '.png', '.jpg', '.webm' | ForEach-Object FullName
+  }
+  else { Write-Warning "offscreen capture: no session folder written (see $log)" }
+  exit 0
+}
 
 if ($Mode -eq 'shots') {
   # -Mode shots: a window and the UI's screenshot tour (main menu, HUD, Help, galaxy map, market + cargo, pause menu),

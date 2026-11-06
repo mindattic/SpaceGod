@@ -51,7 +51,7 @@ internal static class Program
                     return 0;
                 }
                 default:
-                    Console.Error.WriteLine("SpaceGod capture host: capture host --hwnd 0x.. --pid N --app Name --cmdline \"...\" | capture finalize <tapeDir> | capture recover [root]");
+                    Console.Error.WriteLine("SpaceGod capture host: capture host (--hwnd 0x.. | --frames {guid}) --pid N --app Name --cmdline \"...\" | capture finalize <tapeDir> | capture recover [root]");
                     return 1;
             }
         }
@@ -72,8 +72,12 @@ internal static class Program
         }
 
         var log = new LineLog();
-        var hwndText = Opt("hwnd") ?? throw new CaptureException(CaptureError.InvalidArgument, "host needs --hwnd.");
-        var hwnd = (nint)long.Parse(hwndText.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? hwndText[2..] : hwndText,
+        // US-T163: --frames <name> records the game's own frames (FrameFeed.cs; -RenderOffScreen has no window), else
+        // --hwnd its window through Windows Graphics Capture.
+        var framesName = Opt("frames");
+        var hwndText = Opt("hwnd");
+        if (framesName == null && hwndText == null) throw new CaptureException(CaptureError.InvalidArgument, "host needs --hwnd or --frames.");
+        var hwnd = hwndText == null ? 0 : (nint)long.Parse(hwndText.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? hwndText[2..] : hwndText,
             hwndText.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? NumberStyles.HexNumber : NumberStyles.Integer, CultureInfo.InvariantCulture);
         var gameArgs = SplitCommandLine(Opt("cmdline") ?? "");
 
@@ -111,19 +115,32 @@ internal static class Program
         options.DetachedFinalizerPath = Environment.ProcessPath;
 
         CaptureEngine engine;
+        FrameFeed? feed = null;
         try
         {
-            engine = await CaptureEngine.StartNewAsync(new DesktopCaptureHost(CaptureTarget.Window(hwnd), new DesktopHostOptions()), options);
+            ICaptureHost host;
+            if (framesName != null)
+            {
+                feed = FrameFeed.Open(framesName);
+                host = new FramesCaptureHost(feed);
+                log.Info($"Recording the game's frames ({feed.Width}x{feed.Height}, frame feed {framesName}).");
+            }
+            else host = new DesktopCaptureHost(CaptureTarget.Window(hwnd), new DesktopHostOptions());
+            engine = await CaptureEngine.StartNewAsync(host, options);
         }
         catch (CaptureException ex)
         {
+            feed?.Dispose();
             Send(new { op = "ready", any = true, enabled = false, error = ex.Message });
             return (int)ex.Error;
         }
 
+        using var feedLifetime = feed;
         await using (engine)
         {
-            Send(new { op = "ready", any = true, enabled = engine.Enabled, folder = engine.SessionFolder, session = engine.SessionId });
+            // fps: the rate a frame feed is read back at (the game reads back nothing for a window).
+            Send(new { op = "ready", any = true, enabled = engine.Enabled, folder = engine.SessionFolder, session = engine.SessionId,
+                fps = options.Fps, source = feed != null ? "frames" : "window" });
             var stop = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             if (int.TryParse(Opt("pid"), out var pid))
             {

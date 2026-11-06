@@ -1,5 +1,6 @@
 #include "Capture/MindAtticCapture.h"
 
+#include "Capture/FrameFeed.h"
 #include "SpaceGodLog.h"
 
 #include "Dom/JsonObject.h"
@@ -171,6 +172,10 @@ namespace SpaceGod::MindAtticCapture
 				msg->TryGetBoolField(TEXT("any"), s.IsAny);
 				msg->TryGetBoolField(TEXT("enabled"), s.IsEnabled);
 				msg->TryGetStringField(TEXT("folder"), s.Folder);
+				// US-T163: recording the game's own frames: read them back at the host's capture rate.
+				int32 fps = 0;
+				if (s.IsEnabled && msg->TryGetNumberField(TEXT("fps"), fps)) FrameFeed::Start(fps);
+				else FrameFeed::Close();
 				FString error;
 				if (msg->TryGetStringField(TEXT("error"), error) && !error.IsEmpty())
 					UE_LOG(LogSpaceGod, Error, TEXT("[MindAttic.Capture] Capture disabled: %s"), *error);
@@ -225,7 +230,8 @@ namespace SpaceGod::MindAtticCapture
 			}
 		}
 
-		void Start(void* hwnd)
+		/// <paramref name="frames"/>: the frame feed's name (US-T163), recorded instead of the window.
+		void Start(void* hwnd, const FString& frames)
 		{
 			State& s = S();
 			s.Tried = true;
@@ -243,8 +249,11 @@ namespace SpaceGod::MindAtticCapture
 				UE_LOG(LogSpaceGod, Error, TEXT("[MindAttic.Capture] Could not open the pipes to the capture host; capture is off."));
 				return;
 			}
-			const FString args = FString::Printf(TEXT("host --hwnd 0x%llx --pid %u --app %s --version %s --defaults %s --cmdline %s"),
-				static_cast<unsigned long long>(reinterpret_cast<UPTRINT>(hwnd)), FPlatformProcess::GetCurrentProcessId(), AppName,
+			const FString source = frames.IsEmpty()
+				? FString::Printf(TEXT("--hwnd 0x%llx"), static_cast<unsigned long long>(reinterpret_cast<UPTRINT>(hwnd)))
+				: FString::Printf(TEXT("--frames %s"), *frames);
+			const FString args = FString::Printf(TEXT("host %s --pid %u --app %s --version %s --defaults %s --cmdline %s"),
+				*source, FPlatformProcess::GetCurrentProcessId(), AppName,
 				*QuoteArg(FApp::GetBuildVersion()), *QuoteArg(FindDefaults()), *QuoteArg(FCommandLine::GetOriginal()));
 			uint32 pid = 0;
 			s.Proc = FPlatformProcess::CreateProc(*host, *args, /*bLaunchDetached*/ false, /*bLaunchHidden*/ true, /*bLaunchReallyHidden*/ true,
@@ -320,14 +329,27 @@ namespace SpaceGod::MindAtticCapture
 	void Tick()
 	{
 		State& s = S();
+		FrameFeed::TickStats();
 		if (s.ShutDown || !Requested()) return;
 		if (!s.Tried)
 		{
-			void* hwnd = GameWindowHandle();
-			if (!hwnd) return; // the game window isn't up yet
-			Start(hwnd);
+			// US-T163: under -RenderOffScreen (no window) or -capture-source=frames, the game's own frames.
+			if (FrameFeed::Wanted())
+			{
+				FString frames;
+				if (!FrameFeed::Open(frames)) return; // the game viewport isn't up yet
+				Start(nullptr, frames);
+				if (!s.Proc.IsValid()) FrameFeed::Close();
+			}
+			else
+			{
+				void* hwnd = GameWindowHandle();
+				if (!hwnd) return; // the game window isn't up yet
+				Start(hwnd, FString());
+			}
 		}
 		Pump();
+		FrameFeed::Tick();
 	}
 
 	bool Ready() { return !Requested() || S().IsReady; }
@@ -405,5 +427,6 @@ namespace SpaceGod::MindAtticCapture
 		if (s.StdoutRead) FPlatformProcess::ClosePipe(s.StdoutRead, nullptr);
 		s.StdinWrite = s.StdoutRead = nullptr;
 		if (s.Proc.IsValid()) FPlatformProcess::CloseProc(s.Proc);
+		FrameFeed::Close();
 	}
 }

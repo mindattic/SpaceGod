@@ -24,6 +24,7 @@ digests stay identical, and the co-op smoke stays 15/15.
 | `-demo` with `-capture` | The scripted tour (CaptureRunner/SceneTour) plays and quits as before; with `-capture` on, each tour stop's screenshot goes through MindAttic.Capture (`ScreenshotAsync(<stop name>)`) into the session folder. Without `-capture` the tour still plays, with no screenshots. |
 | `-capture` and saves | Autosave is off while `-capture` (or `-demo`) is on, as before (UnitySpaceApp.Saves `InitSaves`). Manual saves still work and raise `game-saved`. |
 | `-capturedir=<dir>` | Unreal copies only, kept for tools/play.ps1: where their tour PNGs also go. Not a MindAttic.Capture flag. |
+| `-RenderOffScreen` with `-capture` | This copy only (US-T163): no window opens, the GPU still renders; the game reads its frames back and feeds them to the capture host, so video, screenshots, markers and events work as with a window (`tools/play.ps1 -Offscreen`; [Capture/README.md](../Capture/README.md), "Frames"). `-capture-source=frames` does the same with a window; `-capture-source=window` forces window capture. `-nullrhi` renders nothing, so it has no images. |
 
 Anything after `-capture` that is not a capture word is left for the game, as MindAttic.Capture does.
 
