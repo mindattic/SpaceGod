@@ -404,7 +404,8 @@ namespace SpaceGod::UI
 
 		constexpr float rowH = 17;
 		float w = canTrade ? 600.0f : 430.0f;
-		float h = marketOpen ? 62 + GoodInfo::Count * rowH + (canTrade ? 20 : 0) + extra + lawRow : 34;
+		// US-T208: 78 = the 50 above the column header, its row, and 11 of padding under the last good (it was 62: Munitions sat on the border).
+		float h = marketOpen ? 78 + GoodInfo::Count * rowH + (canTrade ? 20 : 0) + extra + lawRow : 34;
 		auto r = Panel(layout.Take(HudRegion::TopRight, w, h)); // TopRight's first slot (US-T153)
 		cs::String heading = market != nullptr ? cs::Cat("MARKET  ·  ", market->Name) : cs::String("MARKET  ·  system average");
 		if (GUI::Button(Rect(r.x + 8, r.y + 6, w - 16, 22), UiStyle::Fold(marketOpen, heading), title)) marketOpen = !marketOpen;

@@ -513,7 +513,12 @@ namespace SpaceGod::UI
 		{
 			if (m->Holder == nullptr || seen.Contains(m->Holder)) continue;
 			seen.Add(m->Holder);
-			if (y > r.yMax() - 90) break;
+			// US-T208: stop a line short of the help text (a Line is 18 tall; the text takes the last 96 of the panel), with a closing line.
+			if (y + 18 > r.yMax() - 96 - 16)
+			{
+				Line(y, x, w, "... and more holders", Dim);
+				break;
+			}
 			int held = 0;
 			for (const auto& n : model->Systems)
 				if (n->Holder == m->Holder) held++;
@@ -529,7 +534,7 @@ namespace SpaceGod::UI
 
 		auto old = GUI::contentColor;
 		GUI::contentColor = Dim;
-		GUI::Label(Rect(x, r.yMax() - 92, w, 86),
+		GUI::Label(Rect(x, r.yMax() - 92, w, 84),
 			"Click a star to inspect it, double-click to travel.\nAt the helm: plot an FTL course to any star.\nDrag to turn, shift-drag to pan, wheel to zoom.\n[ or Esc closes the map.", small);
 		GUI::contentColor = old;
 	}

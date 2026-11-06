@@ -3,6 +3,7 @@
 #include "UI/CheatMenu.h"
 
 #include "GameLaunch.h"
+#include "Camera/StarTravel.h"
 #include "Input/InputDevice.h"
 #include "SpaceGodLog.h"
 #include "UI/Hud.h"
@@ -370,6 +371,8 @@ namespace SpaceGod::UI
 		{
 			// The HUD's hint for the key, out of the way at the bottom right (gone with the HUD's panels and a cleared screen).
 			if (!app.ShowHud || app.ScreenCleared) return;
+			// US-T208: a full-screen screen (spawn, manual, galaxy map) owns the corner: the hint would sit on its buttons and borders.
+			if (app.ShowSpawn || app.ShowHelp || (app.ShowGalaxyMap && !app.Travel->Active)) return;
 			auto r = Rect(Screen::width - 196.0f, Screen::height - 24.0f, 186, 18);
 			GUI::Box(r, GUIContent::none(), hint);
 			GUI::Label(r, "Shift+F1  DEV MENU", hint);

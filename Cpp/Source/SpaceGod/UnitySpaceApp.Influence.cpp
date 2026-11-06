@@ -3,6 +3,7 @@
 #include "UnitySpaceApp.h"
 
 #include "Astro.h"
+#include "Camera/StarTravel.h"
 #include "Combat/CombatSpecs.h"
 #include "Combat/SquadOrders.h"
 #include "Coop/CoopPeer.h"
@@ -123,6 +124,10 @@ namespace SpaceGod
 		{
 			float w = 268, h = 46;
 			auto r = Rect(10, 50, w, h);
+			// US-T208: a full-screen screen (spawn, manual, galaxy map) owns the top left: the badge would sit on its titles.
+			bool fullScreen = ShowSpawn || ShowHelp || (ShowGalaxyMap && !Travel->Active);
+			if (!fullScreen)
+			{
 			GUI::Box(r, GUIContent::none(), influencePanel);
 			cs::String head = cs::Cat("INFLUENCE  ", level, "  \xC2\xB7  ", cs::Strings::ToUpperInvariant(SpaceGodInfluence::Title(level)),
 				inf != nullptr && inf->Waived ? cs::String("  \xC2\xB7  LIMITS OFF (dev)") : cs::String());
@@ -135,6 +140,7 @@ namespace SpaceGod
 			if (now < influenceGainUntil && inf != nullptr)
 				foot = cs::Cat("+", cs::Fmt(inf->LastGainXp, "N0"), " XP  \xC2\xB7  ", inf->LastGain);
 			GUI::Label(Rect(r.x + 8, r.y + 29, w - 16, 15), foot, influenceSmall);
+			}
 		}
 
 		// The squad a band captain held is closing with, and the key that orders it to stand down.

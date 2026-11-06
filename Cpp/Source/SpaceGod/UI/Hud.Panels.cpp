@@ -1021,12 +1021,30 @@ namespace SpaceGod::UI
 		}
 
 		float w = 410;
-		float linesH = lines.Count() * 19;
+		// US-T208: a long value wraps inside the card instead of running off its right edge (a row is as tall as its wrapped value).
+		static cs::Ref<GUIStyle> wrapText;
+		if (wrapText == nullptr || wrapText->fontSize != text->fontSize)
+		{
+			wrapText = cs::New<GUIStyle>(*text);
+			wrapText->wordWrap = true;
+		}
+		auto rowHeight = [&](const SelectionLine& l, float valueW)
+		{
+			if (l.key.empty()) return Mathf::Max(19.0f, small->CalcHeight(GUIContent(l.value), w - 28) + 1);
+			return Mathf::Max(19.0f, wrapText->CalcHeight(GUIContent(l.value), valueW) + 1);
+		};
+		float linesH = 0;
+		for (const auto& l : lines) linesH += rowHeight(l, w - 146);
 		// A long card (a boarded hull lists every compartment) never runs into the right-hand column's other panels (the
 		// reactor and sensors under it, the opportunities or market and the HUNTED list over it, US-T152): it takes what
 		// BottomRight has left up to TopRight, and its lines scroll in that.
 		float maxLinesH = Mathf::Max(19.0f * 2, layout.FreeRight() - (64 + 30));
 		bool scrolls = linesH > maxLinesH;
+		if (scrolls)
+		{
+			linesH = 0;
+			for (const auto& l : lines) linesH += rowHeight(l, w - 162);
+		}
 		float shownH = scrolls ? maxLinesH : linesH;
 		float h = 64 + shownH + 30;
 		auto r = Panel(layout.Take(HudRegion::BottomRight, w, h));
@@ -1052,17 +1070,18 @@ namespace SpaceGod::UI
 		}
 		for (const auto& [key, value] : lines)
 		{
+			float rowH = rowHeight(SelectionLine{ key, value }, valueW);
 			if (key.empty())
 			{
-				GUI::Label(Rect(x0 + 14, y, w - 28, 36), value, small);
-				y += 19;
+				GUI::Label(Rect(x0 + 14, y, w - 28, rowH), value, small);
+				y += rowH;
 				continue;
 			}
 			GUI::contentColor = Dim;
 			GUI::Label(Rect(x0 + 14, y, 120, 19), key, small);
 			GUI::contentColor = Color::white();
-			GUI::Label(Rect(x0 + 132, y, valueW, 19), value, text);
-			y += 19;
+			GUI::Label(Rect(x0 + 132, y, valueW, rowH), value, wrapText);
+			y += rowH;
 		}
 		if (scrolls) GUI::EndScrollView();
 		GUI::contentColor = old;
