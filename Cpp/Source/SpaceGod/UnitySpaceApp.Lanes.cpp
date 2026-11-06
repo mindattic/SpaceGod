@@ -379,8 +379,10 @@ namespace SpaceGod
 		double kmS = laneWake.Step(LaneFrameSeconds(laneWakeJd));
 		auto vel = pilotVelKmS();
 		double speed = vel.Length();
-		// Flight assist would brake it at its retros; the wake holds it up, falling smoothly, along wherever it is headed now.
-		if (speed < kmS) SetpilotVelKmS((speed > 1e-9 ? vel / speed : pilotForward()) * kmS);
+		// The wake is the hull's speed while it lasts, along wherever it is headed now: flight assist's retros alone would take
+		// minutes to shed a lane's pace (thousands of km/s) and would never snap it either way, so it is set, not only held
+		// up (US-T218: past the wall the hull kept 7204 km/s through the whole 4.4 s bleed and after it).
+		SetpilotVelKmS((speed > 1e-9 ? vel / speed : pilotForward()) * kmS);
 		if (!laneWake.Active())
 		{
 			laneWakeJd = -1;
