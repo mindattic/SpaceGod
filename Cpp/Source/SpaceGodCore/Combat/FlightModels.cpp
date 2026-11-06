@@ -118,6 +118,12 @@ namespace SpaceGod::Core
 			tuning.BoostDurationS, tuning.CruiseSpeedMultiplier, tuning.CruiseRampS);
 		auto forwardBeforeTurn = s.Forward;
 		bool snap = input.Piloted && Feel.SpinUpS > 0;
+		if (input.Piloted && input.DesiredForward.LengthSquared() > 1e-12)
+		{
+			// The whip (US-T168): a look far off the nose (the string aim lets it swing a full 180) is chased harder.
+			double off = cs::Math::Acos(Max(-1.0, Min(1.0, DVec3::Dot(s.Forward, input.DesiredForward.Normalized())))) * Astro::Rad2Deg;
+			turning.TurnRateDegS *= Feel.Whip(off);
+		}
 		if (snap)
 		{
 			// The player's snap (US-T79): the attitude thrusters reach the top swing and roll in SpinUpS, or faster if

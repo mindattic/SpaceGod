@@ -9,6 +9,7 @@
 #include "Combat/Fighters.h" // US-T106: a craft's carrier
 #include "Astro.h"
 #include "Combat/PilotAim.h" // US-T129
+#include "Combat/FlightModels.h" // US-T168: a light craft's slack string
 #include "Combat/PilotFlight.h"
 #include "Combat/War.h"
 #include "Embodiment/Embodiables.h"
@@ -635,9 +636,14 @@ namespace SpaceGod
 	{
 		auto f = cs::As<FighterSeat>(held);
 		if (f == nullptr || f->Unit == nullptr) return;
+		// The string aim (US-T168): a light craft's is slack, the view anywhere (a full 180) and the craft whipping round
+		// after it; a heavy fighter's or bomber's taut, held within PilotAim::HeavyMaxLeadDeg of its nose. Drifting (US-T165)
+		// any craft's goes slack.
+		auto craft = f->Unit->Fighter != nullptr ? FighterCraft::Of(f->Unit->Fighter->Role) : FighterCraft::Interceptor();
+		if (craft == nullptr || cs::As<LightFighterFlightModel>(craft->Model()) != nullptr) return;
 		auto aim = DVec3(seatAim.x, seatAim.y, seatAim.z).SwapYZ();
 		if (aim.LengthSquared() < 1e-12 || f->Unit->Forward.LengthSquared() < 1e-12) return;
-		aim = PilotFlight::ClampAim(aim.Normalized(), f->Unit->Forward.Normalized(), PilotAim::FreeAimMaxLeadDeg * Astro::Deg2Rad);
+		aim = PilotFlight::ClampAim(aim.Normalized(), f->Unit->Forward.Normalized(), PilotAim::HeavyMaxLeadDeg * Astro::Deg2Rad);
 		seatAim = ToVector(aim.SwapYZ()).normalized();
 	}
 

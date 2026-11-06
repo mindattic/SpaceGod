@@ -183,21 +183,38 @@ namespace SpaceGod::Core
 		/// kick, not a drift.</summary>
 		double DashThrustFraction = 0;
 
+		/// <summary>The whip (US-T168): the "pulled by a string" aim lets the camera swing a full 180 at once, and the nose
+		/// whips round after it, its top swing this many times the turn rate once the aim is <see cref="WhipFullDeg"/> or
+		/// more off the nose (easing in from <see cref="WhipStartDeg"/>), so a big look is chased hard and fine aim stays
+		/// fine. 1: no whip.</summary>
+		double WhipFactor = 1;
+
+		/// <summary>Where the whip starts and where it is full, degrees between the aim and the nose.</summary>
+		static constexpr double WhipStartDeg = 30, WhipFullDeg = 120;
+
 		constexpr LightFighterFeel() = default;
 
-		constexpr LightFighterFeel(double spinUpS, double dashSpeedFraction, double dashThrustFraction)
-			: SpinUpS(spinUpS), DashSpeedFraction(dashSpeedFraction), DashThrustFraction(dashThrustFraction)
+		constexpr LightFighterFeel(double spinUpS, double dashSpeedFraction, double dashThrustFraction, double whipFactor)
+			: SpinUpS(spinUpS), DashSpeedFraction(dashSpeedFraction), DashThrustFraction(dashThrustFraction), WhipFactor(whipFactor)
 		{
 		}
 
-		/// <summary>Light fighters and interceptors: a snap of under a tenth of a second and a hard lateral boost.</summary>
+		/// <summary>The top swing's multiplier with the aim <paramref name="offDeg"/> off the nose (see <see cref="WhipFactor"/>).</summary>
+		double Whip(double offDeg) const
+		{
+			if (WhipFactor <= 1 || offDeg <= WhipStartDeg) return 1;
+			double t = offDeg >= WhipFullDeg ? 1 : (offDeg - WhipStartDeg) / (WhipFullDeg - WhipStartDeg);
+			return 1 + (WhipFactor - 1) * t * t * (3 - 2 * t);
+		}
+
+		/// <summary>Light fighters and interceptors: a snap of under a tenth of a second, a hard lateral boost and a hard whip.</summary>
 		static const LightFighterFeel Dogfighter;
 
-		/// <summary>Couriers: a little crisper than their hull, and no dash; a runner outruns a fight, it does not dance in one.</summary>
+		/// <summary>Couriers: a little crisper than their hull, no dash and a mild whip; a runner outruns a fight, it does not dance in one.</summary>
 		static const LightFighterFeel Runner;
 	};
-	inline constexpr LightFighterFeel LightFighterFeel::Dogfighter = LightFighterFeel(/*spinUpS:*/ 0.08, /*dashSpeedFraction:*/ 0.6, /*dashThrustFraction:*/ 0.8);
-	inline constexpr LightFighterFeel LightFighterFeel::Runner = LightFighterFeel(/*spinUpS:*/ 0.2, /*dashSpeedFraction:*/ 0, /*dashThrustFraction:*/ 0);
+	inline constexpr LightFighterFeel LightFighterFeel::Dogfighter = LightFighterFeel(/*spinUpS:*/ 0.08, /*dashSpeedFraction:*/ 0.6, /*dashThrustFraction:*/ 0.8, /*whipFactor:*/ 1.8);
+	inline constexpr LightFighterFeel LightFighterFeel::Runner = LightFighterFeel(/*spinUpS:*/ 0.2, /*dashSpeedFraction:*/ 0, /*dashThrustFraction:*/ 0, /*whipFactor:*/ 1.3);
 
 	/// <summary>
 	/// Light fighters, Star Conflict style (U.SPC-T17): arcade-coupled dogfighting. With flight assist on,

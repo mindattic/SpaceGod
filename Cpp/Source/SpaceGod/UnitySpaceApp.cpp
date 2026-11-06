@@ -119,7 +119,7 @@ namespace SpaceGod
 		pilotAim = pilot().Forward;
 		pilotViewUp = pilot().Up;
 		helmLookYaw = helmLookPitch = 0;
-		helmStickX = helmStickY = 0; // US-T129
+		pilotLookOwedRight = pilotLookOwedUp = 0; // US-T168
 	}
 
 	void UnitySpaceApp::HailPolity()
@@ -1175,9 +1175,19 @@ namespace SpaceGod
 		double strafeRight = Input.Move.x, strafeUp = Input.Move.y;
 		switch (control)
 		{
-			case PilotControl::FreeAim:
-				PilotAim::Look(pilotAim, pilotViewUp, lookRight, lookUp, pilot().Forward, pilot().Up, dt);
+			default:
+			{
+				// Every fighter and hauler flies "pulled by a string" (US-T168): the camera looks where the mouse puts it and
+				// the hull chases it. A light fighter's string is slack (a full 180 at once, the hull whipping round after it,
+				// LightFighterFeel::Whip); a heavy hull's taut, its look barely faster than its own turn. Any
+				// fighter's goes slack. A hauler's slow mouse (LookFactor) swings it less.
+				double hullTurnDegS = tuning.TurnRateDegS;
+				if (auto heavy = cs::As<HeavyFighterFlightModel>(model)) hullTurnDegS = heavy->TurnRateDegS(tuning);
+				double factor = controls.LookFactor;
+				PilotAim::Look(pilotAim, pilotViewUp, pilotLookOwedRight, pilotLookOwedUp, lookRight * factor, lookUp * factor,
+					pilot().Forward, pilot().Up, dt, PilotAim::StringFor(control, hullTurnDegS, false));
 				break;
+			}
 			case PilotControl::Helm:
 				// A/D and Q/E (C/]) are the helm's yaw and pitch: a capital ship turns rather than strafes.
 				helmLookYaw = Mathf::Repeat(helmLookYaw + look.x * PilotLookSensitivity() + 180.0f, 360.0f) - 180.0f;
@@ -1191,24 +1201,8 @@ namespace SpaceGod
 					strafeRight = strafeUp = 0;
 				}
 				break;
-			default:
-			{
-				// The medium hulls' dogfight stick (US-T129), as Unreal.Soulslike's spaceship: the mouse pushes a stick that
-				// drifts back to centre, its push a turn rate; the camera rides behind and the nose is the crosshair. A hauler's
-				// slow mouse (LookFactor) pushes it less.
-				double factor = controls.LookFactor;
-				pilotAim = PilotAim::Stick(helmStickX, helmStickY, lookRight * Mathf::Rad2Deg * factor, lookUp * Mathf::Rad2Deg * factor,
-					pilot().Forward, pilot().Up, leadRad, dt);
-				break;
-			}
 		}
 		auto desiredForward = pilotAim;
-		// With nothing on the roll keys and the guns quiet, a medium hull levels itself, banked into the turn (US-T129). Only
-		// with flight assist on: off, roll input is raw torque, and a hull once rolled keeps rolling.
-		double roll = Input.Roll;
-		bool stickHull = control == PilotControl::DirectNose || control == PilotControl::Hauler;
-		if (stickHull && !pilotFlightAssistOff && cs::Math::Abs(roll) < 0.1 && !Input.Fire && !Input.Manoeuvre)
-			roll = PilotAim::LevelRoll(pilot().Forward, pilot().Up, helmStickX);
 
 		if (Input.ToggleFlightAssist)
 		{
@@ -1244,7 +1238,7 @@ namespace SpaceGod
 		stick.Throttle = Input.Move.z;
 		stick.StrafeRight = strafeRight;
 		stick.StrafeUp = strafeUp;
-		stick.Roll = roll;
+		stick.Roll = Input.Roll;
 		stick.Boost = Input.Boost;
 		stick.Cruise = Input.Cruise;
 		stick.Fine = Input.Slow;
@@ -1314,9 +1308,9 @@ namespace SpaceGod
 	{
 		switch (control)
 		{
-			case PilotControl::FreeAim: return ToRotation(pilotAim, pilotViewUp);
 			case PilotControl::Helm: return ToRotation(pilot().Forward, pilot().Up) * Quaternion::Euler(helmLookPitch, helmLookYaw, 0);
-			default: return std::nullopt;
+			// The string aim (US-T168), every fighter and hauler: the view is the mouse's, the hull turns after it.
+			default: return ToRotation(pilotAim, pilotViewUp);
 		}
 	}
 

@@ -120,9 +120,9 @@ private:
 	/// the view is swung from dead astern, degrees.</summary>
 	float helmLookYaw = 0, helmLookPitch = 0;
 
-	/// <summary>A medium hull's dogfight stick (US-T129, <see cref="PilotAim.Stick"/>): pushed by the mouse, drifting back
-	/// to centre on its own; x to starboard, y up.</summary>
-	double helmStickX = 0, helmStickY = 0;
+	/// <summary>The string aim's owed mouse travel (US-T168, <see cref="PilotAim.Look"/>), radians right and up: what a heavy
+	/// hull's taut string has yet to pay out at its look rate.</summary>
+	double pilotLookOwedRight = 0, pilotLookOwedUp = 0;
 
 public:
 	/// <summary>How the flown hull is steered (see <see cref="PilotControl"/>).</summary>

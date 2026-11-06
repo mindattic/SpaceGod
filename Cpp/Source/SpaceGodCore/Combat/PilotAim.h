@@ -4,6 +4,25 @@
 
 namespace SpaceGod::Core
 {
+	enum class PilotControl : int;
+
+	/// <summary>
+	/// How far and how fast a "pulled by a string" aim (US-T168) may run ahead of the hull: the camera looks where the
+	/// mouse puts it, the hull chases it. A light fighter's string is long and slack (the view swings a full 180 at once
+	/// and the hull whips round after it); a heavy hull's is short and taut (the view turns not much faster than the hull
+	/// can, so the gap stays subtle).
+	/// </summary>
+	struct SPACEGODCORE_API StringAim
+	{
+		/// <summary>The furthest the aim may lead the nose, degrees; 180 or more: anywhere, even dead astern.</summary>
+		double MaxLeadDeg = 180;
+
+		/// <summary>The fastest the aim may turn, deg/s; 0: at once, as fast as the mouse moves. Mouse travel beyond it is
+		/// kept and paid out at this rate, never more than <see cref="MaxLeadDeg"/> of it (so a flick is not lost, and the
+		/// view does not go on turning long after the hand has stopped).</summary>
+		double LookRateDegS = 0;
+	};
+
 	/// <summary>
 	/// Turns the stick into where the hull should point, one way per <see cref="PilotControl"/>
 	/// (U.SPC-T269). The result is <see cref="PilotInput.DesiredForward"/>; the hull then swings toward
@@ -12,9 +31,13 @@ namespace SpaceGod::Core
 	class SPACEGODCORE_API PilotAim
 	{
 	public:
-		/// <summary>How far a free-aim crosshair may run ahead of the nose: anywhere in front of the hull,
-		/// never behind it, so the camera always looks over the hull's shoulder rather than back at it.</summary>
-		static constexpr double FreeAimMaxLeadDeg = 90;
+		/// <summary>A heavy hull's string (US-T168: heavy fighters, bombers, pickets, haulers): the aim leads the nose by at
+		/// most this, degrees...</summary>
+		static constexpr double HeavyMaxLeadDeg = 25;
+
+		/// <summary>...and turns at most this many times the hull's own top swing, so the camera's look stays close to the
+		/// hull's turn and the gap between them is subtle.</summary>
+		static constexpr double HeavyLookRateFactor = 1.3;
 
 	private:
 		/// <summary>How fast the free-aim view's roof follows the hull's own as it rolls, 1/s.</summary>
@@ -22,18 +45,26 @@ namespace SpaceGod::Core
 
 	public:
 		/// <summary>
-		/// Free aim (<see cref="PilotControl.FreeAim"/>): swings the crosshair <paramref name="aim"/>
-		/// right by <paramref name="rightRad"/> and up by <paramref name="upRad"/> in the view's own frame
-		/// (its roof <paramref name="viewUp"/>, which turns with it), so the mouse is screen-relative
-		/// whatever the hull is doing. The roof then eases toward the hull's own
-		/// (<paramref name="hullUp"/>) about the line of sight, so rolling the hull rolls the view, and
-		/// the crosshair is held within <see cref="FreeAimMaxLeadDeg"/> of the nose.
+		/// The string each kind of hull flies on (US-T168): a light fighter's (<see cref="PilotControl.FreeAim"/>) is slack,
+		/// the view anywhere at once; a heavy hull's (<see cref="PilotControl.DirectNose"/>, <see cref="PilotControl.Hauler"/>)
+		/// taut, <see cref="HeavyMaxLeadDeg"/> and <see cref="HeavyLookRateFactor"/> of <paramref name="hullTurnRateDegS"/>.
+		/// <paramref name="drifting"/> (US-T165) slackens any hull's: the hull turns free of its track.
 		/// </summary>
-		static void Look(DVec3& aim, DVec3& viewUp, double rightRad, double upRad, DVec3 hullForward, DVec3 hullUp, double dt);
+		static StringAim StringFor(PilotControl control, double hullTurnRateDegS, bool drifting);
 
 		/// <summary>
-		/// Nose steering (<see cref="PilotControl.DirectNose"/>, <see cref="PilotControl.Hauler"/>): the
-		/// mouse moves the aim about the hull's own roof and starboard axes, and the aim never leads the
+		/// The string aim (US-T168): swings the crosshair <paramref name="aim"/> right by <paramref name="rightRad"/> and up
+		/// by <paramref name="upRad"/> in the view's own frame (its roof <paramref name="viewUp"/>, which turns with it), so
+		/// the mouse is screen-relative whatever the hull is doing, no faster than <paramref name="string"/>'s look rate
+		/// (travel beyond it waits in <paramref name="pendingRight"/> / <paramref name="pendingUp"/>, radians) and no further
+		/// than its lead from the nose. The roof then eases toward the hull's own (<paramref name="hullUp"/>) about the line
+		/// of sight, so rolling the hull rolls the view.
+		/// </summary>
+		static void Look(DVec3& aim, DVec3& viewUp, double& pendingRight, double& pendingUp, double rightRad, double upRad,
+			DVec3 hullForward, DVec3 hullUp, double dt, const StringAim& string);
+
+		/// <summary>
+		/// Nose steering: the mouse moves the aim about the hull's own roof and starboard axes, and the aim never leads the
 		/// nose by more than the hull can brake its swing in (<see cref="PilotFlight.AimLeadRad"/>), so the
 		/// nose stops soon after the mouse does.
 		/// </summary>
@@ -46,42 +77,6 @@ namespace SpaceGod::Core
 		/// nose; let go and the heading is the nose itself, so the swing stops as fast as the hull allows.
 		/// </summary>
 		static DVec3 Helm(DVec3 hullForward, DVec3 hullUp, double yaw, double pitch, double leadRad);
-
-		// ------------------------------------------------------------ the dogfight stick (US-T129)
-
-		/// <summary>Mouse travel, degrees of look, that pushes the dogfight stick (<see cref="Stick"/>) from centre to full.</summary>
-		static constexpr double StickFullDeg = 12;
-
-		/// <summary>How fast the dogfight stick drifts back to centre on its own, 1/s (Unreal.Soulslike's fighter: 1.6).</summary>
-		static constexpr double StickReturnHz = 1.6;
-
-		/// <summary>How far a medium hull banks into a full-stick turn, deg, when nothing else holds the roll.</summary>
-		static constexpr double BankDeg = 35;
-
-		/// <summary>The roll error, deg, at which the auto-level asks for full roll rate.</summary>
-		static constexpr double LevelFullDeg = 30;
-
-		/// <summary>
-		/// The medium hulls' dogfight stick (US-T129; <see cref="PilotControl.DirectNose"/>, <see cref="PilotControl.Hauler"/>), as
-		/// the spaceship in Unreal.Soulslike flies: the mouse pushes a virtual stick (<paramref name="stick"/>, x to starboard,
-		/// y up, each -1..1 and held inside the unit circle) by <paramref name="rightDeg"/> and <paramref name="upDeg"/> of look
-		/// (<see cref="StickFullDeg"/> to full), and the stick drifts back to centre at <see cref="StickReturnHz"/>. Its
-		/// deflection is a turn rate, not a heading: the result is the heading <see cref="Helm"/> sets for that much stick, so a
-		/// held push keeps the nose swinging and a centred stick lets it settle. The camera rides behind the hull and the nose is
-		/// the crosshair.
-		/// </summary>
-		static DVec3 Stick(double& stickX, double& stickY, double rightDeg, double upDeg, DVec3 hullForward, DVec3 hullUp, double leadRad, double dt);
-
-		/// <summary>
-		/// The dogfight stick's roll (US-T129), as Unreal.Soulslike's fighter: with no roll asked for and the guns quiet, the
-		/// hull rolls itself back toward level with the ecliptic, banked <see cref="BankDeg"/> into the turn the stick asks
-		/// (<paramref name="stickX"/>, + to starboard: the starboard wing dips). A roll input, -1..1 (+ clockwise from behind);
-		/// it fades out as the nose nears the ecliptic's poles, where there is no level to find.
-		/// </summary>
-		static double LevelRoll(DVec3 hullForward, DVec3 hullUp, double stickX);
-
-		/// <summary>The hull's roll off level, deg, -180..180: + with the starboard wing down (clockwise from behind).</summary>
-		static double RollOffLevelDeg(DVec3 hullForward, DVec3 hullUp);
 
 	private:
 		/// <summary><paramref name="up"/> made square to <paramref name="forward"/> (unit), falling back to

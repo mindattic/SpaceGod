@@ -341,10 +341,9 @@ namespace SpaceGod
 		unit->PlayerFireHeld = Input.Fire && armed;
 		// The right button launches missiles once the lock is made (U.SPC-T270); the guns fire down the crosshair.
 		unit->PlayerSecondaryHeld = Input.LookHeld && armed;
-		// Free aim fires toward the crosshair (gimballed off the nose, converging on what lies along it); a medium hull's
-		// dogfight stick sets a turn, not an aim, so its guns fire down the nose (US-T129).
-		bool stickHull = PilotControlMode == Core::PilotControl::DirectNose || PilotControlMode == Core::PilotControl::Hauler;
-		unit->PlayerAim = stickHull ? pilotForward() : pilotAim;
+		// Every fighter fires toward the crosshair, the string aim's (US-T168): gimballed off the nose as far as the guns
+		// bear, converging on what lies along it.
+		unit->PlayerAim = pilotAim;
 		// At a capital ship's helm the trigger calls broadsides (U.SPC-T272): held, the battery bearing where the
 		// player looks builds a volley; let go, it fires.
 		bool helm = PilotControlMode == Core::PilotControl::Helm;
