@@ -5,7 +5,10 @@
 #include "Camera/SpaceCamera.h"
 #include "Astro.h"
 #include "Combat/Battle.h"
+#include "Combat/CombatSpecs.h" // US-T158: the hull's beam, for the plating's normal
+#include "Combat/CombatState.h"
 #include "Combat/Diplomacy.h" // US-T136
+#include "Views/EvaWorkerView.h" // US-T158
 #include "Fleet.h"
 #include "Sensors/SensorPosture.h" // US-T136
 #include "Sensors/Sensors.h"
@@ -316,15 +319,75 @@ namespace SpaceGod
 			SpaceCamera->PilotEye = nullptr;
 			return;
 		}
-		// The eye on the hull (U.SPC-T445 a gun's mount; US-T135 a worker's shoulder), looking along the stick.
+		// The eye on the hull (U.SPC-T445 a gun's mount; US-T135 a worker's shoulder), looking along the stick. A worker's
+		// look starts tipped down onto the plating ahead (US-T158), so the suit and its work are in the frame from the start.
+		if (rig.Kind == EmbodimentCameraKind::Shoulder)
+		{
+			auto roof = ToVector(pose.Up.SwapYZ()).normalized();
+			auto flat = (seatAim - roof * Vector3::Dot(seatAim, roof)).normalized();
+			if (flat.sqrMagnitude() > 1e-6f)
+			{
+				float pitch = static_cast<float>(ShoulderPitchDeg) * Mathf::Deg2Rad;
+				seatAim = (flat * Mathf::Cos(pitch) - roof * Mathf::Sin(pitch)).normalized();
+			}
+		}
 		SpaceCamera->PilotView = Quaternion::LookRotation(seatAim, MountRoof(pose, seatAim));
 		SpaceCamera->PilotEye = [this, next]() { return RigEye(next); };
+	}
+
+	bool UnitySpaceApp::WorkerPose(const cs::Ref<RepairWorker>& w, DVec3& scene, DVec3& up, DVec3& forward, double& height)
+	{
+		if (w == nullptr || w->Unit == nullptr || w->Battle == nullptr || !w->Unit->Present()) return false;
+		auto host = SeatTarget(w);
+		if (host.IsNone()) return false;
+		double length = TargetRadius(host) * 2; // the hull's drawn length, as its model is sized
+		auto n = w->Local.LengthSquared() > 1e-12 ? w->Local.Normalized() : DVec3(0, 1, 0);
+		// The plating's normal on the hull's capsule (Collisions::SurfacePoint): out from its spine, not from its centre.
+		auto spec = w->Unit->Combat != nullptr ? w->Unit->Combat->Spec : nullptr;
+		if (spec != nullptr)
+		{
+			double core = cs::Math::Max(0.0, 0.5 - spec->BeamFraction * 0.5);
+			auto out = w->Local - DVec3(0, 0, cs::Math::Max(-core, cs::Math::Min(core, w->Local.Z)));
+			if (out.LengthSquared() > 1e-12) n = out.Normalized();
+		}
+		up = w->Unit->LocalDirToWorld(n).Normalized().SwapYZ();
+		auto f = w->Unit->LocalDirToWorld(w->Facing).Normalized().SwapYZ();
+		f = f - up * DVec3::Dot(f, up);
+		forward = f.LengthSquared() > 1e-12 ? f.Normalized() : DVec3::Cross(up, DVec3::UnitX).Normalized();
+		scene = TargetScene(host) + w->Unit->LocalDirToWorld(w->Local).SwapYZ() * length;
+		height = length * WorkerHeightLengths;
+		return true;
+	}
+
+	void UnitySpaceApp::UpdateEvaWorkerView()
+	{
+		if (World() == nullptr || systemRoot == nullptr) return;
+		if (evaWorkerView == nullptr || evaWorkerRoot != systemRoot)
+		{
+			evaWorkerView = cs::New<Views::EvaWorkerView>(this, systemRoot);
+			evaWorkerRoot = systemRoot;
+		}
+		evaWorkerView->Update();
 	}
 
 	DVec3 UnitySpaceApp::RigEye(const cs::Ref<IEmbodiable>& s)
 	{
 		auto sub = s->Subject();
 		auto rig = s->CameraRig();
+		// US-T158: a worker's shoulder: behind and above the suit as it is drawn on the plating, set back along the look
+		// (flattened onto the plating), in worker heights, so the suit, the plating and the work ahead share the frame.
+		if (auto w = cs::As<RepairWorker>(s); w != nullptr && rig.Kind == EmbodimentCameraKind::Shoulder)
+		{
+			DVec3 at, up, forward;
+			double h = 0;
+			if (WorkerPose(w, at, up, forward, h))
+			{
+				auto look = DVec3(seatAim.x, seatAim.y, seatAim.z);
+				auto flat = look - up * DVec3::Dot(look, up);
+				flat = flat.LengthSquared() > 1e-12 ? flat.Normalized() : forward;
+				return at + up * (h * ShoulderRise) - flat * (h * ShoulderBack);
+			}
+		}
 		if (sub.Unit == nullptr || !sub.HasPoint) return SeatScene(s);
 		auto host = SeatTarget(s);
 		auto offset = (sub.PointKm - sub.Unit->Pos).SwapYZ() * BattleKmScale();

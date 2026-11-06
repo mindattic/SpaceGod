@@ -124,3 +124,25 @@ private:
 	/// <summary>Where the eye sits for a mount or shoulder rig, from the seat's subject: on the hull as it is drawn, lifted
 	/// off the plating and (a shoulder) set back behind the look, all in the host's radii, so either scale reads the same.</summary>
 	Core::DVec3 RigEye(const cs::Ref<Core::IEmbodiable>& s);
+
+public:
+	/// <summary>US-T158: an EVA worker as drawn: its feet on its hull's plating as the hull is drawn (its point in hull lengths
+	/// times the hull's drawn length, so it sits on the model at either scale; battle km times the battle scale put it inside
+	/// the model at the gameplay scale, whose ship mapping is not linear in length), its roof and facing in the scene, and its
+	/// drawn height. False when it is not on a hull drawn here.</summary>
+	bool WorkerPose(const cs::Ref<Core::RepairWorker>& w, Core::DVec3& scene, Core::DVec3& up, Core::DVec3& forward, double& height);
+
+	/// <summary>US-T158: a worker's drawn height, in its hull's drawn lengths: larger than life (about 13 m on a 600 m
+	/// battleship), like the cargo pods, so it reads against the plating and the camera can stand off it at the realistic
+	/// scale, where the near plane is ten metres.</summary>
+	static constexpr double WorkerHeightLengths = 0.022;
+
+	/// <summary>US-T158: the shoulder rig's eye behind and above the worker, and how far it looks down (degrees), in worker
+	/// heights: the suit, the plating round it and the work ahead in one frame.</summary>
+	static constexpr double ShoulderBack = 4.2, ShoulderRise = 2.0, ShoulderPitchDeg = 24;
+
+private:
+	/// <summary>US-T158: the worker held, drawn; made on the system's root like the cargo pods.</summary>
+	cs::Ref<Views::EvaWorkerView> evaWorkerView;
+	cs::Ref<Transform> evaWorkerRoot;
+	void UpdateEvaWorkerView();

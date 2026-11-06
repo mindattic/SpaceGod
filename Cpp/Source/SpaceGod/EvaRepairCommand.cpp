@@ -21,6 +21,7 @@
 #include "SpaceGodLog.h"
 #include "Target.h"
 #include "Tour/ShowcaseTour.h"
+#include "UI/CheatMenu.h" // US-T158
 #include "UnitySpaceAppActor.h"
 #include "World.h"
 
@@ -253,6 +254,13 @@ namespace
 		TEXT("US-T135: out on a capital ship's hull as an EVA repair worker at a damaged shield generator: sg.EvaRepair [game|real]; "
 			"sg.EvaRepair shots <dir> [quit] screenshots it at both scales."),
 		FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& args) { Start(args); }));
+
+	/// US-T158: in the dev menu (US-T126), by its console command.
+	SpaceGod::UI::CheatRegistration GEvaRepairCheat([]
+	{
+		SpaceGod::UI::CheatRegistry::Add("Embodiment", SpaceGod::UI::CheatEntry::Console("EVA repair on a capital's hull",
+			"out on a battleship's plating mid-fight as a repair worker, welding a damaged shield generator", "sg.EvaRepair"));
+	});
 
 	/// US-T147: the showcase tour's stop, set up by this command.
 	SpaceGod::Tour::TourRegistration GEvaRepairTourStop([]

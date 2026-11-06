@@ -11,10 +11,12 @@ namespace SpaceGod::Core
 {
 	class Battle;
 	class BattleUnit;
+	class RepairWorker; // US-T158
 	class Ship;
 }
 
 namespace SpaceGod::Views
 {
 	class EmbodiedShine; // US-T136
+	class EvaWorkerView; // US-T158
 }

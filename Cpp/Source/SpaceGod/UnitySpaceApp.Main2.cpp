@@ -1350,6 +1350,7 @@ namespace SpaceGod
 		podBeacons->Update();
 		bioMassView->Update();
 		UpdateCargoPodsView(); // US-T95: cargo pods and the tractor beam
+		UpdateEvaWorkerView(); // US-T158: the EVA worker held, on its hull's plating
 		if (embodiedShine) embodiedShine->Update(); // US-T136: other players' units shine
 		Structures->Update(true);
 		swarm->Update(ShowSatellites);
