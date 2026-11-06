@@ -8,9 +8,11 @@
 
 namespace SpaceGod::Core
 {
+	class Battle;
 	class Faction;
 	class OrbitalStructure;
 	class Ship;
 	class StarSystem;
 	enum class ShipClass : int;
+	enum class StructureKind : int; // US-T186
 }

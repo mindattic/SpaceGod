@@ -64,6 +64,8 @@ namespace SpaceGod::Views
 		};
 
 		UnitySpaceApp* app;
+		/// <summary>What the views hang off (US-T186: a structure spawned later is added under it).</summary>
+		cs::Ref<Transform> viewParent;
 		cs::List<cs::Ref<View>> views;
 		cs::List<cs::Ref<RingView>> rings;
 		MaterialPropertyBlock block;
@@ -86,6 +88,10 @@ namespace SpaceGod::Views
 		static constexpr double RingDiameterKm = 10;
 
 		StructureViews(UnitySpaceApp* app, const cs::Ref<Transform>& parent);
+
+		/// <summary>US-T186: draws <paramref name="s"/>, a structure added to the system's infrastructure after it was laid
+		/// out (the spawn menu's stations). Nothing if it is drawn already.</summary>
+		void Add(const cs::Ref<Core::OrbitalStructure>& s);
 
 	private:
 		cs::Ref<View> Create(const cs::Ref<Core::OrbitalStructure>& s, const cs::Ref<Transform>& parent);

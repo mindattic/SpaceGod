@@ -92,6 +92,10 @@ namespace SpaceGod::Input
 		/// it away. F1 alone stays the help screen. Local to this machine: the menu is never a co-op peer's.</summary>
 		bool ToggleCheatMenu = false;
 
+		/// <summary>US-T186: Shift+F2 opens the dev menu straight on its Spawn tab (every hull, station, pirate group and
+		/// Bio Mass growth, each to spawn or to spawn and pilot), or puts it away. F2 alone stays outfitting.</summary>
+		bool ToggleSpawnMenu = false;
+
 		/// <summary>U: the lighter toggle, the HUD's panels and readouts off while the names and markers on the view stay.</summary>
 		bool ToggleHud = false;
 

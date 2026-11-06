@@ -98,7 +98,9 @@ namespace SpaceGod::Input
 		ToggleHud = kb[Key::U].wasPressedThisFrame;
 		ToggleMarket = kb[Key::M].wasPressedThisFrame;
 		ToggleCargo = kb[Key::I].wasPressedThisFrame;
-		ToggleOutfit = kb[Key::F2].wasPressedThisFrame;
+		// US-T186: Shift+F2 is the spawn menu's (the dev menu on its Spawn tab), F2 alone outfitting's.
+		ToggleOutfit = kb[Key::F2].wasPressedThisFrame && !Boost;
+		ToggleSpawnMenu = kb[Key::F2].wasPressedThisFrame && Boost;
 		// US-T93: Shift+F3 powers down (or up again), F3 alone is silent running; Tab at a helm is the active ping.
 		ToggleSilent = kb[Key::F3].wasPressedThisFrame && !Boost;
 		PowerToggle = kb[Key::F3].wasPressedThisFrame && Boost;
@@ -259,6 +261,7 @@ namespace SpaceGod::Input
 		QuickSave = QuickLoad = ToggleSaves = false;
 		SpawnPractice = false;
 		ToggleCheatMenu = false; // US-T126
+		ToggleSpawnMenu = false; // US-T186
 		ToggleSystemCruise = false; // US-T127
 		ToggleTractor = false; // US-T95
 		ToggleFtlAutopilot = ClearFtlCourse = false;

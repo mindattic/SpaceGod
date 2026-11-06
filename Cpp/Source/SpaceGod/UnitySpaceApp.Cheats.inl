@@ -31,6 +31,43 @@ public:
 	/// </summary>
 	cs::List<cs::Ref<Core::Ship>> CheatSpawn(const cs::List<CheatSlot>& slots, const cs::Ref<Core::Faction>& faction);
 
+	/// <summary>
+	/// US-T186: as <see cref="CheatSpawn"/>, at a place already chosen (<paramref name="frame"/>, <paramref name="base"/> in its
+	/// frame, the axes it is laid out along). <paramref name="pilot"/>: the first hull is about to be taken (it faces along
+	/// <paramref name="forward"/>, not at the player). Whatever it spawns that is hostile to a ship near it opens a fight with
+	/// it at once (<see cref="CheatEngage"/>).
+	/// </summary>
+	cs::List<cs::Ref<Core::Ship>> CheatSpawnAt(const cs::List<CheatSlot>& slots, const cs::Ref<Core::Faction>& faction, int frame,
+		Core::DVec3 base, Core::DVec3 forward, Core::DVec3 up, bool pilot);
+
+	/// <summary>
+	/// US-T186: the spawn menu's Spawn and Pilot: <paramref name="slots"/> spawned where <see cref="CheatSpawn"/> puts them, out
+	/// of any seat held first, then the player at the first one's helm. Hostile to a ship near it, it is in the fight with it
+	/// from the start (<see cref="CheatEngage"/>, then <see cref="War.TryStartPlayerBattle"/>). Null if nothing spawned.
+	/// </summary>
+	cs::Ref<Core::Ship> CheatSpawnAndPilot(const cs::List<CheatSlot>& slots, const cs::Ref<Core::Faction>& faction);
+
+	/// <summary>
+	/// US-T186: the nearest ship hostile to <paramref name="ship"/>'s faction within its world's neighbourhood (the reach a
+	/// fight there gathers from), the hull flown included; null if none is.
+	/// </summary>
+	cs::Ref<Core::Ship> CheatNearestHostile(const cs::Ref<Core::Ship>& ship);
+
+	/// <summary>
+	/// US-T186: a spawned ship hostile to a ship near it engages it now, through the war's own path: it joins a fight under way
+	/// there or starts one (<see cref="War.OnArrived"/>), else the other side, if it is fit to, falls on it
+	/// (<see cref="War.TryStartBattle"/>). Its battle, or null when no fight could be had.
+	/// </summary>
+	cs::Ref<Core::Battle> CheatEngage(const cs::Ref<Core::Ship>& ship);
+
+	/// <summary>US-T186: a station of <paramref name="kind"/> for <paramref name="faction"/>, held a few of its lengths ahead of
+	/// the player (the hull flown, else the camera), and drawn from this frame on. Null when the cheats cannot run.</summary>
+	cs::Ref<Core::OrbitalStructure> CheatSpawnStation(Core::StructureKind kind, const cs::Ref<Core::Faction>& faction);
+
+	/// <summary>US-T186: the spawn menu's entries (the dev menu's Spawn tab, Shift+F2): every hull in the ship catalog, by kind,
+	/// each to spawn or to spawn and pilot, for the faction chosen; stations; pirate groups; Bio Mass growths.</summary>
+	static void RegisterSpawnMenu();
+
 	/// <summary>Takes the hull flown (or, out of a helm, the camera) to <paramref name="body"/>: off its sunlit side at the
 	/// distance a fight there is laid out at (<see cref="BodyStandoffKm"/>), nose on it. In true km, so the same at both scales.</summary>
 	void CheatTeleportToBody(int body);
@@ -51,6 +88,10 @@ public:
 	/// <summary>Why the world-changing cheats cannot run now (co-op, between the stars), or empty.</summary>
 	cs::String CheatBlocker() const;
 
+	/// <summary>The player's place to spawn beside: the hull flown (its frame, offset, nose and roof), else the camera's.
+	/// (Public for the spawn menu's Bio Mass growths, US-T186.)</summary>
+	void CheatPlayerFrame(int& frame, Core::DVec3& offsetKm, Core::DVec3& forward, Core::DVec3& up);
+
 private:
 	const cs::Ref<UI::CheatMenu> cheatMenu = cs::New<UI::CheatMenu>();
 
@@ -61,9 +102,6 @@ private:
 	/// it holds them (the frame it closes too: its key is spent).
 	/// </summary>
 	bool UpdateCheatMenu();
-
-	/// <summary>The player's place to spawn beside: the hull flown (its frame, offset, nose and roof), else the camera's.</summary>
-	void CheatPlayerFrame(int& frame, Core::DVec3& offsetKm, Core::DVec3& forward, Core::DVec3& up);
 
 	/// <summary>The hull flown made whole, rearmed and its tanks full.</summary>
 	void CheatMendHull();

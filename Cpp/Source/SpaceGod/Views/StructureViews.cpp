@@ -39,7 +39,7 @@ namespace SpaceGod::Views
 	}
 
 	StructureViews::StructureViews(UnitySpaceApp* app_, const cs::Ref<Transform>& parent)
-		: app(app_)
+		: app(app_), viewParent(parent)
 	{
 		auto infra = app->World()->Infrastructure;
 		if (infra == nullptr) return;
@@ -61,6 +61,14 @@ namespace SpaceGod::Views
 			rv->Owner = r->Owner();
 			rings.Add(rv);
 		}
+	}
+
+	void StructureViews::Add(const cs::Ref<OrbitalStructure>& s)
+	{
+		if (s == nullptr) return;
+		for (const auto& v : views)
+			if (v->S == s) return;
+		views.Add(Create(s, viewParent));
 	}
 
 	cs::Ref<StructureViews::View> StructureViews::Create(const cs::Ref<OrbitalStructure>& s, const cs::Ref<Transform>& parent)

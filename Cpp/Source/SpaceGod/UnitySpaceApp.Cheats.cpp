@@ -60,9 +60,6 @@ namespace SpaceGod
 
 		cs::String ClassName(ShipClass c) { return ShipClassSpec::Of(c)->DisplayName; }
 
-		/// The spawn menu's side: 0 friendly (the player's own), 1 neutral (the independents).
-		int spawnSide = 0;
-
 		int spawned = 0;
 
 		cs::String Plural(int n, const char* one) { return cs::Cat(n, " ", one, n == 1 ? "" : "s"); }
@@ -77,6 +74,15 @@ namespace SpaceGod
 		{
 			if (was) cheatMenu->Close();
 			else cheatMenu->Open();
+		}
+		else if (Input.ToggleSpawnMenu) // US-T186: Shift+F2, the spawn menu: the same menu, opened on its Spawn tab
+		{
+			if (was) cheatMenu->Close();
+			else
+			{
+				cheatMenu->Open();
+				cheatMenu->ShowCategory("Spawn");
+			}
 		}
 		cheatMenu->Update(*this, Time::unscaledDeltaTime);
 		// Keys and buttons held as it closes are not the craft's or the camera's until let go (US-T90).
@@ -114,17 +120,25 @@ namespace SpaceGod
 
 	cs::List<cs::Ref<Ship>> UnitySpaceApp::CheatSpawn(const cs::List<CheatSlot>& slots, const cs::Ref<Faction>& faction)
 	{
-		cs::List<cs::Ref<Ship>> made;
-		if (faction == nullptr || !CheatBlocker().empty()) return made;
+		if (faction == nullptr || !CheatBlocker().empty()) return cs::List<cs::Ref<Ship>>();
 		int frame;
 		DVec3 base, forward, up;
 		CheatPlayerFrame(frame, base, forward, up);
+		return CheatSpawnAt(slots, faction, frame, base, forward, up, false);
+	}
+
+	cs::List<cs::Ref<Ship>> UnitySpaceApp::CheatSpawnAt(const cs::List<CheatSlot>& slots, const cs::Ref<Faction>& faction, int frame,
+		DVec3 base, DVec3 forward, DVec3 up, bool pilot)
+	{
+		cs::List<cs::Ref<Ship>> made;
+		if (faction == nullptr || !CheatBlocker().empty()) return made;
 		auto right = DVec3::Cross(forward, up);
 		right = right.LengthSquared() > 1e-12 ? right.Normalized() : DVec3::UnitY;
 		double jd = Clock->Jd;
 		auto frameHelio = Ephemeris()->Helio(frame);
 		auto player = IsPiloting() ? Piloted.Ship : nullptr;
-		bool hostile = World()->Diplomacy()->Hostile(faction, World()->Sol);
+		// US-T186: hostile to the hull flown (whoever's it is), else to the player's own.
+		bool hostile = World()->Diplomacy()->Hostile(faction, player != nullptr ? player->Faction : World()->Sol);
 		CollectPracticeObstacles(nullptr); // the player's own hull is one of them
 		cs::List<DVec3> locals;
 		for (const auto& slot : slots)
@@ -133,7 +147,7 @@ namespace SpaceGod
 			// The layout's kilometre grows with the hulls, so a carrier is not put a kilometre off a fighter.
 			double unit = cs::Math::Max(1.0, lengthKm * 2.5 + (player != nullptr ? player->LengthKm() * 1.5 : 0.0));
 			auto local = forward * (slot.Ahead * unit) + right * (slot.Right * unit) + up * (slot.Up * unit);
-			auto facing = hostile ? -forward : forward;
+			auto facing = hostile && !pilot ? -forward : forward;
 			auto at = PracticeSpawn::Clear(frameHelio + base + local, facing, lengthKm, practiceObstacles) - frameHelio;
 			auto ship = Fleet()->SpawnAt(slot.Name, slot.Class, faction, frame, at, facing, jd);
 			ship->Ports = World()->FreeShipPorts(); // not a hidden haven's rock, as for every free ship
@@ -165,7 +179,57 @@ namespace SpaceGod
 				}
 			}
 		}
+
+		// US-T186: anything spawned hostile to a ship near it (not the hull flown, settled above) engages it at once.
+		for (const auto& s : made)
+			if (s->Battle == nullptr && !s->Destroyed) CheatEngage(s);
 		return made;
+	}
+
+	cs::Ref<Ship> UnitySpaceApp::CheatNearestHostile(const cs::Ref<Ship>& ship)
+	{
+		if (ship == nullptr || ship->Destroyed || ship->Orbit == nullptr) return nullptr;
+		double jd = Clock->Jd;
+		int body = ship->Orbit->Body;
+		auto here = Fleet()->StateOf(ship, jd).HelioKm;
+		// The reach a fight at this world gathers from: its neighbourhood, or about a gate's approach off the system's root.
+		double reachKm = body == Catalog()->Root()->Index ? War::GateFightRangeKm : cs::Math::Max(ScaleModel::NeighbourhoodKm((*Catalog())[body]), 2000.0);
+		cs::Ref<Ship> best;
+		double bestKm = reachKm;
+		for (const auto& s : Fleet()->Ships())
+		{
+			if (s == ship || s->Destroyed || s->Derelict || s->Planetside() || s->Phase == ShipPhase::Lane || !Fleet()->IsPresent(s)) continue;
+			if (s->Faction == nullptr || !World()->Diplomacy()->Hostile(s->Faction, ship->Faction)) continue;
+			double km = (Fleet()->StateOf(s, jd).HelioKm - here).Length();
+			if (km < bestKm)
+			{
+				bestKm = km;
+				best = s;
+			}
+		}
+		return best;
+	}
+
+	cs::Ref<Battle> UnitySpaceApp::CheatEngage(const cs::Ref<Ship>& ship)
+	{
+		if (ship == nullptr || ship->Destroyed) return nullptr;
+		if (ship->Battle != nullptr) return ship->Battle;
+		auto foe = CheatNearestHostile(ship);
+		if (foe == nullptr) return nullptr;
+		double jd = Clock->Jd;
+		auto war = World()->War;
+		// The hull flown is the player's to fight (TryStartPlayerBattle), never swept into a fight the war starts.
+		if (IsPiloting() && Piloted.Ship == foe)
+		{
+			if (foe->Battle == nullptr) war->TryStartPlayerBattle(foe, pilotFrameBody, pilotOffsetKm(), pilotForward(), jd);
+			else if (ship->Orbit != nullptr) war->OnArrived(ship, jd);
+			return ship->Battle;
+		}
+		// The war's own path: it joins a fight on there or starts one; else the other side, fit to, falls on it.
+		war->OnArrived(ship, jd);
+		if (ship->Battle == nullptr && ship->Orbit != nullptr)
+			war->TryStartBattle(ship->Orbit->Body, foe->Faction, jd, ship->Orbit->Body == Catalog()->Root()->Index ? cs::Nullable<DVec3>(ship->Orbit->OffsetAt(jd)) : cs::Nullable<DVec3>());
+		return ship->Battle;
 	}
 
 	cs::Ref<Faction> UnitySpaceApp::CheatHostileNavy()
@@ -286,30 +350,15 @@ namespace SpaceGod
 		auto blocker = [](UnitySpaceApp& a) { return a.CheatBlocker(); };
 		auto atHelm = [](UnitySpaceApp& a) { return !a.CheatBlocker().empty() ? a.CheatBlocker() : a.IsPiloting() ? cs::String() : cs::String("take a helm first"); };
 
-		CheatRegistry::DeclareCategory("Spawn", 10, "any hull beside you, friendly or neutral");
+		CheatRegistry::DeclareCategory("Spawn", 10, "every hull, station, pirate group and Bio Mass growth, for any faction: spawn, or spawn and pilot (Shift+F2)");
 		CheatRegistry::DeclareCategory("Enemies", 20, "hostiles beside you; at a helm they open a fight with you");
 		CheatRegistry::DeclareCategory("Travel", 30, "the cruise drive, teleports and the other stars");
 		CheatRegistry::DeclareCategory("Helm", 40, "take a helm or a seat, switch craft");
 		CheatRegistry::DeclareCategory("Combat", 50, "the dogfight demo and the hull flown");
 		CheatRegistry::DeclareCategory("Time & scale", 60, "time warp and the realistic / game scale");
 
-		// ---- Spawn: any hull, friendly or neutral, beside the player.
-		CheatRegistry::Add("Spawn", CheatEntry::Action("Side", "Enter switches who the hulls below are spawned for", [](UnitySpaceApp&) { spawnSide = 1 - spawnSide; })
-			.WithState([](UnitySpaceApp&) { return cs::String(spawnSide == 0 ? "FRIENDLY (yours)" : "NEUTRAL (independent)"); })
-			.StaysOpen());
-		for (auto cls : AllClasses())
-		{
-			CheatRegistry::Add("Spawn", CheatEntry::Action(ClassName(cls), cs::Cat("a ", cs::Strings::ToLowerInvariant(ClassName(cls)), " beside you"), [cls](UnitySpaceApp& a)
-			{
-				auto faction = spawnSide == 0 ? a.World()->Sol : a.World()->Independents;
-				auto made = a.CheatSpawn({ CheatSlot{ cls, cs::Cat(spawnSide == 0 ? "Dev " : "Free ", ClassName(cls), " ", ++spawned), 0.6, 1.8, 0.4 } }, faction);
-				if (made.Count() > 0) a.ShowToast(cs::Cat("Spawned the ", made[0]->Name, " beside you (", faction->Name, ")"));
-			}).WithBlocker(blocker).StaysOpen());
-		}
-		CheatRegistry::Add("Spawn", CheatEntry::Action("Spawn & pilot grid", "pick a hull from the grid and take its helm at the camera", [](UnitySpaceApp& a) { a.ShowSpawn = true; })
-			.WithKeys("V").WithBlocker(blocker));
-		CheatRegistry::Add("Spawn", CheatEntry::Action("Practice fighter", "one of your fighters at the camera, you at its helm", [](UnitySpaceApp& a) { a.SpawnPracticeFighter(); })
-			.WithKeys("Shift+V").WithBlocker(blocker));
+		// ---- Spawn: the spawn menu's own entries (US-T186, UnitySpaceApp.Spawn.cpp; Shift+F2 opens the menu on them).
+		RegisterSpawnMenu();
 
 		// ---- Enemies: pirates by size, any pirate hull, a hostile navy's warships, and whatever else hunts the player.
 		struct Group { const char* Label; const char* Detail; std::vector<std::pair<ShipClass, double>> Hulls; };
@@ -366,6 +415,9 @@ namespace SpaceGod
 		}));
 		// US-T125: the Bio Mass, through its own console command; it lights up the moment that command is in the build.
 		CheatRegistry::Add("Enemies", CheatEntry::Console("Bio Mass globule", "a living globule beside your hull (US-T125)", "sg.BioMass here"));
+		// US-T192: its blooms and tumors.
+		CheatRegistry::Add("Enemies", CheatEntry::Console("Bio Mass blooms", "a cluster of blooms just off your hull: they latch on and bite (US-T192)", "sg.BioMass here bloom"));
+		CheatRegistry::Add("Enemies", CheatEntry::Console("Bio Mass tumor", "a tumor rooted on your hull, draining it as it grows (US-T192)", "sg.BioMass here tumor"));
 
 		// ---- Travel: the other stars, the worlds and stations of this one (the cruise drive adds its own, US-T127).
 		CheatRegistry::Add("Travel", CheatEntry::Menu("Teleport to a world", "the hull flown (or the camera) to a star, planet or moon here", [](UnitySpaceApp& a)
