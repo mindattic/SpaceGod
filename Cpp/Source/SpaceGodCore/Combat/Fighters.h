@@ -5,6 +5,7 @@
 #include "Combat/CarrierWings.h"
 #include "Combat/Choreography.h" // Choreography::Flight (by value), US-T164
 #include "Combat/Drift.h" // DriftControl (by value), US-T165
+#include "Combat/DogfightManeuvers.h" // DogfightManeuvers::State (by value), US-T188
 
 namespace SpaceGod::Core
 {
@@ -78,6 +79,10 @@ namespace SpaceGod::Core
 		/// <summary>Its visit to a flight deck (U.SPC-T518, see <see cref="FlightDecks"/>): flying in to land, down on the deck
 		/// being turned round, or launching out of the bow; null while it is out in the fight.</summary>
 		cs::Ref<DeckVisit> Deck;
+
+		/// <summary>The named manoeuvre it is flying in a dogfight on an enemy fighter (US-T188, see
+		/// <see cref="DogfightManeuvers"/>). Not saved: after a load the pilot picks afresh.</summary>
+		DogfightManeuvers::State Tactics;
 	};
 
 	/// <summary>The player's stick on a launched craft they have taken (U.SPC-T422, see <see cref="FighterSeat"/>).</summary>

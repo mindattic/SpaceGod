@@ -5,6 +5,7 @@
 #include "Combat/CarrierWings.h"
 #include "Combat/CombatSpecs.h"
 #include "Combat/CombatState.h"
+#include "Combat/DogfightManeuvers.h"
 #include "Combat/ElectronicWarfare.h"
 #include "Combat/FlightDecks.h"
 #include "Combat/FlightModels.h"
@@ -469,17 +470,15 @@ namespace SpaceGod::Core
 					goal = u->Pos + u->Forward;
 					break;
 				}
-				// US-T164: through the merge a loop back onto it, and now and then a rolling break.
-				Choreography::Flight trick;
-				if (Choreography::FighterTurn(b, u, t, u->Combat->Spec->TurnRateDegS, dt, trick))
+				// US-T188: fighter on fighter, Newtonian: the pilot flies named manoeuvres (flip-and-burn, drift turns,
+				// boom-and-zoom, jinking, lead and lag pursuit, scissors) by the situation, facing apart from its track.
+				if (DogfightManeuvers::Fly(b, u, t, dt))
 				{
-					FlyRun(b, u, trick, speed, dt);
 					Torpedo(b, u);
 					return;
 				}
 				double dist = (t->Pos - u->Pos).Length();
-				auto jink = DVec3(cs::Math::Sin(b->Seconds * 1.7 + f->Seed), cs::Math::Sin(b->Seconds * 1.3 + f->Seed * 2), cs::Math::Sin(b->Seconds * 0.9 + f->Seed * 3)) * 0.15;
-				goal = t->Pos + t->Vel * Min(dist / speed, 3.0) + jink;
+				goal = t->Pos + t->Vel * Min(dist / speed, 3.0);
 				break;
 			}
 		}
