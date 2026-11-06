@@ -40,6 +40,7 @@
 #include "Combat/StrandedWings.h"
 #include "Combat/TachyonLances.h"
 #include "Combat/WeakPatches.h"
+#include "Combat/WeaponSystems.h"
 #include "Combat/Collisions.h"
 #include "Combat/BoardingCommand.h"
 #include "Combat/BuriedBridges.h"
@@ -1389,7 +1390,8 @@ namespace SpaceGod::Core
 				// A plasma bolt bleeds off over the distance it crossed (U.SPC-T488); every other beam hits as hard at any range.
 				double landed = w->DamageAt(dist) * volley;
 				Emit(kind, origin, aimPoint, landed, u->Side, target, sub ? sub->Index : -1);
-				ApplyDamage(target, sub, landed, aimPoint, std::nullopt, small ? WeakPoints::Factor(target, sub, aimPoint - origin) : 1, aimPoint - origin);
+				ApplyDamage(target, sub, landed, aimPoint, std::nullopt, small ? WeakPoints::Factor(target, sub, aimPoint - origin) : 1, aimPoint - origin,
+					false, WeaponSystems::FamilyOf(s->Kind()));
 			}
 			else
 			{
@@ -1462,7 +1464,8 @@ namespace SpaceGod::Core
 				if (r->Target->Present() && r->Target->Side != r->Side && !r->Target->Surrendering)
 				{
 					auto sub = r->TargetSub != nullptr && !r->TargetSub->Destroyed() ? r->TargetSub : nullptr;
-					ApplyDamage(r->Target, sub, r->Damage, r->Pos, std::nullopt, r->SmallCraft ? WeakPoints::Factor(r->Target, sub, r->Vel - r->Target->Vel) : 1, r->Vel - r->Target->Vel);
+					ApplyDamage(r->Target, sub, r->Damage, r->Pos, std::nullopt, r->SmallCraft ? WeakPoints::Factor(r->Target, sub, r->Vel - r->Target->Vel) : 1, r->Vel - r->Target->Vel,
+						false, WeaponSystems::FamilyOfRound(*r));
 				}
 			}
 			else if (r->Life <= 0) r->Gone = true;
@@ -1568,7 +1571,7 @@ namespace SpaceGod::Core
 		// A plasma bolt bleeds off over the distance it crossed (U.SPC-T488).
 		if (w->FalloffEdgeShare < 1 && w->Damage > 0) damage *= w->DamageAt(t) / w->Damage;
 		Emit(EnergyWeapons::FxOf(s->Kind(), true).value_or(w->AntiSmall ? FxKind::PointDefense : w->Lance ? FxKind::TachyonLance : FxKind::Beam), origin, at, damage, u->Side, hit, sub ? sub->Index : -1);
-		ApplyDamage(hit, sub, damage, at, std::nullopt, WeakPoints::IsSmallCraft(u) ? WeakPoints::Factor(hit, sub, dir) : 1, dir);
+		ApplyDamage(hit, sub, damage, at, std::nullopt, WeakPoints::IsSmallCraft(u) ? WeakPoints::Factor(hit, sub, dir) : 1, dir, false, WeaponSystems::FamilyOf(s->Kind()));
 	}
 
 	void Battle::StepAimedRound(const cs::Ref<KineticRound>& r, double dt)
@@ -1585,7 +1588,8 @@ namespace SpaceGod::Core
 				auto at = r->Pos + step / len * t;
 				r->Gone = true;
 				auto sub = SubsystemNear(hit, at);
-				ApplyDamage(hit, sub, r->Damage, at, std::nullopt, r->SmallCraft ? WeakPoints::Factor(hit, sub, r->Vel - hit->Vel) : 1, r->Vel - hit->Vel);
+				ApplyDamage(hit, sub, r->Damage, at, std::nullopt, r->SmallCraft ? WeakPoints::Factor(hit, sub, r->Vel - hit->Vel) : 1, r->Vel - hit->Vel,
+					false, WeaponSystems::FamilyOfRound(*r));
 				return;
 			}
 		}
@@ -2079,7 +2083,7 @@ namespace SpaceGod::Core
 			if (o->Side == side || !o->Present() || !WeakPoints::IsSmallCraft(o) || o->Surrendering) continue;
 			double d = cs::Math::Max(0.0, (o->Pos - at).Length() - o->Radius());
 			if (d > radiusKm) continue;
-			ApplyDamage(o, nullptr, damage * (1 - 0.5 * d / radiusKm), at);
+			ApplyDamage(o, nullptr, damage * (1 - 0.5 * d / radiusKm), at, std::nullopt, 1, std::nullopt, false, WeaponFamily::Flak);
 		}
 	}
 
@@ -2222,10 +2226,12 @@ namespace SpaceGod::Core
 	}
 
 	void Battle::ApplyDamage(const cs::Ref<BattleUnit>& target, const cs::Ref<Subsystem>& sub, double damage, DVec3 at, cs::Nullable<DVec3> shieldAt, double exposed, cs::Nullable<DVec3> incoming,
-		bool strikeTorpedo)
+		bool strikeTorpedo, WeaponFamily family)
 	{
 		if (!target->Present()) return;
 		auto c = target->Combat;
+		// What the shot is (US-T189): how hard it hits the field, the hull and the plate.
+		bool profiled = family != WeaponFamily::None && !WeaponSystems::ProfileOf(family).Neutral();
 		// The shield that takes it is the field over the patch of hull it strikes, in 3D (U.SPC-T501); a guided munition
 		// strikes where it crossed into the hull on the side it came in from, not at the hardpoint it homed on (U.SPC-T380).
 		auto strike = target->ShieldStrike(shieldAt.value_or(at), incoming);
@@ -2237,19 +2243,29 @@ namespace SpaceGod::Core
 			generator->LastHitSeconds = Seconds;
 			if (generator->Shield > 0)
 			{
-				double soaked = cs::Math::Min(generator->Shield, damage);
+				double soaked;
+				if (profiled) damage = WeaponSystems::ThroughShield(family, damage, generator->Shield, soaked);
+				else
+				{
+					soaked = cs::Math::Min(generator->Shield, damage);
+					damage -= soaked;
+				}
 				generator->Shield -= soaked;
-				damage -= soaked;
 				// Sub names the emitter whose field took it, so the bubble it raises is that patch's (U.SPC-T40).
 				Emit(FxKind::ShieldHit, shieldPoint, target->Pos, target->LengthKm, target->Side, target, generator->Index);
+				WeaponSystems::Cue(family, WeaponCueEvent::ShieldImpact, shieldPoint, soaked, target->Side, Id);
 				if (damage <= 0) return;
 			}
 		}
+		// Past the field, the shot meets the hull (US-T189): a plasma bolt or a torpedo guts it, a laser only scorches.
+		if (profiled) damage = WeaponSystems::VsHull(family, damage);
 		if (sub != nullptr && exposed > 1) damage *= exposed;
 		// A capital ship's crew braced for the broadside shrugs off part of it (U.SPC-T425), and a shot meeting its hull
 		// obliquely, measured against the hull's own surface where the shot's line strikes it in 3D, crosses thicker plate
 		// and is partly turned aside (U.SPC-T534).
 		double armour = c->Spec->Armor;
+		// A railgun's slug or a torpedo's warhead goes through much of the plate (US-T189).
+		if (profiled) armour = WeaponSystems::ArmourFaced(family, armour);
 		if (Broadsides::Commands(target))
 		{
 			damage *= Broadsides::BraceFactor(target);
@@ -2263,6 +2279,7 @@ namespace SpaceGod::Core
 		}
 		damage = cs::Math::Max(damage * 0.15, damage - armour);
 		Emit(FxKind::Impact, at, at, damage, target->Side, target, sub ? sub->Index : -1);
+		WeaponSystems::Cue(family, WeaponCueEvent::Impact, at, damage, target->Side, Id);
 		if (sub != nullptr && !sub->Destroyed())
 		{
 			// A buried bridge (U.SPC-T492) takes only what gets through the hull around it; the rest stays in the hull.
@@ -2397,7 +2414,7 @@ namespace SpaceGod::Core
 				{
 					auto sub = m->TargetSub != nullptr && !m->TargetSub->Destroyed() ? m->TargetSub : PickSubsystem(t);
 					ApplyDamage(t, sub, m->Damage, aim, entry, m->SmallCraft ? WeakPoints::Factor(t, sub, m->Vel - t->Vel) : 1, m->Vel - t->Vel,
-						StrikeTorpedoes::IsStrike(m));
+						StrikeTorpedoes::IsStrike(m), WeaponSystems::FamilyOfRound(m->Kind));
 				}
 			}
 		}
@@ -2445,7 +2462,8 @@ namespace SpaceGod::Core
 				auto at = m->Pos + step / len * t;
 				m->Gone = true;
 				auto sub = SubsystemNear(hit, at);
-				ApplyDamage(hit, sub, m->Damage, at, at, m->SmallCraft ? WeakPoints::Factor(hit, sub, m->Vel - hit->Vel) : 1, m->Vel - hit->Vel);
+				ApplyDamage(hit, sub, m->Damage, at, at, m->SmallCraft ? WeakPoints::Factor(hit, sub, m->Vel - hit->Vel) : 1, m->Vel - hit->Vel,
+					false, WeaponFamily::Missile);
 				return;
 			}
 		}
@@ -3132,6 +3150,8 @@ namespace SpaceGod::Core
 		fx.Unit = unit;
 		fx.Sub = sub;
 		Fx.Add(fx);
+		// A shot fired or a round shot down raises its weapon's sound cue (US-T189), if anything is listening.
+		if (WeaponSystems::SoundHook()) WeaponSystems::CueFx(fx, Id);
 	}
 
 	// ---------------------------------------------------------------- placement

@@ -34,6 +34,7 @@ namespace SpaceGod::Core
 	enum class ShipClass : int;
 	enum class SubsystemKind : int;
 	enum class PowerSystem : int;
+	enum class WeaponFamily : int;
 
 	enum class UnitKind : int
 	{
@@ -1139,10 +1140,13 @@ namespace SpaceGod::Core
 		/// split between the struck hardpoint and the hull. A lost reactor takes the ship with it. What gets through the
 		/// shields is multiplied by <paramref name="exposed"/>: a small craft's hit on an open weak point (U.SPC-T424, see
 		/// <see cref="WeakPoints.Factor"/>). A <paramref name="strikeTorpedo"/> (a bomber's) that arrives where the shield
-		/// is already down hits a capital's bare hull harder (U.SPC-T484, see <see cref="StrikeTorpedoes"/>).
+		/// is already down hits a capital's bare hull harder (U.SPC-T484, see <see cref="StrikeTorpedoes"/>). The shot's
+		/// <paramref name="family"/> (US-T189, <see cref="WeaponSystems"/>) sets how hard it hits the shield, the hull and the
+		/// armour: a laser strips a field, plasma and torpedoes gut a hull, a railgun's slug goes through plate. None (a mine,
+		/// a drill, a self-destruct) hits as every shot did before weapon systems.
 		/// </summary>
 		void ApplyDamage(const cs::Ref<BattleUnit>& target, const cs::Ref<Subsystem>& sub, double damage, DVec3 at, cs::Nullable<DVec3> shieldAt = std::nullopt, double exposed = 1, cs::Nullable<DVec3> incoming = std::nullopt,
-			bool strikeTorpedo = false);
+			bool strikeTorpedo = false, WeaponFamily family = {});
 
 		/// <summary>
 		/// A collision's damage to a unit (U.SPC-T60): <paramref name="hp"/> (see <see cref="Collisions.DamageHp"/>)
