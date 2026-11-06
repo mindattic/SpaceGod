@@ -216,7 +216,8 @@ namespace SpaceGod::Core
 	SG_SERIALIZE(BroadsideCommand, "Unity.SpaceGod.Core.BroadsideCommand",
 		SG_F(BraceCooldown), SG_F(BraceLeft), SG_F(Focus), SG_F(Formation), SG_F(ReadyingLoaded), SG_F(ReadyingOn),
 		SG_F(Releasing), SG_F(Repaired), SG_F(Restored), SG_F(RollBearing), SG_F(RollChosen), SG_F(RollDeg),
-		SG_F(RollReconsider), SG_F(RollWeakPatches), SG_F(RunHot), SG_F(SpreadFire), SG_ARRAY(orders))
+		SG_F(RollReconsider), SG_F(RollWeakPatches), SG_F(RunHot), SG_F(SpreadFire), SG_ARRAY(orders),
+		SG_OPT(RollSpin)) // US-T187: the heavy roll's swing, absent from older saves
 
 	SG_SERIALIZE(Captives, "Unity.SpaceGod.Core.Captives",
 		SG_F(Buyer), SG_F(Captors), SG_F(From), SG_F(Haven), SG_F(Marines), SG_F(Owners), SG_F(People),

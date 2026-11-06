@@ -150,6 +150,10 @@ namespace SpaceGod::Core
 		/// <summary>Whether <see cref="RollBearing"/> and <see cref="RollDeg"/> hold a choice yet.</summary>
 		bool RollChosen = false;
 
+		/// <summary>US-T187: how fast an AI capital's heavy roll is swinging about its nose, rad/s (signed as
+		/// WeakPatches::RollAngle; <see cref="CapitalManeuver.Roll"/>). Absent from older saves: then at rest.</summary>
+		double RollSpin = 0;
+
 		/// <summary>This step: whether the volley on each hull goes now, worked out the first time one of its guns asks.</summary>
 		cs::Dictionary<cs::Ref<BattleUnit>, bool> Releasing; // internal in C#
 		SG_SERIALIZABLE(BroadsideCommand); // ObjectGraph registration (Persistence/Registrations)

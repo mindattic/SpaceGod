@@ -5,6 +5,7 @@
 #include "Astro.h"
 #include "Combat/Battle.h"
 #include "Combat/Broadsides.h"
+#include "Combat/CapitalManeuver.h"
 #include "Combat/CombatSpecs.h"
 #include "Combat/CombatState.h"
 #include "Combat/Dogfighting.h"
@@ -366,14 +367,19 @@ namespace SpaceGod::Core
 		double now = b->Seconds + Frac(u->Wander) * ComeAboutCheckS;
 		bool look = cs::Math::Floor(now / ComeAboutCheckS) != cs::Math::Floor((now - dt) / ComeAboutCheckS);
 		if (!about && look && u->ManeuverLeft < hold - 25 && WeakPatches::HasPatches(u->Combat))
-			about = WeakPatches::Exposure(u, WeakPatches::IncomingFireOn(b, u)) > WornExposure;
+			// US-T187: or when the broadside it fights with is depleted and the other is fresh, to rotate that one in.
+			about = WeakPatches::Exposure(u, WeakPatches::IncomingFireOn(b, u)) > WornExposure || CapitalManeuver::BroadsideWorn(b, u);
 		if (about)
 		{
 			u->Circle = u->Circle >= 0 ? -1 : 1;
 			u->ManeuverLeft = hold;
 		}
 		auto spot = t->Pos + dir * rangeKm;
-		return (spot - u->Pos) * 0.02 + Around(dir) * (maxSpeed * 0.8 * (u->Circle >= 0 ? 1 : -1));
+		auto cross = (spot - u->Pos) * 0.02 + Around(dir) * (maxSpeed * 0.8 * (u->Circle >= 0 ? 1 : -1));
+		// US-T187: out of its guns' reach it closes, driving in on the target, and only crosses once they bear.
+		double close = CapitalManeuver::Closing(dist, rangeKm);
+		if (close <= 0) return cross;
+		return cross * (1 - close) + (-dir) * (maxSpeed * close);
 	}
 
 	DVec3 Choreography::Course(const cs::Ref<BattleUnit>& u)

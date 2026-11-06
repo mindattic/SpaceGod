@@ -6,6 +6,7 @@
 #include "Combat/ArmourAngling.h"
 #include "Combat/Battle.h"
 #include "Combat/Broadsides.h"
+#include "Combat/CapitalManeuver.h"
 #include "Combat/Choreography.h"
 #include "Combat/CombatSpecs.h"
 #include "Combat/CombatState.h"
@@ -353,6 +354,17 @@ namespace SpaceGod::Core
 		// than the hysteresis, so when it comes about it does turn its other broadside to the enemy.
 		auto course = Choreography::Course(u);
 		bool steaming = bearings != nullptr && course.LengthSquared() > 1e-12;
+		// US-T187: an AI capital would rather show the main threat its strongest shield face, read by face.
+		bool present = fire.Count() > 0 && CapitalManeuver::Flies(u);
+		FacingShields faces;
+		DVec3 threat = DVec3::Zero;
+		if (present)
+		{
+			faces = CapitalManeuver::Facings(c);
+			for (const auto& f : fire) threat = threat + f.Dir * f.Weight;
+			present = threat.LengthSquared() > 1e-18;
+			if (present) threat = threat.Normalized();
+		}
 		for (int bearing : keys)
 		{
 			double battery = bearings == nullptr ? 1 : most > 0 ? (*bearings)[bearing] / most : 1;
@@ -372,6 +384,7 @@ namespace SpaceGod::Core
 				auto restUp = at - f * DVec3::Dot(at, f);
 				if (restUp.LengthSquared() > 1e-18) at0 = RestBias * (1 - DVec3::Dot(up, restUp.Normalized())) * 0.5;
 				double bonus = cmd->RollChosen && bearing == cmd->RollBearing && cs::Math::Abs(Astro::WrapDegrees360(deg - cmd->RollDeg + 180) - 180) < step * 0.5 ? Hysteresis : 0;
+				if (present) own += CapitalManeuver::PresentBonus(faces, threat, f, up);
 				double carried = own;
 				if (actual.has_value() && fire.Count() > 0)
 				{
@@ -379,6 +392,7 @@ namespace SpaceGod::Core
 					auto up2 = up;
 					Transport(actual, f2, up2);
 					carried = battery - Cost(c, samples, weak, fire, protect, slant, f2, up2);
+					if (present) carried += CapitalManeuver::PresentBonus(faces, threat, f2, up2);
 				}
 				double along = steaming ? Choreography::CourseBias * DVec3::Dot(f, course) : 0;
 				own += bonus - at0 + along;
@@ -413,6 +427,8 @@ namespace SpaceGod::Core
 
 	void WeakPatches::RollToward(const cs::Ref<BattleUnit>& u, DVec3 roof, double degPerSec, double dt)
 	{
+		// US-T187: an AI capital rolls the heavy way, spinning up and braking at its catalog roll rate.
+		if (CapitalManeuver::Roll(u, roof, dt)) return;
 		auto f = u->Forward;
 		auto cur = u->Roof.LengthSquared() > 1e-12 ? u->Roof : LevelRoof(f);
 		cur -= f * DVec3::Dot(cur, f);
