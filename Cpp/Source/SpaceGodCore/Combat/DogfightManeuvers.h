@@ -64,8 +64,9 @@ namespace SpaceGod::Core
 	class SPACEGODCORE_API DogfightManeuvers final
 	{
 	public:
-		/// <summary>A craft's dogfight, carried from step to step on its <see cref="FighterState"/>. Not saved: after a
-		/// load the pilot simply picks its manoeuvre afresh.</summary>
+		/// <summary>A craft's dogfight, carried from step to step on its <see cref="FighterState"/> (a fleet light
+		/// fighter's on its <see cref="BattleUnit.Tactics"/>, US-T204). Not saved: after a load the pilot simply picks its
+		/// manoeuvre afresh.</summary>
 		struct State
 		{
 			DogfightTactic Tactic = DogfightTactic::LeadPursuit;

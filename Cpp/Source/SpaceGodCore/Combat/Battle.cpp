@@ -753,6 +753,24 @@ namespace SpaceGod::Core
 			}
 		auto t = u->Target != nullptr && u->Target->Present() && Hostile(u, u->Target) ? u->Target : nullptr;
 
+		// US-T204: on anything but a capital (whose strafing runs below stay), the Newtonian dogfight a carrier's craft
+		// flies (US-T188): facing apart from its track, its catalog turn, roll, thrust and braking, and named manoeuvres
+		// picked by the situation, each pilot on its own deterministic draws.
+		if (t != nullptr && !Choreography::Strafeable(t))
+		{
+			if (Choreography::Strafing(u)) Choreography::EndRun(u);
+			u->Maneuver = DogfightManeuver::Attack;
+			u->ManeuverLeft = 0;
+			if (DogfightManeuvers::Fly(shared_from_this(), u, t, dt))
+			{
+				// Its roll kept for the crewed flight model, should it next fly a strafing run.
+				u->Up = u->Roof;
+				return;
+			}
+		}
+		u->Tactics.FoeId = 0;
+		u->Tactics.Left = 0;
+
 		auto threat = OnItsTail(u);
 		u->ManeuverLeft -= dt;
 		double crewTurn = tune.TurnRateDegS * DogfightTurnShare * engines;

@@ -6,6 +6,7 @@
 
 #include "Cs/Cs.h"
 #include "DVec3.h"
+#include "Combat/DogfightManeuvers.h"
 #include "Hyperlanes.h"
 #include "Persistence/Serializable.h"
 
@@ -151,6 +152,10 @@ namespace SpaceGod::Core
 		DogfightManeuver Maneuver = DogfightManeuver::Attack;
 		double ManeuverLeft = 0;
 		int BreakSide = 1;
+
+		/// <summary>US-T204: a fleet light fighter's Newtonian dogfight (<see cref="DogfightManeuvers"/>), as a carrier
+		/// craft carries it on its <see cref="FighterState"/>. Not saved: after a load the pilot picks its manoeuvre afresh.</summary>
+		DogfightManeuvers::State Tactics;
 
 		/// <summary>The velocity gunners read this hull as having: its real one, eased in over
 		/// <see cref="Gunnery.TrackingLagS"/>, so a steady course is tracked and a sudden jink is not (U.SPC-T270).</summary>
@@ -830,18 +835,19 @@ namespace SpaceGod::Core
 		/// <summary>How far off a dogfighter goes for the player in preference to whatever else it was after, km.</summary>
 		static constexpr double HuntPlayerKm = 8;
 
-	private:
+	public:
 		/// <summary>The small craft that dogfight: the light fighters and interceptors. A heavy fighter (the gunship) brawls
 		/// on the ordinary circling approach, its crewed turrets firing all round, and a bomber flies at the hulls.</summary>
 		static bool Dogfights(const cs::Ref<BattleUnit>& u);
 
+	private:
 		/// <summary>
 		/// A light fighter flown by its crew in a dogfight: on the same airframe the player flies (its helm turn rate,
 		/// cut to <see cref="DogfightTurnShare"/>, and its own thrust) and through the same flight model, its class's
-		/// (<see cref="FlightModelRegistry.For"/>, U.SPC-T440), so it carves, corners and boosts as the player's would. It lays
-		/// its nose on the lead point for its guns and jinks on the way in; through the merge it extends under boost and comes
-		/// round again; with a hostile on its tail and pointed at it, it breaks hard to one side under boost. It goes for the
-		/// player first.
+		/// (<see cref="FlightModelRegistry.For"/>, U.SPC-T440), so it carves, corners and boosts as the player's would. On a
+		/// capital it flies its strafing runs, breaking hard to one side under boost with a hostile on its tail; on anything
+		/// else it flies the Newtonian dogfight a carrier's craft does (US-T204, <see cref="DogfightManeuvers.Fly"/>: lead and
+		/// lag pursuit, flip-and-burn, drift turns, boom-and-zoom, jinking, scissors). It goes for the player first.
 		/// </summary>
 		void Dogfight(const cs::Ref<BattleUnit>& u, double dt);
 

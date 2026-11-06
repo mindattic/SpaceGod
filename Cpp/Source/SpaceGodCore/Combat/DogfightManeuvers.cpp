@@ -10,6 +10,7 @@
 #include "Combat/PilotTuning.h"
 #include "Combat/ShipCatalog.h"
 #include "Combat/WeakPatches.h"
+#include "Ships.h"
 #include <cstring>
 
 namespace SpaceGod::Core
@@ -82,6 +83,18 @@ namespace SpaceGod::Core
 		bool DfDefensive(DogfightTactic t) { return t == DogfightTactic::FlipAndBurn || t == DogfightTactic::Jink || t == DogfightTactic::Scissors; }
 
 		bool DfSmallCraft(const cs::Ref<BattleUnit>& o) { return o->Kind == UnitKind::Fighter || (o->Kind == UnitKind::Ship && o->LengthKm <= WeakPoints::MaxSmallCraftKm); }
+
+		/// <summary>US-T204: a fleet's own light fighter (a fighter, interceptor or courier hull the battle dogfights,
+		/// <see cref="Battle.Dogfights"/>), which has no <see cref="FighterState"/> and carries its dogfight on the unit.</summary>
+		bool DfFleetCraft(const cs::Ref<BattleUnit>& u) { return u->Fighter == nullptr && Battle::Dogfights(u); }
+
+		/// <summary>The craft's dogfight state: a carrier craft's on its <see cref="FighterState"/>, a fleet light fighter's
+		/// on the unit (US-T204).</summary>
+		DogfightManeuvers::State& DfStateOf(const cs::Ref<BattleUnit>& u) { return u->Fighter != nullptr ? u->Fighter->Tactics : u->Tactics; }
+
+		/// <summary>The pilot's seed: a carrier craft's own; a fleet light fighter's from its unit's per-battle wander phase
+		/// and id (US-T204), so every hull draws its own stream.</summary>
+		double DfSeedOf(const cs::Ref<BattleUnit>& u) { return u->Fighter != nullptr ? u->Fighter->Seed : u->Wander * 7919.0 + u->Id; }
 	}
 
 	// ---------------------------------------------------------------- handling
@@ -113,6 +126,17 @@ namespace SpaceGod::Core
 					h.TurnDegS = tune.TurnRateDegS * Battle::DogfightTurnShare;
 					h.RollDegS = tune.RollRateDegS() * Battle::DogfightTurnShare;
 				}
+			}
+		}
+		else if (u->Ship != nullptr && u->Ship->Spec != nullptr)
+		{
+			// US-T204: a fleet light fighter's helm is its hull class's catalog row, at a crew's share of it, as the old
+			// crewed dogfight (Battle::FlyCrewed) flew it.
+			auto tune = PilotTuning::Of(u->Ship->Spec->Class);
+			if (tune.TurnRateDegS > 0)
+			{
+				h.TurnDegS = tune.TurnRateDegS * Battle::DogfightTurnShare;
+				h.RollDegS = tune.RollRateDegS() * Battle::DogfightTurnShare;
 			}
 		}
 		return h;
@@ -211,7 +235,7 @@ namespace SpaceGod::Core
 	DogfightManeuvers::Command DogfightManeuvers::Plan(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& t, const cs::Ref<BattleUnit>& threat, const Handling& h, State& s, double dt)
 	{
 		Command c;
-		double seed = u->Fighter != nullptr ? u->Fighter->Seed : 0;
+		double seed = DfSeedOf(u);
 		auto rel = t->Pos - u->Pos;
 		double d = rel.Length();
 		auto toT = DfUnit(rel, u->Forward);
@@ -384,9 +408,9 @@ namespace SpaceGod::Core
 
 	bool DogfightManeuvers::Fly(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& t, double dt)
 	{
-		if (b == nullptr || u == nullptr || u->Fighter == nullptr || t == nullptr || !t->Present()) return false;
-		auto& s = u->Fighter->Tactics;
-		double seed = u->Fighter->Seed;
+		if (b == nullptr || u == nullptr || (u->Fighter == nullptr && !DfFleetCraft(u)) || t == nullptr || !t->Present()) return false;
+		auto& s = DfStateOf(u);
+		double seed = DfSeedOf(u);
 		auto h = Handling::Of(u);
 		auto threat = OnTail(b, u);
 		s.Left -= dt;
@@ -405,7 +429,10 @@ namespace SpaceGod::Core
 
 	cs::Nullable<DogfightTactic> DogfightManeuvers::TacticOf(const cs::Ref<BattleUnit>& u)
 	{
-		if (u == nullptr || u->Fighter == nullptr || u->Fighter->Phase != FighterPhase::Dogfight) return std::nullopt;
+		if (u == nullptr) return std::nullopt;
+		// US-T204: a fleet light fighter is dogfighting while it has a foe (Battle::Dogfight clears it otherwise).
+		if (u->Fighter == nullptr) return DfFleetCraft(u) && u->Tactics.FoeId != 0 ? cs::Nullable<DogfightTactic>(u->Tactics.Tactic) : std::nullopt;
+		if (u->Fighter->Phase != FighterPhase::Dogfight) return std::nullopt;
 		return u->Fighter->Tactics.Tactic;
 	}
 }
