@@ -119,6 +119,7 @@ namespace SpaceGod::UI
 		{
 			auto size = label->CalcSize(GUIContent(lineText));
 			auto r = layout.Take(HudRegion::TopCentre, size.x, size.y);
+			RegisterUi(r); // US-T211: world names skip the banner
 			if (Event::current().type == EventType::Repaint) DrawLabel(lineText, Vector2(r.x, r.y), WithAlpha(color, alpha), false);
 		};
 		line(cs::Cat("BIO MASS CONTACT  ", Km(nearestKm), "  -  every gun fires on sight"), UiStyle::Danger, pulse);

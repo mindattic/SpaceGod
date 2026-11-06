@@ -175,6 +175,7 @@ namespace SpaceGod::UI
 		// TopRight before the selection card, which takes what the right-hand column has left between its stacks.
 		if (!app->ShowMarket) DrawOpportunityBoard();
 		if (app->ShowMarket) DrawMarket();
+		DrawHarvest(true); // US-T211: the gas works panel, TopRight after the board
 		DrawHunters();
 		DrawSelection();
 		DrawDrawerHandle(); // US-T200: the status band's bottom-left slot, before the status line takes the rest
@@ -549,6 +550,7 @@ namespace SpaceGod::UI
 		auto size = toast->CalcSize(content);
 		// Below the clock and news feed at the top of the screen: the next slot in TopCentre (US-T154).
 		auto r = layout.Take(HudRegion::TopCentre, size.x, size.y);
+		RegisterUi(r); // US-T211: world names skip the banner
 		auto old = GUI::contentColor;
 		GUI::contentColor = Color(0, 0, 0, 0.7f);
 		GUI::Label(Rect(r.x + 1, r.y + 1, r.width, r.height), content, toast);
@@ -1340,6 +1342,7 @@ namespace SpaceGod::UI
 			cs::String warn = cs::Cat("INCOMING BROADSIDE  ·  ", incoming->Name(), " VOLLEY ", loaded, "%  ·  3 BRACE");
 			auto size = label->CalcSize(GUIContent(warn));
 			auto slot = layout.Take(HudRegion::TopCentre, size.x, size.y);
+			RegisterUi(slot); // US-T211
 			DrawLabel(warn, Vector2(slot.x, slot.y), HostileColor, false);
 		}
 	}

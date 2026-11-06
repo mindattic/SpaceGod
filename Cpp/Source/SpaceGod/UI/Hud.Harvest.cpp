@@ -19,7 +19,7 @@ using namespace SpaceGod::Core;
 
 namespace SpaceGod::UI
 {
-	void Hud::DrawHarvest()
+	void Hud::DrawHarvest(bool panels)
 	{
 		auto world = app->World();
 		auto works = world != nullptr ? world->Harvest : nullptr;
@@ -39,7 +39,7 @@ namespace SpaceGod::UI
 		if (here == nullptr || hereKm > works->GuardKm(here->Body) * 3) here = nullptr;
 		auto ship = app->IsPiloting() ? app->Piloted.Ship : nullptr;
 		auto active = ship != nullptr ? works->ActiveFor(ship) : nullptr;
-		if (here != nullptr)
+		if (here != nullptr && !panels)
 			for (int i = 0; i < here->Platforms.Count(); i++)
 			{
 				auto p = here->Platforms[i];
@@ -56,6 +56,7 @@ namespace SpaceGod::UI
 			}
 
 		// The contract under way.
+		if (!panels) return; // US-T211: the markers drew in the world overlay; the panels below dock in TopRight every event
 		if (active != nullptr)
 		{
 			auto op = active->Operation;
@@ -83,7 +84,7 @@ namespace SpaceGod::UI
 			auto m = GUIContent(line2);
 			auto d = GUIContent(line3);
 			float w = Mathf::Max(Mathf::Max(text->CalcSize(a).x, small->CalcSize(b).x), Mathf::Max(small->CalcSize(m).x, small->CalcSize(d).x)) + 28;
-			auto r = Panel(Rect(Screen::width - w - 16, 150, w, 86));
+			auto r = Panel(layout.Take(HudRegion::TopRight, w, 86)); // US-T211: TopRight, under the opportunities
 			GUI::contentColor = amber;
 			GUI::Label(Rect(r.x + 14, r.y + 5, w, 20), a, text);
 			GUI::contentColor = Color::white();
@@ -113,7 +114,7 @@ namespace SpaceGod::UI
 		auto b = GUIContent(line1);
 		auto m = GUIContent(line2);
 		float w = Mathf::Max(text->CalcSize(a).x, Mathf::Max(small->CalcSize(b).x, small->CalcSize(m).x)) + 28;
-		auto r = Panel(Rect(Screen::width - w - 16, 150, w, raidable ? 68.0f : 50.0f));
+		auto r = Panel(layout.Take(HudRegion::TopRight, w, raidable ? 68.0f : 50.0f)); // US-T211
 		GUI::contentColor = amber;
 		GUI::Label(Rect(r.x + 14, r.y + 5, w, 20), a, text);
 		GUI::contentColor = offer != nullptr ? Color::white() : Dim;

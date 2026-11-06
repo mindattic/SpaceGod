@@ -1531,6 +1531,7 @@ namespace SpaceGod::UI
 		auto old = GUI::color;
 		GUI::color = Color(1, 1, 1, a);
 		auto r = layout.Take(HudRegion::TopCentre, w, 34); // the next slot under the news and alerts (US-T154)
+		RegisterUi(r); // US-T211
 		GUI::Box(r, GUIContent::none(), panel);
 		GUI::Label(Rect(r.x + 20, r.y + 7, w, 22), content, toast);
 		GUI::color = old;
