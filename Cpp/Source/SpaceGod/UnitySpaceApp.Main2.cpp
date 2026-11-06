@@ -895,6 +895,13 @@ namespace SpaceGod
 		float response = 1.0f - Mathf::Exp(-dt * 3.0f);
 		// The fleet keeps hulls clear at the size they are drawn at this blend (US-T209).
 		Fleet()->DrawnBlend = Scale()->Blend();
+		// ... and off the camera's line through the hull flown from the helm, so none is drawn over it (US-T226).
+		{
+			auto look = SpaceCamera->Rotation * Vector3::forward();
+			bool framed = IsPiloting() && World()->PilotedShip != nullptr;
+			Fleet()->DrawnViewHull = framed ? World()->PilotedShip : nullptr;
+			Fleet()->DrawnViewAxis = framed ? Core::DVec3(look.x, look.y, look.z).SwapYZ() : Core::DVec3::Zero;
+		}
 
 		for (int pass = 0; pass < 2; pass++)
 		{

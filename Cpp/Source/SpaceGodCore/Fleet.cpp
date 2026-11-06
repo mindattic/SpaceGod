@@ -115,7 +115,43 @@ namespace SpaceGod::Core
 			DVec3 WorldKm;
 			double FloorKm = 0;
 			int Key = 0;
+			/// <summary>US-T226: for the hull the view is framed on, the camera's line through it (unit; zero for none) and how far
+			/// along it (in clearances) others are kept off it, square to it.</summary>
+			DVec3 Axis;
+			double Reach = 1;
+			/// <summary>US-T226: the share of its clearance (km, at the tighter of the scale's two rates) it is moved square to that
+			/// line: the view draws its sidestep at the tangential rate, so the drawn gap comes out at the clearance, not past it.</summary>
+			double Lateral = 1;
 		};
+
+		/// <summary>
+		/// US-T226: keeps <paramref name="f"/> (free) off the camera's line through <paramref name="v"/> (the hull the view is
+		/// framed on): inside the spheroid round <paramref name="v"/> with <paramref name="need"/> square to the line and
+		/// Reach x need along it, <paramref name="f"/> is moved square to the line, out to the spheroid's edge at its distance
+		/// along the line (so the push fades to nothing at either end). Dead on the line it goes aside in a fixed direction
+		/// chosen by its key, blended in so it never flips. Returns whether it moved.
+		/// </summary>
+		bool KeepOffViewLine(const SepBody& v, DVec3 vOff, const SepBody& f, DVec3& fOff, double need)
+		{
+			auto rel = (f.Pos + fOff) - (v.Pos + vOff);
+			double along = DVec3::Dot(rel, v.Axis);
+			double u = along / (need * cs::Math::Max(1.0, v.Reach));
+			if (u <= -1 || u >= 1) return false;
+			double want = need * cs::Math::Max(1e-6, cs::Math::Min(1.0, f.Lateral)) * cs::Math::Sqrt(1 - u * u);
+			auto lat = rel - v.Axis * along;
+			double l = lat.Length();
+			if (l >= want) return false;
+			auto base = DVec3::Cross(v.Axis, DVec3::UnitZ);
+			if (base.LengthSquared() < 1e-6) base = DVec3::Cross(v.Axis, DVec3::UnitX);
+			base = base.Normalized();
+			auto other = DVec3::Cross(v.Axis, base);
+			double ang = f.Key * 0.6180339887 * 6.283185307179586;
+			auto aside = base * cs::Math::Cos(ang) + other * cs::Math::Sin(ang);
+			auto dir = lat + aside * (need * 1e-3);
+			dir = dir.LengthSquared() > 0 ? dir.Normalized() : aside;
+			fOff = fOff + dir * want - lat;
+			return true;
+		}
 
 		/// <summary>
 		/// Pushes overlapping bodies apart (offsets into <paramref name="off"/>): each pass finds the pairs whose spheres overlap by
@@ -129,10 +165,15 @@ namespace SpaceGod::Core
 			std::vector<int> order(n);
 			std::vector<std::pair<int, int>> pairs;
 			std::vector<int> active;
+			// The hull the view is framed on reaches out along the camera's line (US-T226): its sweep extent covers that reach
+			// against the largest partner.
+			double largest = 0;
+			for (const auto& s : b) largest = cs::Math::Max(largest, s.RadiusKm);
+			auto extent = [&](int i) { return b[i].Axis.LengthSquared() > 0 ? cs::Math::Max(1.0, b[i].Reach) * (b[i].RadiusKm + largest) : b[i].RadiusKm; };
 			for (int pass = 0; pass < passes; pass++)
 			{
 				for (size_t i = 0; i < n; i++) order[i] = static_cast<int>(i);
-				auto lo = [&](int i) { return b[i].Pos.X + off[i].X - b[i].RadiusKm * (1 + margin); };
+				auto lo = [&](int i) { return b[i].Pos.X + off[i].X - extent(i) * (1 + margin); };
 				std::stable_sort(order.begin(), order.end(), [&](int x, int y) { return lo(x) < lo(y); });
 				pairs.clear();
 				active.clear();
@@ -142,7 +183,7 @@ namespace SpaceGod::Core
 					for (size_t k = 0; k < active.size();)
 					{
 						int j = active[k];
-						if (b[j].Pos.X + off[j].X + b[j].RadiusKm * (1 + margin) < start)
+						if (b[j].Pos.X + off[j].X + extent(j) * (1 + margin) < start)
 						{
 							active[k] = active.back();
 							active.pop_back();
@@ -161,6 +202,17 @@ namespace SpaceGod::Core
 					const auto& a = b[static_cast<size_t>(i)];
 					const auto& c = b[static_cast<size_t>(j)];
 					double need = (a.RadiusKm + c.RadiusKm) * (1 + margin);
+					// Off the camera's line through the hull the view is framed on, square to it (US-T226).
+					if (a.Axis.LengthSquared() > 0 && c.Weight > 0)
+					{
+						if (KeepOffViewLine(a, off[i], c, off[j], need)) any = true;
+						continue;
+					}
+					if (c.Axis.LengthSquared() > 0 && a.Weight > 0)
+					{
+						if (KeepOffViewLine(c, off[j], a, off[i], need)) any = true;
+						continue;
+					}
 					auto d = (c.Pos + off[j]) - (a.Pos + off[i]);
 					double dist = d.Length();
 					if (dist >= need) continue;
@@ -217,7 +269,7 @@ namespace SpaceGod::Core
 			(IsHeld == nullptr || !IsHeld(s));
 	}
 
-	double Fleet::SceneUnitsPerKm(int body, DVec3 helioKm, double blend)
+	double Fleet::SceneUnitsPerKm(int body, DVec3 helioKm, double blend, bool tangentialOnly)
 	{
 		// The same neighbourhood the view places the ship's sidestep in (UnitySpaceApp::KmToSceneNear).
 		ScaleModel scale;
@@ -231,6 +283,7 @@ namespace SpaceGod::Core
 		}
 		d = cs::Math::Max(d, cs::Math::Max(def->RadiusKm, 1.0));
 		double tangential = scale.LocalDistance(def, d) / d;
+		if (tangentialOnly) return cs::Math::Max(1e-12, tangential);
 		double radial = scale.LocalDistanceDerivative(def, d);
 		return cs::Math::Max(1e-12, cs::Math::Min(tangential, radial));
 	}
@@ -345,16 +398,33 @@ namespace SpaceGod::Core
 			formation.TryGetValue(s, lead);
 			double drawnHalf = 0.5 * ScaleModel::LogLerp(s->LengthKm() / ScaleModel::KmPerUnit, ScaleModel::GameShipScale * s->LengthKm(), DrawnBlend) * ShipLod::ExtentFactor(s);
 			double perKm = SceneUnitsPerKm(worlds[static_cast<size_t>(i)], sb.Pos, DrawnBlend);
+			sb.Lateral = perKm / SceneUnitsPerKm(worlds[static_cast<size_t>(i)], sb.Pos, DrawnBlend, true);
 			double grow = s->LengthKm() > 0 ? drawnHalf / perKm / sb.RadiusKm : 1;
 			sb.RadiusKm = cs::Math::Max(sb.RadiusKm, drawnHalf / perKm);
 			if (lead > 0) sb.RadiusKm = cs::Math::Max(sb.RadiusKm, lead * cs::Math::Max(1.0, grow));
 		}
+		bool viewing = DrawnViewHull != nullptr && DrawnViewAxis.LengthSquared() > 1e-18;
 		for (int k = 0; k < nh; k++)
 		{
 			auto s = held[k];
 			auto& sb = bodies[static_cast<size_t>(n + k)];
 			double drawnHalf = 0.5 * ScaleModel::LogLerp(s->LengthKm() / ScaleModel::KmPerUnit, ScaleModel::GameShipScale * s->LengthKm(), DrawnBlend) * ShipLod::ExtentFactor(s);
 			sb.RadiusKm = cs::Math::Max(sb.RadiusKm, drawnHalf / SceneUnitsPerKm(heldWorlds[static_cast<size_t>(k)], sb.Pos, DrawnBlend));
+			// US-T226: the hull the view is framed on keeps others off the camera's line through it, further along it the
+			// more the scale compresses space (none past its sphere at the realistic scale, where the sim already parted them).
+			if (viewing && s == DrawnViewHull)
+			{
+				sb.Axis = DrawnViewAxis.Normalized();
+				sb.Reach = 1 + (ViewReach - 1) * DrawnBlend;
+			}
+			// A derelict holds still in the sim, but is drawn where it drifts like any other hull: in the view it gives way
+			// (left fixed, a derelict beside the helm's hull could be drawn through it: both held, so neither would move).
+			else if (s->Derelict && s != DrawnViewHull)
+			{
+				sb.Weight = cs::Math::Max(1e-6, s->LengthKm());
+				int w = heldWorlds[static_cast<size_t>(k)];
+				sb.Lateral = SceneUnitsPerKm(w, sb.Pos, DrawnBlend) / SceneUnitsPerKm(w, sb.Pos, DrawnBlend, true);
+			}
 		}
 		for (int k = 0; k < obstacles.Count(); k++)
 		{
@@ -367,6 +437,9 @@ namespace SpaceGod::Core
 		drawnSeparation.Clear();
 		for (int i = 0; i < n; i++)
 			if (off[static_cast<size_t>(i)].LengthSquared() > 0) drawnSeparation[list[i]] = off[static_cast<size_t>(i)];
+		for (int k = 0; k < nh; k++)
+			if (bodies[static_cast<size_t>(n + k)].Weight > 0 && off[static_cast<size_t>(n + k)].LengthSquared() > 0)
+				drawnSeparation[held[k]] = off[static_cast<size_t>(n + k)];
 	}
 
 	bool Fleet::Manoeuvrable(cs::Ref<Ship> s)

@@ -25,6 +25,7 @@
 #include "Ephemeris.h"
 #include "Fleet.h"
 #include "Hyperlanes.h"
+#include "ScaleModel.h"
 #include "Ships.h"
 #include "World.h"
 #include "Combat/Battle.h"
@@ -876,6 +877,20 @@ namespace
 			log(app, *FString::Printf(TEXT("out, %s short of the hull"), *KmText(off)), t);
 			expect(app.PilotDriveRegime() == DriveRegime::Normal, TEXT("a hull in the path dropped it out of cruise"));
 			expect(off > 1, TEXT("dropped out short of the hull, not through it"));
+			// US-T226: the two hulls as drawn: their centres' gap, and how far the obstacle sits off the camera's line through
+			// the helm's hull, against their drawn half lengths; the obstacle's drawn sidestep.
+			{
+				auto rel = app.ShipScene(r->Obstacle) - app.ShipScene(r->Ship);
+				double gap = rel.Length();
+				auto axis = app.Fleet()->DrawnViewAxis.LengthSquared() > 0 ? app.Fleet()->DrawnViewAxis.Normalized().SwapYZ() : DVec3::Zero;
+				double along = DVec3::Dot(rel, axis);
+				double offLine = (rel - axis * along).Length();
+				double clear = 0.5 * (app.ShipDisplayLength(r->Obstacle) + app.ShipDisplayLength(r->Ship));
+				double side = app.Fleet()->DrawnOffsetOf(r->Obstacle).Length();
+				UE_LOG(LogSpaceGod, Display, TEXT("sg.CruiseRun: drawn, the hulls' centres %.3f units apart (%.3f along the camera's line, %.3f off it) against %.3f of drawn half lengths (scale blend %.2f); the obstacle's drawn sidestep %s"),
+					gap, along, offLine, clear, app.Scale()->Blend(), *KmText(side));
+				expect(gap >= clear && offLine >= clear, TEXT("the hull ahead drawn clear of the helm's and off the camera's line through it, not over it"));
+			}
 			shotIn(TEXT("cruise-6-blocked.png"));
 			return true;
 		} });

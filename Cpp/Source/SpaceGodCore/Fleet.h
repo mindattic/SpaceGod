@@ -226,6 +226,20 @@ namespace SpaceGod::Core
 		/// <summary>The scale blend the view draws at (<see cref="ScaleModel.Blend"/>: 0 realistic, 1 gameplay), for the drawn solve.</summary>
 		double DrawnBlend = 1.0;
 
+		/// <summary>
+		/// US-T226: the hull the view is framed on (the one flown from the helm; null for none) and the way the camera looks at
+		/// it (ecliptic axes). In the drawn solve a hull near it is kept clear not only of its sphere but off the camera's line
+		/// through it, out to <see cref="ViewReach"/> times the clearance ahead of and behind it at the gameplay scale, pushed
+		/// square to that line: at the gameplay scale a hull a few hundred km dead ahead is drawn a few hull lengths off the
+		/// nose, and pushed straight on along the nose it sat in line with the camera, drawn over the helm's hull. View only
+		/// (it moves nothing <see cref="StateOf"/> reports), so it may differ between co-op peers.
+		/// </summary>
+		cs::Ref<Ship> DrawnViewHull;
+		DVec3 DrawnViewAxis;
+
+		/// <summary>How far along the camera's line (in clearances) the drawn solve keeps hulls off it at the gameplay scale (US-T226).</summary>
+		static constexpr double ViewReach = 3.0;
+
 		/// <summary>Something solid that scheduled hulls keep clear of (a station or yard), at its true size and the body it orbits.</summary>
 		struct HullObstacle
 		{
@@ -262,8 +276,9 @@ namespace SpaceGod::Core
 		bool Separable(cs::Ref<Ship> s);
 
 		/// <summary>Scene units per true km where a hull at <paramref name="helioKm"/> near <paramref name="body"/> is drawn at
-		/// <paramref name="blend"/>: the smaller of the scale model's tangential and radial rates there (the tighter one).</summary>
-		double SceneUnitsPerKm(int body, DVec3 helioKm, double blend);
+		/// <paramref name="blend"/>: the smaller of the scale model's tangential and radial rates there (the tighter one).
+		/// With <paramref name="tangential"/>, the tangential rate alone: the one the view draws a sidestep at (US-T226).</summary>
+		double SceneUnitsPerKm(int body, DVec3 helioKm, double blend, bool tangential = false);
 
 	public:
 		/// <summary>How far (km) a ship has stepped aside from its planned path to keep clear of another (its true-size separation included).</summary>
