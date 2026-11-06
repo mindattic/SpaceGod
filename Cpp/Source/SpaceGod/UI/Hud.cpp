@@ -137,17 +137,20 @@ namespace SpaceGod::UI
 		}
 		galaxyMapOpen = false;
 
+		LayoutNews(); // TopCentre's first slot, so every alert and banner stacks under the news
+
 		if (app->Travel->Active) DrawTravel();
 		else if (app->InFtlCruise()) DrawFtlCruise();
 		else
 		{
 			DrawWorldOverlay();
+			DrawBioMassWarning(); // US-T125, under the news (US-T154)
 			// A plotted course over the gates: the way and the next leg (U.SPC-T516).
 			auto courseLine = app->CourseLine();
 			if (!courseLine.empty()) DrawBanner(courseLine);
 			if (app->CourseAutopilotOffered())
 			{
-				auto autopilot = Rect((Screen::width - 240.0f) * 0.5f, Mathf::Max(Screen::height * 0.26f, 170.0f) + 34.0f, 240.0f, 26.0f);
+				auto autopilot = layout.Take(HudRegion::TopCentre, 240.0f, 26.0f);
 				if (GUI::Button(autopilot, "AUTOPILOT: CREW FLIES THE COURSE", button)) app->EngageCourseAutopilot();
 			}
 		}
@@ -538,8 +541,8 @@ namespace SpaceGod::UI
 	{
 		auto content = GUIContent(banner);
 		auto size = toast->CalcSize(content);
-		// Below the clock and news feed at the top of the screen.
-		auto r = Rect((Screen::width - size.x) * 0.5f, Mathf::Max(Screen::height * 0.26f, 170.0f), size.x, size.y);
+		// Below the clock and news feed at the top of the screen: the next slot in TopCentre (US-T154).
+		auto r = layout.Take(HudRegion::TopCentre, size.x, size.y);
 		auto old = GUI::contentColor;
 		GUI::contentColor = Color(0, 0, 0, 0.7f);
 		GUI::Label(Rect(r.x + 1, r.y + 1, r.width, r.height), content, toast);
@@ -1290,8 +1293,12 @@ namespace SpaceGod::UI
 		{
 			auto r = incoming->Broadside;
 			int loaded = r != nullptr ? Mathf::RoundToInt(static_cast<float>(r->ReadyingLoaded) * 100) : 100;
-			DrawLabel(cs::Cat("INCOMING BROADSIDE  ·  ", incoming->Name(), " VOLLEY ", loaded, "%  ·  3 BRACE"),
-				Vector2(Screen::width * 0.5f - 160, Screen::height * 0.28f), HostileColor, false);
+			// An alert in the TopCentre stack under the news and banners (HudLayout.h). Only on Repaint, as only the toast
+			// (no buttons) can come after it there.
+			cs::String warn = cs::Cat("INCOMING BROADSIDE  ·  ", incoming->Name(), " VOLLEY ", loaded, "%  ·  3 BRACE");
+			auto size = label->CalcSize(GUIContent(warn));
+			auto slot = layout.Take(HudRegion::TopCentre, size.x, size.y);
+			DrawLabel(warn, Vector2(slot.x, slot.y), HostileColor, false);
 		}
 	}
 

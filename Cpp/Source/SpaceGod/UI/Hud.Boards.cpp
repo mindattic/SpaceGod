@@ -1012,7 +1012,7 @@ namespace SpaceGod::UI
 		int n = cs::Math::Min(4, events.Count());
 		if (n == 0) return;
 		float w = 640, rowH = 17;
-		auto r = Panel(Rect((Screen::width - w) * 0.5f, 70, w, 10 + n * rowH));
+		auto r = Panel(newsRect); // TopCentre's first slot, taken in LayoutNews (US-T154)
 		auto old = GUI::contentColor;
 		for (int i = 0; i < n; i++)
 		{
@@ -1073,7 +1073,7 @@ namespace SpaceGod::UI
 	{
 		constexpr float w = 760;
 		float h = Mathf::Min(Screen::height * 0.5f, 420.0f);
-		auto r = Panel(Rect((Screen::width - w) * 0.5f, 70, w, h));
+		auto r = Panel(newsRect); // TopCentre's first slot, taken in LayoutNews (US-T154)
 		const auto& events = app->World()->Events;
 		if (GUI::Button(Rect(r.x + 8, r.y + 6, 120, 22), "[-]  NEWS", title)) app->ShowNews = false;
 		auto old = GUI::contentColor;
@@ -1508,7 +1508,7 @@ namespace SpaceGod::UI
 		float w = toast->CalcSize(content).x + 40;
 		auto old = GUI::color;
 		GUI::color = Color(1, 1, 1, a);
-		auto r = Rect((Screen::width - w) * 0.5f, 150, w, 34);
+		auto r = layout.Take(HudRegion::TopCentre, w, 34); // the next slot under the news and alerts (US-T154)
 		GUI::Box(r, GUIContent::none(), panel);
 		GUI::Label(Rect(r.x + 20, r.y + 7, w, 22), content, toast);
 		GUI::color = old;

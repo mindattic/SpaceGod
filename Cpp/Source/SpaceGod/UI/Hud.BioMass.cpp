@@ -21,13 +21,11 @@ namespace SpaceGod::UI
 		if (bio == nullptr || bio->Globules.Count() == 0 || app->Catalog() == nullptr) return;
 		double jd = app->Clock->Jd;
 		auto player = app->PlayerHelioKm();
-		double nearestKm = cs::Double::PositiveInfinity;
 		float pulse = 0.65f + 0.35f * Mathf::Sin(Time::unscaledTime * 4.0f);
 		for (const auto& g : bio->Globules)
 		{
 			if (!g->Alive() || g->Body < 0 || g->Body >= app->Catalog()->Count()) continue;
 			double km = (bio->Helio(g, jd) - player).Length();
-			nearestKm = cs::Math::Min(nearestKm, km);
 			Vector2 p;
 			float depth = 0;
 			if (!app->ToGui(Views::BioMassView::SceneOf(app, *g), p, depth)) continue;
@@ -41,10 +39,29 @@ namespace SpaceGod::UI
 			DrawLabel(cs::Cat("BIO MASS ", static_cast<int>(g->Mass / 1000), " kt  ", hp, "%  ", Km(km), underFire ? "  UNDER FIRE" : ""),
 				p + Vector2(15, 6), c, true);
 		}
-		if (nearestKm < BioMassWarnKm)
+	}
+
+	void Hud::DrawBioMassWarning()
+	{
+		// US-T154: a slot of its own in the TopCentre stack, under the news, never behind it. Taken on every event (not
+		// only Repaint), so whatever stacks under it is placed alike in the Layout pass and the Repaint.
+		auto world = app->World();
+		auto bio = world ? world->BioMass : nullptr;
+		if (bio == nullptr || bio->Globules.Count() == 0 || app->Catalog() == nullptr) return;
+		double jd = app->Clock->Jd;
+		auto player = app->PlayerHelioKm();
+		double nearestKm = cs::Double::PositiveInfinity;
+		for (const auto& g : bio->Globules)
 		{
-			auto warning = cs::Cat("BIO MASS CONTACT  ", Km(nearestKm), "  -  every gun fires on sight");
-			DrawLabel(warning, Vector2(Screen::width * 0.5f - 160, 64), Color(1.0f, 0.3f, 0.25f, pulse), false);
+			if (!g->Alive() || g->Body < 0 || g->Body >= app->Catalog()->Count()) continue;
+			nearestKm = cs::Math::Min(nearestKm, (bio->Helio(g, jd) - player).Length());
 		}
+		if (!(nearestKm < BioMassWarnKm)) return;
+		auto warning = cs::Cat("BIO MASS CONTACT  ", Km(nearestKm), "  -  every gun fires on sight");
+		auto size = label->CalcSize(GUIContent(warning));
+		auto r = layout.Take(HudRegion::TopCentre, size.x, size.y);
+		if (Event::current().type != EventType::Repaint) return;
+		float pulse = 0.65f + 0.35f * Mathf::Sin(Time::unscaledTime * 4.0f);
+		DrawLabel(warning, Vector2(r.x, r.y), Color(1.0f, 0.3f, 0.25f, pulse), false);
 	}
 }
