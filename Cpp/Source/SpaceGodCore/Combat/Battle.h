@@ -693,6 +693,14 @@ namespace SpaceGod::Core
 		/// <summary>Raised when pirates demand a player-flown hull's cargo (the hull, the pirates).</summary>
 		cs::Action<cs::Ref<Battle>, cs::Ref<BattleUnit>, cs::Ref<Faction>> CargoDemanded;
 
+		/// <summary>US-T203: battle seconds until help answering a distress call is there for a unit's side (0 once it has
+		/// joined), negative when none is coming, or null (no help ever comes). See <see cref="RaidDistress.HelpDueS"/>.</summary>
+		cs::Func<double, cs::Ref<Battle>, cs::Ref<BattleUnit>> HelpDueS;
+
+		/// <summary>US-T203: the longest (seconds) an AI freighter at full hull will hold out against raiders for help to come;
+		/// a battered one holds out for its hull's share of it.</summary>
+		static constexpr double MaxHoldOutS = 150;
+
 		/// <summary>Fighter AI hook, run each step for every fighter (see FighterAI).</summary>
 		cs::Action<cs::Ref<Battle>, cs::Ref<BattleUnit>, double> FighterStep;
 
@@ -1350,13 +1358,22 @@ namespace SpaceGod::Core
 		/// A player-flown hull answers through <see cref="AnswerCargoDemand"/>; an AI merchant or civilian hull is asked
 		/// once the raiders have done what their doctrine says to first (U.SPC-T374, <see cref="RaidDoctrine"/>): left it
 		/// dead in space or knocked out by a pulse, or stripped its shields while they have it outgunned. Its crew are paid
-		/// to deliver, not to die, so it complies, and the raiders' drones collect what it jettisons.
+		/// to deliver, not to die, so it complies, and the raiders' drones collect what it jettisons, unless help answering
+		/// its distress call is close enough to be worth holding out for (US-T203, <see cref="HoldsOutForHelp"/>).
 		/// </summary>
 		void MaybeDemandCargo(const cs::Ref<BattleUnit>& pirate);
 
 		/// <summary>Whether raiders have done to <paramref name="v"/> what their doctrine says to before they demand its
 		/// cargo: left it dead in space or stunned by a pulse, or stripped its shields while they have it outgunned.</summary>
 		bool Stripped(const cs::Ref<BattleUnit>& v);
+
+		/// <summary>
+		/// US-T203: whether AI hull <paramref name="v"/>, hailed for its cargo, holds out rather than comply: help answering
+		/// its distress call (<see cref="HelpDueS"/>) is due within what its hull can take (<see cref="MaxHoldOutS"/> times
+		/// its hull fraction). It stalls while the raiders' patience lasts (<see cref="SurrenderDecisionSeconds"/>), their guns
+		/// held; then the demand lapses into a refusal and they open fire. Help no longer due in time, it complies after all.
+		/// </summary>
+		bool HoldsOutForHelp(const cs::Ref<BattleUnit>& v);
 
 	public:
 		/// <summary>

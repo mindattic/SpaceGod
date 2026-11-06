@@ -502,6 +502,8 @@ namespace SpaceGod::Core
 			if (u->Ship != nullptr) world->Log(battle->StartJd + battle->Seconds / Astro::SecondsPerDay,
 				cs::Cat(battle->Name, ": ", pirates->Name, " demand the ", u->Ship->Name, "'s cargo"), WorldEventKind::Battle, Shown(battle));
 		};
+		// US-T203: a freighter hailed for its cargo holds out when the patrols answering its distress call are close enough.
+		b->HelpDueS = [this](cs::Ref<Battle> battle, cs::Ref<BattleUnit> u) { return RaidDistress::HelpDueS(world, battle, u->Side); };
 	}
 
 	void War::OnSurrenderDecided(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& u, const cs::Ref<Faction>& captor, SurrenderTerms terms)

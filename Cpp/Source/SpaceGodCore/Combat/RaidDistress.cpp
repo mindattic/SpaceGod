@@ -73,6 +73,27 @@ namespace SpaceGod::Core
 		return total <= MaxResponseS ? total : -1;
 	}
 
+	double RaidDistress::HelpDueS(const cs::Ref<World>& world, const cs::Ref<Battle>& b, int side)
+	{
+		auto call = CallIn(world, b);
+		if (call == nullptr || call->Side != side) return -1;
+		double best = -1;
+		for (const auto& r : call->Responses)
+		{
+			if (!Flying(r->Leader)) continue;
+			double due;
+			if (r->Arrived)
+			{
+				// Arrived means it came, unless it could not join after all.
+				if (r->Leader->Battle != b) continue;
+				due = 0;
+			}
+			else due = cs::Math::Max(0.0, r->ArriveAtS - b->Seconds);
+			if (best < 0 || due < best) best = due;
+		}
+		return best;
+	}
+
 	void RaidDistress::Advance(const cs::Ref<World>& world, double jd)
 	{
 		if (world == nullptr || world->War == nullptr || world->Fleet == nullptr) return;

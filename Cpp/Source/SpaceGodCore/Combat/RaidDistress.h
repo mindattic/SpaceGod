@@ -92,6 +92,13 @@ namespace SpaceGod::Core
 		static double ResponseSeconds(const cs::Ref<World>& world, const cs::Ref<Ship>& leader, const cs::Ref<Battle>& b, double jd);
 
 		/// <summary>
+		/// US-T203: how many more battle seconds until help is there for side <paramref name="side"/> of <paramref name="b"/>
+		/// (0 once a responder has joined the fight), or a negative number if no call of that side's is being answered. A
+		/// freighter the raiders hail for its cargo weighs this (<see cref="Battle.HelpDueS"/>) before it complies.
+		/// </summary>
+		static double HelpDueS(const cs::Ref<World>& world, const cs::Ref<Battle>& b, int side);
+
+		/// <summary>
 		/// Raises the call of every fight in which raiders have set on a hull they mean to rob and that has none yet, sends
 		/// the patrols that answer, brings in those whose time has come, and forgets the calls of fights that are over.
 		/// Called once a tick from <see cref="War.Update"/>.

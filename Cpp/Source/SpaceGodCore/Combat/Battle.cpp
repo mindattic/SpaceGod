@@ -3061,7 +3061,9 @@ namespace SpaceGod::Core
 			if (u->CargoDemandedBy != nullptr)
 			{
 				u->CargoDemandTimer += dt;
-				if (u->CargoDemandTimer > SurrenderDecisionSeconds) AnswerCargoDemand(u, false);
+				// US-T203: an AI hull stalling for help complies after all once that help is no longer due in time.
+				if (!u->PlayerControlled() && !HoldsOutForHelp(u)) AnswerCargoDemand(u, true);
+				else if (u->CargoDemandTimer > SurrenderDecisionSeconds) AnswerCargoDemand(u, false);
 			}
 			if (!u->Surrendering || u->SurrenderOutcome.has_value()) continue;
 			u->SurrenderTimer += dt;
@@ -3094,8 +3096,15 @@ namespace SpaceGod::Core
 			v->CargoDemandTimer = 0;
 			Emit(FxKind::Hail, pirate->Pos, v->Pos, pirate->LengthKm, pirate->Side, pirate, -1);
 			if (CargoDemanded) CargoDemanded(shared_from_this(), v, pirate->Faction);
-			if (!v->PlayerControlled()) AnswerCargoDemand(v, true);
+			if (!v->PlayerControlled() && !HoldsOutForHelp(v)) AnswerCargoDemand(v, true);
 		}
+	}
+
+	bool Battle::HoldsOutForHelp(const cs::Ref<BattleUnit>& v)
+	{
+		if (!HelpDueS || v->Combat == nullptr) return false;
+		double due = HelpDueS(shared_from_this(), v);
+		return due >= 0 && due <= MaxHoldOutS * v->Combat->HullFraction();
 	}
 
 	bool Battle::Stripped(const cs::Ref<BattleUnit>& v)
