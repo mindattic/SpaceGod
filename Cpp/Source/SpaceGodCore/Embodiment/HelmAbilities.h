@@ -9,6 +9,7 @@ namespace SpaceGod::Core
 	class BattleUnit;
 	class IEmbodiable;
 	class Ship;
+	class World;
 	enum class FighterRole : int;
 
 	/// <summary>
@@ -34,6 +35,10 @@ namespace SpaceGod::Core
 		SendShuttle = 10,
 		FireBreacher = 11,
 		FirePods = 12,
+
+		/// <summary>US-T140: a band's captain orders the squad to stand down (out of a fight, <see cref="SquadOrders.StandDown"/>).
+		/// Last on the bar, so the slots before it keep their keys.</summary>
+		StandDown = 13,
 	};
 
 	/// <summary>One entry of a helm's ability bar: what it does, and how it stands now (craft aboard, reloading, ready).</summary>
@@ -56,14 +61,16 @@ namespace SpaceGod::Core
 	class SPACEGODCORE_API HelmAbilities
 	{
 	public:
-		/// <summary>The bar for <paramref name="ship"/>'s helm, in key order (Shift+1 for the first, Shift+0 the tenth).</summary>
-		static cs::List<HelmAbilityEntry> Of(const cs::Ref<Ship>& ship);
+		/// <summary>The bar for <paramref name="ship"/>'s helm, in key order (Shift+1 for the first, Shift+0 the tenth). With
+		/// <paramref name="world"/>, a band's captain also has the squad's order last (US-T140); every caller that maps keys
+		/// to slots passes the same world, so the HUD's bar and the keys agree.</summary>
+		static cs::List<HelmAbilityEntry> Of(const cs::Ref<Ship>& ship, const cs::Ref<World>& world = nullptr);
 
 		/// <summary>The bar's heading: what kind of hull it is ("CARRIER", "ASSAULT SHIP"...), from what it carries.</summary>
 		static cs::String Heading(const cs::Ref<Ship>& ship);
 
 		/// <summary>What the entry at <paramref name="slot"/> (1-based) of <paramref name="ship"/>'s bar orders, or none.</summary>
-		static HelmAbility AtSlot(const cs::Ref<Ship>& ship, int slot);
+		static HelmAbility AtSlot(const cs::Ref<Ship>& ship, int slot, const cs::Ref<World>& world = nullptr);
 
 		/// <summary>The craft class a launch ability puts up, and whether it is one.</summary>
 		static bool LaunchRole(HelmAbility a, FighterRole& role);
@@ -83,7 +90,7 @@ namespace SpaceGod::Core
 		/// Carries out <paramref name="a"/> from <paramref name="ship"/>'s helm and records what came of it in <see cref="Last"/>
 		/// (every peer in co-op, so each toasts it). Returns whether anything happened.
 		/// </summary>
-		static bool Use(const cs::Ref<Ship>& ship, HelmAbility a);
+		static bool Use(const cs::Ref<Ship>& ship, HelmAbility a, const cs::Ref<World>& world = nullptr);
 
 		/// <summary>An ability carried in a seat's command (<see cref="SeatAuthority"/>): used if <paramref name="seat"/> is a helm.</summary>
 		static void Command(const cs::Ref<IEmbodiable>& seat, int ability);
@@ -97,6 +104,6 @@ namespace SpaceGod::Core
 
 	private:
 		static Result& Mutable();
-		static cs::String Order(const cs::Ref<Ship>& ship, HelmAbility a, cs::List<cs::Ref<BattleUnit>>& launched);
+		static cs::String Order(const cs::Ref<Ship>& ship, HelmAbility a, cs::List<cs::Ref<BattleUnit>>& launched, const cs::Ref<World>& world);
 	};
 }

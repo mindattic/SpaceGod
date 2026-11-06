@@ -11,6 +11,7 @@ namespace SpaceGod::Core
 	class IGameCommand;
 	class IGameEvent;
 	class SeatAuthority;
+	class World;
 
 	/// <summary>
 	/// The session the game ships with (U.SPC-T410, docs/BIBLE.md U.SPC-LAW-1): the <see cref="SeatAuthority"/> in process,
@@ -55,6 +56,9 @@ namespace SpaceGod::Core
 		bool Logging = false;
 
 		void Submit(const cs::Ref<IGameCommand>& command) override;
+
+		/// <summary>The world the embody gate weighs takes against (US-T140, <see cref="SeatAuthority.GateWorld"/>).</summary>
+		void SetGateWorld(const cs::Ref<World>& world);
 
 		int IdOf(const cs::Ref<IEmbodiable>& seat) override;
 

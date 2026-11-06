@@ -11,6 +11,7 @@ namespace SpaceGod::Core
 	class EmbodimentSession;
 	class IGameCommand;
 	class IGameEvent;
+	class World;
 
 	/// <summary>
 	/// The one authority over who holds which seat (U.SPC-T410, docs/BIBLE.md U.SPC-LAW-1): each player's own
@@ -40,6 +41,11 @@ namespace SpaceGod::Core
 		const cs::List<PlayerId>& Players() const { return players; }
 
 		bool Has(PlayerId player) const;
+
+		/// <summary>The world the embody gate weighs takes against (US-T140: its Influence and the helm flown), or null
+		/// (tests, a bare session): then only the gate's world-free rules apply. Set by the app every frame, the same world
+		/// on every lockstep peer.</summary>
+		cs::Ref<World> GateWorld;
 
 		cs::Ref<IEmbodiable> SeatOf(PlayerId player) const override;
 

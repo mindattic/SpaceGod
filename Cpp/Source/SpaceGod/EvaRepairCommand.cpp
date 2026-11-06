@@ -11,6 +11,7 @@
 #include "Combat/CombatSpecs.h"
 #include "Combat/CombatState.h"
 #include "Embodiment/Embodiables.h"
+#include "Embodiment/Influence.h" // US-T140: the dev waiver
 #include "Embodiment/RepairWorker.h"
 #include "GameLaunch.h"
 #include "Combat/War.h"
@@ -173,6 +174,8 @@ namespace
 			s.generator->Shield = 0;
 			auto workers = Embodiables::WorkersOn(app.World(), s.battle, s.unit);
 			if (workers.Count() == 0) throw std::runtime_error("no EVA crew on the hull");
+			// US-T140: a debug run onto a hull already fighting: the dev waiver lifts the embody limits (never saved).
+			SpaceGodInfluence::Of(app.World())->Waived = true;
 			app.PickSeat(workers[0]);
 			auto w = HeldWorker(app);
 			if (w == nullptr) throw std::runtime_error("the worker was not taken");

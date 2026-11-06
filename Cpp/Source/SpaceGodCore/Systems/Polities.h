@@ -13,6 +13,7 @@ namespace SpaceGod::Core
 	class Diplomacy;
 	class StrategicCommand;
 	class Statecraft;
+	class SpaceGodInfluence;
 
 	/// <summary>What sort of power a faction is (game layer), for the ownership the HUD shows.</summary>
 	enum class PolityKind : int
@@ -56,6 +57,10 @@ namespace SpaceGod::Core
 
 		/// <summary>The diplomacy game (U.SPC-T427): opinions, pacts, proposals, declarations of war and peace between the states.</summary>
 		cs::Ref<SpaceGod::Core::Statecraft> Statecraft;
+
+		/// <summary>The SpaceGod's Influence (US-T140, <see cref="SpaceGodInfluence.Of"/>): one for the galaxy, so it is kept
+		/// across every system; made on first use, absent from older saves.</summary>
+		cs::Ref<SpaceGodInfluence> Influence;
 
 		Polities();
 

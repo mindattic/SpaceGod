@@ -498,6 +498,43 @@ namespace SpaceGod::Core
 				  "rehabilitation, fighter school, a pilot's posting, officer, and at last captain of a capital ship of their "
 				  "own. The comms panel shows their age, home and next step.")),
 
+			cs::New<ManualChapter>("Embody limits and Influence", "What the SpaceGod may take, how its reach grows, and ordering a squad through its leader", Keys("EMBODY LIMITS AND INFLUENCE"),
+				T("No embodying in battle",
+				  "A hull marked in a fight under way can't be taken. You can't start a battle and then jump into the enemy "
+				  "to win it. Take a hull before its squad engages, while it is still closing, or once the fight is over. "
+				  "What is on a body you already hold stays yours in a fight: its guns, its EVA repair crews, the craft it "
+				  "launched and their carrier. A refused take says why, in a red banner under the news."),
+				T("Influence",
+				  "Influence is the SpaceGod's, never a pilot's. The meter at the top left shows its level (Whisper, Murmur, "
+				  "Voice, Presence, Hand, Will, Dominion, Sovereign, Ascendant, Godhead) and the XP to the next. XP comes "
+				  "from interventions: 10 for a life you reach into for the first time, 20 for each act its pilot owns once "
+				  "you leave, and 25 for a squad talked down. Missions (contracts carried through) and careers you steered (a "
+				  "pilot you flew, promoted) add more. A pilot's reputation, crimes and story stay with that pilot. Only the "
+				  "reach is yours. One Influence holds for the whole galaxy and travels with you between the stars. In co-op "
+				  "every seat shares it, because together you are one SpaceGod."),
+				T("What it lets you take",
+				  "Small craft and working hulls (fighters, shuttles, freighters, miners, couriers, tugs, tenders) ask "
+				  "Influence 1. Gunships and corvettes ask 2, frigates and destroyers 3, cruisers 4, carriers and battleships "
+				  "5, command cruisers 6 and gate breakers 7. A defence platform asks 3 and a gate's fort 5. One gun or one "
+				  "repair crew asks two less than its hull. A named Epic entity asks more: the flagship of a feared outlaw "
+				  "captain asks at least 6, and the hull of a pirate warlord or king, or of a captain at the top of their "
+				  "ladder, at least 5. A practice hull (Shift+V), a hull you spawn (V), a loaded save's helm and a hull "
+				  "carried on through a lane or FTL are yours already and never refused."),
+				T("Ordering through a leader",
+				  "Take a raider band's captain while the band is closing on a mark, or lying in wait, and the helm's bar ends "
+				  "with \"Squad: stand down\". Whether the crews comply is theirs to decide. Your Influence weighs in. So does "
+				  "the captain's hold on them: rank, renown, how loyal a captain they have been (honour, warmth, no spite, no "
+				  "betrayals behind them) and the fights lived through together. Against that pulls the prize: a lone "
+				  "freighter riding low pulls hardest, and every order they have already argued down makes the next harder. "
+				  "They obey and break off for half a day. They hesitate, holding fire for 45 s, and you can order again. "
+				  "They argue and keep closing. Or they mutiny: the band's strongest captain deposes yours and goes in at "
+				  "once. Like everything a body does, the order is its captain's own act once you leave. It is a squad "
+				  "order, given before a fight. Once the squad has engaged it is too late."),
+				T("Testing",
+				  "The dev menu (Shift+F1) has a SpaceGod tab. It grants Influence and lifts the limits for testing (never "
+				  "saved). It also sets up the stand-down scenario: a pirate band closing on a lone freighter, with you at "
+				  "the captain's helm. The console command sg.StandDown does the same.")),
+
 			cs::New<ManualChapter>("Fleets and command", "Your house, your fleet, and commanding a polity", Keys("FLEET AND COMMAND"),
 				T("Your house",
 				  "F10 opens your fleet: buy hulls at a lawful yard or take the one you fly, hire captains and give them "

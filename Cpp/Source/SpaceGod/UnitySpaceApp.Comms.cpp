@@ -5,7 +5,9 @@
 #include "Combat/Battle.h"
 #include "Comms/Comms.h"
 #include "Comms/Pilots.h"
+#include "Coop/CoopPeer.h" // US-T140: the tracked body the same on every peer
 #include "Embodiment/Embodiment.h"
+#include "Session/ISession.h"
 #include "Embodiment/StationSeat.h"
 #include "Economy/Settlement.h"
 #include "Ephemeris.h"
@@ -223,6 +225,18 @@ namespace SpaceGod
 		if (world == nullptr || world->Law == nullptr) return;
 		cs::Ref<Ship> held;
 		if (IsPiloting()) held = Piloted.Ship;
+		else if (Coop::CoopPeer::Active())
+		{
+			// US-T140: in co-op the register (and the SpaceGod's Influence its acts earn) is world state, so every peer
+			// tracks the same body: the helm (every peer flies it), else the first seat held in player order, never this
+			// machine's own seat.
+			for (const auto& h : session->State()->Held())
+				if (h.Seat != nullptr && h.Seat->Subject().Ship != nullptr)
+				{
+					held = h.Seat->Subject().Ship;
+					break;
+				}
+		}
 		else if (auto seat = Seat()) held = seat->Subject().Ship;
 		if (held != nullptr && (held->Destroyed || held->GateDeparted)) held = nullptr;
 		auto chars = Characters::Of(world);

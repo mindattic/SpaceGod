@@ -27,6 +27,7 @@ namespace SpaceGod::Core
 	class BodyCatalog;
 	class Hyperlanes;
 	class BuildPlan;
+	class SquadOrders;
 	enum class Good : int;
 	enum class ShipClass : int;
 	enum class SurrenderTerms : int;
@@ -423,6 +424,16 @@ namespace SpaceGod::Core
 		/// this body (parked or queued at its ring) and the player be in its neighbourhood. Null if not.
 		/// </summary>
 		cs::Ref<Battle> TryStartPlayerAttack(const cs::Ref<Ship>& ship, const cs::Ref<Ship>& target, int body, DVec3 offsetFromBodyKm, DVec3 forward, double jd);
+
+		/// <summary>
+		/// A raider band that has closed on its mark falls on it (US-T140, <see cref="SquadOrders"/>): a fight where the mark
+		/// is, the band on side 0 (the piloted hull, a captain the SpaceGod holds, stays out of it) and the mark's group on
+		/// side 1. Null if the mark is gone or fighting, none of the band can join, or a battle is already on at that body.
+		/// </summary>
+		cs::Ref<Battle> StrikeAt(const cs::List<cs::Ref<Ship>>& band, const cs::Ref<Ship>& mark, double jd);
+
+		/// <summary>The squads' book (US-T140): bands closing on marks, and those stood down. Null until first used (older saves).</summary>
+		cs::Ref<SquadOrders> Squads;
 
 		/// <summary>
 		/// A patrol interdicts the player's wanted ship (see <see cref="Law.UpdatePilot"/>): a fight off

@@ -41,6 +41,7 @@
 #include "UnitySpaceApp.Tractor.deps.h" // US-T95
 #include "UnitySpaceApp.SkyTravel.deps.h" // US-T145
 #include "UnitySpaceApp.Embody.deps.h" // US-T135
+#include "UnitySpaceApp.Influence.deps.h" // US-T140
 
 namespace SpaceGod
 {
@@ -101,5 +102,6 @@ namespace SpaceGod
 #include "UnitySpaceApp.Tractor.inl" // US-T95: cargo pods and the tractor beam
 #include "UnitySpaceApp.SkyTravel.inl" // US-T145: the sky's layers and the travel between them
 #include "UnitySpaceApp.Embody.inl" // US-T135: the universal embody layer
+#include "UnitySpaceApp.Influence.inl" // US-T140: embody limits, Influence and squad orders as the player meets them
 	};
 }

@@ -1350,7 +1350,7 @@ namespace SpaceGod::UI
 		if (!app->IsPiloting() || app->Travel->Active || app->ShowPicker) return;
 		auto helm = cs::As<ShipHelm>(app->HeldSeat());
 		if (helm == nullptr || helm->Ship == nullptr) return;
-		auto bar = HelmAbilities::Of(helm->Ship);
+		auto bar = HelmAbilities::Of(helm->Ship, app->World()); // US-T140: a band captain's squad order too
 		if (bar.Count() == 0) return;
 		constexpr float pad = 10, rowH = 20, gap = 18;
 		float maxW = Mathf::Min(static_cast<float>(Screen::width) - 40, 1100.0f);

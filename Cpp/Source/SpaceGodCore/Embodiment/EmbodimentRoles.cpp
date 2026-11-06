@@ -48,7 +48,7 @@ namespace SpaceGod::Core
 		Add(p, "Left / right mouse", "guns / missiles");
 		if (Ship != nullptr)
 		{
-			auto bar = HelmAbilities::Of(Ship);
+			auto bar = HelmAbilities::Of(Ship, world); // US-T140: a band captain's squad order too
 			for (int i = 0; i < bar.Count() && i < 10; i++)
 				p.Abilities.Add(EmbodimentAbility(cs::Cat("Shift+", i == 9 ? 0 : i + 1), bar[i].Label, bar[i].Ready));
 		}

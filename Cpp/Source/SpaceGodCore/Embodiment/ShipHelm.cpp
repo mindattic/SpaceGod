@@ -114,7 +114,7 @@ namespace SpaceGod::Core
 			return;
 		}
 		// A helm ability ordered this frame (US-T106): a squadron launched, the wing recalled or called, a boarding order.
-		if (input.HelmAbility != 0 && !Ship->Destroyed) HelmAbilities::Use(Ship, static_cast<HelmAbility>(input.HelmAbility));
+		if (input.HelmAbility != 0 && !Ship->Destroyed) HelmAbilities::Use(Ship, static_cast<HelmAbility>(input.HelmAbility), world); // US-T140: the squad's order too
 		// The sensor and power command (US-T93): a ping, going dark, powering up; the sim runs the clocks (SensorPosture::Advance).
 		if (input.Sensor != 0 && !Ship->Destroyed) SensorPosture::Command(world, Ship, input.Sensor);
 		// Dark or restarting, nothing fires.

@@ -9,9 +9,11 @@
 #include "Combat/CombatState.h"
 #include "Combat/Dogfighting.h"
 #include "Combat/Fighters.h"
+#include "Combat/SquadOrders.h" // US-T140
 #include "Embodiment/ShipHelm.h"
 #include "Settings/GameSetting.h"
 #include "Ships.h"
+#include "World.h"
 
 namespace SpaceGod::Core
 {
@@ -104,7 +106,7 @@ namespace SpaceGod::Core
 
 	const HelmAbilities::Result& HelmAbilities::Last() { return Mutable(); }
 
-	cs::List<HelmAbilityEntry> HelmAbilities::Of(const cs::Ref<Ship>& ship)
+	cs::List<HelmAbilityEntry> HelmAbilities::Of(const cs::Ref<Ship>& ship, const cs::Ref<World>& world)
 	{
 		cs::List<HelmAbilityEntry> bar;
 		if (ship == nullptr || ship->Combat == nullptr || ship->Combat->Spec == nullptr || ship->Destroyed) return bar;
@@ -176,6 +178,18 @@ namespace SpaceGod::Core
 			e.Ready = fight && loaded;
 			bar.Add(e);
 		}
+		// US-T140: a hull with a squad of its band about it orders it through its captain, before any fight (last, so the
+		// slots above keep their keys).
+		if (world != nullptr && SquadOrders::SquadOf(world, ship).Count() > 0)
+		{
+			cs::String state, why;
+			HelmAbilityEntry e;
+			e.Ability = HelmAbility::StandDown;
+			e.Label = "Squad: stand down";
+			e.Ready = SquadOrders::CanOrder(world, ship, world->Jd, state, why);
+			e.State = state;
+			bar.Add(e);
+		}
 		return bar;
 	}
 
@@ -188,9 +202,9 @@ namespace SpaceGod::Core
 		return cs::Cat(kind, "  ", ship->Name);
 	}
 
-	HelmAbility HelmAbilities::AtSlot(const cs::Ref<Ship>& ship, int slot)
+	HelmAbility HelmAbilities::AtSlot(const cs::Ref<Ship>& ship, int slot, const cs::Ref<World>& world)
 	{
-		auto bar = Of(ship);
+		auto bar = Of(ship, world);
 		return slot >= 1 && slot <= bar.Count() ? bar[slot - 1].Ability : HelmAbility::None;
 	}
 
@@ -207,14 +221,14 @@ namespace SpaceGod::Core
 
 	void HelmAbilities::Command(const cs::Ref<IEmbodiable>& seat, int ability)
 	{
-		if (auto helm = cs::As<ShipHelm>(seat)) Use(helm->Ship, static_cast<HelmAbility>(ability));
+		if (auto helm = cs::As<ShipHelm>(seat)) Use(helm->Ship, static_cast<HelmAbility>(ability), helm->WorldOf());
 	}
 
-	bool HelmAbilities::Use(const cs::Ref<Ship>& ship, HelmAbility a)
+	bool HelmAbilities::Use(const cs::Ref<Ship>& ship, HelmAbility a, const cs::Ref<World>& world)
 	{
 		if (ship == nullptr || a == HelmAbility::None) return false;
 		cs::List<cs::Ref<BattleUnit>> launched;
-		auto toast = Order(ship, a, launched);
+		auto toast = Order(ship, a, launched, world);
 		auto& r = Mutable();
 		r.Seq++;
 		r.Toast = toast;
@@ -223,8 +237,14 @@ namespace SpaceGod::Core
 		return launched.Count() > 0 || !toast.empty();
 	}
 
-	cs::String HelmAbilities::Order(const cs::Ref<Ship>& ship, HelmAbility a, cs::List<cs::Ref<BattleUnit>>& launched)
+	cs::String HelmAbilities::Order(const cs::Ref<Ship>& ship, HelmAbility a, cs::List<cs::Ref<BattleUnit>>& launched, const cs::Ref<World>& world)
 	{
+		// US-T140: the squad's order is given before a fight, through the captain; the crews answer (SquadOrders).
+		if (a == HelmAbility::StandDown)
+		{
+			if (world == nullptr) return "";
+			return SquadOrders::StandDown(world, ship, world->Jd).Toast;
+		}
 		auto c = ship->Combat;
 		if (c == nullptr) return "";
 		auto u = UnitOf(ship);

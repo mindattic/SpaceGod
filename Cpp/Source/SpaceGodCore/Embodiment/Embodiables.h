@@ -23,14 +23,50 @@ namespace SpaceGod::Core
 	/// Where the things the player can embody are found (U.SPC-T18): a picker lists from here rather than
 	/// building its own lists, so a new kind registers once and every picker sees it.
 	/// </summary>
+	/// <summary>Which of the gate's rules refused (US-T140), for the HUD.</summary>
+	enum class EmbodyRefusal : int
+	{
+		None,
+		/// <summary>Nothing there to take.</summary>
+		Nothing,
+		/// <summary>The hull is marked in a battle under way and the SpaceGod holds nothing on it.</summary>
+		InBattle,
+		/// <summary>The SpaceGod's Influence is too low for it.</summary>
+		Influence,
+	};
+
 	/// <summary>What the one embody gate (<see cref="Embodiables.MayEmbody"/>) says: allowed, or why not, for the player.</summary>
 	struct EmbodyVerdict
 	{
 		bool Ok = true;
 		cs::String Reason;
+		EmbodyRefusal Rule = EmbodyRefusal::None;
+		/// <summary>For an Influence refusal: what it asks for, and what the SpaceGod has.</summary>
+		int Need = 0, Have = 0;
 
 		static EmbodyVerdict Allow() { return EmbodyVerdict(); }
-		static EmbodyVerdict Refuse(cs::String why) { EmbodyVerdict v; v.Ok = false; v.Reason = std::move(why); return v; }
+		static EmbodyVerdict Refuse(cs::String why, EmbodyRefusal rule = EmbodyRefusal::Nothing)
+		{
+			EmbodyVerdict v;
+			v.Ok = false;
+			v.Reason = std::move(why);
+			v.Rule = rule;
+			return v;
+		}
+	};
+
+	/// <summary>
+	/// What the embody gate weighs a take against (US-T140): the world (for the Influence), and every subject the SpaceGod's
+	/// hands hold now, every co-op seat and the helm flown alike (they are all the one SpaceGod). Built from world state and
+	/// the session's seats only, so each lockstep peer builds the same one.
+	/// </summary>
+	struct SPACEGODCORE_API EmbodyContext
+	{
+		cs::Ref<Core::World> World;
+		cs::List<EmbodimentSubject> Held;
+
+		/// <summary>The context of <paramref name="seats"/> (null ones skipped) plus the helm of <see cref="World.PilotedShip"/>.</summary>
+		static EmbodyContext Of(const cs::Ref<Core::World>& world, const cs::List<cs::Ref<IEmbodiable>>& seats);
 	};
 
 	class SPACEGODCORE_API Embodiables
@@ -38,13 +74,25 @@ namespace SpaceGod::Core
 	public:
 		/// <summary>
 		/// The one gate every attempt to embody anything goes through (US-T135), wherever it comes from (the embody key, the
-		/// picker, cycling, co-op's <see cref="SeatAuthority"/>), after the kind's own <see cref="IEmbodiable.CanEmbody"/>: the
-		/// SpaceGod's own rules on what it may take. The place US-T140 puts them (no hull marked in battle taken out from
-		/// under its side; bigger hulls and named Epic units needing enough SpaceGod Influence); today it allows everything.
+		/// picker, cycling, co-op's <see cref="SeatAuthority"/> and helm take), after the kind's own
+		/// <see cref="IEmbodiable.CanEmbody"/>: the SpaceGod's own rules on what it may take (US-T140).
+		/// 1. Anything on a hull the SpaceGod already holds is free to it: the hull's guns, its EVA crews, its station, its
+		///    host, the craft it launched and their carrier. It is moving about its own body, not taking a new one.
+		/// 2. No hull marked in a battle under way is taken: start a fight, then hijack the enemy, is out. A squad that has not
+		///    engaged yet (no battle) is fair game, and so is everything once the fight is over.
+		/// 3. Each thing asks for Influence (<see cref="SpaceGodInfluence.Needed"/>): bigger hulls and named Epic entities more.
 		/// Rules here read the thing's <see cref="IEmbodiable.Subject"/> and the world, never a player identity: the player is
-		/// no one ship or pilot, and whatever it does is credited to the unit it holds.
+		/// no one ship or pilot, and whatever it does is credited to the unit it holds. Exempt by design (they call
+		/// EnterPiloting directly): V spawn-and-pilot and Shift+V practice (dev and practice hulls the SpaceGod made itself),
+		/// a loaded save's helm (restored, not taken) and FTL / lane re-entry (the same hull carried on).
 		/// </summary>
-		static EmbodyVerdict MayEmbody(const cs::Ref<IEmbodiable>& next);
+		static EmbodyVerdict MayEmbody(const EmbodyContext& context, const cs::Ref<IEmbodiable>& next);
+
+		/// <summary>Whether <paramref name="s"/> is a hull fighting in a battle under way (present, not fled, the battle not over).</summary>
+		static bool InBattle(const EmbodimentSubject& s);
+
+		/// <summary>Whether two subjects are the one body: the same hull, or a launched craft and its carrier (or two of its craft).</summary>
+		static bool SameBody(const EmbodimentSubject& a, const EmbodimentSubject& b);
 
 		/// <summary>A ship's helm.</summary>
 		static cs::Ref<ShipHelm> HelmOf(const cs::Ref<World>& world, const cs::Ref<Ship>& ship);

@@ -467,6 +467,7 @@ namespace SpaceGod
 		// craft and the camera get an idle frame (the simulation runs on).
 		if (UpdateCheatMenu()) Input.Handover();
 		if (UpdateComms()) Input.Handover(); // US-T137: the comms panel (Shift+H) has the keys while open; US-T138: the held pilot
+		UpdateInfluence(); // US-T140: the embody gate's world, this frame
 		if (Tour::ShowcaseTour::Update(*this, !cheatMenu->IsOpen)) Input.Handover(); // US-T147: the showcase tour has the keys while it runs
 		ArbitrateInput(true); // US-T90: one owner per input this frame (the craft held, else the command view)
 		int screensOpen = OpenScreens();
@@ -611,6 +612,7 @@ namespace SpaceGod
 		hud->Draw();
 		DrawComms(); // US-T137: the comms panel, over the HUD
 		DrawSystemCruise(); // US-T127: the cruise drive's readout
+		DrawInfluence(); // US-T140: the Influence meter, the embody gate's refusals, the squad's line
 		Tour::ShowcaseTour::Draw(*this); // US-T147: the showcase tour's strip
 		DrawTractorHud(); // US-T95: the tractor beam's readout
 		cheatMenu->Draw(*this); // US-T126: the dev menu, or the HUD's hint for its key

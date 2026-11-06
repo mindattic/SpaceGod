@@ -36,6 +36,8 @@
 #include "Combat/Pursuit.h"
 #include "Combat/RaidDoctrine.h"
 #include "Combat/Salvage.h"
+#include "Combat/SquadOrders.h" // US-T140
+#include "Embodiment/ShipHelm.h" // US-T140: ShipHelm::FrameOf, where a mark is
 #include "Combat/StrandedWings.h"
 #include "Combat/Wreck.h"
 #include "Combat/CargoPods.h" // US-T95
@@ -205,6 +207,7 @@ namespace SpaceGod::Core
 		SensorPosture::Advance(world, seconds);
 		Interdictions(jd);
 		GateAmbushes(jd);
+		if (Squads != nullptr) SquadOrders::Advance(world, jd); // US-T140: bands closing on their marks (none in the Bench)
 		if (jd >= nextPodSweepJd)
 		{
 			double days = cs::Math::Min(1.0, jd - nextPodSweepJd + PodSweepDays);
@@ -290,7 +293,8 @@ namespace SpaceGod::Core
 	{
 		return !lurker->Destroyed && !lurker->IsEscort() && lurker->Ambushing() && lurker->Battle == nullptr &&
 			lurker != world->PilotedShip && (world->Pursuit == nullptr || world->Pursuit->Of(lurker) == nullptr) &&
-			LaneInterdictors::Fielded(lurker, Fleet()->Ships());
+			LaneInterdictors::Fielded(lurker, Fleet()->Ships()) &&
+			(Squads == nullptr || !SquadOrders::IsStoodDown(world, lurker, lastJd)); // US-T140: a band its captain stood down
 	}
 
 	bool War::Targets(const cs::Ref<Ship>& lurker, const cs::Ref<Ship>& rider)
@@ -921,6 +925,8 @@ namespace SpaceGod::Core
 		if (ship->Destroyed || ship->Battle != nullptr || ship->Planetside()) return;
 		// Local traffic neither joins a fight nor draws one (U.SPC-T375).
 		if (ship->Controller()->Role == ShipRole::Commuter) return;
+		// US-T140: a band closing on its mark picks no other fight on the way in (it strikes when it gets there, SquadOrders).
+		if (Squads != nullptr && SquadOrders::ClosingFor(world, ship) != nullptr) return;
 		int body = ship->Orbit->Body;
 		// Raiders home with plunder put it in the haven's stores (U.SPC-T94).
 		if (ship->Faction->IsPirate) UnloadPlunder(ship->Controller(), body);
@@ -960,6 +966,8 @@ namespace SpaceGod::Core
 	cs::Ref<Battle> War::TryStartPlayerBattle(const cs::Ref<Ship>& ship, int body, DVec3 offsetFromBodyKm, DVec3 forward, double jd)
 	{
 		if (ship->Destroyed || ship->Battle != nullptr || ship->Planetside()) return nullptr;
+		// US-T140: a band captain whose band is closing on its mark holds fire until the strike (or the order to stand down).
+		if (Squads != nullptr && SquadOrders::ClosingFor(world, ship) != nullptr) return nullptr;
 		// Only in the body's own neighbourhood (the frame body never changes mid-flight, however far the
 		// pilot goes), and only into a fight it has actually reached: one placed beyond the battle's
 		// edge would be counted as escaped on the very next step. A fight it starts is fought where it is.
@@ -1027,6 +1035,35 @@ namespace SpaceGod::Core
 		}
 		Battles.Add(b);
 		world->Log(jd, cs::Cat(b->Name, ": the ", ship->Name, " opens fire on the ", target->Faction->Name, " ", cs::Strings::ToLowerInvariant(target->Spec->DisplayName), " ", target->Name), WorldEventKind::Battle, Shown(b));
+		BumpDanger(body, 1);
+		BattleStarted.Invoke(b);
+		return b;
+	}
+
+	cs::Ref<Battle> War::StrikeAt(const cs::List<cs::Ref<Ship>>& band, const cs::Ref<Ship>& mark, double jd)
+	{
+		// US-T140: a band that closed on its mark unopposed by its own captain falls on it, where the mark is.
+		if (mark == nullptr || mark->Destroyed || mark->GateDeparted || mark->Derelict || mark->Battle != nullptr || mark->Planetside()) return nullptr;
+		cs::List<cs::Ref<Ship>> raiders;
+		for (const auto& s : band)
+			if (s != nullptr && !s->Destroyed && s->Battle == nullptr && s != world->PilotedShip) raiders.Add(s);
+		if (raiders.Count() == 0) return nullptr;
+		auto [body, at] = ShipHelm::FrameOf(world, mark, jd);
+		if (BattleAt(body) != nullptr) return nullptr;
+		cs::List<cs::Ref<Ship>> present = raiders;
+		present.Add(mark);
+		auto b = NewBattle(body, jd, present, cs::Nullable<DVec3>(at));
+		for (const auto& s : raiders) Join(b, s, 0, false);
+		Join(b, mark->Controller(), 1, false);
+		if (b->Units.Count() == 0 || mark->Battle != b)
+		{
+			// Nobody could be placed (all held at a helm, or the mark slipped in elsewhere): no fight after all.
+			for (const auto& u : b->Units)
+				if (u->Ship != nullptr && u->Ship->Battle == b) u->Ship->Battle = nullptr;
+			return nullptr;
+		}
+		Battles.Add(b);
+		world->Log(jd, cs::Cat(b->Name, ": ", raiders[0]->Faction->Name, " raiders (", raiders[0]->Name, ") fall on the ", mark->Name), WorldEventKind::Battle, Shown(b));
 		BumpDanger(body, 1);
 		BattleStarted.Invoke(b);
 		return b;
@@ -1365,6 +1402,7 @@ namespace SpaceGod::Core
 		{
 			if (lurker->Destroyed || lurker->IsEscort() || !lurker->Faction->IsPirate || lurker->Runner || !lurker->StakeoutKm.has_value()) continue;
 			if (lurker->Battle != nullptr || lurker == world->PilotedShip || !Core::Fleet::IsAt(lurker, root) || !Willing(lurker, jd)) continue;
+			if (Squads != nullptr && SquadOrders::IsStoodDown(world, lurker, jd)) continue; // US-T140: stood down by its captain
 			auto at = lurker->Orbit->OffsetAt(jd);
 			auto marks = cs::List<cs::Ref<Ship>>();
 			double guns = 0;

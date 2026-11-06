@@ -85,9 +85,12 @@ namespace SpaceGod
 
 	bool UnitySpaceApp::PassesEmbodyGate(const cs::Ref<IEmbodiable>& next)
 	{
-		auto verdict = Embodiables::MayEmbody(next);
+		// US-T140: weighed against everything the SpaceGod's hands hold now (every seat and the helm flown), as SeatAuthority does.
+		cs::List<cs::Ref<IEmbodiable>> held;
+		for (const auto& h : session->State()->Held()) held.Add(h.Seat);
+		auto verdict = Embodiables::MayEmbody(EmbodyContext::Of(World(), held), next);
 		if (verdict.Ok) return true;
-		ShowToast(cs::Cat("Can't embody ", next != nullptr ? next->Name() : cs::String("that"), ": ", verdict.Reason));
+		NoteEmbodyRefusal(next != nullptr ? next->Name() : cs::String("that"), verdict);
 		return false;
 	}
 

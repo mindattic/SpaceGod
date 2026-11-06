@@ -38,6 +38,7 @@
 #include "Economy/Companies.h"
 #include "Economy/Contracts.h"
 #include "Economy/Economy.h"
+#include "Embodiment/Influence.h" // US-T140: Polities.Influence
 #include "Economy/Escorts.h"
 #include "Economy/Goods.h"
 #include "Economy/Holdings.h"
@@ -312,7 +313,8 @@ namespace SpaceGod::Core
 	SG_SERIALIZE(Polities, "Unity.SpaceGod.Core.Polities",
 		SG_P(Command), SG_P(Diplomacy), SG_P(Statecraft),
 		b.Typed("InTransit", &Self::InTransit, +[]() -> const ::SpaceGod::Core::Graph::NetType* { using namespace ::SpaceGod::Core::Registrations; using namespace ::SpaceGod::Core::Graph; return DelegateType(1, true, { IEnumerableOf(TypeOf<cs::Ref<Ship>>()) }); }),
-		SG_F(factions), SG_F(homes), SG_F(worlds))
+		SG_F(factions), SG_F(homes), SG_F(worlds),
+		SG_OPT(Influence)) // US-T140: the SpaceGod's Influence, absent from older saves
 
 	SG_SERIALIZE(PolityDirectives, "Unity.SpaceGod.Core.PolityDirectives",
 		SG_F(Build), SG_F(Faction), SG_F(Levels), SG_F(Production), SG_F(Research), SG_F(ResearchPoints))

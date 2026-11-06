@@ -19,6 +19,7 @@
 #include "Combat/Battle.h"
 #include "Combat/CombatSpecs.h"
 #include "Ephemeris.h"
+#include "Embodiment/Influence.h" // US-T140: the dev waiver
 #include "Fleet.h"
 #include "ScaleModel.h"
 #include "Ships.h"
@@ -57,6 +58,9 @@ namespace SpaceGod::Tour
 
 		bool Helm(UnitySpaceApp& app, const cs::String& path)
 		{
+			// US-T140: the tour shows each feature from hulls it sets up (capitals, seats in its own skirmishes), so it runs
+			// with the dev waiver of the embody limits (never saved); the limits have their own stop.
+			if (app.World() != nullptr) SpaceGodInfluence::Of(app.World())->Waived = true;
 			cs::String said;
 			return UI::CheatMenu::RunPath(app, path, said);
 		}
@@ -373,8 +377,19 @@ namespace SpaceGod::Tour
 					if (step == 2 && t > 10) { step = 3; Helm(app, "Helm/Man the next gun"); }
 				})
 				.For(13));
-			TourRegistry::Add(TourStop::Placeholder("Embodiment", "influence", "Influence and the embody limits",
-				"no hijacking a unit marked in battle; Influence grows with your level and opens bigger hulls and Epic entities", "US-T140").At(90));
+			// US-T140: the embody limits and Influence, and ordering a squad through its leader: sg.StandDown lays out a pirate band
+			// closing on a lone freighter with you at its captain's helm (Influence at least 4), then the squad is ordered down.
+			TourRegistry::Add(TourStop::Console("Embodiment", "influence", "Influence and ordering a squad",
+				"The Influence meter (top left) gates bigger hulls and Epic names; no hull in a battle under way can be taken. Here, a pirate captain's band closes on a lone freighter: Shift+1 orders it to stand down, and the crews obey, hesitate, argue or mutiny", "sg.StandDown")
+				.At(90)
+				.Until([](UnitySpaceApp& app, double t) { return app.IsPiloting() && t > 5; }, 30)
+				.WithCamera([](UnitySpaceApp& app, double t)
+				{
+					static bool ordered = false;
+					if (t == 0) ordered = false;
+					if (!ordered && t > 4) { ordered = true; app.OrderSquadStandDown(); }
+				})
+				.For(12).AtBothScales());
 
 			// ---- Places (the skies and Void Station 1 register from their commands).
 			TourRegistry::Add(SiteStop("void-megastructure", "Megastructure",

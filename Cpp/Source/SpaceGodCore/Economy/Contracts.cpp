@@ -14,6 +14,7 @@
 #include "Economy/Goods.h"
 #include "Economy/People.h"
 #include "Economy/Settlement.h"
+#include "Embodiment/Influence.h" // US-T140
 #include "Ephemeris.h"
 #include "Fleet.h"
 #include "Hyperlanes.h"
@@ -1021,6 +1022,8 @@ namespace SpaceGod::Core
 			if (!c->ByPlayer && c->Taker != nullptr && (c->Kind == ContractKind::Passengers || c->Kind == ContractKind::Colonists)) c->Taker->Cargo = cs::String();
 			world->Log(jd, cs::Cat("Contract done: ", c->Title(), " (", why, ") by ", who, (pay ? cs::Cat(", ", Cr(c->Pay), " cr from ", c->Patron->Name) : cs::String())), WorldEventKind::Info, c->Body);
 			if (c->ByPlayer && law) law->Notice(cs::Cat("Contract complete: ", c->Title(), (pay ? cs::Cat(": ", c->Patron->Name, " pays ", Cr(c->Pay), " cr") : cs::String())));
+			// US-T140: a mission carried through at a helm is the SpaceGod's Influence (the pay and standing are the pilot's).
+			if (c->ByPlayer) SpaceGodInfluence::Grant(world, InfluenceSource::Mission, 40 + cs::Math::Min(60.0, c->Pay / 20000.0), cs::Cat("mission: ", c->Title()));
 			return;
 		}
 		if (state == ContractState::Expired) return;

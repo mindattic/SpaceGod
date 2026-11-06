@@ -130,9 +130,16 @@ namespace SpaceGod::Core
 				More("you are no one pilot: bounties, grudges and the story land on the pilot of the body you hold, who owns it all once you leave"),
 				L("Esc / Left", "back to the contacts, then close")),
 
+			cs::New<HelpSection>("EMBODY LIMITS AND INFLUENCE",
+				More("no embodying in battle: a hull marked in a fight under way can't be taken (no starting a fight, then hijacking the enemy); take it before it engages, or once the fight is over; what is on a hull you already hold (its guns, EVA crews, launched craft) stays yours"),
+				More("Influence (the meter top left) is the SpaceGod's own, never a pilot's: it grows with XP from interventions (acts a pilot owns once you leave, a squad talked down), missions (contracts) and careers you steered (a pilot you flew promoted)"),
+				More("it gates what you can take: small craft and working hulls 1, gunships and corvettes 2, frigates and destroyers 3, cruisers 4, carriers and battleships 5, command cruisers 6, gate breakers 7; a defence platform 3, a gate fort 5; a named Epic entity (a feared outlaw's flagship, a pirate warlord or king, a captain at the top of their ladder) more"),
+				L("Shift+n (squad)", "at a band captain's helm, before a fight: order the squad to stand down (the bar's last entry); by your Influence and the captain's hold on the crews (rank, reputation, loyalty, history) they obey, hesitate, argue, or mutiny and put someone else at the head of the band"),
+				More("a refusal shows on the HUD with its reason; the dev menu (Shift+F1, SpaceGod) grants Influence, lifts the limits for testing, and sets up the stand-down scenario")),
+
 			cs::New<HelpSection>("FLEET AND COMMAND",
 				L("F10", "your fleet: buy hulls, warehouses, station shares and claims; hire captains and give them standing orders"),
-				L("'  ;", "take charge, any time: jump into the next seat in the fight in view (a ship's helm, a fighter or bomber, a station), straight from the one you hold"),
+				L("'  ;", "the next seat in the fight in view (a ship's helm, a fighter or bomber, a station), straight from the one you hold: only on a hull you already hold (its guns, crews and craft); a hull already in the battle is refused"),
 				L("/", "man the next gun on the hull or station you hold (or have selected): the view sits on the mount, down the barrel; past the last gun, back to the helm or station (Shift+/ is the launched craft's, below)"),
 				L("Shift+1 ... Shift+0", "at a helm, the hull's own abilities, as its ability bar lists them from what it carries: a carrier launches a squadron of each class it has aboard (interceptors, fighters, bombers, heavy fighters, recon), recalls its wing, and calls it onto your locked hull, to guard the carrier, or to its own fights; a shuttle bay, a Breacher bay or boarding pods send a boarding shuttle, a Breacher or a pod salvo at the hull locked (T). In a fight only; a carrier you fly into a fight holds its wing aboard for you to launch"),
 				L("Shift+/", "from a carrier's helm: jump into the craft it launched last (a fighter, bomber or boarding shuttle), again for the next one, past the last back to the carrier's helm"),

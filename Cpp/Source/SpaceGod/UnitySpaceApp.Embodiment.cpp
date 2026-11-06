@@ -355,7 +355,7 @@ namespace SpaceGod
 	{
 		if (!Input.Boost || Input.NumberKey < 0 || ClickPanelOpen() || ship == nullptr || ship->Phase == ShipPhase::Lane) return 0;
 		int slot = Input.NumberKey == 0 ? 10 : Input.NumberKey;
-		auto ability = HelmAbilities::AtSlot(ship, slot);
+		auto ability = HelmAbilities::AtSlot(ship, slot, World()); // US-T140: the bar as the HUD shows it (a band captain's squad order last)
 		if (ability == HelmAbility::None) return 0;
 		Input.NumberKey = -1; // spent: Shift+digit is the ability, never also the captain's order on the digit
 		return static_cast<int>(ability);

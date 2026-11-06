@@ -31,6 +31,8 @@ namespace SpaceGod::Core
 		if (command != nullptr) pending.Enqueue(command);
 	}
 
+	void LocalSession::SetGateWorld(const cs::Ref<World>& world) { authority->GateWorld = world; } // US-T140
+
 	int LocalSession::IdOf(const cs::Ref<IEmbodiable>& seat) { return authority->IdOf(seat); }
 
 	void LocalSession::ApplyPending()

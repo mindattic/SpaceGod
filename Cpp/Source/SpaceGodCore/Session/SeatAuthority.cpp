@@ -163,8 +163,11 @@ namespace SpaceGod::Core
 			raise(cs::New<CommandRefused>(command, cs::Cat(next->Name(), " is held by ", holder)));
 			return;
 		}
-		// US-T135: the one embody gate (US-T140's rules go there), on every peer alike.
-		auto verdict = Embodiables::MayEmbody(next);
+		// US-T135: the one embody gate (US-T140's rules), on every peer alike: weighed against everything the SpaceGod's hands
+		// hold now (every player's seat and the helm flown), which is the same on every peer.
+		cs::List<cs::Ref<IEmbodiable>> held;
+		for (const auto& q : players) held.Add(seats.At(q)->Current);
+		auto verdict = Embodiables::MayEmbody(EmbodyContext::Of(GateWorld, held), next);
 		if (!verdict.Ok)
 		{
 			raise(cs::New<CommandRefused>(command, cs::Cat("can't take ", next->Name(), ": ", verdict.Reason)));

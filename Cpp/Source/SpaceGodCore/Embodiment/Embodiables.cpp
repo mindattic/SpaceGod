@@ -2,6 +2,8 @@
 
 #include "Embodiment/Embodiables.h"
 #include "Embodiment/FighterSeat.h"
+#include "Embodiment/Influence.h" // US-T140
+#include "Combat/Fighters.h"     // US-T140: a craft's carrier
 #include "Embodiment/MountedTurret.h"
 #include "Embodiment/RepairWorker.h"
 #include "Embodiment/ShipHelm.h"
@@ -154,10 +156,80 @@ namespace SpaceGod::Core
 		return list;
 	}
 
-	EmbodyVerdict Embodiables::MayEmbody(const cs::Ref<IEmbodiable>& next)
+	// ------------------------------------------------------------ the embody gate (US-T140)
+
+	EmbodyContext EmbodyContext::Of(const cs::Ref<Core::World>& world, const cs::List<cs::Ref<IEmbodiable>>& seats)
+	{
+		EmbodyContext c;
+		c.World = world;
+		for (const auto& s : seats)
+			if (s != nullptr) c.Held.Add(s->Subject());
+		if (world != nullptr && world->PilotedShip != nullptr && !world->PilotedShip->Destroyed)
+			c.Held.Add(Embodiables::HelmOf(world, world->PilotedShip)->Subject());
+		return c;
+	}
+
+	namespace
+	{
+		/// The unit a subject is part of, a launched craft counted as its carrier's.
+		cs::Ref<BattleUnit> BodyUnit(const EmbodimentSubject& s)
+		{
+			auto u = s.Unit;
+			if (u == nullptr && s.Ship != nullptr && s.Ship->Battle != nullptr) u = s.Ship->Battle->UnitOf(s.Ship);
+			if (u != nullptr && u->Fighter != nullptr && u->Fighter->Carrier != nullptr) return u->Fighter->Carrier;
+			return u;
+		}
+	}
+
+	bool Embodiables::InBattle(const EmbodimentSubject& s)
+	{
+		auto battle = s.Battle;
+		auto unit = s.Unit;
+		if (battle == nullptr && s.Ship != nullptr) battle = s.Ship->Battle;
+		if (battle == nullptr || battle->Over) return false;
+		if (unit == nullptr && s.Ship != nullptr) unit = battle->UnitOf(s.Ship);
+		// A ship marked in the battle with no unit there yet is in it all the same; a unit that has fled or gone is not.
+		return unit == nullptr ? s.Ship != nullptr : unit->Present();
+	}
+
+	bool Embodiables::SameBody(const EmbodimentSubject& a, const EmbodimentSubject& b)
+	{
+		if (a.Ship != nullptr && a.Ship == b.Ship) return true;
+		if (a.Unit != nullptr && a.Unit == b.Unit) return true;
+		auto ua = BodyUnit(a), ub = BodyUnit(b);
+		return ua != nullptr && ua == ub;
+	}
+
+	EmbodyVerdict Embodiables::MayEmbody(const EmbodyContext& context, const cs::Ref<IEmbodiable>& next)
 	{
 		if (next == nullptr) return EmbodyVerdict::Refuse("nothing there to take");
-		// US-T140 adds its rules here (in battle, Influence); until then the SpaceGod may take anything it can reach.
+		auto influence = SpaceGodInfluence::Find(context.World);
+		if (influence != nullptr && influence->Waived) return EmbodyVerdict::Allow(); // dev only, never saved
+		auto sub = next->Subject();
+		// 1. Moving about a body the SpaceGod already holds (its guns, its crews, its craft, back to its helm): always free.
+		for (const auto& held : context.Held)
+			if (SameBody(held, sub)) return EmbodyVerdict::Allow();
+		// 2. No taking a hull out of a fight under way: no starting a battle and then hijacking the enemy.
+		if (InBattle(sub))
+		{
+			auto battle = sub.Battle != nullptr ? sub.Battle : sub.Ship != nullptr ? sub.Ship->Battle : nullptr;
+			return EmbodyVerdict::Refuse(cs::Cat("it is in battle (", battle != nullptr ? battle->Name : cs::String("a fight"),
+				"): take a hull before it engages, or once the fight is over"), EmbodyRefusal::InBattle);
+		}
+		// 3. The SpaceGod's reach: bigger hulls and Epic names ask for more Influence (no world given, as in a bare session's
+		// tests, no reach to weigh).
+		if (context.World == nullptr) return EmbodyVerdict::Allow();
+		cs::String what;
+		int need = SpaceGodInfluence::Needed(context.World, next, what);
+		int have = influence != nullptr ? influence->Level() : 1;
+		if (need > have)
+		{
+			auto v = EmbodyVerdict::Refuse(cs::Cat(what, " asks Influence ", need, ", the SpaceGod has ", have, " (",
+				SpaceGodInfluence::Title(have), "): grow it through interventions, missions and careers steered"), EmbodyRefusal::Influence);
+			v.Need = need;
+			v.Have = have;
+			return v;
+		}
 		return EmbodyVerdict::Allow();
 	}
 

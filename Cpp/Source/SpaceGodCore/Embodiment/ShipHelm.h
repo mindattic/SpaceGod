@@ -32,6 +32,9 @@ namespace SpaceGod::Core
 
 		ShipHelm(const cs::Ref<World>& world, const cs::Ref<Core::Ship>& ship);
 
+		/// <summary>The world the hull flies in (US-T140: its squad orders weigh it).</summary>
+		const cs::Ref<World>& WorldOf() const { return world; }
+
 		cs::String Name() const override;
 		EmbodimentKind Kind() const override { return EmbodimentKind::Ship; }
 		cs::Ref<Core::Faction> Faction() const override;

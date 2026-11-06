@@ -7,6 +7,7 @@
 #include "Combat/Diplomacy.h"
 #include "Economy/Economy.h"
 #include "Economy/Settlement.h"
+#include "Embodiment/Influence.h" // US-T140
 #include "Events/EventSources.h"
 #include "Fleet.h"
 #include "Law/Law.h"
@@ -580,6 +581,8 @@ namespace SpaceGod::Core
 		if (p == nullptr) return nullptr;
 		p->TimesEmbodied++;
 		p->Held = true;
+		// US-T140: a life the SpaceGod reaches into for the first time is an intervention of its own.
+		if (p->TimesEmbodied == 1) SpaceGodInfluence::Grant(world, InfluenceSource::Intervention, 10, cs::Cat("took ", p->Styled(), " for the first time"));
 		return p;
 	}
 
@@ -590,11 +593,18 @@ namespace SpaceGod::Core
 		p->Held = false;
 		// The rationalization rule: each act done while held becomes the pilot's own, with a reason that fits who they are
 		// and where they stood. The motive is chosen here, deterministically, so every peer and a rewind tell the same story.
+		int owned = 0;
 		for (const auto& e : p->Story)
 		{
 			if (!e->Owned || !e->Slot("motive").empty()) continue;
 			e->Set("motive", cs::Str(static_cast<int>(Mix(static_cast<uint32_t>(e->Seed) ^ static_cast<uint32_t>(p->Seed)) & 0xffff)));
+			owned++;
 		}
+		// US-T140: every act the pilot now owns as their own choice is an intervention the SpaceGod made (its Influence, not
+		// the pilot's: the reputation stays with them).
+		if (owned > 0)
+			SpaceGodInfluence::Grant(world, InfluenceSource::Intervention, 20.0 * owned,
+				cs::Cat(owned, " act", owned == 1 ? "" : "s", " owned by ", p->Styled()));
 		Advance(world, p, jd);
 	}
 
@@ -664,6 +674,9 @@ namespace SpaceGod::Core
 		p->Rank++;
 		p->RankJd = jd;
 		auto title = Careers::Title(p->Track, p->Rank);
+		// US-T140: a career the SpaceGod has steered (a pilot it has flown) moving up is its doing too.
+		if (p->TimesEmbodied > 0)
+			SpaceGodInfluence::Grant(world, InfluenceSource::Career, 30.0 + 20.0 * p->Rank, cs::Cat(p->Name, " rose to ", title));
 		if (p->Track == CareerTrack::Pirate && p->Rank == Careers::TopRank(CareerTrack::Pirate))
 			Act(p, LifeEventKind::CrownedKing, jd, 0, { "title", title, "faction", p->Faction != nullptr ? p->Faction->Name : cs::String("the clans") });
 		else if (p->Track == CareerTrack::Reform && p->Rank == 1)
