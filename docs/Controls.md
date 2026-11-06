@@ -136,10 +136,18 @@ the sky cycle. A plain key never changes meaning with Shift unless the table say
 
 ## Console
 
-Open with the console key; `sg.BigBattle sg.BioMass sg.Cheat sg.CheatMenu sg.Comms sg.DogfightDemo sg.Drift sg.EdgeRun
-sg.EvaRepair sg.Harvest sg.HullLighting sg.HyperspaceToll sg.Lighting sg.Race sg.Shine sg.Sky* sg.StandDown sg.Tour sg.Tractor
-sg.VoidStation sg.WarpRun sg.WarpTunnel`. Every dev-menu entry is also reachable as a console command; the console is the only
-way to some tuning (`sg.Lighting`, `sg.Shine`, `sg.HullLighting`).
+Open with the console key; `sg.BigBattle sg.BioMass sg.CapitalRoll sg.Cheat sg.CheatMenu sg.Comms sg.DogfightDemo sg.Drift
+sg.EdgeRun sg.EvaRepair sg.Ghost sg.Harvest sg.HullLighting sg.HyperspaceToll sg.LaneRide sg.Lighting sg.Race sg.Shine sg.Sky*
+sg.StandDown sg.Tour sg.Tractor sg.VoidStation sg.WarpRun sg.WarpTunnel`. Every dev-menu entry is also reachable as a console
+command; the console is the only way to some tuning (`sg.Lighting`, `sg.Shine`, `sg.HullLighting`).
+
+Staged checks (US-T218), each logging its numbers under LogSpaceGod and, with `shot`, saving screenshots:
+
+| Command | What it stages |
+|---|---|
+| `sg.Ghost [shot <file>] [quit]` | Two hulls on one line of sight, the far one focused: the near one drawn as the see-through occluder ghost (US-T185); logs each hull's materials; also `<file>-opaque.png` (focus let go) and `<file>-far-alone.png` |
+| `sg.LaneRide [shot <dir>] [quit]` | A fighter flown into a space lane, steered about inside the tube (US-T196), then out past its wall; logs the offset, sideways speed and speed every half second, and the speed bleeding down to the hull's own every quarter second; `lane-1..4-*.png` |
+| `sg.CapitalRoll [shot <dir>] [seconds=60] [preroll=90] [quit]` | The big battle off Uranus run on `preroll` battle seconds, the camera on the capital under the most fire; each second its roll, the threat's bearing and the shield field it shows the threat against its strongest face and every other roll (US-T187); `roll-NN.png` every 5 s |
 
 ## Findings and conflicts
 
