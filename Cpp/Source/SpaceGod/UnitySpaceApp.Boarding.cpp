@@ -55,6 +55,17 @@ namespace SpaceGod
 			case 3:
 				if (inside->Command(role, BoardingOrder::Hold)) ShowToast(cs::Cat(Side(role), BoardingCommand::Label(inside, role)));
 				break;
+			case 4:
+				// US-T82: over the hull for the picked space, out through the hatches of what they hold.
+				if (role != BoardingRole::Boarders)
+				{
+					ShowToast("Only boarders go over the hull");
+					break;
+				}
+				if (BoardingPick < 0) BoardingPick = BoardingCommand::NextObjective(inside, BoardingPick);
+				if (inside->Command(role, BoardingOrder::OverHull, BoardingPick)) ShowToast(cs::Cat(Side(role), BoardingCommand::Label(inside, role)));
+				else if (BoardingPick >= 0) ShowToast(cs::Cat(inside->Compartments[BoardingPick]->Name, " has no hatch to the hull"));
+				break;
 			case 0:
 				inside->AutoResolve(role);
 				ShowToast(cs::Cat(Side(role), BoardingCommand::Label(inside, role)));

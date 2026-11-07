@@ -5,7 +5,8 @@
 // Interactive boarding (U.SPC-T468, docs/BOARDING.md). While piloting in a battle with a fight aboard, the piloted
 // hull's own (defending) or one its faction's marines are in (boarding), B opens the boarding panel and the number
 // keys give that side its standing orders over the compartments: 1 picks the next compartment, 2 sends the boarders
-// for it or musters the defenders on it, 3 has them hold where they stand, 0 hands the side back to the resolver
+// for it or musters the defenders on it, 3 has them hold where they stand, 4 (boarders only, US-T82) sends them out
+// through the hatches of what they hold and over the hull to cut in at it, 0 hands the side back to the resolver
 // (the auto-resolve). The fight in each compartment is the resolver's weighted roll as ever. A hail still has the
 // number keys first.
 // </summary>

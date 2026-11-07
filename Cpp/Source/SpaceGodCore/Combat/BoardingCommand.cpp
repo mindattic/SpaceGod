@@ -25,6 +25,7 @@ namespace SpaceGod::Core
 			case BoardingOrder::Auto: return "Auto";
 			case BoardingOrder::Push: return "Push";
 			case BoardingOrder::Hold: return "Hold";
+			case BoardingOrder::OverHull: return "OverHull";
 		}
 		return "";
 	}
@@ -56,17 +57,20 @@ namespace SpaceGod::Core
 	cs::String BoardingCommand::Label(const cs::Ref<Interior>& interior, BoardingRole role)
 	{
 		auto [order, objective] = OrdersOf(interior, role);
+		cs::String where = objective >= 0 && objective < interior->Compartments.Count() ? interior->Compartments[objective]->Name : cs::String("?");
+		// US-T82: parties out on the plating, whatever the order now standing.
+		cs::String hull = role == BoardingRole::Boarders && interior->OnHull() > 0.5
+			? cs::Cat(", ", cs::Fmt(interior->OnHull(), "0"), " crossing the hull") : cs::String();
 		switch (order)
 		{
+			case BoardingOrder::OverHull:
+				return cs::Cat("over the hull for ", where, interior->OnHull() > 0.5 ? cs::String() : cs::String(" (pushing for a hatch first)"), hull);
 			case BoardingOrder::Push:
-			{
-				cs::String where = objective >= 0 && objective < interior->Compartments.Count() ? interior->Compartments[objective]->Name : cs::String("?");
-				return cs::String(role == BoardingRole::Boarders ? "push for " : "muster on ") + where;
-			}
+				return cs::String(role == BoardingRole::Boarders ? "push for " : "muster on ") + where + hull;
 			case BoardingOrder::Hold:
-				return role == BoardingRole::Boarders ? "dig in where they stand" : "hold their posts";
+				return cs::String(role == BoardingRole::Boarders ? "dig in where they stand" : "hold their posts") + hull;
 			default:
-				return role == BoardingRole::Boarders ? "auto (for the bridge and engineering)" : "auto (muster on the fighting)";
+				return cs::String(role == BoardingRole::Boarders ? "auto (for the bridge and engineering)" : "auto (muster on the fighting)") + hull;
 		}
 	}
 }

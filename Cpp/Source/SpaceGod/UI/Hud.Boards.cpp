@@ -1320,7 +1320,9 @@ namespace SpaceGod::UI
 		auto inside = hull->Combat->Interior;
 		auto [order, objective] = BoardingCommand::OrdersOf(inside, role);
 		constexpr float rowH = 16;
-		float w = 560, h = 82 + inside->Compartments.Count() * rowH;
+		// US-T82: a row for each party out on the hull, with how far across it is.
+		int rows = inside->Compartments.Count() + inside->HullParties.Count();
+		float w = 560, h = 82 + rows * rowH;
 		auto r = Panel(Rect((Screen::width - w) * 0.5f, Screen::height - h - 48, w, h));
 		GUI::Label(Rect(r.x + 12, r.y + 6, w - 24, 20), cs::Cat("BOARDING  ·  ", cs::Strings::ToUpperInvariant(hull->Name()), "  ·  ",
 			role == BoardingRole::Boarders ? cs::String("OUR MARINES ABOARD") : cs::Cat("REPELLING ", cs::Strings::ToUpperInvariant(inside->BoarderNames()))), title);
@@ -1331,13 +1333,24 @@ namespace SpaceGod::UI
 			GUI::contentColor = c->Contested() ? UiStyle::Danger : c->Taken ? Color(1.0f, 0.85f, 0.4f) : Color::white();
 			GUI::Label(Rect(r.x + 12, r.y + 30 + i * rowH, w - 24, rowH), cs::Cat(mark, c->Name, ":  ", SpaceText(c)), small);
 		}
+		GUI::contentColor = Accent;
+		for (int i = 0; i < inside->HullParties.Count(); i++)
+		{
+			auto p = inside->HullParties[i];
+			int across = (int)cs::Math::Round(p->Progress() * 10);
+			cs::String bar = cs::Cat("[", cs::String(across, '='), cs::String(10 - across, ' '), "]");
+			GUI::Label(Rect(r.x + 12, r.y + 30 + (inside->Compartments.Count() + i) * rowH, w - 24, rowH),
+				cs::Cat("   On the hull:  ", cs::Fmt(p->Marines, "0"), " marines, ", inside->Compartments[p->From]->Name, " to ",
+					inside->Compartments[p->To]->Name, "  ", bar, " ", cs::Fmt(p->Progress(), "P0")), small);
+		}
 		GUI::contentColor = Color::white();
-		float y = r.y + 34 + inside->Compartments.Count() * rowH;
+		float y = r.y + 34 + rows * rowH;
 		GUI::Label(Rect(r.x + 12, y, w - 24, rowH), cs::Cat("Orders:  ", BoardingCommand::Label(inside, role),
 			inside->Log.Count() > 0 ? cs::Cat("   ·   ", inside->Log[inside->Log.Count() - 1].Text) : cs::String()), small);
 		GUI::contentColor = Accent;
 		GUI::Label(Rect(r.x + 12, r.yMax() - 26, w - 24, 20),
-			cs::Cat("1 pick   2 ", role == BoardingRole::Boarders ? "push for it" : "muster on it", "   3 hold   0 auto-resolve   B close"), text);
+			cs::Cat("1 pick   2 ", role == BoardingRole::Boarders ? "push for it" : "muster on it", "   3 hold   ",
+				role == BoardingRole::Boarders ? "4 over the hull   " : "", "0 auto-resolve   B close"), text);
 		GUI::contentColor = Color::white();
 	}
 

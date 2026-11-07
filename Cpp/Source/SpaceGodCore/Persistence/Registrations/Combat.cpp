@@ -299,7 +299,11 @@ namespace SpaceGod::Core
 		SG_F(Boarder), SG_F(BoarderObjective), SG_F(BoarderOrder), SG_F(BoarderQuality), SG_F(BoarderSide),
 		SG_F(BoardersLanded), SG_F(BoardersLost), SG_F(Captured), SG_F(Compartments), SG_F(CrewLost),
 		SG_F(DefenderObjective), SG_F(DefenderOrder), SG_F(DefenderQuality), SG_F(Log), SG_F(MarinesLost),
-		SG_F(Parties), SG_F(Training), SG_F(reactIn))
+		SG_F(Parties), SG_F(Training), SG_F(reactIn),
+		SG_OPT(HullParties)) // US-T82: boarders crossing the hull, absent from older saves
+
+	SG_SERIALIZE(HullParty, "Unity.SpaceGod.Core.HullParty",
+		SG_F(Distance), SG_F(From), SG_F(FromY), SG_F(FromZ), SG_F(Marines), SG_F(To), SG_F(Walked), SG_F(Y), SG_F(Z))
 
 	SG_SERIALIZE(KineticRound, "Unity.SpaceGod.Core.KineticRound",
 		SG_F(Aimed), SG_F(ArriveIn), SG_F(Damage), SG_F(Gone), SG_F(Hit), SG_F(Life), SG_F(Pos), SG_F(Railgun),

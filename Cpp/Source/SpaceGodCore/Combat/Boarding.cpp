@@ -45,9 +45,21 @@ namespace SpaceGod::Core
 
 	double Interior::Boarders() const
 	{
-		double n = 0;
+		double n = OnHull();
 		for (const auto& c : Compartments) n += c->Boarders;
 		return n;
+	}
+
+	double Interior::OnHull() const
+	{
+		double n = 0;
+		for (const auto& p : HullParties) n += p->Marines;
+		return n;
+	}
+
+	bool Interior::HullReaches(int objective) const
+	{
+		return objective >= 0 && objective < Compartments.Count() && !Compartments[objective]->Buried;
 	}
 
 	bool Interior::UnderBoarding() const { return Boarder != nullptr && Boarders() > 0.5 && !Captured; }
@@ -241,7 +253,9 @@ namespace SpaceGod::Core
 	{
 		if (Boarder == nullptr || Captured) return false;
 		if (order == BoardingOrder::Push && (objective < 0 || objective >= Compartments.Count())) return false;
-		if (order != BoardingOrder::Push) objective = -1;
+		// US-T82: only boarders go over the hull, and only for a space with a hatch of its own.
+		if (order == BoardingOrder::OverHull && (role != BoardingRole::Boarders || !HullReaches(objective))) return false;
+		if (order != BoardingOrder::Push && order != BoardingOrder::OverHull) objective = -1;
 		if (role == BoardingRole::Boarders)
 		{
 			BoarderOrder = order;
@@ -321,12 +335,13 @@ namespace SpaceGod::Core
 		Boarder = nullptr;
 		BoarderSide = -1;
 		Parties.Clear();
+		// Anyone still out on the hull went with the boarding (callers that keep them count them first).
+		HullParties.Clear();
 		ClearOrders();
 	}
 
 	bool Interior::Step(double dt, double seconds, cs::Random& rng)
 	{
-		(void)rng; // unused in the C# too
 		if (Captured || Boarder == nullptr) return false;
 
 		// Vacuum: crew caught in a holed compartment die until it is sealed.
@@ -339,6 +354,20 @@ namespace SpaceGod::Core
 			c->SealIn -= dt;
 			if (c->SealIn <= 0) Note(seconds, c->Index, cs::Cat("Emergency bulkheads seal ", c->Name));
 		}
+
+		// US-T82: boarders sent over the hull go out through the hatches of what they hold (those left inside dig in), and
+		// the parties already out on the plating walk on and cut in at their hatch.
+		if (BoarderOrder == BoardingOrder::OverHull)
+		{
+			if (Compartments[BoarderObjective]->Taken && !Compartments[BoarderObjective]->Contested())
+			{
+				Note(seconds, BoarderObjective, cs::Cat(Compartments[BoarderObjective]->Name, " is already held; the boarders press on"));
+				BoarderOrder = BoardingOrder::Auto;
+				BoarderObjective = -1;
+			}
+			else if (SendOverHull(seconds) > 0) BoarderOrder = BoardingOrder::Hold;
+		}
+		if (HullParties.Count() > 0) WalkHull(dt, seconds, rng);
 
 		// Defending marines move toward the fighting once they have been roused.
 		reactIn -= dt;
@@ -405,6 +434,7 @@ namespace SpaceGod::Core
 		if (Boarders() <= 0.5)
 		{
 			Note(seconds, -1, cs::Cat("The ", BoarderNames(), " boarders are wiped out; the crew hold the ship"));
+			HullParties.Clear();
 			for (const auto& c : Compartments)
 			{
 				c->Boarders = 0;
@@ -449,7 +479,7 @@ namespace SpaceGod::Core
 		for (const auto& c : Compartments)
 		{
 			if (!c->Taken || c->Boarders <= (front ? 1 : 0.01)) continue;
-			int next = NextToward(c->Index, BoarderOrder == BoardingOrder::Push ? BoarderObjective : -1);
+			int next = NextToward(c->Index, BoarderOrder == BoardingOrder::Push || BoarderOrder == BoardingOrder::OverHull ? BoarderObjective : -1);
 			if (next < 0) continue;
 			// Most of the party moves on; a rear guard holds what was taken.
 			double move = c->Boarders * cs::Math::Min(1.0, 0.08 * dt);
@@ -460,6 +490,67 @@ namespace SpaceGod::Core
 		{
 			m.from->Boarders -= m.marines;
 			m.to->Boarders += m.marines;
+		}
+	}
+
+	double Interior::SendOverHull(double seconds)
+	{
+		auto to = Compartments[BoarderObjective];
+		double sent = 0;
+		for (const auto& c : Compartments)
+		{
+			// Out through the hatch of a space they hold, quiet, with a rear guard left in it; never one buried at the
+			// centre of the hull (it has no hatch), nor the one they are making for.
+			if (c == to || c->Buried || !c->Taken || c->Contested() || c->Boarders < HullRearGuard + 0.5) continue;
+			auto p = cs::New<HullParty>();
+			p->Marines = c->Boarders - HullRearGuard;
+			p->From = c->Index;
+			p->To = to->Index;
+			p->FromZ = p->Z = c->Z;
+			p->FromY = p->Y = c->Y;
+			// Along the keel and round the hull's curve, plus cycling out through one hatch and cutting in at the other.
+			p->Distance = cs::Math::Abs(to->Z - c->Z) + cs::Math::Abs(to->Y - c->Y) + HatchSeconds / HullWalkSeconds;
+			c->Boarders -= p->Marines;
+			sent += p->Marines;
+			HullParties.Add(p);
+			Note(seconds, c->Index, cs::Cat(cs::Fmt(p->Marines, "0"), " boarders go out through the ", c->Name, " hatch and over the hull for ", to->Name));
+		}
+		return sent;
+	}
+
+	void Interior::WalkHull(double dt, double seconds, cs::Random& rng)
+	{
+		for (int i = HullParties.Count() - 1; i >= 0; i--)
+		{
+			auto p = HullParties[i];
+			// Out in the open: the ship's own point defence and the debris of the fight round it.
+			double lost = p->Marines * cs::Math::Min(1.0, HullExposure * dt);
+			p->Marines -= lost;
+			BoardersLost += lost;
+			p->Walked += dt / HullWalkSeconds;
+			auto to = Compartments[p->To];
+			double t = p->Progress();
+			p->Z = p->FromZ + (to->Z - p->FromZ) * t;
+			p->Y = p->FromY + (to->Y - p->FromY) * t;
+			if (p->Marines < 0.05)
+			{
+				BoardersLost += p->Marines;
+				HullParties.RemoveAt(i);
+				Note(seconds, p->From, cs::Cat("The party out on the hull from ", Compartments[p->From]->Name, " is lost"));
+				continue;
+			}
+			if (t < 1) continue;
+			// Cut in at the hatch: it opens to space, and the crew inside are caught in it until the bulkheads close.
+			to->Boarders += p->Marines;
+			if (!to->Vented)
+			{
+				to->Vented = true;
+				to->SealIn = 4 + rng.NextDouble() * 10;
+			}
+			HullParties.RemoveAt(i);
+			Note(seconds, to->Index, cs::Cat(cs::Fmt(p->Marines, "0"), " boarders cut in at ", to->Name, " from the hull"));
+			// The last of them in: those who dug in to wait for them push on for the objective with them.
+			if (HullParties.Count() == 0 && BoarderOrder == BoardingOrder::Hold && BoarderObjective >= 0) BoarderOrder = BoardingOrder::Push;
 		}
 	}
 
@@ -526,6 +617,9 @@ namespace SpaceGod::Core
 
 	void Interior::HandOver(double prizeCrew)
 	{
+		// US-T82: a party still out on the plating comes in at the hatch it was making for.
+		for (const auto& p : HullParties) Compartments[p->To]->Boarders += p->Marines;
+		HullParties.Clear();
 		SpreadCrew(prizeCrew, false);
 		for (const auto& c : Compartments)
 		{
@@ -570,7 +664,8 @@ namespace SpaceGod::Core
 
 	double Interior::Recall()
 	{
-		double n = 0;
+		double n = OnHull(); // US-T82: those out on the hull come back too
+		HullParties.Clear();
 		for (const auto& c : Compartments)
 		{
 			n += c->Boarders;

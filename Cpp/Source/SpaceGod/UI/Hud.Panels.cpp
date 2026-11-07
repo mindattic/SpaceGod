@@ -1001,6 +1001,10 @@ namespace SpaceGod::UI
 			{
 				lines.Add(SelectionLine{ "BOARDED", cs::Cat(inside->BoarderNames(), ": ", cs::Fmt(inside->Boarders(), "0"), " boarders hold ", inside->TakenCount(), " of ", inside->Compartments.Count(), " spaces") });
 				for (const auto& space : inside->Compartments) lines.Add(SelectionLine{ cs::Cat("  ", space->Name), SpaceText(space) });
+				// US-T82: boarders out on the plating, crossing to cut in somewhere else.
+				for (const auto& p : inside->HullParties)
+					lines.Add(SelectionLine{ "  On the hull", cs::Cat(cs::Fmt(p->Marines, "0"), " boarders for ", inside->Compartments[p->To]->Name, ", ",
+						cs::Fmt(p->Progress(), "P0"), " across") });
 				if (inside->Log.Count() > 0) lines.Add(SelectionLine{ "", inside->Log[inside->Log.Count() - 1].Text });
 			}
 			if (ship->Derelict) lines.Add(SelectionLine{ "DERELICT", "Boarded, stripped and abandoned" });

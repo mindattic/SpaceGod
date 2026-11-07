@@ -102,6 +102,31 @@ namespace SpaceGod::Core
 	};
 
 	/// <summary>
+	/// Boarders out on a hull's plating (US-T82): marines who left a compartment they hold through its hatch and are
+	/// crossing the outside of the ship on magnetic boots to cut in at another (<see cref="BoardingOrder.OverHull"/>),
+	/// past the defenders mustered between. Where they stand is kept in the compartments' own frame (ship lengths along the
+	/// keel, height) so a view can draw them on the hull as they go. Out there they take losses from the ship's own point
+	/// defence and debris (<see cref="Interior.HullExposure"/>) but nobody fights them hand to hand.
+	/// </summary>
+	class SPACEGODCORE_API HullParty final
+	{
+	public:
+		double Marines = 0;
+
+		/// <summary>The compartment they came out of, and the one whose hatch they make for.</summary>
+		int From = 0, To = 0;
+
+		/// <summary>Where they set out from and where they stand now (ship lengths along the keel, height).</summary>
+		double FromZ = 0, FromY = 0, Z = 0, Y = 0;
+
+		/// <summary>How far they have walked and how far the crossing is, in ship lengths over the plating.</summary>
+		double Walked = 0, Distance = 0;
+
+		/// <summary>How far across they are, 0 to 1.</summary>
+		double Progress() const { return Distance > 1e-9 ? cs::Math::Min(1.0, Walked / Distance) : 1.0; }
+	};
+
+	/// <summary>
 	/// The inside of a hull and any fight going on in it. Defending marines sit in their barracks
 	/// and react to a breach after a delay; the fight in each compartment trades casualties by
 	/// numbers, training (<see cref="Faction.MarineQuality"/>) and a defender's advantage; boarders
@@ -145,6 +170,25 @@ namespace SpaceGod::Core
 		/// <summary>Marines that boarded in total, and how many of them fell.</summary>
 		double BoardersLanded = 0, BoardersLost = 0, CrewLost = 0, MarinesLost = 0;
 
+		/// <summary>Boarders out on the hull's plating, crossing to cut in somewhere else (US-T82).</summary>
+		cs::List<cs::Ref<HullParty>> HullParties;
+
+		/// <summary>Seconds a party takes to cross one ship length of plating (US-T82): slow going on magnetic boots,
+		/// round the hull's curve and past its mounts.</summary>
+		static constexpr double HullWalkSeconds = 60;
+
+		/// <summary>Seconds to cycle out through a hatch and to cut back in through another, added to every crossing.</summary>
+		static constexpr double HatchSeconds = 8;
+
+		/// <summary>The share of a party on the hull lost each second to the ship's point defence and debris.</summary>
+		static constexpr double HullExposure = 0.004;
+
+		/// <summary>Marines a party leaves behind in each compartment it goes out from, holding it.</summary>
+		static constexpr double HullRearGuard = 1;
+
+		/// <summary>Boarders out on the hull.</summary>
+		double OnHull() const;
+
 	private:
 		double reactIn = 0;
 
@@ -167,6 +211,8 @@ namespace SpaceGod::Core
 	public:
 		double Crew() const;
 		double Marines() const;
+
+		/// <summary>Boarders in the fight: those in the compartments and (US-T82) those out on the hull.</summary>
 		double Boarders() const;
 
 		bool UnderBoarding() const;
@@ -256,6 +302,10 @@ namespace SpaceGod::Core
 		/// <summary>Hands one side back to the resolver: the auto-resolve.</summary>
 		void AutoResolve(BoardingRole role) { Command(role, BoardingOrder::Auto); }
 
+		/// <summary>Whether boarders could be sent over the hull for <paramref name="objective"/> (US-T82): a compartment
+		/// with a hatch of its own (not one buried at the centre of the hull).</summary>
+		bool HullReaches(int objective) const;
+
 		/// <summary>Whether either side is under orders other than the resolver's.</summary>
 		bool Commanded() const { return BoarderOrder != BoardingOrder::Auto || DefenderOrder != BoardingOrder::Auto; }
 
@@ -286,6 +336,13 @@ namespace SpaceGod::Core
 		void Reinforce(double dt);
 
 		void Advance(double dt);
+
+		/// <summary>US-T82: the boarders under orders to go over the hull leave every compartment they hold (bar a rear
+		/// guard) through its hatch for the objective's. Returns how many went out; none while they hold nothing yet.</summary>
+		double SendOverHull(double seconds);
+
+		/// <summary>US-T82: the parties on the hull walk on, take their losses out there, and cut in at their hatch.</summary>
+		void WalkHull(double dt, double seconds, cs::Random& rng);
 
 		/// <summary>The neighbour on the shortest way from a compartment to <paramref name="objective"/>, or (-1) to the
 		/// nearest of the bridge and engineering not yet held; -1 when there is no way, or the party is already there.</summary>

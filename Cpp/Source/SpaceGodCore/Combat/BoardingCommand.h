@@ -36,6 +36,12 @@ namespace SpaceGod::Core
 		/// <summary>Stand fast where they are: boarders dig in on what they hold (waiting for the next wave),
 		/// defenders hold their posts instead of mustering.</summary>
 		Hold,
+
+		/// <summary>US-T82, boarders only: go out through the hatches of what they hold and cross the outside of the hull
+		/// to cut in at the objective's own hatch, past the defenders between (a rear guard holds each space they leave).
+		/// Until they hold a space with a hatch to go out by, they push for the objective inside; once out, those left
+		/// inside dig in, and when the last party is in they push on from there.</summary>
+		OverHull,
 	};
 	SPACEGODCORE_API const char* ToString(BoardingOrder v);
 
