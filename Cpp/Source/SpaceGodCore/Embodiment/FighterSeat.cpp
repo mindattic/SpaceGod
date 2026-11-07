@@ -37,7 +37,12 @@ namespace SpaceGod::Core
 
 	cs::Ref<Core::Faction> FighterSeat::Faction() const { return Unit->Faction; }
 
-	bool FighterSeat::Embodied() const { return Battle->Flown.ContainsKey(Unit); }
+	bool FighterSeat::Embodied() const
+	{
+		// An abandoned craft (US-T166, its pilot ejected) stays among the flown so no AI pilot takes it, but nobody holds it.
+		cs::Ref<FighterControl> stick;
+		return Battle->Flown.TryGetValue(Unit, stick) && !stick->Abandoned;
+	}
 
 	cs::String FighterSeat::Blocker() const
 	{
@@ -48,6 +53,8 @@ namespace SpaceGod::Core
 		if (Unit->Docked && !FlightDecks::TurningRound(Unit)) return "back aboard its carrier";
 		if (!Unit->Present()) return "gone";
 		if (Unit->Captured) return "taken as a prize";
+		cs::Ref<FighterControl> stick;
+		if (Battle->Flown.TryGetValue(Unit, stick) && stick->Abandoned) return "abandoned: its pilot ejected"; // US-T166
 		return cs::String();
 	}
 
@@ -114,6 +121,9 @@ namespace SpaceGod::Core
 
 	void FighterSeat::HandBack()
 	{
+		// Abandoned (US-T166): there is no pilot to hand it back to; it coasts on as the ejection left it.
+		cs::Ref<FighterControl> left;
+		if (Battle->Flown.TryGetValue(Unit, left) && left->Abandoned) return;
 		SelfDestruct::Disarm(Unit->Combat); // US-T97: its pilot carries no countdown on
 		Battle->Flown.Remove(Unit);
 		Unit->SetPlayerControlled(false);

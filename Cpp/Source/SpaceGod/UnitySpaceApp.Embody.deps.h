@@ -12,6 +12,7 @@ namespace SpaceGod::Core
 	class Battle;
 	class BattleUnit;
 	class RepairWorker; // US-T158
+	class EvaPilot; // US-T166
 	class Ship;
 }
 

@@ -90,6 +90,7 @@ namespace SpaceGod::Core
 		Add(p, "2 3 4 5", "wing: attack my target, cover me, form up, at will");
 		Add(p, "7 8 9 0", "power to weapons, shields, engines, even");
 		Add(p, "Shift+/", "next craft of the wing");
+		Add(p, "Shift+Y", "eject: out in the suit (EVA), the craft left coasting"); // US-T166
 		Add(p, "Backspace", "back to the carrier's helm");
 		Switching(p, false, false);
 		return p;

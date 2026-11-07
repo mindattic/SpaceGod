@@ -22,7 +22,7 @@ namespace SpaceGod::Core
 				L("Tab  /  Shift+Tab", "cycle ships forward / back"),
 				L("B", "watch a battle"),
 				L("Space  or  Pause", "pause (eases to a stop and back)"),
-				L(",  .  or  -  =  or  numpad -  +", "time warp slower / faster"),
+				L(",  .  or  -  =  or  numpad -  +", "time warp slower / faster; below real time, slow motion (1/2, 1/4, 1/10, 1/30)"), // US-T166
 				L("T", "back to now"),
 				L("G  or  `", "toggle GAMEPLAY / REALISTIC scale"),
 				L("R", "auto-reorient on / off (keep this system's plane level); at a fighter's controls, held, R is drift"),
@@ -151,6 +151,7 @@ namespace SpaceGod::Core
 				L("Shift+Backspace (hold)", "self-destruct, at any controls: held a second it arms a countdown (5 s a fighter, 8 s a light hull, 15 s a capital, 20 s a station; a gun sets off its hull), pressed again it aborts; at zero the craft blows with everyone aboard, the blast worst on whatever it is touching"),
 				L("F9", "take-charge picker: every seat on the hull in hand and around the camera (helms, fighters, stations, gun mounts, EVA workers), click one to jump in"),
 				L("Shift+P", "EVA: out on the hull held, flown or selected (a capital ship or station in a fight) as its next repair worker; again for the next"),
+				L("Shift+Y", "eject from a launched craft's cockpit: out in the suit (thrusters on W/S A/D Q/E, Shift), left mouse tethers onto a torpedo in reach, W walks it to the warhead, left mouse taps the safing, right mouse lets go"), // US-T166
 				More("as a worker: W/S A/D crawl the plating where you look, Shift the suit's jets; reach the bracketed damaged hardpoint (a shield generator, an engine, a turret) and the torch lights"),
 				L("Left mouse (worker)", "weld: tap as the marker crosses the green zone; good welds raise the weld's quality and the repair runs up to 2.75x the team's own rate (1.25x just for your hands), a miss sputters the torch"),
 				L("Backspace (worker)", "back inside, to the hull's helm or the station"),

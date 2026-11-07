@@ -132,6 +132,7 @@ namespace SpaceGod::Input
 		Home = kb[Key::Home].wasPressedThisFrame || backspaceAlone;
 		Pilot = kb[Key::P].wasPressedThisFrame && !Boost;
 		EmbodyCrew = kb[Key::P].wasPressedThisFrame && Boost; // US-T135
+		Eject = kb[Key::Y].wasPressedThisFrame && Boost; // US-T166
 		CycleSeat = kb[Key::Quote].wasPressedThisFrame ? 1 : kb[Key::Semicolon].wasPressedThisFrame ? -1 : 0;
 		ManGun = kb[Key::Slash].wasPressedThisFrame && !Boost;
 		JumpToCraft = kb[Key::Slash].wasPressedThisFrame && Boost; // US-T106: Shift+/ into a launched craft
@@ -212,6 +213,7 @@ namespace SpaceGod::Input
 		SensorPing = PowerToggle = false; // US-T93: nothing to ping from or power down in command
 		ToggleSystemCruise = false; // US-T127: no drive to spool in command
 		ToggleTractor = false; // US-T95: no beam in command
+		Eject = false; // US-T166: no cockpit to eject from in command
 		ThrottleStep = 0;
 		Roll = 0;
 	}
@@ -274,6 +276,7 @@ namespace SpaceGod::Input
 		ThrottleStep = 0;
 		ManGun = false;
 		EmbodyCrew = false; // US-T135
+		Eject = false; // US-T166
 		JumpToCraft = false;
 		MoveToHost = false;
 		TogglePicker = false;

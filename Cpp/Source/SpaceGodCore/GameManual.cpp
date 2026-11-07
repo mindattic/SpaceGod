@@ -602,6 +602,18 @@ namespace SpaceGod::Core
 				  "crews do. While you hold a worker its team is outside, not in the damage control pool; let go (P, or "
 				  "Backspace back inside to the helm or station) and it rejoins them. Distances are in hull lengths, so it "
 				  "plays the same at gameplay and realistic scale."),
+				T("Eject and EVA: riding a torpedo down to disarm it",
+				  "In a launched craft's cockpit Shift+Y ejects: the canopy blows and you are out in the pilot's pressure suit, "
+				  "floating clear with the craft's speed and a kick off the seat, while the craft coasts on empty, guns quiet -- "
+				  "the enemy may still chase it. The suit's thrusters fly you along your look (W/S A/D Q/E, Shift for the jets "
+				  "at full) on a small store of delta-v. Get within the tether's 120 m of a torpedo in flight, slow enough "
+				  "against it (450 m/s at most), and left mouse fires the magnetic tether: your mag boots hold on at its tail. "
+				  "W walks the casing to the warhead, where the safing begins: a marker sweeps a bar, as the repair weld's does, "
+				  "and each tap of left mouse in the bright zone clears a step -- arming plug, fuse, booster, detonator -- while "
+				  "a miss undoes one. Clear all four before it strikes and the round goes dead; if it strikes first you go with "
+				  "it, and if it is shot down under you, you are thrown clear. Right mouse lets go. The time it takes is the "
+				  "clock's to give: comma steps the time below real time into slow motion (a half, a quarter, a tenth and a "
+				  "thirtieth, a near-freeze), period steps back up, and space pauses to plan the next move."),
 				T("A hull's own abilities: launch, then fly what you launched",
 				  "At a helm the ability bar above the flight readout lists what that hull can order from what it really carries, "
 				  "each on Shift and a digit (Shift+1 the first, Shift+0 the tenth). A carrier has one launch for each class of "

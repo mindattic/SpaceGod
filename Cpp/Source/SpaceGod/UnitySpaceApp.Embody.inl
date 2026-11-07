@@ -49,6 +49,10 @@ public:
 	/// <summary>Shift+P (US-T135): out on the plating as the next EVA repair worker of the hull held (or flown, or selected).</summary>
 	void CycleWorker();
 
+	/// <summary>Shift+Y (US-T166): in a launched craft's cockpit, eject (<see cref="Core::EvaPilot::Eject"/>) and take the pilot
+	/// out in the suit; the craft is left coasting. Single player only for now: co-op has no seat key for a pilot.</summary>
+	void EjectPilot();
+
 	// ---------------------------------------------------------------- US-T136: other players' units, co-op or PvP
 
 	/// <summary>How two players stand, from the units they hold now: the same side of one fight (or one faction) is an ally,
@@ -141,7 +145,17 @@ public:
 	/// heights: the suit, the plating round it and the work ahead in one frame.</summary>
 	static constexpr double ShoulderBack = 4.2, ShoulderRise = 2.0, ShoulderPitchDeg = 24;
 
+	/// <summary>US-T166: an ejected pilot as drawn: at its battle point in the scene, its roof and facing, and its drawn height
+	/// (a share of the drawn length of the craft it left, as a worker's is of its hull, so it reads beside it at either scale;
+	/// the last one is kept once the craft is gone). False when not drawable here.</summary>
+	bool EvaPilotPose(const cs::Ref<Core::EvaPilot>& p, Core::DVec3& scene, Core::DVec3& up, Core::DVec3& forward, double& height);
+
+	/// <summary>US-T166: the suit's drawn height in the drawn lengths of the craft it ejected from.</summary>
+	static constexpr double PilotHeightLengths = 0.3;
+
 private:
+	double evaPilotHeight = 0;
+
 	/// <summary>US-T158: the worker held, drawn; made on the system's root like the cargo pods.</summary>
 	cs::Ref<Views::EvaWorkerView> evaWorkerView;
 	cs::Ref<Transform> evaWorkerRoot;

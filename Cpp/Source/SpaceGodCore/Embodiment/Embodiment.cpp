@@ -16,6 +16,7 @@ namespace SpaceGod::Core
 		case EmbodimentKind::RepairWorker: return "Worker"; // US-T135
 		case EmbodimentKind::Mech: return "Mech";
 		case EmbodimentKind::Marine: return "Marine";
+		case EmbodimentKind::EvaPilot: return "EVA pilot"; // US-T166
 		}
 		return "";
 	}
@@ -31,6 +32,7 @@ namespace SpaceGod::Core
 		case EmbodimentInputProfile::Satellite: return "Satellite";
 		case EmbodimentInputProfile::HullWalker: return "HullWalker";
 		case EmbodimentInputProfile::Walker: return "Walker";
+		case EmbodimentInputProfile::Eva: return "Eva"; // US-T166
 		}
 		return "";
 	}

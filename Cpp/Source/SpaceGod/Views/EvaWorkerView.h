@@ -11,7 +11,8 @@ namespace SpaceGod
 namespace SpaceGod::Views
 {
 	/// <summary>
-	/// The suited EVA repair worker the SpaceGod holds, standing on the plating where <c>UnitySpaceApp::WorkerScene</c> puts
+	/// The suited EVA repair worker the SpaceGod holds (and since US-T166 a pilot ejected from its craft, in open space or on
+	/// the casing of the torpedo it rides, drawn under its boots to the suit's scale), standing on the plating where <c>UnitySpaceApp::WorkerScene</c> puts
 	/// it (on the hull as drawn), its feet on the hull's surface, its back along the hull's normal and its front toward
 	/// where the player looks: a white suit (torso, legs, arms reaching forward), a gold visor, an orange-banded backpack,
 	/// and the torch's spark (a hot white-blue flicker with an amber flare) while there is work under it. Built from the
@@ -24,6 +25,9 @@ namespace SpaceGod::Views
 	{
 		UnitySpaceApp* app;
 		cs::Ref<Transform> root;
+		/// <summary>US-T166: the casing of the torpedo an ejected pilot rides, drawn under its boots to the suit's scale.</summary>
+		cs::Ref<Transform> casing;
+		MaterialPropertyBlock hull, warhead;
 		cs::Ref<GameObject> spark;
 		cs::Ref<Mesh> sparkMesh;
 		MaterialPropertyBlock suit, visor, pack, band;
@@ -32,7 +36,8 @@ namespace SpaceGod::Views
 		cs::List<Vector3> uvs;
 		cs::List<int> indices;
 
-		void Part(const cs::Ref<Mesh>& mesh, Vector3 at, Vector3 scale, Vector3 euler, const MaterialPropertyBlock& block, const char* name);
+		void Part(const cs::Ref<Mesh>& mesh, Vector3 at, Vector3 scale, Vector3 euler, const MaterialPropertyBlock& block, const char* name,
+			const cs::Ref<Transform>& parent = nullptr);
 		void Sprite(Vector3 c, float radius, Color color, Vector3 right, Vector3 up);
 
 	public:

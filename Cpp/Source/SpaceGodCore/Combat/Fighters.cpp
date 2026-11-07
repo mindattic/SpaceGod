@@ -668,6 +668,17 @@ namespace SpaceGod::Core
 
 	void FighterAI::FlyManned(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& u, const cs::Ref<FighterControl>& stick, double dt)
 	{
+		// Abandoned (US-T166): its pilot ejected, so nothing flies it; it coasts on, its guns quiet and no lock held.
+		if (stick->Abandoned)
+		{
+			u->Target = nullptr;
+			u->PlayerLockTarget = nullptr;
+			u->PlayerSubTarget = nullptr;
+			u->PlayerFireHeld = false;
+			u->PlayerSecondaryHeld = false;
+			u->Pos = u->Pos + u->Vel * dt;
+			return;
+		}
 		// The lock is its target: wingmen in the vee fire on it, and told to, go after it.
 		if (u->PlayerLockTarget != nullptr && !u->PlayerLockTarget->Present())
 		{

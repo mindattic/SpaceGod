@@ -24,6 +24,19 @@ namespace SpaceGod::Core
 		return value;
 	}
 
+	const cs::List<SimClock::WarpLevel>& SimClock::SlowLevels()
+	{
+		// US-T166: below real time, for a fight played on the clock.
+		static const cs::List<WarpLevel> value =
+		{
+			WarpLevel(0.5, "slow motion 1/2"),
+			WarpLevel(0.25, "slow motion 1/4"),
+			WarpLevel(0.1, "slow motion 1/10"),
+			WarpLevel(1.0 / 30, "slow motion 1/30 (near-freeze)"),
+		};
+		return value;
+	}
+
 	const cs::Ref<ChoiceSetting>& SimClock::StartingWarp()
 	{
 		static const cs::Ref<ChoiceSetting> value = []

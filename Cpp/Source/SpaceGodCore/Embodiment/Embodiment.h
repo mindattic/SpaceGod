@@ -36,6 +36,9 @@ namespace SpaceGod::Core
 
 		/// <summary>A power-suited marine (US-T82, boarding, not built yet): reserved as <see cref="Mech"/> is.</summary>
 		Marine,
+
+		/// <summary>A pilot ejected from a launched craft, out in a pressure suit (US-T166, <see cref="EvaPilot"/>).</summary>
+		EvaPilot,
 	};
 	SPACEGODCORE_API const char* ToString(EmbodimentKind v);
 
@@ -63,6 +66,9 @@ namespace SpaceGod::Core
 		/// <summary>A walker on its feet (US-T83 mech, US-T82 marine): W/S A/D walk, Shift run, mouse look, left/right mouse its
 		/// arms. Reserved: nothing uses it until those kinds land; the app's walker hands go to it unchanged.</summary>
 		Walker,
+		/// <summary>EVA in open space (US-T166, an ejected pilot): W/S A/D Q/E the suit's thrusters along the look, Shift the jets
+		/// at full, left mouse the tether onto a torpedo and then the warhead's safing, right mouse lets go.</summary>
+		Eva,
 	};
 	SPACEGODCORE_API const char* ToString(EmbodimentInputProfile v);
 

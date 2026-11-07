@@ -123,6 +123,11 @@ namespace SpaceGod::Core
 
 		/// <summary>The seat's flight line for the readout (US-T87): with assist off, what stopping costs. Not saved.</summary>
 		cs::String Note;
+
+		/// <summary>Its pilot ejected (US-T166, <see cref="EvaPilot"/>): nobody at the stick, the craft coasting on its momentum,
+		/// its guns quiet, never landed by a deck. Kept in the battle's flown craft so no pilot of the AI picks it up. Not saved:
+		/// the stick it leaves (assist off, no burn, no aim) coasts it on after a load all the same.</summary>
+		bool Abandoned = false;
 	};
 
 	/// <summary>

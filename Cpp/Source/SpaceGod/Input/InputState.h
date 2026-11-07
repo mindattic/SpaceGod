@@ -158,6 +158,10 @@ namespace SpaceGod::Input
 		/// <summary>Shift+P (US-T135): out on the hull held, flown or selected as its next EVA repair worker.</summary>
 		bool EmbodyCrew = false;
 
+		/// <summary>Shift+Y (US-T166): in a launched craft's cockpit, eject: the pilot out in a pressure suit (EVA), the craft
+		/// left coasting on.</summary>
+		bool Eject = false;
+
 		/// <summary>Take charge (U.SPC-T422): ' takes the next seat in the fight in view (a ship's helm or a launched
 		/// fighter's cockpit), ; the one before (0: neither).</summary>
 		int CycleSeat = 0;

@@ -15,6 +15,8 @@
 #include "Coop/CoopPeer.h"
 #include "Embodiment/Embodiables.h"
 #include "Embodiment/Embodiment.h"
+#include "Embodiment/EvaPilot.h" // US-T166
+#include "Embodiment/FighterSeat.h" // US-T166
 #include "Embodiment/RepairWorker.h"
 #include "Embodiment/ShipHelm.h"
 #include "Embodiment/StationSeat.h"
@@ -171,6 +173,52 @@ namespace SpaceGod
 			return;
 		}
 		TakeSeat(Embodiables::Cycle(workers, HeldNonHelm(), 1));
+	}
+
+	void UnitySpaceApp::EjectPilot()
+	{
+		auto cockpit = cs::As<FighterSeat>(HeldNonHelm());
+		if (cockpit == nullptr)
+		{
+			ShowToast("Shift+Y ejects from a launched craft's cockpit: take one first (' ; in a fight, or Shift+/ from a carrier)");
+			return;
+		}
+		if (Coop::CoopPeer::Active())
+		{
+			ShowToast("No ejecting in co-op yet: the pilot stays aboard");
+			return;
+		}
+		cs::String why;
+		auto pilot = EvaPilot::Eject(cockpit->Battle, cockpit->Unit, why);
+		if (pilot == nullptr)
+		{
+			ShowToast(cs::Cat("Can't eject from the ", cockpit->Name(), ": ", why));
+			return;
+		}
+		evaPilotHeight = 0; // sized afresh off the craft it leaves
+		TakeSeat(pilot);
+		if (EmbodiableEquals(HeldNonHelm(), pilot)) return;
+		// The take refused: no ejection after all.
+		EvaPilot::Unabandon(cockpit->Battle, cockpit->Unit, EmbodiableEquals(HeldNonHelm(), cockpit));
+	}
+
+	bool UnitySpaceApp::EvaPilotPose(const cs::Ref<EvaPilot>& p, DVec3& scene, DVec3& up, DVec3& forward, double& height)
+	{
+		if (p == nullptr || p->Battle == nullptr || p->Battle->Over) return false;
+		if (p->Craft != nullptr && p->Craft->Present())
+		{
+			auto craft = Target::OfUnit(p->Battle, p->Craft);
+			double length = TargetRadius(craft) * 2;
+			if (length > 0) evaPilotHeight = length * PilotHeightLengths;
+		}
+		if (evaPilotHeight <= 0) evaPilotHeight = cs::Math::Max(BattleKmScale() * 0.004, 1e-9);
+		scene = BattleScene(p->Battle, p->Pos);
+		up = p->Up.SwapYZ();
+		forward = p->Facing.SwapYZ();
+		forward = forward - up * DVec3::Dot(forward, up);
+		forward = forward.LengthSquared() > 1e-12 ? forward.Normalized() : DVec3::Cross(up, DVec3::UnitX).Normalized();
+		height = evaPilotHeight;
+		return true;
 	}
 
 	// ---------------------------------------------------------------- US-T136: other players' units
@@ -386,6 +434,18 @@ namespace SpaceGod
 				auto flat = look - up * DVec3::Dot(look, up);
 				flat = flat.LengthSquared() > 1e-12 ? flat.Normalized() : forward;
 				return at + up * (h * ShoulderRise) - flat * (h * ShoulderBack);
+			}
+		}
+		// US-T166: an ejected pilot's shoulder, in open space: behind and above the suit along the look, in suit heights.
+		if (auto p = cs::As<EvaPilot>(s))
+		{
+			DVec3 at, up, forward;
+			double h = 0;
+			if (EvaPilotPose(p, at, up, forward, h))
+			{
+				auto look = DVec3(seatAim.x, seatAim.y, seatAim.z);
+				if (look.LengthSquared() < 1e-12) look = forward;
+				return at + up * (h * ShoulderRise) - look.Normalized() * (h * ShoulderBack);
 			}
 		}
 		if (sub.Unit == nullptr || !sub.HasPoint) return SeatScene(s);
