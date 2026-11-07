@@ -35,9 +35,14 @@
 		{
 			"Name": "SpaceGodRender",
 			"Enabled": true
+		},
+		{
+			"Name": "MindAtticShared",
+			"Enabled": true
 		}
 	],
 	"AdditionalPluginDirectories": [
-		"../Shared/Plugins"
+		"../Shared/Plugins",
+		"../../Unreal.Shared/Plugins"
 	]
 }

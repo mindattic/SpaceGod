@@ -1,6 +1,7 @@
 #include "GameLaunch.h"
 #include "Bootstrap.h"
 #include "Coop/CoopPeer.h"
+#include "MindAtticHeadless.h"
 
 namespace SpaceGod
 {
@@ -8,7 +9,7 @@ namespace SpaceGod
 	{
 		return Bootstrap::HasCommandLineFlag("-demo") || Bootstrap::HasCommandLineFlag("-capture") || Bootstrap::HasCommandLineFlag("-continue")
 			|| Bootstrap::HasCommandLineFlag("-dogfight") || Bootstrap::HasCommandLineFlag("-dogfight-heavy") // US-T88
-			|| Bootstrap::HasCommandLineFlag("--headless") // US-T233: a headless run has no window to click a menu in
+			|| FMindAtticHeadless::IsActive() // US-T233, US-T234: a headless run has no window to click a menu in
 			|| Coop::CoopPeer::SkipsMenu(); // US-T44: a co-op client (and the smoke host) goes straight in
 	}
 

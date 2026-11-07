@@ -5,7 +5,7 @@
 #include "ModelViewer.h"
 #include "Shared/Profiles/Profiles.h"
 #include "Input/InputDevice.h"
-#include "SpaceGodLog.h"
+#include "MindAtticHeadless.h"
 
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -97,19 +97,16 @@ namespace SpaceGod
 			app->AddCaptureRunner(); // app.gameObject.AddComponent<CaptureRunner>() (US-T31)
 		}
 
-		// US-T233: --headless runs this same ordinary session (not the -SpaceGodSmoke tour, not -SpaceGodViews) for
-		// scripted/automated testing, paired on the real command line with -RenderOffScreen -unattended -nosplash
-		// -nosound exactly as -SpaceGodSmoke/-SpaceGodViews already pair with -nullrhi -unattended -nosplash
-		// (tools/play.ps1 -Offscreen, US-T163) -- those draw no window, not this flag. With no window there is no
-		// real mouse/keyboard for UnitySpaceAppActor::Tick to feed, so the app takes scripted input like every other
-		// driven run here, left for a test or CI harness to write (the ScriptedDevice pattern, console ExecCmds, or
-		// just reading the frames FrameFeed.h already hands back under -RenderOffScreen) instead of this ticket
-		// inventing a second one.
-		if (HasCommandLineFlag("--headless"))
+		// US-T233, US-T234: a headless run (--headless or MINDATTIC_HEADLESS=1, decided by the shared MindAtticShared
+		// plugin, Unreal.Shared) is this same ordinary session (not the -SpaceGodSmoke tour, not -SpaceGodViews) for
+		// scripted/automated testing. The plugin keeps the window away and logs MINDATTIC_HEADLESS_READY; with no
+		// window there is no real mouse/keyboard for UnitySpaceAppActor::Tick to feed, so the app takes scripted input
+		// like every other driven run here, left for a test or CI harness to write (the ScriptedDevice pattern,
+		// console ExecCmds, or the frames FrameFeed.h hands back under -RenderOffScreen).
+		if (FMindAtticHeadless::IsActive())
 		{
 			app->bScriptedInput = true;
 			Input::InputDevice::current().Clear();
-			UE_LOG(LogSpaceGod, Display, TEXT("SpaceGod headless: no window, scripted input; ready for automation"));
 		}
 	}
 

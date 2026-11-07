@@ -23,10 +23,10 @@ param(
   # (read back from the GPU into the capture host, Capture/README.md) into the usual session folder. -Seconds stops the
   # game after that long (the host then exports the session); -ExecCmds runs a scenario (e.g. "sg.Tour auto");
   # -CaptureStats logs the game's frame rate and the frame feed's cost every 5 s ([MindAttic.Capture] feed: ...).
-  # US-T233: this is also the real command line that carries --headless, the game's own flag for an ordinary,
-  # scripted/automated-testing session (Bootstrap.cpp). A tester or CI script invoking the exe directly (not through
-  # this script) needs to add --headless itself, alongside -RenderOffScreen -unattended -nosplash -nosound, the same
-  # way -SpaceGodSmoke/-SpaceGodViews already pair with -nullrhi -unattended -nosplash.
+  # US-T233, US-T234: this goes through the shared headless launcher, ..\Unreal.Shared\tools\Start-Headless.ps1, so it
+  # is the MindAtticShared plugin's --headless run: an ordinary session on scripted input past the main menu, which logs
+  # MINDATTIC_HEADLESS_READY SpaceGod once up. A test or CI script can call that launcher itself
+  # (-Project Cpp/SpaceGod.uproject -Map /Engine/Maps/Entry -Wait), or set MINDATTIC_HEADLESS=1.
   [switch]$Offscreen,
   [string]$Capture = 'video hq',
   [int]$Seconds = 0,
@@ -57,8 +57,8 @@ quits; the log is Cpp/Saved/Logs/<project>.log.
   ./tools/play.ps1 -Mode audit              # headless: the smoke, then a probe per binding, PASS/FAIL each (US-T48)
   ./tools/play.ps1 -Mode dogfight -Offscreen -Seconds 30          # no window: a 30 s video of the dogfight demo (US-T163)
   ./tools/play.ps1 -Offscreen -ExecCmds "sg.Tour auto quit"       # no window: the showcase tour, recorded
-  ./tools/play.ps1 -Offscreen                                     # no window: an ordinary session, --headless on its own
-                                                                   # command line, ready for a test/CI harness (US-T233)
+  ./tools/play.ps1 -Offscreen                                     # no window: an ordinary --headless session (the shared
+                                                                   # Start-Headless.ps1), ready for a test/CI harness (US-T234)
 #>
 
 $ErrorActionPreference = 'Stop'
@@ -77,28 +77,27 @@ if ($Offscreen) {
   # Under -RenderOffScreen Unreal opens no window, so the game feeds the capture host its read-back frames instead of
   # the host recording a window (Cpp/Source/SpaceGod/Capture/FrameFeed.h). -nullrhi would render nothing at all.
   if ($Mode -notin 'solo', 'dogfight') { throw '-Offscreen runs -Mode solo or dogfight (-ExecCmds for a scenario, e.g. "sg.Tour auto quit").' }
-  $editor = Join-Path $engine 'Engine\Binaries\Win64\UnrealEditor.exe'
-  $gameArgs = @("`"$($project.FullName)`"", '/Engine/Maps/Entry', '-game', '-RenderOffScreen', "-ResX=$ResX", "-ResY=$ResY", '-nosound',
-    # --headless (US-T233): the game's own flag for this ordinary session having no window (Bootstrap.cpp: scripted
-    # input instead of a real mouse/keyboard, straight past the main menu); -RenderOffScreen/-unattended/-nosplash
-    # above are what actually draw no window and stay quiet.
-    '--headless',
-    # -Multiprocess: the editor binaries skip their startup "UBT -Mode=ValidatePlatforms", which otherwise waits behind
-    # every UE build queued on the machine (Build.bat's lock) before the game even starts.
-    '-Multiprocess', '-unattended', '-nosplash', '-log')
+  # US-T234: launched through the shared headless launcher (Unreal.Shared/tools/Start-Headless.ps1, cloned next to this
+  # repo), which runs UnrealEditor.exe <project> /Engine/Maps/Entry -game -Multiprocess --headless -RenderOffScreen
+  # -unattended -nosplash -nosound -abslog=<log>; --headless is the MindAtticShared plugin's switch, and the game's own
+  # opt-ins (scripted input, straight past the main menu: Bootstrap.cpp, GameLaunch.cpp) key off it. The game logs
+  # MINDATTIC_HEADLESS_READY SpaceGod once it is up. Everything below is passed to the game unchanged.
+  $launcher = Join-Path $repo '..\Unreal.Shared\tools\Start-Headless.ps1'
+  if (-not (Test-Path -LiteralPath $launcher)) { throw "-Offscreen needs Unreal.Shared cloned next to this repo ($launcher)." }
+  $gameArgs = @("-ResX=$ResX", "-ResY=$ResY", '-log')
   # -Capture '' -CaptureStats: the same run with no capture at all, for the frame rate to compare against.
   if ($Capture) { $gameArgs += @('-capture') + @($Capture -split '\s+' | Where-Object { $_ }) }
   if ($Mode -eq 'dogfight') { $gameArgs += $(if ($Heavy) { '-dogfight-heavy' } else { '-dogfight' }) }
-  if ($ExecCmds) { $gameArgs += "`"-ExecCmds=$ExecCmds`"" }
+  if ($ExecCmds) { $gameArgs += "-ExecCmds=$ExecCmds" } # the launcher quotes a value with spaces
   if ($CaptureStats) { $gameArgs += '-CaptureStats' }
   # A log of this run's own (other runs may share Saved/Logs/SpaceGod.log).
   $logs = Join-Path $project.DirectoryName 'Saved\Logs'
   New-Item -ItemType Directory -Force -Path $logs | Out-Null
   $log = Join-Path $logs ("Offscreen-{0}-{1}.log" -f (Get-Date).ToString('yyyyMMdd-HHmmss'), $PID)
-  $gameArgs += "`"-abslog=$log`""
   "offscreen capture: log $log"
   $t0 = Get-Date
-  $p = Start-Process -FilePath $editor -PassThru -ArgumentList $gameArgs
+  # -PassThru by name: the game's own -flags never reach PowerShell's parameter binding (-log would bind -LogPath).
+  $p = (& $launcher -Project $project.FullName -EngineRoot $engine -Map '/Engine/Maps/Entry' -LogPath $log -PassThru $gameArgs).Process
   try {
     if ($Seconds -gt 0) {
       # From the moment the capture host answers (the editor binaries take a while to load), so the video is that long.
