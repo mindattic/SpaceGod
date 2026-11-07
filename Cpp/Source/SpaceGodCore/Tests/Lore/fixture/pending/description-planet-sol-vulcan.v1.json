@@ -1,0 +1,17 @@
+{
+  "schema": "prose-text/1",
+  "id": "description-planet-sol-vulcan",
+  "universe": "spacegod",
+  "kind": "description",
+  "key": "planet-sol-vulcan",
+  "about": [],
+  "speakers": [],
+  "version": 1,
+  "status": "approved",
+  "hash": "sha256:bc689e762ae11d1f0df4c9ba3ea4d84db59e8757c2b2be95e6363b6503fce539",
+  "approvedBy": "owner",
+  "approvedAt": "2026-11-07T22:00:00Z",
+  "payload": {
+    "short": "A planet SpaceGod never had."
+  }
+}

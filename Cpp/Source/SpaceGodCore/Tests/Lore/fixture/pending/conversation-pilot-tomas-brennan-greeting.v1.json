@@ -1,0 +1,43 @@
+{
+  "schema": "prose-text/1",
+  "id": "conversation-pilot-tomas-brennan-greeting",
+  "universe": "spacegod",
+  "kind": "conversation",
+  "key": "pilot-tomas-brennan/greeting",
+  "about": [
+    "pilot-tomas-brennan"
+  ],
+  "speakers": [
+    "pilot-tomas-brennan",
+    "$player"
+  ],
+  "version": 1,
+  "status": "approved",
+  "hash": "sha256:a983e87a762fc3d5a5770dbcd0b890397b0dc348250e77ca17ea54ff5ecf2338",
+  "approvedBy": "owner",
+  "approvedAt": "2026-11-07T22:00:00Z",
+  "payload": {
+    "title": "Brennan's greeting",
+    "start": "hello",
+    "nodes": [
+      {
+        "id": "hello",
+        "speaker": "pilot-tomas-brennan",
+        "line": "You fly like a {entity:faction-sol-federation} cadet.",
+        "next": "reply"
+      },
+      {
+        "id": "reply",
+        "speaker": "$player",
+        "line": "And you talk like a pirate.",
+        "choices": [
+          {
+            "text": "Trade?",
+            "next": "$trade",
+            "tags": []
+          }
+        ]
+      }
+    ]
+  }
+}

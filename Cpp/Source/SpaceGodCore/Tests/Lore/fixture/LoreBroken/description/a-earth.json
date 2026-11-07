@@ -1,0 +1,16 @@
+{
+  "schema": "spacegod-text/1",
+  "id": "description-planet-sol-earth",
+  "kind": "description",
+  "key": "planet-sol-earth",
+  "version": 2,
+  "hash": "sha256:8fa7927da256fc7552760dd8f891ebefefc1cbfb2c13e73fb7d32e65743ec8e4",
+  "about": [
+    "planet-sol-earth"
+  ],
+  "speakers": [],
+  "payload": {
+    "short": "Cradle world of the Sol Federation.",
+    "long": "Blue, crowded and loud on every band: Earth still sets the Federation's laws, if not its prices."
+  }
+}

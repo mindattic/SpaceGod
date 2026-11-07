@@ -1,0 +1,20 @@
+{
+  "schema": "prose-text/1",
+  "id": "crawl-sector-sol",
+  "universe": "spacegod",
+  "kind": "crawl",
+  "key": "spacegod/sol",
+  "about": [],
+  "speakers": [],
+  "version": 1,
+  "status": "approved",
+  "hash": "sha256:21451551e3e12e0fbc59847259b398b95e17765024d8920cda52040bd60875af",
+  "approvedBy": "owner",
+  "approvedAt": "2026-11-07T22:00:00Z",
+  "payload": {
+    "title": "Sol",
+    "paragraphs": [
+      "Not a SpaceGod kind."
+    ]
+  }
+}

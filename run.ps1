@@ -69,12 +69,12 @@ if (-not $NoPull) {
 $head = (git -C $repoDir rev-parse HEAD).Trim()
 
 # ── Up to date? ────────────────────────────────────────────────────────────────
-# Nothing the game is built from (Cpp, Shared, Capture, Vendor) differs between the deployed commit and HEAD, and the tree has no
+# Nothing the game is built from (Cpp, Shared, Capture, Vendor, and Data/Lore's Prose texts) differs between the deployed commit and HEAD, and the tree has no
 # uncommitted change there: docs-only commits don't repackage. -Force skips this.
 $upToDate = $false
 if (-not $Force -and (Test-Path -LiteralPath (Join-Path $out $exeName)) -and (Test-Path -LiteralPath $marker)) {
     $deployed = (Get-Content -LiteralPath $marker -Raw).Trim()
-    git -C $repoDir diff --quiet $deployed -- Cpp Shared Capture Vendor 2>$null
+    git -C $repoDir diff --quiet $deployed -- Cpp Shared Capture Vendor Data/Lore 2>$null
     $upToDate = $LASTEXITCODE -eq 0
 }
 if ($upToDate) {

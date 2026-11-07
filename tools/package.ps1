@@ -25,6 +25,7 @@ Steps:
     UBT runs with -WaitMutex (queued behind any other UE build) and -MaxParallelActions (default 4).
  3. Renames the launcher exe (see below).
  4. dotnet publish of the MindAttic.Capture host (Capture/SpaceGod.Capture) into <archive>/Capture/ (US-T72).
+ 5. Data/Lore (the applied Prose texts, docs/PROSE.md) into <archive>/Lore/, where the game reads them (US-T236).
 
 Exe name. UE names a game exe after its target, and a target name is a C# class name, so it cannot contain dots:
 UAT writes <archive>/<Target>.exe, a small bootstrap launcher, plus the real game in
@@ -83,6 +84,15 @@ $captureOut = Join-Path $archive 'Capture'
 & dotnet publish $captureProject -c Release -r win-x64 --self-contained false -o $captureOut -nologo -v q '-p:GenerateDocumentationFile=false'
 if ($LASTEXITCODE) { throw "Publishing the capture host failed ($LASTEXITCODE)." }
 if (-not (Test-Path -LiteralPath (Join-Path $captureOut 'capture.exe'))) { throw "The capture host publish wrote no capture.exe in $captureOut." }
+
+# 5. The Prose texts (US-T236; docs/PROSE.md): Data/Lore's <kind>/*.json beside the package's Engine/ folder, where
+#    GameLore (Source/SpaceGod/GameLore.cpp) looks first. None yet is fine: the game plays on its placeholders.
+$loreOut = Join-Path $archive 'Lore'
+foreach ($kindDir in Get-ChildItem -LiteralPath (Join-Path $repo 'Data\Lore') -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '.*' }) {
+  $dest = Join-Path $loreOut $kindDir.Name
+  New-Item -ItemType Directory -Force $dest | Out-Null
+  Copy-Item -Path (Join-Path $kindDir.FullName '*.json') -Destination $dest -Force
+}
 }
 
 $size = (Get-ChildItem -LiteralPath $archive -Recurse -File | Measure-Object Length -Sum).Sum

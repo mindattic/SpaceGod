@@ -211,4 +211,18 @@ Write-Host "exe     $scExe"
 if (-not $SkipParity) {
   & $scExe
   if ($LASTEXITCODE -ne 0) { Write-Host 'SectionCollidersTests: failures (see above).' -ForegroundColor Red; exit $LASTEXITCODE }
-}exit 0
+}
+
+# ---------------------------------------------------------------- LoreLibraryTests (US-T236)
+$loreDir = Join-Path $core 'Tests\Lore'
+$lt = Invoke-Compile @(Get-Item -LiteralPath (Join-Path $loreDir 'LoreLibraryTests.cpp')) $parityObjRoot
+if ($lt.Failed.Count -gt 0) { exit 1 }
+$ltExe = Join-Path $out 'LoreLibraryTests.exe'
+& link.exe /nologo /DEBUG @linkOpt "/OUT:$ltExe" $lt.Objs $lib
+if ($LASTEXITCODE -ne 0) { throw 'link.exe failed (LoreLibraryTests).' }
+Write-Host "exe     $ltExe"
+if (-not $SkipParity) {
+  & $ltExe (Join-Path $loreDir 'fixture')
+  if ($LASTEXITCODE -ne 0) { Write-Host 'LoreLibraryTests: failures (see above).' -ForegroundColor Red; exit $LASTEXITCODE }
+}
+exit 0

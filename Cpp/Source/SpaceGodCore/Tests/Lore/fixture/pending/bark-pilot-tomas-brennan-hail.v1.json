@@ -1,0 +1,26 @@
+{
+  "schema": "prose-text/1",
+  "id": "bark-pilot-tomas-brennan-hail",
+  "universe": "spacegod",
+  "kind": "bark",
+  "key": "pilot-tomas-brennan/hail",
+  "about": [
+    "pilot-tomas-brennan"
+  ],
+  "speakers": [
+    "pilot-tomas-brennan"
+  ],
+  "version": 1,
+  "status": "published",
+  "hash": "sha256:b75409a06ec02bfc71f37436cf6b1f284ede96d35ad80c59fb8554af199b092f",
+  "approvedBy": "owner",
+  "approvedAt": "2026-11-07T22:00:00Z",
+  "payload": {
+    "speaker": "pilot-tomas-brennan",
+    "context": "hailed in open space",
+    "lines": [
+      "Brennan here. Make it quick.",
+      "You're on my vector, friend."
+    ]
+  }
+}

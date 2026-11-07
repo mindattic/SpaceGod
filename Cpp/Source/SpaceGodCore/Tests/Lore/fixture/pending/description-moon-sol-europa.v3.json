@@ -1,0 +1,19 @@
+{
+  "schema": "prose-text/1",
+  "id": "description-moon-sol-europa",
+  "universe": "spacegod",
+  "kind": "description",
+  "key": "moon-sol-europa",
+  "about": [
+    "moon-sol-europa"
+  ],
+  "speakers": [],
+  "version": 3,
+  "status": "retired",
+  "hash": "sha256:cb13ae7beac3c676c1ad131318cc242068341ec93b9c2eb97d783c32ac36a080",
+  "approvedBy": "owner",
+  "approvedAt": "2026-11-07T22:00:00Z",
+  "payload": {
+    "short": "retired"
+  }
+}

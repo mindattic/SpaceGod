@@ -1,0 +1,44 @@
+{
+  "universe": {
+    "id": "spacegod",
+    "name": "SpaceGod"
+  },
+  "entities": [
+    {
+      "id": "planet-sol-earth",
+      "type": "planet",
+      "name": "Earth",
+      "summary": "Third planet of Sol.",
+      "details": {},
+      "relations": [],
+      "tags": []
+    },
+    {
+      "id": "moon-sol-europa",
+      "type": "moon",
+      "name": "Europa",
+      "summary": "Moon of Jupiter.",
+      "details": {},
+      "relations": [],
+      "tags": []
+    },
+    {
+      "id": "pilot-tomas-brennan",
+      "type": "character",
+      "name": "Tomas Brennan",
+      "summary": "A pilot.",
+      "details": {},
+      "relations": [],
+      "tags": []
+    },
+    {
+      "id": "faction-sol-federation",
+      "type": "faction",
+      "name": "Sol Federation",
+      "summary": "A state.",
+      "details": {},
+      "relations": [],
+      "tags": []
+    }
+  ]
+}
