@@ -1,0 +1,17 @@
+{
+  "kit": 1,
+  "consumer": "spacegod",
+  "universe": "spacegod",
+  "displayName": "SpaceGod",
+  "root": "../..",
+  "mapper": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/universe-export.ps1 -BuildCore",
+  "applier": "python tools/prose_apply.py Data/Prose/pending --lore Data/Lore --universe Data/Prose/spacegod.universe.json",
+  "kinds": ["description", "book", "bark", "conversation"],
+  "universeFile": "spacegod.universe.json",
+  "pending": "pending",
+  "applied": "applied.jsonl",
+  "outboxLog": "outbox.jsonl",
+  "scratch": ".kit",
+  "batchSize": 400,
+  "prune": true
+}

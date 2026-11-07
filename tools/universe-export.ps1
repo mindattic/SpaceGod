@@ -20,13 +20,15 @@ param(
 <#
 .SYNOPSIS
 US-T171: builds tools/universe-export (a headless Core runner, no Unreal) and writes the SpaceGod universe as a Prose
-Universe Interchange file (RFC 0007), then validates it against Data/Prose/universe.schema.json.
+Universe Interchange file (RFC 0007), then checks its manifest (tools/prose_manifest.py). It is the Prose consumer kit's
+mapper (Data/Prose/prose.config.json, US-T236): `kit.ps1 push --map --prune` runs it.
 
 .DESCRIPTION
 Links tools/universe-export/UniverseExport.cpp against the standalone SpaceGodCore.lib (tools/build-core.ps1) into
 Cpp/Intermediate/CoreStandalone/Release/UniverseExport.exe, runs it with the build hash (git HEAD, "+dirty" when Core
-has uncommitted edits) recorded in the file's manifest entity, and checks the result with tools/prose_universe.py.
-Same seed + same build = the same file, byte for byte. Push it to Prose with tools/prose-sync.ps1.
+has uncommitted edits) recorded in the file's source block and manifest entity, and checks the manifest's counts with
+tools/prose_manifest.py (the kit's validate checks the rest of the contract). Same seed + same build = the same file,
+byte for byte. Push it to Prose with the consumer kit (docs/PROSE.md).
 
 .EXAMPLE
 tools/universe-export.ps1                 # build the exporter against the lib already built, export, validate
@@ -92,6 +94,6 @@ $sw = [Diagnostics.Stopwatch]::StartNew()
 if ($LASTEXITCODE -ne 0) { throw "UniverseExport.exe failed (exit $LASTEXITCODE)." }
 Write-Host ("exported in {0:0.0} s" -f $sw.Elapsed.TotalSeconds)
 
-& python (Join-Path $PSScriptRoot 'prose_universe.py') validate $Out
-if ($LASTEXITCODE -ne 0) { throw 'The interchange file is not schema-valid.' }
+& python (Join-Path $PSScriptRoot 'prose_manifest.py') $Out
+if ($LASTEXITCODE -ne 0) { throw 'The interchange file does not match its manifest.' }
 exit 0

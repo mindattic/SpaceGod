@@ -44,7 +44,7 @@ Every game these scripts start records: they pass `-capture video hq` (see Recor
 ./tools/package.ps1 -Configuration Shipping         # Builds/Cpp/Windows/SpaceGod.exe
 ./tools/bench.ps1                                   # the headless Bench: 5 scenarios, digests checked
 ./tools/play.ps1 -Mode coop-smoke -PackageDir Builds/Cpp/Windows   # two packaged instances, co-op checked
-./tools/prose-sync.ps1 -Export                      # catalogue the universe into Prose's 'spacegod' (docs/PROSE.md)
+..\Prose\consumer-kit\kit.ps1 push --map --prune    # catalogue the universe into Prose's 'spacegod'; pull/apply bring story back (docs/PROSE.md)
 ```
 
 Opening `Cpp/SpaceGod.uproject` in the editor works too; `Cpp/Content/Python/init_unreal.py` imports the

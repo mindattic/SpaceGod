@@ -33,9 +33,15 @@ Capture/**/obj/
 Vendor/**/bin/
 Vendor/**/obj/
 
-# US-T171: the Prose Universe Interchange files are rebuilt from Core and a seed (tools/universe-export.ps1, tools/prose-sync.ps1;
-# docs/PROSE.md). The schema copy and the reviewed proposals under Data/Lore are committed; the outbox journal is not.
+# US-T171/US-T236: the Prose conduit (docs/PROSE.md). The universe file is rebuilt from Core and a seed by the mapper
+# (tools/universe-export.ps1); the consumer kit's pending texts, Outbox journal and scratch are local. Committed: the
+# kit config, applied.jsonl and the applied texts under Data/Lore.
 Data/Prose/*.json
-!Data/Prose/universe.schema.json
+!Data/Prose/prose.config.json
+Data/Prose/*.universe.json
+Data/Prose/pending/
+Data/Prose/outbox.jsonl
+Data/Prose/.kit/
+# Left by the retired tools/prose-sync.ps1 and tools/prose-outbox.ps1 (US-T171), kept ignored on older checkouts.
 Data/Lore/.outbox/
 Data/Prose/*.import-batches/

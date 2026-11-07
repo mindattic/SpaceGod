@@ -2,7 +2,7 @@
 //
 // Builds the galaxy exactly as the game and the Bench do (Galaxy::CreateDefault at a fixed start date and seed), runs it
 // on for --days at coarse detail, then writes everything in it as one Universe Interchange file
-// (Data/Prose/universe.schema.json): systems, stars, planets, moons, stations, settlements, pirate bases, void stations
+// (Prose's docs/schemas/universe.schema.json; it is the Prose consumer kit's mapper, US-T236): systems, stars, planets, moons, stations, settlements, pirate bases, void stations
 // and their sites, nebulas, ice fields, graveyards and derelicts, factions, every ship, a named pilot for each ship with
 // their life story, technologies, weapons, equipment, ship classes and designs, goods, missing ships with their
 // last-known coordinates, gas harvesters, and the edges between them (orbits, located-in, owns, crew-of, grudges,
@@ -1258,10 +1258,14 @@ namespace
 		}
 	};
 
-	void Write(const Universe& u, const std::string& path)
+	void Write(const Universe& u, const Args& args, const std::string& path)
 	{
 		std::ostringstream o;
-		o << "{\n  \"universe\": {\n";
+		// US-T236: the file's provenance, in the interchange's own top-level source block (Prose keeps it with the universe
+		// and returns it on export); the manifest entity keeps the counts. No timestamp: same build and seed, same bytes.
+		o << "{\n  \"source\": {\"consumer\": \"spacegod\", \"generator\": \"tools/universe-export\", \"build\": " << Esc(args.Build)
+		  << ", \"seed\": " << args.Seed << ", \"startJd\": " << Num(args.StartJd) << ", \"simDays\": " << Num(args.Days) << "},\n";
+		o << "  \"universe\": {\n";
 		o << "    \"id\": \"spacegod\",\n";
 		o << "    \"name\": \"SpaceGod\",\n";
 		o << "    \"tagline\": " << Esc("Become any unit in a living galaxy that runs whether you watch it or not.") << ",\n";
@@ -1303,7 +1307,7 @@ int main(int argc, char** argv)
 		Args args = Parse(argc, argv);
 		Exporter x(args);
 		x.Run();
-		Write(x.U, args.Out);
+		Write(x.U, args, args.Out);
 		size_t edges = 0;
 		for (const auto& e : x.U.Entities) edges += e.Relations.size();
 		int dropped = 0;
