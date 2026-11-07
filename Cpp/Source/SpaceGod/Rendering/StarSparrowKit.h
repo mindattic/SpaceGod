@@ -59,8 +59,11 @@ namespace SpaceGod::Rendering
 		/// <summary>
 		/// A gun turret's model from the kit (US-T110): the traversing base (a Plasma pod squashed into a barbette) or the
 		/// elevating barrels (Weapon barrels, two or three by the gun), sized as ShipMeshFactory::GetPart's, upright
-		/// (+Y) and facing +Z, in ship lengths, each renderer added to <paramref name="into"/>. False (nothing built) for a
-		/// hardpoint the kit does not draw (launchers, emitters, masts) or without the kit.
+		/// (+Y) and facing +Z, in ship lengths, each renderer added to <paramref name="into"/>. US-T117: the base of a
+		/// missile, hive, interceptor, rocket or torpedo launcher or a shield emitter is a kit part too (a plated box with
+		/// tubes or cells, a breech and muzzle bell, a column under a dish) while the kit's own hulls are in use (not under
+		/// Ultimate Spaceships Creator's). False (nothing built) for a hardpoint the kit does not draw (masts, hangars) or
+		/// without the kit.
 		/// </summary>
 		static bool Turret(const cs::Ref<Transform>& parent, Core::SubsystemKind kind, const cs::Ref<Core::Faction>& faction, bool barrels,
 			cs::List<cs::Ref<Renderer>>& into);

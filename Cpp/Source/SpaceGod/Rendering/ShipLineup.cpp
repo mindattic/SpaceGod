@@ -360,7 +360,8 @@ namespace SpaceGod::Rendering
 				camera = ModelViewerBackend::AddCamera(cameraObject);
 				RenderBackend::Active()->SetupCamera(camera, CameraRole::Overlay);
 				camera->clearFlags = CameraClearFlags::SolidColor;
-				camera->backgroundColor = Color(0.045f, 0.05f, 0.07f);
+				// A lighter slate than space (US-T117), so a dark pirate hull's edge stands off it.
+				camera->backgroundColor = Color(0.08f, 0.09f, 0.115f);
 				camera->fieldOfView = 24.0f;
 				ModelViewerBackend::SetDepth(camera, 1000);
 				ModelViewerBackend::SetCullingMask(camera, 1 << Layer());
@@ -390,11 +391,13 @@ namespace SpaceGod::Rendering
 				StarLighting light;
 				Vector3 key = cameraObject->transform->position() + Vector3(1.2f, 1.4f, -1.0f).normalized() * (distance * 1000.0f);
 				light.SunPosition = Vector4(key.x, key.y, key.z, 0);
-				light.SunColor = Vector4(2.4f, 2.36f, 2.3f, 1.0f);
-				// A dim cool second light from the lower left, so the shadow side still reads.
-				Vector3 fill = cameraObject->transform->position() + Vector3(-1.0f, -0.6f, -0.4f).normalized() * (distance * 1000.0f);
+				// US-T117: brighter again, the key a quarter up and the fill doubled and raised nearer eye level (under the
+				// real hull lighting of US-T172 the sheets still read dark): judging a kit means seeing its panels.
+				light.SunColor = Vector4(3.0f, 2.95f, 2.88f, 1.0f);
+				// A cool second light from over the viewer's left, a little below, so the shadow side still reads.
+				Vector3 fill = cameraObject->transform->position() + Vector3(-1.0f, -0.35f, -1.0f).normalized() * (distance * 1000.0f);
 				light.Sun2Position = Vector4(fill.x, fill.y, fill.z, 0);
-				light.Sun2Color = Vector4(0.3f, 0.36f, 0.48f, 0.4f);
+				light.Sun2Color = Vector4(0.62f, 0.68f, 0.82f, 0.7f);
 				RenderBackend::Active()->OverrideLighting(light);
 			}
 

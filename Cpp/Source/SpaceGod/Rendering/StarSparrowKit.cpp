@@ -3,6 +3,7 @@
 #include "Rendering/HullLighting.h"
 #include "Rendering/Materials.h"
 #include "Rendering/ShipMeshFactory.h"
+#include "Rendering/UscKit.h"
 #include "SpaceGodLog.h"
 
 #include "Combat/CombatSpecs.h"
@@ -206,6 +207,62 @@ namespace SpaceGod::Rendering
 					for (const auto& v : otherwise) Engine(v.x, v.y, v.z, r, length);
 			}
 
+			// US-T117: a capital hull used to be one Core module (a fighter's fuselage and canopy) stretched half a hull long,
+			// which read as a stretched fighter. A warship is now a short prow, an armoured run of plated sections behind
+			// it, stepped superstructure and a bridge at the kit's own proportions on top.
+
+			/// The bow: the Core module turned over (its canopy under the keel, out of sight) as a short pointed prow from z0
+			/// to z1, w across and h deep.
+			Part& Prow(float z0, float z1, float w, float h, float y = 0, float x = 0) { return Hull(z0, z1, w, h, y, x, false, true); }
+
+			/// An armoured hull run from z0 (aft) to z1: n Plasma plates end to end, each a little longer than its share so
+			/// they overlap, narrowing towards the bow by taper (0 none, 0.3 a third). A run across SplitZ is laid as two runs
+			/// meeting there, so a warship's stern and bow each keep their own plates when it breaks in two.
+			void Armour(float z0, float z1, float w, float h, int n, float taper = 0.2f, float y = 0, float x = 0)
+			{
+				auto run = [&](float a, float b, int count)
+				{
+					float step = (b - a) / count;
+					for (int i = 0; i < count; i++)
+					{
+						float z = a + step * (i + 0.5f);
+						// 0 at the stern of the whole run, 1 at its bow.
+						float t = (z - z0) / Mathf::Max(z1 - z0, 1e-4f);
+						Block(Vector3(x, y, z), Vector3(w * (1.0f - taper * t), h * (1.0f - taper * 0.5f * t), step * 1.08f));
+					}
+				};
+				constexpr float split = ShipMeshFactory::SplitZ;
+				if (z0 < split && z1 > split)
+				{
+					int aft = Mathf::Clamp(Mathf::RoundToInt(n * (split - z0) / (z1 - z0)), 1, Mathf::Max(1, n - 1));
+					run(z0, split, aft);
+					run(split, z1, Mathf::Max(1, n - aft));
+				}
+				else
+					run(z0, z1, n);
+			}
+
+			/// The bridge: the Core module at the kit's own proportions (its canopy the bridge's windows), length long, its
+			/// keel standing on deck at (x, z).
+			Part& Bridge(float x, float deck, float z, float length)
+			{
+				const auto& info = Info(P::Core);
+				float up = info.Ok ? length * info.Size().y / Mathf::Max(info.Size().x, 1e-4f) : length * 0.3f;
+				return Add(P::Core, Vector3(x, deck + up * 0.5f, z), Vector3(0, 0, length));
+			}
+
+			/// A strut from a to b (a beam's length along it), `thick` across: a boom, a claw's arm, a ring's segment.
+			Part& Strut(Vector3 a, Vector3 b, float thick, P piece = P::Weapon, float overlap = 1.0f)
+			{
+				Vector3 d = b - a;
+				float length = d.magnitude();
+				Vector3 n = length > 1e-5f ? d / length : Vector3::forward();
+				// Euler(pitch, yaw, 0) takes the nose (+z) to (sin yaw cos pitch, -sin pitch, cos yaw cos pitch).
+				float pitch = -Mathf::Asin(Mathf::Clamp(n.y, -1.0f, 1.0f)) * Mathf::Rad2Deg;
+				float yaw = Mathf::Atan2(n.x, n.z) * Mathf::Rad2Deg;
+				return Add(piece, (a + b) * 0.5f, Vector3(thick, thick, length * overlap), Vector3(pitch, yaw, 0));
+			}
+
 			/// Every part mirrored to port (its x and turns flipped), for symmetric work.
 			void Mirror(const std::function<void(float side)>& make)
 			{
@@ -223,8 +280,9 @@ namespace SpaceGod::Rendering
 			// Twin hulls under one broad flight deck: a catamaran, flat and wide, unlike any other class.
 			r.Mirror([&](float s)
 			{
-				r.Hull(ShipMeshFactory::SplitZ + 0.01f, 0.5f, 0.09f, 0.07f, 0, s * 0.055f);
-				r.Block(Vector3(s * 0.055f, 0, -0.27f), Vector3(0.1f, 0.075f, 0.42f));
+				// Each hull a short prow on a run of armour plates.
+				r.Prow(0.3f, 0.5f, 0.075f, 0.06f, 0, s * 0.055f);
+				r.Armour(-0.48f, 0.31f, 0.095f, 0.072f, 5, 0.12f, 0, s * 0.055f);
 				// Sponsons along each beam, the side hangars' bays.
 				r.Block(Vector3(s * 0.118f, -0.005f, 0.13f), Vector3(0.035f, 0.05f, 0.3f));
 				r.Block(Vector3(s * 0.118f, -0.005f, -0.25f), Vector3(0.035f, 0.05f, 0.34f));
@@ -232,29 +290,35 @@ namespace SpaceGod::Rendering
 				r.Wing(0, 0.04f, 0.2f, 0.135f, 0.5f, 0.012f, s);
 				r.Wing(0, 0.04f, -0.3f, 0.135f, 0.38f, 0.012f, s);
 			});
-			// The island: a tower block and its mast, to starboard aft.
+			// The hangar deck between the hulls, under the flight deck.
+			r.Armour(-0.46f, 0.3f, 0.05f, 0.045f, 4, 0.0f, 0.012f);
+			// The island to starboard aft: a tower, a second tier, the bridge on top and its mast.
 			r.Block(Vector3(0.075f, 0.085f, -0.12f), Vector3(0.035f, 0.08f, 0.13f));
-			r.Fin(0.075f, 0.12f, -0.12f, 0.06f, 0.06f, 0.006f);
+			r.Block(Vector3(0.075f, 0.14f, -0.13f), Vector3(0.028f, 0.03f, 0.08f));
+			r.Bridge(0.075f, 0.155f, -0.11f, 0.05f);
+			r.Fin(0.075f, 0.155f, -0.15f, 0.05f, 0.03f, 0.005f);
 			r.Engines(layout, 0.021f, 0.06f, { Vector3(-0.075f, 0, -0.52f), Vector3(-0.027f, 0, -0.52f), Vector3(0.027f, 0, -0.52f), Vector3(0.075f, 0, -0.52f) });
 		}
 
 		void Battleship(Recipe& r, Layout layout)
 		{
 			// The heaviest gun line: a deep, armour-belted hull, a tall tower amidships and a big three-engine drive.
-			r.Hull(ShipMeshFactory::SplitZ, 0.5f, 0.14f, 0.085f);
-			r.Hull(0.02f, 0.42f, 0.07f, 0.045f, -0.04f, 0, false, true);
-			r.Block(Vector3(0, 0, -0.27f), Vector3(0.15f, 0.09f, 0.42f));
-			r.Block(Vector3(0, -0.045f, -0.25f), Vector3(0.07f, 0.04f, 0.32f));
+			r.Prow(0.24f, 0.5f, 0.12f, 0.07f);
+			r.Armour(-0.48f, 0.27f, 0.16f, 0.09f, 5, 0.25f);
+			// A keel of plates under the hull.
+			r.Armour(-0.42f, 0.2f, 0.07f, 0.04f, 3, 0.2f, -0.05f);
 			r.Mirror([&](float s)
 			{
 				// Armour belts down both beams.
-				r.Block(Vector3(s * 0.074f, 0, 0.14f), Vector3(0.022f, 0.045f, 0.36f));
-				r.Block(Vector3(s * 0.078f, 0, -0.26f), Vector3(0.022f, 0.05f, 0.38f));
+				r.Block(Vector3(s * 0.082f, 0, 0.1f), Vector3(0.022f, 0.05f, 0.3f));
+				r.Block(Vector3(s * 0.086f, 0, -0.26f), Vector3(0.022f, 0.055f, 0.38f));
 				r.Wing(s * 0.07f, 0.0f, -0.36f, 0.04f, 0.1f, 0.008f, s, 0, 30);
 			});
-			r.Block(Vector3(0, 0.065f, -0.12f), Vector3(0.06f, 0.05f, 0.15f));
-			r.Block(Vector3(0, 0.095f, -0.11f), Vector3(0.04f, 0.025f, 0.08f));
-			r.Fin(0, 0.105f, -0.13f, 0.05f, 0.05f, 0.006f);
+			// A stepped tower amidships, the bridge on top and its mast.
+			r.Block(Vector3(0, 0.06f, -0.14f), Vector3(0.085f, 0.04f, 0.22f));
+			r.Block(Vector3(0, 0.09f, -0.15f), Vector3(0.06f, 0.03f, 0.13f));
+			r.Bridge(0, 0.105f, -0.12f, 0.07f);
+			r.Fin(0, 0.105f, -0.17f, 0.045f, 0.035f, 0.005f);
 			r.Fin(0, 0.04f, -0.4f, 0.05f, 0.09f, 0.008f, 0, P::Tail);
 			r.Engines(layout, 0.022f, 0.07f, { Vector3(-0.042f, 0, -0.51f), Vector3(0, 0, -0.51f), Vector3(0.042f, 0, -0.51f) });
 		}
@@ -262,9 +326,9 @@ namespace SpaceGod::Rendering
 		void GateBreaker(Recipe& r, Layout layout)
 		{
 			// A short, slab-sided siege hull: three hulls side by side under thick belts, a blunt ram bow.
-			r.Hull(ShipMeshFactory::SplitZ, 0.5f, 0.17f, 0.1f);
+			r.Prow(0.32f, 0.5f, 0.16f, 0.1f);
 			for (float x : { -0.05f, 0.0f, 0.05f })
-				r.Block(Vector3(x, 0, -0.27f), Vector3(0.065f, 0.1f, 0.42f));
+				r.Armour(-0.48f, 0.33f, 0.065f, 0.1f, 5, 0.1f, 0, x);
 			r.Mirror([&](float s)
 			{
 				r.Block(Vector3(s * 0.09f, 0, 0.16f), Vector3(0.025f, 0.075f, 0.42f));
@@ -274,20 +338,22 @@ namespace SpaceGod::Rendering
 			});
 			r.Block(Vector3(0, 0.07f, -0.05f), Vector3(0.07f, 0.035f, 0.2f)).Section = ShipMeshFactory::Stern;
 			r.Block(Vector3(0, 0.09f, -0.26f), Vector3(0.05f, 0.04f, 0.08f));
-			r.Fin(0, 0.11f, -0.26f, 0.08f, 0.04f, 0.008f);
+			r.Bridge(0, 0.11f, -0.24f, 0.05f);
+			r.Fin(0, 0.11f, -0.28f, 0.08f, 0.04f, 0.008f);
 			r.Engines(layout, 0.025f, 0.06f, { Vector3(-0.045f, 0, -0.51f), Vector3(0, 0, -0.51f), Vector3(0.045f, 0, -0.51f) });
 		}
 
 		void Cruiser(Recipe& r, Layout layout)
 		{
 			// A long fine bow, a slimmer drive spine, and outrigger engine nacelles on wing banks amidships.
-			r.Hull(ShipMeshFactory::SplitZ, 0.5f, 0.12f, 0.055f);
-			r.Block(Vector3(0, 0, -0.27f), Vector3(0.07f, 0.05f, 0.42f));
+			r.Prow(0.2f, 0.5f, 0.1f, 0.05f);
+			r.Armour(-0.48f, 0.22f, 0.11f, 0.055f, 4, 0.3f);
 			r.Mirror([&](float s)
 			{
 				r.Wing(s * 0.03f, 0, -0.08f, 0.075f, 0.2f, 0.01f, s, 0, 15);
 			});
-			r.Block(Vector3(0, 0.045f, -0.2f), Vector3(0.04f, 0.035f, 0.1f));
+			r.Block(Vector3(0, 0.045f, -0.2f), Vector3(0.045f, 0.035f, 0.12f));
+			r.Bridge(0, 0.0625f, -0.18f, 0.05f);
 			r.Fin(0, 0.06f, -0.21f, 0.04f, 0.05f, 0.006f);
 			r.Fin(0, -0.02f, -0.35f, 0.04f, 0.07f, 0.006f, 180, P::Tail);
 			r.Engines(layout, 0.02f, 0.08f, { Vector3(-0.025f, 0, -0.5f), Vector3(0.025f, 0, -0.5f), Vector3(-0.1f, 0, -0.255f), Vector3(0.1f, 0, -0.255f) });
@@ -296,8 +362,8 @@ namespace SpaceGod::Rendering
 		void CommandCruiser(Recipe& r, Layout layout)
 		{
 			// A long battlecruiser hull carrying a big search dish on a dorsal mast and antenna spars down both beams.
-			r.Hull(ShipMeshFactory::SplitZ, 0.5f, 0.11f, 0.055f);
-			r.Block(Vector3(0, 0, -0.27f), Vector3(0.13f, 0.065f, 0.42f));
+			r.Prow(0.2f, 0.5f, 0.1f, 0.05f);
+			r.Armour(-0.48f, 0.22f, 0.13f, 0.065f, 4, 0.2f);
 			r.Mirror([&](float s)
 			{
 				r.Beam(Vector3(s * 0.085f, 0.01f, 0.13f), Vector3(0.008f, 0.008f, 0.34f));
@@ -308,17 +374,19 @@ namespace SpaceGod::Rendering
 			r.Fin(0, 0.03f, 0.24f, 0.08f, 0.04f, 0.008f);
 			r.Add(P::Thruster, Vector3(0, 0.12f, 0.255f), Vector3(0.11f, 0.11f, 0.02f), Vector3::zero(), true);
 			r.Block(Vector3(0, 0.055f, 0.05f), Vector3(0.05f, 0.04f, 0.09f));
+			r.Bridge(0, 0.075f, 0.06f, 0.045f);
 			r.Engines(layout, 0.018f, 0.06f, { Vector3(-0.04f, 0, -0.51f), Vector3(0, 0, -0.51f), Vector3(0.04f, 0, -0.51f) });
 		}
 
 		void Destroyer(Recipe& r, Layout layout)
 		{
 			// A long knife-edged wedge with a deep keel fin and twin big drives.
-			r.Hull(ShipMeshFactory::SplitZ, 0.5f, 0.13f, 0.06f);
-			r.Block(Vector3(0, 0, -0.26f), Vector3(0.13f, 0.065f, 0.4f));
+			r.Prow(0.1f, 0.5f, 0.12f, 0.055f);
+			r.Armour(-0.48f, 0.12f, 0.13f, 0.065f, 4, 0.15f);
 			r.Fin(0, -0.03f, -0.1f, 0.05f, 0.3f, 0.008f, 180, P::Tail).Section = ShipMeshFactory::Stern;
 			r.Fin(0, 0.03f, -0.28f, 0.06f, 0.16f, 0.008f, 0, P::Tail);
 			r.Block(Vector3(0, 0.04f, -0.09f), Vector3(0.05f, 0.03f, 0.1f));
+			r.Bridge(0, 0.055f, -0.07f, 0.04f);
 			r.Mirror([&](float s) { r.Wing(s * 0.06f, 0, -0.32f, 0.05f, 0.14f, 0.008f, s, -10, 25); });
 			r.Engines(layout, 0.025f, 0.08f, { Vector3(-0.035f, 0, -0.5f), Vector3(0.035f, 0, -0.5f) });
 		}
@@ -326,9 +394,10 @@ namespace SpaceGod::Rendering
 		void Frigate(Recipe& r, Layout layout)
 		{
 			// A slim spine with paired missile racks forward and an engine block a third of the hull long.
-			r.Hull(ShipMeshFactory::SplitZ, 0.5f, 0.07f, 0.045f);
+			r.Prow(0.26f, 0.5f, 0.07f, 0.045f);
+			r.Armour(-0.22f, 0.27f, 0.065f, 0.042f, 3, 0.1f);
 			r.Block(Vector3(0, 0, -0.33f), Vector3(0.15f, 0.1f, 0.26f));
-			r.Hull(-0.22f, ShipMeshFactory::SplitZ - 0.005f, 0.06f, 0.04f, 0, 0, false, true);
+			r.Bridge(0, 0.021f, 0.08f, 0.035f);
 			r.Mirror([&](float s)
 			{
 				for (float y : { -0.035f, 0.035f }) r.Block(Vector3(s * 0.06f, y, 0.15f), Vector3(0.04f, 0.024f, 0.16f));
@@ -339,8 +408,9 @@ namespace SpaceGod::Rendering
 		void Corvette(Recipe& r, Layout layout)
 		{
 			// A short, stocky patrol hull with broad saddle tanks, a search mast and twin bells.
-			r.Hull(ShipMeshFactory::SplitZ, 0.47f, 0.12f, 0.08f);
-			r.Block(Vector3(0, 0, -0.25f), Vector3(0.12f, 0.08f, 0.36f));
+			r.Prow(0.2f, 0.47f, 0.12f, 0.08f);
+			r.Armour(-0.43f, 0.21f, 0.12f, 0.08f, 3, 0.15f);
+			r.Bridge(0, 0.04f, 0.1f, 0.04f);
 			r.Mirror([&](float s) { r.Add(P::Engine, Vector3(s * 0.1f, 0, -0.2f), Vector3(0.065f, 0.065f, 0.26f)); });
 			r.Fin(0, 0.04f, 0.0f, 0.1f, 0.03f, 0.008f).Section = ShipMeshFactory::Bow;
 			r.Add(P::Thruster, Vector3(0, 0.15f, 0.0f), Vector3(0.09f, 0.09f, 0.012f), Vector3(90, 0, 0)).Section = ShipMeshFactory::Bow;
@@ -436,15 +506,22 @@ namespace SpaceGod::Rendering
 			r.Block(Vector3(0, capture ? 0.065f : 0.085f, 0.08f), Vector3(0.07f, 0.05f, 0.12f));
 			// The push plate: two wing plates either side of the keel, standing across the bow.
 			r.Mirror([&](float s) { r.Wing(0, 0, 0.22f, capture ? 0.1f : 0.14f, 0.03f, 0.24f, s); });
+			// US-T117: claws that read as claws: at each place round the bow a shoulder pod, an arm reaching forward and out
+			// to a knuckle, and a jaw curling back in towards the axis. The capture tug's three reach further and close
+			// tighter (they hold a hull); the ore tug's four are shorter and squarer (they brace a rock against the plate).
 			int claws = capture ? 3 : 4;
+			float shoulder = capture ? 0.06f : 0.08f, reach = capture ? 0.16f : 0.17f, grip = capture ? 0.05f : 0.1f;
+			float elbowZ = capture ? 0.36f : 0.32f, tipZ = capture ? 0.5f : 0.42f, arm = capture ? 0.026f : 0.032f;
 			for (int k = 0; k < claws; k++)
 			{
 				float deg = capture ? 90.0f + 120.0f * k : 45.0f + 90.0f * k, a = deg * Mathf::Deg2Rad;
 				Vector3 radial(Mathf::Cos(a), Mathf::Sin(a), 0);
-				// A fin turned to reach forward, splayed out from the keel at its place round the bow.
-				auto& c = r.Add(P::Fin, radial * (capture ? 0.1f : 0.13f) + Vector3(0, 0, 0.22f), Vector3(0.025f, capture ? 0.32f : 0.26f, 0.06f),
-					Vector3(0, 0, deg - 90.0f));
-				c.Pre = Vector3(80, 0, 0);
+				Vector3 root = radial * shoulder + Vector3(0, 0, 0.21f), elbow = radial * reach + Vector3(0, 0, elbowZ),
+					tip = radial * grip + Vector3(0, 0, tipZ);
+				r.Block(root, Vector3(arm * 1.7f, arm * 1.7f, arm * 1.2f));
+				r.Strut(root, elbow, arm, P::Weapon, 1.05f);
+				r.Block(elbow, Vector3(arm * 1.5f, arm * 1.5f, arm * 1.5f));
+				r.Strut(elbow, tip, arm * 0.8f, P::Weapon, 1.05f);
 			}
 			if (capture)
 			{
@@ -463,18 +540,23 @@ namespace SpaceGod::Rendering
 		{
 			// A stubby work hull holding a glowing service ring out ahead on two booms.
 			r.Hull(-0.35f, 0.2f, 0.2f, 0.15f);
+			// US-T117: the ring is closed (it was twelve fins standing round it, a crown with gaps): sixteen beam segments
+			// end to end round the circle, four Engine nodes on it (their glow ends lit), held on four booms from the hull.
+			constexpr float ringR = 0.13f, ringZ = 0.42f;
+			auto onRing = [&](float deg)
+			{
+				return Vector3(Mathf::Cos(deg * Mathf::Deg2Rad) * ringR, Mathf::Sin(deg * Mathf::Deg2Rad) * ringR, ringZ);
+			};
+			constexpr int segments = 16;
+			for (int k = 0; k < segments; k++)
+				r.Strut(onRing(360.0f * k / segments), onRing(360.0f * (k + 1) / segments), 0.018f, P::Weapon, 1.12f);
+			for (int k = 0; k < 4; k++) r.Add(P::Engine, onRing(90.0f * k), Vector3(0.032f, 0.032f, 0.045f));
 			r.Mirror([&](float s)
 			{
 				r.Block(Vector3(s * 0.11f, 0, -0.1f), Vector3(0.04f, 0.1f, 0.36f));
-				r.Beam(Vector3(s * 0.07f, 0, 0.3f), Vector3(0.02f, 0.02f, 0.24f));
+				r.Strut(Vector3(s * 0.07f, 0, 0.16f), onRing(s > 0 ? 0.0f : 180.0f), 0.02f);
+				r.Strut(Vector3(0, s * 0.06f, 0.16f), onRing(s > 0 ? 90.0f : 270.0f), 0.02f);
 			});
-			for (int k = 0; k < 12; k++)
-			{
-				float deg = 30.0f * k;
-				auto& f = r.Add(P::Fin, Vector3(Mathf::Cos(deg * Mathf::Deg2Rad) * 0.12f, Mathf::Sin(deg * Mathf::Deg2Rad) * 0.12f, 0.42f),
-					Vector3(0.012f, 0.08f, 0.05f), Vector3(0, 0, deg - 90.0f));
-				(void)f;
-			}
 			r.Engine(-0.05f, 0, -0.5f, 0.035f, 0.06f);
 			r.Engine(0.05f, 0, -0.5f, 0.035f, 0.06f);
 		}
@@ -604,6 +686,81 @@ namespace SpaceGod::Rendering
 		}
 
 		Color Mix(Color a, Color b, float t) { return Color::Lerp(a, b, t); }
+
+		/// US-T117: the launchers and shield emitters as kit parts in the hull's livery, where they were ShipMeshFactory's
+		/// white procedural boxes; each about the procedural part's size, on the same mount (its +y up off the hull, its +z
+		/// the way it fires). Only on a kit hull: with Ultimate Spaceships Creator's hulls in use (it draws ahead of this kit)
+		/// a Star Sparrow part would be in the wrong livery, so they stay procedural there. False for anything else.
+		bool Launcher(const cs::Ref<Transform>& parent, SubsystemKind kind, const cs::Ref<Faction>& faction, cs::List<cs::Ref<Renderer>>& into)
+		{
+			switch (kind)
+			{
+				case SubsystemKind::MissileLauncher: case SubsystemKind::HiveLauncher: case SubsystemKind::InterceptorMissile:
+				case SubsystemKind::RocketPod: case SubsystemKind::TorpedoTube: case SubsystemKind::AntimatterTorpedo:
+				case SubsystemKind::ShieldGenerator: break;
+				default: return false;
+			}
+			if (UscKit::Available()) return false;
+			auto material = StarSparrowKit::Livery(faction);
+			auto root = NewSection(parent, "KitBase");
+			auto add = [&](P piece, Vector3 pos, Vector3 size, Vector3 euler = Vector3::zero(), bool aft = false)
+			{
+				Part p;
+				p.Piece = piece;
+				p.Pos = pos;
+				p.Size = size;
+				p.Euler = euler;
+				p.Aft = aft;
+				if (auto mr = Place(root, p, material)) into.Add(mr);
+			};
+			// A bell turned with its mouth up: a cell's hatch, an emitter's dish.
+			const Vector3 mouthUp(90, 0, 0);
+			switch (kind)
+			{
+				case SubsystemKind::MissileLauncher:
+					// A plated box launcher, four tubes out of its face.
+					add(P::Plasma, Vector3(0, 0.008f, -0.004f), Vector3(0.03f, 0.018f, 0.046f));
+					for (int r = 0; r < 2; r++)
+						for (int c = 0; c < 2; c++)
+							add(P::Weapon, Vector3(-0.007f + c * 0.014f, 0.004f + r * 0.009f, 0.022f), Vector3(0.007f, 0.007f, 0.014f));
+					break;
+				case SubsystemKind::HiveLauncher:
+				case SubsystemKind::InterceptorMissile:
+				{
+					// Vertical cells: a squat block with its cells' hatches opening upward.
+					bool hive = kind == SubsystemKind::HiveLauncher;
+					float w = hive ? 0.03f : 0.026f, h = hive ? 0.016f : 0.012f, cell = hive ? 0.011f : 0.008f;
+					add(P::Plasma, Vector3(0, h * 0.5f, 0), Vector3(w, h, hive ? 0.036f : 0.026f));
+					for (int r = 0; r < 2; r++)
+						for (int c = 0; c < 2; c++)
+							add(P::Thruster, Vector3((c - 0.5f) * w * 0.47f, h, (r - 0.5f) * w * 0.5f), Vector3(cell, cell, cell * 0.4f), mouthUp);
+					break;
+				}
+				case SubsystemKind::RocketPod:
+					// A round pod (the Engine module) with a pair of tubes along its flanks.
+					add(P::Engine, Vector3(0, 0.008f, 0), Vector3(0.016f, 0.016f, 0.034f));
+					for (float s : { -1.0f, 1.0f }) add(P::Weapon, Vector3(s * 0.01f, 0.006f, 0.004f), Vector3(0.005f, 0.005f, 0.03f));
+					break;
+				case SubsystemKind::TorpedoTube:
+				case SubsystemKind::AntimatterTorpedo:
+				{
+					// An armoured breech, a wide tube and a bell for its muzzle; the antimatter tube heavier, with a coil.
+					bool am = kind == SubsystemKind::AntimatterTorpedo;
+					float k = am ? 1.2f : 1.0f, y = 0.008f * k;
+					add(P::Plasma, Vector3(0, y, -0.012f * k), Vector3(0.03f * k, 0.016f * k, 0.04f * k));
+					add(P::Weapon, Vector3(0, y, 0.018f * k), Vector3(0.018f * k, 0.018f * k, 0.03f * k));
+					add(P::Thruster, Vector3(0, y, 0.033f * k), Vector3(0.022f * k, 0.022f * k, 0.007f * k), Vector3::zero(), true);
+					if (am) add(P::Thruster, Vector3(0, y, 0.006f * k), Vector3(0.025f * k, 0.025f * k, 0.005f * k), Vector3::zero(), true);
+					break;
+				}
+				default:
+					// The shield emitter: a short column (the Engine module stood on end) under a dish opening to the sky.
+					add(P::Engine, Vector3(0, 0.008f, 0), Vector3(0.014f, 0.014f, 0.016f), Vector3(-90, 0, 0));
+					add(P::Thruster, Vector3(0, 0.018f, 0), Vector3(0.032f, 0.032f, 0.008f), mouthUp);
+					break;
+			}
+			return true;
+		}
 	}
 
 	bool StarSparrowKit::Available()
@@ -665,6 +822,7 @@ namespace SpaceGod::Rendering
 		cs::List<cs::Ref<Renderer>>& into)
 	{
 		if (!Available()) return false;
+		if (!barrels && Launcher(parent, kind, faction, into)) return true;
 		// Sized as ShipMeshFactory::GetPart's turrets, so the barrels' height (ShipView) still sits on the base.
 		float w;
 		int guns;
