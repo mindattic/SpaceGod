@@ -1067,7 +1067,15 @@ namespace SpaceGod::Core
 		/// </summary>
 		void ThrowDecoy(const cs::Ref<BattleUnit>& u, const cs::Ref<Subsystem>& s, const cs::Ref<WeaponSpec>& w);
 
+		/// <summary>The cloud itself, astern of <paramref name="u"/>, and every round homing on it within reach given its
+		/// chance of being drawn off; <paramref name="sub"/> the dispenser's hardpoint, or -1 for none.</summary>
+		void DeployDecoy(const cs::Ref<BattleUnit>& u, int sub);
+
 	public:
+		/// <summary>US-T170: a hauler's helm throws a flare-and-chaff cloud from its own magazine (<see cref="HelmFlares"/>),
+		/// having no dispenser hardpoint of its own; false while its systems are stunned.</summary>
+		bool ThrowFlares(const cs::Ref<BattleUnit>& u);
+
 		/// <summary>The nearest guided round homing on <paramref name="u"/> within <paramref name="km"/> and not already drawn off, or null.</summary>
 		cs::Ref<Missile> MissileInbound(const cs::Ref<BattleUnit>& u, double km);
 

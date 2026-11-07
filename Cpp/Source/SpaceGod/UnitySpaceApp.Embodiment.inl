@@ -232,6 +232,12 @@ private:
 	/// </summary>
 	void UpdateSeat(float dt);
 
+	/// <summary>US-T170: the feel of the seat flown this frame (<see cref="flightFeel"/>): a launched craft's, an EVA worker's.</summary>
+	void StepSeatFeel(const cs::Ref<Core::IEmbodiable>& held, const Core::EmbodimentInput& input, float dt);
+
+	/// <summary>An EVA worker's weld hits as last seen, so each new one is felt as it lands (US-T170).</summary>
+	int seatWeldHits = 0;
+
 	/// <summary>
 	/// The dogfight game's keys in a cockpit (U.SPC-T424): F flight assist, T a lock on the hostile nearest the crosshair
 	/// (again for the next), Ctrl flares, and the number keys: 1 the next weapon group on the second trigger, 2-5 orders

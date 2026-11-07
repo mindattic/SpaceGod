@@ -4,6 +4,7 @@
 
 #include "Camera/SpaceCamera.h"
 #include "Combat/Battle.h"
+#include "Combat/CombatSpecs.h" // US-T170: a craft's dry mass, for its feel
 #include "Combat/CombatState.h"
 #include "Combat/Dogfighting.h"
 #include "Combat/Fighters.h" // US-T106: a craft's carrier
@@ -18,6 +19,7 @@
 #include "Embodiment/FighterSeat.h"
 #include "Embodiment/HelmAbilities.h"
 #include "Embodiment/MountedTurret.h"
+#include "Embodiment/RepairWorker.h" // US-T170: a weld struck, felt
 #include "Embodiment/ShipHelm.h"
 #include "Embodiment/SelfDestruct.h"
 #include "Embodiment/StationSeat.h"
@@ -31,6 +33,8 @@
 #include "SimClock.h"
 #include "World.h"
 
+#include <algorithm>
+#include <cmath>
 #include <tuple>
 
 using namespace SpaceGod::Core;
@@ -628,9 +632,42 @@ namespace SpaceGod
 			NoteSelfDestruct(); // US-T97
 			return;
 		}
+		StepSeatFeel(held, input, dt); // US-T170
 		auto pose = held->PoseAt(Clock->Jd);
 		auto roof = ToVector(pose.Up.SwapYZ());
 		SpaceCamera->PilotView = Quaternion::LookRotation(seatAim, Vector3::Dot(roof, seatAim) > 0.99f ? up : roof);
+	}
+
+	void UnitySpaceApp::StepSeatFeel(const cs::Ref<IEmbodiable>& held, const EmbodimentInput& input, float dt)
+	{
+		// US-T170: a launched craft flies with a fighter's feel, scaled by its own mass; an EVA worker with a drone's, nimble
+		// and light, and every good weld strikes with a sharp tick. A gun mount or a station's chair has no flight to feel.
+		FlightFeelInput in;
+		in.Boosting = input.Boost;
+		if (auto f = cs::As<FighterSeat>(held); f != nullptr && f->Unit != nullptr)
+		{
+			auto craft = f->Unit->Fighter != nullptr ? FighterCraft::Of(f->Unit->Fighter->Role) : FighterCraft::Interceptor();
+			if (craft == nullptr) return;
+			double mass = craft->Spec != nullptr ? craft->Spec->DryMassTonnes : 0;
+			FeelFor(f, FlightFeelProfile::Of(FeelRole::Fighter, mass));
+			in.Pace = f->Unit->Vel.Length() / cs::Math::Max(craft->Tuning().MaxSpeed, 1e-9);
+			in.Thrust = std::max(std::abs(static_cast<double>(input.Throttle)),
+				0.5 * std::max(std::abs(static_cast<double>(input.StrafeRight)), std::abs(static_cast<double>(input.StrafeUp))));
+		}
+		else if (auto w = cs::As<RepairWorker>(held))
+		{
+			bool fresh = feelFor != std::static_pointer_cast<void>(w);
+			FeelFor(w, FlightFeelProfile::Of(FeelRole::Drone, 0.2));
+			if (fresh) seatWeldHits = w->Weld.Hits;
+			if (w->Weld.Hits > seatWeldHits) flightFeel.Kick(0.6 + 0.1 * std::min(w->Weld.Streak, 4));
+			seatWeldHits = w->Weld.Hits;
+			// The suit's jets: a light push on the crawl, more with them lit.
+			in.Thrust = (input.Boost ? 0.6 : 0.25) * std::min(1.0, std::abs(static_cast<double>(input.Throttle)) + std::abs(static_cast<double>(input.StrafeRight)));
+			in.Boosting = false;
+		}
+		else return;
+		flightFeel.Step(dt, in);
+		feelStepped = true;
 	}
 
 	void UnitySpaceApp::ClampSeatAim(const cs::Ref<IEmbodiable>& held)

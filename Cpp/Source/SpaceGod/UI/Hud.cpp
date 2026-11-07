@@ -1522,6 +1522,7 @@ namespace SpaceGod::UI
 			if (app->RidingLane() && DirectionToGui(app->PilotForward(), ahead)) centre = ahead;
 			DrawStreaks(centre, strength, StreakCount, StreakColor, 0, 170.0f);
 		}
+		else if (!app->RidingLane()) DrawSpeedDust(app->FlightStreaks());
 		// Through a gate at the helm (U.SPC-T414): the gate's violet glow and its streaks held over the far side
 		// while it streams in, space folding shut and open again with it (the view narrows, see HelmGateFold).
 		float glow = app->HelmGateGlow();
@@ -1537,6 +1538,35 @@ namespace SpaceGod::UI
 			GUI::DrawTexture(Rect(0, 0, static_cast<float>(Screen::width), static_cast<float>(Screen::height)), Icons::White());
 			GUI::color = old;
 		}
+	}
+
+	void Hud::DrawSpeedDust(float strength)
+	{
+		if (strength < 0.01f) return;
+		// From the point the hull is moving toward (only when that is ahead: backing off, nothing pours past this way).
+		Vector2 centre;
+		if (!DirectionToGui(app->PilotVelocityKmS(), centre)) return;
+		float reach = Vector2(static_cast<float>(Screen::width), static_cast<float>(Screen::height)).magnitude() * 0.6f;
+		float t = Time::unscaledTime;
+		auto old = GUI::color;
+		for (int i = 0; i < SpeedDustCount; i++)
+		{
+			// Fixed per mote: its bearing, pace and starting point (a cheap hash of its index, as the warp's dust).
+			int k = i + 3000;
+			float h1 = Frac(Mathf::Sin(k * 12.9898f) * 43758.55f);
+			float h2 = Frac(Mathf::Sin(k * 78.233f) * 12345.67f);
+			float h3 = Frac(Mathf::Sin(k * 37.719f) * 24634.63f);
+			float angle = h1 * Mathf::PI * 2.0f;
+			float phase = Frac(t * (0.12f + 0.55f * strength) * (0.5f + h2) + h3);
+			// Cubed, so a mote creeps out of the distance and rushes past at the edge, as if coming nearer.
+			float r = 20.0f + phase * phase * phase * reach;
+			float size = 1.0f + 1.8f * phase;
+			GUI::color = Color(DustColor.r, DustColor.g, DustColor.b, strength * Mathf::Min(1.0f, phase * 4.0f) * (0.15f + 0.35f * h3));
+			auto p = centre + Vector2(Mathf::Cos(angle), Mathf::Sin(angle)) * r;
+			GUI::DrawTexture(Rect(p.x - size * 0.5f, p.y - size * 0.5f, size, size), Icons::White());
+		}
+		GUI::color = old;
+		DrawStreaks(centre, strength * 0.55f, SpeedStreakCount, StreakColor, 2000, 90.0f);
 	}
 
 	void Hud::DrawGateLight(float amount, Color color, float opacity)

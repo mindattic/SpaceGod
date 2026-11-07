@@ -1764,6 +1764,18 @@ namespace SpaceGod::Core
 		if (!want || s->Ammo <= 0 || u->Stunned > 0) return;
 		s->Ammo--;
 		s->Cooldown = w->Cooldown;
+		DeployDecoy(u, s->Index);
+	}
+
+	bool Battle::ThrowFlares(const cs::Ref<BattleUnit>& u)
+	{
+		if (u == nullptr || u->Stunned > 0) return false;
+		DeployDecoy(u, -1);
+		return true;
+	}
+
+	void Battle::DeployDecoy(const cs::Ref<BattleUnit>& u, int sub)
+	{
 		auto at = u->Pos - u->Forward * (u->Radius() + 0.02);
 		auto decoy = cs::New<Decoy>();
 		decoy->Pos = at;
@@ -1771,7 +1783,7 @@ namespace SpaceGod::Core
 		decoy->Side = u->Side;
 		decoy->Life = Countermeasures::LifeSeconds;
 		Decoys.Add(decoy);
-		Emit(FxKind::Deployed, at, at, 0.03, u->Side, u, s->Index);
+		Emit(FxKind::Deployed, at, at, 0.03, u->Side, u, sub);
 		for (const auto& m : Missiles)
 		{
 			if (m->Gone || m->Target != u || m->Decoy != nullptr || (m->Pos - u->Pos).Length() > Countermeasures::ReachKm) continue;

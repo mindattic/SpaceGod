@@ -12,6 +12,7 @@
 #include "Combat/PilotFlight.h"        // PilotState, PilotCruiseState, EngineTelegraph
 #include "Combat/PilotTuning.h"        // PilotControl (by value)
 #include "Embodiment/HelmFlight.h"     // helmFlight's initialiser (cs::New<HelmFlight>)
+#include "Embodiment/FlightFeel.h"     // FlightFeel, HelmFlares (by value), US-T170
 #include "UI/PauseMenu.h"              // pauseMenu's initialiser (cs::New<PauseMenu>)
 
 #include <tuple>

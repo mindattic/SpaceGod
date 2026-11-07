@@ -398,11 +398,28 @@ namespace SpaceGod
 		bool helm = PilotControlMode == Core::PilotControl::Helm;
 		unit->PlayerHelm = helm;
 		unit->PlayerVolleyAim = helm ? PilotLookDirection() : Core::DVec3::Zero;
-		if (helm && helmTriggerWas && !unit->PlayerFireHeld) unit->PlayerVolleyRelease = true;
+		if (helm && helmTriggerWas && !unit->PlayerFireHeld)
+		{
+			unit->PlayerVolleyRelease = true;
+			flightFeel.Kick(); // US-T170: the broadside goes out and the whole hull shudders with it
+		}
 		helmTriggerWas = helm && unit->PlayerFireHeld;
 		// The rest of the arsenal (U.SPC-T271): the EMP on the middle button, a mine on Ctrl; an auto turret needs no hand.
 		unit->PlayerEmpHeld = Input.FireEmp && armed;
 		if (Input.DropMine && armed) unit->PlayerMineRequested = true;
+		// A hauler's Ctrl in a fight (US-T170), outside a port's approach where it is docking mode: flares and chaff from
+		// the helm's own magazine, to spoof the heat-seekers pirates throw at a freighter.
+		if (Input.DropMine && PilotControlMode == Core::PilotControl::Hauler && !helmFlight->DockingApproach)
+		{
+			if (!helmFlares.Ready())
+				ShowToast(helmFlares.Left <= 0 ? cs::String("Flare magazine empty") : cs::String("Flare dispenser cycling"));
+			else if (ship->Battle->ThrowFlares(unit))
+			{
+				helmFlares.Spend();
+				flightFeel.Kick(0.4);
+				ShowToast(cs::Cat("Flares and chaff away  (", helmFlares.Left, " left)"));
+			}
+		}
 		// A fighter locked in this fight is held as its unit; a ship as itself, so the lock outlives the fight.
 		if (pilotLockUnit != nullptr && (!pilotLockUnit->Present() || !ship->Battle->Units.Contains(pilotLockUnit))) pilotLockUnit = nullptr;
 		auto lockUnit = pilotLockUnit ? pilotLockUnit : (pilotLockTarget.IsShip() ? ship->Battle->UnitOf(pilotLockTarget.Ship) : nullptr);
@@ -1219,11 +1236,21 @@ namespace SpaceGod
 		double nearest = cs::Math::Min(NearestSurface(SpaceCamera->ScenePosition), Travel->GateClearance());
 		UnityCamera->nearClipPlane = static_cast<float>(cs::Math::Max(1e-6, cs::Math::Min(nearest * 0.25, 20.0)));
 		UnityCamera->farClipPlane = 5e8f;
-		UnityCamera->transform->SetPositionAndRotation(Vector3::zero(), SpaceCamera->Rotation);
+		// US-T170: what is flown this frame (the helm's hull, a cockpit, an EVA worker) has its feel stepped; with nothing
+		// flown it settles back to still. Its shake lays a small turn over the view only, never the camera's own pose.
+		if (!feelStepped) flightFeel.Settle(dt);
+		bool feeling = feelStepped;
+		feelStepped = false;
+		auto shake = Quaternion::identity();
+		if (!Travel->Active && (cs::Math::Abs(flightFeel.ShakeYawDeg) + cs::Math::Abs(flightFeel.ShakePitchDeg) + cs::Math::Abs(flightFeel.ShakeRollDeg)) > 1e-4)
+			shake = Quaternion::Euler(static_cast<float>(flightFeel.ShakePitchDeg), static_cast<float>(flightFeel.ShakeYawDeg), static_cast<float>(flightFeel.ShakeRollDeg));
+		UnityCamera->transform->SetPositionAndRotation(Vector3::zero(), SpaceCamera->Rotation * shake);
 
+		// The view widens with the pace of what is flown, more on the afterburner (kicked wide as it lights) and under the
+		// cruise drive, by its role's feel (US-T170): a fighter's snaps out, a capital ship's barely swells.
 		float targetFov = RidingLane() ? BaseFov + (LaneFov - BaseFov) * LaneRideSpeed
-			: IsPiloting() && (pilotCruise().Active() || systemCruise.Cruising() /* US-T127 */) ? CruiseFov : IsPiloting() && pilotBoosting ? BoostFov : BaseFov;
-		cameraFov = Mathf::Lerp(cameraFov, targetFov, 1.0f - Mathf::Exp(-dt * FovResponseHz));
+			: feeling ? BaseFov + static_cast<float>(flightFeel.ViewFovDeg()) : BaseFov;
+		cameraFov = Mathf::Lerp(cameraFov, targetFov, 1.0f - Mathf::Exp(-dt * (feeling && !RidingLane() ? FovResponseHz * 2.5f : FovResponseHz)));
 		// A ring gate kicks the view wide for a moment and flashes as the hull goes through (U.SPC-T41).
 		fovKick *= Mathf::Exp(-dt * 3.5f);
 		GateFlash = Mathf::Max(0.0f, GateFlash - dt / GateFlashS);

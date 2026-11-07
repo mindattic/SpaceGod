@@ -358,6 +358,11 @@ private:
 	/// through washes the screen in a flash.
 	void DrawLaneEffects();
 
+	/// US-T170: the sense of speed at the helm off a lane: dust motes and thin streaks pouring past from the point the
+	/// hull is moving toward, coming on from a third of its top speed (<see cref="UnitySpaceApp::FlightStreaks"/>).
+	void DrawSpeedDust(float strength);
+	static constexpr int SpeedDustCount = 90, SpeedStreakCount = 28;
+
 	static constexpr Color GateGlowColor{0.4f, 0.28f, 0.85f};
 	static constexpr Color GateFlashColor{0.78f, 0.93f, 1.0f};
 

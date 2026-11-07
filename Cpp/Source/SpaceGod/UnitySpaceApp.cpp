@@ -1299,6 +1299,7 @@ namespace SpaceGod
 		}
 		// The camera's FOV kick below, and the HUD's readouts.
 		pilotBoosting = helmFlight->Boosting;
+		StepHelmFeel(ship, tuning, hull, dt); // US-T170: the hull's feel, by its role and mass
 		HaulerReadout(helmFlight->Model, helmFlight->Hull, helmFlight->Input);
 		PilotTelegraph = capital != nullptr ? pilot().Telegraph : cs::Nullable<EngineTelegraph>();
 		PilotFlightNote = helmFlight->Note;
@@ -1344,6 +1345,30 @@ namespace SpaceGod
 			// The string aim (US-T168), every fighter and hauler: the view is the mouse's, the hull turns after it.
 			default: return ToRotation(pilotAim, pilotViewUp);
 		}
+	}
+
+	void UnitySpaceApp::FeelFor(const std::shared_ptr<void>& owner, const FlightFeelProfile& profile)
+	{
+		if (feelFor == owner) return;
+		feelFor = owner;
+		flightFeel.Reset(profile);
+	}
+
+	void UnitySpaceApp::StepHelmFeel(const cs::Ref<Ship>& ship, const PilotTuning& tuning, const HullDynamics& hull, float dt)
+	{
+		// US-T170: a new hull at the helm starts on its own feel (its role's, scaled by its mass) and a full flare magazine.
+		if (feelFor != std::static_pointer_cast<void>(ship)) helmFlares.Refill();
+		FeelFor(ship, FlightFeelProfile::Of(FlightFeelProfile::RoleOf(PilotControlMode), hull.MassKt * 1000));
+		helmFlares.Step(dt);
+		FlightFeelInput in;
+		in.Pace = pilot().Vel.Length() / cs::Math::Max(tuning.MaxSpeed, 1e-9);
+		// The drive's push: what the hull's velocity did this frame beyond gravity's pull, against its main drive's thrust.
+		if (dt > 0 && hull.MainAccel > 0)
+			in.Thrust = ((pilot().Vel - helmFlight->VelBefore) / dt - helmFlight->Gravity).Length() / hull.MainAccel;
+		in.Boosting = helmFlight->Boosting;
+		in.Cruising = pilotCruise().Active() || systemCruise.Cruising();
+		flightFeel.Step(dt, in);
+		feelStepped = true;
 	}
 
 	Quaternion UnitySpaceApp::ToRotation(DVec3 forward, DVec3 up)

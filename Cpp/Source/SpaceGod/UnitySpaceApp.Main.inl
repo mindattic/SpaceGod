@@ -139,13 +139,36 @@ private:
 	/// <summary>What the pilot camera leans toward tracking, independent of the ship's own facing.</summary>
 	Target pilotLockTarget = Target::None();
 
-	/// <summary>Base field of view everywhere outside an active boost (matches <see cref="SetupCamera"/>'s
-	/// initial value) and the widened view boost eases toward -- a classic sense-of-speed cue
-	/// (Freelancer, Elite, Star Citizen all do this) that costs nothing to add since the ship's
-	/// actual boosted velocity is already real.</summary>
-	static constexpr float BaseFov = 60.0f, BoostFov = 74.0f, CruiseFov = 86.0f, FovResponseHz = 6.0f;
+	/// <summary>Base field of view (matches <see cref="SetupCamera"/>'s initial value); what is flown widens it with its
+	/// pace, its afterburner and its cruise drive by its role's feel (US-T170, <see cref="Core::FlightFeelProfile"/>) -- a
+	/// classic sense-of-speed cue (Freelancer, Elite, Star Citizen all do this).</summary>
+	static constexpr float BaseFov = 60.0f, FovResponseHz = 6.0f;
 	float cameraFov = BaseFov;
 	bool pilotBoosting = false;
+
+	/// <summary>US-T170: the feel of what is being flown (the helm's hull, a craft's cockpit, an EVA worker): its speed
+	/// streaks, the field of view it widens to, and the camera's shake by its role and mass. Stepped by the helm and the
+	/// seats each frame they fly (<see cref="feelStepped"/>), settled back to still otherwise.</summary>
+	Core::FlightFeel flightFeel;
+	bool feelStepped = false;
+
+	/// <summary>What <see cref="flightFeel"/> was last set up for (a hull, a seat), so a new one starts on its own feel.</summary>
+	std::shared_ptr<void> feelFor;
+
+	/// <summary>US-T170: a hauler helm's own flare-and-chaff magazine, full each time a hull's helm is taken.</summary>
+	Core::HelmFlares helmFlares;
+
+	/// <summary>The feel set up for <paramref name="owner"/> (a new one: reset to <paramref name="profile"/>).</summary>
+	void FeelFor(const std::shared_ptr<void>& owner, const Core::FlightFeelProfile& profile);
+
+	/// <summary>The feel stepped for the helm's hull this frame, after it has flown.</summary>
+	void StepHelmFeel(const cs::Ref<Core::Ship>& ship, const Core::PilotTuning& tuning, const Core::HullDynamics& hull, float dt);
+
+public:
+	/// <summary>US-T170: the flown hull's speed streaks and dust, 0..1, for the HUD.</summary>
+	float FlightStreaks() const { return static_cast<float>(flightFeel.Streaks); }
+
+private:
 
 	/// <summary>The cruise drive's own ramp state (see <see cref="PilotFlight.Step"/>) -- persists
 	/// across frames like <see cref="pilotVelKmS"/> does, and only while piloting.</summary>

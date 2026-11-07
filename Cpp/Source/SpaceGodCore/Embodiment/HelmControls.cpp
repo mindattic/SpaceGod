@@ -66,7 +66,12 @@ namespace SpaceGod::Core
 		}
 	}
 
-	cs::String HelmControls::Heavy() const { return DockingMode ? ", flies heavy on its load, Ctrl in a port's approach to dock" : ""; }
+	// US-T170: elsewhere a hauler's Ctrl throws flares and chaff from the helm's own magazine, in a fight.
+	cs::String HelmControls::Heavy() const
+	{
+		return Stick == PilotControl::Hauler ? (DockingMode ? ", flies heavy on its load, Ctrl in a port's approach to dock, in a fight throws flares" : ", Ctrl in a fight throws flares")
+			: DockingMode ? ", flies heavy on its load, Ctrl in a port's approach to dock" : "";
+	}
 
 	cs::String HelmControls::StickHint() const
 	{
