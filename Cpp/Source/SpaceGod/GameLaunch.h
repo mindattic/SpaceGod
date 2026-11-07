@@ -5,8 +5,8 @@
 namespace SpaceGod
 {
 	/// The way between the main menu scene and the game scene: the menu starts a new game or names the save to
-	/// resume, and the game goes back to the menu. A run started for the tour, a capture or <c>-continue</c>
-	/// skips the menu.
+	/// resume, and the game goes back to the menu. A run started for the tour, a capture, <c>-continue</c> or
+	/// <c>--headless</c> (US-T233: no window to click a menu in) skips the menu.
 	///
 	/// Unreal: a "scene" is a map. Both are the same empty map (the game is built at runtime), so loading the game
 	/// scene reopens the map with ?Scene=UnitySpace and the menu with ?Scene=MainMenu; ASpaceGameMode reads the

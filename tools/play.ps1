@@ -23,6 +23,10 @@ param(
   # (read back from the GPU into the capture host, Capture/README.md) into the usual session folder. -Seconds stops the
   # game after that long (the host then exports the session); -ExecCmds runs a scenario (e.g. "sg.Tour auto");
   # -CaptureStats logs the game's frame rate and the frame feed's cost every 5 s ([MindAttic.Capture] feed: ...).
+  # US-T233: this is also the real command line that carries --headless, the game's own flag for an ordinary,
+  # scripted/automated-testing session (Bootstrap.cpp). A tester or CI script invoking the exe directly (not through
+  # this script) needs to add --headless itself, alongside -RenderOffScreen -unattended -nosplash -nosound, the same
+  # way -SpaceGodSmoke/-SpaceGodViews already pair with -nullrhi -unattended -nosplash.
   [switch]$Offscreen,
   [string]$Capture = 'video hq',
   [int]$Seconds = 0,
@@ -53,6 +57,8 @@ quits; the log is Cpp/Saved/Logs/<project>.log.
   ./tools/play.ps1 -Mode audit              # headless: the smoke, then a probe per binding, PASS/FAIL each (US-T48)
   ./tools/play.ps1 -Mode dogfight -Offscreen -Seconds 30          # no window: a 30 s video of the dogfight demo (US-T163)
   ./tools/play.ps1 -Offscreen -ExecCmds "sg.Tour auto quit"       # no window: the showcase tour, recorded
+  ./tools/play.ps1 -Offscreen                                     # no window: an ordinary session, --headless on its own
+                                                                   # command line, ready for a test/CI harness (US-T233)
 #>
 
 $ErrorActionPreference = 'Stop'
@@ -73,6 +79,10 @@ if ($Offscreen) {
   if ($Mode -notin 'solo', 'dogfight') { throw '-Offscreen runs -Mode solo or dogfight (-ExecCmds for a scenario, e.g. "sg.Tour auto quit").' }
   $editor = Join-Path $engine 'Engine\Binaries\Win64\UnrealEditor.exe'
   $gameArgs = @("`"$($project.FullName)`"", '/Engine/Maps/Entry', '-game', '-RenderOffScreen', "-ResX=$ResX", "-ResY=$ResY", '-nosound',
+    # --headless (US-T233): the game's own flag for this ordinary session having no window (Bootstrap.cpp: scripted
+    # input instead of a real mouse/keyboard, straight past the main menu); -RenderOffScreen/-unattended/-nosplash
+    # above are what actually draw no window and stay quiet.
+    '--headless',
     # -Multiprocess: the editor binaries skip their startup "UBT -Mode=ValidatePlatforms", which otherwise waits behind
     # every UE build queued on the machine (Build.bat's lock) before the game even starts.
     '-Multiprocess', '-unattended', '-nosplash', '-log')
