@@ -600,6 +600,13 @@ namespace SpaceGod::Core
 
 		/// <summary>The hull jumping out: a flash where it was (A) and a streak along its nose (towards B), Size its radius, km.</summary>
 		FtlJump,
+
+		// Sectional damage (US-T91), appended.
+
+		/// <summary>A piece of hull breaking off (see <see cref="ModularHull.Strike"/>): A where it was on the hull, B the way
+		/// it is thrown (straight out from the hull's centre through it), Size the piece's own length, km; Sub the first of
+		/// its modules (<see cref="HullModule.Id"/>).</summary>
+		SectionLost,
 	};
 	SPACEGODCORE_API const char* ToString(FxKind v);
 
@@ -1197,6 +1204,16 @@ namespace SpaceGod::Core
 		void ApplyImpact(const cs::Ref<BattleUnit>& target, DVec3 at, double hp);
 
 	private:
+		/// <summary>
+		/// US-T91: sectional damage. What a shot did past the shields and armour (<paramref name="damage"/>, hull points)
+		/// also lands on the section of the hull's structure it struck at battle-local <paramref name="at"/>
+		/// (<see cref="ModularHull.Strike"/>): that section's structure takes it and the joints round it are loaded, the
+		/// nearest the most. A section whose structure is gone shatters, and every piece no longer held to the hull's root
+		/// breaks off independently: its hardpoints go with it and the hull loses its share (<see cref="ModularHulls.ApplyBreak"/>),
+		/// and a <see cref="FxKind.SectionLost"/> shows it tearing away. A hull already dead is left to its wreck's break-up.
+		/// </summary>
+		void StrikeSections(const cs::Ref<BattleUnit>& target, DVec3 at, double damage);
+
 		void StepMissiles(double dt);
 
 		// ---------------------------------------------------------------- the full arsenal (US-T101)

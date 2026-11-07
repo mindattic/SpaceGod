@@ -252,6 +252,11 @@ namespace SpaceGod::Views
 				e.Color = Color(0.7f, 0.88f, 1.0f) * 2.2f;
 				e.Life = 0.9f;
 				break;
+			case FxKind::SectionLost:
+				// A piece of hull torn away (US-T91): hot at the break, the piece itself a dark, burning hulk tumbling off.
+				e.Color = Color(1.0f, 0.62f, 0.28f) * 1.8f;
+				e.Life = 7.0f;
+				break;
 			default:
 				return;
 		}
@@ -461,6 +466,9 @@ namespace SpaceGod::Views
 			case FxKind::FtlJump:
 				DrawEscapeJump(e, age, t, fade);
 				break;
+			case FxKind::SectionLost:
+				DrawSectionLost(e, age, t, fade);
+				break;
 			case FxKind::Pulse:
 			{
 				// The interdiction pulse: a shell racing outward far past the battle.
@@ -540,6 +548,37 @@ namespace SpaceGod::Views
 				break;
 			}
 		}
+	}
+
+	void BattleFx::DrawSectionLost(const Effect& e, float age, float t, float fade)
+	{
+		// US-T91: a piece of hull breaking off. A flash and a ring of debris where it tore away, then the piece itself
+		// (a tumbling cross of dark plate, its broken edge burning) thrown out the way it came away, slowing as it goes,
+		// with a thin trail of venting smoke back to where it was.
+		auto a = Point(e.Battle, e.A);
+		auto b = Point(e.Battle, e.B);
+		float size = Mathf::Max(static_cast<float>(app->Scale()->ShipLength(e.Size)), PixelSize(a, 6.0f));
+		if (age < 0.3f)
+		{
+			float k = 1 - age / 0.3f;
+			Sprite(a, Mathf::Max(size * 1.4f, PixelSize(a, 18.0f)) * (0.6f + 0.4f * k), Color::white() * 1.8f * k, Shape::Radial);
+		}
+		if (age < 1.6f) Sprite(a, Mathf::Max(size * (0.6f + 1.8f * age), PixelSize(a, 10.0f + 30.0f * age)), e.Color * (1 - age / 1.6f) * 0.6f, Shape::Ring);
+		float travel = 1 - (1 - t) * (1 - t); // fast off the hull, slowing as it drifts clear
+		auto c = Vector3::Lerp(a, b, travel);
+		Ribbon(a, c, 1.6f, Color(0.45f, 0.42f, 0.4f) * fade * 0.5f);
+		// The piece: two crossed slabs turning about its centre in the camera's plane, a different spin per piece.
+		auto cam = app->UnityCamera->transform;
+		float spin = (1.2f + 0.35f * static_cast<float>((e.Sub + 1) % 4)) * age;
+		auto u = (cam->right() * Mathf::Cos(spin) + cam->up() * Mathf::Sin(spin)) * size * 0.5f;
+		auto v = (cam->right() * -Mathf::Sin(spin) + cam->up() * Mathf::Cos(spin)) * size * 0.22f;
+		auto hull = Color(0.16f, 0.15f, 0.14f) * Mathf::Min(1.0f, fade * 3.0f);
+		float wide = Mathf::Max(2.5f, size / Mathf::Max(PixelSize(c, 1.0f), 1e-6f) * 0.35f);
+		Ribbon(c - u, c + u, wide, hull);
+		Ribbon(c - v, c + v, wide * 0.8f, hull);
+		// Its broken edge burns, flickering, until it is far enough off to be cold.
+		float flicker = 0.7f + 0.3f * Mathf::Sin(age * 23.0f + e.Sub);
+		Sprite(c - u * 0.8f, Mathf::Max(size * 0.25f, PixelSize(c, 4.0f)) * flicker, e.Color * fade, Shape::Radial);
 	}
 
 	void BattleFx::DrawLance(const Effect& e, float age, float fade)

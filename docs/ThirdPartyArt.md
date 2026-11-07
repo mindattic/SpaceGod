@@ -68,6 +68,15 @@ still come in a stern and a bow split at `SplitZ`; gun turrets are kit parts too
 on the same mounts. Each faction gets a livery from its colour (`StarSparrowKit::Livery`): navies steel washed in
 their colour, pirates soot-black with the clan's colour on the trim and red lights, civilians white with a stripe.
 
+Pass 2 (US-T117): a warship is no longer one Core module stretched half a hull long (a stretched fighter) but a short
+Core prow turned over, an armoured run of Plasma plates behind it (laid as two runs meeting at `SplitZ`, so the stern
+and bow keep their own plates when it breaks), stepped superstructure, and a bridge: the Core at the kit's own
+proportions standing on the top deck. The tugs carry real claws (a shoulder pod, an arm out to a knuckle, a jaw curling
+back in: three long ones on the capture tug, four short ones on the ore tug), the lane tender's service ring is closed
+(sixteen beam segments with four Engine nodes on four booms), and missile, hive, interceptor, rocket and torpedo
+launchers and shield emitters are kit parts in the hull's livery instead of the white procedural ones (only with the
+kit's hulls; under Ultimate Spaceships Creator's they stay procedural). The lineup's key and fill are brighter.
+
 Without the pack (a fresh clone), in a headless run (`-nullrhi`, which cannot draw imported meshes), or with
 `-NoStarSparrow`, `StarSparrowKit::Available()` is false and the game draws the procedural hulls and Kenney craft
 exactly as before. `-SpaceGodShipLineup=<dir>` on the game's command line (it
@@ -135,6 +144,27 @@ Mechlab (US-T89) would choose another hull or gun.
 The order is USC, then Star Sparrow, then procedural: without USC (or with `-NoUSC`) the Star Sparrow kit draws them,
 without that too (or headless) the procedural hulls. `-SpaceGodShipLineup=<dir>` adds a `usc-models` sheet of every
 model the classes use.
+
+### Sectional damage (US-T91)
+
+Ships come apart section by section. The structure is the simulation core's (`Combat/ModularHull`): every hull is cut
+into keel sections (bow, midsections, engineering) with sponsons for mounts set out past its beam, each with its own
+structure points, held together by joints. Every shot that gets through shields and armour (`Battle::StrikeSections`)
+and every collision (`SectionColliders::StrikeStructure`) lands on the section it struck and loads the joints round it;
+a section whose structure is gone shatters, and whatever is no longer held to the root (the section with the bridge)
+breaks off independently: its hardpoints go with it and the hull loses its share of points (never killing it by
+itself). It is all in the deterministic core, saved with the ship, and a destroyed hull's wreck scatters into the same
+pieces for salvage. On screen, a piece tearing off is `FxKind::SectionLost` (a flash, then the piece tumbling away,
+burning, `BattleFx::DrawSectionLost`), and once every keel section on one side of the model's bow/stern cut has gone,
+that half of the drawn hull drifts off and is gone (`ShipView::UpdateLostSections`).
+
+Evaluation of a Fab modular destruction asset: none is needed. Unreal's own Chaos destruction (Geometry Collections)
+and the destruction packs on Fab fracture meshes in the physics engine, which is neither deterministic across machines
+nor visible to the simulation, so it could not drive what a ship loses, its salvage or a co-op/rewind replay. The
+destruction stays in the core, and the art it needs is already here: Ultimate Spaceships Creator ships come as bow
+and stern pieces with their modules as separate `Module:<Name>` objects, enough to show a half torn away and its guns
+gone with it. A finer visual split (a mesh cut per keel section) would be a change to `tools/usc_prepare.py`'s cut, not
+a new asset.
 
 ## Space Station Creator Remastered (Ebal Studios, US-T143)
 

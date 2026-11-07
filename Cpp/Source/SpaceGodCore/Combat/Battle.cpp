@@ -142,6 +142,7 @@ namespace SpaceGod::Core
 			case FxKind::FtlSpool: return "FtlSpool";
 			case FxKind::FtlAbort: return "FtlAbort";
 			case FxKind::FtlJump: return "FtlJump";
+			case FxKind::SectionLost: return "SectionLost";
 		}
 		return "";
 	}
@@ -2328,6 +2329,8 @@ namespace SpaceGod::Core
 			}
 		}
 		else c->Hull -= damage;
+		// US-T91: the hit lands on a section of the hull's structure too, which may tear pieces of it away.
+		if (c->Hull > 0) StrikeSections(target, at, damage);
 
 		if (c->Hull <= 0)
 		{
@@ -2335,6 +2338,23 @@ namespace SpaceGod::Core
 			target->Dead = true;
 			Emit(FxKind::UnitDestroyed, target->Pos, target->Pos, target->LengthKm, target->Side, target, -1);
 			if (UnitDestroyed) UnitDestroyed(shared_from_this(), target);
+		}
+	}
+
+	void Battle::StrikeSections(const cs::Ref<BattleUnit>& target, DVec3 at, double damage)
+	{
+		auto c = target->Combat;
+		if (c == nullptr || c->Spec == nullptr || damage <= 0) return;
+		auto pieces = c->Structure()->Strike(target->ToLocal(at), damage);
+		for (const auto& p : pieces)
+		{
+			ModularHulls::ApplyBreak(c, p);
+			// Thrown straight out from the hull's centre through where the piece was, its length the cube root of its
+			// share of the hull's mass (a sponson is a small piece, half the keel a big one).
+			auto from = target->PointLocal(p->Centroid);
+			auto out = p->Centroid.LengthSquared() > 1e-12 ? (from - target->Pos).Normalized() : target->Forward;
+			double size = target->LengthKm * cs::Math::Max(0.08, cs::Math::Pow(cs::Math::Max(0.0, p->MassShare), 1.0 / 3.0));
+			Emit(FxKind::SectionLost, from, from + out * target->LengthKm, size, target->Side, target, p->Modules.Count() > 0 ? p->Modules[0] : -1);
 		}
 	}
 

@@ -11,6 +11,7 @@
 #include "Combat/CombatSpecs.h"
 #include "Combat/PilotTuning.h"
 #include "Combat/CombatState.h"
+#include "Combat/ModularHull.h"
 #include "Economy/BeltMining.h"
 #include "Ships.h"
 
@@ -562,6 +563,7 @@ namespace SpaceGod::Views
 
 	void ShipView::ApplyCombat(const cs::Ref<ShipCombat>& combat, bool fighting, bool thrusting, float now, float dt)
 	{
+		if (visible) UpdateLostSections(combat, now);
 		if (!visible || !detailed) return;
 		UpdateShieldRing(fighting);
 		if (!bow) return;
@@ -650,6 +652,7 @@ namespace SpaceGod::Views
 		if (bow)
 		{
 			PlaceBrokenHalves(age);
+			HideLostSections();
 			for (const auto& p : parts)
 			{
 				for (const auto& r : p->Renderers) r->enabled = false;
@@ -676,6 +679,75 @@ namespace SpaceGod::Views
 		return true;
 	}
 
+	/// <summary>
+	/// US-T91: sectional damage on the drawn hull. A warship is drawn in two sections cut at ShipMeshFactory::SplitZ; once
+	/// every keel section of its structure on one side of that cut has broken away (ModularHull, struck by fire and
+	/// collisions), that half of the model is seen tearing off: it drifts out the way it faces, tumbling, for
+	/// <see cref="LostDriftS"/>, then is gone. Hardpoints on it are already shot away (their scars and fires ride along);
+	/// a sponson or a single section lost is shown by the battle's own effects (BattleFx, FxKind::SectionLost).
+	/// </summary>
+	void ShipView::UpdateLostSections(const cs::Ref<ShipCombat>& combat, float now)
+	{
+		bool first = !sectionsSeen;
+		sectionsSeen = true;
+		if (!bow) return;
+		bool anyFore = false, foreGone = true, anyAft = false, aftGone = true;
+		// Only a structure the hull already has: building one here for every hull drawn would change nothing but cost.
+		if (combat != nullptr && combat->HasStructure())
+			for (const auto& m : combat->Structure()->Modules)
+			{
+				if (m->Kind == HullModuleKind::Sponson) continue;
+				if (m->Centre.Z >= ShipMeshFactory::SplitZ)
+				{
+					anyFore = true;
+					foreGone = foreGone && m->Detached;
+				}
+				else
+				{
+					anyAft = true;
+					aftGone = aftGone && m->Detached;
+				}
+			}
+		bool bowLost = anyFore && foreGone, sternLost = anyAft && aftGone;
+		// Lost now, or mended (a yard rebuilt the hull): the section shows as it stands.
+		if (bowLost != (bowLostAt >= 0))
+		{
+			bowLostAt = bowLost ? (first ? now - LostDriftS : now) : -1;
+			if (!bowLost && bow->gameObject()) bow->gameObject()->SetActive(true);
+		}
+		if (sternLost != (sternLostAt >= 0))
+		{
+			sternLostAt = sternLost ? (first ? now - LostDriftS : now) : -1;
+			if (!sternLost && stern->gameObject()) stern->gameObject()->SetActive(true);
+		}
+		if (bowLostAt >= 0) PlaceLostSection(bow, bowLostAt, 1.0f, now);
+		if (sternLostAt >= 0) PlaceLostSection(stern, sternLostAt, -1.0f, now);
+	}
+
+	/// <summary>A section broken off <paramref name="lostAt"/>: thrown out along the keel (<paramref name="away"/> +1 for the
+	/// bow, -1 for the stern), slowing as it drifts clear, and tumbling; gone after <see cref="LostDriftS"/>.</summary>
+	void ShipView::PlaceLostSection(const cs::Ref<Transform>& section, float lostAt, float away, float now)
+	{
+		if (!section || !section->gameObject()) return;
+		float age = now - lostAt;
+		if (age >= LostDriftS)
+		{
+			section->gameObject()->SetActive(false);
+			return;
+		}
+		if (wreckSpin == 0) wreckSpin = 6.0f + (Ship->Id % 5) * 3.0f;
+		float drift = Mathf::Sqrt(age) * 0.18f;
+		section->localPosition = Vector3(0.012f * age * away, 0.01f * age, drift * away);
+		section->localRotation = Quaternion::Euler(age * wreckSpin * 0.5f * away, age * wreckSpin * 0.25f, age * wreckSpin * 0.8f);
+	}
+
+	/// <summary>A lost bow or stern is no part of the hull's wreck or hulk: whatever placed the halves, it stays gone.</summary>
+	void ShipView::HideLostSections()
+	{
+		if (bow && bowLostAt >= 0 && bow->gameObject()) bow->gameObject()->SetActive(false);
+		if (stern && sternLostAt >= 0 && bow && stern->gameObject()) stern->gameObject()->SetActive(false);
+	}
+
 	/// <summary>A warship's bow and stern drifting apart and tumbling, <paramref name="age"/> real seconds after it broke.</summary>
 	void ShipView::PlaceBrokenHalves(float age)
 	{
@@ -692,6 +764,7 @@ namespace SpaceGod::Views
 		Derelict(relative, rotation, length, now);
 		if (!bow) return;
 		PlaceBrokenHalves(WreckBurnS);
+		HideLostSections();
 		for (const auto& p : parts)
 		{
 			for (const auto& r : p->Renderers) r->enabled = false;
@@ -716,6 +789,7 @@ namespace SpaceGod::Views
 			bow->localPosition = Vector3::zero();
 			bow->localRotation = Quaternion::identity();
 		}
+		HideLostSections();
 		for (const auto& g : glows) g->R->enabled = false;
 		block.SetFloat(EngineGlowId, 0.0f);
 		block.SetFloat(HighlightId, 0.0f);

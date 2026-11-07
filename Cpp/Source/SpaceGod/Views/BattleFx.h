@@ -122,6 +122,9 @@ namespace SpaceGod::Views
 		/// <summary>US-T98: a hull's FTL drive spooling to jump out of the fight, the charge broken, and the jump itself.</summary>
 		void DrawEscapeJump(const Effect& e, float age, float t, float fade);
 
+		/// <summary>US-T91: a piece of hull breaking off and tumbling away from the hull it was part of.</summary>
+		void DrawSectionLost(const Effect& e, float age, float t, float fade);
+
 		void DrawShieldHit(const Effect& e, float t, float fade);
 
 		void DrawMissiles(const cs::Ref<Core::Battle>& b);

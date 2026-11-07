@@ -64,6 +64,15 @@ namespace SpaceGod::Views
 		bool detailed = true;
 		float wreckSpin = 0;
 
+		/// <summary>US-T91: when the bow's or the stern's whole run of keel sections broke away from the hull (real seconds,
+		/// Time::unscaledTime), -1 while it holds; and whether the structure has been looked at yet, so a piece already lost
+		/// when the view is first built (a loaded game) is simply gone rather than seen tearing away.</summary>
+		float bowLostAt = -1, sternLostAt = -1;
+		bool sectionsSeen = false;
+
+		/// <summary>How long a lost bow or stern is seen drifting and tumbling off before it is out of the picture, real seconds.</summary>
+		static constexpr float LostDriftS = 12.0f;
+
 		/// <summary>Its thrusters (US-T231), built from the hull as drawn the first time it is shown in full; null until then.
 		/// Once built they draw the drive's flame and exhaust (on the stern's own nozzles) in place of the one plume.</summary>
 		cs::Ref<HullThrusters> thrusters;
@@ -185,6 +194,9 @@ namespace SpaceGod::Views
 		void Aim(Part& p, const cs::Ref<Core::Subsystem>& sub, bool fighting, Quaternion inverseShip, float dt);
 		void Billboard(float now);
 		void PlaceBrokenHalves(float age);
+		void UpdateLostSections(const cs::Ref<Core::ShipCombat>& combat, float now);
+		void PlaceLostSection(const cs::Ref<Transform>& section, float lostAt, float away, float now);
+		void HideLostSections();
 		void HardStopExhaust();
 		void HideThrusters();
 		void SetBlock();
