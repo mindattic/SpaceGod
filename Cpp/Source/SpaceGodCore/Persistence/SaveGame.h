@@ -73,6 +73,10 @@ namespace SpaceGod::Core
 		double Credits = 0;
 		cs::String Path;
 
+		/// <summary>US-T247: how the game began (NewGameSetup::Summary: the starting situation, the galaxy seed, the difficulty and
+		/// a picked start day), for Load Game's line. Empty in a format 1 save.</summary>
+		cs::String Setup;
+
 		cs::DateTime SimUtc() const;
 	};
 
@@ -83,7 +87,8 @@ namespace SpaceGod::Core
 	class SPACEGODCORE_API SaveGame
 	{
 	public:
-		static constexpr int Format = 1;
+		/// <summary>2 since US-T247 (the header's <see cref="SaveHeader.Setup"/>); a format 1 save still loads.</summary>
+		static constexpr int Format = 2;
 
 		static void Write(std::ostream& stream, const cs::Ref<SaveData>& data, const cs::String& slot, const cs::String& label, const cs::DateTime& savedUtc);
 

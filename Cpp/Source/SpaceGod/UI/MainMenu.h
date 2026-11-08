@@ -10,6 +10,7 @@
 #include "Cs/Cs.h"
 #include "UnityCompat/UnityTypes.h"
 #include "UnityCompat/UnityGui.h"
+#include "UI/NewGamePage.h" // US-T247
 
 class UWorld;
 class UCanvas;
@@ -74,9 +75,11 @@ namespace SpaceGod::UI
 			Host, // US-T248: host a co-op game (a new game or a save, listening)
 			Join, // US-T248: join one, by address or from the recent hosts
 			Credits, // US-T246: the rolling credits (fades itself in)
+			NewGame, // US-T247: the New Game setup page (a new game, or the Host Co-op page's)
 		};
 
 		Page page = Page::Main;
+		NewGamePage newGame; // US-T247
 		const cs::Ref<PauseMenu> settings;
 		const cs::Ref<HelpScreen> help;
 		const cs::Ref<CreditsScreen> credits; // US-T246
@@ -149,6 +152,7 @@ namespace SpaceGod::UI
 		void DrawProfiles();
 		void DrawHost(); // US-T248
 		void DrawJoin(); // US-T248
+		void DrawNewGame(); // US-T247
 
 		/// US-T248: the "Your name" row the Host and Join pages share, at y; the row's height.
 		float DrawCoopName(const Rect& r, float y);

@@ -9,6 +9,7 @@
 #include <system_error>
 
 #include "Astro.h"
+#include "NewGameSetup.h" // US-T247
 #include "Persistence/ObjectGraph.h"
 #include "Ships.h"
 #include "SimClock.h"
@@ -134,6 +135,7 @@ namespace SpaceGod::Core
 		w.Str(h->ActiveSystem);
 		w.Str(h->PilotedShip);
 		w.F64(h->Credits);
+		w.Str(h->Setup); // US-T247 (format 2)
 		WriteBytes(stream, w.Bytes);
 		auto graph = ObjectGraph::ToBytes(data);
 		WriteBytes(stream, Deflate(graph.Raw()));
@@ -146,7 +148,7 @@ namespace SpaceGod::Core
 		catch (const EndOfStreamException&) { throw InvalidDataException("Not a save file"); }
 		if (magic != Magic) throw InvalidDataException("Not a save file");
 		int format = ReadInt32(stream);
-		if (format != Format) throw InvalidDataException(cs::Cat("A save from another version (format ", format, ")"));
+		if (format != Format && format != 1) throw InvalidDataException(cs::Cat("A save from another version (format ", format, ")"));
 		auto h = cs::New<SaveHeader>();
 		h->Format = format;
 		h->Slot = ReadString(stream);
@@ -156,6 +158,7 @@ namespace SpaceGod::Core
 		h->ActiveSystem = ReadString(stream);
 		h->PilotedShip = NullIfEmpty(ReadString(stream));
 		h->Credits = ReadDouble(stream);
+		if (format >= 2) h->Setup = ReadString(stream); // US-T247
 		return h;
 	}
 
@@ -219,6 +222,7 @@ namespace SpaceGod::Core
 		h->ActiveSystem = data->Session ? data->Session->ActiveSystem : cs::String();
 		h->PilotedShip = piloted ? piloted->Name : cs::String();
 		h->Credits = piloted && piloted->Faction ? piloted->Faction->Treasury : 0;
+		if (data->Galaxy) h->Setup = NewGameSetup::Summary(data->Galaxy->SetupRecord, data->Galaxy->Seed, data->Galaxy->DifficultyRecord); // US-T247
 		return h;
 	}
 

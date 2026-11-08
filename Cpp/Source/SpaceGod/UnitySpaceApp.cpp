@@ -94,6 +94,7 @@
 #include "Systems/Polities.h"
 #include "Systems/Statecraft.h"
 #include "World.h"
+#include "GameLaunch.h" // US-T247: the New Game setup
 
 #include <tuple>
 
@@ -206,11 +207,24 @@ namespace SpaceGod
 		pauseMenu->ShowHelp = [this] { ShowHelp = true; };
 		pauseMenu->ToMainMenu = [this] { pendingMainMenu = true; };
 
-		Clock = std::isnan(StartJd) ? SimClock::StartingNow() : cs::New<SimClock>(StartJd); // US-T45: was SimClock::StartingNow()
+		// US-T247: a new game set up on the main menu's New Game page starts on its day, from its seed, in its situation.
+		Core::NewGameSetup setup;
+		bool setUp = GameLaunch::TakeSetup(setup);
+		if (setUp && !std::isnan(setup.StartJd)) Clock = cs::New<SimClock>(setup.StartJd);
+		else Clock = std::isnan(StartJd) ? SimClock::StartingNow() : cs::New<SimClock>(StartJd); // US-T45: was SimClock::StartingNow()
 		Clock->SetWarp(SimClock::StartingWarp()->Index);
 		scaleModel = cs::New<ScaleModel>();
 		scaleModel->SetBlend(1);
-		Galaxy = Core::Galaxy::CreateDefault(Clock->Jd);
+		Galaxy = Core::Galaxy::CreateDefault(Clock->Jd, setUp ? setup.Seed : Core::Galaxy::DefaultSeed);
+		if (setUp)
+		{
+			Galaxy->SetupRecord = setup.Record();
+			if (setup.Situation != StartSituation::GodView)
+			{
+				newGameStart = setup.Situation;
+				newGameStartDueFrames = 3; // a few frames for the scene to lay itself out first
+			}
+		}
 
 		SetupCamera();
 		worldRoot = NewGameObject("World")->transform; // held by the scene until Destroy (US-T30), as Unity's new GameObject
@@ -510,6 +524,7 @@ namespace SpaceGod
 		Scale()->Layout(Ephemeris(), bodyScene);
 		UpdateRadii();
 		UpdateDogfightDemo(); // US-T88: the demo the game was launched for (-dogfight, the main menu's button)
+		UpdateNewGameStart(); // US-T247: the starting situation picked on the New Game setup page
 		CoopUpdatePiloting(dt); // US-T44 (US-T43): UpdatePiloting(dt), on the helm holder's frame of input on every peer in co-op
 		UpdateSeat(dt);
 		ShowLawNotices();

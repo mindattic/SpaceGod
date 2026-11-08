@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Cs/Cs.h"
+#include "NewGameSetup.h" // US-T247
 
 namespace SpaceGod
 {
@@ -24,6 +25,17 @@ namespace SpaceGod
 		static bool SkipsMenu();
 
 		static void NewGame();
+
+		/// US-T247: a new game set up on the main menu's New Game page: its start day, galaxy seed and starting situation (the
+		/// difficulty is the setting itself). The god view offers the guided tutorial as MenuNewGame does; the others never.
+		static void NewGame(const Core::NewGameSetup& setup);
+
+		/// US-T247: sets up the next new game started (the Host Co-op page's new game: SetUpNext, then Host with no slot).
+		static void SetUpNext(const Core::NewGameSetup& setup);
+
+		/// US-T247: what the new game starting was set up with, once; false for a game without a setup (Quick Start, a
+		/// script, a console command, a load), which starts as it always did.
+		static bool TakeSetup(Core::NewGameSetup& setup);
 
 		/// US-T254: the main menu's New Game: a new game that offers the guided tutorial if this profile has never been
 		/// offered it (a console command's or a script's NewGame never does).
@@ -104,5 +116,7 @@ namespace SpaceGod
 		static inline bool dogfightFlagTaken = false;
 		static inline int tutorial = 0; // US-T254
 		static inline bool hostCoop = false; // US-T248
+		static inline Core::NewGameSetup setup; // US-T247
+		static inline bool hasSetup = false; // US-T247
 	};
 }

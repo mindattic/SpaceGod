@@ -45,6 +45,7 @@
 #include "UnitySpaceApp.Influence.deps.h" // US-T140
 #include "UnitySpaceApp.Discoveries.deps.h" // US-T259
 #include "UnitySpaceApp.Tutorial.deps.h" // US-T254
+#include "NewGameSetup.h" // US-T247: the New Game setup page's choices
 
 namespace SpaceGod
 {
@@ -110,5 +111,6 @@ namespace SpaceGod
 #include "UnitySpaceApp.Influence.inl" // US-T140: embody limits, Influence and squad orders as the player meets them
 #include "UnitySpaceApp.Discoveries.inl" // US-T259: the discovery log and its screen
 #include "UnitySpaceApp.Tutorial.inl" // US-T254: the guided tutorial and the first-time hints
+#include "UnitySpaceApp.NewGame.inl" // US-T247: the New Game setup page's starting situations
 	};
 }

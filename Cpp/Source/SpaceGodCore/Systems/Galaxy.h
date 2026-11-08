@@ -277,6 +277,13 @@ namespace SpaceGod::Core
 		cs::String DifficultyRecord;
 
 		/// <summary>
+		/// How this game began (US-T247, see <see cref="NewGameSetup.Record"/>): the starting situation, the seed and the start day
+		/// picked on the New Game setup page, written once when the game is made. Empty for a game started without the page (Quick
+		/// Start, a script) and in a save from before it; display only (the save header and Load Game's line), nothing simulated reads it.
+		/// </summary>
+		cs::String SetupRecord;
+
+		/// <summary>
 		/// The system simulated at full detail (U.SPC-T104): the one the player is in. Every other system keeps
 		/// running at once, but at coarse detail (<see cref="World.Coarse"/>), stepped on a fixed grid of
 		/// <see cref="CoarseStepDays"/> rather than every frame. Null runs every system at full detail.

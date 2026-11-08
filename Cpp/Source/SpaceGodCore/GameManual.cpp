@@ -27,11 +27,20 @@ namespace SpaceGod::Core
 				  "own. You can play it as a strategy game, a dogfighter, a capital-ship broadside game, a trader's career or a "
 				  "diplomat's, or take nothing at all and let it play out."),
 				T("The main menu",
-				  "Continue loads the latest save, New Game starts at the current date beside Earth, Load Game opens the "
-				  "saves, Profiles switches player profile (each keeps its own saves and settings), Settings opens every "
+				  "Continue loads the latest save, New Game opens the setup page (below), Quick Start starts at once at the "
+				  "current date beside Earth, Load Game opens the saves (each line says how its game began), Profiles switches player profile (each keeps its own saves and settings), Settings opens every "
 				  "tunable, Help opens this manual and Quit leaves."),
+				T("Setting up a new game",
+				  "New Game asks how the game starts. Start date: today, or pick a day (yyyy-mm-dd, 1900 to 2300) and the worlds "
+				  "stand where they did, or will, that day. Galaxy seed: a random number, or type your own (a word works too); the "
+				  "same seed makes the same galaxy beyond the real stars near Sol, so share it with a friend. Starting as: the god "
+				  "view by Earth (the classic start), a fighter pilot on patrol (at the helm of a home-side fighter near Earth), a "
+				  "freighter captain with a small purse (your own freighter at Earth and 250,000 cr in the house account), or a "
+				  "capital helm in a war zone (a warship in a fight already raging, else raiders closing on a home-side cruiser off a "
+				  "giant world). Difficulty: as under Settings > Gameplay. Every save keeps these, and Load Game shows them. In co-op "
+				  "the host sets the game up from Host Co-op, and the players who join take it as set. Quick Start skips the page."),
 				T("Your first minutes",
-				  "You start in free swim beside Earth, with Earth selected, at gameplay scale and real time. Swim with "
+				  "With the classic start you begin in free swim beside Earth, with Earth selected, at gameplay scale and real time. Swim with "
 				  "W A S D, look with the right mouse button, and click anything to select it. Open the navigator to pick "
 				  "a body or a ship, press Tab to cycle through ships, and B to jump to the biggest battle going. Select a "
 				  "ship and press P to take its helm; P again hands it back to its crew."),
@@ -286,7 +295,7 @@ namespace SpaceGod::Core
 				  "and red on the hull, fading as they go; the screen's edge pulses blue as your shields fail and red as the hull "
 				  "goes critical, glowing faintly for as long as it stays so."),
 				T("Difficulty",
-				  "Story, Normal, Hard or Custom: chosen beside New Game on the main menu, changeable at any time under Settings > "
+				  "Story, Normal, Hard or Custom: chosen on the New Game setup page, changeable at any time under Settings > "
 				  "Gameplay, and kept in each save. It touches only the unit you embody: the damage your hull takes, how well hostile "
 				  "gunners aim at you, how long their missile launchers take to lock you between launches, how keen pirates are to "
 				  "pick you out and hunt you, and what the contracts you take pay. Story halves the damage, shakes their aim, slows "

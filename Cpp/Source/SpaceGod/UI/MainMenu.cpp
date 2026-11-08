@@ -186,7 +186,7 @@ namespace SpaceGod::UI
 			settings->Update(escape, Time::unscaledDeltaTime);
 			return;
 		}
-		if (escape && page != Page::Main) Open(Page::Main);
+		if (escape && page != Page::Main) Open(page == Page::NewGame && newGame.Hosting() ? Page::Host : Page::Main); // US-T247: back to Host Co-op
 	}
 
 	void MainMenu::OnDestroy()
@@ -355,13 +355,14 @@ namespace SpaceGod::UI
 			return;
 		}
 		// US-T255: each page eases in as it opens (Help fades itself in).
-		static const char* const pageIds[] = { "menu.main", "menu.load", "menu.profiles", "menu.assets", nullptr, "menu.host", "menu.join" };
-		UiMotion::Scope motion(pageIds[Mathf::Clamp(static_cast<int>(page), 0, 6)]);
+		static const char* const pageIds[] = { "menu.main", "menu.load", "menu.profiles", "menu.assets", nullptr, "menu.host", "menu.join", nullptr, "menu.newgame" };
+		UiMotion::Scope motion(pageIds[Mathf::Clamp(static_cast<int>(page), 0, 8)]);
 		switch (page)
 		{
 			case Page::Load: DrawLoad(); break;
 			case Page::Host: DrawHost(); break; // US-T248
 			case Page::Join: DrawJoin(); break; // US-T248
+			case Page::NewGame: DrawNewGame(); break; // US-T247
 			case Page::Profiles: DrawProfiles(); break;
 			case Page::AssetLibraries: DrawAssetLibraries(); break;
 			case Page::Help:
@@ -392,11 +393,15 @@ namespace SpaceGod::UI
 		GUI::enabled = enabled && latest != nullptr;
 		if (GUI::Button(Rect(r.x + 20, y, bw, 38), "Continue", latest != nullptr ? buttonActive : button)) GameLaunch::Load(latest->Slot);
 		GUI::enabled = enabled;
-		// US-T253: the new game's difficulty beside it (a click steps Story / Normal / Hard / Custom; Settings > Gameplay holds it too).
+		// US-T247: New Game opens the setup page (date, seed, situation, difficulty); Quick Start keeps the one-click start (today,
+		// the usual galaxy, the god view, at the difficulty set, offering the tutorial once a profile, US-T254).
 		const float dw = 150;
-		if (GUI::Button(Rect(r.x + 20, y + 48, bw - dw - 10, 38), "New Game", latest == nullptr ? buttonActive : button)) GameLaunch::MenuNewGame(); // US-T254: offers the tutorial once a profile
-		if (GUI::Button(Rect(r.x + 20 + bw - dw, y + 48, dw, 38), cs::Cat("Difficulty: ", Difficulty::Name()), button))
-			Difficulty::Level()->Cycle(1);
+		if (GUI::Button(Rect(r.x + 20, y + 48, bw - dw - 10, 38), "New Game...", latest == nullptr ? buttonActive : button))
+		{
+			newGame.Open(false);
+			Open(Page::NewGame);
+		}
+		if (GUI::Button(Rect(r.x + 20 + bw - dw, y + 48, dw, 38), "Quick Start", button)) GameLaunch::MenuNewGame();
 		GUI::enabled = enabled && saveNames.Count() > 0;
 		if (GUI::Button(Rect(r.x + 20, y + 96, bw, 38), "Load Game", button)) Open(Page::Load);
 		GUI::enabled = enabled;
@@ -451,7 +456,8 @@ namespace SpaceGod::UI
 			GUI::Box(row0, GUIContent::none(), row);
 			GUI::Label(Rect(row0.x + 6, row0.y + 3, 150, 20), UnitySpaceApp::SaveTitle(slot, hdr), text);
 			GUI::Label(Rect(row0.x + 160, row0.y + 4, row0.width - 330, 20),
-				cs::Cat(UnitySpaceApp::DescribeSave(hdr), "   ·   saved ", hdr->SavedUtc.ToLocalTime().ToString("MMM d HH:mm")), small);
+				cs::Cat(UnitySpaceApp::DescribeSave(hdr), hdr->Setup.empty() ? cs::String() : cs::Cat("   ·   ", hdr->Setup), // US-T247: how it began
+					"   ·   saved ", hdr->SavedUtc.ToLocalTime().ToString("MMM d HH:mm")), small);
 			if (GUI::Button(Rect(row0.xMax() - 156, row0.y + 2, 74, 20), "Load", buttonActive)) GameLaunch::Load(slot);
 			if (GUI::Button(Rect(row0.xMax() - 78, row0.y + 2, 74, 20), deleteArmed == slot ? "Sure?" : "Delete", button))
 			{
@@ -552,10 +558,12 @@ namespace SpaceGod::UI
 		y += addrH + 10;
 
 		float half = (w - 50) * 0.5f;
-		if (GUI::Button(Rect(r.x + 20, y, half, 34), cs::Cat("Host New Game  ·  ", Difficulty::Name()), buttonActive))
+		if (GUI::Button(Rect(r.x + 20, y, half, 34), "Host New Game...", buttonActive))
 		{
+			// US-T247: set up on the New Game page first (the players who join take the game as it is set up).
 			KeepCoopName();
-			GameLaunch::Host(cs::String());
+			newGame.Open(true);
+			Open(Page::NewGame);
 		}
 		bool enabled = GUI::enabled;
 		GUI::enabled = enabled && latest != nullptr;
@@ -595,6 +603,28 @@ namespace SpaceGod::UI
 
 		if (!notice.empty()) GUI::Label(Rect(r.x + 20, r.yMax() - 44, w - 170, 36), notice, small);
 		if (GUI::Button(Rect(r.xMax() - 130, r.yMax() - 46, 110, 30), "Back", button)) Open(Page::Main);
+	}
+
+	// ---------------------------------------------------------------- the New Game setup page (US-T247)
+
+	void MainMenu::DrawNewGame()
+	{
+		NewGamePage::Styles styles{ panel, title, text, small, button, buttonActive, field };
+		switch (newGame.Draw(styles))
+		{
+			case NewGamePage::Action::Back:
+				Open(newGame.Hosting() ? Page::Host : Page::Main);
+				break;
+			case NewGamePage::Action::Start:
+				if (newGame.Hosting())
+				{
+					GameLaunch::SetUpNext(newGame.Setup());
+					GameLaunch::Host(cs::String());
+				}
+				else GameLaunch::NewGame(newGame.Setup());
+				break;
+			default: break;
+		}
 	}
 
 	void MainMenu::DrawJoin()

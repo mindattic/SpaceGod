@@ -17,18 +17,43 @@ namespace SpaceGod
 	void GameLaunch::NewGame()
 	{
 		tutorial = 0;
+		hasSetup = false; // US-T247: as it always started
 		Start(cs::String());
+	}
+
+	void GameLaunch::NewGame(const Core::NewGameSetup& chosen)
+	{
+		// US-T247: the tutorial is played from the god view, so only that start offers it.
+		tutorial = chosen.Situation == Core::StartSituation::GodView ? 1 : 0;
+		SetUpNext(chosen);
+		Start(cs::String());
+	}
+
+	void GameLaunch::SetUpNext(const Core::NewGameSetup& chosen)
+	{
+		setup = chosen;
+		hasSetup = true;
+	}
+
+	bool GameLaunch::TakeSetup(Core::NewGameSetup& out)
+	{
+		bool asked = hasSetup;
+		if (asked) out = setup;
+		hasSetup = false;
+		return asked;
 	}
 
 	void GameLaunch::MenuNewGame()
 	{
 		tutorial = 1; // US-T254: offered if this profile never was
+		hasSetup = false; // US-T247: Quick Start, as it always started
 		Start(cs::String());
 	}
 
 	void GameLaunch::Tutorial()
 	{
 		tutorial = 2; // US-T254
+		hasSetup = false; // US-T247
 		Start(cs::String());
 	}
 
@@ -49,6 +74,7 @@ namespace SpaceGod
 	{
 		tutorial = 0;
 		dogfightDemo = heavy ? 2 : 1;
+		hasSetup = false; // US-T247
 		Start(cs::String());
 	}
 
@@ -70,6 +96,7 @@ namespace SpaceGod
 	{
 		FromMenu = true;
 		loadSlot = slot;
+		if (!slot.empty()) hasSetup = false; // US-T247: a save keeps how its game began
 		Travel(GameScene);
 	}
 
