@@ -20,6 +20,7 @@ namespace SpaceGod::Core
 	class SPACEGODCORE_API SettingGroups
 	{
 	public:
+		static constexpr const char* Gameplay = "Gameplay"; // US-T253: difficulty
 		static constexpr const char* Graphics = "Graphics";
 		static constexpr const char* RenderPipeline = "Render pipeline";
 		static constexpr const char* RenderBudget = "LOD & render budget";

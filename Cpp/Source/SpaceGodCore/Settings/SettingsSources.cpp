@@ -14,6 +14,7 @@
 
 #include "Settings/SettingsRegistry.h"
 
+#include "Difficulty.h" // US-T253
 #include "RenderLod.h"
 #include "ShipLod.h"
 #include "SimClock.h"
@@ -63,6 +64,8 @@ namespace SpaceGod::Core
 	{
 		int found = 0;
 		// ---- Core/ (the folder's own files)
+		Difficulty::Level(); Difficulty::CustomDamageTaken(); Difficulty::CustomAccuracy(); Difficulty::CustomLockTime(); Difficulty::CustomAggression();
+		Difficulty::CustomPay(); found++; // US-T253 (not a C# source)
 		RenderLod::SimplifyBelowPx(); RenderLod::CullBelowPx(); RenderLod::AggregatePx(); found++;
 		ShipLod::IconBelowPx(); ShipLod::IconNames(); found++;
 		SimClock::StartingWarp(); found++;

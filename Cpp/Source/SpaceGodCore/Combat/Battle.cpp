@@ -48,6 +48,7 @@
 #include "Combat/BuriedBridges.h"
 #include "Combat/MarineHabitats.h"
 #include "BodyDefinition.h"
+#include "Difficulty.h" // US-T253
 #include "ScaleModel.h"
 #include "Embodiment/MountedTurret.h"
 #include "Economy/Settlement.h"
@@ -589,6 +590,8 @@ namespace SpaceGod::Core
 			if (o->Kind == UnitKind::Fighter) score += u->Kind == UnitKind::Fighter ? 0 : 25;
 			else if (u->Kind == UnitKind::Fighter) score -= 4;
 			if (o->Ship != nullptr && !o->Ship->Spec->IsMilitary) score += u->Faction->IsPirate ? -15 : 10;
+			// US-T253: how keen raiders are to go for a hull a player holds (Normal: 0, no change).
+			if (u->Faction->IsPirate && o->PlayerControlled() && !u->PlayerControlled()) score += Difficulty::PirateTargetBias(true, true);
 			// A lane tender is the prize of the fight (U.SPC-T481): sink it and its lane goes dark.
 			if (LaneUpkeep::IsTender(o->Ship)) score -= LaneUpkeep::TenderFocus()->Value;
 			// Raiders kill a gate picket first, before it can warn its navy (U.SPC-T480).
@@ -786,7 +789,7 @@ namespace SpaceGod::Core
 
 		// The player first, if near enough to be worth the chase.
 		for (const auto& o : Units)
-			if (o->PlayerControlled() && Hostile(u, o) && (o->Pos - u->Pos).Length() < HuntPlayerKm)
+			if (o->PlayerControlled() && Hostile(u, o) && (o->Pos - u->Pos).Length() < Difficulty::PirateHuntKm(u->Faction->IsPirate, HuntPlayerKm)) // US-T253
 			{
 				u->Target = o;
 				break;
@@ -1367,6 +1370,9 @@ namespace SpaceGod::Core
 			if (w->Missile)
 			{
 				if (s->Ammo <= 0) continue;
+				// US-T253: a crew's launcher must lock a hull a player holds again before its next launch; the difficulty makes that
+				// lock slower or quicker (Normal: the design's reload, untouched).
+				if (target->PlayerControlled() && !u->PlayerControlled()) s->Cooldown = Difficulty::ReloadAfterLock(true, s->Cooldown, Gunnery::LockSeconds);
 				// A capital torpedo tube's round flies as a torpedo: tougher for point defence to stop (U.SPC-T377); an
 				// antimatter torpedo is tougher still and hits hardest of all (U.SPC-T489).
 				auto kindOf = ScreenWeapons::KindOf(s->Kind(), w);
@@ -1413,7 +1419,9 @@ namespace SpaceGod::Core
 			{
 				// At the player's own hull every shot is aimed and real (U.SPC-T270): led, late on a target
 				// crossing the gunner's sights and scattered by his skill, it hits only if it meets the hull.
-				auto dir = AimAt(u, origin, target, aimPoint, w, accuracyScale * (volley > 1 ? 1 + Broadsides::CrewVolleyAccuracyBonus : 1));
+				// US-T253: the difficulty steadies or shakes the gunner's hand at a hull a player holds (Normal: as it was).
+				double atPlayer = Difficulty::AccuracyAt(true, accuracyScale);
+				auto dir = AimAt(u, origin, target, aimPoint, w, atPlayer * (volley > 1 ? 1 + Broadsides::CrewVolleyAccuracyBonus : 1));
 				s->Aim = dir;
 				ResolveShot(u, s, origin, dir, w, volley * burst);
 				continue;
@@ -2129,6 +2137,8 @@ namespace SpaceGod::Core
 		double burst = cs::Math::Max(w->BurstKm, 0.05) * ScreenWeapons::FlakBurst()->Value;
 		// US-T180: a shell fused for where a fast-crossing craft was bursts behind it more often than not.
 		double evade = round == nullptr ? Choreography::Evasion(u, craft, origin) : 1.0;
+		// US-T253: at a craft a player holds, the difficulty scales the gunner's aim (Normal: as it was).
+		if (round == nullptr && craft != nullptr && craft->PlayerControlled() && !u->PlayerControlled()) accuracyScale = Difficulty::AccuracyAt(true, accuracyScale);
 		if (rng.NextDouble() >= w->Accuracy * accuracyScale * evade)
 		{
 			// Wide: the shell bursts a burst and a half or two off its mark.
@@ -2312,6 +2322,8 @@ namespace SpaceGod::Core
 		bool strikeTorpedo, WeaponFamily family)
 	{
 		if (!target->Present()) return;
+		// US-T253: the difficulty scales what reaches a hull a player holds (Normal: as it was).
+		damage = Difficulty::Incoming(target->PlayerControlled(), damage);
 		auto c = target->Combat;
 		// What the shot is (US-T189): how hard it hits the field, the hull and the plate.
 		bool profiled = family != WeaponFamily::None && !WeaponSystems::ProfileOf(family).Neutral();
@@ -2413,6 +2425,7 @@ namespace SpaceGod::Core
 	void Battle::ApplyImpact(const cs::Ref<BattleUnit>& target, DVec3 at, double hp)
 	{
 		if (!target->Present() || hp <= 0) return;
+		hp = Difficulty::Incoming(target->PlayerControlled(), hp); // US-T253
 		auto c = target->Combat;
 		double shieldBefore = c->Shield();
 		auto generator = c->EmitterFor(target->ShieldStrike(at));

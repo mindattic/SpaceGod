@@ -9,6 +9,7 @@
 
 #include <exception>
 
+#include "Difficulty.h" // US-T253
 #include "Ephemeris.h"
 #include "Fleet.h"
 #include "ScaleModel.h"
@@ -193,6 +194,7 @@ namespace SpaceGod
 		auto data = cs::New<SaveData>();
 		data->Clock = Clock;
 		data->Galaxy = Galaxy;
+		if (Galaxy != nullptr) Galaxy->DifficultyRecord = Difficulty::Record(); // US-T253: the save keeps the level it was played at
 		cs::Ref<SaveSession> s = data->Session;
 		s->ActiveSystem = ActiveSystem->Name;
 		s->ScaleGoal = ScaleGoal;
@@ -212,6 +214,8 @@ namespace SpaceGod
 		DropSession();
 		Clock = data->Clock;
 		Galaxy = data->Galaxy;
+		// US-T253: the level the save was played at (a co-op client already has the host's, from the sync's settings).
+		if (!CoopIsClient()) Difficulty::Restore(Galaxy->DifficultyRecord);
 		for (const auto& sys : Galaxy->Systems) // US-T215: escort names saved with a doubled faction prefix
 			if (sys != nullptr && sys->World != nullptr && sys->World->Fleet != nullptr) sys->World->Fleet->NormaliseNames();
 		Rendering::Materials::DestroyOwned(Interstellar->Root->transform);

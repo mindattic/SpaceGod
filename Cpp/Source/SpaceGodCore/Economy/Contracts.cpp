@@ -1,6 +1,7 @@
 // Port of Unity.SpaceGod Assets/UnitySpace/Core/Economy/Contracts.cs (US-T18).
 
 #include "Economy/Contracts.h"
+#include "Difficulty.h" // US-T253
 
 #include "Astro.h"
 #include "BodyCatalog.h"
@@ -1012,19 +1013,21 @@ namespace SpaceGod::Core
 				c->Destination->Population += c->People;
 				c->Aboard = false;
 			}
+			// US-T253: a player's pay is scaled by the difficulty (the patron still pays the posted price; Normal: the same).
+			double paid = Difficulty::PayFor(c->ByPlayer, c->Pay);
 			if (pay && c->Pay > 0)
 			{
 				c->Patron->Treasury -= c->Pay;
 				if (c->Taker != nullptr)
 				{
-					c->Taker->Faction->Treasury += c->Pay;
+					c->Taker->Faction->Treasury += paid;
 					if (!c->ByPlayer) c->Taker->Credits += c->Pay;
 				}
 			}
 			Standing(rec, c->Patron, CompleteStanding + UrgentStanding * c->Urgency);
 			if (!c->ByPlayer && c->Taker != nullptr && (c->Kind == ContractKind::Passengers || c->Kind == ContractKind::Colonists)) c->Taker->Cargo = cs::String();
 			world->Log(jd, cs::Cat("Contract done: ", c->Title(), " (", why, ") by ", who, (pay ? cs::Cat(", ", Cr(c->Pay), " cr from ", c->Patron->Name) : cs::String())), WorldEventKind::Info, c->Body);
-			if (c->ByPlayer && law) law->Notice(cs::Cat("Contract complete: ", c->Title(), (pay ? cs::Cat(": ", c->Patron->Name, " pays ", Cr(c->Pay), " cr") : cs::String())));
+			if (c->ByPlayer && law) law->Notice(cs::Cat("Contract complete: ", c->Title(), (pay ? cs::Cat(": ", c->Patron->Name, " pays ", Cr(paid), " cr") : cs::String())));
 			// US-T140: a mission carried through at a helm is the SpaceGod's Influence (the pay and standing are the pilot's).
 			if (c->ByPlayer) SpaceGodInfluence::Grant(world, InfluenceSource::Mission, 40 + cs::Math::Min(60.0, c->Pay / 20000.0), cs::Cat("mission: ", c->Title()));
 			return;
@@ -1079,7 +1082,8 @@ namespace SpaceGod::Core
 
 	cs::String Contracts::Describe(const cs::Ref<Contract>& c, double jd)
 	{
-		cs::String text = cs::Cat(c->Title(), "  \xC2\xB7  ", Cr(c->Pay), " cr  \xC2\xB7  ", c->Patron->Name);
+		// US-T253: the board is the player's, so it shows what the job pays the player at this difficulty.
+		cs::String text = cs::Cat(c->Title(), "  \xC2\xB7  ", Cr(Difficulty::PayFor(c->IsOpen() || c->ByPlayer, c->Pay)), " cr  \xC2\xB7  ", c->Patron->Name);
 		if (c->IsOpen()) text += cs::Cat("  \xC2\xB7  ", cs::Fmt(c->DeadlineDays, "0"), " d to do it, offer ends in ", cs::Fmt(cs::Math::Max(0.0, c->ExpiresJd - jd), "0"), " d");
 		else if (c->IsActive()) text += cs::Cat("  \xC2\xB7  due in ", cs::Fmt(cs::Math::Max(0.0, c->DueJd - jd), "0.#"), " d");
 		if (c->Kind == ContractKind::Freight && c->IsActive()) text += cs::Cat("  \xC2\xB7  ", cs::Fmt(c->Delivered, "N0"), " t handed over");

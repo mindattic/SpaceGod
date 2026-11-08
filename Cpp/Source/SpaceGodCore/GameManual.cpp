@@ -285,6 +285,13 @@ namespace SpaceGod::Core
 				  "reticle. When your own hull takes fire, arcs round the reticle point the way it came from, blue on the shield "
 				  "and red on the hull, fading as they go; the screen's edge pulses blue as your shields fail and red as the hull "
 				  "goes critical, glowing faintly for as long as it stays so."),
+				T("Difficulty",
+				  "Story, Normal, Hard or Custom: chosen beside New Game on the main menu, changeable at any time under Settings > "
+				  "Gameplay, and kept in each save. It touches only the unit you embody: the damage your hull takes, how well hostile "
+				  "gunners aim at you, how long their missile launchers take to lock you between launches, how keen pirates are to "
+				  "pick you out and hunt you, and what the contracts you take pay. Story halves the damage, shakes their aim, slows "
+				  "their locks, cools the pirates and pays a quarter more; Hard does the reverse; Custom takes its five sliders. "
+				  "Fights between other ships run the same at every level. In co-op the host's level is everyone's."),
 				T("Reactor power",
 				  "Whatever you take the controls of -- a ship's helm, a fighter, a gun (which draws on the hull it is mounted on) or "
 				  "a station -- shares its reactor three ways, six pips in all and at most four to one system, two each at an even "

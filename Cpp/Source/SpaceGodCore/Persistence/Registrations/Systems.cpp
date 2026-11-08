@@ -242,6 +242,7 @@ namespace SpaceGod::Core
 		SG_F(undiscoveredNames),
 		SG_OPT(Territory), // US-T190: faction territory, absent from older saves (made on the first update)
 		SG_OPT(DiscoveryLog), // US-T259: the discovery log, absent from older saves (made on the game's first sweep)
+		SG_OPT(DifficultyRecord), // US-T253: the difficulty, absent from older saves (the setting then stands)
 		b.Loaded(&::SpaceGod::Core::Registrations::RewireGalaxy))
 
 	SG_SERIALIZE(GateConstruction, "Unity.SpaceGod.Core.GateConstruction",

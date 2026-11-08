@@ -12,9 +12,11 @@
 
 #include "ActiveProfile.h"
 #include "AssetLibraryCandidates.h"
+#include "Difficulty.h" // US-T253
 #include "GameLaunch.h"
 #include "GameSettingsHost.h"
 #include "Persistence/SaveGame.h"
+#include "Settings/GameSetting.h" // US-T253
 #include "Shared/Profiles/ProfileStore.h"
 #include "UI/DisplayOptions.h"
 #include "UI/HelpScreen.h"
@@ -232,7 +234,11 @@ namespace SpaceGod::UI
 		GUI::enabled = enabled && latest != nullptr;
 		if (GUI::Button(Rect(r.x + 20, y, bw, 38), "Continue", latest != nullptr ? buttonActive : button)) GameLaunch::Load(latest->Slot);
 		GUI::enabled = enabled;
-		if (GUI::Button(Rect(r.x + 20, y + 48, bw, 38), "New Game", latest == nullptr ? buttonActive : button)) GameLaunch::NewGame();
+		// US-T253: the new game's difficulty beside it (a click steps Story / Normal / Hard / Custom; Settings > Gameplay holds it too).
+		const float dw = 150;
+		if (GUI::Button(Rect(r.x + 20, y + 48, bw - dw - 10, 38), "New Game", latest == nullptr ? buttonActive : button)) GameLaunch::NewGame();
+		if (GUI::Button(Rect(r.x + 20 + bw - dw, y + 48, dw, 38), cs::Cat("Difficulty: ", Difficulty::Name()), button))
+			Difficulty::Level()->Cycle(1);
 		GUI::enabled = enabled && saveNames.Count() > 0;
 		if (GUI::Button(Rect(r.x + 20, y + 96, bw, 38), "Load Game", button)) Open(Page::Load);
 		GUI::enabled = enabled;

@@ -26,7 +26,7 @@ namespace SpaceGod::Coop::CoopSettings
 		const std::set<cs::String>& SharedGroups()
 		{
 			static const std::set<cs::String> groups = {
-				SettingGroups::Streaming, SettingGroups::Simulation, SettingGroups::Ftl, SettingGroups::Civilizations, SettingGroups::Ai,
+				SettingGroups::Gameplay /* US-T253: the host's difficulty is everyone's */, SettingGroups::Streaming, SettingGroups::Simulation, SettingGroups::Ftl, SettingGroups::Civilizations, SettingGroups::Ai,
 				SettingGroups::Dogfighting, SettingGroups::Broadsides, SettingGroups::Weapons, SettingGroups::Economy,
 			};
 			return groups;

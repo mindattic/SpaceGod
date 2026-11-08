@@ -271,6 +271,12 @@ namespace SpaceGod::Core
 		cs::Ref<SpaceGod::Core::DiscoveryLog> DiscoveryLog;
 
 		/// <summary>
+		/// The difficulty this game is played at (US-T253, see <see cref="Difficulty.Record"/>): written by the game when it captures
+		/// a save, put back into the setting when one is loaded. Empty in a save from before difficulty (which then keeps the setting).
+		/// </summary>
+		cs::String DifficultyRecord;
+
+		/// <summary>
 		/// The system simulated at full detail (U.SPC-T104): the one the player is in. Every other system keeps
 		/// running at once, but at coarse detail (<see cref="World.Coarse"/>), stepped on a fixed grid of
 		/// <see cref="CoarseStepDays"/> rather than every frame. Null runs every system at full detail.
