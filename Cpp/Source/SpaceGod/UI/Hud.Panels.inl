@@ -204,6 +204,12 @@ private:
 
 	void DrawSelection();
 
+	/// US-T256 (Hud.Target.cpp): the hull the controls held have locked -- name, class, flag and stance, range and closing
+	/// speed, hull, each shield emitter's patch, gun heat, its subsystems by kind and the weak point the guns go for, with the
+	/// key that picks another. BottomRight over the sensors, sized to what the column has free; taken before the selection
+	/// card sizes itself to the rest.
+	void DrawTargetCard();
+
 	/// <summary>The tanks: how full, how many tonnes, and the delta-v that leaves at the ship's present mass.</summary>
 	static cs::String PropellantText(const cs::Ref<Core::Ship>& ship);
 

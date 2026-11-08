@@ -836,6 +836,8 @@ namespace SpaceGod::UI
 
 	void Hud::DrawSelection()
 	{
+		// US-T256: the locked hull's card takes its BottomRight slot first, so the selection card fits what is left.
+		DrawTargetCard();
 		auto t = app->Selected;
 		if (t.IsNone()) return;
 		// US-T239: a new selection opens on its overview (unless sg.ScanView has just asked for a tab).

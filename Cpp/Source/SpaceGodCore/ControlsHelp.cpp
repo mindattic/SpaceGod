@@ -84,6 +84,8 @@ namespace SpaceGod::Core
 			cs::New<HelpSection>("COMBAT",
 				L("Left mouse", "guns, down the crosshair (watch the heat)"),
 				L("T", "lock the hull under the crosshair; hold the crosshair on it to lock"),
+				More("a locked hull gets the target card, bottom right: its class, flag and stance, range and closing speed, hull, the shield of each emitter's patch, its gun heat, its subsystems' health and the weak point you are going for"), // US-T256
+				L("6", "at a fighter's controls, a destroyer or bigger locked: the next weak point to go for (marked on the target card, OPEN when your guns can reach it)"), // US-T256
 				More("off-screen targets: an arrow on the screen's edge points the way to turn to each hostile, the locked hull (ringed), the selection, the hunters and a plotted course; the closer it is (against your guns' reach, the same at either scale), the bigger; red hostile, green your side, grey neutral, blue the course"),
 				L("Right mouse", "homing and hive missiles once locked; dumb-fire rockets straight down the nose, no lock"),
 				More("a vulcan rotary cannon spins up as it fires: short bursts from cold, a torrent once spun (watch the heat)"),
