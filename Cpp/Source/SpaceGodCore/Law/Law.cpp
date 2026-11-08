@@ -6,6 +6,7 @@
 #include "BodyCatalog.h"
 #include "BodyDefinition.h"
 #include "Combat/Battle.h"
+#include "Combat/BroadcastArrays.h"
 #include "Combat/CombatState.h"
 #include "Combat/Diplomacy.h"
 #include "Combat/Morale.h"
@@ -423,15 +424,23 @@ namespace SpaceGod::Core
 				if (b->EnforcingSide == 1 - side) { if (!harmed) continue; }
 				else if ((side != b->AggressorSide || (by != b->SideLeaders[side] && !harmed)) && !pirate && !robbed) continue;
 				auto rec = RecordOf(key.Ship);
-				// The one they attacked who lived to tell it, else anyone close enough to see.
+				// The one they attacked who lived to tell it, else anyone close enough to see. A victim whose broadcast array
+				// was knocked out has nothing to tell it with (US-T96).
 				cs::String witness; // (null is empty)
+				bool silenced = false;
 				for (const auto& v : victims)
 					if (!v->Dead && !v->Captured)
 					{
+						if (BroadcastArrays::Silenced(v))
+						{
+							silenced = true;
+							continue;
+						}
 						witness = v->Ship != nullptr ? cs::Cat("the ", v->Ship->Name) : v->Platform != nullptr ? v->Platform->Name : v->Fort != nullptr ? v->Fort->Name : cs::String();
 						if (!witness.empty()) break;
 					}
 				if (witness.empty()) witness = FindWitness(where, jd, [&inBattle](cs::Ref<Ship> s) { return inBattle.Contains(s); });
+				if (silenced && witness.empty() && IsPlayer(rec)) Notice(cs::Cat("Their broadcast array was down and nobody else saw it: ", b->Name, " goes unreported"));
 				// The side's leader, if its own ships were among those wronged (not a power the offender is at war with, fighting beside them).
 				auto leader = b->SideLeaders[1 - side];
 				auto victim = leader != nullptr && !leader->IsPirate && victims.Exists([&leader](const cs::Ref<BattleUnit>& v) { return v->Faction == leader; }) ? leader : victims[0]->Faction;

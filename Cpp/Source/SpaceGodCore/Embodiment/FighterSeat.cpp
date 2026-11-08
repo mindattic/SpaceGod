@@ -4,6 +4,7 @@
 #include "Astro.h"
 #include "Combat/Arsenal.h"
 #include "Combat/Battle.h"
+#include "Combat/BroadcastArrays.h"
 #include "Combat/CombatSpecs.h"
 #include "Combat/CombatState.h"
 #include "Combat/Dogfighting.h"
@@ -216,7 +217,8 @@ namespace SpaceGod::Core
 	{
 		auto t = Unit->PlayerLockTarget;
 		if (t == nullptr || !t->Present()) return nullptr;
-		Unit->PlayerSubTarget = WeakPoints::Cycle(t, Unit->PlayerSubTarget, step);
+		// Its weak points, then its broadcast array (US-T96): any hull fought as a ship has one to knock out.
+		Unit->PlayerSubTarget = BroadcastArrays::Cycle(t, Unit->PlayerSubTarget, step);
 		return Unit->PlayerSubTarget;
 	}
 
@@ -297,7 +299,7 @@ namespace SpaceGod::Core
 			sb.Append(u->LockProgress >= 1 ? cs::String("LOCKED") : Pct(u->LockProgress));
 			auto weak = u->PlayerSubTarget;
 			if (weak != nullptr && !weak->Destroyed())
-				sb.Append(" @ ").Append(WeakPoints::Label(weak)).Append(WeakPoints::ExposedFrom(t, weak, u->Pos) ? " (OPEN)" : " (covered)");
+				sb.Append(" @ ").Append(WeakPoints::Label(weak)).Append(BroadcastArrays::Is(t, weak) ? "" : WeakPoints::ExposedFrom(t, weak, u->Pos) ? " (OPEN)" : " (covered)");
 		}
 		if (Wingmen() > 0) sb.Append("  ·  wing ").Append(Wingmen()).Append(": ").Append(Wing::Label(u->Fighter->Order));
 		if (u->Overheated) sb.Append("  ·  GUNS OVERHEATED");

@@ -106,6 +106,10 @@ namespace SpaceGod::Core
 		/// <summary>A dumb-fire rocket pod (US-T101): an unguided salvo along the nose, fast and cheap, that hits whatever
 		/// hostile hull it flies into and nothing it does not.</summary>
 		RocketPod,
+
+		/// <summary>A hull's broadcast array (US-T96, see <see cref="BroadcastArrays"/>): the comms mast it reports an attack
+		/// with. Never one of a design's hardpoints (it lives on the battle unit), so it is numbered apart from them.</summary>
+		BroadcastArray = 100,
 	};
 	SPACEGODCORE_API const char* ToString(SubsystemKind v);
 

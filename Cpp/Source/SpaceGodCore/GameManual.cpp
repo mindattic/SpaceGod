@@ -278,7 +278,8 @@ namespace SpaceGod::Core
 				  "Left mouse guns, right mouse the second trigger's weapon group -- homing missiles, hive missiles, dumb-fire "
 				  "rockets or torpedoes (1 cycles them; the readout names the group and its rounds) -- T locks the hostile "
 				  "nearest the crosshair, Ctrl throws flares and chaff, 7 / 8 / 9 move reactor power to weapons, shields or "
-				  "engines and 0 evens it (the arrows too, as at any controls), 2-5 order your wingmen, and 6 picks a capital's next weak point."),
+				  "engines and 0 evens it (the arrows too, as at any controls), 2-5 order your wingmen, and 6 picks a capital's next weak point "
+				  "or the locked ship's broadcast array."), // US-T96
 				T("Off-screen arrows",
 				  "At any controls, whatever is worth turning to and off the screen gets an arrow on the screen's edge, pointing "
 				  "the way to turn: every hostile in the fight (the nearest named by its range), the hull you have locked, ringed "
@@ -519,7 +520,8 @@ namespace SpaceGod::Core
 				T("Crime",
 				  "Attacking a ship you are not at war with, piracy, smuggling, trespass and running from a scan are crimes, "
 				  "but only if someone's scanners saw them. A crime posts a bounty and lowers your standing, which sets your "
-				  "prices and whether a port lets you dock."),
+				  "prices and whether a port lets you dock. A ship you attack reports it over its broadcast array: lock it, "
+				  "pick the array (6) and shoot it out, and only a station or ship watching from outside the fight can tell."), // US-T96
 				T("Patrols and scans",
 				  "Navy patrols and corvettes hail you in their space for a cargo scan: hold still. Wanted, you are ordered to "
 				  "heave to and pay (1) or be interdicted. Fines can be paid at any of a faction's ports."),

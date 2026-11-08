@@ -97,7 +97,8 @@ namespace SpaceGod::Core
 		/// <summary>Locks <paramref name="target"/> (null drops the lock); a capital ship gets its most telling weak point picked.</summary>
 		void Lock(const cs::Ref<BattleUnit>& target);
 
-		/// <summary>The next (or previous) weak point on the locked capital ship; returns it, or null if there is none.</summary>
+		/// <summary>The next (or previous) weak point on the locked capital ship, or the locked hull's broadcast array (US-T96,
+		/// <see cref="BroadcastArrays"/>); returns it, or null if there is none.</summary>
 		cs::Ref<Subsystem> CycleWeakPoint(int step = 1);
 
 		/// <summary>Throws a flare-and-chaff cloud astern this step, if the dispenser is ready and has any left.</summary>

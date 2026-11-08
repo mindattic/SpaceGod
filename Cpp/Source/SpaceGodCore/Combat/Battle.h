@@ -305,6 +305,10 @@ namespace SpaceGod::Core
 		/// torpedoes are aimed at (U.SPC-T424), or null to leave it to the seeker.</summary>
 		cs::Ref<Subsystem> PlayerSubTarget;
 
+		/// <summary>US-T96: this hull's broadcast array (see <see cref="BroadcastArrays"/>), made when the player first picks it;
+		/// null until then (whole). Not one of <see cref="ShipCombat.Subsystems"/>: it lasts for the battle.</summary>
+		cs::Ref<Subsystem> Broadcast;
+
 		/// <summary>While <see cref="PlayerControlled"/>: a flare-and-chaff cloud asked for this frame (the battle clears it
 		/// once it has tried, U.SPC-T424).</summary>
 		bool PlayerDecoyRequested = false;

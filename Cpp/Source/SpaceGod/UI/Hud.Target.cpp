@@ -1,6 +1,7 @@
 // Hud target card (US-T256): the hull the controls held have locked, as a docked panel in the right-hand column -- its
 // name, class, flag and stance, range and closing speed, hull, the shield of each emitter's patch, its gun heat, its
-// subsystems by kind with their health, and the weak point a fighter's guns go for. Declared in Hud.Panels.inl.
+// subsystems by kind with their health, its broadcast array (US-T96), and the weak point a fighter's guns go for. Declared
+// in Hud.Panels.inl.
 //
 // Read only: nothing here enters the simulation. Screen space, a fixed width, the same at the gameplay and the realistic
 // scale. BottomRight over the sensors (HudLayout), taken on every event so the Layout pass and the Repaint place it and
@@ -13,6 +14,7 @@
 
 #include "Camera/StarTravel.h"
 #include "Combat/Battle.h"
+#include "Combat/BroadcastArrays.h"
 #include "Combat/CombatSpecs.h"
 #include "Combat/CombatState.h"
 #include "Combat/Dogfighting.h"
@@ -153,11 +155,23 @@ namespace SpaceGod::UI
 		if (t == nullptr || !t->Present() || t->Combat == nullptr || t->Combat->Spec == nullptr) return;
 		auto c = t->Combat;
 		bool fighterSeat = cs::As<FighterSeat>(app->HeldSeat()) != nullptr;
-		auto weak = me->PlayerSubTarget != nullptr && !me->PlayerSubTarget->Destroyed() && c->Subsystems.Contains(me->PlayerSubTarget)
+		bool arrayPicked = BroadcastArrays::Is(t, me->PlayerSubTarget);
+		auto weak = me->PlayerSubTarget != nullptr && !me->PlayerSubTarget->Destroyed() && (c->Subsystems.Contains(me->PlayerSubTarget) || arrayPicked)
 			? me->PlayerSubTarget : nullptr;
 
 		auto patches = Patches(c);
 		auto kinds = Kinds(c, weak);
+		// Its broadcast array (US-T96): knocked out, it cannot report the attack. Whole until first picked.
+		if (BroadcastArrays::Carries(t))
+		{
+			KindRow a;
+			a.Kind = SubsystemKind::BroadcastArray;
+			a.Total = 1;
+			a.Alive = BroadcastArrays::Silenced(t) ? 0 : 1;
+			a.Health = BroadcastArrays::Health(t);
+			a.Weak = weak != nullptr && arrayPicked;
+			kinds.push_back(a);
+		}
 		int patchRows = static_cast<int>((patches.size() + 1) / 2);
 		bool weakLine = fighterSeat || weak != nullptr;
 
@@ -241,11 +255,15 @@ namespace SpaceGod::UI
 		{
 			if (weak != nullptr)
 				DrawLabel(FitText(cs::Cat("WEAK POINT  ", cs::Strings::ToUpperInvariant(WeakPoints::Label(weak)), "  ", Pct(weak->Health()), "  ",
-					WeakPoints::ExposedFrom(t, weak, me->Pos) ? "OPEN" : "covered"), minorLabel, w), Vector2(x, y), LockColor, true);
+					arrayPicked ? "silence it" : WeakPoints::ExposedFrom(t, weak, me->Pos) ? "OPEN" : "covered"), minorLabel, w), Vector2(x, y), LockColor, true);
+			else if (BroadcastArrays::Silenced(t))
+				DrawLabel("BROADCAST ARRAY  out: it cannot report", Vector2(x, y), LockColor, true);
 			else
 				DrawLabel(WeakPoints::IsCapital(t) ? "WEAK POINT  none left" : "WEAK POINT  none (a destroyer and up)", Vector2(x, y), Dim, true);
 			y += RowH;
-			if (fighterSeat) DrawLabel(FitText(weak != nullptr || WeakPoints::IsCapital(t) ? "6 next weak point  \xC2\xB7  T next lock" : "T next lock", minorLabel, w), Vector2(x, y), Dim, true);
+			// US-T96: any ship's broadcast array can be picked while it stands.
+			bool pickable = weak != nullptr || WeakPoints::IsCapital(t) || (BroadcastArrays::Carries(t) && !BroadcastArrays::Silenced(t));
+			if (fighterSeat) DrawLabel(FitText(pickable ? "6 next weak point  \xC2\xB7  T next lock" : "T next lock", minorLabel, w), Vector2(x, y), Dim, true);
 		}
 	}
 }

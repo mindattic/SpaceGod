@@ -9,6 +9,7 @@
 #include "Combat/Boarding.h"
 #include "Combat/BoardingShuttles.h"
 #include "Combat/BreacherBays.h"
+#include "Combat/BroadcastArrays.h"
 #include "Combat/Broadsides.h"
 #include "Combat/CarrierWings.h"
 #include "Combat/Choreography.h"
@@ -1341,7 +1342,7 @@ namespace SpaceGod::Core
 			}
 			// A player's guided rounds go for the weak point picked on the locked hull (U.SPC-T424).
 			auto sub = u->PlayerControlled() && w->Missile && target == u->PlayerLockTarget && u->PlayerSubTarget != nullptr && !u->PlayerSubTarget->Destroyed()
-						&& target->Combat->Subsystems.Contains(u->PlayerSubTarget)
+						&& (target->Combat->Subsystems.Contains(u->PlayerSubTarget) || BroadcastArrays::Is(target, u->PlayerSubTarget)) // US-T96: or its broadcast array
 				? u->PlayerSubTarget
 				: PickSubsystem(target, u);
 			auto aimPoint = sub != nullptr ? target->PointOf(sub->Def) : target->Pos;
@@ -1641,7 +1642,8 @@ namespace SpaceGod::Core
 			return;
 		}
 		auto at = origin + dir * t;
-		auto sub = SubsystemNear(hit, at);
+		// US-T96: the player's guns strike the broadcast array picked on the hull locked when they land by it.
+		auto sub = BroadcastArrays::Struck(u, hit, at, SubsystemNear(hit, at));
 		// A plasma bolt bleeds off over the distance it crossed (U.SPC-T488).
 		if (w->FalloffEdgeShare < 1 && w->Damage > 0) damage *= w->DamageAt(t) / w->Damage;
 		FxShot shot(*this, u, s); // US-T257
@@ -1662,7 +1664,7 @@ namespace SpaceGod::Core
 			{
 				auto at = r->Pos + step / len * t;
 				r->Gone = true;
-				auto sub = SubsystemNear(hit, at);
+				auto sub = BroadcastArrays::Struck(r->Shooter, hit, at, SubsystemNear(hit, at)); // US-T96
 				FxShot shot(*this, r->Shooter, r->Mount); // US-T257
 				ApplyDamage(hit, sub, r->Damage, at, std::nullopt, r->SmallCraft ? WeakPoints::Factor(hit, sub, r->Vel - hit->Vel) : 1, r->Vel - hit->Vel,
 					false, WeaponSystems::FamilyOfRound(*r));

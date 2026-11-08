@@ -4,6 +4,7 @@
 
 #include "Camera/SpaceCamera.h"
 #include "Combat/Battle.h"
+#include "Combat/BroadcastArrays.h" // US-T96
 #include "Combat/CombatSpecs.h" // US-T170: a craft's dry mass, for its feel
 #include "Combat/CombatState.h"
 #include "Combat/Dogfighting.h"
@@ -714,7 +715,10 @@ namespace SpaceGod
 			case 6:
 			{
 				auto weak = f->CycleWeakPoint();
-				ShowToast(weak == nullptr ? cs::String("Lock a capital ship (T) to pick a weak point") : cs::Cat("Weak point: ", WeakPoints::Label(weak)));
+				// US-T96: any hull's broadcast array is in the cycle; knocked out, the victim cannot report the attack.
+				ShowToast(weak == nullptr ? cs::String("Lock a ship (T) to pick a weak point or its broadcast array")
+					: BroadcastArrays::Is(f->Unit->PlayerLockTarget, weak) ? cs::String("Broadcast array: knock it out and they cannot report the attack")
+					: cs::Cat("Weak point: ", WeakPoints::Label(weak)));
 				break;
 			}
 			case 7: f->ShiftPower(PowerSystem::Weapons); break;

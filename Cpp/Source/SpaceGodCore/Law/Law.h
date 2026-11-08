@@ -336,7 +336,8 @@ namespace SpaceGod::Core
 		/// foes included lawful units -- not pirates, not a faction it is at war with, not ships wanted in that
 		/// jurisdiction -- has committed assault, or piracy if it is a pirate or took or ransomed one of them (pirates
 		/// and robbers answer for it whichever side they were on; a lawful ship defending itself does not). A survivor among those it attacked
-		/// is a witness; failing that, any ship or station in sensor range. The side enforcing the law in an
+		/// is a witness, unless its broadcast array was knocked out (US-T96, <see cref="BroadcastArrays"/>); failing that, any ship or
+		/// station in sensor range. The side enforcing the law in an
 		/// interdiction commits nothing, and a wanted ship it stopped is charged only if it destroyed or took one of
 		/// the patrol's ships. A wanted commander killed or taken by bounty hunters or the player is theirs to collect on, at
 		/// the dead rate for a kill and in full alive (see <see cref="Outlaws.ClaimInBattle"/>); by a faction that posted a bounty on it, it has paid that one

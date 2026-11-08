@@ -1,6 +1,7 @@
 #include "Combat/Fighters.h"
 #include "Combat/Battle.h"
 #include "Combat/BoardingShuttles.h"
+#include "Combat/BroadcastArrays.h"
 #include "Combat/Boarding.h"
 #include "Combat/CarrierWings.h"
 #include "Combat/CombatSpecs.h"
@@ -629,7 +630,9 @@ namespace SpaceGod::Core
 		if (u->PlayerControlled())
 		{
 			auto picked = u->PlayerSubTarget;
-			if (target == u->PlayerLockTarget && picked != nullptr && !picked->Destroyed() && target->Combat->Subsystems.Contains(picked)) return picked;
+			// US-T96: or the broadcast array picked on it.
+			if (target == u->PlayerLockTarget && picked != nullptr && !picked->Destroyed()
+				&& (target->Combat->Subsystems.Contains(picked) || BroadcastArrays::Is(target, picked))) return picked;
 		}
 		else if (WeakPoints::AiGoesForThem()->Value)
 		{
