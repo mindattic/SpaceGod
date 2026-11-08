@@ -7,6 +7,7 @@
 #include "Combat/FireCones.h"
 #include "Combat/Outfitting.h"
 #include "Combat/Salvage.h"
+#include "Combat/ShipComponents.h" // US-T269: reinforced bulkheads
 #include "Economy/Goods.h"
 #include "Economy/Settlement.h"
 
@@ -130,6 +131,8 @@ namespace SpaceGod::Core
 			h->AddJoint(s->Section, s->Id, DVec3(s->Side * halfBeam * SponsonReach, s->Centre.Y, s->Centre.Z), spec->Hull * SponsonJointShare);
 
 		h->Root = RootSection(h, layout, n);
+		// US-T269: a component with a reinforced bulkhead in its sockets holds out longer, and so do the joints round it.
+		ShipComponents::Reinforce(h, spec);
 		return h;
 	}
 

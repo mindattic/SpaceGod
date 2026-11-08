@@ -12,6 +12,7 @@
 #include "Combat/Facilities.h"
 #include "Combat/FireCones.h"
 #include "Combat/FleetPatterns.h"
+#include "Combat/Radiators.h" // US-T269
 #include "Combat/ShipComponents.h" // US-T89
 #include "Combat/SpinalMounts.h"
 #include "Combat/TachyonLances.h"
@@ -864,14 +865,20 @@ namespace SpaceGod::Core
 	{
 		auto l = LoadoutOf(ship);
 		if (l == nullptr) return nullptr;
-		for (const auto& [slot, module, facility] : AiWishes(ship, l, plan))
+		for (const auto& w : AiWishes(ship, l, plan))
 		{
-			cs::Ref<IPartSpec> part = facility != nullptr ? cs::Ref<IPartSpec>(facility) : l->PartAt(slot, module);
-			auto q = facility != nullptr ? QuoteFacility(ship, yard, facility) : Quote(ship, yard, slot, module);
+			const auto& [slot, module, facility, socket, utility] = w;
+			// US-T269: a utility part, priced and fitted as the Mechlab fits one.
+			cs::Nullable<UtilityKind> kind = utility >= 0 ? cs::Nullable<UtilityKind>(static_cast<UtilityKind>(utility)) : std::nullopt;
+			cs::Ref<IPartSpec> part = socket >= 0 ? cs::Ref<IPartSpec>(UtilitySpec::Of(*kind))
+				: facility != nullptr ? cs::Ref<IPartSpec>(facility) : l->PartAt(slot, module);
+			auto q = socket >= 0 ? ShipComponents::Quote(ship, yard, socket, kind)
+				: facility != nullptr ? QuoteFacility(ship, yard, facility) : Quote(ship, yard, slot, module);
 			if (!q.InStock || !Surplus(yard, part, l->Scale())) continue;
 			if (ship->Faction->Treasury < q.Net() * AiFlush + 2 * Economy::HullPrice(ship->Spec->Class)) continue;
 			OutfitQuote unused;
-			auto outcome = facility != nullptr ? FitFacility(economy, ship, yard, facility, unused) : Fit(economy, ship, yard, slot, module, unused);
+			auto outcome = socket >= 0 ? ShipComponents::Fit(economy, ship, yard, socket, kind, unused)
+				: facility != nullptr ? FitFacility(economy, ship, yard, facility, unused) : Fit(economy, ship, yard, slot, module, unused);
 			if (outcome == OutfitOutcome::Ok) return part;
 		}
 		return nullptr;
@@ -941,6 +948,26 @@ namespace SpaceGod::Core
 			if (l->Fitted[i] == ModuleKind::Engine && CanFit(l, i, ModuleKind::TorchEngine)) wishes.Add(AiWish{ i, ModuleKind::TorchEngine, nullptr });
 		if (!lanceFirst)
 			if (auto late = LanceWish(l)) wishes.Add(AiWish{ *late, ModuleKind::TachyonLance, nullptr });
+		// US-T269: last of all, a utility part for some designs, each in the first empty socket that takes it (bow first):
+		// a navy's capital a reinforced bulkhead, a raider manoeuvring thrusters, a capital cooled by radiators a heat sink.
+		// One of each kind at most; small craft are left as built.
+		if (!l->SmallCraft)
+		{
+			int sockets = ShipComponents::SocketCount(l);
+			auto want = [&](UtilityKind k)
+			{
+				if (ShipComponents::Count(l, k) > 0) return;
+				for (int s = 0; s < sockets; s++)
+					if (!ShipComponents::At(l, s).has_value() && ShipComponents::CanFit(l, s, k))
+					{
+						wishes.Add(AiWish{ -1, ModuleKind{}, nullptr, s, static_cast<int>(k) });
+						return;
+					}
+			};
+			if (ship->Faction->IsPirate) want(UtilityKind::ManeuveringThrusters);
+			else if (big) want(UtilityKind::ReinforcedBulkhead);
+			if (big && Radiators::PanelsFor(ship->Spec->Class).Count() > 0) want(UtilityKind::HeatSink);
+		}
 		return wishes;
 	}
 

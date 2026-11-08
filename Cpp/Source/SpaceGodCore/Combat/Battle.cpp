@@ -29,6 +29,7 @@
 #include "Combat/GateBreakers.h"
 #include "Combat/Gunnery.h"
 #include "Combat/ModularHull.h"
+#include "Combat/ShipComponents.h" // US-T269
 #include "Combat/NaniteRepairs.h"
 #include "Combat/Morale.h"
 #include "Combat/PilotAim.h"
@@ -1992,7 +1993,9 @@ namespace SpaceGod::Core
 	void Battle::StepPlayerWeapons(const cs::Ref<BattleUnit>& u, double dt)
 	{
 		// Power to the weapons cools the guns faster (U.SPC-T424).
-		u->Heat = cs::Math::Max(0.0, u->Heat - Gunnery::HeatCoolPerS * PowerFactor(u, PowerSystem::Weapons) * dt);
+		// US-T269: heat sinks in the hull's sockets cool them faster still.
+		double sinks = u->Combat != nullptr && u->Combat->Spec != nullptr ? 1 + u->Combat->Spec->HeatShedBonus : 1;
+		u->Heat = cs::Math::Max(0.0, u->Heat - Gunnery::HeatCoolPerS * PowerFactor(u, PowerSystem::Weapons) * sinks * dt);
 		if (u->PlayerHelm && u->PlayerFireHeld) u->VolleyCharge = cs::Math::Min(VolleyBuildSeconds, u->VolleyCharge + dt);
 		if (u->Overheated && u->Heat < Gunnery::HeatRecoverBelow) u->Overheated = false;
 
@@ -2427,6 +2430,8 @@ namespace SpaceGod::Core
 			double size = target->LengthKm * cs::Math::Max(0.08, cs::Math::Pow(cs::Math::Max(0.0, p->MassShare), 1.0 / 3.0));
 			Emit(FxKind::SectionLost, from, from + out * target->LengthKm, size, target->Side, target, p->Modules.Count() > 0 ? p->Modules[0] : -1);
 		}
+		// US-T269: utility parts on a component shot below its knock-out share, shattered or cut away go down with it.
+		ShipComponents::KnockOut(c);
 	}
 
 	void Battle::ApplyImpact(const cs::Ref<BattleUnit>& target, DVec3 at, double hp)

@@ -631,7 +631,9 @@ namespace SpaceGod::Core
 		/// (<see cref="NavyFacilities"/>: plate, a scanner and a brig; <see cref="RaiderFacilities"/>: plate, a brig and
 		/// racks for plunder; for both a Breacher bay where there is room and a team to man it, U.SPC-T521), then hardened shields, the role weapons its doctrine favours (U.SPC-T505,
 		/// <see cref="FleetPatterns.Wishes"/>: phaser arrays, plasma cannons), heavier guns on a big hull, a tachyon lance
-		/// for a capital of a navy that favours one, then torch drives, and the lance last of all for any other navy.
+		/// for a capital of a navy that favours one, then torch drives, and the lance last of all for any other navy; then (US-T269)
+		/// a utility part for some designs: a reinforced bulkhead for a navy's capital, manoeuvring thrusters for a raider, and a
+		/// heat sink for a capital cooled by radiators.
 		/// <paramref name="plan"/> is the owner's build plan, its doctrine (null: the balanced fleet's). Returns what was
 		/// fitted (a <see cref="ModuleSpec"/> or a <see cref="FacilityKind"/>), or null.
 		/// </summary>
@@ -662,6 +664,8 @@ namespace SpaceGod::Core
 			int slot = 0;
 			ModuleKind module{};
 			cs::Ref<FacilityKind> facility;
+			/// <summary>US-T269: a utility socket to fill (with <see cref="utility"/>, a UtilityKind's value), -1 for none.</summary>
+			int socket = -1, utility = -1;
 		};
 
 		// An eager list of what the C# iterator yields: AiRefit stops at the first wish that is fitted, and nothing a

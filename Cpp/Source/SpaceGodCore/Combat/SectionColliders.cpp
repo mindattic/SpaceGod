@@ -6,6 +6,7 @@
 #include "Combat/CombatSpecs.h"
 #include "Combat/CombatState.h"
 #include "Combat/ModularHull.h"
+#include "Combat/ShipComponents.h" // US-T269
 #include "Combat/Battle.h"
 #include "Combat/War.h"
 #include "Ephemeris.h"
@@ -335,6 +336,7 @@ namespace SpaceGod::Core
 		// The section's hit points are hull points (Hull * MaxStructure / total); the module's structure is its own.
 		auto pieces = h->Strike(m->Centre, hp * total / c->Spec->Hull);
 		for (const auto& p : pieces) ModularHulls::ApplyBreak(c, p);
+		ShipComponents::KnockOut(c); // US-T269: utility parts go down with their component
 		return pieces.Count();
 	}
 

@@ -47,6 +47,16 @@ namespace SpaceGod::Views
 		cs::List<cs::Ref<Glow>> breaches;
 		bool visible = true;
 
+		/// <summary>US-T269: the utility parts fitted in its components' sockets (Core::ShipComponents), each a small housing on
+		/// top of its component with a glow in its kind's colour, put away once the part is shot out.</summary>
+		struct UtilityMark
+		{
+			int Socket = 0;
+			cs::Ref<Renderer> Housing;
+			cs::Ref<Glow> Light;
+		};
+		cs::List<UtilityMark> utilityMarks;
+
 		/// <summary>A truss freighter's hull (U.SPC-T482), whose mesh is swapped as its load changes the pods clamped on
 		/// it, and what that mesh shows now; null for any other hull.</summary>
 		cs::Ref<MeshFilter> truss;
@@ -185,6 +195,8 @@ namespace SpaceGod::Views
 		static cs::Ref<Material> GlowMaterial(const cs::String& name, Color c, float intensity, float falloff);
 		static cs::Ref<ParticleSystem> BuildExhaust(const cs::Ref<Transform>& parent);
 		void BuildShieldRing();
+		void BuildUtilityMarks();
+		void ShowUtilityMarks(const cs::Ref<Core::ShipCombat>& combat, bool show);
 		void UpdateShieldRing(bool fighting);
 		cs::Ref<Transform> SectionFor(float z) const;
 		cs::Ref<Part> BuildPart(const cs::Ref<Core::Subsystem>& sub);

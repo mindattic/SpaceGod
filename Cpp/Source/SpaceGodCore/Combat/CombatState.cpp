@@ -8,6 +8,7 @@
 #include "Combat/EnergyWeapons.h"
 #include "Combat/ModularHull.h"
 #include "Combat/ShieldEmitters.h"
+#include "Combat/ShipComponents.h" // US-T269
 #include "Settings/GameSetting.h"
 #include "Ships.h"
 
@@ -240,6 +241,8 @@ namespace SpaceGod::Core
 
 	void ShipCombat::Repair(double share)
 	{
+		// US-T269: mended whole, every utility part shot out with its component works again.
+		if (share >= 1) Spec = ShipComponents::Restored(Spec);
 		Hull = cs::Math::Min(Spec->Hull, Hull + Spec->Hull * share);
 		for (const auto& s : Subsystems)
 		{
@@ -256,7 +259,13 @@ namespace SpaceGod::Core
 	{
 		if (share <= 0) return;
 		Hull = cs::Math::Min(Spec->Hull, Hull + Spec->Hull * share);
-		if (Hull >= Spec->Hull) structure = nullptr;
+		if (Hull >= Spec->Hull)
+		{
+			structure = nullptr;
+			// US-T269: mended whole, its utility parts work again (a bulkhead's hull points with it).
+			Spec = ShipComponents::Restored(Spec);
+			Hull = Spec->Hull;
+		}
 		else if (structure) structure->Repair(share);
 	}
 

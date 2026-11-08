@@ -231,7 +231,9 @@ namespace SpaceGod::Core
 		SG_F(LateralThrustMN), SG_ARRAY(Layout), SG_F(LengthKm), SG_F(MainThrustMN), SG_F(Marines), SG_F(MassKt),
 		SG_F(MaxSpeed), SG_F(PitchYawTorqueMNKm), SG_F(PropellantTonnes), SG_F(ReconCraft), SG_F(RetroThrustMN),
 		SG_F(RollTorqueMNKm), SG_F(Shield), SG_F(ShieldRegen), SG_F(Shuttles), SG_F(SpinalPlants), SG_F(Squadrons),
-		SG_F(TurnRateDegS), SG_F(VerticalThrustMN))
+		SG_F(TurnRateDegS), SG_F(VerticalThrustMN),
+		SG_OPT(HeatShedBonus), SG_OPT(Utility), SG_OPT(UtilityBase), SG_OPT(UtilityCrewBase), SG_OPT(UtilityFitted),
+		SG_OPT(UtilityModule)) // US-T269: utility parts and what of them still works, absent from older saves
 
 	SG_SERIALIZE(Compartment, "Unity.SpaceGod.Core.Compartment",
 		SG_F(Boarders), SG_F(Buried), SG_F(Crew), SG_F(Index), SG_F(Kind), SG_F(Links), SG_F(Marines), SG_F(Name),

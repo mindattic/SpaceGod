@@ -2,7 +2,8 @@
 // its components (Core::ShipComponents: the bow, the midsections, engineering, the sponsons), each a card with its type
 // limits, the hardpoints mounted on it and its utility sockets. A hardpoint chosen here is refitted exactly as in the list
 // view (OutfitOptions / OutfitOption, the co-op "outfit" entry); a utility socket through ShipComponents::Fit, carried as
-// a co-op "utility" entry (Hud.Coop.cpp) so every peer refits the same hull the same way.
+// a co-op "utility" entry (Hud.Coop.cpp) so every peer refits the same hull the same way. US-T269: each card shows its
+// utility tonnage, a part shot out with its component reads so, and a part too heavy for what is left is listed but not offered.
 
 #include "UI/Hud.h"
 #include "UI/UiMotion.h" // US-T255
@@ -61,7 +62,7 @@ namespace SpaceGod::UI
 
 		constexpr Color UtilityColor{0.85f, 0.85f, 0.6f, 1.0f};
 
-		/// "E 2  ·  M 1  ·  U 2": what a component's hardpoints allow by type, and its sockets.
+		/// "E 2  ·  M 1  ·  U 2 (45 / 80 t)": what a component's hardpoints allow by type, and its sockets and their tonnage.
 		cs::String Limits(const ShipComponent& c, const cs::Ref<Loadout>& l)
 		{
 			static const MountType types[] = { MountType::Energy, MountType::Ballistic, MountType::Missile, MountType::Spinal, MountType::Shield, MountType::Engine };
@@ -72,15 +73,20 @@ namespace SpaceGod::UI
 				int n = c.Limit(l, types[i]);
 				if (n > 0) s += cs::Cat(s.empty() ? "" : "  ·  ", names[i], " ", n);
 			}
-			if (c.Sockets > 0) s += cs::Cat(s.empty() ? "" : "  ·  ", "U ", c.Sockets);
+			if (c.Sockets > 0)
+				s += cs::Cat(s.empty() ? "" : "  ·  ", "U ", c.Sockets, " (", cs::Fmt(ShipComponents::UsedTonnes(l, c), "0"), " / ",
+					cs::Fmt(c.CapacityTonnes(l->Scale()), "0"), " t)");
 			return s.empty() ? cs::String("structure only") : s;
 		}
 
 		/// What an empty socket on <paramref name="c"/> takes, for its row.
 		cs::String SocketTakes(const ShipComponent& c, bool smallCraft)
 		{
-			bool thrusters = c.Takes(UtilityKind::ManeuveringThrusters, smallCraft), air = c.Takes(UtilityKind::LifeSupport, smallCraft);
-			return thrusters && air ? "thrusters / life support" : thrusters ? "thrusters" : air ? "life support" : "nothing";
+			static const char* names[] = { "thrusters", "life support", "heat sink", "power cell", "bulkhead" };
+			cs::String s;
+			for (const auto& u : UtilitySpec::Catalogue())
+				if (c.Takes(u->Kind, smallCraft)) s += cs::Cat(s.empty() ? "" : " / ", names[static_cast<int>(u->Kind)]);
+			return s.empty() ? cs::String("nothing") : s;
 		}
 	}
 
@@ -134,7 +140,7 @@ namespace SpaceGod::UI
 				"  ·  dry mass ", Tonnes(spec->DryMassTonnes), "  ·  max speed ", cs::Fmt(spec->MaxSpeed, "0.###"), "  ·  turn ", cs::Fmt(spec->TurnRateDegS, "0.#"), " deg/s"), small);
 		GUI::Label(Rect(r.x + 12, r.y + 46, w - 24, 18),
 			cs::Cat("Crew ", cs::Fmt(spec->Crew, "N0"), "  ·  side thrust ", cs::Fmt(spec->LateralThrustMN, "0.##"), " MN  ·  ",
-				hardpoints, " hardpoints on ", parts.Count(), " components  ·  utility ", ShipComponents::Count(loadout, UtilityKind::ManeuveringThrusters) + ShipComponents::Count(loadout, UtilityKind::LifeSupport),
+				hardpoints, " hardpoints on ", parts.Count(), " components  ·  utility ", ShipComponents::Fitted(loadout),
 				" of ", sockets, " sockets  ·  credits ", Credits(ship->Faction->Treasury)), small);
 		GUI::Label(Rect(r.x + 12, r.y + 64, w - 24, 18), yard != nullptr
 			? "Pick a hardpoint or a utility socket on a component, then what to fit.   E energy · B ballistic · M missile · SP spinal · SH shield · EN engine · U utility.   F2 to close"
@@ -182,6 +188,8 @@ namespace SpaceGod::UI
 				int socket = c.FirstSocket + k;
 				auto in = ShipComponents::At(loadout, socket);
 				cs::String socketLabel = in.has_value() ? UtilitySpec::Of(*in)->Name : cs::Cat("(empty: ", SocketTakes(c, loadout->SmallCraft), ")");
+				// US-T269: shot out with its component; a yard that mends the hull whole brings it back.
+				if (in.has_value() && ShipComponents::ShotOut(spec, socket)) socketLabel += "  (shot out)";
 				GUI::contentColor = in.has_value() ? Color::white() : Dim;
 				if (GUI::Button(Rect(x + 4, ry, cardW - 8, rowH - 1), cs::Cat("        ", socketLabel), socket == outfitSocket ? rowSelected : row))
 				{
@@ -227,12 +235,15 @@ namespace SpaceGod::UI
 		GUI::Label(Rect(x + 20, y, 200, rowH), k.has_value() ? UtilitySpec::Of(*k)->Name : cs::String("Empty the socket"), small);
 		GUI::contentColor = Dim;
 		if (k.has_value()) GUI::Label(Rect(x + 220, y, 230, rowH), UtilitySpec::Of(*k)->Effect, small);
+		// US-T269: a part its component has no tonnage left for is listed, not offered.
+		bool fits = current || ShipComponents::CanFit(loadout, outfitSocket, k);
 		cs::String price = current ? cs::String("fitted")
+			: !fits ? cs::String("too heavy for the component")
 			: !q.InStock ? cs::Cat("yard is short of ", cs::Strings::ToLowerInvariant(GoodInfo::Of(q.Short)->Name))
 			: q.Net() >= 0 ? Credits(q.Net()) : cs::Cat("+", Credits(-q.Net()), " back");
 		GUI::Label(Rect(x + 460, y, 220, rowH), price, small);
 		GUI::contentColor = Color::white();
-		if (current || !q.InStock) return;
+		if (current || !fits || !q.InStock) return;
 		if (!GUI::Button(Rect(x + w - 100, y - 1, 84, rowH - 1), k.has_value() ? "Fit" : "Empty", button)) return;
 		if (CoopSends("utility", K(yard), outfitSocket, kind)) return; // an entry in co-op, as every refit is
 		UtilityApply(ship, yard, outfitSocket, kind);
@@ -258,6 +269,7 @@ namespace SpaceGod::UI
 		case OutfitOutcome::Busy: message = "Not while fighting or boarded"; break;
 		case OutfitOutcome::CannotDock: message = "Not welcome to refit here"; break;
 		case OutfitOutcome::NotAYard: message = "Only a shipyard (or a haven) refits a hull"; break;
+		case OutfitOutcome::WontFit: message = "That socket doesn't take it, or the component hasn't the tonnage"; break;
 		default: message = "That socket doesn't take it"; break;
 		}
 		app->ShowToast(message);

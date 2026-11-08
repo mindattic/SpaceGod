@@ -540,7 +540,13 @@ namespace SpaceGod::Core
 				  "allow, no bigger than each mount. Each also has utility sockets: manoeuvring thrusters on the bow, "
 				  "engineering and sponsons (faster turns, rolls and side thrust), life support amidships and in engineering "
 				  "(air for a bigger crew: more damage control teams and more hands against boarders; small craft have no "
-				  "room for it). The stats at the top are the ones the hull fights with."), // US-T89
+				  "room for it), heat sinks in the keel (more heat shed, guns cool faster), power cells anywhere (faster "
+				  "shield regrowth, longer boost) and reinforced bulkheads in the keel (that component holds out half as "
+				  "long again, and the hull takes a little more). Each component's parts may weigh only so much: the card "
+				  "shows the tonnes used and allowed. A part goes down with its component: shoot a section below about a "
+				  "third of its structure, or off the hull, and what is in its sockets stops working, shown on the ship "
+				  "and in the Mechlab as shot out, until a yard mends the hull whole. Some navies and raiders fit them "
+				  "too. The stats at the top are the ones the hull fights with."), // US-T89, US-T269
 				T("The news",
 				  "X opens the news feed: shocks, price spikes, embargoes, battles and captures as they happen, with news from "
 				  "other systems as old as the gates made it.")),

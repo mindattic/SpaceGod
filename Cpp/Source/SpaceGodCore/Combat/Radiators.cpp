@@ -209,7 +209,12 @@ namespace SpaceGod::Core
 		return total <= 0 ? 1 : alive / total;
 	}
 
-	double Radiators::Shed(const cs::Ref<ShipCombat>& c) { return SkinShed()->Value + RadiatorShed()->Value * Intact(c); }
+	double Radiators::Shed(const cs::Ref<ShipCombat>& c)
+	{
+		// US-T269: heat sinks in the hull's utility sockets shed that much more.
+		double sinks = c != nullptr && c->Spec != nullptr ? 1 + c->Spec->HeatShedBonus : 1;
+		return (SkinShed()->Value + RadiatorShed()->Value * Intact(c)) * sinks;
+	}
 
 	double Radiators::Made(const cs::Ref<BattleUnit>& u, double reload)
 	{

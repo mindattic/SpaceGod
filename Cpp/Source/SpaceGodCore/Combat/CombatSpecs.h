@@ -417,6 +417,22 @@ namespace SpaceGod::Core
 		/// </summary>
 		double DryMassTonnes = 0, PropellantTonnes = 0, ExhaustVelocityKmS = 0;
 
+		/// <summary>
+		/// US-T269: the utility parts the hull was built with (<see cref="ShipComponents"/>), one entry per socket: what is
+		/// fitted (a <see cref="UtilityKind"/>'s value, -1 for none), what of that still works (a part shot out with its
+		/// component reads -1), and the component it sits in (<see cref="ShipComponents.ModuleKey"/>). With them the spec
+		/// as it was before any utility part's effect (<see cref="UtilityBase"/>) and the complement an oxygen plant's share
+		/// is of, so a part shot out can be taken off again. All empty (and null) for a hull with no utility parts, every
+		/// stock design among them. Saved, as optional fields older saves lack.
+		/// </summary>
+		cs::List<int> UtilityFitted, Utility, UtilityModule;
+		cs::Ref<CombatSpec> UtilityBase;
+		double UtilityCrewBase = 0;
+
+		/// <summary>US-T269: how much more heat the hull sheds for its heat sinks, as a share of what it sheds without
+		/// (<see cref="Radiators.Shed"/>; a player's guns cool that much faster too). 0 with none.</summary>
+		double HeatShedBonus = 0;
+
 	private:
 		/// The designs by class: the C# static field initialiser, then its static constructor (see Specs()).
 		static const cs::Dictionary<ShipClass, cs::List<cs::Ref<CombatSpec>>>& Specs();

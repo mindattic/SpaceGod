@@ -12,6 +12,7 @@
 #include "Combat/PilotTuning.h"
 #include "Combat/CombatState.h"
 #include "Combat/ModularHull.h"
+#include "Combat/ShipComponents.h" // US-T269
 #include "Economy/BeltMining.h"
 #include "Ships.h"
 
@@ -51,6 +52,8 @@ namespace SpaceGod::Views
 	{
 		cs::Ref<Mesh> plumeMesh, quadMesh;
 		cs::Ref<Material> plumeMaterial, fireMaterial, engineMaterial, shieldRingMaterial;
+		/// US-T269: a utility part's light, by its kind (thrusters, life support, heat sink, power cell, bulkhead).
+		cs::List<cs::Ref<Material>> utilityMaterials;
 	}
 
 	const cs::List<float>& ShipView::BreachAt()
@@ -94,6 +97,7 @@ namespace SpaceGod::Views
 
 		const auto& subs = ship->Combat->Subsystems;
 		for (int i = 0; i < subs.Count(); i++) parts.Add(BuildPart(subs[i]));
+		BuildUtilityMarks();
 
 		// Breach points along the upper hull, fixed per ship so the damage reads consistently.
 		cs::Random rng(ship->Id * 7919 + 13);
@@ -115,6 +119,63 @@ namespace SpaceGod::Views
 		fireMaterial = GlowMaterial("Fire", Color(1.0f, 0.5f, 0.18f), 1.6f, 1.8f);
 		engineMaterial = GlowMaterial("EngineGlow", Color(0.5f, 0.8f, 1.0f), 1.5f, 2.2f);
 		shieldRingMaterial = Materials::MarkShared(Materials::Create(Materials::Fx(), "ShieldRing"));
+		utilityMaterials = {
+			GlowMaterial("UtilityThrusters", Color(0.45f, 0.7f, 1.0f), 1.3f, 2.0f),
+			GlowMaterial("UtilityLifeSupport", Color(0.45f, 1.0f, 0.55f), 1.3f, 2.0f),
+			GlowMaterial("UtilityHeatSink", Color(1.0f, 0.42f, 0.25f), 1.3f, 2.0f),
+			GlowMaterial("UtilityPowerCell", Color(1.0f, 0.9f, 0.35f), 1.3f, 2.0f),
+			GlowMaterial("UtilityBulkhead", Color(0.8f, 0.8f, 0.85f), 1.0f, 2.0f),
+		};
+	}
+
+	/// <summary>
+	/// US-T269: a small housing on top of each component for every utility part fitted in its sockets, side by side when it
+	/// carries two, with a light in the part's colour (blue thrusters, green life support, red heat sink, yellow power cell,
+	/// pale bulkhead). Laid out from the design's structure (ModularHull::For, the same pieces ShipComponents names), never
+	/// from the live hull's, which only the simulation lays out.
+	/// </summary>
+	void ShipView::BuildUtilityMarks()
+	{
+		auto spec = Ship->Combat->Spec;
+		if (spec == nullptr || spec->UtilityFitted.Count() == 0) return;
+		auto hull = ModularHull::For(spec);
+		for (int s = 0; s < spec->UtilityFitted.Count() && s < spec->UtilityModule.Count(); s++)
+		{
+			int kind = spec->UtilityFitted[s];
+			if (kind < 0 || kind >= utilityMaterials.Count()) continue;
+			auto m = ShipComponents::ModuleFor(hull, spec->UtilityModule[s]);
+			if (m == nullptr) continue;
+			// Which of the component's fitted parts this is, so two sit side by side.
+			int index = 0, count = 0;
+			for (int o = 0; o < spec->UtilityFitted.Count() && o < spec->UtilityModule.Count(); o++)
+			{
+				if (spec->UtilityFitted[o] < 0 || spec->UtilityModule[o] != spec->UtilityModule[s]) continue;
+				if (o < s) index++;
+				count++;
+			}
+			float spread = 0.035f * (index - 0.5f * (count - 1));
+			Vector3 pos(static_cast<float>(m->Centre.X) + spread, static_cast<float>(m->HalfExtent.Y * 0.6), static_cast<float>(m->Centre.Z));
+			auto section = SectionFor(pos.z);
+			auto housing = ShipModels::Part(section, MeshFactory::BuiltinCube(), cs::Cat("Utility ", ToString(static_cast<UtilityKind>(kind))));
+			housing->transform()->localPosition = pos;
+			housing->transform()->localScale = Vector3(0.022f, 0.009f, 0.034f);
+			housing->enabled = false; // shown by ApplyCombat with the rest of the full model
+			UtilityMark mark;
+			mark.Socket = s;
+			mark.Housing = housing;
+			mark.Light = NewGlow(section, pos + Vector3(0, 0.009f, 0), 0.03f, utilityMaterials[kind], nullptr);
+			utilityMarks.Add(mark);
+		}
+	}
+
+	void ShipView::ShowUtilityMarks(const cs::Ref<ShipCombat>& combat, bool show)
+	{
+		for (const auto& u : utilityMarks)
+		{
+			bool working = show && (combat == nullptr || !ShipComponents::ShotOut(combat->Spec, u.Socket));
+			if (u.Housing) u.Housing->enabled = working;
+			u.Light->R->enabled = working;
+		}
 	}
 
 	cs::Ref<Material> ShipView::GlowMaterial(const cs::String& name, Color c, float intensity, float falloff)
@@ -580,6 +641,7 @@ namespace SpaceGod::Views
 			}
 			if (p->Turret && !sub->Destroyed()) Aim(*p, sub, fighting, inverse, dt);
 		}
+		ShowUtilityMarks(combat, true); // US-T269: a part shot out with its component is gone from the hull
 		float hull = static_cast<float>(combat->HullFraction());
 		for (int i = 0; i < breaches.Count(); i++) breaches[i]->R->enabled = hull < BreachAt()[i];
 		for (const auto& g : glows)
@@ -660,6 +722,7 @@ namespace SpaceGod::Views
 				p->Fire->R->enabled = age < Life * 0.7f && (p->Sub->Index % 2 == 0);
 			}
 			for (const auto& g : breaches) g->R->enabled = age < Life * 0.8f;
+			ShowUtilityMarks(nullptr, false);
 			for (const auto& g : glows)
 				if (g->Engine) g->R->enabled = false;
 			Billboard(now);
@@ -772,6 +835,7 @@ namespace SpaceGod::Views
 			p->Fire->R->enabled = false;
 		}
 		for (const auto& g : breaches) g->R->enabled = false;
+		ShowUtilityMarks(nullptr, false);
 	}
 
 	void ShipView::Derelict(Vector3 relative, Quaternion rotation, float length, float now)
@@ -830,6 +894,7 @@ namespace SpaceGod::Views
 		}
 		if (!full)
 		{
+			ShowUtilityMarks(nullptr, false);
 			HardStopExhaust();
 			HideThrusters();
 			for (const auto& g : glows) g->R->enabled = false;
@@ -852,6 +917,7 @@ namespace SpaceGod::Views
 		}
 		if (!value)
 		{
+			ShowUtilityMarks(nullptr, false);
 			plume->enabled = false;
 			HardStopExhaust();
 			HideThrusters();
