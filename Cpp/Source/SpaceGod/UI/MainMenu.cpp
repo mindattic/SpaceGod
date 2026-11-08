@@ -18,6 +18,7 @@
 #include "Persistence/SaveGame.h"
 #include "Settings/GameSetting.h" // US-T253
 #include "Shared/Profiles/ProfileStore.h"
+#include "UI/CreditsScreen.h" // US-T246
 #include "UI/DisplayOptions.h"
 #include "UI/HelpScreen.h"
 #include "UI/Hud.h"
@@ -93,7 +94,7 @@ namespace SpaceGod::UI
 	}
 
 	MainMenu::MainMenu()
-		: settings(cs::New<PauseMenu>()), help(cs::New<HelpScreen>())
+		: settings(cs::New<PauseMenu>()), help(cs::New<HelpScreen>()), credits(cs::New<CreditsScreen>())
 	{
 	}
 
@@ -129,6 +130,7 @@ namespace SpaceGod::UI
 		panelTexture = buttonTexture = buttonActiveTexture = rowTexture = fieldTexture = nullptr;
 		settings->DestroyOwnedTextures();
 		help->DestroyOwnedTextures();
+		credits->DestroyOwnedTextures(); // US-T246
 	}
 
 	void MainMenu::ReadProfile()
@@ -199,6 +201,12 @@ namespace SpaceGod::UI
 			settings->Draw();
 			return;
 		}
+		// US-T246: the credits, the whole screen (they fade themselves in).
+		if (page == Page::Credits)
+		{
+			if (credits->Draw("Esc to go back")) Open(Page::Main);
+			return;
+		}
 		// US-T255: each page eases in as it opens (Help fades itself in).
 		static const char* const pageIds[] = { "menu.main", "menu.load", "menu.profiles", "menu.assets", nullptr };
 		UiMotion::Scope motion(pageIds[Mathf::Clamp(static_cast<int>(page), 0, 4)]);
@@ -245,7 +253,14 @@ namespace SpaceGod::UI
 		GUI::enabled = enabled;
 		if (GUI::Button(Rect(r.x + 20, y + 144, bw, 38), "Profiles", button)) Open(Page::Profiles);
 		if (GUI::Button(Rect(r.x + 20, y + 192, bw, 38), "Settings", button)) settings->OpenSettings();
-		if (GUI::Button(Rect(r.x + 20, y + 240, bw, 38), "Help", button)) Open(Page::Help);
+		// US-T246: Credits beside Help.
+		const float helpW = (bw - 10) * 0.5f;
+		if (GUI::Button(Rect(r.x + 20, y + 240, helpW, 38), "Help", button)) Open(Page::Help);
+		if (GUI::Button(Rect(r.x + 30 + helpW, y + 240, helpW, 38), "Credits", button))
+		{
+			credits->Restart();
+			Open(Page::Credits);
+		}
 		if (GUI::Button(Rect(r.x + 20, y + 288, bw, 38), "Asset Library POC", button)) Open(Page::AssetLibraries);
 		// US-T88: a new game straight into the dogfight demo, at a light or a heavy fighter's helm (-dogfight / -dogfight-heavy).
 		float half = (bw - 10) * 0.5f;

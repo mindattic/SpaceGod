@@ -8,6 +8,7 @@
 #include "Settings/GameSetting.h"
 #include "Settings/SettingsRegistry.h"
 #include "Shared/Profiles/ProfileStore.h"
+#include "UI/CreditsScreen.h" // US-T246
 #include "UI/DisplayOptions.h"
 #include "UI/Hud.h"
 
@@ -78,6 +79,9 @@ namespace SpaceGod::UI
 				if (!search.empty()) search = "";
 				else if (settingsOnly) Close();
 				else page = Page::Main;
+				break;
+			case Page::Credits: // US-T246
+				page = Page::Main;
 				break;
 			default:
 				Close();
@@ -150,7 +154,7 @@ namespace SpaceGod::UI
 			UiMotion::Scope shade("pause.shade", 0);
 			GUI::DrawTexture(Rect(0, 0, static_cast<float>(Screen::width), static_cast<float>(Screen::height)), shadeTexture);
 		}
-		UiMotion::Scope motion(page == Page::Main ? "pause.main" : page == Page::Settings ? "pause.settings" : "pause.display");
+		UiMotion::Scope motion(page == Page::Main ? "pause.main" : page == Page::Settings ? "pause.settings" : page == Page::Credits ? "pause.credits" : "pause.display");
 		bool enabled = GUI::enabled;
 		bool asking = leaving != Leave::None && page == Page::Main; // US-T252
 		GUI::enabled = confirm == nullptr && !asking;
@@ -158,6 +162,9 @@ namespace SpaceGod::UI
 		{
 			case Page::Main: DrawMain(); break;
 			case Page::Settings: DrawSettings(); break;
+			case Page::Credits: // US-T246
+				if (credits->Draw("Esc to go back")) page = Page::Main;
+				break;
 			default: DrawDisplay(); break;
 		}
 		GUI::enabled = enabled;
@@ -172,7 +179,7 @@ namespace SpaceGod::UI
 
 	void PauseMenu::DrawMain()
 	{
-		const float w = 320, h = 346;
+		const float w = 320, h = 390;
 		auto r = Centred(w, h);
 		GUI::Box(r, GUIContent::none(), panel);
 		GUI::Label(Rect(r.x + 20, r.y + 14, w - 40, 22), "PAUSED", title);
@@ -190,14 +197,20 @@ namespace SpaceGod::UI
 			if (ShowSaves) ShowSaves();
 		}
 		if (GUI::Button(Rect(r.x + 20, y + 132, w - 40, 34), "Settings", button)) page = Page::Settings;
+		if (GUI::Button(Rect(r.x + 20, y + 176, w - 40, 34), "Credits", button)) // US-T246
+		{
+			if (!credits) credits = cs::New<CreditsScreen>();
+			credits->Restart();
+			page = Page::Credits;
+		}
 		// US-T252: Confirm before quitting (Settings > Gameplay) asks first.
 		bool ask = PlayerOptions::ConfirmQuit()->Value && !PlayerOptions::ScriptedRun(); // a driven run leaves in one click
-		if (GUI::Button(Rect(r.x + 20, y + 176, w - 40, 34), "Main Menu", button))
+		if (GUI::Button(Rect(r.x + 20, y + 220, w - 40, 34), "Main Menu", button))
 		{
 			if (ask) leaving = Leave::MainMenu;
 			else LeaveNow(Leave::MainMenu);
 		}
-		if (GUI::Button(Rect(r.x + 20, y + 220, w - 40, 34), "Quit", button))
+		if (GUI::Button(Rect(r.x + 20, y + 264, w - 40, 34), "Quit", button))
 		{
 			if (ask) leaving = Leave::Quit;
 			else LeaveNow(Leave::Quit);
@@ -617,5 +630,6 @@ namespace SpaceGod::UI
 	{
 		// Object.Destroy(texture): dropping the last reference.
 		panelTexture = shadeTexture = buttonTexture = buttonActiveTexture = rowHoverTexture = rowSelectedTexture = fieldTexture = nullptr;
+		if (credits) credits->DestroyOwnedTextures(); // US-T246
 	}
 }

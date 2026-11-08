@@ -15,8 +15,10 @@ namespace SpaceGod::Core
 
 namespace SpaceGod::UI
 {
+	class CreditsScreen;
+
 	/// The pause menu (U.SPC-T276), opened by Esc once there is nothing left for it to back out of (or at the
-	/// helm): Resume, Help, Save / Load, Settings, Main Menu and Quit. Settings lists every setting the game's systems
+	/// helm): Resume, Help, Save / Load, Settings, Credits (US-T246), Main Menu and Quit. Settings lists every setting the game's systems
 	/// declare in the <see cref="SettingsRegistry"/> (U.SPC-T431), by group, with a search across them all, each
 	/// taking effect at once and remembered in the profile, with Reset per setting and per group; a new setting
 	/// shows up here by being declared, never by an edit to this menu. Settings also holds the Display page, where
@@ -33,10 +35,14 @@ namespace SpaceGod::UI
 			Main,
 			Settings,
 			Display,
+			Credits, // US-T246: the rolling credits, over the whole screen
 		};
 
 		Page page = Page::Main;
 		float timeScaleBefore = 1;
+
+		/// US-T246: the Credits page's screen (made the first time it is opened).
+		cs::Ref<CreditsScreen> credits;
 
 		/// The Display page's sizes, the settings it is editing (not yet applied), and how far its list is scrolled.
 		cs::List<Core::DisplayResolution> resolutions, allResolutions;

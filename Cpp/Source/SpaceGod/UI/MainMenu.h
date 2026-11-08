@@ -25,10 +25,11 @@ namespace SpaceGod::UI
 {
 	class PauseMenu;
 	class HelpScreen;
+	class CreditsScreen;
 
 	/// The main menu, the scene the game opens on: Continue (the profile's latest save), New Game, Load Game,
 	/// Profiles (switch to another, or make a new one), Settings (the pause menu's own pages), Help (every key
-	/// and control, U.SPC-T494) and Quit, over a
+	/// and control, U.SPC-T494), Credits (US-T246: the rolling credits) and Quit, over a
 	/// slowly turning sky. The game scene is loaded only once the player picks a game; a run for the tour, a
 	/// capture or <c>-continue</c> never stops here (<see cref="Bootstrap"/>). Esc goes back a page.
 	class MainMenu final
@@ -69,11 +70,13 @@ namespace SpaceGod::UI
 			Profiles,
 			AssetLibraries,
 			Help,
+			Credits, // US-T246: the rolling credits (fades itself in)
 		};
 
 		Page page = Page::Main;
 		const cs::Ref<PauseMenu> settings;
 		const cs::Ref<HelpScreen> help;
+		const cs::Ref<CreditsScreen> credits; // US-T246
 
 		cs::Ref<Core::SaveSlots> slots;
 		cs::List<cs::String> saveNames;
