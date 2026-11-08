@@ -348,6 +348,10 @@ private:
 	bool ClickPanelOpen() const;
 
 public:
+	/// <summary>US-T250: a menu, panel or screen is up (the pause menu, the dev menu, comms, the bottom drawer, or a screen the
+	/// player clicks through): the gamepad is the GUI's (Input::Gamepad::MenuMode), its focus moved by the d-pad.</summary>
+	bool PadMenusOpen() const;
+
 	bool ShowLanes = true;
 
 	/// <summary>Satellite constellations (thousands of points round Earth); off by default, K toggles.</summary>

@@ -4,6 +4,7 @@
 #include "UnrealSpace.h"
 #include "SpaceGodLog.h"
 #include "Input/UnrealInputDevice.h"
+#include "Input/Gamepad.h" // US-T250
 #include "UnityCompat/GuiHost.h"
 #include "UnityCompat/UnityScene.h"
 #include "CaptureRunner.h"
@@ -145,6 +146,7 @@ void AUnitySpaceAppActor::Step(float RealDelta)
 	{
 		// A scene without the app: its own Update (the main menu's; its OnGUI runs in the GUI host's passes).
 		if (SceneUpdate) SceneUpdate();
+		Input::Gamepad::MenuMode = true; // US-T250: the menu's scene: the pad moves its focus
 		UnityScene::Sync();
 		Rendering::HullLighting::Tick(nullptr, RealDelta); // US-T172
 		Rendering::HyperspaceToll::Tick(nullptr, RealDelta); // US-T191
@@ -161,6 +163,7 @@ void AUnitySpaceAppActor::Step(float RealDelta)
 		Capture->Start();
 	}
 	if (App->enabled) App->Update();
+	Input::Gamepad::MenuMode = App->PadMenusOpen(); // US-T250: the pad is the GUI's next frame while a menu or panel is up
 	// US-T44: the host's frame to its clients (the C# track's game mode Step: CoopPeer.HostEndUpdate after the Update).
 	if (Coop::CoopPeer* Peer = Coop::CoopPeer::Current(); Peer && Peer->IsHost()) Peer->HostEndUpdate(App.get());
 	if (Capture) Capture->Update();

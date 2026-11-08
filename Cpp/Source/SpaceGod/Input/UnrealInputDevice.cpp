@@ -1,4 +1,5 @@
 #include "Input/UnrealInputDevice.h"
+#include "Input/Gamepad.h" // US-T250
 #include "UnrealSpace.h"
 
 #include "GameFramework/PlayerController.h"
@@ -87,6 +88,64 @@ namespace SpaceGod::Input
 			into.wasPressedThisFrame = pc->WasInputKeyJustPressed(key);
 			into.wasReleasedThisFrame = pc->WasInputKeyJustReleased(key);
 		}
+
+		/// US-T250: each PadButton's Unreal FKey (Xbox layout: FaceButton_Bottom is A, Special_Left is View ...).
+		const TArray<FKey>& PadMap()
+		{
+			static const TArray<FKey> map = []
+			{
+				TArray<FKey> m;
+				m.SetNum(static_cast<int>(PadButton::Count));
+				auto set = [&m](PadButton b, const FKey& f) { m[static_cast<int>(b)] = f; };
+				set(PadButton::A, EKeys::Gamepad_FaceButton_Bottom);
+				set(PadButton::B, EKeys::Gamepad_FaceButton_Right);
+				set(PadButton::X, EKeys::Gamepad_FaceButton_Left);
+				set(PadButton::Y, EKeys::Gamepad_FaceButton_Top);
+				set(PadButton::LeftBumper, EKeys::Gamepad_LeftShoulder);
+				set(PadButton::RightBumper, EKeys::Gamepad_RightShoulder);
+				set(PadButton::LeftTrigger, EKeys::Gamepad_LeftTrigger);
+				set(PadButton::RightTrigger, EKeys::Gamepad_RightTrigger);
+				set(PadButton::View, EKeys::Gamepad_Special_Left);
+				set(PadButton::Menu, EKeys::Gamepad_Special_Right);
+				set(PadButton::LeftStick, EKeys::Gamepad_LeftThumbstick);
+				set(PadButton::RightStick, EKeys::Gamepad_RightThumbstick);
+				set(PadButton::DPadUp, EKeys::Gamepad_DPad_Up);
+				set(PadButton::DPadDown, EKeys::Gamepad_DPad_Down);
+				set(PadButton::DPadLeft, EKeys::Gamepad_DPad_Left);
+				set(PadButton::DPadRight, EKeys::Gamepad_DPad_Right);
+				return m;
+			}();
+			return map;
+		}
+
+		/// US-T250: the pad, raw (InputState and the GUI apply the dead zone from the settings, not the input ini's).
+		void FeedPad(APlayerController* pc)
+		{
+			GamepadDevice& pad = GamepadDevice::current();
+			pad.present = true;
+			const TArray<FKey>& map = PadMap();
+			for (int i = static_cast<int>(PadButton::None) + 1; i < static_cast<int>(PadButton::Count); i++)
+			{
+				ButtonControl& control = pad[static_cast<PadButton>(i)];
+				const FKey& key = map[i];
+				if (key.IsValid()) Read(pc, key, control);
+				else control = ButtonControl();
+			}
+			UPlayerInput* in = pc->PlayerInput;
+			pad.leftStick = Vector2(in->GetRawKeyValue(EKeys::Gamepad_LeftX), in->GetRawKeyValue(EKeys::Gamepad_LeftY));
+			pad.rightStick = Vector2(in->GetRawKeyValue(EKeys::Gamepad_RightX), in->GetRawKeyValue(EKeys::Gamepad_RightY));
+			pad.leftTrigger = FMath::Clamp(in->GetRawKeyValue(EKeys::Gamepad_LeftTriggerAxis), 0.0f, 1.0f);
+			pad.rightTrigger = FMath::Clamp(in->GetRawKeyValue(EKeys::Gamepad_RightTriggerAxis), 0.0f, 1.0f);
+		}
+
+		/// US-T250: the keyboard or the mouse touched this frame (a key or button down, the pointer moved, the wheel).
+		bool KeyboardMouseTouched(const InputDevice& device)
+		{
+			for (int i = static_cast<int>(Key::None) + 1; i < static_cast<int>(Key::Count); i++)
+				if (device[static_cast<Key>(i)].wasPressedThisFrame) return true;
+			return device.leftButton.wasPressedThisFrame || device.rightButton.wasPressedThisFrame || device.middleButton.wasPressedThisFrame
+				|| device.delta.sqrMagnitude() > 9.0f || device.scrollY != 0.0f;
+		}
 	}
 
 	void UnrealInputDevice::Feed(APlayerController* pc, float dt)
@@ -97,6 +156,8 @@ namespace SpaceGod::Input
 		{
 			device.present = false;
 			device.Clear();
+			GamepadDevice::current().present = false; // US-T250
+			GamepadDevice::current().Clear();
 			return;
 		}
 		device.present = true;
@@ -130,5 +191,10 @@ namespace SpaceGod::Input
 		if (notches == 0.0f)
 			notches = (pc->WasInputKeyJustPressed(EKeys::MouseScrollUp) ? 1.0f : 0.0f) - (pc->WasInputKeyJustPressed(EKeys::MouseScrollDown) ? 1.0f : 0.0f);
 		device.scrollY = notches * WheelUnitsPerNotch;
+
+		// US-T250: the pad, and which device was used last (the GUI's focus highlight and the Help screen's pad buttons).
+		FeedPad(pc);
+		if (GamepadDevice::current().Touched()) Gamepad::LastUsed = true;
+		else if (KeyboardMouseTouched(device)) Gamepad::LastUsed = false;
 	}
 }

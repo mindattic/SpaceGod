@@ -1,6 +1,7 @@
 #pragma once
 // Port of Unity.SpaceGod Runtime/Input/InputState.cs (US-T29). Unity's Input System devices are read through the
-// seam in Input/InputDevice.h (fed from Unreal by Input/UnrealInputDevice), with every binding as the original's.
+// seam in Input/InputDevice.h (fed from Unreal by Input/UnrealInputDevice), with every binding as the original's. The
+// gamepad (US-T250, Input/Gamepad.h) feeds the same fields after them.
 
 #include "UnityCompat/UnityTypes.h"
 
@@ -253,6 +254,17 @@ namespace SpaceGod::Input
 		/// US-T97: when Shift+Backspace went down (-1 while it is not held) and whether this press has armed already.
 		float selfDestructDownAt = -1.0f;
 		bool selfDestructArmed = false;
+		/// US-T250: this frame's pad meanings that depend on who owns the frame, kept for Arbitrate: the right stick's look
+		/// (the command view's orbit), the secondary trigger (a seat's right button), the bumpers (roll at the controls, rise
+		/// and sink in command), the d-pad press (0 left, 1 up, 2 right, 3 down; -1 none: the reactor at the controls, time
+		/// and ships in command) and the drift button's press (back out, in command). Cleared with every frame (Reset).
+		Vector2 padLook;
+		bool padSecondary = false, padBack = false;
+		float padBumpers = 0;
+		int padDpad = -1;
+		/// US-T250: the left stick's last step past half way (1 ahead, -1 astern, 0 centred): a capital's telegraph rings
+		/// once a push, as W and S ring it once a press. Kept across frames.
+		int padThrottleLatch = 0;
 
 	public:
 		/// <summary>True on the frame the right button was released without dragging (a "right click").</summary>
@@ -295,6 +307,9 @@ namespace SpaceGod::Input
 
 	private:
 		void Reset();
+
+		/// US-T250: the pad's part of the frame (Input/Gamepad.h), after the keyboard's and mouse's.
+		void PollPad();
 
 		static float Axis(const ButtonControl& positive, const ButtonControl& negative);
 	};

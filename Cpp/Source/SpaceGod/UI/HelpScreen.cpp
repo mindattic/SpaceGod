@@ -3,6 +3,7 @@
 
 #include "ControlsHelp.h"
 #include "GameManual.h"
+#include "Input/Gamepad.h" // US-T250
 #include "UI/Hud.h"
 #include "UI/ShipCatalogScreen.h"
 #include "UI/UiStyle.h"
@@ -113,6 +114,7 @@ namespace SpaceGod::UI
 			y += th + TopicGap;
 		}
 
+		if (ShowsPad(c)) y = DrawPadSection(y, w); // US-T250
 		for (const auto& section : GameManual::ControlsOf(c))
 			y = DrawSection(section, y, w);
 		GUI::EndScrollView();
@@ -123,6 +125,7 @@ namespace SpaceGod::UI
 		float h = 28 + small->CalcHeight(GUIContent(c->Summary), w) + TopicGap;
 		for (const auto& t : c->Topics)
 			h += HeadingH - 2 + text->CalcHeight(GUIContent(t.Text), w) + TopicGap;
+		if (ShowsPad(c)) h += PadSectionHeight(w); // US-T250
 		for (const auto& section : GameManual::ControlsOf(c))
 		{
 			h += HeadingH;
@@ -152,6 +155,64 @@ namespace SpaceGod::UI
 		return y + TopicGap;
 	}
 
+	// ---------------------------------------------------------------- the gamepad's buttons (US-T250)
+
+	bool HelpScreen::ShowsPad(const cs::Ref<ManualChapter>& c)
+	{
+		return ::SpaceGod::Input::Gamepad::LastUsed && GameManual::ControlsOf(c).Count() > 0;
+	}
+
+	cs::List<HelpScreen::PadLine> HelpScreen::PadLines()
+	{
+		using namespace ::SpaceGod::Input;
+		cs::List<PadLine> lines;
+		lines.Add(PadLine{ "LS", "Left stick: thrust and strafe at the controls; the camera's swim in command." });
+		lines.Add(PadLine{ "RS", "Right stick: aim (the look the hull is pulled after); in command, look about. In menus it scrolls." });
+		for (int i = 0; i < static_cast<int>(PadAction::Count); i++)
+		{
+			auto a = static_cast<PadAction>(i);
+			PadButton b = Gamepad::ButtonFor(a);
+			if (b == PadButton::None) continue;
+			cs::String glyph = ToString(b);
+			if (b == PadButton::LeftStick || b == PadButton::RightStick) glyph = cs::Cat(glyph, " click");
+			lines.Add(PadLine{ glyph, Gamepad::ActionName(a) });
+		}
+		lines.Add(PadLine{ "D-pad", "At the controls, the reactor: left weapons, up shields, right engines, down an even share. In command: up / down time faster / slower, right / left the next / previous ship." });
+		lines.Add(PadLine{ "Menus", "D-pad or left stick moves the highlight, A presses, B backs out. Rebind the buttons, dead zone and aim speed under Settings > Controls." });
+		return lines;
+	}
+
+	float HelpScreen::PadSectionHeight(float w)
+	{
+		float h = HeadingH;
+		for (const auto& line : PadLines()) h += Mathf::Max(22.0f, text->CalcHeight(GUIContent(line.Text), w - KeyW)) + LineGap;
+		return h + TopicGap;
+	}
+
+	float HelpScreen::DrawPadSection(float y, float w)
+	{
+		GUI::Label(Rect(0, y, w, HeadingH - 4), "GAMEPAD", heading);
+		GUI::DrawTexture(Rect(0, y + HeadingH - 5, w, 1), buttonActiveTexture);
+		y += HeadingH;
+		for (const auto& line : PadLines())
+		{
+			float h = Mathf::Max(22.0f, text->CalcHeight(GUIContent(line.Text), w - KeyW));
+			// The glyph: the button's face colour (Xbox layout), its name on it.
+			Color face = line.Glyph == "A" ? Color(0.30f, 0.69f, 0.31f) : line.Glyph == "B" ? Color(0.86f, 0.26f, 0.22f)
+				: line.Glyph == "X" ? Color(0.20f, 0.50f, 0.90f) : line.Glyph == "Y" ? Color(0.96f, 0.76f, 0.13f) : Color(0.32f, 0.35f, 0.40f);
+			const auto& style = line.Glyph == "Y" ? glyphDark : glyphLight;
+			float gw = Mathf::Clamp(style->CalcSize(GUIContent(line.Glyph)).x + 14, 26.0f, KeyW - 12);
+			Color keep = GUI::color;
+			GUI::color = face;
+			GUI::DrawTexture(Rect(0, y + 1, gw, 20), Texture2D::whiteTexture());
+			GUI::color = keep;
+			GUI::Label(Rect(0, y + 1, gw, 20), line.Glyph, style);
+			GUI::Label(Rect(KeyW, y, w - KeyW, h), line.Text, text);
+			y += h + LineGap;
+		}
+		return y + TopicGap;
+	}
+
 	void HelpScreen::EnsureStyles()
 	{
 		if (stylesReady) return;
@@ -175,6 +236,10 @@ namespace SpaceGod::UI
 		button = S::ButtonStyle(T::Heading, buttonTexture, buttonActiveTexture);
 		entry = S::EntryStyle(T::Body, buttonTexture, buttonActiveTexture);
 		entrySelected = S::EntrySelectedStyle(entry, buttonActiveTexture);
+		glyphLight = S::TextStyle(T::Body, Color(1, 1, 1), FontStyle::Bold); // US-T250
+		glyphLight->alignment = TextAnchor::MiddleCenter;
+		glyphDark = S::TextStyle(T::Body, Color(0.08f, 0.08f, 0.08f), FontStyle::Bold);
+		glyphDark->alignment = TextAnchor::MiddleCenter;
 	}
 
 	void HelpScreen::DestroyOwnedTextures()

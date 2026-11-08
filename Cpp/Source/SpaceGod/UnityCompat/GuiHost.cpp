@@ -1,4 +1,5 @@
 #include "UnityCompat/GuiHost.h"
+#include "UnityCompat/GuiPadNav.h" // US-T250
 
 #include "UnityCompat/UnityRuntime.h"
 #include "UI/UiInput.h"
@@ -758,6 +759,23 @@ namespace SpaceGod::UnityCompat
 			GUI::SetRenderer(&slateRenderer);
 			GUI::BeginFrame();
 			GUI::Stats() = GUI::FrameStats();
+
+			// US-T250: the pad's events first (GuiPadNav): a press of the focused control, a slider's step, a scroll, Esc (which
+			// UiInput hears too, as it would the key).
+			{
+				std::vector<Event> pad;
+				bool padEscape = false;
+				GuiPadNav::BeginFrame(pad, input.haveMouse ? toGui(ToPixels(input.absMouse)) : Vector2(-10000, -10000), padEscape);
+				if (padEscape) input.pressedSince.insert(static_cast<int>(KeyCode::Escape));
+				for (Event& e : pad)
+				{
+					Event layout;
+					layout.type = layout.rawType = EventType::Layout;
+					layout.mousePosition = e.mousePosition;
+					RunPass(layout);
+					RunPass(e);
+				}
+			}
 
 			std::vector<PendingEvent> events;
 			events.swap(input.queue);

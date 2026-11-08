@@ -59,5 +59,18 @@ namespace SpaceGod::UI
 		float LineHeight(const Core::HelpLine& line, float w);
 		float DrawSection(const cs::Ref<Core::HelpSection>& section, float y, float w);
 		void EnsureStyles();
+
+		/// US-T250: with the gamepad used last, a chapter that prints keys first prints the pad's: each button as its glyph
+		/// (A green, B red, X blue, Y yellow, the rest grey) beside what it does, as Settings > Controls binds it now.
+		struct PadLine
+		{
+			cs::String Glyph;
+			cs::String Text;
+		};
+		static bool ShowsPad(const cs::Ref<Core::ManualChapter>& c);
+		static cs::List<PadLine> PadLines();
+		float PadSectionHeight(float w);
+		float DrawPadSection(float y, float w);
+		cs::Ref<GUIStyle> glyphLight, glyphDark;
 	};
 }

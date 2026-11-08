@@ -1,4 +1,5 @@
 #include "UnityCompat/UnityGui.h"
+#include "UnityCompat/GuiPadNav.h" // US-T250
 
 #include "UnityCompat/UnityRuntime.h"
 
@@ -854,6 +855,14 @@ namespace SpaceGod::UnityCompat
 			const GUIStyleState& text = lit >= 0.5f ? hover : rest;
 			DrawTextBlock(style, contentRect, content.text, DisabledFade(Tint(Tint(text.textColor, GUI::color), GUI::contentColor)));
 		}
+
+		/// US-T250: an enabled control's Repaint makes it a stop for the pad's focus (GuiPadNav), ringed when focused.
+		void PadStop(int id, const Rect& position, GuiPadNav::Kind kind)
+		{
+			if (!GUI::enabled || clips.empty()) return;
+			GuiPadNav::Register(id, Intersect(ToScreen(position), clips.back().clip), kind);
+			GuiPadNav::DrawFocus(id, position);
+		}
 	}
 
 	// ---------------------------------------------------------------- Event
@@ -1055,6 +1064,17 @@ namespace SpaceGod::UnityCompat
 					Rect screen = Intersect(ToScreen(position), clips.back().clip);
 					if (screen.width > 0 && screen.height > 0) DrawnButtons().emplace(content.text, screen);
 				}
+				PadStop(id, position, GuiPadNav::Kind::Button); // US-T250
+				return false;
+			case EventType::KeyDown:
+				// US-T250: the pad's A on the focused button (GuiPadNav), a click.
+				if (enabled && GuiPadNav::Pressed(e, id))
+				{
+					e.Use();
+					changed = true;
+					Stats().Clicks++;
+					return true;
+				}
 				return false;
 			default:
 				return false;
@@ -1093,6 +1113,16 @@ namespace SpaceGod::UnityCompat
 				break;
 			case EventType::Repaint:
 				DrawControl(style, position, content, id, value);
+				PadStop(id, position, GuiPadNav::Kind::Button); // US-T250
+				break;
+			case EventType::KeyDown:
+				// US-T250: the pad's A on the focused toggle (GuiPadNav) flips it.
+				if (enabled && GuiPadNav::Pressed(e, id))
+				{
+					e.Use();
+					changed = true;
+					return !value;
+				}
 				break;
 			default:
 				break;
@@ -1246,8 +1276,19 @@ namespace SpaceGod::UnityCompat
 				Rect tr(position.x + slider.padding.left + travel * t, position.y + slider.padding.top, thumbW,
 					position.height - slider.padding.top - slider.padding.bottom);
 				thumb.Draw(tr, GUIContent::none(), tr.Contains(e.mousePosition) && enabled, GUIUtility::hotControl == id, false, false);
+				PadStop(id, position, GuiPadNav::Kind::Slider); // US-T250
 				break;
 			}
+			case EventType::KeyDown:
+				// US-T250: the pad's d-pad left / right on the focused slider (GuiPadNav): a twentieth of the range a step.
+				if (int step = enabled ? GuiPadNav::Nudge(e, id) : 0)
+				{
+					float lo = Mathf::Min(leftValue, rightValue), hi = Mathf::Max(leftValue, rightValue);
+					value = Mathf::Clamp(value + step * (rightValue - leftValue) * 0.05f, lo, hi);
+					changed = true;
+					e.Use();
+				}
+				break;
 			default:
 				break;
 		}

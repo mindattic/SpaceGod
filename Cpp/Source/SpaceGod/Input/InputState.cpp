@@ -3,6 +3,7 @@
 #include "Input/InputState.h"
 #include "Input/InputDevice.h"
 #include "Input/DriftKey.h"
+#include "Input/Gamepad.h" // US-T250
 #include "CaptureEvents.h"
 #include "Embodiment/SelfDestruct.h"
 
@@ -31,7 +32,9 @@ namespace SpaceGod::Input
 		// Shift+Alt+K, Alt keeps its other meanings, which only read it with another key.
 		Manoeuvre = kb[Key::LeftAlt].isPressed || kb[Key::RightAlt].isPressed;
 		// US-T165: at the controls, held (or pressed on, then off, set to toggle); R alone toggles auto-reorient in command.
-		Drift = DriftKey::Read(kb[Key::R].isPressed, kb[Key::R].wasPressedThisFrame);
+		// US-T250: the pad's drift button is R too (one latch for both in toggle mode), but only while the pad is the game's.
+		const ButtonControl& padDrift = Gamepad::MenuMode ? ButtonControl() : Gamepad::Action(PadAction::Drift);
+		Drift = DriftKey::Read(kb[Key::R].isPressed || padDrift.isPressed, kb[Key::R].wasPressedThisFrame || padDrift.wasPressedThisFrame);
 		// US-T94: the arrows move reactor power at the controls (Core::PowerKey): Left weapons, Up shields, Right engines a
 		// pip at a time, Down an even share; Shift with one of the three, all the reactor can spare to it.
 		PowerKey = kb[Key::LeftArrow].wasPressedThisFrame ? (Boost ? 3 : 0)
@@ -189,6 +192,59 @@ namespace SpaceGod::Input
 		const Key digits[] = { Key::Digit0, Key::Digit1, Key::Digit2, Key::Digit3, Key::Digit4, Key::Digit5, Key::Digit6, Key::Digit7, Key::Digit8, Key::Digit9 };
 		for (int i = 0; i < 10; i++)
 			if (kb[digits[i]].wasPressedThisFrame) NumberKey = i;
+
+		PollPad(); // US-T250
+	}
+
+	void InputState::PollPad()
+	{
+		const GamepadDevice& pad = GamepadDevice::current();
+		if (!pad.present) return;
+		auto held = [](PadAction a) { return Gamepad::Action(a).isPressed; };
+		auto pressed = [](PadAction a) { return Gamepad::Action(a).wasPressedThisFrame; };
+
+		// A menu, panel or screen is up: the pad is the GUI's (UnityCompat/GuiPadNav moves the focus and presses), and the
+		// game hears only Esc from B or the pause button, as the keyboard's Esc closes what is open.
+		if (Gamepad::MenuMode)
+		{
+			if (pad[PadButton::B].wasPressedThisFrame || pressed(PadAction::Pause)) Escape = true;
+			return;
+		}
+
+		// The left stick: thrust and strafe at the controls, the camera's swim in command (W/S and A/D).
+		Vector2 move = Gamepad::Stick(pad.leftStick);
+		Move.x = Mathf::Clamp(Move.x + move.x, -1.0f, 1.0f);
+		Move.z = Mathf::Clamp(Move.z + move.y, -1.0f, 1.0f);
+		// A capital's telegraph: a step ahead or astern each time the stick is pushed past half way (W and S once a press).
+		int step = move.y > 0.6f ? 1 : move.y < -0.6f ? -1 : Mathf::Abs(move.y) < 0.3f ? 0 : padThrottleLatch;
+		if (step != padThrottleLatch && step != 0 && ThrottleStep == 0) ThrottleStep = step;
+		padThrottleLatch = step;
+
+		// The right stick: the look (the string aim's at the controls, US-T168), as the mouse moves it; in command the
+		// orbit, which Arbitrate hands the camera as a held right button.
+		padLook = Gamepad::AimDelta(Time::unscaledDeltaTime);
+		MouseDelta += padLook;
+
+		Fire = Fire || held(PadAction::Fire);
+		padSecondary = held(PadAction::Secondary);
+		padBumpers = (held(PadAction::RollRight) ? 1.0f : 0.0f) - (held(PadAction::RollLeft) ? 1.0f : 0.0f);
+		Roll = Mathf::Clamp(Roll + padBumpers, -1.0f, 1.0f);
+		Boost = Boost || held(PadAction::Boost);
+		Manoeuvre = Manoeuvre || held(PadAction::Flip);
+		padBack = pressed(PadAction::Drift); // the drift itself was read with R, above
+		if (pressed(PadAction::LockFocus))
+		{
+			// Y: lock at the controls, focus in command (Arbitrate keeps the owner's meaning, as T and F share theirs).
+			LockTarget = true;
+			Focus = true;
+		}
+		if (pressed(PadAction::FlightAssist)) ToggleFlightAssist = true;
+		if (pressed(PadAction::Embody)) Pilot = true;
+		if (pressed(PadAction::Pause)) Escape = true;
+		if (pressed(PadAction::Help)) ToggleHelp = true;
+
+		padDpad = pad[PadButton::DPadLeft].wasPressedThisFrame ? 0 : pad[PadButton::DPadUp].wasPressedThisFrame ? 1
+			: pad[PadButton::DPadRight].wasPressedThisFrame ? 2 : pad[PadButton::DPadDown].wasPressedThisFrame ? 3 : -1;
 	}
 
 	void InputState::ReleaseLook()
@@ -206,8 +262,26 @@ namespace SpaceGod::Input
 			// keys; the command view's meanings of them stand aside.
 			Focus = ResetTime = Home = WatchBattle = ToggleNews = CycleShips = CycleBackward = false;
 			ToggleReorient = false; // US-T165: R held is the craft's drift
+			// US-T250: the pad at the controls: the left trigger is the seat's second trigger (the right button's), the d-pad
+			// shares the reactor as the arrows do (left weapons, up shields, right engines, down an even share).
+			if (padSecondary) LookHeld = true;
+			if (PowerKey < 0 && padDpad >= 0) PowerKey = padDpad == 3 ? 6 : padDpad;
 			return;
 		}
+		// US-T250: the pad in command: the right stick orbits and looks about (the right button held), the bumpers sink and
+		// rise (C and E), the d-pad steps time (up faster, down slower) and the ships (right the next, left the one before),
+		// and the drift button backs out (Esc).
+		if (padLook.sqrMagnitude() > 0)
+		{
+			LookHeld = true;
+			LookDelta = LookDelta + padLook;
+		}
+		Move.y = Mathf::Clamp(Move.y + padBumpers, -1.0f, 1.0f);
+		if (padDpad == 1) TimeFaster = true;
+		else if (padDpad == 3) TimeSlower = true;
+		else if (padDpad == 2) CycleShips = true;
+		else if (padDpad == 0) CycleShips = CycleBackward = true;
+		if (padBack) Escape = true;
 		// In command nothing is flown: F focuses, T resets time, Backspace goes home, B watches a battle.
 		ToggleFlightAssist = LockTarget = MoveToHost = ToggleBoarding = Manoeuvre = JumpToCraft = false; // US-T106: no craft to jump from
 		Drift = false; // US-T165: R toggles auto-reorient
@@ -297,6 +371,10 @@ namespace SpaceGod::Input
 		captureScreenshot = false; // US-T72
 		captureToggleRecording = false;
 		captureSaveReplay = false;
+		padLook = Vector2::zero(); // US-T250
+		padSecondary = padBack = false;
+		padBumpers = 0;
+		padDpad = -1;
 	}
 
 	float InputState::Axis(const ButtonControl& positive, const ButtonControl& negative)

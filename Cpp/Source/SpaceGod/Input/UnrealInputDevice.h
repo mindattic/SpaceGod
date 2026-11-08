@@ -1,6 +1,7 @@
 #pragma once
 
-// The keyboard and mouse through Unreal (US-T29): fills InputDevice::current() once a frame from the local player
+// The keyboard and mouse through Unreal (US-T29), and the gamepad (US-T250, GamepadDevice::current() from the Gamepad_*
+// keys and axes): fills InputDevice::current() once a frame from the local player
 // controller's raw key polling (IsInputKeyDown, WasInputKeyJustPressed/Released, GetMousePosition, the mouse axes and
 // the MouseWheelAxis key), before the app's Update polls it.
 //
