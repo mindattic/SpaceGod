@@ -17,6 +17,8 @@
 #include "Session/LocalSession.h"
 #include "Ships.h"
 #include "SimClock.h"
+#include "Systems/Galaxy.h"
+#include "Systems/LastingConsequences.h" // US-T105
 #include "UI/CheatMenu.h"
 #include "UI/Hud.h"
 #include "World.h"
@@ -57,6 +59,9 @@ namespace SpaceGod
 	{
 		session->SetGateWorld(World());
 		if (HarnessRun() && World() != nullptr) SpaceGodInfluence::Of(World())->Waived = true;
+		// US-T105: the game's wars put objectives to the SpaceGod and leave refugee tribes behind (made once, in a new game
+		// or an older save alike; a Core-only run, the Bench's, never makes them).
+		if (Galaxy != nullptr) LastingConsequences::Of(*Galaxy);
 	}
 
 	void UnitySpaceApp::NoteEmbodyRefusal(const cs::String& what, const EmbodyVerdict& verdict)

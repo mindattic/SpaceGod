@@ -15,6 +15,7 @@
 #include "Systems/GateConstruction.h"
 #include "Systems/InterstellarColonisation.h"
 #include "Systems/InterstellarWars.h"
+#include "Systems/LastingConsequences.h" // US-T105
 #include "Systems/StrategicCommand.h"
 #include "Systems/Statecraft.h"
 #include "Systems/Territory.h" // US-T190
@@ -241,6 +242,8 @@ namespace SpaceGod::Core
 		LookForStars(jd);
 		if (Construction) Construction->Update(jd);
 		if (Wars) Wars->Update(jd);
+		// Wars leave consequences (US-T105): objectives for the SpaceGod, refugee tribes, their grudges and plots (only once the game has made them).
+		if (auto consequences = LastingConsequences::Find(*this)) consequences->Update(*this, jd);
 		// Borders follow the money (US-T190): rich states settle new ground, indebted ones sell up, changes go out as news.
 		SpaceGod::Core::Territory::Of(*this)->Update(*this, jd);
 		// And the settled worlds go on growing (US-T100): new stations, satellites and moon bases, and distant colonies seceding.

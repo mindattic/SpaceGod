@@ -22,6 +22,7 @@ namespace SpaceGod::Core
 	class Faction;
 	class Galaxy;
 	class GalaxyLife;
+	class LastingConsequences;
 	class Settlement;
 	class Ship;
 	class StarSystem;
@@ -149,6 +150,11 @@ namespace SpaceGod::Core
 		/// <summary>US-T100: the galaxy's monthly works and secessions (see <see cref="GalaxyLife"/>), kept here so they are saved
 		/// with the territory; null until the first update (and in older saves).</summary>
 		cs::Ref<GalaxyLife> Life;
+
+		/// <summary>US-T105: the war objectives put to the SpaceGod and the refugee tribes wars leave behind (see
+		/// <see cref="LastingConsequences"/>), kept here so they are saved with the territory; made by the game, null in a
+		/// Core-only run and in older saves.</summary>
+		cs::Ref<LastingConsequences> Consequences;
 
 	private:
 		/// <summary>Who held each system at the last review.</summary>

@@ -12,6 +12,7 @@
 #include "Ships.h"
 #include "Systems/Galaxy.h"
 #include "Systems/GalaxyLife.h" // US-T100
+#include "Systems/LastingConsequences.h" // US-T105
 #include "Systems/Polities.h"
 #include "World.h"
 
@@ -318,5 +319,6 @@ namespace SpaceGod::Core
 
 	SG_SERIALIZE(Territory, "SpaceGod.Core.Territory",
 		SG_F(Standings), SG_F(Changes), SG_F(holders), SG_F(nextDailyJd),
-		SG_OPT(Life)) // US-T100, absent from older saves
+		SG_OPT(Life), // US-T100, absent from older saves
+		SG_OPT(Consequences)) // US-T105, absent from older saves
 }
