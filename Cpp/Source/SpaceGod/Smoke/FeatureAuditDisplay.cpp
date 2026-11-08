@@ -1,7 +1,7 @@
 // FeatureAudit's display probes (US-T55, US-T56), line for line the C# track's Runtime/Audit/DisplayAudit.cs.
 #include "Smoke/FeatureAuditDisplay.h"
 
-#include "EngineSettings.h"
+#include "GraphicsSettings.h"
 #include "Settings/GameSetting.h"
 #include "UI/DisplayOptions.h"
 #include "UnityCompat/ShaderBinding.h"
@@ -54,19 +54,20 @@ namespace SpaceGod::Smoke::FeatureAudit
 
 	void MsaaProbes(const DisplayReport& result, const std::function<void(int)>& frames)
 	{
-		const auto& msaa = EngineSettings::Msaa();
-		bool before = msaa->Value;
-		bool wasDefault = msaa->IsDefault();
+		// US-T251: render.msaa's toggle is Settings > Graphics > Anti-aliasing now ("MSAA 4x" first, "Off" last).
+		const auto& aa = GraphicsSettings::AntiAliasing();
+		int before = aa->Index;
+		bool wasDefault = aa->IsDefault();
 		int forward = CVar(TEXT("r.ForwardShading"));
-		msaa->Set(false);
+		aa->Set(aa->Options.IndexOf("Off"));
 		frames(1);
 		int offMethod = CVar(TEXT("r.AntiAliasingMethod")), offCount = CVar(TEXT("r.MSAACount"));
 		float offWidth = UnityCompat::ShaderBinding::LineWidthPx();
-		msaa->Set(true);
+		aa->Set(aa->Options.IndexOf("MSAA 4x"));
 		frames(1);
 		int onMethod = CVar(TEXT("r.AntiAliasingMethod")), onCount = CVar(TEXT("r.MSAACount"));
 		float onWidth = UnityCompat::ShaderBinding::LineWidthPx();
-		if (wasDefault) msaa->Reset(); else msaa->Set(before);
+		if (wasDefault) aa->Reset(); else aa->Set(before);
 		frames(1);
 		result("render.msaa", forward == 1 && offMethod == 0 && offCount == 1 && offWidth == 1.0f && onMethod == 3 && onCount == 4 && onWidth == 1.4f,
 			Text(FString::Printf(TEXT("forward shading %d; off: AA method %d, %d sample, lines %.1f px; on: AA method %d, %d samples, lines %.1f px"),

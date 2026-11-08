@@ -1,7 +1,6 @@
 #include "EngineSettings.h"
 #include "SessionAudio.h"
 #include "UnityCompat/UnityTypes.h"
-#include "Rendering/Pipeline/RenderBackend.h"
 #include "Settings/GameSetting.h"
 
 using namespace SpaceGod::Core;
@@ -20,17 +19,6 @@ namespace SpaceGod
 			"Frame rate cap", cs::List<cs::String>{ "30 fps", "60 fps", "90 fps", "120 fps", "144 fps", "165 fps", "240 fps", "Unlimited" }, 4,
 			"The most frames drawn a second when VSync is off (with VSync on, the screen's refresh rate sets it).",
 			"fps performance framerate")->Applying([](int i) { Application::SetTargetFrameRate(FrameRates()[i]); });
-		return value;
-	}
-
-	const cs::Ref<ToggleSetting>& EngineSettings::Msaa()
-	{
-		static const cs::Ref<ToggleSetting> value = cs::New<ToggleSetting>("render.msaa", SettingGroups::RenderPipeline,
-			"Anti-aliasing (MSAA 4x)", true, "Smooths the edges of hulls, rings and orbit lines, at some cost on a slow GPU.",
-			"antialiasing jaggies edges multisample quality")->Applying([](bool on)
-			{
-				for (Camera* cam : Camera::allCameras()) Rendering::RenderBackend::Active()->SetMsaa(cam, on);
-			});
 		return value;
 	}
 

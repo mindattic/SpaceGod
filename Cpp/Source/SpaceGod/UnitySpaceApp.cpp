@@ -9,6 +9,7 @@
 #include "Input/InputState.h"
 #include "Input/InputDevice.h"
 #include "EngineSettings.h"
+#include "GraphicsSettings.h"
 #include "GameSettingsHost.h"
 #include "PlayerOptions.h" // US-T252
 #include "GameVoice.h" // US-T139
@@ -380,7 +381,7 @@ namespace SpaceGod
 		// Whatever the pipeline needs of its camera (HDR off, its per-camera data) and no post-processing yet.
 		auto backend = Rendering::RenderBackend::Active();
 		backend->SetupCamera(UnityCamera, Rendering::CameraRole::Main);
-		backend->SetMsaa(UnityCamera, EngineSettings::Msaa()->Value);
+		backend->SetAntiAliasing(UnityCamera, GraphicsSettings::AntiAliasingMethod()); // US-T251: Settings > Graphics
 		backend->SetPostProcessing(UnityCamera, Rendering::PostProcessLook::None());
 		// The camera's AudioListener is switched on in Unity; Unreal's listener is the player controller's, which follows
 		// the view target (the app's camera), so there is nothing to enable.

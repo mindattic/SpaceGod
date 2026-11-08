@@ -1,6 +1,7 @@
 #include "GameSettingsHost.h"
 #include "ActiveProfile.h"
 #include "EngineSettings.h"
+#include "GraphicsSettings.h"
 #include "PlayerOptions.h" // US-T252
 #include "UnitySpaceApp.h"
 #include "Camera/SpaceCamera.h"
@@ -23,7 +24,7 @@ namespace SpaceGod
 	{
 		// US-T70: URP's post-processing settings first. In Unity they live in an assembly of their own
 		// (Unity.SpaceGod.Rendering.Urp) that declares them before the game's Runtime does, so the original's Render pipeline
-		// page reads URP's rows, then render.msaa, then the pipeline and HDRP's (SpaceGod.Unity.CSharp's audit; the Unreal C#
+		// page reads URP's rows, then render.msaa (graphics.antiAliasing since US-T251), then the pipeline and HDRP's (SpaceGod.Unity.CSharp's audit; the Unreal C#
 		// copy's Bootstrap.MatchSettingsOrder, 57c111a). Nothing touches these settings before this discovery (GameSettingsHost::Bind).
 		SettingsRegistry::AddDeclarationSource([]
 		{
@@ -35,7 +36,10 @@ namespace SpaceGod
 			UrpPostProcessSettings::Temperature();
 		});
 		// The Runtime assembly's [SettingsSource] classes, each accessor touched in C# field order.
-		SettingsRegistry::AddDeclarationSource([] { EngineSettings::FrameRateCap(); EngineSettings::Msaa(); EngineSettings::MasterVolume(); });
+		SettingsRegistry::AddDeclarationSource([] { EngineSettings::FrameRateCap(); EngineSettings::MasterVolume(); });
+		// US-T251: the rest of Settings > Graphics (the preset, scalability knobs, anti-aliasing (render.msaa before),
+		// resolution scale, upscaler and field of view), right under the frame-rate cap.
+		SettingsRegistry::AddDeclarationSource([] { GraphicsSettings::Declare(); });
 		SettingsRegistry::AddDeclarationSource([] { PlayerOptions::Declare(); }); // US-T252: Settings > Gameplay and Accessibility
 		SettingsRegistry::AddDeclarationSource([] { UnitySpaceApp::AutoReorientSetting(); });
 		SettingsRegistry::AddDeclarationSource([] { UnitySpaceApp::TutorialHintsSetting(); }); // US-T254: the first-time hints
@@ -64,6 +68,11 @@ namespace SpaceGod
 				Debug::LogError(cs::Cat("[Unity.SpaceGod] Saving the setting '", s->Key, "' failed: ", e.what()));
 			};
 		}
-		Registry()->Bind(cs::New<ProfileSettingStore>(ActiveProfile::Current()));
+		auto store = cs::New<ProfileSettingStore>(ActiveProfile::Current());
+		{
+			GraphicsSettings::LoadScope loading; // the LOD budgets load before the preset: not the player making it Custom
+			Registry()->Bind(store);
+		}
+		GraphicsSettings::AfterBind(store); // US-T251: a first launch benchmarks for its preset
 	}
 }

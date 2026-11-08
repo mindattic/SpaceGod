@@ -101,6 +101,10 @@ namespace SpaceGod::Rendering
 		/// <summary>Turns multisample anti-aliasing on or off for <paramref name="camera"/>.</summary>
 		virtual void SetMsaa(Camera* camera, bool on) = 0;
 
+		/// <summary>US-T251: the anti-aliasing method, as Unreal numbers it (r.AntiAliasingMethod: 0 none, 1 FXAA, 2 TAA,
+		/// 3 MSAA, 4 TSR). A pipeline with nothing but MSAA takes MSAA for 3 and none for the rest.</summary>
+		virtual void SetAntiAliasing(Camera* camera, int method) { SetMsaa(camera, method == 3); }
+
 		/// <summary>Adds a directional key light under <paramref name="parent"/> that lights only <paramref name="cullingMask"/>.</summary>
 		virtual cs::Ref<Light> AddKeyLight(const cs::Ref<Transform>& parent, const cs::String& name, Quaternion rotation, float intensity, int cullingMask,
 			HideFlags hideFlags = HideFlags::None) = 0;
@@ -223,6 +227,8 @@ namespace SpaceGod::Rendering
 		/// The C# track's UnrealRenderBackend.SetMsaa (US-T55): 4x MSAA on the forward renderer, or none, with Unity's
 		/// MSAA line width.
 		void SetMsaa(Camera* camera, bool on) override;
+		/// US-T251: any of Unreal's methods (Settings > Graphics > Anti-aliasing); MSAA keeps Unity's 1.4-pixel lines.
+		void SetAntiAliasing(Camera* camera, int method) override;
 
 		/// <summary>Puts <paramref name="value"/> into effect on the game's own camera (the settings menu's choice).</summary>
 		void SetLook(const Core::CameraLook& value);

@@ -4,6 +4,7 @@
 
 #include "UnitySpaceApp.h"
 #include "CaptureEvents.h" // US-T72
+#include "GraphicsSettings.h" // US-T251: the flown field of view
 
 #include "Astro.h"
 #include "BodyCatalog.h"
@@ -1264,8 +1265,10 @@ namespace SpaceGod
 
 		// The view widens with the pace of what is flown, more on the afterburner (kicked wide as it lights) and under the
 		// cruise drive, by its role's feel (US-T170): a fighter's snaps out, a capital ship's barely swells.
-		float targetFov = RidingLane() ? BaseFov + (LaneFov - BaseFov) * LaneRideSpeed
-			: feeling ? BaseFov + static_cast<float>(flightFeel.ViewFovDeg()) : BaseFov;
+		// US-T251: a flown view (behind the helm, in a cockpit) starts from Settings > Graphics > Field of view.
+		float flownFov = GraphicsSettings::FlownFov();
+		float targetFov = RidingLane() ? flownFov + (Mathf::Max(LaneFov, flownFov) - flownFov) * LaneRideSpeed
+			: feeling ? flownFov + static_cast<float>(flightFeel.ViewFovDeg()) : BaseFov;
 		cameraFov = Mathf::Lerp(cameraFov, targetFov, 1.0f - Mathf::Exp(-dt * (feeling && !RidingLane() ? FovResponseHz * 2.5f : FovResponseHz)));
 		// A ring gate kicks the view wide for a moment and flashes as the hull goes through (U.SPC-T41).
 		fovKick *= Mathf::Exp(-dt * 3.5f);

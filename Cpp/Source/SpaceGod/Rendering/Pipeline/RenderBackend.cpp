@@ -220,13 +220,19 @@ namespace SpaceGod::Rendering
 
 	void UnrealRenderBackend::SetMsaa(Camera* camera, bool on)
 	{
-		NeutralRenderBackend::SetMsaa(camera, on);
+		SetAntiAliasing(camera, on ? 3 : 0);
+	}
+
+	void UnrealRenderBackend::SetAntiAliasing(Camera* camera, int method)
+	{
+		NeutralRenderBackend::SetMsaa(camera, method == 3);
 		// US-T55: as the original's URP asset (m_MSAA: 4) with the camera's allowMSAA: 4x MSAA on, none off (MSAA is the
 		// forward renderer's: Config/DefaultEngine.ini r.ForwardShading). Unity's hardware lines are 1.4-pixel quads under
-		// MSAA, one pixel without (ShaderBinding::SetLineWidthPx); its points stay 1x1.
-		SetCVar(TEXT("r.MSAACount"), on ? 4 : 1);
-		SetCVar(TEXT("r.AntiAliasingMethod"), on ? 3 : 0);
-		UnityCompat::ShaderBinding::SetLineWidthPx(on ? 1.4f : 1.0f);
+		// MSAA, one pixel without (ShaderBinding::SetLineWidthPx); its points stay 1x1. US-T251: or TSR, TAA or FXAA.
+		bool msaa = method == 3;
+		SetCVar(TEXT("r.MSAACount"), msaa ? 4 : 1);
+		SetCVar(TEXT("r.AntiAliasingMethod"), method);
+		UnityCompat::ShaderBinding::SetLineWidthPx(msaa ? 1.4f : 1.0f);
 	}
 
 	void UnrealRenderBackend::SetPostProcessing(Camera* camera, const PostProcessLook& value)
