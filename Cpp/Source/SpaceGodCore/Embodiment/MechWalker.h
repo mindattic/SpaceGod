@@ -6,11 +6,13 @@
 #include "Cs/Cs.h"
 #include "DVec3.h"
 #include "Embodiment/Embodiment.h"
+#include "Persistence/Serializable.h" // US-T270: saved with its fight
 
 namespace SpaceGod::Core
 {
 	class Battle;
 	class BattleUnit;
+	class CombatSpec;
 
 	/// <summary>
 	/// A mech out of a hull's bay (US-T83), as an <see cref="IEmbodiable"/> of <see cref="EmbodimentKind.Mech"/> on
@@ -27,8 +29,11 @@ namespace SpaceGod::Core
 	/// ripples a four-missile salvo from the shoulder pods, homing on the hostile nearest the aim (straight rockets when none
 	/// is near it). Both build heat on one scale (<see cref="Heat"/>, overheated at 100 they lock out until it falls to
 	/// <see cref="CoolResumeHeat"/>). Battle km and seconds throughout; nothing drawn at random, so co-op and replays step it
-	/// alike. Only ever stepped while held, as any seat: crews, the AI and the Bench never see it. Not saved, as an EVA pilot
-	/// is not: a load drops the player back in command.
+	/// alike. US-T270: kept on its fight (<see cref="Battle.Mechs"/>) and saved with it; the fight steps it while nobody holds it
+	/// (<see cref="StepIn"/>: it stands, or coasts) and its hostiles engage it: every hostile hull and small craft in range
+	/// fires aimed rounds at it (<see cref="ThreatOf"/>, a deterministic spread, never the hull under its boots), and any hostile
+	/// aimed round that crosses it strikes its armour; at none left it is wrecked. In co-op Shift+N is an entry every peer
+	/// carries out at its frame. The Bench never sends one out, so its fights are unchanged.
 	/// </summary>
 	class SPACEGODCORE_API MechWalker final : public IEmbodiable
 	{
@@ -74,6 +79,10 @@ namespace SpaceGod::Core
 		/// <summary>Seconds each arm's muzzle flash has left (0 the left arm, 1 the right), and since it last set down.</summary>
 		double MuzzleFlash[2] = { 0, 0 };
 		double SinceLanding = 10;
+
+		/// <summary>US-T270: rounds that have struck it, and seconds since the last did (for the HUD and the cockpit's jolt).</summary>
+		int HitsTaken = 0;
+		double SinceHit = 100;
 
 		/// <summary>The last thing that happened, for the HUD (and how long it shows); why it was lost, once it is.</summary>
 		cs::String Event;
@@ -136,6 +145,16 @@ namespace SpaceGod::Core
 		/// <summary>The smallest hull it can stand on (km long): nothing a fighter's size.</summary>
 		static constexpr double MinHullKm = 0.05;
 
+		/// <summary>US-T270: the sphere enemy rounds must cross to strike it (km), about its middle.</summary>
+		static constexpr double HitRadiusKm = HeightKm * 0.55;
+		/// <summary>US-T270: the most rounds one hostile fires at it in a battle step (a coarse step's catch-up stays bounded).</summary>
+		static constexpr int MaxShotsPerStep = 4;
+
+		/// <summary>US-T270: how a hostile <paramref name="u"/> engages a mech: rounds a second, damage a round, reach (km), muzzle
+		/// speed (km/s) and spread (radians either way). False for one that cannot fire on it (gone, struck, captured, crippled,
+		/// stunned).</summary>
+		static bool ThreatOf(const cs::Ref<BattleUnit>& u, double& rate, double& damage, double& rangeKm, double& muzzleKmS, double& spread);
+
 		MechWalker(const cs::Ref<Core::Battle>& battle, const cs::Ref<BattleUnit>& carrier);
 
 		/// <summary>Whether <paramref name="u"/> carries a mech in its bay: a capital ship or a station (whatever sends out EVA
@@ -150,6 +169,22 @@ namespace SpaceGod::Core
 
 		/// <summary>Every mech out in <paramref name="battle"/> and still standing (<see cref="Embodiables.WalkersIn"/>).</summary>
 		static cs::List<cs::Ref<MechWalker>> DeployedIn(const cs::Ref<Core::Battle>& battle);
+
+		/// <summary>
+		/// US-T270: one step of <paramref name="battle"/> for the mechs out in it (<see cref="Battle.Step"/>, before the rounds
+		/// fly): one nobody holds stands where it is or coasts on; every hostile in range fires on each standing mech; then every
+		/// hostile aimed round that will cross one this step strikes it (unless a hostile hull stands in the way first).
+		/// Deterministic: no draw on the battle's generator, so a fight with no mech out steps exactly as before.
+		/// </summary>
+		static void StepIn(const cs::Ref<Core::Battle>& battle, double dt);
+
+		/// <summary>US-T270: the hull's plating nearest <paramref name="local"/> (hull frame, hull lengths): the collision
+		/// capsule's surface (<see cref="Collisions"/>), and its outward normal there.</summary>
+		static DVec3 Plating(const cs::Ref<CombatSpec>& spec, DVec3 local);
+		static DVec3 PlatingNormal(const cs::Ref<CombatSpec>& spec, DVec3 local);
+
+		/// <summary>US-T270: its roof on the hull it stands on (hull frame, unit): the plating's normal under its boots.</summary>
+		DVec3 RoofLocal() const;
 
 		/// <summary>Whether <paramref name="u"/> is a hull its boots can stand on.</summary>
 		static bool Standable(const cs::Ref<BattleUnit>& u);
@@ -175,6 +210,9 @@ namespace SpaceGod::Core
 		EmbodimentSubject Subject() const override;
 
 	private:
+		SG_SERIALIZABLE(MechWalker); // US-T270: ObjectGraph registration (Persistence/Registrations)
+		MechWalker() = default;
+
 		bool held = false;
 		bool secondaryWas = false;
 		double cannonCooldown = 0, missileCooldown = 0, salvoTimer = 0, liftGrace = 0;
@@ -195,5 +233,9 @@ namespace SpaceGod::Core
 		DVec3 MuzzleAt(int arm) const;
 		/// <summary>A friendly unit still in the fight to stand for it in the world: the hull it is on, its carrier, or the nearest.</summary>
 		cs::Ref<BattleUnit> Anchor() const;
+		/// <summary>US-T270: the middle of it, battle frame: what enemy rounds aim at and must cross.</summary>
+		DVec3 Centre() const;
+		void EngagedBy(const cs::Ref<BattleUnit>& u, double dt);
+		void Struck(double damage, const cs::String& by);
 	};
 }

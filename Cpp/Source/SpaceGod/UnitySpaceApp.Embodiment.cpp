@@ -681,9 +681,12 @@ namespace SpaceGod
 			{
 				seatMechFootfalls = m->Footfalls;
 				seatMechLandings = m->Landings;
+				seatMechHits = m->HitsTaken;
 			}
 			if (m->Footfalls > seatMechFootfalls) flightFeel.Kick(0.25 + 0.25 * std::min(1.0, std::abs(m->Speed) / MechWalker::MaxForwardKmS));
 			if (m->Landings > seatMechLandings) flightFeel.Kick(1.0);
+			if (m->HitsTaken > seatMechHits) flightFeel.Kick(0.5); // US-T270: a round striking the armour
+			seatMechHits = m->HitsTaken;
 			seatMechFootfalls = m->Footfalls;
 			seatMechLandings = m->Landings;
 			in.Pace = std::abs(m->Speed) / MechWalker::MaxForwardKmS;

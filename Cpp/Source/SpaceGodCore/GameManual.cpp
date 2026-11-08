@@ -719,8 +719,11 @@ namespace SpaceGod::Core
 				  "while it stands on a hull. Let go and it coasts; coast onto any hull big enough to stand on -- yours or the "
 				  "enemy's -- and the boots catch. Come down faster than 30 m/s and the landing dents the armour; at 250 m/s it "
 				  "wrecks the mech. While you pilot one, Space is the jets' and not the pause (the Pause key still pauses; the "
-				  "jets can be rebound under Settings > Controls > Key bindings), and a pad's A button lights them. Not yet: "
-				  "enemies do not aim at the mech, and it is single player only."),
+				  "jets can be rebound under Settings > Controls > Key bindings), and a pad's A button lights them. The enemy shoots "
+				  "back: every hostile ship, station and fighter in range fires on a mech it can reach (never the hull it is "
+				  "standing on, whose guns can't bear on their own plating), and its armour wears down until it is wrecked; a "
+				  "bay sends out one mech a fight. Its feet plant on the plating and step over the hull's curve. Mechs are "
+				  "saved with the fight, and in co-op Shift+N sends one out for whoever asks, the others seeing it walk."),
 				T("A hull's own abilities: launch, then fly what you launched",
 				  "At a helm the ability bar above the flight readout lists what that hull can order from what it really carries, "
 				  "each on Shift and a digit (Shift+1 the first, Shift+0 the tenth). A carrier has one launch for each class of "

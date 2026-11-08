@@ -3,6 +3,7 @@
 // own pantograph leg solve, its torso twisting and its arms pitching to the aim, its jump jets and muzzle flashes lit.
 
 #include "UnityCompat/UnityRenderingTypes.h"
+#include "DVec3.h"
 
 #include <unordered_map>
 
@@ -25,8 +26,10 @@ namespace SpaceGod::Views
 	/// (Rendering/MechMeshData.inl), under the procedural ship material with its vertex colours. Posed as ASoulsMech posed it
 	/// (SoulsMech.cpp, TickPose): the hips bob and roll with the gait and drop on landing, the torso twists by the mech's
 	/// <see cref="Core::MechWalker.TorsoYawDeg"/>, the arms pitch by its aim, and each bird leg (thigh, shin, metatarsal,
-	/// foot) is solved to its foot by the same pantograph two-bone solve: the feet plant and swing by the mech's walk cycle
-	/// (<see cref="Core::MechWalker.GaitPhase"/>), and hang tucked in flight. The jets burn under its back while lit and each
+	/// foot) is solved to its foot by the same pantograph two-bone solve. US-T270: on a hull each foot plants on the plating and
+	/// stays put there while the body walks over it, then steps (by the walk cycle, <see cref="Core::MechWalker.GaitPhase"/>) to
+	/// a spot ahead found on the plating, so the soles meet the hull's curve and the hips settle to the lower foot; in flight the
+	/// feet hang tucked. The jets burn under its back while lit and each
 	/// arm's muzzle flashes as it fires, camera-facing quads in the Fx shader. Presentation only.
 	/// </summary>
 	class MechView final
@@ -44,6 +47,12 @@ namespace SpaceGod::Views
 			double Activity = 0;
 			double Sign = 1;
 			double LastPhase = 0;
+			/// US-T270: each foot planted on the plating (hull frame, hull lengths), and in a step where it lifted from and
+			/// where it comes down; the hull they are on (a new one, or none, plants them afresh).
+			bool Planted[2] = { false, false };
+			bool Swinging[2] = { false, false };
+			Core::DVec3 Plant[2], From[2], To[2];
+			const void* HullWas = nullptr;
 		};
 
 		UnitySpaceApp* app;

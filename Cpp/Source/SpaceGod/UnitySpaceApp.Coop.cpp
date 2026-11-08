@@ -34,6 +34,7 @@
 #include "Embodiment/Embodiment.h"
 #include "Embodiment/FighterSeat.h"
 #include "Embodiment/MountedTurret.h"
+#include "Embodiment/MechWalker.h" // US-T270: a mech in co-op
 #include "Embodiment/RepairWorker.h" // US-T135
 #include "Views/EmbodiedShine.h" // US-T136: seat colours
 #include "Embodiment/StationSeat.h"
@@ -461,6 +462,11 @@ namespace SpaceGod
 			int b = IndexOfRef(battles, w->Battle), u = w->Battle != nullptr ? IndexOfRef(w->Battle->Units, w->Unit) : -1;
 			return b < 0 || u < 0 ? cs::String() : cs::Cat("W ", b, " ", u, " ", w->Team);
 		}
+		if (auto m = cs::As<MechWalker>(seat)) // US-T270: a mech, by its fight and the hull whose bay it came out of
+		{
+			int b = IndexOfRef(battles, m->Battle), u = m->Battle != nullptr ? IndexOfRef(m->Battle->Units, m->Carrier) : -1;
+			return b < 0 || u < 0 ? cs::String() : cs::Cat("M ", b, " ", u);
+		}
 		return cs::String();
 	}
 
@@ -507,6 +513,15 @@ namespace SpaceGod
 				int team = Wire::ParseI(f.at(3));
 				for (const auto& w : Embodiables::WorkersOn(World(), b, u))
 					if (w->Team == team) return w;
+				return nullptr;
+			}
+			if (f[0] == "M") // US-T270
+			{
+				auto b = battleAt(Wire::ParseI(f.at(1)));
+				auto u = unitAt(b, Wire::ParseI(f.at(2)));
+				if (u == nullptr) return nullptr;
+				for (const auto& m : MechWalker::DeployedIn(b))
+					if (m->Carrier == u) return m;
 				return nullptr;
 			}
 		}
@@ -1191,6 +1206,7 @@ namespace SpaceGod
 			if (ship != nullptr && to != nullptr) StartCrewCourse(ship, to, a.at(1) == "1");
 		}
 		else if (verb == "tanker") CallTanker();
+		else if (verb == "mech") CoopDeployMech(peer, seat, Wire::ParseI(a.at(0)), Wire::ParseI(a.at(1))); // US-T270: Shift+N
 		else if (verb == "ftlplot")
 		{
 			cs::String name = JoinFrom(a, 1);
@@ -1241,6 +1257,27 @@ namespace SpaceGod
 		ship->Ports = World()->FreeShipPorts(); // not a hidden haven's rock, as for every free ship
 		CoopPeer::Log(cs::Cat(peer.NameOf(seat), " spawns ", ship->Name, " (ship ", ship->Id, ") at frame ", peer.Frame()));
 		CoopHelmEntry(peer, seat, { "h", Wire::I(seat), "take", Wire::I(ship->Id), UpFrameText(up) });
+	}
+
+	void UnitySpaceApp::CoopDeployMech(CoopPeer& peer, int seat, int battleIndex, int unitIndex)
+	{
+		// US-T270: every peer sends the same mech out at this frame and seats the asker in it, so each peer's session names it
+		// alike (as CoopRetake seats a player).
+		const auto& battles = World()->War->Battles;
+		auto battle = battleIndex >= 0 && battleIndex < battles.Count() ? battles[battleIndex] : nullptr;
+		auto unit = battle != nullptr && unitIndex >= 0 && unitIndex < battle->Units.Count() ? battle->Units[unitIndex] : nullptr;
+		cs::String why;
+		auto mech = MechWalker::Deploy(battle, unit, why);
+		if (mech == nullptr)
+		{
+			CoopPeer::Log(cs::Cat(peer.NameOf(seat), "'s mech refused: ", why));
+			ShowToast(cs::Cat("Can't send out a mech: ", why));
+			return;
+		}
+		if (seat == peer.LocalSeat()) mechHeight = 0; // sized afresh off the hull it stands on
+		session->Submit(cs::New<TakeSeatCommand>(PlayerId(seat), session->IdOf(mech)));
+		session->ApplyPending();
+		CoopPeer::Log(cs::Cat(peer.NameOf(seat), " (player ", seat + 1, ") sends out ", mech->Name(), " at frame ", peer.Frame()));
 	}
 
 	void UnitySpaceApp::CoopSpawnPractice(CoopPeer& peer, int seat, const std::vector<cs::String>& a, int at)

@@ -240,6 +240,7 @@ private:
 
 	/// <summary>US-T83: a mech's footfalls and landings as last seen, so each new one is felt.</summary>
 	int seatMechFootfalls = 0, seatMechLandings = 0;
+	int seatMechHits = 0; // US-T270: rounds that have struck it, felt as they land
 
 	/// <summary>
 	/// The dogfight game's keys in a cockpit (U.SPC-T424): F flight assist, T a lock on the hostile nearest the crosshair

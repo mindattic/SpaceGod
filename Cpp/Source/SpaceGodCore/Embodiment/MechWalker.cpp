@@ -4,26 +4,31 @@
 #include "Astro.h"
 #include "Combat/Battle.h"
 #include "Combat/Collisions.h"
+#include "Combat/CombatSpecs.h"
 #include "Combat/CombatState.h"
+#include "Combat/Gunnery.h" // US-T270: rounds crossing it, hulls in the way
 #include "Embodiment/RepairWorker.h" // TeamsOn: a hull with EVA crews has a mech bay
+
+#include <cstdint>
 
 namespace SpaceGod::Core
 {
 	namespace
 	{
-		/// Every mech sent out, so the seat pickers find it again (not saved: a load drops them, as an EVA pilot).
-		cs::List<cs::Ref<MechWalker>>& Registry()
+		/// US-T270: a hash of (a, b) to two numbers in -1..1, for a hostile's spread: fixed by who fired and which round it
+		/// was, never drawn from the battle's generator, so co-op, replays and the Bench step alike.
+		void Spread2(uint64_t a, uint64_t b, double& x, double& y)
 		{
-			static cs::List<cs::Ref<MechWalker>> all;
-			return all;
-		}
-
-		void Prune()
-		{
-			Registry().RemoveAll([](const cs::Ref<MechWalker>& m)
+			uint64_t z = a * 0x9E3779B97F4A7C15ull + b + 0x632BE59BD9B4E019ull;
+			auto mix = [](uint64_t v)
 			{
-				return m == nullptr || m->Battle == nullptr || m->Battle->Over || !m->Lost.empty();
-			});
+				v = (v ^ (v >> 30)) * 0xBF58476D1CE4E5B9ull;
+				v = (v ^ (v >> 27)) * 0x94D049BB133111EBull;
+				return v ^ (v >> 31);
+			};
+			uint64_t h1 = mix(z), h2 = mix(z ^ 0xD1B54A32D192ED03ull);
+			x = static_cast<double>(h1 >> 11) / static_cast<double>(1ull << 53) * 2 - 1;
+			y = static_cast<double>(h2 >> 11) / static_cast<double>(1ull << 53) * 2 - 1;
 		}
 
 		DVec3 PerpendicularTo(DVec3 v)
@@ -80,23 +85,53 @@ namespace SpaceGod::Core
 		else if (battle->Over) why = "the fight is over";
 		else if (!CarriesMech(carrier)) why = "no mech bay aboard (capital ships and stations carry one)";
 		if (!why.empty()) return nullptr;
-		Prune();
-		for (const auto& m : Registry())
-			if (m->Battle == battle && m->Carrier == carrier) return m;
+		// One mech to a bay (US-T270): the one out if it still stands; none more once it is wrecked.
+		for (const auto& m : battle->Mechs)
+		{
+			if (m == nullptr || m->Carrier != carrier) continue;
+			if (m->Lost.empty()) return m;
+			why = cs::Cat("its mech was lost in this fight (", m->Lost, ")");
+			return nullptr;
+		}
 		auto m = cs::New<MechWalker>(battle, carrier);
 		m->PlaceOnCarrier();
 		m->Note("Out of the bay: mag boots on the plating. Space lights the jump jets");
-		Registry().Add(m);
+		battle->Mechs.Add(m);
 		return m;
 	}
 
 	cs::List<cs::Ref<MechWalker>> MechWalker::DeployedIn(const cs::Ref<Core::Battle>& battle)
 	{
-		Prune();
 		cs::List<cs::Ref<MechWalker>> list;
-		for (const auto& m : Registry())
-			if (m->Battle == battle) list.Add(m);
+		if (battle == nullptr || battle->Over) return list;
+		for (const auto& m : battle->Mechs)
+			if (m != nullptr && m->Lost.empty()) list.Add(m);
 		return list;
+	}
+
+	DVec3 MechWalker::Plating(const cs::Ref<CombatSpec>& spec, DVec3 local)
+	{
+		// The collision capsule (Collisions: a hull a length long, its beam the capsule's diameter): the nearest point of its
+		// surface, so the boots walk its length, not slide to an end cap as its farthest-point-along a direction would.
+		double r = spec != nullptr ? spec->BeamFraction * 0.5 : 0.1;
+		double core = cs::Math::Max(0.0, 0.5 - r);
+		auto onAxis = DVec3(0, 0, cs::Math::Clamp(local.Z, -core, core));
+		auto out = local - onAxis;
+		out = out.LengthSquared() > 1e-18 ? out.Normalized() : DVec3(0, 1, 0);
+		return onAxis + out * r;
+	}
+
+	DVec3 MechWalker::PlatingNormal(const cs::Ref<CombatSpec>& spec, DVec3 local)
+	{
+		double r = spec != nullptr ? spec->BeamFraction * 0.5 : 0.1;
+		double core = cs::Math::Max(0.0, 0.5 - r);
+		auto out = local - DVec3(0, 0, cs::Math::Clamp(local.Z, -core, core));
+		return out.LengthSquared() > 1e-18 ? out.Normalized() : DVec3(0, 1, 0);
+	}
+
+	DVec3 MechWalker::RoofLocal() const
+	{
+		return PlatingNormal(Hull != nullptr && Hull->Combat != nullptr ? Hull->Combat->Spec : nullptr, Local);
 	}
 
 	void MechWalker::PlaceOnCarrier()
@@ -105,8 +140,8 @@ namespace SpaceGod::Core
 		// The dorsal plating a little aft of amidships (the workers' airlock is amidships), facing the bow.
 		auto dir = DVec3(0, 1, -0.15);
 		Hull = Carrier;
-		Local = spec != nullptr ? Collisions::SurfacePoint(spec, dir) : dir.Normalized() * 0.5;
-		auto n = Local.LengthSquared() > 1e-12 ? Local.Normalized() : DVec3(0, 1, 0);
+		Local = Plating(spec, dir.Normalized() * 0.5);
+		auto n = PlatingNormal(spec, Local);
 		Legs = Flatten(DVec3(0, 0, 1), n, PerpendicularTo(n));
 		Speed = 0;
 		Pos = Hull->PointLocal(Local);
@@ -158,6 +193,7 @@ namespace SpaceGod::Core
 		dt = cs::Math::Max(0.0, dt);
 		EventS = cs::Math::Max(0.0, EventS - dt);
 		SinceLanding += dt;
+		SinceHit += dt;
 		liftGrace = cs::Math::Max(0.0, liftGrace - dt);
 		for (double& f : MuzzleFlash) f = cs::Math::Max(0.0, f - dt);
 		// The hull under its boots gone (destroyed, fled, docked): thrown clear, coasting on the hull's way.
@@ -177,7 +213,7 @@ namespace SpaceGod::Core
 	void MechWalker::Walk(const EmbodimentInput& input, double dt)
 	{
 		auto spec = Hull->Combat != nullptr ? Hull->Combat->Spec : nullptr;
-		auto n = Local.LengthSquared() > 1e-12 ? Local.Normalized() : DVec3(0, 1, 0);
+		auto n = PlatingNormal(spec, Local);
 		Legs = Flatten(Legs, n, PerpendicularTo(n));
 		// The hull frame's right (+X) against its up and forward is roof x forward: BattleUnit::Basis's world right is
 		// forward x roof, and the frame's axes map onto the world's with a mirror.
@@ -199,8 +235,8 @@ namespace SpaceGod::Core
 		if (Speed != 0 && dt > 0)
 		{
 			auto next = Local + Legs * (Speed * dt / cs::Math::Max(Hull->LengthKm, 1e-6));
-			Local = spec != nullptr ? Collisions::SurfacePoint(spec, next) : next;
-			n = Local.LengthSquared() > 1e-12 ? Local.Normalized() : n;
+			Local = Plating(spec, next);
+			n = PlatingNormal(spec, Local);
 			Legs = Flatten(Legs, n, PerpendicularTo(n));
 			right = DVec3::Cross(n, Legs);
 		}
@@ -281,10 +317,12 @@ namespace SpaceGod::Core
 			auto local = u->ToLocal(Pos);
 			double r = local.Length();
 			if (r > 1.0) continue; // nowhere near: a hull is within half a length of its centre
-			auto surface = Collisions::SurfacePoint(u->Combat->Spec, local.LengthSquared() > 1e-12 ? local : DVec3(0, 1, 0));
+			auto surface = Plating(u->Combat->Spec, local);
 			double clearance = HeightKm * 0.6 / u->LengthKm;
-			bool inside = r <= surface.Length();
-			if (!inside && (JetsLit || r > surface.Length() + clearance)) continue;
+			// Inside the capsule (its axis nearer than its radius) or within a stride of its plating.
+			double out = DVec3::Dot(local - surface, PlatingNormal(u->Combat->Spec, local));
+			bool inside = out <= 0;
+			if (!inside && (JetsLit || out > clearance)) continue;
 			SetDown(u, surface);
 			return;
 		}
@@ -302,7 +340,7 @@ namespace SpaceGod::Core
 		}
 		Hull = u;
 		Local = local;
-		auto n = Local.LengthSquared() > 1e-12 ? Local.Normalized() : DVec3(0, 1, 0);
+		auto n = PlatingNormal(u->Combat != nullptr ? u->Combat->Spec : nullptr, Local);
 		Legs = Flatten(u->DirToLocal(Facing), n, PerpendicularTo(n));
 		Speed = 0;
 		TorsoYawDeg = AimPitchDeg = 0;
@@ -491,6 +529,155 @@ namespace SpaceGod::Core
 		return best != nullptr ? best : Carrier;
 	}
 
+	// ---------------------------------------------------------------- US-T270: under fire
+
+	DVec3 MechWalker::Centre() const { return Pos + Up * (HeightKm * 0.5); }
+
+	bool MechWalker::ThreatOf(const cs::Ref<BattleUnit>& u, double& rate, double& damage, double& rangeKm, double& muzzleKmS, double& spread)
+	{
+		if (u == nullptr || !u->Present() || u->Surrendering || u->Captured || u->Stunned > 0 || u->Combat == nullptr || u->Combat->Disabled()) return false;
+		if (u->Kind == UnitKind::Fighter)
+		{
+			// A small craft's guns: close in, quick, light.
+			rate = 2.0; damage = 5; rangeKm = 2.0; muzzleKmS = 3.0; spread = 0.004;
+		}
+		else if (u->Kind == UnitKind::Platform)
+		{
+			// A station's point defence: far, steady.
+			rate = 2.5; damage = 12; rangeKm = 5.0; muzzleKmS = 3.0; spread = 0.0035;
+		}
+		else if (u->LengthKm < 0.15)
+		{
+			// A light hull's turrets.
+			rate = 1.5; damage = 8; rangeKm = 3.0; muzzleKmS = 3.0; spread = 0.004;
+		}
+		else
+		{
+			// A capital's point defence turned on it.
+			rate = 2.5; damage = 9; rangeKm = 4.0; muzzleKmS = 3.0; spread = 0.0035;
+		}
+		return true;
+	}
+
+	void MechWalker::StepIn(const cs::Ref<Core::Battle>& battle, double dt)
+	{
+		if (battle == nullptr || battle->Mechs.Count() == 0 || dt <= 0) return;
+		// A copy: a step must not see the list change under it.
+		auto mechs = battle->Mechs;
+		for (const auto& m : mechs)
+		{
+			if (m == nullptr || !m->Lost.empty() || m->Battle != battle) continue;
+			// Nobody at its controls: it stands where it is (the legs coming to a stop) or coasts on, its boots catching as ever.
+			if (!m->held) m->Control(EmbodimentInput{}, dt);
+			if (!m->Lost.empty()) continue;
+			for (const auto& u : battle->Units)
+			{
+				if (u == nullptr || u->Side == m->Side || u == m->Hull) continue; // the hull under its boots can't bear on its own plating
+				m->EngagedBy(u, dt);
+			}
+		}
+		// Every hostile aimed round that will cross a standing mech this step, before any other hostile hull, strikes it.
+		for (const auto& r : battle->Rounds)
+		{
+			if (r == nullptr || r->Gone || !r->Aimed) continue;
+			auto step = r->Vel * dt;
+			double len = step.Length();
+			if (len < 1e-12) continue;
+			auto dir = step / len;
+			cs::Ref<MechWalker> struck;
+			double best = -1;
+			for (const auto& m : mechs)
+			{
+				if (m == nullptr || !m->Lost.empty() || m->Side == r->Side) continue;
+				double t = Gunnery::RaySphere(r->Pos, dir, len, m->Centre(), HitRadiusKm);
+				if (t >= 0 && (best < 0 || t < best))
+				{
+					best = t;
+					struck = m;
+				}
+			}
+			if (struck == nullptr) continue;
+			bool blocked = false;
+			for (const auto& o : battle->Units)
+			{
+				// The plating it stands on is no shield from a round coming down at it: only a hull it is not on.
+				if (o == nullptr || o == struck->Hull || o->Side == r->Side || !o->Present() || o->Surrendering) continue;
+				double t = Gunnery::RaySphere(r->Pos, dir, best, o->Pos, Gunnery::HitRadius(o));
+				if (t >= 0 && t < best)
+				{
+					blocked = true;
+					break;
+				}
+			}
+			if (blocked) continue;
+			r->Gone = true;
+			auto at = r->Pos + dir * best;
+			battle->Emit(FxKind::Impact, at, at, 0.002, struck->Side, nullptr, -1);
+			struck->Struck(r->Damage, r->Shooter != nullptr ? r->Shooter->Name() : cs::String());
+		}
+	}
+
+	void MechWalker::EngagedBy(const cs::Ref<BattleUnit>& u, double dt)
+	{
+		double rate, damage, range, muzzle, spread;
+		if (!ThreatOf(u, rate, damage, range, muzzle, spread)) return;
+		auto centre = Centre();
+		auto to = centre - u->Pos;
+		double d = to.Length();
+		if (d > range || d < 1e-9) return;
+		// Each hostile fires on its own beat (its id sets the phase): the rounds due between this step's start and end.
+		double phase = static_cast<double>((static_cast<uint64_t>(u->Id) * 0x9E3779B97F4A7C15ull) >> 11) / static_cast<double>(1ull << 53);
+		double t1 = Battle->Seconds, t0 = t1 - dt;
+		auto first = static_cast<int64_t>(cs::Math::Floor(t0 * rate + phase)) + 1;
+		auto last = static_cast<int64_t>(cs::Math::Floor(t1 * rate + phase));
+		if (last < first) return;
+		if (last - first + 1 > MaxShotsPerStep) first = last - MaxShotsPerStep + 1;
+		// Led on its way relative to the shooter, once over.
+		double tof = d / muzzle;
+		auto aim = centre + (Vel - u->Vel) * tof - u->Pos;
+		aim = aim.LengthSquared() > 1e-18 ? aim.Normalized() : to / d;
+		auto side = PerpendicularTo(aim);
+		auto lift = DVec3::Cross(aim, side);
+		for (int64_t shot = first; shot <= last; shot++)
+		{
+			double sx, sy;
+			Spread2(static_cast<uint64_t>(u->Id) + 1, static_cast<uint64_t>(shot), sx, sy);
+			auto dir = (aim + side * (sx * spread) + lift * (sy * spread)).Normalized();
+			auto from = u->Pos + dir * cs::Math::Min(d * 0.5, Gunnery::HitRadius(u));
+			auto r = cs::New<KineticRound>();
+			r->Pos = from;
+			r->Vel = u->Vel + dir * muzzle;
+			r->Damage = damage;
+			r->Life = range * 1.25 / muzzle;
+			r->Side = u->Side;
+			r->Tracer = true;
+			r->Aimed = true;
+			r->SmallCraft = u->Kind == UnitKind::Fighter;
+			r->Shooter = u;
+			Battle->Rounds.Add(r);
+			Battle->Emit(FxKind::Guns, from, from + dir * cs::Math::Min(range, d * 1.2), 0, u->Side, u, -1);
+		}
+	}
+
+	void MechWalker::Struck(double damage, const cs::String& by)
+	{
+		if (!Lost.empty() || damage <= 0) return;
+		Armor -= damage;
+		HitsTaken++;
+		bool fresh = SinceHit > 4;
+		SinceHit = 0;
+		if (Armor <= 0)
+		{
+			Armor = 0;
+			Lost = by.empty() ? cs::String("wrecked under fire") : cs::Cat("wrecked by the ", by, "'s guns");
+			JetsLit = false;
+			salvoLeft = 0;
+			Battle->Emit(FxKind::Impact, Centre(), Centre(), 0.012, Side, nullptr, -1);
+			return;
+		}
+		if (fresh || EventS <= 0) Note(cs::Cat("TAKING FIRE", by.empty() ? cs::String() : cs::Cat(" from the ", by), ": armour ", cs::Fmt(ArmorFraction() * 100, "0"), "%"));
+	}
+
 	EmbodimentCameraRig MechWalker::CameraRig() const { return EmbodimentCameraRig(EmbodimentCameraKind::Shoulder, 6, 0.05, 0.07); }
 
 	EmbodimentRolePanel MechWalker::RolePanel()
@@ -511,7 +698,7 @@ namespace SpaceGod::Core
 			: cs::Cat(JetsLit ? "JETS LIT" : "Coasting", "  \xC2\xB7  ", cs::Fmt((Vel - (Anchor() != nullptr ? Anchor()->Vel : DVec3::Zero)).Length() * 1000, "N0"), " m/s");
 		cs::String gauges = cs::Cat("ARMOUR ", bar(ArmorFraction()), " ", cs::Fmt(ArmorFraction() * 100, "0"), "%  \xC2\xB7  HEAT ", bar(Heat / 100),
 			Overheated ? " LOCKED" : "", "  \xC2\xB7  JETS ", bar(JetFuel / JetFuelS), "  \xC2\xB7  ", CannonAmmo, " shells, ", Missiles, " missiles");
-		cs::String state = cs::Cat(where, "  \xC2\xB7  ", gauges);
+		cs::String state = cs::Cat(where, SinceHit < 2 ? "  \xC2\xB7  UNDER FIRE" : "", "  \xC2\xB7  ", gauges);
 		p.Status = EventS > 0 && !Event.empty() ? cs::Cat(Event, "  \xC2\xB7  ", state) : state;
 		if (Hull != nullptr)
 		{

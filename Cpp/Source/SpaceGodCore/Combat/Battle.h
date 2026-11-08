@@ -27,6 +27,7 @@ namespace SpaceGod::Core
 	class Decoy;
 	class MountControl;
 	class FighterControl;
+	class MechWalker; // US-T270
 	class Battle;
 	struct PilotTuning;
 	struct HullDynamics;
@@ -695,6 +696,10 @@ namespace SpaceGod::Core
 		/// <summary>Launched small craft the player is flying (U.SPC-T422, see <see cref="FighterSeat"/>): each is flown by
 		/// <see cref="FighterAI.FlyManned"/> on its stick instead of by its pilot. Kept on the battle, like <see cref="Manned"/>.</summary>
 		cs::Dictionary<cs::Ref<BattleUnit>, cs::Ref<FighterControl>> Flown;
+
+		/// <summary>Mechs sent out of a bay in this fight (US-T83, US-T270, see <see cref="MechWalker"/>), wrecked ones kept so a
+		/// carrier sends out only the one: stepped and shot at with the fight (<see cref="MechWalker.StepIn"/>) and saved with it.</summary>
+		cs::List<cs::Ref<MechWalker>> Mechs;
 
 		/// <summary>Set for an ambush beside a hyperlane; null for a battle at a body.</summary>
 		cs::Ref<LaneSite> Site;

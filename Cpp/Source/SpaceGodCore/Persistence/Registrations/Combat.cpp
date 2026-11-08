@@ -54,6 +54,7 @@
 #include "Economy/TradeDesk.h"
 #include "Economy/TradeInsurance.h"
 #include "Embodiment/MountedTurret.h"
+#include "Embodiment/MechWalker.h" // US-T270: Battle.Mechs
 #include "Ephemeris.h"
 #include "Events/EventDirector.h"
 #include "Events/Opportunity.h"
@@ -192,7 +193,8 @@ namespace SpaceGod::Core
 		SG_F(Manned), SG_F(Mines), SG_F(Missiles), SG_F(Name), SG_F(ReconAloft), SG_ARRAY(Robbed), SG_F(Rounds),
 		SG_F(Seconds), SG_ARRAY(SideLeaders), SG_F(Site), SG_F(StartJd), SG_F(SurrenderDecided), SG_F(UnitCaptured),
 		SG_F(UnitDestroyed), SG_F(UnitSurrendered), SG_F(Units), SG_F(WantsAlive), SG_F(accumulator),
-		SG_F(burnedOut), SG_F(nextUnitId), SG_F(rng), SG_ARRAY(sideStrength))
+		SG_F(burnedOut), SG_F(nextUnitId), SG_F(rng), SG_ARRAY(sideStrength),
+		SG_OPT(Mechs)) // US-T270: the mechs out of a bay, absent from older saves
 
 	SG_SERIALIZE(BattleUnit, "Unity.SpaceGod.Core.BattleUnit",
 		SG_P(PlayerFlown), SG_F(BoardTarget), SG_F(BreacherBayReload), SG_F(BreakSide), SG_F(Broadside),

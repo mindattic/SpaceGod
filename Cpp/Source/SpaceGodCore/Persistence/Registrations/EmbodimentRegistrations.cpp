@@ -51,6 +51,7 @@
 #include "Economy/TradeDesk.h"
 #include "Economy/TradeInsurance.h"
 #include "Embodiment/MountedTurret.h"
+#include "Embodiment/MechWalker.h" // US-T270
 #include "Ephemeris.h"
 #include "Events/EventDirector.h"
 #include "Events/Opportunity.h"
@@ -97,4 +98,14 @@ namespace SpaceGod::Core
 {
 	SG_SERIALIZE(MountControl, "Unity.SpaceGod.Core.MountControl",
 		SG_F(Aim), SG_F(ByStation), SG_F(Trigger))
+
+	// US-T270: a mech out of a bay (Battle.Mechs), saved with its fight; not a C# type (the mech is new to the port), so every
+	// field is its own. Whether a player holds it is not saved: a load drops the player back in command, beside it.
+	SG_SERIALIZE(MechWalker, "Unity.SpaceGod.Core.MechWalker",
+		SG_F(AimDir), SG_F(AimPitchDeg), SG_F(Armor), SG_F(Battle), SG_F(Callsign), SG_F(CannonAmmo), SG_F(Carrier),
+		SG_F(Event), SG_F(EventS), SG_F(Facing), SG_F(Footfalls), SG_F(GaitPhase), SG_F(Heat), SG_F(HitsTaken), SG_F(Hull),
+		SG_F(JetFuel), SG_F(JetsLit), SG_F(Landings), SG_F(Legs), SG_F(Local), SG_F(Lost), SG_F(Missiles), SG_F(MissilesFired),
+		SG_F(Overheated), SG_F(Pos), SG_F(ShellsFired), SG_F(SinceHit), SG_F(SinceLanding), SG_F(Side), SG_F(Speed),
+		SG_F(TorsoYawDeg), SG_F(Up), SG_F(Vel), SG_F(cannonCooldown), SG_F(liftGrace), SG_F(missileCooldown),
+		SG_F(nextArm), SG_F(salvoLeft), SG_F(salvoTarget), SG_F(salvoTimer), SG_F(secondaryWas))
 }

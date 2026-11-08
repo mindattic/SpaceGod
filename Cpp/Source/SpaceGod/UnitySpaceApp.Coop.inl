@@ -79,6 +79,8 @@ public:
 	/// a gun, "S i" a station (i-th of Embodiables::StationsIn), "SB b u" a station fighting as unit u. Empty for one
 	/// co-op does not share.
 	cs::String CoopSeatKey(const cs::Ref<Core::IEmbodiable>& seat);
+	/// <summary>US-T270: a Shift+N entry carried out: the mech out of that hull's bay, the asker seated in it, on every peer.</summary>
+	void CoopDeployMech(Coop::CoopPeer& peer, int seat, int battleIndex, int unitIndex);
 	cs::Ref<Core::IEmbodiable> CoopResolveSeat(const cs::String& key);
 
 	/// A selection as every peer can read it back: "n", "b <body>", "s <ship id>", "u <battle> <unit>", else "o <kind>".

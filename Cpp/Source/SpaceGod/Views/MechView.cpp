@@ -6,6 +6,7 @@
 #include "Rendering/ShipModels.h"
 
 #include "Combat/Battle.h"
+#include "Combat/CombatState.h" // US-T270: the hull's spec, for its plating
 #include "Combat/War.h"
 #include "Embodiment/MechWalker.h"
 #include "World.h"
@@ -273,34 +274,84 @@ namespace SpaceGod::Views
 		a.Activity = MoveToward(a.Activity, moving ? 1.0 : 0.0, dt * 3.0);
 		if (std::abs(m->Speed) > 1e-6) a.Sign = m->Speed > 0 ? 1 : -1;
 
-		// The feet: planted and swinging by the walk cycle (one stride a cycle, the legs half a cycle apart); tucked up in flight.
-		float amp = StrideCm * 0.25f * static_cast<float>(a.Activity);
+		// The feet (US-T270): on a hull each plants on the plating and stays there while the body walks over it, then steps by
+		// the walk cycle (the legs half a cycle apart) to a spot ahead found on the plating; tucked up in flight. Worked in the
+		// hull's frame at the drawn scale: a drawn cm is MechHeightLengths / HeightCm hull lengths.
 		float lift = (38.0f + 34.0f * speedFrac) * static_cast<float>(a.Activity);
 		Vector3 foot[2];
 		float swing[2] = { -1, -1 };
 		float footPitch[2] = { 0, 0 };
+		float lowest = 0;
+		auto hull = onHull ? m->Hull : nullptr;
+		auto spec = hull != nullptr && hull->Combat != nullptr ? hull->Combat->Spec : nullptr;
+		const double cm = UnitySpaceApp::MechHeightLengths / HeightCm;
+		DVec3 roof = onHull ? m->RoofLocal() : DVec3(0, 1, 0);
+		DVec3 ahead = m->Legs, right = DVec3::Cross(roof, ahead);
+		auto toHull = [&](Vector3 c) { return MechWalker::Plating(spec, m->Local + (ahead * c.x + right * c.y + roof * c.z) * cm); };
+		auto toRig = [&](DVec3 p)
+		{
+			auto d = (p - m->Local) / cm;
+			return Vector3(static_cast<float>(DVec3::Dot(d, ahead)), static_cast<float>(DVec3::Dot(d, right)), static_cast<float>(DVec3::Dot(d, roof)));
+		};
+		// Half a stride as the body covers the plating at the drawn scale (a mech drawn larger than life takes shorter steps for
+		// its size), kept within the legs' reach.
+		float amp = 0;
+		if (hull != nullptr && hull->LengthKm > 0)
+			amp = Mathf::Clamp(static_cast<float>(0.25 * MechWalker::StrideKm / hull->LengthKm / cm), StrideCm * 0.04f, StrideCm * 0.3f);
+		if (hull.get() != a.HullWas) a.Planted[0] = a.Planted[1] = a.Swinging[0] = a.Swinging[1] = false;
+		a.HullWas = hull.get();
 		for (int leg = 0; leg < 2; leg++)
 		{
-			Vector3 home(Foot[leg].x, Foot[leg].y, -FootFloor);
+			Vector3 home(Foot[leg].x, Foot[leg].y, 0);
 			if (!onHull)
 			{
-				foot[leg] = home + Vector3(-50.0f, 0, 120.0f + (leg == 0 ? 0.0f : 25.0f));
+				foot[leg] = home + Vector3(-50.0f, 0, -FootFloor + 120.0f + (leg == 0 ? 0.0f : 25.0f));
 				footPitch[leg] = -20;
 				continue;
 			}
 			double t = m->GaitPhase + leg * 0.5;
 			float f = static_cast<float>(t - std::floor(t));
-			float x, z = 0;
-			if (f < 0.5f) x = amp - 4 * amp * f;
-			else
+			bool stepping = f >= 0.5f && a.Activity > 0.02;
+			if (!a.Planted[leg])
 			{
-				float s = (f - 0.5f) * 2;
+				a.Plant[leg] = toHull(home);
+				a.Planted[leg] = true;
+				a.Swinging[leg] = false;
+			}
+			if (stepping && !a.Swinging[leg])
+			{
+				a.Swinging[leg] = true;
+				a.From[leg] = a.Plant[leg];
+				a.To[leg] = toHull(home + Vector3(amp * static_cast<float>(a.Sign * a.Activity), 0, 0));
+			}
+			else if (!stepping && a.Swinging[leg])
+			{
+				a.Swinging[leg] = false;
+				a.Plant[leg] = a.To[leg];
+			}
+			if (!a.Swinging[leg])
+			{
+				// Left behind out of reach (a turn on the spot, a shove): it is set down again under the hip.
+				Vector3 at = toRig(a.Plant[leg]);
+				if ((Vector3(at.x, at.y, 0) - home).magnitude() > StrideCm * 0.6f) a.Plant[leg] = toHull(home);
+			}
+			DVec3 sole;
+			float raise = 0;
+			if (a.Swinging[leg])
+			{
+				float s = Mathf::Clamp((f - 0.5f) * 2, 0.0f, 1.0f);
 				swing[leg] = s;
-				x = -amp + 2 * amp * Ease(s);
-				z = lift * std::sin(Mathf::PI * s);
+				sole = MechWalker::Plating(spec, a.From[leg] + (a.To[leg] - a.From[leg]) * Ease(s));
+				raise = lift * std::sin(Mathf::PI * s);
 				footPitch[leg] = 14.0f * std::sin(Mathf::PI * std::min(s * 1.2f, 1.0f)) * static_cast<float>(a.Activity);
 			}
-			foot[leg] = home + Vector3(x * static_cast<float>(a.Sign), 0, z);
+			else sole = a.Plant[leg];
+			Vector3 at = toRig(sole);
+			lowest = std::min(lowest, at.z);
+			foot[leg] = at + Vector3(0, 0, -FootFloor + raise);
+			// The sole laid along the plating's slope under it, toe down where the hull falls away ahead.
+			DVec3 nf = MechWalker::PlatingNormal(spec, sole);
+			footPitch[leg] -= static_cast<float>(std::atan2(DVec3::Dot(nf, ahead), DVec3::Dot(nf, roof)) * 57.29577951308232);
 		}
 		// The hips: bob and roll over the planted foot, lean into the walk, drop under a landing.
 		float bob = 0, roll = 0, sway = 0;
@@ -313,7 +364,8 @@ namespace SpaceGod::Views
 			sway += (leg == 0 ? -1.0f : 1.0f) * s * 2.5f * speedFrac;
 		}
 		float landing = onHull && m->SinceLanding < 0.5 ? 1.0f - static_cast<float>(m->SinceLanding / 0.5) : 0.0f;
-		float hipZ = StandRaise - 22.0f * speedFrac - 75.0f * landing * landing + bob;
+		// US-T270: settled toward the lower foot where the plating falls away under it.
+		float hipZ = StandRaise - 22.0f * speedFrac - 75.0f * landing * landing + bob + 0.8f * lowest;
 		float lean = onHull ? -(speedFrac * 3.0f) * static_cast<float>(a.Sign) - 6.0f * landing : -8.0f;
 		Vector3 pelvisLoc = Pelvis + Vector3(0, 0, hipZ);
 		Quaternion pelvisRot = Quaternion::Euler(-lean, sway, -roll);

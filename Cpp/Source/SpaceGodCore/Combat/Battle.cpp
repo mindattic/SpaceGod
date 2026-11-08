@@ -54,6 +54,7 @@
 #include "Difficulty.h" // US-T253
 #include "ScaleModel.h"
 #include "Embodiment/MountedTurret.h"
+#include "Embodiment/MechWalker.h" // US-T270: the mechs out, stepped and shot at with the fight
 #include "Economy/Settlement.h"
 #include "Sensors/SensorPosture.h"
 #include "Settings/GameSetting.h"
@@ -408,6 +409,8 @@ namespace SpaceGod::Core
 			}
 		}
 		StepMissiles(dt);
+		// US-T270: the mechs out in the fight: hostile guns engage them and rounds crossing them strike, before the rounds fly on.
+		if (Mechs.Count() > 0) MechWalker::StepIn(self, dt);
 		StepRounds(dt);
 		StepMines(dt);
 		StepDecoys(dt);

@@ -213,9 +213,13 @@ namespace SpaceGod
 			ShowToast("Shift+N sends out a hull's mech: fly or select a capital ship or station in a fight (or hold one of its guns) first");
 			return;
 		}
+		// US-T270: in co-op an entry every peer carries out at its frame (CoopDeployMech), the asker seated in it there.
 		if (Coop::CoopPeer::Active())
 		{
-			ShowToast("No mechs in co-op yet: it stays in its bay");
+			const auto& battles = World()->War->Battles;
+			int b = battles.IndexOf(battle), u = battle->Units.IndexOf(unit);
+			if (b >= 0 && u >= 0 && CoopSends("mech", cs::Cat(b, " ", u))) ShowToast(cs::Cat("Asking for the ", unit->Name(), "'s mech..."));
+			else ShowToast("Can't ask for a mech right now"); // never sent out on this peer alone: the others would not see it
 			return;
 		}
 		cs::String why;
@@ -240,7 +244,7 @@ namespace SpaceGod
 			double length = TargetRadius(host) * 2;
 			if (length <= 0) return false;
 			mechHeight = length * MechHeightLengths;
-			auto n = m->Local.LengthSquared() > 1e-12 ? m->Local.Normalized() : DVec3(0, 1, 0);
+			auto n = m->RoofLocal(); // US-T270: the plating's own normal, not the way out from the hull's middle
 			up = m->Hull->LocalDirToWorld(n).Normalized().SwapYZ();
 			scene = TargetScene(host) + m->Hull->LocalDirToWorld(m->Local).SwapYZ() * length;
 		}
