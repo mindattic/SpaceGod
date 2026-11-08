@@ -19,6 +19,46 @@ namespace SpaceGod::Core
 		return cs::Cat(Market ? Market->Name : cs::String(), " (", Source, ")");
 	}
 
+	void PriceSheet::Remember()
+	{
+		// One sample a day: a later report the same day replaces the earlier.
+		int n = SeenJd.Count();
+		if (n > 0 && cs::Math::Floor(SeenJd[n - 1]) == cs::Math::Floor(Jd))
+		{
+			SeenJd.RemoveAt(n - 1);
+			SeenPrice.RemoveRange((n - 1) * GoodInfo::Count, GoodInfo::Count);
+		}
+		SeenJd.Add(Jd);
+		for (int g = 0; g < GoodInfo::Count; g++) SeenPrice.Add(static_cast<float>(Price[g]));
+		// Kept as long as a market keeps its own board.
+		int old = 0;
+		while (old < SeenJd.Count() && SeenJd[old] < Jd - Settlement::HistoryDays) old++;
+		if (old > 0)
+		{
+			SeenJd.RemoveRange(0, old);
+			SeenPrice.RemoveRange(0, old * GoodInfo::Count);
+		}
+	}
+
+	PriceRange PriceSheet::RangeOver(Good g, double jd, double days) const
+	{
+		PriceRange r;
+		double sum = 0;
+		if (SeenPrice.Count() != SeenJd.Count() * GoodInfo::Count) return r;
+		for (int k = 0; k < SeenJd.Count(); k++)
+		{
+			if (SeenJd[k] < jd - days || SeenJd[k] > jd) continue;
+			double p = SeenPrice[k * GoodInfo::Count + static_cast<int>(g)];
+			if (r.Samples == 0) r.Low = r.High = p;
+			r.Low = cs::Math::Min(r.Low, p);
+			r.High = cs::Math::Max(r.High, p);
+			sum += p;
+			r.Samples++;
+		}
+		if (r.Samples > 0) r.Mean = sum / r.Samples;
+		return r;
+	}
+
 	cs::String TradeLead::ToString() const
 	{
 		return cs::Cat(GoodInfo::Of(Good)->Name, ": ", From->Name, " -> ", To->Name, ", ", cs::Fmt(Profit, "N0"), " cr");
@@ -56,6 +96,7 @@ namespace SpaceGod::Core
 			sheet->Wants[g] = s->Fallen ? 0 : s->Absorb(good);
 			sheet->Buys[g] = !s->Fallen && s->Demand[g] > 0;
 		}
+		sheet->Remember(); // US-T263
 		return sheet;
 	}
 
@@ -172,6 +213,12 @@ namespace SpaceGod::Core
 					lead->Risk = risk;
 					lead->BackDoor = toRisk.Closed();
 					lead->Score = profit * ca * cb * (1 - risk);
+					// Against what the player has seen these prices do over the last month (US-T263).
+					auto buyRange = a->RangeOver(lead->Good, jd, 30), sellRange = b->RangeOver(lead->Good, jd, 30);
+					lead->BuyHasHistory = buyRange.Samples > 1;
+					lead->SellHasHistory = sellRange.Samples > 1;
+					lead->BuyVsAvg = buyRange.VsMean(buy);
+					lead->SellVsAvg = sellRange.VsMean(sell);
 					leads.Add(lead);
 				}
 			}

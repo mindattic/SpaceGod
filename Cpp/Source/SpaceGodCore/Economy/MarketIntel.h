@@ -3,6 +3,7 @@
 
 #include "Cs/Cs.h"
 #include "Economy/Goods.h" // GoodInfo::Count (the sheets' lengths), Good (by value in TradeLead)
+#include "Economy/Settlement.h" // PriceRange (by value, US-T263)
 
 #include <vector>
 #include "Persistence/Serializable.h"
@@ -35,6 +36,21 @@ namespace SpaceGod::Core
 
 		double AgeDays(double jd) const { return cs::Math::Max(0.0, jd - Jd); }
 
+		/// <summary>
+		/// The prices the player has seen here over time (US-T263): one sample a day for each day a report came in (in
+		/// port, from a captain, from a broker), kept for <see cref="Settlement.HistoryDays"/> days, oldest first. The
+		/// player's price history runs only as far as their information does: days nobody reported are not here.
+		/// <see cref="SeenPrice"/> holds <see cref="GoodInfo.Count"/> prices for each entry of <see cref="SeenJd"/>.
+		/// </summary>
+		cs::List<double> SeenJd;
+		cs::List<float> SeenPrice;
+
+		/// <summary>Adds the sheet's current prices to the history (a second report the same day replaces the first).</summary>
+		void Remember();
+
+		/// <summary>Low, high and mean of <paramref name="g"/>'s price as seen over the <paramref name="days"/> days before <paramref name="jd"/>.</summary>
+		PriceRange RangeOver(Good g, double jd, double days) const;
+
 		cs::String ToString() const;
 	};
 
@@ -51,6 +67,11 @@ namespace SpaceGod::Core
 
 		/// <summary>Margin times tonnes, credits.</summary>
 		double Profit = 0;
+
+		/// <summary>How the buy and sell prices sit against their 30-day averages as the player has seen them (+0.1 = 10%
+		/// above), and whether there is any history to say so (US-T263).</summary>
+		double BuyVsAvg = 0, SellVsAvg = 0;
+		bool BuyHasHistory = false, SellHasHistory = false;
 
 		/// <summary>The older of the two price sheets, days; and the risk at the far end, 0..1.</summary>
 		double AgeDays = 0, Risk = 0;

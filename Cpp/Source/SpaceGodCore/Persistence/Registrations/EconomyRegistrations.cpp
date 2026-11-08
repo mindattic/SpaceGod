@@ -297,7 +297,8 @@ namespace SpaceGod::Core
 		SG_F(TonnesMined), SG_F(Wages))
 
 	SG_SERIALIZE(PriceSheet, "Unity.SpaceGod.Core.PriceSheet",
-		SG_ARRAY(Available), SG_ARRAY(Buys), SG_F(Jd), SG_F(Market), SG_ARRAY(Price), SG_F(Source), SG_ARRAY(Wants))
+		SG_ARRAY(Available), SG_ARRAY(Buys), SG_F(Jd), SG_F(Market), SG_ARRAY(Price), SG_F(Source), SG_ARRAY(Wants),
+		SG_ARRAY(SeenJd).Optional(), SG_ARRAY(SeenPrice).Optional()) // US-T263: the player's price history, absent from older saves
 
 	SG_SERIALIZE(Property, "Unity.SpaceGod.Core.Property",
 		SG_P(Name), SG_F(Body), SG_F(BuyInputs), SG_F(CapacityTonnes), SG_F(DownUntilJd), SG_F(Income), SG_F(Kind),
@@ -318,7 +319,8 @@ namespace SpaceGod::Core
 		SG_F(Platforms), SG_F(Population), SG_ARRAY(Price), SG_ARRAY(PropellantDemand), SG_ARRAY(PropellantSold),
 		SG_F(Ration), SG_F(RebuildJd), SG_F(RuinedJd), SG_ARRAY(Satisfaction), SG_F(Site), SG_F(Staffing),
 		SG_F(Stage), SG_ARRAY(Stock), SG_F(Strays), SG_ARRAY(Supply), SG_F(TradeVolumeCredits), SG_F(Unrest),
-		SG_F(WageBill), SG_F(WageIndex), SG_F(WageTax), SG_F(Wellbeing))
+		SG_F(WageBill), SG_F(WageIndex), SG_F(WageTax), SG_F(Wellbeing),
+		SG_ARRAY(PriceLog).Optional(), SG_OPT(PriceLogDay), SG_OPT(PriceLogDays)) // US-T263: the board's price history, absent from older saves
 
 	SG_SERIALIZE(Smuggling, "Unity.SpaceGod.Core.Smuggling",
 		SG_F(desk), SG_F(rng))

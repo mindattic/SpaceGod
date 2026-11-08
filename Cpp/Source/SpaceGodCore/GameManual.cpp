@@ -430,7 +430,9 @@ namespace SpaceGod::Core
 				  "shocks (mine accidents, blights, strikes, blockades, embargoes) move prices for real."),
 				T("Buying and selling",
 				  "Near a settlement's world the market board (M) has Buy and Sell, trading whole crates at the prices and tax "
-				  "AI traders pay, and Refuel. I opens the grid cargo hold: click a crate, then a cell, to move it."),
+				  "AI traders pay, and Refuel. Every market keeps 90 days of its prices: the board shows each good's run as a "
+				  "sparkline and its 30- and 90-day low, high and average, warm when today's price is above the month's average "
+				  "and cool below it. I opens the grid cargo hold: click a crate, then a cell, to move it."), // US-T263
 				T("Contracts",
 				  "Every lawful port posts jobs from what the system needs: freight, passengers and colonists, escorts, "
 				  "patrols, surveys and bounties (F7). Completing one pays and raises standing with the patron; failing one costs it."),
@@ -453,7 +455,9 @@ namespace SpaceGod::Core
 				T("The trade desk",
 				  "The backslash key opens it: the runs your known prices add up to (prices you saw, your captains report or a "
 				  "broker sells, each ageing), trade news, time charters of your hulls to the companies, insurance, warehouses "
-				  "and the back door, where smugglers buy what the open market will not, at the risk of customs."),
+				  "and the back door, where smugglers buy what the open market will not, at the risk of customs. Each run marks "
+				  "how its buy and sell prices sit against their 30-day average as you have seen them; days nobody reported are "
+				  "not in your history."), // US-T263
 				T("Outfitting",
 				  "At a shipyard F2 (or Outfit on the market board) opens the hull's hardpoints and internal space: guns, "
 				  "shields and drives on the hardpoints; plate, cargo racks, scanners, a brig, marine habitats and more inside. "

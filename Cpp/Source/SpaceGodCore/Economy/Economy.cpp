@@ -98,6 +98,8 @@ namespace SpaceGod::Core
 			double dt = cs::Math::Min(tick, jd - Jd);
 			Tick(dt);
 			Jd += dt;
+			// Each market's board takes down the day's prices once a day (US-T263): read-only, so the sim is unchanged.
+			for (const auto& s : Settlements) s->SamplePrices(Jd);
 			if (Jd >= nextReviewJd)
 			{
 				Review();

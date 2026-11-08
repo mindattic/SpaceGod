@@ -25,6 +25,17 @@ namespace SpaceGod::Core
 	};
 	SPACEGODCORE_API const char* ToString(SettlementKind v);
 
+	/// <summary>A price's spread over a stretch of days (US-T263): lowest, highest and mean, and how many samples went in
+	/// (0: nothing known, the rest meaningless).</summary>
+	struct SPACEGODCORE_API PriceRange
+	{
+		double Low = 0, High = 0, Mean = 0;
+		int Samples = 0;
+
+		/// <summary>How far <paramref name="price"/> sits from the mean, as a share of it (+0.12 = 12% dearer); 0 when nothing is known.</summary>
+		double VsMean(double price) const { return Samples > 0 && Mean > 0 ? price / Mean - 1 : 0; }
+	};
+
 	/// <summary>
 	/// A populated place with a market: a colony on a world, a station in orbit, a mining outpost or a
 	/// pirate haven. It produces through its facilities, consumes through its people and industry,
@@ -244,6 +255,31 @@ namespace SpaceGod::Core
 
 		/// <summary>Credits for buying <paramref name="tonnes"/>, walking the price up as stock falls.</summary>
 		double PurchaseCost(Good g, double tonnes) const;
+
+		// ---------------------------------------------------------------- price history (US-T263)
+
+		/// <summary>Days of prices a market keeps on its board: the price history is a ring this long.</summary>
+		static constexpr int HistoryDays = 90;
+
+		/// <summary>
+		/// The board's price history (US-T263): one sample a day per good, the price at the first market tick of that day,
+		/// in a ring of <see cref="HistoryDays"/> days (slot = day mod HistoryDays, then good). Empty until first sampled.
+		/// Recorded from the prices alone, so it never feeds back into the simulation.
+		/// </summary>
+		cs::List<float> PriceLog;
+
+		/// <summary>The last day (whole Julian day) sampled into <see cref="PriceLog"/>, and how many days it holds.</summary>
+		int PriceLogDay = 0;
+		int PriceLogDays = 0;
+
+		/// <summary>Takes down today's prices if this day is not yet sampled; days skipped by a coarse tick take today's too.</summary>
+		void SamplePrices(double jd);
+
+		/// <summary>The last <paramref name="days"/> daily prices of <paramref name="g"/> held, oldest first (fewer if fewer are held).</summary>
+		cs::List<double> PriceTrail(Good g, int days) const;
+
+		/// <summary>Low, high and mean of <paramref name="g"/>'s price over the last <paramref name="days"/> days held.</summary>
+		PriceRange PriceRangeOver(Good g, int days) const;
 
 		/// <summary>
 		/// A copy of this market's board as it stands at this moment (its stock, prices, flows and deliveries booked),

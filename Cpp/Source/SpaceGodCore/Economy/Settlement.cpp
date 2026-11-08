@@ -132,4 +132,57 @@ namespace SpaceGod::Core
 		for (int i = 0; i < Supply.Count(); i++) s->Supply[i] = Supply[i];
 		return s;
 	}
+
+	// ---------------------------------------------------------------- price history (US-T263)
+
+	namespace
+	{
+		int HistorySlot(int day) { return ((day % Settlement::HistoryDays) + Settlement::HistoryDays) % Settlement::HistoryDays; }
+	}
+
+	void Settlement::SamplePrices(double jd)
+	{
+		int day = static_cast<int>(cs::Math::Floor(jd));
+		if (PriceLog.Count() != HistoryDays * GoodInfo::Count)
+		{
+			PriceLog = cs::NewArray<float>(HistoryDays * GoodInfo::Count);
+			PriceLogDays = 0;
+		}
+		if (PriceLogDays > 0 && day <= PriceLogDay) return;
+		// Days a coarse tick jumped over take today's prices (the best the board knows of them).
+		int first = PriceLogDays > 0 ? cs::Math::Max(PriceLogDay + 1, day - HistoryDays + 1) : day;
+		for (int d = first; d <= day; d++)
+		{
+			int at = HistorySlot(d) * GoodInfo::Count;
+			for (int g = 0; g < GoodInfo::Count; g++) PriceLog[at + g] = static_cast<float>(Price[g]);
+		}
+		PriceLogDays = cs::Math::Min(HistoryDays, PriceLogDays + (day - first + 1));
+		PriceLogDay = day;
+	}
+
+	cs::List<double> Settlement::PriceTrail(Good g, int days) const
+	{
+		cs::List<double> trail;
+		if (PriceLog.Count() != HistoryDays * GoodInfo::Count) return trail;
+		int n = cs::Math::Min(cs::Math::Min(days, HistoryDays), PriceLogDays);
+		for (int k = 0; k < n; k++)
+			trail.Add(PriceLog[HistorySlot(PriceLogDay - (n - 1) + k) * GoodInfo::Count + static_cast<int>(g)]);
+		return trail;
+	}
+
+	PriceRange Settlement::PriceRangeOver(Good g, int days) const
+	{
+		PriceRange r;
+		double sum = 0;
+		for (double p : PriceTrail(g, days))
+		{
+			if (r.Samples == 0) r.Low = r.High = p;
+			r.Low = cs::Math::Min(r.Low, p);
+			r.High = cs::Math::Max(r.High, p);
+			sum += p;
+			r.Samples++;
+		}
+		if (r.Samples > 0) r.Mean = sum / r.Samples;
+		return r;
+	}
 }

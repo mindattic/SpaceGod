@@ -53,6 +53,7 @@
 #include "Systems/CruiseDrive.h"
 #include "Systems/Galaxy.h"
 #include "Systems/InterstellarTraffic.h"
+#include "UI/Icons.h" // US-T263: the market board's sparklines
 
 using namespace SpaceGod::Core;
 
@@ -454,6 +455,40 @@ namespace SpaceGod::UI
 
 	// ---------------------------------------------------------------- market board
 
+	namespace
+	{
+		/// <summary>A price's last days as a row of thin bars, scaled from the stretch's low to its high; a fixed day width,
+		/// so a short history sits at the right (US-T263).</summary>
+		void Sparkline(Rect area, const cs::List<double>& trail, Color colour)
+		{
+			auto old = GUI::color;
+			GUI::color = Color(colour.r, colour.g, colour.b, 0.12f);
+			GUI::DrawTexture(area, Icons::White());
+			if (trail.Count() > 0)
+			{
+				double lo = trail[0], hi = trail[0];
+				for (double p : trail) { lo = cs::Math::Min(lo, p); hi = cs::Math::Max(hi, p); }
+				GUI::color = colour;
+				float step = area.width / Settlement::HistoryDays;
+				for (int k = 0; k < trail.Count(); k++)
+				{
+					double f = hi - lo > 1e-6 * hi ? (trail[k] - lo) / (hi - lo) : 0.5;
+					float bh = 1 + static_cast<float>(f) * (area.height - 1);
+					float x = area.xMax() - (trail.Count() - k) * step;
+					GUI::DrawTexture(Rect(x, area.yMax() - bh, step < 1 ? 1.0f : step, bh), Icons::White());
+				}
+			}
+			GUI::color = old;
+		}
+
+		/// <summary>"112-180 / 150": a stretch's low-high and mean, or a dash with nothing held (US-T263).</summary>
+		cs::String HistoryRangeText(const PriceRange& r)
+		{
+			return r.Samples == 0 ? cs::String("-")
+				: cs::Cat(cs::Fmt(r.Low, "N0"), "-", cs::Fmt(r.High, "N0"), " / ", cs::Fmt(r.Mean, "N0"));
+		}
+	}
+
 	void Hud::DrawMarket()
 	{
 		cs::Ref<Settlement> market = nullptr;
@@ -484,7 +519,9 @@ namespace SpaceGod::UI
 		float extra = shocks.has_value() ? 18.0f : 0.0f;
 
 		constexpr float rowH = 17;
-		float w = canTrade ? 600.0f : 430.0f;
+		// US-T263: the board's price history (a 90-day sparkline and the 30- and 90-day low-high / average) for a port.
+		float histW = market != nullptr ? 360.0f : 0.0f;
+		float w = (canTrade ? 600.0f : 430.0f) + histW;
 		// US-T208: 78 = the 50 above the column header, its row, and 11 of padding under the last good (it was 62: Munitions sat on the border).
 		float h = marketOpen ? 78 + GoodInfo::Count * rowH + (canTrade ? 20 : 0) + extra + lawRow : 34;
 		auto r = Panel(layout.Take(HudRegion::TopRight, w, h)); // TopRight's first slot (US-T153)
@@ -536,6 +573,13 @@ namespace SpaceGod::UI
 		GUI::Label(Rect(r.x + 170, y, 80, rowH), market != nullptr ? "Stock" : "", small);
 		GUI::Label(Rect(r.x + 250, y, 80, rowH), "Price", small);
 		GUI::Label(Rect(r.x + 340, y, 80, rowH), market != nullptr ? "Flow/day" : "vs base", small);
+		float hx = r.x + 430; // the history columns (US-T263)
+		if (histW > 0)
+		{
+			GUI::Label(Rect(hx, y, 90, rowH), "90 days", small);
+			GUI::Label(Rect(hx + 100, y, 125, rowH), "30 d low-high / avg", small);
+			GUI::Label(Rect(hx + 230, y, 125, rowH), "90 d low-high / avg", small);
+		}
 		y += rowH;
 		for (int g = 0; g < GoodInfo::Count; g++)
 		{
@@ -555,10 +599,22 @@ namespace SpaceGod::UI
 			cs::String price = cs::Fmt(market != nullptr ? market->Price[g] : info->BasePrice * ratio, "N0");
 			GUI::Label(Rect(r.x + 250, y, 90, rowH), price, small);
 			if (market == nullptr) GUI::Label(Rect(r.x + 340, y, 90, rowH), cs::Cat("x", cs::Fmt(ratio, "0.00")), small);
+			if (histW > 0)
+			{
+				// Today's price against the month's average: dearer than usual warm, cheaper cool (US-T263).
+				auto month = market->PriceRangeOver(good, 30), season = market->PriceRangeOver(good, Settlement::HistoryDays);
+				double vs = month.VsMean(market->Price[g]);
+				Color trend = month.Samples < 2 || cs::Math::Abs(vs) < 0.03 ? Color(0.7f, 0.75f, 0.85f) : vs > 0 ? Color(1.0f, 0.7f, 0.45f) : Color(0.55f, 0.85f, 1.0f);
+				Sparkline(Rect(hx, y + 2, 90, rowH - 4), market->PriceTrail(good, Settlement::HistoryDays), trend);
+				GUI::contentColor = trend;
+				GUI::Label(Rect(hx + 100, y, 125, rowH), HistoryRangeText(month), small);
+				GUI::contentColor = Dim;
+				GUI::Label(Rect(hx + 230, y, 125, rowH), HistoryRangeText(season), small);
+			}
 			if (canTrade)
 			{
-				if (GUI::Button(Rect(r.x + 440, y - 1, 68, rowH), "Buy", button)) ClickBuy(market, good);
-				if (GUI::Button(Rect(r.x + 515, y - 1, 68, rowH), "Sell", button)) ClickSell(market, good);
+				if (GUI::Button(Rect(r.x + 440 + histW, y - 1, 68, rowH), "Buy", button)) ClickBuy(market, good);
+				if (GUI::Button(Rect(r.x + 515 + histW, y - 1, 68, rowH), "Sell", button)) ClickSell(market, good);
 			}
 			y += rowH;
 		}

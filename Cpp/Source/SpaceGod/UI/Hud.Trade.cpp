@@ -141,8 +141,10 @@ namespace SpaceGod::UI
 		for (const auto& lead : leads)
 		{
 			GUI::contentColor = lead->BackDoor ? UiStyle::Warning : lead->Risk >= 0.35 ? Color(1.0f, 0.85f, 0.5f) : Color::white();
-			cs::String line = cs::Cat(GoodInfo::Of(lead->Good)->Name, ":  ", lead->From->Name, " ", cs::Fmt(lead->BuyPrice, "N0"),
-				"  ->  ", lead->To->Name, " ", cs::Fmt(lead->SellPrice, "N0"), "   ", Tonnes(lead->Tonnes),
+			// Each end against its 30-day average as the player has seen it (US-T263): "(+12% avg)".
+			auto vsAvg = [](bool known, double vs) { return known ? cs::Cat(" (", vs >= 0 ? "+" : "", cs::Fmt(vs * 100, "0"), "% avg)") : cs::String(); };
+			cs::String line = cs::Cat(GoodInfo::Of(lead->Good)->Name, ":  ", lead->From->Name, " ", cs::Fmt(lead->BuyPrice, "N0"), vsAvg(lead->BuyHasHistory, lead->BuyVsAvg),
+				"  ->  ", lead->To->Name, " ", cs::Fmt(lead->SellPrice, "N0"), vsAvg(lead->SellHasHistory, lead->SellVsAvg), "   ", Tonnes(lead->Tonnes),
 				"  ·  ", Credits(lead->Profit), "  ·  ", MarketIntel::AgeText(lead->AgeDays),
 				lead->Risk >= 0.05 ? cs::Cat("  ·  risk ", Percent(lead->Risk)) : cs::String(), lead->BackDoor ? "  ·  back door" : "");
 			GUI::Label(Rect(x, y, view.width - 140, rowH), line, small);
