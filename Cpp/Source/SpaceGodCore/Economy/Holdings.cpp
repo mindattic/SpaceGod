@@ -9,7 +9,9 @@
 #include "Combat/Diplomacy.h"
 #include "Economy/Charters.h"
 #include "Economy/Companies.h"
+#include "Economy/Contracts.h"
 #include "Economy/Economy.h"
+#include "Economy/Industry.h"
 #include "Economy/Propulsion.h"
 #include "Economy/Settlement.h"
 #include "Fleet.h"
@@ -40,6 +42,19 @@ namespace SpaceGod::Core
 			case PropertyKind::Warehouse: return "Warehouse";
 			case PropertyKind::StationShare: return "StationShare";
 			case PropertyKind::MiningClaim: return "MiningClaim";
+			case PropertyKind::Plant: return "Plant";
+		}
+		return "";
+	}
+
+	const char* ToString(PlantStatus v)
+	{
+		switch (v)
+		{
+			case PlantStatus::Running: return "Running";
+			case PlantStatus::Idle: return "Idle";
+			case PlantStatus::Starved: return "Starved";
+			case PlantStatus::Full: return "Full";
 		}
 		return "";
 	}
@@ -555,8 +570,13 @@ namespace SpaceGod::Core
 	double Holdings::SellFromStore(const cs::Ref<Property>& warehouse, Good good, double tonnes, double jd)
 	{
 		if (warehouse == nullptr || warehouse->Lost || warehouse->Kind != PropertyKind::Warehouse) return 0;
-		tonnes = cs::Math::Min(tonnes, warehouse->Stock[static_cast<int>(good)]);
-		auto s = warehouse->Settlement;
+		return SellStock(warehouse, warehouse, good, tonnes, jd, true);
+	}
+
+	double Holdings::SellStock(const cs::Ref<Property>& store, const cs::Ref<Property>& credit, Good good, double tonnes, double jd, bool book)
+	{
+		tonnes = cs::Math::Min(tonnes, store->Stock[static_cast<int>(good)]);
+		auto s = store->Settlement;
 		if (!CanTradeAt(s)) return 0;
 		if (tonnes < 0.01 || s->Demand[static_cast<int>(good)] <= 0) return 0;
 		double value = s->SaleValue(good, tonnes);
@@ -564,12 +584,308 @@ namespace SpaceGod::Core
 		s->Stock[static_cast<int>(good)] += tonnes;
 		s->Owner->Treasury += tax;
 		s->TradeVolumeCredits += value;
-		warehouse->Stock[static_cast<int>(good)] -= tonnes;
+		store->Stock[static_cast<int>(good)] -= tonnes;
 		House->Treasury += value - tax;
-		warehouse->Income += value - tax;
+		credit->Income += value - tax;
 		s->RefreshPrices();
-		Book(jd, cs::Cat("Sold ", cs::Fmt(tonnes, "N0"), " t of ", cs::Strings::ToLowerInvariant(GoodInfo::Of(good)->Name), " out of the ", warehouse->Name), value - tax);
+		if (book) Book(jd, cs::Cat("Sold ", cs::Fmt(tonnes, "N0"), " t of ", cs::Strings::ToLowerInvariant(GoodInfo::Of(good)->Name), " out of the ", credit->Name), value - tax);
 		return value - tax;
+	}
+
+	// ---------------------------------------------------------------- plants (US-T265)
+
+	cs::List<IndustryKind> Holdings::PlantKindsAt(const cs::Ref<Settlement>& port)
+	{
+		cs::List<IndustryKind> kinds;
+		if (port == nullptr) return kinds;
+		for (const auto& f : port->Facilities)
+		{
+			if (f == nullptr || f->Recipe == nullptr) continue;
+			auto k = f->Recipe->Kind;
+			if (k == IndustryKind::Mine || k == IndustryKind::Shipyard || kinds.Contains(k)) continue;
+			kinds.Add(k);
+		}
+		// In the order of the industries, not of the port's works.
+		for (int i = 1; i < kinds.Count(); i++)
+			for (int j = i; j > 0 && static_cast<int>(kinds[j]) < static_cast<int>(kinds[j - 1]); j--)
+			{
+				auto t = kinds[j];
+				kinds[j] = kinds[j - 1];
+				kinds[j - 1] = t;
+			}
+		return kinds;
+	}
+
+	double Holdings::PlantPrice(IndustryKind kind)
+	{
+		auto r = Recipe::Of(kind);
+		double v = 0;
+		for (const auto& [g, rate] : r->Outputs) v += rate * PlantLevel * GoodInfo::Of(g)->BasePrice;
+		return v * PlantPriceDays;
+	}
+
+	cs::String Holdings::PlantWord(IndustryKind kind) { return kind == IndustryKind::Smelter ? cs::String("refinery") : cs::String("factory"); }
+
+	cs::Ref<Property> Holdings::BuyPlant(const cs::Ref<Settlement>& port, IndustryKind kind, double jd)
+	{
+		if (port == nullptr || port->Fallen || port->Owner == nullptr || port->Owner->IsPirate || port->Kind == SettlementKind::Haven || !world->Diplomacy()->CanDockAt(House, port)) return nullptr;
+		if (!PlantKindsAt(port).Contains(kind)) return nullptr;
+		cs::Ref<Property> store = nullptr;
+		for (const auto& p : OfKind(PropertyKind::Warehouse))
+			if (p->Settlement == port) store = p;
+		if (store == nullptr) return nullptr;
+		for (const auto& p : OfKind(PropertyKind::Plant))
+			if (p->Settlement == port && p->Recipe != nullptr && p->Recipe->Kind == kind) return nullptr;
+		double price = PlantPrice(kind);
+		if (House->Treasury < price) return nullptr;
+		House->Treasury -= price;
+		port->Owner->Treasury += price;
+		auto plant = cs::New<Property>();
+		plant->Kind = PropertyKind::Plant;
+		plant->Settlement = port;
+		plant->Body = port->Body;
+		plant->Recipe = Recipe::Of(kind);
+		plant->Level = PlantLevel;
+		plant->Warehouse = store;
+		plant->Landlord = port->Owner;
+		plant->PricePaid = price;
+		plant->SinceJd = jd;
+		plant->Name = cs::Cat(PlantWord(kind), " at ", port->Name, " (", cs::Strings::ToLowerInvariant(plant->Recipe->Name), ")");
+		AddProperty(plant, jd);
+		return plant;
+	}
+
+	double Holdings::PlantRate(const cs::Ref<Property>& plant, Good good, bool output)
+	{
+		if (plant == nullptr || plant->Recipe == nullptr) return 0;
+		double t = 0;
+		for (const auto& [g, rate] : output ? plant->Recipe->Outputs : plant->Recipe->Inputs)
+			if (g == good) t += rate * plant->Level;
+		return t;
+	}
+
+	void Holdings::RunPlant(const cs::Ref<Property>& p, double jd)
+	{
+		auto s = p->Settlement;
+		auto store = p->Warehouse;
+		auto recipe = p->Recipe;
+		if (recipe == nullptr || store == nullptr || store->Lost || s == nullptr)
+		{
+			p->Status = PlantStatus::Idle;
+			p->Utilisation = 0;
+			return;
+		}
+		double crew = (recipe->WorkersPerLevel * p->Level * PlantWagePerWorker + PlantFixedPerDay) * TickDays;
+		auto Average = [&](double profit) { p->ProfitPerDay = p->TonnesMade <= 0 && p->ProfitPerDay == 0 ? profit : 0.7 * p->ProfitPerDay + 0.3 * profit; };
+
+		// Raiders where the war runs hot: they carry off part of what it made, and it stands idle while it mends.
+		if (p->DownUntilJd <= jd && world->Contracts != nullptr)
+		{
+			double danger = cs::Math::Max(0.0, cs::Math::Min(1.0, world->Contracts->DangerAt(p->Body)));
+			if (danger > 0 && rng.NextDouble() < danger * PlantRaidPerDay * TickDays)
+			{
+				double tonnes = 0, value = 0;
+				for (const auto& [g, rate] : recipe->Outputs)
+				{
+					double take = store->Stock[static_cast<int>(g)] * PlantRaidShare;
+					store->Stock[static_cast<int>(g)] -= take;
+					tonnes += take;
+					value += take * GoodInfo::Of(g)->BasePrice;
+				}
+				p->TonnesRaided += tonnes;
+				p->DownUntilJd = jd + PlantRaidDownDays;
+				Book(jd, cs::Cat("Raiders hit the ", p->Name, tonnes >= 1 ? cs::Cat(": ", cs::Fmt(tonnes, "N0"), " t carried off") : cs::String()), -value, true, /*cash:*/ false);
+				world->Log(jd, cs::Cat("Raiders hit your ", p->Name), WorldEventKind::Loss, p->Body);
+			}
+		}
+
+		if (!p->Working || p->DownUntilJd > jd)
+		{
+			p->Status = PlantStatus::Idle;
+			p->Utilisation = 0;
+			Charge(p, crew * PlantIdleUpkeep, jd, cs::Cat("Upkeep on the idle ", p->Name));
+			Average(-crew * PlantIdleUpkeep);
+			return;
+		}
+
+		// How much of its rate it can make: its feedstock (from the warehouse, then the market), then room for the goods.
+		bool market = p->BuyInputs && CanTradeAt(s);
+		int n = recipe->Inputs.Count();
+		double f = 1, eff = 1;
+		for (int i = 0; i < n; i++)
+		{
+			auto [g, rate] = recipe->Inputs[i];
+			double need = rate * p->Level * TickDays;
+			if (need <= 0) continue;
+			double have = store->Stock[static_cast<int>(g)] + (market ? s->Available(g) : 0);
+			double share = cs::Math::Min(1.0, have / need);
+			if (recipe->Limiting[i]) f = cs::Math::Min(f, share);
+			else eff = cs::Math::Min(eff, Recipe::MinorFloor + (1 - Recipe::MinorFloor) * share);
+		}
+		double fed = f;
+		double outFull = 0;
+		for (const auto& [g, rate] : recipe->Outputs) outFull += rate * p->Level * TickDays * eff;
+		double room = cs::Math::Max(0.0, store->CapacityTonnes - store->StoredTonnes());
+		if (outFull > 0 && outFull * f > room) f = room / outFull;
+		bool full = f < fed - 1e-9;
+
+		// What it must buy at that rate, cut to what the account can pay.
+		auto Use = [&](int i, double ff)
+		{
+			auto [g, rate] = recipe->Inputs[i];
+			double use = rate * p->Level * TickDays * ff;
+			return recipe->Limiting[i] ? use : cs::Math::Min(use, store->Stock[static_cast<int>(g)] + (market ? s->Available(g) : 0));
+		};
+		bool poor = false;
+		if (market)
+			for (int guard = 0; guard < 4 && f > 1e-6; guard++)
+			{
+				double cost = 0;
+				for (int i = 0; i < n; i++)
+				{
+					auto g = std::get<0>(recipe->Inputs[i]);
+					double buy = Use(i, f) - store->Stock[static_cast<int>(g)];
+					if (buy > 0.01) cost += s->PurchaseCost(g, buy) * (1 + Economy::PortTax);
+				}
+				if (cost <= cs::Math::Max(0.0, House->Treasury)) break;
+				poor = true;
+				f *= cs::Math::Max(0.0, House->Treasury) / cost * 0.99;
+			}
+		if (f < 1e-6) f = 0;
+
+		// Draw the feedstock and make the goods.
+		double drawnValue = 0, bought = 0;
+		for (int i = 0; i < n; i++)
+		{
+			auto g = std::get<0>(recipe->Inputs[i]);
+			int gi = static_cast<int>(g);
+			double use = Use(i, f);
+			double fromStore = cs::Math::Min(use, store->Stock[gi]);
+			store->Stock[gi] -= fromStore;
+			drawnValue += fromStore * s->Price[gi];
+			double buy = market ? cs::Math::Min(use - fromStore, s->Available(g)) : 0;
+			if (buy <= 0.01) continue;
+			double price = s->PurchaseCost(g, buy);
+			s->Stock[gi] = cs::Math::Max(0.0, s->Stock[gi] - buy);
+			s->Owner->Treasury += price * Economy::PortTax;
+			s->TradeVolumeCredits += price;
+			House->Treasury -= price * (1 + Economy::PortTax);
+			bought += price * (1 + Economy::PortTax);
+		}
+		if (bought > 0)
+		{
+			s->RefreshPrices();
+			p->Upkeep += bought;
+			Book(jd, cs::Cat("Feedstock for the ", p->Name), -bought);
+		}
+		double made = 0, value = 0;
+		for (const auto& [g, rate] : recipe->Outputs)
+		{
+			double t = rate * p->Level * TickDays * f * eff;
+			if (t <= 0) continue;
+			store->Stock[static_cast<int>(g)] += t;
+			made += t;
+			value += t * s->Price[static_cast<int>(g)];
+		}
+		p->TonnesMade += made;
+		p->Utilisation = f * eff;
+		p->Status = f * eff >= 0.999 ? PlantStatus::Running : full ? PlantStatus::Full : PlantStatus::Starved;
+		if (poor && p->Status == PlantStatus::Running) p->Status = PlantStatus::Starved;
+
+		// Straight onto the market, if the house wants it sold as it is made (more supply here, a lower price).
+		if (p->SellOutputs && made > 0)
+		{
+			double sold = 0;
+			for (const auto& [g, rate] : recipe->Outputs)
+				sold += SellStock(store, p, g, rate * p->Level * TickDays * f * eff, jd, false);
+			if (sold >= 1) Book(jd, cs::Cat("Sold what the ", p->Name, " made"), sold);
+		}
+
+		Charge(p, crew, jd, cs::Cat("Crew and power at the ", p->Name));
+		Average(value - drawnValue - bought - crew);
+	}
+
+	bool Holdings::DeliverToPlant(const cs::Ref<Ship>& ship, int body, double jd)
+	{
+		auto o = Of(ship);
+		if (o == nullptr || o->FeedingPlant == nullptr) return false;
+		auto p = o->FeedingPlant;
+		if (!ship->HasCargo)
+		{
+			o->FeedingPlant = nullptr;
+			return false;
+		}
+		if (p->Body != body) return false; // not there yet
+		o->FeedingPlant = nullptr;
+		auto store = p->Warehouse;
+		if (p->Lost || store == nullptr || store->Lost || PlantRate(p, ship->CargoGood, false) <= 0) return false;
+		double t = cs::Math::Min(ship->CargoTonnes, cs::Math::Max(0.0, store->CapacityTonnes - store->StoredTonnes()));
+		if (t < 0.01) return false; // no room: it goes to the market
+		double cost = ship->CargoTonnes > 0 ? ship->CargoCost * t / ship->CargoTonnes : 0;
+		auto good = ship->CargoGood;
+		Economy()->Release(ship);
+		store->Stock[static_cast<int>(good)] += t;
+		ship->CargoTonnes -= t;
+		ship->CargoCost -= cost;
+		p->Upkeep += cost;
+		// Paid for out of the account when it was loaded (cargo afloat until now): a cost of the plant's from here.
+		Book(jd, cs::Cat("The ", o->Name(), " delivers ", cs::Fmt(t, "N0"), " t of ", cs::Strings::ToLowerInvariant(GoodInfo::Of(good)->Name), " to the ", p->Name), -cost);
+		if (ship->CargoTonnes > 1e-6)
+		{
+			ship->Cargo = Economy::CargoText(ship);
+			return false;
+		}
+		ship->HasCargo = false;
+		ship->CargoTonnes = 0;
+		ship->CargoCost = 0;
+		ship->CargoBonus = 0;
+		ship->CargoDestination = nullptr;
+		ship->Cargo = cs::String();
+		return true;
+	}
+
+	bool Holdings::LoadForPlant(const cs::Ref<OwnedShip>& o, int here, int to, double jd)
+	{
+		auto ship = o->Ship;
+		if (ship->HasCargo || ship->CapacityTonnes <= 0) return false;
+		for (const auto& p : Properties)
+		{
+			if (p->Lost || p->Kind != PropertyKind::Plant || p->Body != to || !p->Working || p->Recipe == nullptr) continue;
+			auto store = p->Warehouse;
+			if (store == nullptr || store->Lost) continue;
+			double room = store->CapacityTonnes - store->StoredTonnes();
+			if (room < 1) continue;
+			// The feedstock furthest short of its days in stock (by value) that a market here sells and the hull can carry.
+			cs::Ref<Settlement> from = nullptr;
+			Good good = static_cast<Good>(0);
+			double tonnes = 0, best = 0;
+			for (int i = 0; i < p->Recipe->Inputs.Count(); i++)
+			{
+				if (!p->Recipe->Limiting[i]) continue;
+				auto g = std::get<0>(p->Recipe->Inputs[i]);
+				double want = PlantRate(p, g, false) * PlantStockDays - store->Stock[static_cast<int>(g)];
+				if (want < 1 || !Economy::Carries(ship->Spec->Class, g)) continue;
+				for (const auto& s : Economy()->At(here))
+				{
+					if (s == p->Settlement || !CanTradeAt(s) || !Economy()->CanTrade(ship, s)) continue;
+					double t = cs::Math::Min(cs::Math::Min(want, room), cs::Math::Min(ship->CapacityTonnes, s->Available(g)));
+					double v = t * GoodInfo::Of(g)->BasePrice;
+					if (t >= 1 && v > best)
+					{
+						best = v;
+						from = s;
+						good = g;
+						tonnes = t;
+					}
+				}
+			}
+			if (from == nullptr) continue;
+			if (from->PurchaseCost(good, tonnes) * (1 + Economy::PortTax) > House->Treasury) continue;
+			Economy()->LoadUnbooked(ship, from, good, tonnes, cs::Cat("the ", p->Name));
+			o->FeedingPlant = p;
+			return true;
+		}
+		return false;
 	}
 
 	// ---------------------------------------------------------------- the daily round
@@ -609,6 +925,10 @@ namespace SpaceGod::Core
 					break;
 				case PropertyKind::MiningClaim:
 					Charge(p, ClaimFeePerDay, jd, cs::Cat("Fee on the ", p->Name));
+					break;
+				case PropertyKind::Plant:
+					if (Seized(p, jd)) break;
+					RunPlant(p, jd);
 					break;
 			}
 		}
@@ -764,13 +1084,17 @@ namespace SpaceGod::Core
 		// A port abandoned to ruin is gone for good too (nothing re-opens a ruin): no more rent on a store nobody
 		// can sell from, nor a share of trade that will never come.
 		bool abandoned = p->Settlement != nullptr && p->Settlement->Fallen && owner != nullptr && !owner->IsPirate;
-		if (owner != nullptr && !owner->IsPirate && !abandoned) return false;
+		// A plant goes with its port: whoever takes the port in war takes the works (US-T265).
+		bool takenOver = p->Kind == PropertyKind::Plant && p->Landlord != nullptr && owner != nullptr && owner != p->Landlord && !owner->IsPirate && !abandoned;
+		if (owner != nullptr && !owner->IsPirate && !abandoned && !takenOver) return false;
 		p->Lost = true;
 		p->LostJd = jd;
 		double value = p->PricePaid;
 		if (p->Kind == PropertyKind::Warehouse)
 			for (int g = 0; g < GoodInfo::Count; g++) value += p->Stock[g] * GoodInfo::Of(static_cast<Good>(g))->BasePrice;
-		cs::String what = abandoned ? cs::Cat(" is lost with the abandoned ", p->Settlement->Name) : cs::String(" is seized");
+		cs::String what = abandoned ? cs::Cat(" is lost with the abandoned ", p->Settlement->Name)
+			: takenOver ? cs::Cat(" is seized by the ", owner->Name, ", who took ", p->Settlement->Name)
+			: cs::String(" is seized");
 		Book(jd, cs::Cat("The ", p->Name, what), -value, true, /*cash:*/ false);
 		world->Log(jd, cs::Cat("Your ", p->Name, what), WorldEventKind::Loss, p->Body);
 		PropertyLost.Invoke(p, value, jd);
@@ -892,6 +1216,8 @@ namespace SpaceGod::Core
 			if (sell >= 0) return sell;
 			DumpCargo(ship);
 		}
+		// Feedstock for a house plant at the next stop comes first (US-T265), then whatever pays best there.
+		if (!ship->HasCargo) LoadForPlant(o, here, to, jd);
 		if (!ship->HasCargo) Economy()->LoadFor(ship, here, to, jd);
 		if (!ship->HasCargo) ship->Cargo = cs::Cat("Empty, on its route to ", (*world->Catalog())[to]->Name);
 		return to;

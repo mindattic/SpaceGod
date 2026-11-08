@@ -549,8 +549,10 @@ namespace SpaceGod::Core
 			if (ship->Role == ShipRole::Tug) TugArrived(ship, when);
 			// A works' freighter empties its hold into the warehouse its convoy is for (U.SPC-T523).
 			if (ship->Role == ShipRole::Hauler) FreighterArrived(ship, when);
+			// Feedstock a house captain carried for one of the house's plants goes into its warehouse (US-T265).
+			bool fed = Holdings != nullptr && Holdings->DeliverToPlant(ship, ship->Orbit->Body, when);
 			bool contracted = Contracts->OnArrived(ship, ship->Orbit->Body, when);
-			if (IsTrader(ship) && !bound && !contracted) economy->OnArrive(ship, ship->Orbit->Body, when);
+			if (IsTrader(ship) && !bound && !contracted && !fed) economy->OnArrive(ship, ship->Orbit->Body, when);
 			war->OnArrived(ship, when);
 		};
 		fleet->ReachedRing = [war](cs::Ref<Ship> ship, double jd) { war->OnArrived(ship, jd); };

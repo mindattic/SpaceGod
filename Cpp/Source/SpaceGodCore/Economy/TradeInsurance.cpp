@@ -119,7 +119,7 @@ namespace SpaceGod::Core
 
 	cs::Ref<InsurancePolicy> TradeInsurance::Insure(const cs::Ref<::SpaceGod::Core::Property>& p, double jd)
 	{
-		if (p == nullptr || p->Lost || p->Kind != PropertyKind::Warehouse || !Holdings()->Properties.Contains(p) || Of(p) != nullptr) return nullptr;
+		if (p == nullptr || p->Lost || (p->Kind != PropertyKind::Warehouse && p->Kind != PropertyKind::Plant) || !Holdings()->Properties.Contains(p) || Of(p) != nullptr) return nullptr;
 		auto [cover, premium, risk] = Quote(p);
 		if (risk >= Uninsurable) return nullptr;
 		auto policy = cs::New<InsurancePolicy>();

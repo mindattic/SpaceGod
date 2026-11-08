@@ -112,7 +112,7 @@ namespace SpaceGod::Core
 		/// <summary>Insures a hull (and its cargo); null if it is not the house's, already covered, or too great a risk to write.</summary>
 		cs::Ref<InsurancePolicy> Insure(const cs::Ref<OwnedShip>& o, double jd);
 
-		/// <summary>Insures a warehouse (and its stock); null if it is not a standing warehouse of the house's, already
+		/// <summary>Insures a warehouse (and its stock) or a plant (US-T265); null if it is not a standing one of the house's, already
 		/// covered, or too great a risk to write.</summary>
 		cs::Ref<InsurancePolicy> Insure(const cs::Ref<::SpaceGod::Core::Property>& p, double jd);
 

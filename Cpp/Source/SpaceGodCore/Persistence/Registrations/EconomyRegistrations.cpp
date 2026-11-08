@@ -131,6 +131,8 @@ namespace SpaceGod::Core
 
 	SG_ENUM(PropertyKind, "Unity.SpaceGod.Core.PropertyKind")
 
+	SG_ENUM(PlantStatus, "Unity.SpaceGod.Core.PlantStatus") // US-T265
+
 	SG_ENUM(SettlementKind, "Unity.SpaceGod.Core.SettlementKind")
 
 	SG_ENUM(ShockKind, "Unity.SpaceGod.Core.ShockKind")
@@ -290,7 +292,7 @@ namespace SpaceGod::Core
 		SG_F(TugsLost))
 
 	SG_SERIALIZE(OwnedShip, "Unity.SpaceGod.Core.OwnedShip",
-		SG_F(Captain), SG_F(Charter), SG_F(Earned), SG_F(Lost), SG_F(LostHow), SG_F(LostJd), SG_F(MiningDays),
+		SG_F(Captain), SG_F(Charter), SG_F(Earned), SG_F(FeedingPlant), SG_F(Lost), SG_F(LostHow), SG_F(LostJd), SG_F(MiningDays),
 		SG_F(Orders), SG_F(PricePaid), SG_F(Repairs), SG_F(SeenCredits), SG_F(Ship), SG_F(SinceJd), SG_F(Spent),
 		SG_F(TonnesMined), SG_F(Wages))
 
@@ -298,9 +300,11 @@ namespace SpaceGod::Core
 		SG_ARRAY(Available), SG_ARRAY(Buys), SG_F(Jd), SG_F(Market), SG_ARRAY(Price), SG_F(Source), SG_ARRAY(Wants))
 
 	SG_SERIALIZE(Property, "Unity.SpaceGod.Core.Property",
-		SG_P(Name), SG_F(Body), SG_F(CapacityTonnes), SG_F(Income), SG_F(Kind), SG_F(Lost), SG_F(LostJd), SG_F(Ore),
-		SG_F(PricePaid), SG_F(SeenTradeVolume), SG_F(Settlement), SG_F(Share), SG_F(SinceJd), SG_ARRAY(Stock),
-		SG_F(Upkeep), SG_F(YieldPerDay))
+		SG_P(Name), SG_F(Body), SG_F(BuyInputs), SG_F(CapacityTonnes), SG_F(DownUntilJd), SG_F(Income), SG_F(Kind),
+		SG_F(Landlord), SG_F(Level), SG_F(Lost), SG_F(LostJd), SG_F(Ore), SG_F(PricePaid), SG_F(ProfitPerDay),
+		SG_F(Recipe), SG_F(SeenTradeVolume), SG_F(SellOutputs), SG_F(Settlement), SG_F(Share), SG_F(SinceJd),
+		SG_F(Status), SG_ARRAY(Stock), SG_F(TonnesMade), SG_F(TonnesRaided), SG_F(Upkeep), SG_F(Utilisation),
+		SG_F(Warehouse), SG_F(Working), SG_F(YieldPerDay))
 
 	SG_SERIALIZE(Recipe, "Unity.SpaceGod.Core.Recipe",
 		SG_PARRAY(Inputs), SG_P(Kind), SG_PARRAY(Limiting), SG_P(Name), SG_PARRAY(Outputs), SG_P(WorkersPerLevel))

@@ -4,6 +4,7 @@
 #include "CaptureEvents.h" // US-T72
 
 #include "UnitySpaceApp.h"
+#include "Coop/CoopPeer.h" // US-T265: plants are bought and run outside co-op
 #include "Camera/SpaceCamera.h"
 #include "Rendering/ShipThumbnails.h"
 
@@ -32,6 +33,7 @@
 #include "Economy/Economy.h"
 #include "Economy/Goods.h"
 #include "Economy/Holdings.h"
+#include "Economy/Industry.h" // US-T265: a plant's recipe
 #include "Economy/MarketIntel.h"
 #include "Economy/MarketShocks.h"
 #include "Economy/Settlement.h"
@@ -207,9 +209,9 @@ namespace SpaceGod::UI
 		constexpr float w = 820, rowH = 20;
 		int shipRows = 0, propRows = 0;
 		for (const auto& o : h->Ships) if (!o->Lost) shipRows++;
-		for (const auto& p : h->Properties) if (!p->Lost) propRows++;
+		for (const auto& p : h->Properties) if (!p->Lost) propRows += p->Kind == PropertyKind::Plant ? 2 : 1; // a plant: its state, then its goods (US-T265)
 		float listH = Mathf::Min((shipRows + propRows + 2) * rowH, 260.0f);
-		float h0 = 128 + listH + 6 * 16;
+		float h0 = 128 + 24 + listH + 6 * 16;
 		auto r = Panel(Rect((Screen::width - w) * 0.5f, 110, w, h0));
 		GUI::Label(Rect(r.x + 12, r.y + 6, w - 24, 22), cs::Cat("YOUR FLEET  ·  account ", Credits(h->Balance()), "  ·  earned ", Credits(h->TotalEarned),
 			"  ·  costs ", Credits(h->TotalCosts), "  ·  lost ", Credits(h->TotalLost)), title);
@@ -262,6 +264,40 @@ namespace SpaceGod::UI
 			GUI::contentColor = Dim;
 			GUI::Label(Rect(x, y + 2, 420, 18), "Select a world with a port (or fly alongside one) to buy there.", small);
 		}
+
+		// A refinery or factory at the port, running one of its own works off the house warehouse there (US-T265).
+		y += 24;
+		if (port != nullptr)
+		{
+			bool stored = false;
+			for (const auto& p : h->OfKind(PropertyKind::Warehouse))
+				if (p->Settlement == port) stored = true;
+			auto kinds = Holdings::PlantKindsAt(port);
+			GUI::contentColor = Dim;
+			if (Coop::CoopPeer::Current() != nullptr)
+				GUI::Label(Rect(x, y + 2, w - 24, 18), "Plants are bought and run outside co-op.", small);
+			else if (kinds.Count() == 0)
+				GUI::Label(Rect(x, y + 2, w - 24, 18), cs::Cat(port->Name, " runs no works a refinery or factory could copy."), small);
+			else if (!stored)
+				GUI::Label(Rect(x, y + 2, w - 24, 18), cs::Cat("Buy a warehouse at ", port->Name, " to build a refinery or factory there: it feeds the plant and takes what it makes."), small);
+			else
+			{
+				GUI::Label(Rect(x, y + 2, 170, 18), "Build a plant:", small);
+				GUI::contentColor = Color::white();
+				float bx = x + 170;
+				for (auto kind : kinds)
+				{
+					auto recipe = Recipe::Of(kind);
+					if (bx + 150 > r.xMax() - 12) break;
+					if (GUI::Button(Rect(bx, y, 146, 20), cs::Cat(recipe->Name, " ", Credits(Holdings::PlantPrice(kind))), button))
+					{
+						auto plant = h->BuyPlant(port, kind, jd);
+						app->ShowToast(plant != nullptr ? cs::Cat("The ", plant->Name, " is yours") : cs::String("Not for sale (one of each per port, and the account must cover it)"));
+					}
+					bx += 150;
+				}
+			}
+		}
 		if (sel.IsBody() && !(*world->Catalog())[sel.Body]->IsStar())
 		{
 			GUI::contentColor = Color::white();
@@ -282,6 +318,46 @@ namespace SpaceGod::UI
 		auto content = Rect(0, 0, w - 36, (shipRows + propRows + 2) * rowH);
 		fleetScroll = GUI::BeginScrollView(view, fleetScroll, content);
 		float ly = 0;
+		bool coop = Coop::CoopPeer::Current() != nullptr; // US-T265: a plant's switches are the host's alone
+		// A plant's two rows (US-T265): its state and switches, then its goods.
+		auto DrawPlantRows = [&](const cs::Ref<Property>& p)
+		{
+			auto store = p->Warehouse;
+			auto was = GUI::contentColor;
+			// Its state: what it made of its rate, the profit a day it is running at, and its switches.
+			cs::String status = p->Status == PlantStatus::Running ? "running"
+				: p->Status == PlantStatus::Starved ? "STARVED of feedstock"
+				: p->Status == PlantStatus::Full ? "FULL: no room in the warehouse"
+				: p->DownUntilJd > jd ? "idle, mending after a raid"
+				: !p->Working ? "idle (stood down)" : "idle";
+			GUI::contentColor = p->Status == PlantStatus::Running ? UiStyle::Good : p->Status == PlantStatus::Idle ? Dim : UiStyle::Warning;
+			GUI::Label(Rect(4, ly, w - 300, rowH), cs::Cat(p->Name, "  ·  ", status, "  ·  ", cs::Fmt(p->Utilisation, "P0"), " of rate  ·  ",
+				p->ProfitPerDay >= 0 ? "+" : "", Credits(p->ProfitPerDay), " a day"), small);
+			GUI::contentColor = Color::white();
+			if (!coop)
+			{
+				if (GUI::Button(Rect(w - 36 - 256, ly, 80, rowH - 2), p->Working ? "Stand down" : "Start up", button)) p->Working = !p->Working;
+				if (GUI::Button(Rect(w - 36 - 172, ly, 84, rowH - 2), p->BuyInputs ? "Buys feed" : "Store feed", button)) p->BuyInputs = !p->BuyInputs;
+				if (GUI::Button(Rect(w - 36 - 84, ly, 84, rowH - 2), p->SellOutputs ? "Sells out" : "Stores out", button)) p->SellOutputs = !p->SellOutputs;
+			}
+			ly += rowH;
+			// Its goods: each feedstock's need a day against the warehouse's stock, and each product's rate and stock.
+			auto Stock = [&](Good g) { return store != nullptr && !store->Lost ? store->Stock[static_cast<int>(g)] : 0.0; };
+			cs::String in, out;
+			if (p->Recipe != nullptr)
+			{
+				for (const auto& [g, rate] : p->Recipe->Inputs)
+					in = cs::Cat(in, in.empty() ? "" : ", ", cs::Strings::ToLowerInvariant(GoodInfo::Of(g)->Name), " ", Tonnes(rate * p->Level), "/d (", Tonnes(Stock(g)), ")");
+				for (const auto& [g, rate] : p->Recipe->Outputs)
+					out = cs::Cat(out, out.empty() ? "" : ", ", cs::Strings::ToLowerInvariant(GoodInfo::Of(g)->Name), " ", Tonnes(rate * p->Level), "/d (", Tonnes(Stock(g)), ")");
+			}
+			GUI::contentColor = Dim;
+			GUI::Label(Rect(16, ly, w - 52, rowH), cs::Cat("in: ", in, "  ->  out: ", out, "  ·  stock in ", store != nullptr ? store->Name : cs::String("no warehouse"),
+				h != nullptr && store != nullptr ? cs::Cat(" ", Tonnes(store->StoredTonnes()), "/", Tonnes(store->CapacityTonnes)) : cs::String()), small);
+			ly += rowH;
+			GUI::contentColor = was;
+		};
+
 		GUI::contentColor = Dim;
 		GUI::Label(Rect(4, ly, w, rowH), shipRows == 0 ? "No ships yet." : "SHIPS", small);
 		ly += rowH;
@@ -322,6 +398,11 @@ namespace SpaceGod::UI
 		for (const auto& p : h->Properties)
 		{
 			if (p->Lost) continue;
+			if (p->Kind == PropertyKind::Plant)
+			{
+				DrawPlantRows(p);
+				continue;
+			}
 			cs::String extra = p->Kind == PropertyKind::Warehouse ? cs::Cat("  ·  ", Tonnes(p->StoredTonnes()), " of ", Tonnes(p->CapacityTonnes), " stored")
 				: p->Kind == PropertyKind::MiningClaim ? cs::Cat("  ·  ", Tonnes(p->YieldPerDay), " a day") : cs::String();
 			GUI::Label(Rect(4, ly, w - 40, rowH), cs::Cat(p->Name, extra, "  ·  income ", Credits(p->Income), "  ·  upkeep ", Credits(p->Upkeep)), small);

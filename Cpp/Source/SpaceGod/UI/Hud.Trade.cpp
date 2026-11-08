@@ -258,7 +258,7 @@ namespace SpaceGod::UI
 		}
 		for (const auto& p : h->Properties)
 		{
-			if (p->Lost || p->Kind != PropertyKind::Warehouse || y > view.yMax() - rowH) continue;
+			if (p->Lost || (p->Kind != PropertyKind::Warehouse && p->Kind != PropertyKind::Plant) || y > view.yMax() - rowH) continue; // a plant too (US-T265)
 			auto prop = p;
 			Row(cs::Cat("The ", p->Name), ins->Of(p), ins->Quote(p), [&ins, prop, jd]() { return ins->Insure(prop, jd); }, cs::Cat("p ", K(h->Properties, p))); // US-T44 (US-T43): the key
 		}

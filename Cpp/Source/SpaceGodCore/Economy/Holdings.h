@@ -14,6 +14,8 @@ namespace SpaceGod::Core
 	class BodyCatalog;
 	class Charter;
 	class Economy;
+	class Recipe;
+	enum class IndustryKind : int;
 	enum class ShipClass : int;
 	enum class ShipRole : int;
 
@@ -125,6 +127,10 @@ namespace SpaceGod::Core
 		/// trades for its charterer, who keeps its takings and pays the house a day rate, and its orders are the charter's.</summary>
 		cs::Ref<::SpaceGod::Core::Charter> Charter;
 
+		/// <summary>The house plant the load in its hold is for (US-T265), or null: on arrival it goes into the plant's
+		/// warehouse, not onto the market.</summary>
+		cs::Ref<Property> FeedingPlant;
+
 		bool OnCharter() const;
 
 		double Net() const { return Earned - Spent - Wages - Repairs; }
@@ -142,8 +148,29 @@ namespace SpaceGod::Core
 
 		/// <summary>The right to cut one ore on one world: the player's ore haulers mine it under standing orders.</summary>
 		MiningClaim,
+
+		/// <summary>A refinery or factory at a port (US-T265): it runs one of the port's own industry recipes, drawing its
+		/// inputs from the house warehouse there (or buying them off the local market) and putting its outputs into it.</summary>
+		Plant,
 	};
 	SPACEGODCORE_API const char* ToString(PropertyKind v);
+
+	/// <summary>How a plant ran over its last day (US-T265).</summary>
+	enum class PlantStatus : int
+	{
+		/// <summary>At full rate.</summary>
+		Running,
+
+		/// <summary>Stood down: paused by the house, or mending after a raid.</summary>
+		Idle,
+
+		/// <summary>Short of a feedstock: neither the warehouse nor the market (nor the account) could supply it.</summary>
+		Starved,
+
+		/// <summary>The warehouse has no room for what it makes.</summary>
+		Full,
+	};
+	SPACEGODCORE_API const char* ToString(PlantStatus v);
 
 	/// <summary>Something the player owns that is not a ship.</summary>
 	class SPACEGODCORE_API Property final
@@ -179,6 +206,32 @@ namespace SpaceGod::Core
 
 		/// <summary>The settlement's trade the dividend last caught up with.</summary>
 		double SeenTradeVolume = 0;
+
+		// ---- a plant (US-T265)
+
+		/// <summary>A plant: the recipe it runs (one of its port's industries), and its size as a share of a settlement's
+		/// level-1 works (the recipe's tonnes a day and crew scale by it).</summary>
+		cs::Ref<::SpaceGod::Core::Recipe> Recipe;
+		double Level = 0;
+
+		/// <summary>A plant: the house warehouse at its port that feeds it and takes what it makes.</summary>
+		cs::Ref<Property> Warehouse;
+
+		/// <summary>A plant: who owned the port when it was bought. A port taken by anyone else (in war, or by raiders)
+		/// takes the works with it.</summary>
+		cs::Ref<Faction> Landlord;
+
+		/// <summary>A plant: whether it works (the house can stand it down, paying a share of its crew), whether it buys what
+		/// the warehouse lacks off the local market, and whether it sells what it makes straight into it.</summary>
+		bool Working = true, BuyInputs = true, SellOutputs = false;
+
+		/// <summary>A plant: how it ran over its last day, the share of its rate it made, and until when it mends after a raid.</summary>
+		PlantStatus Status = PlantStatus::Idle;
+		double Utilisation = 0, DownUntilJd = 0;
+
+		/// <summary>A plant: what it made (at the local market's price) less what it used and cost to run, credits a day
+		/// (a running average), and over its life the tonnes it made and lost to raids.</summary>
+		double ProfitPerDay = 0, TonnesMade = 0, TonnesRaided = 0;
 
 		cs::String Name;
 
@@ -438,6 +491,68 @@ namespace SpaceGod::Core
 
 		/// <summary>Sells <paramref name="tonnes"/> of what the warehouse holds into its port's market; returns the credits (after tax).</summary>
 		double SellFromStore(const cs::Ref<Property>& warehouse, Good good, double tonnes, double jd);
+
+		// ---------------------------------------------------------------- plants (US-T265)
+
+		/// <summary>A plant's size: a tenth of a settlement's level-1 works.</summary>
+		static constexpr double PlantLevel = 0.1;
+
+		/// <summary>A plant's price: this many days of what it makes at base prices.</summary>
+		static constexpr double PlantPriceDays = 90;
+
+		/// <summary>A plant's upkeep a day: each crew member's pay, and a flat charge for power and spares; stood down, it
+		/// pays <see cref="PlantIdleUpkeep"/> of that.</summary>
+		static constexpr double PlantWagePerWorker = 100;
+		static constexpr double PlantFixedPerDay = 2000;
+		static constexpr double PlantIdleUpkeep = 0.25;
+
+		/// <summary>Days of its feedstock a trade route keeps a plant's warehouse stocked with.</summary>
+		static constexpr double PlantStockDays = 10;
+
+		/// <summary>The chance a day of a raid at full danger (<see cref="Contracts.DangerAt"/>), the share of what the plant
+		/// made that raiders carry off, and the days it stands idle after.</summary>
+		static constexpr double PlantRaidPerDay = 0.05;
+		static constexpr double PlantRaidShare = 0.3;
+		static constexpr double PlantRaidDownDays = 3;
+
+		/// <summary>The industries <paramref name="port"/> runs that a plant can be built for (its works that make a good:
+		/// not its mines, nor its shipyard).</summary>
+		static cs::List<IndustryKind> PlantKindsAt(const cs::Ref<Settlement>& port);
+
+		/// <summary>What a plant running <paramref name="kind"/> costs.</summary>
+		static double PlantPrice(IndustryKind kind);
+
+		/// <summary>"refinery" for a smelter, else "factory".</summary>
+		static cs::String PlantWord(IndustryKind kind);
+
+		/// <summary>
+		/// Buys a plant at <paramref name="port"/> running one of its own industries, fed from and filling the house warehouse
+		/// there (one plant per recipe per port), paid to the port's owner. Null if the port will not sell (no house warehouse
+		/// there, a pirate's, a ruin, not one of its industries) or the account cannot pay.
+		/// </summary>
+		cs::Ref<Property> BuyPlant(const cs::Ref<Settlement>& port, IndustryKind kind, double jd);
+
+		/// <summary>A plant's tonnes a day of <paramref name="good"/> at full rate, used (an input) or made (an output).</summary>
+		static double PlantRate(const cs::Ref<Property>& plant, Good good, bool output);
+
+		/// <summary>
+		/// Fleet hook, as an owned ship arrives: a hold loaded for one of the house's plants goes into its warehouse rather
+		/// than onto the market. True if the whole load was taken in (nothing left to sell).
+		/// </summary>
+		bool DeliverToPlant(const cs::Ref<Ship>& ship, int body, double jd);
+
+	private:
+		/// <summary>A day of a plant's work: raids, feedstock drawn or bought, goods made, upkeep paid.</summary>
+		void RunPlant(const cs::Ref<Property>& p, double jd);
+
+		/// <summary>A trade route's captain at <paramref name="here"/> bound for <paramref name="to"/>: if a house plant there runs
+		/// short of a feedstock sold here, loads it for the plant. True if it loaded.</summary>
+		bool LoadForPlant(const cs::Ref<OwnedShip>& o, int here, int to, double jd);
+
+		/// <summary>Sells out of a store into its port's market, crediting <paramref name="credit"/>'s income; the credits after tax.</summary>
+		double SellStock(const cs::Ref<Property>& store, const cs::Ref<Property>& credit, Good good, double tonnes, double jd, bool book);
+
+	public:
 
 		// ---------------------------------------------------------------- the daily round
 
