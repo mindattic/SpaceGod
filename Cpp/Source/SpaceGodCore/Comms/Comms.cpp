@@ -416,18 +416,31 @@ namespace SpaceGod::Core
 		else if (stance == CommsStance::Neutral) pool = chatty ? &neutralChat : &neutralTerse;
 		else if (stance == CommsStance::Wary) pool = &wary;
 		else pool = &hostile;
-		cs::String line = cs::Cat(intro, Pick(*pool, seed));
+		return cs::Cat(intro, Pick(*pool, seed));
+	}
+
+	cs::String Comms::GreetingRider(const CommsContext& c, const CommsParty& to, CommsStance stance)
+	{
 		// US-T201: who they are colours the first word. A merchant with a hold to sell says so; a raider that outguns a laden
-		// speaker names its price.
+		// speaker names its price. US-T238: kept apart from the flavour so a Prose bark never hides it.
+		if (to.IsStation() || to.Ship == nullptr) return cs::String();
 		auto ship = to.Ship;
+		bool pirate = ship->Faction != nullptr && ship->Faction->IsPirate;
 		if (pirate && stance == CommsStance::Hostile && c.Speaker != nullptr && c.Speaker->HasCargo && c.Speaker->CargoTonnes > 0.5
 			&& GroupStrength(c.World, ship) > GroupStrength(c.World, c.Speaker))
-			line = cs::Cat(line, " That's ", cs::Fmt(c.Speaker->CargoTonnes, "N0"), " t of ", GoodName(c.Speaker->CargoGood),
+			return cs::Cat("That's ", cs::Fmt(c.Speaker->CargoTonnes, "N0"), " t of ", GoodName(c.Speaker->CargoGood),
 				" you're hauling. Dump it and burn, and we never met.");
-		else if (!pirate && stance != CommsStance::Hostile && ship->HasCargo && ship->CargoTonnes > 0.5
+		if (!pirate && stance != CommsStance::Hostile && ship->HasCargo && ship->CargoTonnes > 0.5
 			&& (ship->Role == ShipRole::Trader || ship->Role == ShipRole::Courier || ship->Role == ShipRole::Free))
-			line = cs::Cat(line, " Carrying ", GoodName(ship->CargoGood), ", if you're buying.");
-		return line;
+			return cs::Cat("Carrying ", GoodName(ship->CargoGood), ", if you're buying.");
+		return cs::String();
+	}
+
+	cs::String Comms::WithRider(const cs::String& flavour, const cs::String& rider)
+	{
+		if (rider.empty()) return flavour;
+		if (flavour.empty()) return rider;
+		return cs::Cat(flavour, " ", rider);
 	}
 
 	cs::String Comms::Advice(const CommsContext& c, const CommsParty& to, CommsStance stance, const cs::Ref<NamedPilot>& p)
@@ -1152,8 +1165,15 @@ namespace SpaceGod::Core
 		switch (verb)
 		{
 		case CommsVerb::Hail:
-			r.Lines.Add({ who, Greeting(c, to, stance, p), false });
+		{
+			// US-T238: the flavour and the gameplay rider are composed apart; the line carries its rider so a display that
+			// swaps the flavour (a Prose bark) appends the same rider. Text is byte-for-byte what it always was.
+			cs::String rider = GreetingRider(c, to, stance);
+			CommsLine line{ who, WithRider(Greeting(c, to, stance, p), rider), false };
+			line.Rider = rider;
+			r.Lines.Add(line);
 			break;
+		}
 		case CommsVerb::AskRumours:
 			r.Lines.Add({ SpeakerName(c), "Heard anything interesting?", true });
 			r.Lines.Add({ who, Rumours(c, to, stance, p), false });

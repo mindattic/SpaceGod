@@ -149,6 +149,10 @@ namespace SpaceGod::Core
 		cs::String Who;
 		cs::String Text;
 		bool FromSpeaker = false;
+		/// <summary>US-T238: the gameplay sentence that ends <see cref="Text"/> (a trader's cargo offer, a raider's demand), or "".
+		/// Kept apart so a display that replaces the flavour (a Prose hail bark) appends it again: story never hides game
+		/// information. Every peer and replay computes the same one.</summary>
+		cs::String Rider;
 	};
 
 	struct SPACEGODCORE_API CommsReply
@@ -238,8 +242,13 @@ namespace SpaceGod::Core
 		/// co-op peer or a replay runs with the command's two numbers, at the tick it lands.</summary>
 		static CommsReply Apply(const CommsContext& c, int targetKey, int verb);
 
+		/// <summary>US-T238: a flavour line with its gameplay <paramref name="rider"/> after it ("flavour rider"); either may be
+		/// empty. How a hail's generated greeting is put together, and how a Prose bark stands in for its flavour.</summary>
+		static cs::String WithRider(const cs::String& flavour, const cs::String& rider);
+
 	private:
 		static cs::String Greeting(const CommsContext& c, const CommsParty& to, CommsStance stance, const cs::Ref<NamedPilot>& p);
+		static cs::String GreetingRider(const CommsContext& c, const CommsParty& to, CommsStance stance);
 		static cs::String Advice(const CommsContext& c, const CommsParty& to, CommsStance stance, const cs::Ref<NamedPilot>& p);
 		static cs::String News(const CommsContext& c, const CommsParty& to);
 		static cs::String Rumours(const CommsContext& c, const CommsParty& to, CommsStance stance, const cs::Ref<NamedPilot>& p);

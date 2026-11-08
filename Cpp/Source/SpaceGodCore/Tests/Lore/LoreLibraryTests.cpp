@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <string>
 
+#include "Comms/Comms.h"
 #include "Cs/Cs.h"
 #include "Lore/LoreKeys.h"
 #include "Lore/LoreLibrary.h"
@@ -147,6 +148,23 @@ namespace
 		Check(s.Short(LoreKeys::Named(port, LoreKeys::Hail), "placeholder") == "placeholder", "a bark is never a description");
 	}
 
+	// US-T238: a hail bark replaces only the greeting's flavour; the gameplay rider (a cargo offer, a raider's demand) follows.
+	void HailRider(const cs::String& fixture)
+	{
+		auto lib = LoreLibrary::Load(fixture + "/Lore");
+		const cs::String rider = "Carrying ore, if you're buying.";
+		cs::String bark = lib.BarkLine(LoreKeys::Pilot("Tomas Brennan"), LoreKeys::Hail, 0, "");
+		cs::String shown = Comms::WithRider(bark, rider);
+		Check(shown == "Brennan here. Make it quick. Carrying ore, if you're buying.", "a bark plus a rider shows both, bark first");
+		Check(cs::Strings::StartsWith(shown, bark) && cs::Strings::EndsWith(shown, rider), "the bark leads and the rider ends the line");
+		Check(Comms::WithRider(bark, "") == bark, "no rider: the bark alone");
+		Check(Comms::WithRider("", rider) == rider, "no flavour: the rider alone");
+		Check(Comms::WithRider("Go ahead.", "That's 40 t of ore you're hauling. Dump it and burn, and we never met.") ==
+			"Go ahead. That's 40 t of ore you're hauling. Dump it and burn, and we never met.", "the generated greeting joins the same way");
+		Check(Comms::WithRider(lib.BarkLine(LoreKeys::Pilot("Tomas Brennan"), LoreKeys::Hail, 0, ""), rider) == shown,
+			"the same pick gives the same line (peers and replays agree)");
+	}
+
 	void Deterministic(const cs::String& fixture)
 	{
 		auto a = LoreLibrary::Load(fixture + "/LoreBroken");
@@ -173,6 +191,7 @@ int main(int argc, char** argv)
 	Deterministic(fixture);
 	Keys();
 	Surfaces(fixture);
+	HailRider(fixture);
 	std::printf("LoreLibraryTests: %d checks, %d failed\n", checks, failures);
 	return failures == 0 ? 0 : 1;
 }

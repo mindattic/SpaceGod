@@ -251,7 +251,7 @@ makes one lookup through GameLore (`LoreShort`, `LoreLong`, `LoreBark`); with no
 | Selection card, a ship's named pilot (once met at a hail or a fight) | `pilot-<name>` | short, after their styled name | no line |
 | Galaxy map, a known system's detail | `system-<sys>` | short | no line |
 | Comms channel header, the party hailed (pilot or station) | `pilot-<name>` / `settlement-<sys>-<name>` | short | no line |
-| Comms, the answer to a hail | bark `<speaker>/hail`, else any bark naming the speaker; then the hull's `ship-<sys>-<name>/hail` | one line, picked from the pilot's seed and times hailed (a station: its key and the day) | the generated greeting |
+| Comms, the answer to a hail | bark `<speaker>/hail`, else any bark naming the speaker; then the hull's `ship-<sys>-<name>/hail` | one line, picked from the pilot's seed and times hailed (a station: its key and the day); it replaces only the flavour, and the greeting's gameplay rider (`CommsLine::Rider`: a trader's cargo offer, a raider's demand) always follows it (US-T238) | the generated greeting |
 
 Lore is display only: no simulation code reads it, and a hail's bark replaces only the logged words after `Comms::Apply`
 has done what the hail does. A key the game cannot rebuild never matches and keeps its placeholder: an entity the export

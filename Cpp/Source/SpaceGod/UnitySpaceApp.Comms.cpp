@@ -160,9 +160,13 @@ namespace SpaceGod
 		// same two numbers for a co-op peer or a replay, and Comms::Apply gives the same answer there.
 		auto r = Comms::Apply(c, commsTarget.Key(), static_cast<int>(verb));
 		// US-T237: the answer to a hail is the speaker's approved Prose bark when there is one; else the generated greeting.
+		// US-T238: the bark replaces only the flavour; the line's gameplay rider (a cargo offer, a raider's demand) follows it.
 		// Only the panel's log changes: Comms::Apply has already done whatever the hail does.
 		if (verb == CommsVerb::Hail && r.Lines.Count() == 1 && !r.Lines[0].FromSpeaker && r.Lines[0].Who != "comms")
-			r.Lines[0].Text = HailBark(commsTarget, r.Lines[0].Text);
+		{
+			cs::String bark = HailBark(commsTarget, cs::String());
+			if (!bark.empty()) r.Lines[0].Text = Comms::WithRider(bark, r.Lines[0].Rider);
+		}
 		for (const auto& l : r.Lines) commsLog.Add(l);
 		while (commsLog.Count() > CommsLogKept) commsLog.RemoveAt(0);
 		if (!r.Toast.empty()) ShowToast(r.Toast);
