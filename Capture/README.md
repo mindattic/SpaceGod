@@ -8,7 +8,7 @@ library runs beside the game in a small host process the game starts and drives.
  game (C++)                                   capture.exe host (Capture/SpaceGod.Capture)
  ──────────                                   ───────────────────────────────────────────
  -capture on the command line?
-   └─ first frame with a window: start ───>   host --hwnd <game window> --pid <game> --app SpaceGod.Unreal.Cpp
+   └─ first frame with a window: start ───>   host --hwnd <game window> --pid <game> --app SpaceGod
                                                --defaults <Content/Capture/SpaceGod.capture.json> --cmdline "<game's>"
                                                builds CaptureOptions as CaptureUnity does, starts CaptureEngine on the
                                                game window (Windows Graphics Capture), answers {"op":"ready",...}
@@ -23,7 +23,8 @@ library runs beside the game in a small host process the game starts and drives.
 - **Where it is.** `tools/package.ps1` publishes the host to `<package>/Capture/capture.exe`, next to the package's
   `Engine/` folder. An editor or uncooked run uses a build of `Capture/SpaceGod.Capture` in the repo
   (`dotnet build -c Release`). `MINDATTIC_CAPTURE_HOST` overrides both.
-- **Output.** `R:\MindAttic\Capture\SpaceGod.Unreal.Cpp\` (or `Videos\MindAttic\Capture\...` without `R:`).
+- **Output.** `R:\MindAttic\Capture\SpaceGod\` (this repo's name, docs/CAPTURE.md section 2; before the promotion,
+  US-T76, it was `SpaceGod.Unreal.Cpp\`, which the archived SpaceGod.Unreal.Cpp repo still writes) (or `Videos\MindAttic\Capture\...` without `R:`).
 - **Prerequisites.** The .NET 10 runtime (the SDK that builds it installs it), and ffmpeg on PATH for video and
   replays. ffmpeg is not bundled.
 - **Name.** The exe is `capture.exe` with product name `MindAttic.Capture.Agent`, the names MindAttic.Capture trusts for

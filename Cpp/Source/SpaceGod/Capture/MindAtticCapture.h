@@ -6,7 +6,7 @@
 // window and its command line, and drives it over a pipe: one JSON request a line on its stdin, one JSON reply or
 // notice a line from its stdout (Capture/README.md). The host builds its options exactly as CaptureUnity does: off
 // unless -capture is literally on the command line; -capture video / screen N / -capture-config path.json; output in
-// R:\MindAttic\Capture\SpaceGod.Unreal.Cpp\. The game's events, markers, screenshots and hotkeys go through here.
+// R:\MindAttic\Capture\SpaceGod\. The game's events, markers, screenshots and hotkeys go through here.
 
 #include "CoreMinimal.h"
 

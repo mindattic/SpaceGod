@@ -31,7 +31,7 @@ namespace SpaceGod::MindAtticCapture
 	namespace
 	{
 		/// The folder name under R:\MindAttic\Capture (CaptureUnity's ProjectName: the repo the game comes from).
-		const TCHAR* AppName = TEXT("SpaceGod.Unreal.Cpp");
+		const TCHAR* AppName = TEXT("SpaceGod"); // docs/CAPTURE.md section 2: this copy's own repo name since the promotion (US-T76)
 
 		/// The game's shipped default rules (docs/CAPTURE.md section 4): <Project>/Content/Capture/, staged as a non-UFS file.
 		const TCHAR* DefaultsFile = TEXT("SpaceGod.capture.json");

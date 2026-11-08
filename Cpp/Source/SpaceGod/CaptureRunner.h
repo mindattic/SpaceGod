@@ -27,7 +27,7 @@ namespace SpaceGod
 	/// each sidecar tagged with its stop. Without <c>-capture</c> the tour still plays, just with no screenshots.
 	///
 	/// Unreal (US-T72): with <c>-capture</c> each stop is <c>ScreenshotAsync(&lt;stop&gt;)</c> through MindAttic.Capture's
-	/// host (Capture/MindAtticCapture.h), into the session folder under R:\MindAttic\Capture\SpaceGod.Unreal.Cpp\, as in
+	/// host (Capture/MindAtticCapture.h), into the session folder under R:\MindAttic\Capture\SpaceGod\, as in
 	/// Unity. With tools/play.ps1's <c>-capturedir=&lt;dir&gt;</c> the stops stay Unreal screenshots through CaptureBackend,
 	/// saved as <c>&lt;dir&gt;/&lt;stop&gt;.png</c>, with no capture host.
 	class CaptureRunner final
