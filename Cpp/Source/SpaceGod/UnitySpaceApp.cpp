@@ -446,6 +446,7 @@ namespace SpaceGod
 		pauseMenu->DestroyOwnedTextures();
 		DestroyCommsTextures(); // US-T137
 		cheatMenu->DestroyOwnedTextures(); // US-T126
+		DestroyTutorialTextures(); // US-T254
 		Tour::ShowcaseTour::Abandon(); // US-T147: a tour ends with its game
 		Tour::ShowcaseTour::DestroyOwnedTextures();
 	}
@@ -472,9 +473,11 @@ namespace SpaceGod
 		if (hud != nullptr && hud->UpdateDrawer(!cheatMenu->IsOpen && !commsOpen)) Input.Handover(); // US-T200: the bottom drawer (Shift+U) has the keys while open
 		UpdateInfluence(); // US-T140: the embody gate's world, this frame
 		if (Tour::ShowcaseTour::Update(*this, !cheatMenu->IsOpen)) Input.Handover(); // US-T147: the showcase tour has the keys while it runs
+		TutorialKeys(); // US-T254: Shift+Enter / Shift+Esc on the tutorial's card (it never takes the other keys)
 		ArbitrateInput(true); // US-T90: one owner per input this frame (the craft held, else the command view)
 		int screensOpen = OpenScreens();
 		HandleCommands();
+		UpdateTutorial(dt); // US-T254: the tutorial's step looked for in what the commands did, and the first-time hints
 		ArbitrateInput(false); // US-T90: a seat taken or let go just now: the new owner starts on an idle frame
 		// A panel or screen opened while the screen is cleared (F11) brings the UI back, rather than opening unseen.
 		if (ScreenCleared && (OpenScreens() & ~screensOpen) != 0) ScreenCleared = false;
@@ -620,6 +623,7 @@ namespace SpaceGod
 		DrawTractorHud(); // US-T95: the tractor beam's readout
 		DrawInfluence(); // US-T140: the Influence meter, the embody gate's refusals, the squad's line
 		Tour::ShowcaseTour::Draw(*this); // US-T147: the showcase tour's strip
+		DrawTutorial(); // US-T254: the tutorial's card, or a first-time hint
 		cheatMenu->Draw(*this); // US-T126: the dev menu, or the HUD's hint for its key
 		GUI::enabled = true;
 		if (menu) pauseMenu->Draw();

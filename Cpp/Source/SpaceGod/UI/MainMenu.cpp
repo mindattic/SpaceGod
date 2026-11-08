@@ -208,6 +208,7 @@ namespace SpaceGod::UI
 			case Page::Profiles: DrawProfiles(); break;
 			case Page::AssetLibraries: DrawAssetLibraries(); break;
 			case Page::Help:
+				help->OnTutorial = [] { GameLaunch::Tutorial(); }; // US-T254: Help's Tutorial button starts one
 				if (help->Draw("Esc to go back")) Open(Page::Main);
 				break;
 			default: DrawMain(); break;
@@ -236,7 +237,7 @@ namespace SpaceGod::UI
 		GUI::enabled = enabled;
 		// US-T253: the new game's difficulty beside it (a click steps Story / Normal / Hard / Custom; Settings > Gameplay holds it too).
 		const float dw = 150;
-		if (GUI::Button(Rect(r.x + 20, y + 48, bw - dw - 10, 38), "New Game", latest == nullptr ? buttonActive : button)) GameLaunch::NewGame();
+		if (GUI::Button(Rect(r.x + 20, y + 48, bw - dw - 10, 38), "New Game", latest == nullptr ? buttonActive : button)) GameLaunch::MenuNewGame(); // US-T254: offers the tutorial once a profile
 		if (GUI::Button(Rect(r.x + 20 + bw - dw, y + 48, dw, 38), cs::Cat("Difficulty: ", Difficulty::Name()), button))
 			Difficulty::Level()->Cycle(1);
 		GUI::enabled = enabled && saveNames.Count() > 0;
@@ -251,7 +252,9 @@ namespace SpaceGod::UI
 		if (GUI::Button(Rect(r.x + 20, y + 336, half, 38), "Dogfight Demo", button)) GameLaunch::DogfightDemo(false);
 		if (GUI::Button(Rect(r.x + 30 + half, y + 336, half, 38), "Dogfight (Heavy)", button)) GameLaunch::DogfightDemo(true);
 		// US-T147: a new game straight into the showcase tour, every feature in turn (sg.Tour waits for the game it starts).
-		if (GUI::Button(Rect(r.x + 20, y + 384, bw, 38), "Showcase Tour", button) && GEngine) GEngine->Exec(nullptr, TEXT("sg.Tour"));
+		// US-T254: the guided tutorial, played by doing, any time (a new game with it running).
+		if (GUI::Button(Rect(r.x + 20, y + 384, half, 38), "Tutorial", button)) GameLaunch::Tutorial();
+		if (GUI::Button(Rect(r.x + 30 + half, y + 384, half, 38), "Showcase Tour", button) && GEngine) GEngine->Exec(nullptr, TEXT("sg.Tour"));
 		if (GUI::Button(Rect(r.x + 20, y + 432, bw, 38), "Quit", button)) Quit();
 	}
 

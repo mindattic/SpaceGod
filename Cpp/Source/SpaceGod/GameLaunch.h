@@ -25,6 +25,17 @@ namespace SpaceGod
 
 		static void NewGame();
 
+		/// US-T254: the main menu's New Game: a new game that offers the guided tutorial if this profile has never been
+		/// offered it (a console command's or a script's NewGame never does).
+		static void MenuNewGame();
+
+		/// US-T254: a new game straight into the guided tutorial (the main menu's and the Help screen's Tutorial button).
+		static void Tutorial();
+
+		/// US-T254: what this game was asked to do about the tutorial, once: 0 nothing, 1 offer it on a profile's first
+		/// New Game, 2 start it.
+		static int TakeTutorial();
+
 		static void Load(const cs::String& slot);
 
 		/// US-T88: a new game that drops the player straight into the dogfight demo (UnitySpaceApp::StartDogfightDemo),
@@ -61,5 +72,6 @@ namespace SpaceGod
 		static inline cs::String loadSlot;
 		static inline int dogfightDemo = 0;
 		static inline bool dogfightFlagTaken = false;
+		static inline int tutorial = 0; // US-T254
 	};
 }

@@ -3,6 +3,7 @@
 #include "Smoke/FeatureAuditDisplay.h"
 #include "Smoke/FeatureAuditSettings.h"
 #include "Smoke/FeatureAuditEditing.h"
+#include "Smoke/FeatureAuditTutorial.h" // US-T254
 
 #include "Bootstrap.h"
 #include "Target.h"
@@ -1287,6 +1288,7 @@ namespace SpaceGod::Smoke::FeatureAudit
 		Probe("seats", SeatProbes);
 		Probe("diplomacy", DiplomacyProbes);
 		Probe("traffic", TrafficProbes); // US-T222
+		Probe("tutorial", [] { TutorialProbes(*app, *kb, Result, frames); }); // US-T254: the guided tutorial, played to its end
 		// US-T52, US-T53: checks of this copy's own GUI facade (UnityCompat's TextEditor) and model viewer camera, which the
 		// C# copies get from Unity or the C# facade. US-T70: opt-in (-SpaceGodAuditFacade), so the default audit is the 85
 		// probes every copy runs, in the same order, and its log compares row for row with the C# copies'.

@@ -56,6 +56,9 @@ namespace SpaceGod::UI
 		if (chapter > 0 && GUI::Button(Rect(x, screen.height - 50, 120, 32), "Previous", button)) Select(chapter - 1);
 		if (chapter < chapters.Count() - 1 && GUI::Button(Rect(x + 132, screen.height - 50, 120, 32), "Next", button)) Select(chapter + 1);
 		if (GUI::Button(Rect(screen.width - Margin - 120 - 12 - 150, screen.height - 50, 150, 32), "Ship catalog", button)) showCatalog = true;
+		// US-T254: the guided tutorial, replayed from here (the owner says what starting one means: a new game from the menu,
+		// the tutorial over the game in play).
+		if (OnTutorial && GUI::Button(Rect(screen.width - Margin - 120 - 12 - 150 - 12 - 120, screen.height - 50, 120, 32), "Tutorial", button)) OnTutorial();
 		return GUI::Button(Rect(screen.width - Margin - 120, screen.height - 50, 120, 32), "Back", button);
 	}
 

@@ -44,6 +44,7 @@
 #include "UnitySpaceApp.Embody.deps.h" // US-T135
 #include "UnitySpaceApp.Influence.deps.h" // US-T140
 #include "UnitySpaceApp.Discoveries.deps.h" // US-T259
+#include "UnitySpaceApp.Tutorial.deps.h" // US-T254
 
 namespace SpaceGod
 {
@@ -108,5 +109,6 @@ namespace SpaceGod
 #include "UnitySpaceApp.Embody.inl" // US-T135: the universal embody layer
 #include "UnitySpaceApp.Influence.inl" // US-T140: embody limits, Influence and squad orders as the player meets them
 #include "UnitySpaceApp.Discoveries.inl" // US-T259: the discovery log and its screen
+#include "UnitySpaceApp.Tutorial.inl" // US-T254: the guided tutorial and the first-time hints
 	};
 }

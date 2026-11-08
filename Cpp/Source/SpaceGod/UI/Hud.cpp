@@ -123,7 +123,11 @@ namespace SpaceGod::UI
 		// So is Help (U.SPC-T494): every key and control, by group, over the whole view.
 		if (app->ShowHelp)
 		{
-			if (!helpScreen) helpScreen = cs::New<HelpScreen>();
+			if (!helpScreen)
+			{
+				helpScreen = cs::New<HelpScreen>();
+				helpScreen->OnTutorial = [this] { app->ShowHelp = false; app->StartTutorial(); }; // US-T254: replayed over the game
+			}
 			auto whole = Rect(0, 0, static_cast<float>(Screen::width), static_cast<float>(Screen::height));
 			if (!app->UiRects.Contains(whole)) app->UiRects.Add(whole); // the world under it takes no clicks
 			if (helpScreen->Draw("Esc, H or F1 to close")) app->ShowHelp = false;

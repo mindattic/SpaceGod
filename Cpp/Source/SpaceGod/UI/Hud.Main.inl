@@ -411,4 +411,12 @@ public:
 	/// otherwise, so each game session (and every galaxy map it opened) would leave its textures behind.
 	void DestroyOwnedTextures();
 
+	/// US-T254: whether the NAVIGATOR panel is unfolded (the tutorial's step waits for it).
+	bool NavigatorOpen() const { return navigatorOpen; }
+	void SetNavigatorOpen(bool open) { navigatorOpen = open; }
+
+	/// US-T254: where the HUD element a tutorial step points at is drawn (a Core::TutorialHighlight, as an int); a zero
+	/// size for none. Bodies in Hud.Tutorial.cpp, from the same numbers the panels are drawn with.
+	static Rect TutorialHighlightRect(int highlight);
+
 private:

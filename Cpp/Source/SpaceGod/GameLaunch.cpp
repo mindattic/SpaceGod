@@ -14,12 +14,40 @@ namespace SpaceGod
 			|| Coop::CoopPeer::SkipsMenu(); // US-T44: a co-op client (and the smoke host) goes straight in
 	}
 
-	void GameLaunch::NewGame() { Start(cs::String()); }
+	void GameLaunch::NewGame()
+	{
+		tutorial = 0;
+		Start(cs::String());
+	}
 
-	void GameLaunch::Load(const cs::String& slot) { Start(slot); }
+	void GameLaunch::MenuNewGame()
+	{
+		tutorial = 1; // US-T254: offered if this profile never was
+		Start(cs::String());
+	}
+
+	void GameLaunch::Tutorial()
+	{
+		tutorial = 2; // US-T254
+		Start(cs::String());
+	}
+
+	int GameLaunch::TakeTutorial()
+	{
+		int asked = tutorial;
+		tutorial = 0;
+		return asked;
+	}
+
+	void GameLaunch::Load(const cs::String& slot)
+	{
+		tutorial = 0;
+		Start(slot);
+	}
 
 	void GameLaunch::DogfightDemo(bool heavy)
 	{
+		tutorial = 0;
 		dogfightDemo = heavy ? 2 : 1;
 		Start(cs::String());
 	}

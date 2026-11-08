@@ -35,6 +35,9 @@ namespace SpaceGod::UI
 		/// The screen's own textures go with whatever owns it (U.SPC-T366): DontSave outlives the scene otherwise.
 		void DestroyOwnedTextures();
 
+		/// US-T254: what the Tutorial button does (start the guided tutorial); the button is shown only when it is set.
+		cs::Action<> OnTutorial;
+
 	private:
 		static constexpr float Margin = 40, Gutter = 28, KeyW = 150, LineGap = 3, TopicGap = 14, HeadingH = 24, ContentsRowH = 30;
 
