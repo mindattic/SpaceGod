@@ -269,3 +269,12 @@ The one third-party piece that **is** committed: its licence allows redistributi
 - **Drawn** (`Cpp/Source/SpaceGod/Views/SkyLayers.cpp`): the hero system's sky (the first violet-storm system beyond
   Sol), as a sky sphere (`sg.SkyMode sphere`) and as a painted volume (`sg.SkyMode volume`, the default); its core's
   direction (longitude -3.16, latitude +1.05 degrees in its frame) is where the hero system's fill light comes from.
+
+## Sound (US-T240)
+
+No third-party sound is used. Every sound SpaceGod plays is synthesized in code at run time
+(`Cpp/Source/SpaceGod/Audio/SynthSound.cpp`: tones, pitch sweeps and filtered noise with simple envelopes), so
+there is no recording, no licence and nothing to import under `Cpp/Content`. The audio layer
+(`Cpp/Source/SpaceGod/Audio/GameAudio.cpp`) plays them through Unreal's audio engine on the Music, Effects,
+Interface and Ambience buses. A recorded sound added later must be CC0 or the team's own, and is listed here with
+its source and licence and in `Core/Credits.cpp`.

@@ -1,5 +1,6 @@
 #include "GameSettingsHost.h"
 #include "ActiveProfile.h"
+#include "Audio/GameAudio.h" // US-T240
 #include "EngineSettings.h"
 #include "GraphicsSettings.h"
 #include "PlayerOptions.h" // US-T252
@@ -38,6 +39,7 @@ namespace SpaceGod
 		});
 		// The Runtime assembly's [SettingsSource] classes, each accessor touched in C# field order.
 		SettingsRegistry::AddDeclarationSource([] { EngineSettings::FrameRateCap(); EngineSettings::MasterVolume(); });
+		SettingsRegistry::AddDeclarationSource([] { Audio::GameAudio::Declare(); }); // US-T240: the bus volumes, under the master volume
 		// US-T251: the rest of Settings > Graphics (the preset, scalability knobs, anti-aliasing (render.msaa before),
 		// resolution scale, upscaler and field of view), right under the frame-rate cap.
 		SettingsRegistry::AddDeclarationSource([] { GraphicsSettings::Declare(); });
