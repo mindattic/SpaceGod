@@ -1473,6 +1473,7 @@ namespace SpaceGod
 		bioMassView->Update();
 		UpdateCargoPodsView(); // US-T95: cargo pods and the tractor beam
 		UpdateEvaWorkerView(); // US-T158: the EVA worker held, on its hull's plating
+		UpdateMechView(); // US-T83: the mechs out in the fight, on the plating or in flight
 		if (embodiedShine) embodiedShine->Update(); // US-T136: other players' units shine
 		Structures->Update(true);
 		swarm->Update(ShowSatellites);

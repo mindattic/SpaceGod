@@ -4,6 +4,7 @@
 #include "Embodiment/FighterSeat.h"
 #include "Embodiment/Influence.h" // US-T140
 #include "Combat/Fighters.h"     // US-T140: a craft's carrier
+#include "Embodiment/MechWalker.h" // US-T83
 #include "Embodiment/MountedTurret.h"
 #include "Embodiment/RepairWorker.h"
 #include "Embodiment/ShipHelm.h"
@@ -145,7 +146,7 @@ namespace SpaceGod::Core
 				Add(SeatOf(world, unitBattle, onUnit));
 				for (const auto& gun : TurretsOn(world, unitBattle, onUnit)) Add(gun);
 				for (const auto& crew : CrewOn(world, unitBattle, onUnit)) Add(crew); // US-T135: its EVA workers
-				for (const auto& walker : WalkersIn(world, unitBattle)) Add(walker); // US-T83: none until the mech lands
+				for (const auto& walker : WalkersIn(world, unitBattle)) Add(walker); // US-T83: the mechs out in the fight
 			}
 		}
 		else if (onShip != nullptr && world != nullptr) Add(HelmOf(world, onShip));
@@ -260,10 +261,15 @@ namespace SpaceGod::Core
 		return list;
 	}
 
-	cs::List<cs::Ref<IEmbodiable>> Embodiables::WalkersIn(const cs::Ref<World>& /*world*/, const cs::Ref<Battle>& /*battle*/)
+	cs::List<cs::Ref<IEmbodiable>> Embodiables::WalkersIn(const cs::Ref<World>& /*world*/, const cs::Ref<Battle>& battle)
 	{
-		// US-T83: the mech is not ported yet (see the declaration); it is listed here once it is.
-		return cs::List<cs::Ref<IEmbodiable>>();
+		// US-T83: every mech sent out of a bay in this fight and still standing (one still in its bay is sent out with
+		// Shift+N, MechWalker::Deploy, not listed here).
+		cs::List<cs::Ref<IEmbodiable>> list;
+		if (battle == nullptr || battle->Over) return list;
+		for (const auto& m : MechWalker::DeployedIn(battle))
+			if (m->CanEmbody()) list.Add(m);
+		return list;
 	}
 
 	cs::Ref<IEmbodiable> Embodiables::SeatOf(const cs::Ref<World>& world, const cs::Ref<Battle>& battle, const cs::Ref<BattleUnit>& unit)

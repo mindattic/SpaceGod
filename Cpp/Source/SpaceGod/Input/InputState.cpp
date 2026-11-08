@@ -27,6 +27,9 @@ namespace SpaceGod::Input
 		Move = Vector3(axis(A::StrafeRight, A::StrafeLeft), axis(A::Rise, A::Sink), axis(A::MoveForward, A::MoveBack));
 		Move.y = Mathf::Clamp(Move.y, -1.0f, 1.0f);
 		Boost = down(A::Boost);
+		keyBoost = Boost; // US-T83
+		JumpJets = down(A::JumpJets); // US-T83: the mech's, kept only while one is held (GiveWalkerKeys)
+		jumpJetsPressed = hit(A::JumpJets);
 		Slow = down(A::Slow);
 		Cruise = down(A::Cruise);
 		ToggleSystemCruise = hit(A::SystemCruise); // US-T127: Shift+J, the cruise drive
@@ -142,6 +145,7 @@ namespace SpaceGod::Input
 		Pilot = hit(A::Pilot);
 		EmbodyCrew = hit(A::EmbodyCrew); // US-T135
 		Eject = hit(A::Eject); // US-T166
+		DeployMech = hit(A::DeployMech); // US-T83: Shift+N, the mech out of the bay
 		CycleSeat = hit(A::NextSeat) ? 1 : hit(A::PrevSeat) ? -1 : 0;
 		ManGun = hit(A::ManGun);
 		JumpToCraft = hit(A::JumpToCraft); // US-T106: Shift+/ into a launched craft
@@ -229,7 +233,8 @@ namespace SpaceGod::Input
 		padSecondary = held(PadAction::Secondary);
 		padBumpers = (held(PadAction::RollRight) ? 1.0f : 0.0f) - (held(PadAction::RollLeft) ? 1.0f : 0.0f);
 		Roll = Mathf::Clamp(Roll + padBumpers, -1.0f, 1.0f);
-		Boost = Boost || held(PadAction::Boost);
+		padBoost = held(PadAction::Boost); // US-T83: a mech's jets (GiveWalkerKeys)
+		Boost = Boost || padBoost;
 		Manoeuvre = Manoeuvre || held(PadAction::Flip);
 		padBack = pressed(PadAction::Drift); // the drift itself was read with R, above
 		if (pressed(PadAction::LockFocus))
@@ -293,13 +298,32 @@ namespace SpaceGod::Input
 		ToggleSystemCruise = false; // US-T127: no drive to spool in command
 		ToggleTractor = false; // US-T95: no beam in command
 		Eject = false; // US-T166: no cockpit to eject from in command
+		JumpJets = jumpJetsPressed = false; // US-T83: no mech to lift in command; Space is the pause's
 		ThrottleStep = 0;
 		Roll = 0;
 	}
 
+	void InputState::GiveWalkerKeys(bool walker)
+	{
+		if (!walker)
+		{
+			// Only a mech has jets: Space stays the pause at every other seat.
+			JumpJets = jumpJetsPressed = false;
+			return;
+		}
+		// The press was the jets' (they share Space by default): no pause under the pilot's feet.
+		if (jumpJetsPressed) TogglePause = false;
+		// The pad's boost button is the jets in a mech (A, the jump), not a run.
+		if (padBoost)
+		{
+			JumpJets = true;
+			Boost = keyBoost;
+		}
+	}
+
 	bool InputState::HandsIdle() const
 	{
-		return Move.sqrMagnitude() < 0.0001f && Roll == 0 && !Fire && !FireEmp && !LookHeld && !Boost && !Manoeuvre && !Cruise && !Drift;
+		return Move.sqrMagnitude() < 0.0001f && Roll == 0 && !Fire && !FireEmp && !LookHeld && !Boost && !Manoeuvre && !Cruise && !Drift && !JumpJets;
 	}
 
 	void InputState::HoldHandsOff()
@@ -308,6 +332,7 @@ namespace SpaceGod::Input
 		Roll = 0;
 		ThrottleStep = 0;
 		Fire = FireEmp = Boost = Slow = Manoeuvre = Cruise = Drift = false;
+		JumpJets = false; // US-T83
 		LookHeld = false;
 		LookDelta = Vector2::zero();
 		SelectClicked = SelectDoubleClicked = RightClicked = false;
@@ -320,6 +345,7 @@ namespace SpaceGod::Input
 		chase.LookHeld = false;
 		chase.LookDelta = Vector2::zero();
 		chase.Boost = chase.Slow = false;
+		chase.JumpJets = false; // US-T83
 		return chase;
 	}
 
@@ -359,6 +385,8 @@ namespace SpaceGod::Input
 		ManGun = false;
 		EmbodyCrew = false; // US-T135
 		Eject = false; // US-T166
+		JumpJets = DeployMech = false; // US-T83
+		jumpJetsPressed = keyBoost = padBoost = false;
 		JumpToCraft = false;
 		MoveToHost = false;
 		TogglePicker = false;

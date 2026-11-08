@@ -9,6 +9,7 @@
 #include "Combat/CombatState.h"
 #include "Combat/Diplomacy.h" // US-T136
 #include "Views/EvaWorkerView.h" // US-T158
+#include "Views/MechView.h" // US-T83
 #include "Fleet.h"
 #include "Sensors/SensorPosture.h" // US-T136
 #include "Sensors/Sensors.h"
@@ -16,6 +17,7 @@
 #include "Embodiment/Embodiables.h"
 #include "Embodiment/Embodiment.h"
 #include "Embodiment/EvaPilot.h" // US-T166
+#include "Embodiment/MechWalker.h" // US-T83
 #include "Embodiment/FighterSeat.h" // US-T166
 #include "Embodiment/RepairWorker.h"
 #include "Embodiment/ShipHelm.h"
@@ -200,6 +202,75 @@ namespace SpaceGod
 		if (EmbodiableEquals(HeldNonHelm(), pilot)) return;
 		// The take refused: no ejection after all.
 		EvaPilot::Unabandon(cockpit->Battle, cockpit->Unit, EmbodiableEquals(HeldNonHelm(), cockpit));
+	}
+
+	void UnitySpaceApp::DeployMech()
+	{
+		cs::Ref<Battle> battle;
+		auto unit = HullInHand(battle);
+		if (unit == nullptr)
+		{
+			ShowToast("Shift+N sends out a hull's mech: fly or select a capital ship or station in a fight (or hold one of its guns) first");
+			return;
+		}
+		if (Coop::CoopPeer::Active())
+		{
+			ShowToast("No mechs in co-op yet: it stays in its bay");
+			return;
+		}
+		cs::String why;
+		auto mech = MechWalker::Deploy(battle, unit, why);
+		if (mech == nullptr)
+		{
+			ShowToast(cs::Cat("The ", unit->Name(), " can't send out a mech: ", why));
+			return;
+		}
+		if (EmbodiableEquals(HeldNonHelm(), mech)) return;
+		mechHeight = 0; // sized afresh off the hull it stands on
+		TakeSeat(mech);
+	}
+
+	bool UnitySpaceApp::MechPose(const cs::Ref<MechWalker>& m, DVec3& scene, DVec3& up, DVec3& forward, double& height)
+	{
+		if (m == nullptr || m->Battle == nullptr || m->Battle->Over || !m->Lost.empty()) return false;
+		if (m->Hull != nullptr && m->Hull->Present())
+		{
+			// On the plating as the hull is drawn: its point in hull lengths times the drawn length (as a worker's).
+			auto host = Target::OfUnit(m->Battle, m->Hull);
+			double length = TargetRadius(host) * 2;
+			if (length <= 0) return false;
+			mechHeight = length * MechHeightLengths;
+			auto n = m->Local.LengthSquared() > 1e-12 ? m->Local.Normalized() : DVec3(0, 1, 0);
+			up = m->Hull->LocalDirToWorld(n).Normalized().SwapYZ();
+			scene = TargetScene(host) + m->Hull->LocalDirToWorld(m->Local).SwapYZ() * length;
+		}
+		else
+		{
+			if (mechHeight <= 0)
+			{
+				auto anchor = m->Carrier != nullptr && m->Carrier->Present() ? m->Carrier : nullptr;
+				double length = anchor != nullptr ? TargetRadius(Target::OfUnit(m->Battle, anchor)) * 2 : 0;
+				mechHeight = length > 0 ? length * MechHeightLengths : cs::Math::Max(BattleKmScale() * MechWalker::HeightKm, 1e-9);
+			}
+			scene = BattleScene(m->Battle, m->Pos);
+			up = m->Up.SwapYZ();
+		}
+		auto f = m->Facing.SwapYZ();
+		f = f - up * DVec3::Dot(f, up);
+		forward = f.LengthSquared() > 1e-12 ? f.Normalized() : DVec3::Cross(up, DVec3::UnitX).Normalized();
+		height = mechHeight;
+		return true;
+	}
+
+	void UnitySpaceApp::UpdateMechView()
+	{
+		if (World() == nullptr || systemRoot == nullptr) return;
+		if (mechView == nullptr || mechRoot != systemRoot)
+		{
+			mechView = cs::New<Views::MechView>(this, systemRoot);
+			mechRoot = systemRoot;
+		}
+		mechView->Update();
 	}
 
 	bool UnitySpaceApp::EvaPilotPose(const cs::Ref<EvaPilot>& p, DVec3& scene, DVec3& up, DVec3& forward, double& height)
@@ -446,6 +517,18 @@ namespace SpaceGod
 				auto look = DVec3(seatAim.x, seatAim.y, seatAim.z);
 				if (look.LengthSquared() < 1e-12) look = forward;
 				return at + up * (h * ShoulderRise) - look.Normalized() * (h * ShoulderBack);
+			}
+		}
+		// US-T83: a mech's shoulder: behind and above the torso along the look, in mech heights.
+		if (auto m = cs::As<MechWalker>(s))
+		{
+			DVec3 at, up, forward;
+			double h = 0;
+			if (MechPose(m, at, up, forward, h))
+			{
+				auto look = DVec3(seatAim.x, seatAim.y, seatAim.z);
+				if (look.LengthSquared() < 1e-12) look = forward;
+				return at + up * (h * MechShoulderRise) - look.Normalized() * (h * MechShoulderBack);
 			}
 		}
 		if (sub.Unit == nullptr || !sub.HasPoint) return SeatScene(s);

@@ -255,6 +255,7 @@ namespace SpaceGod::Input
 				{ KeyAction::SystemCruise, "systemCruise", "Flight: cruise drive", Controls, EdgeKind, { KeyChord(Key::J, S) }, "Spool the in-system cruise drive for what the nose is on, or drop out of it." },
 				{ KeyAction::Drift, "drift", "Flight: drift", Controls, HeldKind, { Key::R }, "A fighter's drift (hold, or toggle as Controls > Drift key sets it)." },
 				{ KeyAction::FlightAssist, "flightAssist", "Flight: flight assist", Controls, EdgeKind, { Key::F }, "Flight assist on or off." },
+				{ KeyAction::JumpJets, "jumpJets", "Flight: jump jets (mech)", Controls, HeldKind, { Key::Space }, "Held in a mech: the jump jets lift it off the plating and fly it in open space (the pause's Space is theirs while you pilot one)." },
 
 				{ KeyAction::LockTarget, "lockTarget", "Combat: lock target", Controls, EdgeKind, { Key::T }, "Lock (or clear) the hull under the mouse or selected." },
 				{ KeyAction::Tractor, "tractor", "Combat: tractor beam", Controls, EdgeKind, { KeyChord(Key::T, S) }, "The tractor beam on the nearest cargo pod in reach, or off." },
@@ -285,6 +286,7 @@ namespace SpaceGod::Input
 
 				{ KeyAction::Pilot, "pilot", "Seats: embody / let go", Both, EdgeKind, { Key::P }, "Embody what is selected or under the mouse; at any controls, let go." },
 				{ KeyAction::EmbodyCrew, "embodyCrew", "Seats: EVA repair worker", Both, EdgeKind, { KeyChord(Key::P, S) }, "Out on the hull as its next EVA repair worker." },
+				{ KeyAction::DeployMech, "deployMech", "Seats: mech out of the bay", Both, EdgeKind, { KeyChord(Key::N, S) }, "In a fight: the mech out of the bay of the hull held, flown or selected (a capital ship or station), you at its controls." },
 				{ KeyAction::NextSeat, "nextSeat", "Seats: next seat", Both, EdgeKind, { Key::Quote }, "Take the next seat in the fight in view." },
 				{ KeyAction::PrevSeat, "prevSeat", "Seats: previous seat", Both, EdgeKind, { Key::Semicolon }, "Take the seat before." },
 				{ KeyAction::ManGun, "manGun", "Seats: man the next gun", Both, EdgeKind, { Key::Slash }, "Man the next gun on the hull flown or selected; past the last, back to the helm." },

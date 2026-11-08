@@ -19,6 +19,7 @@
 #include "Embodiment/CraftPower.h"
 #include "Embodiment/FighterSeat.h"
 #include "Embodiment/HelmAbilities.h"
+#include "Embodiment/MechWalker.h" // US-T83: a mech's footfalls, felt
 #include "Embodiment/MountedTurret.h"
 #include "Embodiment/RepairWorker.h" // US-T170: a weld struck, felt
 #include "Embodiment/ShipHelm.h"
@@ -80,6 +81,9 @@ namespace SpaceGod
 			if (craft != craftHasInput) inputHandover = true; // changed outside the frame's commands (a seat lost, a load)
 			craftHasInput = craft;
 			Input.Arbitrate(craft);
+			// US-T83: a mech held keeps its jump jets' key (Space, over the pause); anywhere else the jets read nothing.
+			auto held = craft ? HeldNonHelm() : nullptr;
+			Input.GiveWalkerKeys(held != nullptr && held->InputProfile() == EmbodimentInputProfile::Walker);
 			if (inputHandover)
 			{
 				// Let go of everything held across the change: from the next frame on, the hands are the new owner's.
@@ -610,6 +614,7 @@ namespace SpaceGod
 		input.Boost = Input.Boost;
 		input.Manoeuvre = Input.Manoeuvre; // US-T87: the turn-and-burn's flip
 		input.Drift = Input.Drift; // US-T165: R held, a launched craft drifts (other seats ignore it)
+		input.JumpJets = Input.JumpJets; // US-T83: Space held, a mech's jump jets (other seats ignore it)
 		input.Primary = Input.Fire && !ClickPanelOpen();
 		input.Secondary = Input.LookHeld && !ClickPanelOpen();
 		// The arrows share the reactor the seat draws on (US-T94): a craft's own, a gun's hull's, a station's.
@@ -665,6 +670,25 @@ namespace SpaceGod
 			// The suit's jets: a light push on the crawl, more with them lit.
 			in.Thrust = (input.Boost ? 0.6 : 0.25) * std::min(1.0, std::abs(static_cast<double>(input.Throttle)) + std::abs(static_cast<double>(input.StrafeRight)));
 			in.Boosting = false;
+		}
+		else if (auto m = cs::As<MechWalker>(held))
+		{
+			// US-T83: the mech's weight: every footfall a thud through the cockpit, a landing a jolt by how hard it came
+			// down, the jump jets a roar.
+			bool fresh = feelFor != std::static_pointer_cast<void>(m);
+			FeelFor(m, FlightFeelProfile::Of(FeelRole::Hauler, 60));
+			if (fresh)
+			{
+				seatMechFootfalls = m->Footfalls;
+				seatMechLandings = m->Landings;
+			}
+			if (m->Footfalls > seatMechFootfalls) flightFeel.Kick(0.25 + 0.25 * std::min(1.0, std::abs(m->Speed) / MechWalker::MaxForwardKmS));
+			if (m->Landings > seatMechLandings) flightFeel.Kick(1.0);
+			seatMechFootfalls = m->Footfalls;
+			seatMechLandings = m->Landings;
+			in.Pace = std::abs(m->Speed) / MechWalker::MaxForwardKmS;
+			in.Thrust = m->JetsLit ? 1.0 : 0.3 * std::min(1.0, std::abs(static_cast<double>(input.Throttle)));
+			in.Boosting = m->JetsLit && input.Boost;
 		}
 		else return;
 		flightFeel.Step(dt, in);

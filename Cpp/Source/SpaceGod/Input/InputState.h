@@ -178,6 +178,13 @@ namespace SpaceGod::Input
 		/// left coasting on.</summary>
 		bool Eject = false;
 
+		/// <summary>US-T83: the jump jets held (Space by default; the pad's boost button in a mech). Only a walker (the mech)
+		/// keeps it (<see cref="GiveWalkerKeys"/>); everywhere else it reads false and Space stays the pause.</summary>
+		bool JumpJets = false;
+
+		/// <summary>Shift+N (US-T83): the mech out of the bay of the hull held, flown or selected, the player at its controls.</summary>
+		bool DeployMech = false;
+
 		/// <summary>Take charge (U.SPC-T422): ' takes the next seat in the fight in view (a ship's helm or a launched
 		/// fighter's cockpit), ; the one before (0: neither).</summary>
 		int CycleSeat = 0;
@@ -266,6 +273,9 @@ namespace SpaceGod::Input
 		/// US-T250: the left stick's last step past half way (1 ahead, -1 astern, 0 centred): a capital's telegraph rings
 		/// once a push, as W and S ring it once a press. Kept across frames.
 		int padThrottleLatch = 0;
+		/// US-T83: the jump jets' key went down this frame (it shares Space with the pause), and the boost from the keys alone
+		/// and from the pad (in a mech the pad's boost button is its jets).
+		bool jumpJetsPressed = false, keyBoost = false, padBoost = false;
 
 	public:
 		/// <summary>True on the frame the right button was released without dragging (a "right click").</summary>
@@ -290,6 +300,11 @@ namespace SpaceGod::Input
 		/// <summary>Clears the meanings of the shared keys that do not belong to this frame's owner: the embodied craft's
 		/// when <paramref name="atControls"/>, the command view's otherwise.</summary>
 		void Arbitrate(bool atControls);
+
+		/// <summary>US-T83: after <see cref="Arbitrate"/>, at the controls: with a walker held (a mech) the jump jets keep their
+		/// key, and a Space press that was theirs is no pause; the pad's boost button lights the jets instead of running. With
+		/// anything else held (or none), the jets read false.</summary>
+		void GiveWalkerKeys(bool walker);
 
 		/// <summary>The owner changed part-way through this frame: what was pressed has been spent by the old owner, so
 		/// the new one gets an idle frame (every edge and every held key cleared).</summary>

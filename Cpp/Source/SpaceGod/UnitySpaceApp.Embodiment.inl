@@ -238,6 +238,9 @@ private:
 	/// <summary>An EVA worker's weld hits as last seen, so each new one is felt as it lands (US-T170).</summary>
 	int seatWeldHits = 0;
 
+	/// <summary>US-T83: a mech's footfalls and landings as last seen, so each new one is felt.</summary>
+	int seatMechFootfalls = 0, seatMechLandings = 0;
+
 	/// <summary>
 	/// The dogfight game's keys in a cockpit (U.SPC-T424): F flight assist, T a lock on the hostile nearest the crosshair
 	/// (again for the next), Ctrl flares, and the number keys: 1 the next weapon group on the second trigger, 2-5 orders

@@ -17,6 +17,9 @@
 // each action says where it is live, InputState::Arbitrate keeps only the owner's meanings, and the bindings page warns
 // of a chord given to two actions live in the same place (unless both have it by default, as the pairs above do).
 //
+// US-T83: the mech's jump jets share Space with the pause by default: while a walker (a mech) is held the press is the
+// jets' (InputState::GiveWalkerKeys), anywhere else the pause's, so the page does not call it a clash.
+//
 // Fixed: Esc (it backs out of everything, menus included), the number keys, the mouse, and the keys inside panels and
 // menus (arrows, Enter, PgUp/PgDn in a list). The gamepad's buttons are its own map (Input/Gamepad.h, PadAction, under
 // Settings > Controls) and feed the same InputState fields after the keys; a pad binding needs no KeyAction.
@@ -34,7 +37,7 @@ namespace SpaceGod::Input
 		// Move (the camera's swim in command, thrust and strafe at the controls)
 		MoveForward, MoveBack, StrafeLeft, StrafeRight, Rise, Sink, Boost, Slow,
 		// Flight
-		RollLeft, RollRight, Manoeuvre, Cruise, SystemCruise, Drift, FlightAssist,
+		RollLeft, RollRight, Manoeuvre, Cruise, SystemCruise, Drift, FlightAssist, JumpJets,
 		// Combat and sensors
 		LockTarget, Tractor, DropMine, TunePhasers, RunHot, SensorPing, SilentRunning, PowerToggle, SelfDestruct,
 		// Reactor
@@ -42,7 +45,7 @@ namespace SpaceGod::Input
 		// Travel
 		ActivateGate, Eject, EngageFtl, FtlAutopilot, NextFtlTarget, PrevFtlTarget, ClearFtlCourse, RollPatches,
 		// Seats
-		Pilot, EmbodyCrew, NextSeat, PrevSeat, ManGun, JumpToCraft, MoveToHost, Picker, Boarding,
+		Pilot, EmbodyCrew, DeployMech, NextSeat, PrevSeat, ManGun, JumpToCraft, MoveToHost, Picker, Boarding,
 		// Command view
 		Focus, Home, CycleShips, CycleBackward, WatchBattle, ResetTime, Reorient, News,
 		// Time and scale

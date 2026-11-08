@@ -47,6 +47,8 @@ namespace SpaceGod::Core
 				CreditEntry("Space Station Creator Remastered", "Ebal Studios: every station, structure, Void Station and derelict",
 					"Store licence: used in the game, source assets not redistributed"),
 				CreditEntry("Space Kit", "Kenney (kenney.nl): the small civilian craft", "CC0 1.0 (public domain)"),
+				CreditEntry("Animated Mech Pack", "Quaternius (quaternius.com): \"George\", the walking mech with jump jets, cut into rigid "
+					"parts with gun arms and missile pods by MindAttic's Unreal.Soulslike (US-T83)", "CC0 1.0 (public domain)"),
 				CreditEntry("MetalPlates015A", "ambientCG (ambientcg.com): the plating on every procedural hull and station",
 					"CC0 1.0 (public domain)"),
 			}));

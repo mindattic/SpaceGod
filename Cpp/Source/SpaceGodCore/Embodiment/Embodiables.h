@@ -180,10 +180,10 @@ namespace SpaceGod::Core
 		static cs::List<cs::Ref<IEmbodiable>> CrewOn(const cs::Ref<World>& world, const cs::Ref<Battle>& battle, const cs::Ref<BattleUnit>& unit);
 
 		/// <summary>
-		/// Every walker in <paramref name="battle"/> the player could take (US-T135): none yet. The mech of Unreal.Soulslike
-		/// (US-T83) is not ported; when it is, it is an <see cref="IEmbodiable"/> of <see cref="EmbodimentKind.Mech"/> on
-		/// <see cref="EmbodimentInputProfile.Walker"/> (walk, run, look, its arms on the triggers) with a
-		/// <see cref="EmbodimentCameraKind.Shoulder"/> or chase rig, listed here; nothing else needs to change.
+		/// Every walker in <paramref name="battle"/> the player could take (US-T135): the mechs out of their bays and still
+		/// standing (US-T83, <see cref="MechWalker"/>, an <see cref="IEmbodiable"/> of <see cref="EmbodimentKind.Mech"/> on
+		/// <see cref="EmbodimentInputProfile.Walker"/> with a <see cref="EmbodimentCameraKind.Shoulder"/> rig). A mech still in
+		/// its bay is not listed: <see cref="MechWalker.Deploy"/> sends it out (Shift+N in the app).
 		/// </summary>
 		static cs::List<cs::Ref<IEmbodiable>> WalkersIn(const cs::Ref<World>& world, const cs::Ref<Battle>& battle);
 

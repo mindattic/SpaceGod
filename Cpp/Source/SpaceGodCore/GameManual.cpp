@@ -698,6 +698,23 @@ namespace SpaceGod::Core
 				  "it, and if it is shot down under you, you are thrown clear. Right mouse lets go. The time it takes is the "
 				  "clock's to give: comma steps the time below real time into slow motion (a half, a quarter, a tenth and a "
 				  "thirtieth, a near-freeze), period steps back up, and space pauses to plan the next move."),
+				T("The mech: walking a hull, flying on jump jets",
+				  "Every capital ship and station keeps a mech in its bay: a seven-metre, two-legged war machine. Shift+N (at its "
+				  "helm, on one of its guns, or with it selected in a fight) sends it out onto the dorsal plating with you at its "
+				  "controls; ' and ; find it again later in the fight. Mag boots hold it to the hull wherever the hull goes. W/S "
+				  "throttle the legs, with the weight of the thing -- it builds speed and sheds it slowly, Shift runs -- and A/D "
+				  "turn them, slower the faster it walks; the mouse twists the torso up to a hundred degrees off the legs and "
+				  "pitches the gun arms, so it can walk one way and shoot another. Left mouse (held) fires the twin arm "
+				  "autocannons in turn, real rounds that hit the first hostile hull they cross; right mouse ripples a four-missile "
+				  "salvo off the shoulder pods at the hostile nearest the crosshair, or straight rockets when nothing is near it. "
+				  "Both heat the mech on one scale: at the top the weapons lock out until it has cooled to forty. Hold Space for "
+				  "the jump jets: off the plating along its roof, then pushing it along your look through open space (W/S A/D "
+				  "Q/E steer the push, Shift burns them at full for twice the push), on a tank of six seconds' burn that refills "
+				  "while it stands on a hull. Let go and it coasts; coast onto any hull big enough to stand on -- yours or the "
+				  "enemy's -- and the boots catch. Come down faster than 30 m/s and the landing dents the armour; at 250 m/s it "
+				  "wrecks the mech. While you pilot one, Space is the jets' and not the pause (the Pause key still pauses; the "
+				  "jets can be rebound under Settings > Controls > Key bindings), and a pad's A button lights them. Not yet: "
+				  "enemies do not aim at the mech, and it is single player only."),
 				T("A hull's own abilities: launch, then fly what you launched",
 				  "At a helm the ability bar above the flight readout lists what that hull can order from what it really carries, "
 				  "each on Shift and a digit (Shift+1 the first, Shift+0 the tenth). A carrier has one launch for each class of "

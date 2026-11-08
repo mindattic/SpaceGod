@@ -270,6 +270,25 @@ The one third-party piece that **is** committed: its licence allows redistributi
   Sol), as a sky sphere (`sg.SkyMode sphere`) and as a painted volume (`sg.SkyMode volume`, the default); its core's
   direction (longitude -3.16, latitude +1.05 degrees in its frame) is where the hero system's fill light comes from.
 
+## Walking mech: Animated Mech Pack, by Quaternius (US-T83)
+
+Committed: CC0 allows anything, and the mech is drawn from code, not from imported assets.
+
+- **Source:** Quaternius's "Animated Mech Pack" (March 2021), `George.blend` + `George_Texture.png`, from
+  opengameart.org/content/animated-mech-pack (`animated_mech_pack_-_march_2021.zip`, downloaded 2026-11-04 without a
+  login for MindAttic's Unreal.Soulslike, UNR-T68). That repo's `tools/convert_mech.py` (Blender 4.4+) posed the arms as
+  gun arms, added an autocannon barrel under each forearm and a missile pod on each shoulder (UV'd onto the pack's own
+  texture), and cut the skinned model into 13 rigid parts about their joints (pelvis, torso, canopy, two arms; per leg
+  thigh, shin, metatarsal, foot).
+- **Licence:** CC0 1.0 (creativecommons.org/publicdomain/zero/1.0), the pack's own `License.txt` (copied beside the
+  parts). No attribution required; credited anyway (`Core/Credits.cpp`).
+- **Copied** into `Cpp/SourceArt/Mech/`: the 13 `SM_Mech_<Part>.obj`, `Mech_Texture.png`, `mech_rig.json` (the joints)
+  and `License.txt`. Nothing reads the sibling repo.
+- **Baked** by `tools/bake_mech.py` into `Cpp/Source/SpaceGod/Rendering/MechMeshData.inl` (generated: positions,
+  normals and a palette colour per corner sampled from the texture), which `Views/MechView.cpp` builds meshes from at
+  run time under the procedural ship material (vertex colours); nothing under `Cpp/Content`. Re-run the script after
+  changing the OBJs.
+
 ## Sound (US-T240)
 
 No third-party sound is used. Every sound SpaceGod plays is synthesized in code at run time

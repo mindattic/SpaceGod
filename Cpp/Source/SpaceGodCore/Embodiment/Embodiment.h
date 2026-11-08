@@ -30,8 +30,8 @@ namespace SpaceGod::Core
 		/// <summary>An EVA repair worker out on a hull, one of its damage control teams (US-T135, <see cref="RepairWorker"/>).</summary>
 		RepairWorker,
 
-		/// <summary>A mech (US-T83, the Unreal.Soulslike mech, not ported yet): reserved so the picker, the HUD and co-op
-		/// already know the kind; it will embody on <see cref="EmbodimentInputProfile.Walker"/>.</summary>
+		/// <summary>A mech (US-T83, the Unreal.Soulslike mech, <see cref="MechWalker"/>): out of a hull's bay, walking its plating
+		/// on <see cref="EmbodimentInputProfile.Walker"/>, its jump jets flying it in open space.</summary>
 		Mech,
 
 		/// <summary>A power-suited marine (US-T82, boarding, not built yet): reserved as <see cref="Mech"/> is.</summary>
@@ -63,8 +63,9 @@ namespace SpaceGod::Core
 		/// <summary>EVA on a hull (US-T135): W/S A/D crawl the plating where the mouse looks, Shift the suit's jets, left mouse
 		/// the welding torch's timing.</summary>
 		HullWalker,
-		/// <summary>A walker on its feet (US-T83 mech, US-T82 marine): W/S A/D walk, Shift run, mouse look, left/right mouse its
-		/// arms. Reserved: nothing uses it until those kinds land; the app's walker hands go to it unchanged.</summary>
+		/// <summary>A walker on its feet (US-T83 mech, US-T82 marine): W/S walk, A/D turn, Shift run, mouse look, left/right mouse
+		/// its arms; the mech's jump jets on their own key (<see cref="EmbodimentInput.JumpJets"/>, Space by default), which the
+		/// app gives it over the pause while a walker is held.</summary>
 		Walker,
 		/// <summary>EVA in open space (US-T166, an ejected pilot): W/S A/D Q/E the suit's thrusters along the look, Shift the jets
 		/// at full, left mouse the tether onto a torpedo and then the warhead's safing, right mouse lets go.</summary>
@@ -227,6 +228,10 @@ namespace SpaceGod::Core
 		/// <summary>Drift held (R, US-T165, <see cref="Drift"/>): a fighter's dogfight model let go, the hull coasting on its
 		/// way while it turns free onto the aim; let go, a boost-out in the new facing. A capital's helm ignores it.</summary>
 		bool Drift = false;
+
+		/// <summary>The jump jets held (Space by default, US-T83, <see cref="MechWalker"/>): a mech lifts off the plating and flies
+		/// on them in open space. Every other seat ignores it.</summary>
+		bool JumpJets = false;
 
 		/// <summary>The reactor split asked for this frame (US-T94, <see cref="PowerDistribution.Code"/>), -1 for no change:
 		/// whole, not a step, so a command carried twice (co-op, a replay) lands the same. See <see cref="CraftPower"/>.</summary>

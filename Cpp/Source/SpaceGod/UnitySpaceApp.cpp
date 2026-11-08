@@ -754,6 +754,7 @@ namespace SpaceGod
 		if (i.ManGun) ManNextGun();
 		if (i.EmbodyCrew) CycleWorker(); // US-T135: Shift+P, out on the hull as an EVA repair worker
 		if (i.Eject) EjectPilot(); // US-T166: Shift+Y, out of a launched craft's cockpit in the suit
+		if (i.DeployMech) DeployMech(); // US-T83: Shift+N, the mech out of the bay of the hull in hand
 		// Shift+/ (US-T106): into the newest craft the carrier launched, the next, and back to its helm.
 		if (i.JumpToCraft) JumpToCraft();
 		// At a gun mount (U.SPC-T445): up to the helm of the hull it is on; in a launched craft, back to its carrier's (US-T106).

@@ -13,6 +13,7 @@ namespace SpaceGod::Core
 	class BattleUnit;
 	class RepairWorker; // US-T158
 	class EvaPilot; // US-T166
+	class MechWalker; // US-T83
 	class Ship;
 }
 
@@ -20,4 +21,5 @@ namespace SpaceGod::Views
 {
 	class EmbodiedShine; // US-T136
 	class EvaWorkerView; // US-T158
+	class MechView; // US-T83
 }
