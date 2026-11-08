@@ -209,6 +209,13 @@ namespace SpaceGod::UI
 			if (!app->CoopActingHere()) outfitSlot = was; // the row picked is the asker's panel's
 			return true;
 		}
+		if (verb == "utility") // US-T89: a utility socket refitted in the Mechlab
+		{
+			auto yard = Port(a.at(0));
+			auto ship = world->PilotedShip;
+			if (yard != nullptr && ship != nullptr && ship->Combat != nullptr) UtilityApply(ship, yard, Wire::ParseI(a.at(1)), Wire::ParseI(a.at(2)));
+			return true;
+		}
 		// ---- the bounty board's brig
 		if (verb == "deliver" || verb == "ransom")
 		{

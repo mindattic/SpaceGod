@@ -281,6 +281,11 @@ namespace SpaceGod::Core
 		cs::List<cs::Ref<OutfitSlot>> Slots;
 		cs::List<cs::Nullable<ModuleKind>> Fitted;
 
+		/// <summary>US-T89: what is in each of the hull's utility sockets (see <see cref="ShipComponents"/>), in socket order:
+		/// a <see cref="UtilityKind"/>'s value, or -1 for an empty one. Short or empty when nothing was ever fitted (every
+		/// socket past its end is empty), so a stock hull, and any saved before there were sockets, carries none.</summary>
+		cs::List<int> Utility;
+
 		/// <summary>The facilities inside the hull now (U.SPC-T470): the design's own first, in its layout's order, then
 		/// those fitted since.</summary>
 		cs::List<cs::Ref<FacilitySite>> Facilities;
@@ -501,6 +506,7 @@ namespace SpaceGod::Core
 	/// </summary>
 	class SPACEGODCORE_API Outfitting final
 	{
+		friend class ShipComponents; // US-T89: a utility socket's refit is priced, readied and paid for as any other
 	public:
 		/// <summary>The yard's labour, as a share of the materials' base worth.</summary>
 		static constexpr double LabourShare = 0.25;

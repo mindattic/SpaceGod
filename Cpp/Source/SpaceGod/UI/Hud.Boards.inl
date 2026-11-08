@@ -89,6 +89,31 @@ private:
 	void OutfitOption(const cs::Ref<Core::Ship>& ship, const cs::Ref<Core::Settlement>& yard, const cs::Ref<Core::Loadout>& loadout,
 		const OutfitChoice& option, float x, float y, float w, float rowH);
 
+	// ---------------------------------------------------------------- the Mechlab (US-T89, UI/Hud.Mechlab.cpp)
+
+	/// <summary>Whether the outfitting panel shows the hull as its components (the Mechlab) rather than the plain list.</summary>
+	bool outfitMechlab = false;
+
+	/// <summary>The Mechlab's chosen utility socket (-1: none; a hardpoint chosen is <see cref="outfitSlot"/>) and its scroll.</summary>
+	int outfitSocket = -1;
+	Vector2 mechlabScroll;
+
+	/// <summary>
+	/// The Mechlab (US-T89, <see cref="Core::ShipComponents"/>): the piloted hull laid out as its components (bow, midsections,
+	/// engineering, sponsons), each a card with its type limits, the hardpoints on it (type and size, what is fitted and how it
+	/// stands) and its utility sockets. Pick a hardpoint for every module of its type and size, or a socket for the utility
+	/// parts it takes, each priced at the yard's market; the stats above are the spec the hull fights with.
+	/// </summary>
+	void DrawMechlab(const cs::Ref<Core::Ship>& ship, const cs::Ref<Core::Settlement>& yard, const cs::Ref<Core::Settlement>& port,
+		const cs::Ref<Core::Loadout>& loadout);
+
+	/// <summary>One line of what a utility socket takes (<paramref name="kind"/> a <see cref="Core::UtilityKind"/>, -1 emptying it).</summary>
+	void MechlabUtilityOption(const cs::Ref<Core::Ship>& ship, const cs::Ref<Core::Settlement>& yard, const cs::Ref<Core::Loadout>& loadout, int kind,
+		float x, float y, float w, float rowH);
+
+	/// <summary>A utility socket's Fit/Empty, as its button does it (also a co-op frame's "utility").</summary>
+	void UtilityApply(const cs::Ref<Core::Ship>& ship, const cs::Ref<Core::Settlement>& yard, int socket, int kind);
+
 	// ---------------------------------------------------------------- the port screen (US-T266, UI/Hud.Port.cpp)
 
 	/// <summary>The player's price factor at <paramref name="port"/> (their standing with its owner), 1 with no law.</summary>

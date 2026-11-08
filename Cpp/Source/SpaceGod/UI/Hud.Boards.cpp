@@ -775,6 +775,7 @@ namespace SpaceGod::UI
 			if (yard == nullptr && Outfitting::IsYard(st)) yard = st;
 		}
 		auto loadout = Outfitting::LoadoutOf(ship);
+		if (outfitMechlab) { DrawMechlab(ship, yard, port, loadout); return; } // US-T89: the hull as its components
 		auto spec = ship->Combat->Spec;
 		constexpr float rowH = 18;
 		// Rows: the hardpoints, then the facilities, then the free space.
@@ -787,6 +788,8 @@ namespace SpaceGod::UI
 		auto r = Panel(Rect((Screen::width - w) * 0.5f, 190, w, h));
 		GUI::Label(Rect(r.x + 12, r.y + 6, w - 24, 22), cs::Cat("OUTFITTING  ·  ", ship->Name, "  ·  ",
 			yard != nullptr ? yard->Name : port != nullptr ? cs::Cat(port->Name, " (no yard)") : cs::String("not alongside a port")), title);
+		// US-T89: the same hull as its components, with their utility sockets.
+		if (GUI::Button(Rect(r.xMax() - 132, r.y + 6, 120, 20), "Mechlab view", button)) { outfitMechlab = true; outfitSocket = -1; }
 		auto old = GUI::contentColor;
 		GUI::contentColor = Dim;
 		GUI::Label(Rect(r.x + 12, r.y + 28, w - 24, 18),

@@ -12,6 +12,7 @@
 #include "Combat/Facilities.h"
 #include "Combat/FireCones.h"
 #include "Combat/FleetPatterns.h"
+#include "Combat/ShipComponents.h" // US-T89
 #include "Combat/SpinalMounts.h"
 #include "Combat/TachyonLances.h"
 #include "Economy/CargoHold.h"
@@ -421,7 +422,7 @@ namespace SpaceGod::Core
 		for (int i = 0; i < Slots.Count(); i++) if (Fitted[i] != Slots[i]->Stock) return false;
 		if (Facilities.Count() != StockFacilities.Count()) return false;
 		for (int i = 0; i < Facilities.Count(); i++) if (Facilities[i] != StockFacilities[i]) return false;
-		return true;
+		return !ShipComponents::Any(Self()); // US-T89: nothing in a utility socket
 	}
 
 	double Loadout::CapacityTonnes() const
@@ -482,7 +483,7 @@ namespace SpaceGod::Core
 			auto def = f->Def();
 			mass -= def ? def->Mass(scale) : 0;
 		}
-		return mass;
+		return mass + ShipComponents::AddedMassTonnes(Self()); // US-T89: the utility parts
 	}
 
 	cs::Ref<IPartSpec> Loadout::PartAt(int slot, ModuleKind m) const
@@ -563,6 +564,8 @@ namespace SpaceGod::Core
 		spec->Decel = Base->Decel * drive / heavier;
 		spec->MaxSpeed = Base->MaxSpeed * cs::Math::Sqrt(drive / heavier);
 		spec->TurnRateDegS = Base->TurnRateDegS / cs::Math::Sqrt(heavier);
+		// US-T89: what the components' utility sockets carry (thrusters, life support), on top of the rest.
+		ShipComponents::Apply(spec, Self());
 		return spec;
 	}
 
@@ -601,6 +604,7 @@ namespace SpaceGod::Core
 		for (int i = 0; i < Fitted.Count(); i++) l->Fitted[i] = Fitted[i]; // Array.Copy
 		l->Facilities.Clear();
 		l->Facilities.AddRange(Facilities);
+		l->Utility.AddRange(Utility); // US-T89
 		return l;
 	}
 

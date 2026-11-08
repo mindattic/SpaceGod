@@ -317,7 +317,8 @@ namespace SpaceGod::Core
 	SG_SERIALIZE(Loadout, "Unity.SpaceGod.Core.Loadout",
 		SG_F(Base), SG_F(BaseCapacityTonnes), SG_F(Category), SG_F(Class), SG_F(Facilities), SG_ARRAY(Fitted),
 		SG_F(InternalSpace), SG_F(Slots), SG_F(SmallCraft),
-		b.FieldWith<StockFacilitiesCodec>("StockFacilities", &Self::StockFacilities))
+		b.FieldWith<StockFacilitiesCodec>("StockFacilities", &Self::StockFacilities),
+		SG_OPT(Utility)) // US-T89: the components' utility sockets, absent from older saves
 
 	SG_SERIALIZE(Mine, "Unity.SpaceGod.Core.Mine",
 		SG_F(ArmIn), SG_F(BlastKm), SG_F(Damage), SG_F(Gone), SG_F(Life), SG_F(Pos), SG_F(Side), SG_F(Vel))
