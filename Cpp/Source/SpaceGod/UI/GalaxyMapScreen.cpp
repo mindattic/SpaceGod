@@ -1,4 +1,5 @@
 #include "UI/GalaxyMapScreen.h"
+#include "UI/UiMotion.h" // US-T255
 
 #include "UnitySpaceApp.h"
 #include "UI/Hud.h"
@@ -51,6 +52,7 @@ namespace SpaceGod::UI
 	void GalaxyMapScreen::Draw()
 	{
 		EnsureStyles();
+		UiMotion::Scope motion("galaxy-map", 0); // US-T255: the whole screen fades in
 		auto screen = Rect(0, 0, static_cast<float>(Screen::width), static_cast<float>(Screen::height));
 		// The map has the whole screen: nothing under it is clicked or steered while it is up.
 		if (Event::current().type == EventType::Layout || Event::current().type == EventType::Repaint)

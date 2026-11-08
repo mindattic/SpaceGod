@@ -1,4 +1,5 @@
 #include "UI/HelpScreen.h"
+#include "UI/UiMotion.h" // US-T255
 
 #include "ControlsHelp.h"
 #include "GameManual.h"
@@ -17,6 +18,8 @@ namespace SpaceGod::UI
 	bool HelpScreen::Draw(const cs::String& closeHint)
 	{
 		EnsureStyles();
+		// US-T255: the whole screen fades in (no slide: it covers the screen); the catalog is a page of its own.
+		UiMotion::Scope motion(showCatalog ? "help.catalog" : "help", 0);
 
 		// The ship catalog (US-T193): every hull's handling, slots and compartments, in place of the manual.
 		if (showCatalog)

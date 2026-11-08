@@ -52,6 +52,10 @@ namespace SpaceGod
 		/// Set by the game mode: how a scene load reaches Unreal (ServerTravel / OpenLevel on the current map).
 		static inline cs::Action<cs::String> SceneLoader;
 
+		/// US-T255: LoadScene through a fade to black (UiMotion::FadeOutThen), for a change the player asked for (menu ->
+		/// game, game -> menu); at once when motion is off. A run skipping the menu loads straight away (LoadScene).
+		static void Travel(const cs::String& scene);
+
 	private:
 		static void Start(const cs::String& slot);
 		static inline cs::String loadSlot;

@@ -6,6 +6,7 @@
 #include "Shared/Profiles/Profiles.h"
 #include "Input/InputDevice.h"
 #include "MindAtticHeadless.h"
+#include "UI/UiMotion.h"
 
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -50,6 +51,7 @@ namespace SpaceGod
 	{
 		FillCommandLineArgs();
 		EnsureModelViewer();
+		UI::UiMotion::SceneArrived(); // US-T255: a fade held black for this scene comes back in
 		// The main menu is a scene of its own, and the app is not made in it: the menu loads the game scene
 		// when the player starts. A run for the tour, a capture or -continue goes straight there.
 		if (scene == GameLaunch::MenuScene)

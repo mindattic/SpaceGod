@@ -275,6 +275,13 @@ namespace SpaceGod::UnityCompat
 		static inline GuiMatrix matrix;
 		static GUISkin& skin();
 
+		// ---- host extensions (US-T255): not Unity's; UI/UiMotion drives them, and left alone they change nothing
+		/// Every draw's alpha is multiplied by it (a panel fading in). Reset to 1 at the start of every OnGUI call.
+		static inline float fade = 1;
+		/// How long a button or toggle takes to light up as the pointer comes onto it, and to dim as it leaves
+		/// (0: at once, as Unity does). The host's setting, not reset per OnGUI call.
+		static inline float hoverSeconds = 0;
+
 		// ---- controls
 		static void Label(const Rect& position, const cs::String& text);
 		static void Label(const Rect& position, const GUIContent& content);

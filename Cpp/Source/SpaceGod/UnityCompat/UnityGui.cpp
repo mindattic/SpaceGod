@@ -115,6 +115,7 @@ namespace SpaceGod::UnityCompat
 		Color DisabledFade(Color c)
 		{
 			if (!GUI::enabled) c.a *= 0.5f;
+			c.a *= GUI::fade; // US-T255: a panel fading in
 			return c;
 		}
 
@@ -783,6 +784,72 @@ namespace SpaceGod::UnityCompat
 		Draw(position, content, isHover, isActive, on, GUIUtility::keyboardControl == controlID);
 	}
 
+	namespace
+	{
+		/// US-T255: how lit each button or toggle is (0 resting .. 1 hovered), by control id, and when it was last drawn.
+		struct HoverGlow
+		{
+			float amount = 0;
+			float at = -1;
+		};
+		std::unordered_map<int, HoverGlow> hoverGlows;
+		float hoverPrunedAt = 0;
+
+		float HoverAmount(int id, bool hovered)
+		{
+			float now = Time::unscaledTime;
+			HoverGlow& g = hoverGlows[id];
+			// Not drawn lately (a new control, or one back on screen): it starts at rest.
+			bool fresh = g.at < 0 || now - g.at > 0.25f;
+			if (fresh) g.amount = 0;
+			float dt = fresh ? 0.0f : Mathf::Max(0.0f, now - g.at);
+			g.at = now;
+			float step = dt / Mathf::Max(0.001f, GUI::hoverSeconds);
+			g.amount = hovered ? Mathf::Min(1.0f, g.amount + step) : Mathf::Max(0.0f, g.amount - step);
+			if (now - hoverPrunedAt > 5)
+			{
+				hoverPrunedAt = now;
+				for (auto it = hoverGlows.begin(); it != hoverGlows.end();)
+					it = now - it->second.at > 1 ? hoverGlows.erase(it) : std::next(it);
+			}
+			return g.amount;
+		}
+
+		/// A button's or toggle's Repaint: Unity's look at rest and fully hovered, but with GUI::hoverSeconds set the hover
+		/// background eases in over the resting one as the pointer comes on (and out as it leaves) instead of snapping.
+		void DrawControl(const GUIStyle& style, const Rect& position, const GUIContent& content, int id, bool on)
+		{
+			if (GUI::hoverSeconds <= 0 || content.image || !renderer)
+			{
+				style.Draw(position, content, id, on);
+				return;
+			}
+			Vector2 m = Event::current().mousePosition;
+			bool isActive = GUIUtility::hotControl == id;
+			bool isHover = GUI::enabled && position.Contains(m) && (GUIUtility::hotControl == 0 || isActive);
+			bool focus = GUIUtility::keyboardControl == id;
+			float lit = HoverAmount(id, isHover && !isActive);
+			const GUIStyleState& rest = ChooseState(style, false, false, on, focus);
+			const GUIStyleState& hover = ChooseState(style, true, false, on, focus);
+			if (isActive || lit <= 0 || lit >= 1 || rest.background.get() == hover.background.get())
+			{
+				style.Draw(position, content, isHover, isActive, on, focus);
+				return;
+			}
+			Rect back = style.overflow.Add(position);
+			DrawBackground(back, rest.background, style.border);
+			float keep = GUI::fade;
+			GUI::fade = keep * lit * lit * (3 - 2 * lit); // smoothstep
+			DrawBackground(back, hover.background, style.border);
+			GUI::fade = keep;
+			Rect contentRect = style.padding.Remove(position);
+			contentRect.x += style.contentOffset.x;
+			contentRect.y += style.contentOffset.y;
+			const GUIStyleState& text = lit >= 0.5f ? hover : rest;
+			DrawTextBlock(style, contentRect, content.text, DisabledFade(Tint(Tint(text.textColor, GUI::color), GUI::contentColor)));
+		}
+	}
+
 	// ---------------------------------------------------------------- Event
 
 	bool Event::isMouse() const
@@ -881,6 +948,7 @@ namespace SpaceGod::UnityCompat
 		contentColor = Color::white();
 		enabled = true;
 		changed = false;
+		fade = 1;
 		matrix = GuiMatrix::identity();
 		nextControlId = (handlerIndex + 1) * 1000000 + 1;
 		pendingControlName.clear();
@@ -974,7 +1042,7 @@ namespace SpaceGod::UnityCompat
 				if (GUIUtility::hotControl == id) e.Use();
 				return false;
 			case EventType::Repaint:
-				style.Draw(position, content, id, false);
+				DrawControl(style, position, content, id, false);
 				Stats().Buttons++;
 				if (enabled && !content.text.empty() && !clips.empty())
 				{
@@ -1018,7 +1086,7 @@ namespace SpaceGod::UnityCompat
 				if (GUIUtility::hotControl == id) e.Use();
 				break;
 			case EventType::Repaint:
-				style.Draw(position, content, id, value);
+				DrawControl(style, position, content, id, value);
 				break;
 			default:
 				break;

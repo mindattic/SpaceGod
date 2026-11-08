@@ -1,4 +1,5 @@
 #include "UI/LogsScreen.h"
+#include "UI/UiMotion.h" // US-T255
 
 #include "Lore/LoreBooks.h"
 #include "Lore/LoreLibrary.h"
@@ -15,6 +16,7 @@ namespace SpaceGod::UI
 	bool LogsScreen::Draw(const cs::List<cs::String>& keys, const LoreLibrary& lore, const cs::String& closeHint)
 	{
 		EnsureStyles();
+		UiMotion::Scope motion("logs", 0); // US-T255: the whole screen fades in
 
 		// Newest find first; a key whose text has since been retired drops out (no book, no item).
 		cs::List<LoreBook> books;

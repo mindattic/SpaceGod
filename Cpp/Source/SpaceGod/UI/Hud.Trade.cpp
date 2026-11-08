@@ -1,6 +1,7 @@
 // Port of Unity.SpaceGod's Runtime/UI/Hud.Trade.cs (see UI/Hud.Trade.inl for the declarations).
 
 #include "UI/Hud.h"
+#include "UI/UiMotion.h" // US-T255
 
 #include <tuple>
 
@@ -44,6 +45,7 @@ namespace SpaceGod::UI
 
 	void Hud::DrawTradeDesk()
 	{
+		UiMotion::Scope motion("hud.trade"); // US-T255
 		auto world = app->World();
 		auto desk = world->Trade;
 		if (desk == nullptr) return;

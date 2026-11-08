@@ -1,4 +1,5 @@
 #include "UI/PauseMenu.h"
+#include "UI/UiMotion.h" // US-T255
 
 #include "ActiveProfile.h"
 #include "GameSettingsHost.h"
@@ -130,7 +131,12 @@ namespace SpaceGod::UI
 	{
 		if (!IsOpen) return;
 		EnsureStyles();
-		GUI::DrawTexture(Rect(0, 0, static_cast<float>(Screen::width), static_cast<float>(Screen::height)), shadeTexture);
+		{
+			// US-T255: the shade fades in as the menu opens, and each page eases in as it is turned to.
+			UiMotion::Scope shade("pause.shade", 0);
+			GUI::DrawTexture(Rect(0, 0, static_cast<float>(Screen::width), static_cast<float>(Screen::height)), shadeTexture);
+		}
+		UiMotion::Scope motion(page == Page::Main ? "pause.main" : page == Page::Settings ? "pause.settings" : "pause.display");
 		bool enabled = GUI::enabled;
 		GUI::enabled = confirm == nullptr;
 		switch (page)

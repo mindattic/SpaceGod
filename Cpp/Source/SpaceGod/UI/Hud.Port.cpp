@@ -5,6 +5,7 @@
 // purchases do ("repair" / "repairall", carried out in Hud.Coop.cpp).
 
 #include "UI/Hud.h"
+#include "UI/UiMotion.h" // US-T255
 
 #include "UnitySpaceApp.h"
 
@@ -81,6 +82,7 @@ namespace SpaceGod::UI
 
 	void Hud::DrawPort()
 	{
+		UiMotion::Scope motion("hud.port"); // US-T255
 		auto port = app->DockedAt;
 		auto ship = app->World()->PilotedShip;
 		if (port == nullptr || ship == nullptr)

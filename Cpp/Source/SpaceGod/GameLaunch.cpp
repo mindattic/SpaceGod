@@ -2,6 +2,7 @@
 #include "Bootstrap.h"
 #include "Coop/CoopPeer.h"
 #include "MindAtticHeadless.h"
+#include "UI/UiMotion.h"
 
 namespace SpaceGod
 {
@@ -41,7 +42,7 @@ namespace SpaceGod
 	{
 		FromMenu = true;
 		loadSlot = slot;
-		LoadScene(GameScene);
+		Travel(GameScene);
 	}
 
 	cs::String GameLaunch::TakeLoadSlot()
@@ -57,7 +58,13 @@ namespace SpaceGod
 		return false;
 	}
 
-	void GameLaunch::ToMainMenu() { LoadScene(MenuScene); }
+	void GameLaunch::ToMainMenu() { Travel(MenuScene); }
+
+	void GameLaunch::Travel(const cs::String& scene)
+	{
+		// US-T255: through black, back in once the scene has arrived (Bootstrap::EnsureApp -> UiMotion::SceneArrived).
+		UI::UiMotion::FadeOutThen([scene] { LoadScene(scene); });
+	}
 
 	void GameLaunch::LoadScene(const cs::String& scene)
 	{

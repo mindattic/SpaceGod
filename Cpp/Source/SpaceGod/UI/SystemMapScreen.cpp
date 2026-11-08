@@ -1,6 +1,7 @@
 // US-T258: the system map (declarations and the rule in UI/SystemMapScreen.h).
 
 #include "UI/SystemMapScreen.h"
+#include "UI/UiMotion.h" // US-T255
 
 #include "UnitySpaceApp.h"
 #include "Camera/SpaceCamera.h"
@@ -489,6 +490,7 @@ namespace SpaceGod::UI
 	void SystemMapScreen::Draw()
 	{
 		EnsureStyles();
+		UiMotion::Scope motion("system-map", 0); // US-T255: the whole screen fades in
 		auto screen = Rect(0, 0, static_cast<float>(Screen::width), static_cast<float>(Screen::height));
 		// The map has the whole screen: nothing under it is clicked while it is up.
 		if (Event::current().type == EventType::Layout || Event::current().type == EventType::Repaint)

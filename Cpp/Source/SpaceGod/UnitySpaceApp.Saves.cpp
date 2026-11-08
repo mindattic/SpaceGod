@@ -5,6 +5,7 @@
 
 #include "UnitySpaceApp.h"
 #include "CaptureEvents.h" // US-T72
+#include "UI/UiMotion.h" // US-T255
 
 #include <exception>
 
@@ -183,6 +184,7 @@ namespace SpaceGod
 		ShowSaves = false;
 		ShowToast(cs::Cat("Loaded ", SlotName(slot), "  (", DescribeSave(header), ")"));
 		CaptureEvents::GameLoaded(SlotName(slot)); // US-T72
+		UI::UiMotion::FadeFromBlack(); // US-T255: a load in place (quickload, the saves panel) cuts to black and fades back in
 		return true;
 	}
 

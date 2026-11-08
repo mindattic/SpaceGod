@@ -1,4 +1,5 @@
 #include "UI/MainMenu.h"
+#include "UI/UiMotion.h" // US-T255
 
 #include "Engine/Engine.h"
 #include "Engine/World.h"
@@ -196,6 +197,9 @@ namespace SpaceGod::UI
 			settings->Draw();
 			return;
 		}
+		// US-T255: each page eases in as it opens (Help fades itself in).
+		static const char* const pageIds[] = { "menu.main", "menu.load", "menu.profiles", "menu.assets", nullptr };
+		UiMotion::Scope motion(pageIds[Mathf::Clamp(static_cast<int>(page), 0, 4)]);
 		switch (page)
 		{
 			case Page::Load: DrawLoad(); break;
@@ -363,7 +367,7 @@ namespace SpaceGod::UI
 			bool enabled = GUI::enabled;
 			GUI::enabled = enabled && installed;
 			if (GUI::Button(Rect(row0.xMax() - 110, row0.y + 10, 104, 28), "Launch demo", installed ? buttonActive : button))
-				GameLaunch::LoadScene(c->DemoScenePath);
+				GameLaunch::Travel(c->DemoScenePath); // US-T255: through black
 			GUI::enabled = enabled;
 		}
 		if (GUI::Button(Rect(r.xMax() - 130, r.yMax() - 46, 110, 30), "Back", button)) Open(Page::Main);

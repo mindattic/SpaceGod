@@ -22,6 +22,7 @@
 #include "Ships.h"
 #include "SimClock.h"
 #include "UI/Hud.h"
+#include "UI/UiMotion.h" // US-T255
 #include "World.h"
 
 #include <algorithm>
@@ -448,6 +449,7 @@ namespace SpaceGod
 	void UnitySpaceApp::DrawComms()
 	{
 		if (!commsOpen || ScreenCleared) return;
+		UI::UiMotion::Scope motion("comms"); // US-T255
 		EnsureCommsStyles();
 		auto c = CommsHere();
 		float w = std::min(static_cast<float>(Screen::width) - 32, 980.0f);

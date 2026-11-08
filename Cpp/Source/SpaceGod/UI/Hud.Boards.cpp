@@ -1,6 +1,7 @@
 // Port of Unity.SpaceGod's Runtime/UI/Hud.cs lines 2383-3745 (see UI/Hud.Boards.inl for the declarations).
 
 #include "UI/Hud.h"
+#include "UI/UiMotion.h" // US-T255
 #include "CaptureEvents.h" // US-T72
 
 #include "UnitySpaceApp.h"
@@ -64,6 +65,7 @@ namespace SpaceGod::UI
 
 	void Hud::DrawBounties()
 	{
+		UiMotion::Scope motion("hud.bounties"); // US-T255
 		auto outlaws = app->World()->Outlaws;
 		if (outlaws == nullptr) return;
 		cs::Ref<Settlement> port = nullptr;
@@ -132,6 +134,7 @@ namespace SpaceGod::UI
 
 	void Hud::DrawContracts()
 	{
+		UiMotion::Scope motion("hud.contracts"); // US-T255
 		auto contracts = app->World()->Contracts;
 		if (contracts == nullptr) return;
 		cs::Ref<Settlement> port = nullptr;
@@ -193,6 +196,7 @@ namespace SpaceGod::UI
 
 	void Hud::DrawFleet()
 	{
+		UiMotion::Scope motion("hud.fleet"); // US-T255
 		auto world = app->World();
 		auto h = world->Holdings;
 		if (h == nullptr) return;
@@ -492,6 +496,7 @@ namespace SpaceGod::UI
 
 	void Hud::DrawMarket()
 	{
+		UiMotion::Scope motion("hud.market"); // US-T255
 		cs::Ref<Settlement> market = nullptr;
 		auto t = app->Selected;
 		if (t.IsBody()) for (const auto& s : app->Economy()->At(t.Body)) if (s->Discovered()) { market = s; break; }
@@ -751,6 +756,7 @@ namespace SpaceGod::UI
 
 	void Hud::DrawOutfit()
 	{
+		UiMotion::Scope motion("hud.outfit"); // US-T255
 		auto ship = app->World()->PilotedShip;
 		constexpr float w = 600;
 		if (ship == nullptr || ship->Combat == nullptr)
@@ -994,6 +1000,7 @@ namespace SpaceGod::UI
 
 	void Hud::DrawSpawn()
 	{
+		UiMotion::Scope motion("hud.spawn", 0); // US-T255: the whole screen, faded in
 		GUI::Box(Rect(0, 0, static_cast<float>(Screen::width), static_cast<float>(Screen::height)), GUIContent::none(), panel);
 		RegisterUi(Rect(0, 0, static_cast<float>(Screen::width), static_cast<float>(Screen::height)));
 
@@ -1041,6 +1048,7 @@ namespace SpaceGod::UI
 
 	void Hud::DrawCargo()
 	{
+		UiMotion::Scope motion("hud.cargo"); // US-T255
 		auto ship = app->World()->PilotedShip;
 		if (ship == nullptr)
 		{
@@ -1181,6 +1189,18 @@ namespace SpaceGod::UI
 		const auto& events = app->World()->Events;
 		int n = cs::Math::Min(4, events.Count());
 		if (n == 0) return;
+		// US-T255: when the newest report came in (told apart by its date and text: the list is trimmed at its cap).
+		static cs::String tickerNewest;
+		static double tickerArrivedAt = 0;
+		{
+			const auto& newest = events[events.Count() - 1];
+			cs::String key = cs::Cat(cs::Fmt(newest.Jd, "F6"), " ", newest.Text);
+			if (key != tickerNewest)
+			{
+				tickerNewest = key;
+				tickerArrivedAt = UiMotion::Now();
+			}
+		}
 		float w = 640, rowH = 17;
 		auto r = Panel(newsRect); // TopCentre's first slot, taken in LayoutNews (US-T154)
 		auto old = GUI::contentColor;
@@ -1194,6 +1214,8 @@ namespace SpaceGod::UI
 				tickerStyle->wordWrap = false;
 				tickerStyle->clipping = TextClipping::Clip;
 			}
+			// US-T255: the newest report fades and rises into its row as it comes in.
+			UiMotion::Scope arriving(i == n - 1 ? UiMotion::Enter(static_cast<float>(UiMotion::Now() - tickerArrivedAt)) : 1.0f, rowH);
 			GUI::Label(Rect(r.x + 10, r.y + 5 + i * rowH, w - 20, rowH), NewsLine(e), tickerStyle);
 		}
 		GUI::contentColor = old;
@@ -1241,6 +1263,7 @@ namespace SpaceGod::UI
 
 	void Hud::DrawNews()
 	{
+		UiMotion::Scope motion("hud.news"); // US-T255
 		constexpr float w = 760;
 		float h = Mathf::Min(Screen::height * 0.5f, 420.0f);
 		auto r = Panel(newsRect); // TopCentre's first slot, taken in LayoutNews (US-T154)
@@ -1409,6 +1432,7 @@ namespace SpaceGod::UI
 	{
 		cs::Ref<PatrolHail> hail = app->IsPiloting() && app->World()->Law != nullptr ? app->World()->Law->Hail : nullptr;
 		if (hail == nullptr || app->CommsOpen()) return; // US-T215: the comms panel takes precedence over the patrol hail line (it drew behind it)
+		UiMotion::Scope motion("hud.hail"); // US-T255
 		int seconds = Mathf::CeilToInt(static_cast<float>(hail->SecondsLeft(app->Clock->Jd)));
 		cs::String s = cs::Cat("HAILED  ·  ", cs::Strings::ToUpperInvariant(hail->By->Name), " PATROL ", cs::Strings::ToUpperInvariant(hail->Patrol->Name), "  ·  ",
 			hail->Interdiction ? cs::Cat("HEAVE TO:  1 pay the ", Credits(hail->Fine), " fine, or be fired on in ", seconds, " s")
@@ -1441,6 +1465,7 @@ namespace SpaceGod::UI
 		if (s == nullptr)
 		{
 			if (app->SalvageApproach.empty()) return;
+			UiMotion::Scope motion("hud.salvage-approach"); // US-T255
 			auto line = GUIContent(app->SalvageApproach);
 			float lw = text->CalcSize(line).x + 28;
 			auto lr = Panel(Rect((Screen::width - lw) * 0.5f, Screen::height - 76, lw, 30));
@@ -1485,6 +1510,7 @@ namespace SpaceGod::UI
 	void Hud::DrawBoarding()
 	{
 		if (!app->BoardingPanelOpen()) return;
+		UiMotion::Scope motion("hud.boarding"); // US-T255
 		auto [hull, role] = *app->BoardingFight;
 		auto inside = hull->Combat->Interior;
 		auto [order, objective] = BoardingCommand::OrdersOf(inside, role);
@@ -1715,6 +1741,7 @@ namespace SpaceGod::UI
 		float w = toast->CalcSize(content).x + 40;
 		auto old = GUI::color;
 		GUI::color = Color(1, 1, 1, a);
+		UiMotion::Scope arriving(UiMotion::Enter(app->ToastAge), -UiMotion::ToastSlide); // US-T255: eases down into its slot
 		auto r = layout.Take(HudRegion::TopCentre, w, 34); // the next slot under the news and alerts (US-T154)
 		RegisterUi(r); // US-T211
 		GUI::Box(r, GUIContent::none(), panel);
