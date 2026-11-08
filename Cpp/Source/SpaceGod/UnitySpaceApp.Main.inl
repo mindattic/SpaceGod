@@ -322,6 +322,10 @@ public:
 	/// <summary>The galaxy map ([, U.SPC-T103): a full screen of every system, its holder, the gate traffic, fronts and raiders.</summary>
 	bool ShowGalaxyMap = false;
 
+	/// <summary>US-T258: the system map (Shift+[, or the drawer's SYSTEM MAP): the system the player is in, top-down, with
+	/// click-to-select and, at a helm, cruise and lane-route plots (UI/SystemMapScreen).</summary>
+	bool ShowSystemMap = false;
+
 	/// <summary>The polity the galaxy map's envoy screen opens on next (U.SPC-T427), set by a hail; the map takes it and clears it.</summary>
 	cs::Ref<Core::Faction> EnvoyTo;
 

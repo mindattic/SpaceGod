@@ -6,6 +6,7 @@
 #include "UnitySpaceApp.h"
 #include "ActiveProfile.h"
 #include "UI/GalaxyMapScreen.h"
+#include "UI/SystemMapScreen.h" // US-T258
 #include "UI/HelpScreen.h"
 #include "UI/LogsScreen.h"
 #include "GameLore.h"
@@ -152,6 +153,18 @@ namespace SpaceGod::UI
 			return;
 		}
 		galaxyMapOpen = false;
+
+		// So is the system map (US-T258): the system the player is in, top-down; a trip under way has the screen.
+		if (app->ShowSystemMap && !app->Travel->Active && !app->InFtlCruise())
+		{
+			if (!systemMap) systemMap = cs::New<SystemMapScreen>(app);
+			if (!systemMapOpen) systemMap->Opened();
+			systemMapOpen = true;
+			systemMap->Draw();
+			DrawToast();
+			return;
+		}
+		systemMapOpen = false;
 
 		LayoutNews(); // TopCentre's first slot, so every alert and banner stacks under the news
 
@@ -1741,6 +1754,7 @@ namespace SpaceGod::UI
 		// UnityEngine.Object.Destroy(tex) -> dropping the reference (the last one releases the Unreal texture).
 		panelTexture = rowHoverTexture = rowSelectedTexture = buttonTexture = buttonActiveTexture = nullptr;
 		if (galaxyMap) galaxyMap->DestroyOwnedTextures();
+		if (systemMap) systemMap->DestroyOwnedTextures(); // US-T258
 		if (helpScreen) helpScreen->DestroyOwnedTextures();
 		if (logsScreen) logsScreen->DestroyOwnedTextures(); // US-T261
 	}

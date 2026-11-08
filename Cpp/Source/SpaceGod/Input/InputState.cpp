@@ -114,7 +114,8 @@ namespace SpaceGod::Input
 		ToggleContracts = kb[Key::F7].wasPressedThisFrame;
 		ToggleFleet = kb[Key::F10].wasPressedThisFrame;
 		ToggleTrade = kb[Key::Backslash].wasPressedThisFrame;
-		ToggleGalaxyMap = kb[Key::LeftBracket].wasPressedThisFrame;
+		ToggleGalaxyMap = kb[Key::LeftBracket].wasPressedThisFrame && !Boost;
+		ToggleSystemMap = kb[Key::LeftBracket].wasPressedThisFrame && Boost; // US-T258: Shift+[, the system map
 		ClearScreen = kb[Key::F11].wasPressedThisFrame;
 		HailPolity = kb[Key::F12].wasPressedThisFrame;
 		ToggleNews = kb[Key::X].wasPressedThisFrame;
@@ -267,6 +268,7 @@ namespace SpaceGod::Input
 		Focus = Escape = ToggleScale = TimeFaster = TimeSlower = TogglePause = ResetTime = false;
 		ToggleOrbits = ToggleLabels = ToggleHelp = ToggleHud = ClearScreen = ToggleMarket = DockPort = ToggleCargo = ToggleOutfit = ToggleSilent = ToggleBounties = ToggleContracts = ToggleFleet = ToggleTrade = ToggleGalaxyMap = ToggleNews = ToggleSpawn = WatchBattle = ToggleLanes = ToggleSatellites = ToggleReorient = CycleShips = CycleBackward = Home = Pilot = LockTarget = ActivateGate = EngageFtl = false;
 		QuickSave = QuickLoad = ToggleSaves = false;
+		ToggleSystemMap = false; // US-T258
 		SpawnPractice = false;
 		ToggleCheatMenu = false; // US-T126
 		ToggleLogs = false; // US-T261

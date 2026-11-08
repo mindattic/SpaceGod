@@ -68,6 +68,8 @@ private:
 	/// The galaxy map screen ([), made the first time it is opened; and whether it was up last frame.
 	cs::Ref<GalaxyMapScreen> galaxyMap;
 	bool galaxyMapOpen = false;
+	cs::Ref<SystemMapScreen> systemMap; // US-T258
+	bool systemMapOpen = false;
 
 	/// The Help screen (H / F1, or Help in the Esc menu), made the first time it is opened.
 	cs::Ref<HelpScreen> helpScreen;

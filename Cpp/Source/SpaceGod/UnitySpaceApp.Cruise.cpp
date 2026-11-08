@@ -28,6 +28,7 @@
 #include "World.h"
 
 #include <cmath>
+#include <cstdlib> // US-T258
 
 using namespace SpaceGod::Core;
 using SpaceGod::UI::Icons;
@@ -223,6 +224,7 @@ namespace SpaceGod
 
 	void UnitySpaceApp::CruiseTo(const Target& target)
 	{
+		if (CoopSends("cruise", CruiseTargetWire(target))) return; // US-T258: the shared helm's drive: into the frames, as the course is
 		if (!IsPiloting())
 		{
 			ShowToast("No cruise: take a helm first (Helm > Pilot the nearest ship)");
@@ -239,6 +241,30 @@ namespace SpaceGod
 			cs::String name;
 			if (CruiseTargetAt(target, at, standoff, name)) ShowToast(cs::Cat("Cruise: now bound for ", name));
 		}
+	}
+
+	cs::String UnitySpaceApp::CruiseTargetWire(const Target& t) // US-T258
+	{
+		auto infra = World()->Infrastructure;
+		if (infra != nullptr && t.IsStructure())
+			for (int i = 0; i < infra->Structures.Count(); i++)
+				if (infra->Structures[i] == t.Structure) return cs::Cat("t ", i);
+		if (infra != nullptr && t.IsRing())
+			for (int i = 0; i < infra->Rings.Count(); i++)
+				if (infra->Rings[i] == t.Ring) return cs::Cat("r ", i);
+		return CoopTargetKey(t);
+	}
+
+	Target UnitySpaceApp::CruiseTargetFromWire(const cs::String& key) // US-T258
+	{
+		auto infra = World()->Infrastructure;
+		if (infra != nullptr && key.size() > 2 && (key[0] == 't' || key[0] == 'r') && key[1] == ' ')
+		{
+			int i = std::atoi(key.c_str() + 2);
+			if (key[0] == 't') return i >= 0 && i < infra->Structures.Count() ? Target::OfStructure(infra->Structures[i]) : Target::None();
+			return i >= 0 && i < infra->Rings.Count() ? Target::OfRing(infra->Rings[i]) : Target::None();
+		}
+		return CoopResolveTarget(key);
 	}
 
 	void UnitySpaceApp::DropSystemCruise(const cs::String& why)

@@ -109,3 +109,8 @@ private:
 	/// while the scale model still draws the point by it (at the game scale a world's mapping eases out over a wide reach;
 	/// changing frame only where the two mappings meet keeps the hull from jumping on the screen).</summary>
 	bool CruiseHolds(int body, Core::DVec3 helio);
+
+	/// <summary>US-T258: a cruise target as every co-op peer can read it back: a station in orbit ("t <index>") or a docking
+	/// ring ("r <index>") by its place in the Infrastructure, anything else as <see cref="CoopTargetKey"/> has it.</summary>
+	cs::String CruiseTargetWire(const Target& t);
+	Target CruiseTargetFromWire(const cs::String& key);

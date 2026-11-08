@@ -134,6 +134,9 @@ namespace SpaceGod::Input
 		/// <summary>[ (left bracket): the galaxy map (U.SPC-T103; on F11 until U.SPC-T496 gave that to the clear screen).</summary>
 		bool ToggleGalaxyMap = false;
 
+		/// <summary>US-T258: Shift+[ : the system map, the tactical map of the system the player is in.</summary>
+		bool ToggleSystemMap = false;
+
 		/// <summary>F12 (U.SPC-T427): hails the polity of the ship locked, selected or hailing you, and opens the envoy screen to treat with it.</summary>
 		bool HailPolity = false;
 

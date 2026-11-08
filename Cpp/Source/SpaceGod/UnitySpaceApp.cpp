@@ -147,7 +147,7 @@ namespace SpaceGod
 	bool UnitySpaceApp::ClickPanelOpen() const
 	{
 		if (coopPanelOverride.has_value()) return *coopPanelOverride; // US-T44 (US-T43): the helm holder's, while its frame is flown in co-op
-		return !ScreenCleared && (ShowSpawn || ShowSaves || ShowGalaxyMap || ShowHelp || ShowLogs /* US-T261 */ || (ShowHud && (ShowMarket || ShowCargo || ShowNews || ShowOutfit || ShowBounties || ShowContracts || ShowFleet || ShowTrade || ShowPicker || ShowPort))); // US-T266: the port screen too; a cleared screen (F11) shows none of them; market, cargo, outfitting, bounties, contracts and news are HUD panels, hidden with it
+		return !ScreenCleared && (ShowSpawn || ShowSaves || ShowGalaxyMap || ShowSystemMap /* US-T258 */ || ShowHelp || ShowLogs /* US-T261 */ || (ShowHud && (ShowMarket || ShowCargo || ShowNews || ShowOutfit || ShowBounties || ShowContracts || ShowFleet || ShowTrade || ShowPicker || ShowPort))); // US-T266: the port screen too; a cleared screen (F11) shows none of them; market, cargo, outfitting, bounties, contracts and news are HUD panels, hidden with it
 	}
 
 	bool UnitySpaceApp::IsSol() const { return ActiveSystem->Catalog->Root()->Name == "Sun"; }
@@ -457,7 +457,7 @@ namespace SpaceGod
 		Input.Poll(overUi, ModelViewer::CapturesInput());
 		CaptureEvents::Hotkeys(Input); // US-T72: Alt+F9/F10/F11 while capture runs, on this machine only
 		// The galaxy map turns with its own drag: the camera behind it does not look about meanwhile.
-		if ((ShowGalaxyMap || ShowHelp || ShowLogs) && !ScreenCleared) Input.ReleaseLook(); // US-T261: the logs screen too
+		if ((ShowGalaxyMap || ShowSystemMap /* US-T258 */ || ShowHelp || ShowLogs) && !ScreenCleared) Input.ReleaseLook(); // US-T261: the logs screen too
 		// The pause menu has the frame: nothing else moves, and the stick and trigger do nothing, until it closes.
 		if (pauseMenu->IsOpen)
 		{
@@ -685,6 +685,11 @@ namespace SpaceGod
 		if (i.ToggleFleet) ShowFleet = !ShowFleet;
 		if (i.ToggleTrade) ShowTrade = !ShowTrade;
 		if (i.ToggleGalaxyMap) ShowGalaxyMap = !ShowGalaxyMap;
+		if (i.ToggleSystemMap) // US-T258: Shift+[, the system map (in place of the galaxy map, which [ brings back)
+		{
+			ShowSystemMap = !ShowSystemMap;
+			if (ShowSystemMap) ShowGalaxyMap = false;
+		}
 		if (i.HailPolity) HailPolity();
 		// At the helm X rolls the hull (Z/X): the news feed would free the cursor and take the stick and guns.
 		if (i.ToggleNews && !AtControls()) ShowNews = !ShowNews;
@@ -742,6 +747,7 @@ namespace SpaceGod
 			case EscapeAction::ClosePanels:
 				ShowSpawn = ShowSaves = ShowMarket = ShowCargo = ShowNews = ShowOutfit = ShowBounties = ShowContracts = ShowFleet = ShowTrade = ShowGalaxyMap = ShowHelp = ShowPicker = false;
 				ShowPort = false; // US-T266: the screen closes, the hull stays docked (Shift+M opens it again)
+				ShowSystemMap = false; // US-T258
 				ShowLogs = false; // US-T261
 				break;
 			case EscapeAction::LeaveFocus:

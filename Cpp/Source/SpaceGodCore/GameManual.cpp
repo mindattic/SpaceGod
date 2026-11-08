@@ -741,6 +741,13 @@ namespace SpaceGod::Core
 				T("The galaxy map",
 				  "[ opens it: every system at its real place, who holds it, gate traffic, war fronts, blockades and raiders as "
 				  "far as the news goes. Click a star to inspect it, double-click to travel; DIPLOMACY and COMMAND are its panels."),
+				T("The system map", // US-T258
+				  "Shift+[ (or the drawer's SYSTEM MAP) opens the system you are in, seen from above: every world on its orbit, "
+				  "the settlements on them, stations, gas works, the lanes with their ramps and the spurs to the gates, the gates, "
+				  "belts, ice fields, nebulae and graveyards, and the ships about as far as your sensors make them out. Hover for "
+				  "a line on anything, click to select it; drag pans, the wheel zooms, FIT and HERE frame the system or you. At a "
+				  "helm, CRUISE THERE spools the cruise drive for it, and LANE ROUTE plots the lanes to ride there: each off-ramp "
+				  "then picks the next lane for you, and the banner shows the next ramp. A gate's button plots the course through it."),
 				T("Information lag",
 				  "News travels at light speed inside a system and through the gates between them, so what anyone knows of a "
 				  "distant place is as old as the news that brought it.")),

@@ -203,7 +203,7 @@ namespace SpaceGod
 		Clock->SetWarp(Core::SimClock::WarpToCover(simSeconds, RideRealSeconds, rideWarpBefore));
 		RideOnward.Clear();
 		RideOnward.AddRange(Fleet()->Lanes->OnwardHops(hop.To, hop.Lane));
-		RideChoice = -1;
+		RideChoice = LaneRouteChoice(hop); // US-T258: a plotted lane route picks the off-ramp's exit (-1, come off, without one)
 		warnedOf = nullptr;
 		RideThreat = std::nullopt;
 		laneRejoinable = false;
@@ -427,5 +427,6 @@ namespace SpaceGod
 			ShowToast(cs::Cat("Off the ", hop.Lane->Name, " spur at ", cs::Strings::ToUpperInvariant(hop.Lane->Gate->Name),
 				(hop.Lane->Gate->Destination() != nullptr ? cs::Cat(", to ", cs::Strings::ToUpperInvariant(hop.Lane->Gate->Destination()->Name), " (Y to jump)") : cs::String())));
 		else ShowToast(cs::Cat("Off the ", hop.Lane->Name, (hop.Lane->IsGateSpur() ? " spur" : " lane"), " at ", Fleet()->Lanes->EndName(hop.Lane, hop.To)));
+		LaneRouteRampReached(hop); // US-T258
 	}
 }

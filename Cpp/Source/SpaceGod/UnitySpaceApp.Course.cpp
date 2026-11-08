@@ -155,7 +155,7 @@ namespace SpaceGod
 
 	cs::String UnitySpaceApp::CourseLine()
 	{
-		if (Course == nullptr) return cs::String();
+		if (Course == nullptr) return LaneRouteLine(); // US-T258: else the lane route the system map plotted, if any
 		if (CourseByCrew) return Course->Done() ? cs::String() : cs::Cat("AUTOPILOT  ", cs::Strings::ToUpperInvariant(courseShip->Name), "  ", cs::Strings::ToUpperInvariant(Course->Describe()));
 		// Another hull's helm ends the course; a system the hull came to some other way (FTL) replans from there.
 		if (!IsPiloting() || Piloted.Ship != courseShip) { Course = nullptr; return cs::String(); }

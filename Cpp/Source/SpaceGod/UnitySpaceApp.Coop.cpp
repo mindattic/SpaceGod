@@ -1179,6 +1179,9 @@ namespace SpaceGod
 			}
 		}
 		else if (verb == "plot") PlotCourse(Galaxy->Find(args));
+		else if (verb == "cruise") CruiseTo(CruiseTargetFromWire(args)); // US-T258: the system map's (and the navigator's) cruise
+		else if (verb == "laneplot") PlotLaneRoute(Wire::ParseI(a.at(0)), Wire::ParseI(a.at(1)), JoinFrom(a, 2)); // US-T258
+		else if (verb == "laneclear") ClearLaneRoute(); // US-T258
 		else if (verb == "autopilot") EngageCourseAutopilot();
 		else if (verb == "crew")
 		{

@@ -167,3 +167,41 @@ private:
 
 	/// <summary>A frame of the bleed: the hull's speed held up to the wake's, along the way it is going, until it is down to its own.</summary>
 	void UpdateLaneWake(const cs::Ref<Core::Ship>& ship);
+
+	// ---------------------------------------------------------------- US-T258: the lane route (UnitySpaceApp.SystemMap.cpp)
+
+public:
+	/// <summary>
+	/// US-T258: the lane route plotted from the system map at a helm: the lanes (and at the end a gate's spur) to ride from
+	/// the planetary system the hull is at to the one its destination is in, in order (null: none plotted). Riding one of
+	/// them, the off-ramp's exit is picked for the next (<see cref="RideChoice"/>); the course banner shows the next ramp.
+	/// Plotted and cleared through the co-op frames, as the course is, so every peer rides the same exits.
+	/// </summary>
+	cs::Ref<cs::List<Core::LaneHop>> LaneRoute;
+	cs::String LaneRouteName;
+
+	/// <summary>The planetary system on the lane network nearest the unit held (or the view): where a lane route starts (-1: no lanes).</summary>
+	int LaneSystemHere();
+
+	/// <summary>The lanes from here to planetary system <paramref name="toSystem"/>, or on to <paramref name="gate"/>'s spur
+	/// (then <paramref name="toSystem"/> is ignored); null when there is no way over the lanes, or none is needed.</summary>
+	cs::Ref<cs::List<Core::LaneHop>> LaneRouteTo(int toSystem, const cs::Ref<Core::JumpGate>& gate);
+
+	/// <summary>Plots the lane route to <paramref name="toSystem"/> (or to the active system's gate <paramref name="gateIndex"/>,
+	/// -1 for none), called <paramref name="name"/>; into the frames in co-op.</summary>
+	void PlotLaneRoute(int toSystem, int gateIndex, const cs::String& name);
+
+	/// <summary>Drops the lane route; into the frames in co-op.</summary>
+	void ClearLaneRoute();
+
+	/// <summary>The banner's line for the lane route (empty: none): how many lanes are left and the next ramp, or the lane ridden.</summary>
+	cs::String LaneRouteLine();
+
+private:
+	cs::Ref<Core::Ship> laneRouteShip;
+
+	/// <summary>The index in <see cref="RideOnward"/> of the route's next hop after <paramref name="riding"/> (-1: none, come off).</summary>
+	int LaneRouteChoice(const Core::LaneHop& riding) const;
+
+	/// <summary>Off a lane at its far ramp: the route is done if that was its last hop.</summary>
+	void LaneRouteRampReached(const Core::LaneHop& hop);
