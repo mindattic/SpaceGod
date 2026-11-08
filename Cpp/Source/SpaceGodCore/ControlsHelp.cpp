@@ -29,6 +29,7 @@ namespace SpaceGod::Core
 				L("O", "orbits"),
 				L("L", "labels"),
 				L("Shift+L", "recovered logs: the ship logs and station records you have found, to read (Up / Down a log, Left / Right a page)"), // US-T261
+				L("Shift+O", "discoveries: everything you have found, by kind and the day (stars charted or visited, bodies surveyed, settlements, pirate havens, graveyards, derelict stations, void sights, sightings, pilots met); each shows its readings and description, with Select, Focus and Plot course buttons; O alone stays the orbits"), // US-T259
 				L("N", "hyperlanes"),
 				L("K", "satellites"),
 				L("Shift+K  or  numpad *", "skybox: the next sky for the system in view, which keeps it (Shift+Alt+K or numpad / goes back)"),
@@ -113,6 +114,8 @@ namespace SpaceGod::Core
 
 			cs::New<HelpSection>("TRADE",
 				L("M", "market: Buy / Sell and Refuel appear while piloting near the shown settlement's body"),
+				L("Shift+M", "port services: at a helm alongside a port, ask for docking clearance (by the port's trade with the hull and its owner's standing toward the pilot); docked, one screen with tabs (Market, Outfitting at a yard, Repair & Rearm, Contracts, Bounties, Fleet & property, Trade desk, Crew, News); flying off or leaving the helm undocks"), // US-T266
+				More("exploration pays: a find past charted space (a far star, a first body, a void sight, an anomaly, a graveyard) leaves survey data aboard the hull; the market board at a cartographer (a lawful colony or station of 20,000 people or more) buys it, once per faction"), // US-T260
 				L("I", "cargo hold (while piloting): click a crate, then a cell, to move it"),
 				L("\\", "trade desk: runs from your price intelligence, brokers, trade news, charters, insurance, warehouses, the back door"),
 				L("F7", "contracts board of the port in view: freight, passengers, colonists, escorts, patrols, surveys, bounties"),
@@ -170,6 +173,7 @@ namespace SpaceGod::Core
 				L("Shift+F1", "dev menu, pulled down over the view: spawn any hull, station or growth for any faction (Shift+F2 opens it there), enemies (pirates small, medium and large, a hostile navy, Bio Mass), the cruise drive and Cruise to, teleports to a world, station or star, helms and seats, the dogfight demo, a big battle to watch (US-T164), time warp and the two scales; type to filter, Enter or click runs, Tab steps the categories, Esc closes. The game runs on; the craft holds its heading"), // US-T126
 				L("Shift+F2", "spawn menu (the dev menu on its Spawn tab), any time: every hull in the ship catalog (fighters, freighters and working hulls, warships and capitals), stations, pirate groups and Bio Mass growths; Faction steps who it is for (yours, a rival's, the independents', the pirates'); each has Spawn (beside you, flying its own AI) and Spawn and pilot (you at its helm). Spawned hostile to a ship near, it engages it at once"), // US-T186
 				L("Showcase tour", "every feature in turn, chapter by chapter (main menu, dev menu > Showcase, or sg.Tour): Right / N next, Left / B previous, S skip the chapter, Space pause, 1-9 a chapter, O also each stop at the other scale, Esc ends it where it is"), // US-T147
+				L("Tutorial", "a guided first run, played by doing (offered once on a profile's first New Game; main menu Extras or the Help screen replays it): each step a card with its keys that waits for you to do it; Shift+Enter skips the step, Shift+Esc ends the tutorial; it never takes any other key"), // US-T254
 				L("Esc", "pause menu (straight away at the helm): Resume, Help, Save / Load, Settings > Display (resolution, window mode, VSync), Main Menu, Quit"),
 				L("[", "galaxy map: every system, who holds it, gate traffic, war fronts, blockades and raiders, as far as the news goes; click a star to inspect, double-click to travel"),
 				L("Shift+[", "system map: this system top-down, its worlds and orbits, settlements, stations, gas works, lanes and ramps, gates, belts, fields, nebulae, graveyards and the ships your sensors see; hover for a line on it, click to select, drag pans, wheel zooms; at a helm CRUISE THERE or plot the LANE ROUTE (the off-ramps' exits picked for you)"), // US-T258

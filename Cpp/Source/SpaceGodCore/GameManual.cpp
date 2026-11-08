@@ -488,6 +488,22 @@ namespace SpaceGod::Core
 				  "AI traders pay, and Refuel. Every market keeps 90 days of its prices: the board shows each good's run as a "
 				  "sparkline and its 30- and 90-day low, high and average, warm when today's price is above the month's average "
 				  "and cool below it. I opens the grid cargo hold: click a crate, then a cell, to move it."), // US-T263
+				T("Port services and docking clearance", // US-T266
+				  "At a helm alongside a port, Shift+M asks for docking clearance: the port weighs its trade with your hull and "
+				  "its owner's standing toward the pilot. Once docked, one port screen holds tabs for the Market, Outfitting (at a "
+				  "yard), Repair and Rearm, Contracts, Bounties, Fleet and property, the Trade desk, Crew and News; their own keys "
+				  "still open them directly. Repair and Rearm quotes the hull, each hurt hardpoint, the shields, magazines and tanks "
+				  "with parts at the yard's prices and labour, item by item or Repair all. Flying off, or leaving the helm, undocks "
+				  "and closes the screen."),
+				T("Exploration rewards and cartographers", // US-T260
+				  "Exploring pays. Charting a star past the known neighbourhood, being first to a body there, visiting a void sight, "
+				  "seeing an anomaly through or coming on a graveyard leaves survey data aboard the hull you are embodied in, worth "
+				  "more the rarer the find and the further it lies past charted space. A cartographer, any lawful colony or station "
+				  "of 20,000 people or more, buys the data on its market board (M) and charts it for its faction; a find sells once "
+				  "per faction, and losing the hull loses the data. Every find is a first discovery: the news credits the pilot by "
+				  "name, it enters their story, and it earns a little Influence. Shift+O opens the discoveries screen, a dated "
+				  "list of everything you have found, by kind, with live readings and a description, and Select, Focus and Plot "
+				  "course buttons for each."),
 				T("Contracts",
 				  "Every lawful port posts jobs from what the system needs: freight, passengers and colonists, escorts, "
 				  "patrols, surveys and bounties (F7). Completing one pays and raises standing with the patron; failing one costs it."),
@@ -855,6 +871,14 @@ namespace SpaceGod::Core
 				  "Up and Down pick, Enter or a click runs, Right opens a submenu, Left backs out, Tab steps the categories, "
 				  "Esc closes. While it is open it has the keys and the mouse; the game runs on and the craft holds its "
 				  "heading. The console's sg.Cheat runs any entry by its path."),
+				T("The tutorial", // US-T254
+				  "A guided first run, played by doing: swim and look, select, focus (F), time warp, scale (G), the navigator, "
+				  "embodying a fighter (P, or Shift+V), flying and firing, locking (T) and missiles, hailing (Shift+H), letting go "
+				  "(P), the market (M) and the galaxy map ([). It is offered once on a profile's first New Game, and Tutorial under "
+				  "the main menu's Extras or on the Help screen plays it again. Each step is a card with its keys that waits for the "
+				  "game to show it done and outlines the part of the HUD involved. Shift+Enter skips a step and Shift+Esc ends the "
+				  "tutorial; it never takes any other key. Afterwards short hints appear once per profile for your first battle, "
+				  "lane, jump gate, void stop and fight aboard; Settings > Controls > Tutorial hints turns them off."),
 				T("The showcase tour", // US-T147
 				  "One guided run through every feature, so nothing has to be launched as a demo of its own: Showcase Tour under "
 				  "the main menu's Extras, the dev menu's Showcase category, or sg.Tour in the console. It plays in chapters (Flight and "
