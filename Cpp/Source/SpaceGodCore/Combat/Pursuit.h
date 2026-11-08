@@ -126,6 +126,17 @@ namespace SpaceGod::Core
 		/// </summary>
 		cs::List<cs::Ref<Pursuer>> Consider(const cs::Ref<Ship>& pilot, int body, DVec3 pilotOffset, DVec3 pilotVel, double jd);
 
+		/// <summary>How near a raider band that baited its trap shows up when it is sprung, km (US-T139): it was waiting.</summary>
+		static constexpr double SprungKm = 80;
+
+		/// <summary>
+		/// A raider band's lure has been answered (US-T139, see <see cref="EventDirector.Sprung"/>): the band led by
+		/// <paramref name="leader"/> turns on the piloted ship at once, no sighting or chance asked, starting
+		/// <see cref="SprungKm"/> off on its real bearing. Null when the band is gone, broken, already chasing or in a fight,
+		/// or the pilot is in one.
+		/// </summary>
+		cs::Ref<Pursuer> Spring(const cs::Ref<Ship>& leader, const cs::Ref<Ship>& pilot, int body, DVec3 pilotOffset, DVec3 pilotVel, double jd);
+
 	private:
 		/// <summary>Raiders are the keenest to run a ship down; a navy at war with its flag only somewhat less.</summary>
 		static double ChaseChance(const cs::Ref<Ship>& s);

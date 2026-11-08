@@ -76,6 +76,19 @@ namespace SpaceGod::Core
 		return found;
 	}
 
+	cs::Ref<Pursuer> Pursuit::Spring(const cs::Ref<Ship>& leader, const cs::Ref<Ship>& pilot, int body, DVec3 pilotOffset, DVec3 pilotVel, double jd)
+	{
+		if (pilot == nullptr || pilot->Destroyed || pilot->Battle != nullptr || leader == nullptr || leader == pilot) return nullptr;
+		if (leader->Destroyed || leader->Derelict || leader->Battle != nullptr || leader->GateDeparted || leader->Planetside() || Of(leader) != nullptr) return nullptr;
+		if (!leader->Combat->Armed()) return nullptr;
+		if (Body != body) ReleaseAll(jd);
+		Body = body;
+		auto pilotHelio = world->Ephemeris->HelioAt(body, jd) + pilotOffset;
+		auto to = world->Fleet->StateOf(leader, jd).HelioKm - pilotHelio;
+		double d = to.Length();
+		return Begin(leader, pilotOffset + (d > 1e-6 ? to / d : DVec3::UnitX) * cs::Math::Min(SprungKm, cs::Math::Max(d, EngageKm * 2)), pilotVel, jd);
+	}
+
 	double Pursuit::ChaseChance(const cs::Ref<Ship>& s) { return s->Faction->IsPirate ? 0.35 : 0.25; }
 
 	bool Pursuit::MayChase(const cs::Ref<Ship>& s, const cs::Ref<Ship>& pilot, int body, double jd) const

@@ -38,6 +38,7 @@
 #include "Economy/Economy.h"
 #include "Economy/Propulsion.h"
 #include "Economy/Settlement.h"
+#include "Events/EventDirector.h" // US-T139: sprung lures
 #include "Events/Opportunity.h"
 #include "Infrastructure/Infrastructure.h"
 #include "Information/Ranges.h" // US-T156
@@ -157,6 +158,18 @@ namespace SpaceGod
 		if (pursuit == nullptr) return;
 		pilotEmpSeconds = cs::Math::Max(0, pilotEmpSeconds - dt);
 		double jd = Clock->Jd;
+		// US-T139: a stranded ship's call answered, and it was raiders lying in wait: they turn on the ship that came.
+		if (World()->Adventures != nullptr)
+			for (const auto& op : World()->Adventures->TakeSprung())
+			{
+				if (op->EngagedBy != ship || op->Ship == nullptr) continue;
+				auto g = pursuit->Spring(op->Ship, ship, pilotFrameBody, pilotOffsetKm(), pilotVelKmS(), jd);
+				if (Clock->WarpIndex > 0) Clock->SetWarp(0);
+				ShowToast(g != nullptr
+					? cs::Cat("IT'S A TRAP: there is no ", op->Caller, ". ", HunterName(g), " comes about for you, ",
+						Ranges::Readout(Ranges::Km(pilotOffsetKm(), g->Pos)), " out")
+					: cs::Cat("IT'S A TRAP: there is no ", op->Caller, ", only ", op->Ship->Faction->Name, " raiders lying in wait"));
+			}
 		pursuitCheckTimer -= dt;
 		if (pursuitCheckTimer <= 0 && ship->Battle == nullptr)
 		{

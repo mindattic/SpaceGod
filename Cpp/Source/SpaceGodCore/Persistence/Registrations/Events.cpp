@@ -108,11 +108,13 @@ namespace SpaceGod::Core
 		SG_F(MinEscortDays), SG_F(PodPickupKm), SG_F(PodRescueCredits), SG_F(PodRescueReputation), SG_F(Reputation),
 		SG_F(Resolved), SG_F(ScanIntervalDays), SG_F(SpawnRadiusKm), SG_F(Spawned), SG_F(SurvivorRescueCredits),
 		SG_F(SurvivorRescueReputation), SG_F(lastAnomalyRollJd), SG_F(nextId), SG_F(nextScanJd), SG_F(restUntil),
-		SG_F(rng))
+		SG_F(rng),
+		SG_OPT(BaitShare), SG_OPT(Sprung)) // US-T139: lures, absent from older saves
 
 	SG_SERIALIZE(Opportunity, "Unity.SpaceGod.Core.Opportunity",
 		SG_F(Battle), SG_F(Body), SG_F(Captain), SG_F(DryTanks), SG_F(Engaged), SG_F(EngagedBy),
 		SG_F(EngagedFaction), SG_F(ExpiresJd), SG_F(HelioKm), SG_F(Hook), SG_F(Id), SG_F(Kind), SG_F(Lane),
 		SG_F(OffsetKm), SG_F(Outcome), SG_F(Patron), SG_F(Pod), SG_F(ResolvedJd), SG_F(Reward), SG_F(Ship),
-		SG_F(SourceKey), SG_F(SpawnJd), SG_F(State), SG_F(Title), SG_F(UnderAttack), SG_F(Wreck))
+		SG_F(SourceKey), SG_F(SpawnJd), SG_F(State), SG_F(Title), SG_F(UnderAttack), SG_F(Wreck),
+		SG_OPT(Bait), SG_OPT(Caller), SG_OPT(Place), SG_OPT(Sprung)) // US-T139: lures and the caller's words, absent from older saves
 }

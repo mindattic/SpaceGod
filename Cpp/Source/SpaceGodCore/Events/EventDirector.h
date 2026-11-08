@@ -79,6 +79,15 @@ namespace SpaceGod::Core
 		/// <summary>How many ended opportunities are kept for the HUD's history.</summary>
 		int HistoryLength = 40;
 
+		/// <summary>The share of raider bands lying in wait that bait their trap (US-T139): instead of being reported, they
+		/// broadcast a stranded ship's distress call to draw a passing helm in. Fixed per hull, so a band always does or never
+		/// does, and offered only while someone is at a helm to hear it.</summary>
+		double BaitShare = 0.35;
+
+		/// <summary>Lures the player has flown into (US-T139), waiting for the helm to set the raiders on them
+		/// (<see cref="TakeSprung"/>): each one's <see cref="Opportunity.Ship"/> is the band's lead raider.</summary>
+		cs::List<cs::Ref<Opportunity>> Sprung;
+
 		cs::List<cs::Ref<Opportunity>> Active;
 		cs::List<cs::Ref<Opportunity>> History;
 
@@ -108,6 +117,14 @@ namespace SpaceGod::Core
 		/// -- offers new ones from what is happening near <paramref name="playerHelio"/>.
 		/// </summary>
 		void Update(double jd, const cs::Ref<EventSources>& src, DVec3 playerHelio, const cs::Ref<Ship>& playerShip);
+
+		/// <summary>The lures sprung since the last call (US-T139), oldest first; the list is emptied. The helm sets each
+		/// band on the ship that answered (<see cref="Pursuit.Spring"/>).</summary>
+		cs::List<cs::Ref<Opportunity>> TakeSprung();
+
+		/// <summary>Whether the raider band led by <paramref name="s"/> baits its trap with a false distress call (US-T139):
+		/// fixed per hull by <see cref="BaitShare"/>.</summary>
+		bool Baits(const cs::Ref<Ship>& s) const;
 
 		// ---------------------------------------------------------------- spawning
 
@@ -159,6 +176,13 @@ namespace SpaceGod::Core
 		static cs::String HoldReads(const cs::List<SalvageStack>& salvage);
 
 		cs::Ref<Opportunity> Ambush(const cs::Ref<Ship>& s, const cs::Ref<Lane>& lane, double jd, const cs::Ref<EventSources>& src);
+
+		/// <summary>A raider band's false distress call (US-T139): a stranded ship that is not there, adrift off the band's lane.</summary>
+		cs::Ref<Opportunity> Lure(const cs::Ref<Ship>& s, const cs::Ref<Lane>& lane, double jd);
+
+		/// <summary>The player is on the scene of a lure: it becomes the ambush it was, paid by the pirate hunters if broken,
+		/// and is queued for the helm (<see cref="Sprung"/>).</summary>
+		void Spring(const cs::Ref<Opportunity>& op, double jd, const cs::Ref<EventSources>& src);
 
 		cs::Ref<Opportunity> Escort(const cs::Ref<Ship>& s, const cs::Ref<Lane>& lane, double jd, const cs::Ref<EventSources>& src);
 

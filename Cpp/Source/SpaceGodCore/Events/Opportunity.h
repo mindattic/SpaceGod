@@ -159,6 +159,21 @@ namespace SpaceGod::Core
 		/// seen through by pumping some of the player's own reaction mass across.</summary>
 		bool DryTanks = false;
 
+		/// <summary>Who a distress call says is calling (US-T139): the ship's own name, or for a lure the name the raiders
+		/// broadcast. The story pools (<see cref="StoryHooks"/>) and a BYOKey voice speak it; nothing in the sim reads it.</summary>
+		cs::String Caller;
+
+		/// <summary>Where a distress call says the caller is ("off the Vega lane", "off Ceres", "beside the lane"), or empty.</summary>
+		cs::String Place;
+
+		/// <summary>A stranded ship that is not there (US-T139): raiders lying in wait off a lane broadcast a distress call
+		/// to draw a passing helm in. It reads as an ordinary <see cref="OpportunityKind.Distress"/> adrift call until the
+		/// player is on the scene; <see cref="Ship"/> is the band's lead raider.</summary>
+		bool Bait = false;
+
+		/// <summary>The lure has been sprung: the call became the <see cref="OpportunityKind.PirateAmbush"/> it always was.</summary>
+		bool Sprung = false;
+
 		bool IsActive() const { return State == OpportunityState::Active; }
 
 		double DaysLeft(double jd) const { return cs::Math::Max(0.0, ExpiresJd - jd); }

@@ -12,6 +12,7 @@
 #include "Economy/Goods.h"
 #include "Economy/Propulsion.h"
 #include "Events/EventSources.h"
+#include "Events/StoryHooks.h"
 #include "Hyperlanes.h"
 #include "Law/Law.h"
 #include "Law/Outlaws.h"
@@ -41,12 +42,14 @@ namespace SpaceGod::Core
 			// from an unrelated band of the same clan still collects (U.SPC-T363). Band, not Leader/
 			// Controller, survives EnterPiloting clearing an escort's Leader the moment it is taken.
 			bool sameBand = op->Ship != nullptr && playerShip != nullptr && op->Ship->Band() == playerShip->Band()
-				&& (op->Kind == OpportunityKind::Bounty || op->Kind == OpportunityKind::PirateAmbush);
+				&& (op->Kind == OpportunityKind::Bounty || op->Kind == OpportunityKind::PirateAmbush || op->Bait);
 			if (playerShip != nullptr && !playerShip->Destroyed && op->Ship != playerShip && !sameBand && (op->HelioKm - playerHelio).Length() <= ArriveKm)
 			{
 				op->Engaged = true;
 				op->EngagedBy = playerShip;
 				op->EngagedFaction = playerShip->Faction;
+				// US-T139: whoever answers a lure finds the raiders, not a stranded ship.
+				if (op->Bait && !op->Sprung) Spring(op, jd, src);
 			}
 			Settle(op, jd, src, playerShip, playerHelio);
 		}
@@ -73,7 +76,12 @@ namespace SpaceGod::Core
 			if (s->Faction->IsPirate)
 			{
 				cs::Ref<Lane> lurkLane;
-				if (d <= SpawnRadiusKm && s->Ambushing() && !s->Derelict && (lurkLane = LaneOf(s)) != nullptr && src->LaneDanger(lurkLane) >= AmbushDanger)
+				bool lurking = d <= SpawnRadiusKm && s->Ambushing() && !s->Derelict && (lurkLane = LaneOf(s)) != nullptr;
+				// US-T139: a band that baits its trap calls for help instead, while there is a helm to hear it (not a raider's:
+				// raiders do not pulse their own kind). With nobody at a helm (the Bench) nothing here changes.
+				if (lurking && playerShip != nullptr && !playerShip->Destroyed && playerShip->Faction != nullptr && !playerShip->Faction->IsPirate && Baits(s))
+					op = Lure(s, lurkLane, jd);
+				else if (lurking && src->LaneDanger(lurkLane) >= AmbushDanger)
 					op = Ambush(s, lurkLane, jd, src);
 				else if (!bountyOpen && d <= BountyRadiusKm && !s->Derelict && s->Spec->IsMilitary)
 					op = BountyOn(s, jd, src);
@@ -223,6 +231,8 @@ namespace SpaceGod::Core
 		op->Ship = s;
 		op->Battle = s->Battle;
 		op->UnderAttack = true;
+		op->Caller = s->Name;
+		op->Place = s->Battle->Site != nullptr ? cs::String("beside the lane") : cs::Cat("off ", where);
 		op->Patron = s->Faction;
 		OpportunityReward reward;
 		reward.Credits = RoundThousand(100000 + 0.02 * CargoValue(s));
@@ -242,6 +252,8 @@ namespace SpaceGod::Core
 		op->Hook = cs::Cat(s->Name, " here, pulled out of the lane", lane, " by an interdiction pulse. Drives are dead and we're drifting. Requesting assistance.");
 		op->ExpiresJd = jd + 1;
 		op->Ship = s;
+		op->Caller = s->Name;
+		op->Place = cs::Strings::Trim(lane);
 		op->Patron = s->Faction;
 		OpportunityReward reward;
 		reward.Credits = 60000;
@@ -261,6 +273,8 @@ namespace SpaceGod::Core
 		op->Hook = cs::Cat(s->Name, " here, drifting", nearBody, " with our tanks run dry. The tanker is still a way out. Can anyone spare reaction mass?");
 		op->ExpiresJd = cs::Math::Max(jd + 0.1, s->PhaseEndJd);
 		op->Ship = s;
+		op->Caller = s->Name;
+		op->Place = cs::Strings::Trim(nearBody);
 		op->Patron = s->Faction;
 		op->DryTanks = true;
 		OpportunityReward reward;
@@ -368,6 +382,64 @@ namespace SpaceGod::Core
 		return op;
 	}
 
+	bool EventDirector::Baits(const cs::Ref<Ship>& s) const
+	{
+		if (s == nullptr || BaitShare <= 0) return false;
+		// A stable mix of the hull's id: no draw on the director's generator, so offering a lure moves nothing else.
+		uint32_t x = static_cast<uint32_t>(s->Id) * 2654435761u ^ 0xB417A17u;
+		x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15; x *= 0x846CA68Bu; x ^= x >> 16;
+		return (x % 10000u) < static_cast<uint32_t>(cs::Math::Min(1.0, BaitShare) * 10000);
+	}
+
+	cs::Ref<Opportunity> EventDirector::Lure(const cs::Ref<Ship>& s, const cs::Ref<Lane>& lane, double jd)
+	{
+		// It reads exactly as a ship pulled out of the lane would (DistressAdrift): nothing in the call gives it away.
+		cs::String name = StoryHooks::LureName(s->Id);
+		auto op = cs::New<Opportunity>();
+		op->Kind = OpportunityKind::Distress;
+		op->SourceKey = Key("lure", s);
+		op->Title = cs::Cat("Adrift: ", name);
+		op->Hook = cs::Cat(name, " here, pulled out of the lane off the ", lane->Name, " lane by an interdiction pulse. Drives are dead and we're drifting. Requesting assistance.");
+		op->ExpiresJd = s->PhaseEndJd > jd ? cs::Math::Min(jd + 1, s->PhaseEndJd) : jd + 1;
+		op->Ship = s;
+		op->Lane = lane;
+		op->Caller = name;
+		op->Place = cs::Cat("off the ", lane->Name, " lane");
+		op->Bait = true;
+		OpportunityReward reward;
+		reward.Credits = 60000; // what the call promises; nobody pays it
+		op->Reward = reward;
+		return op;
+	}
+
+	void EventDirector::Spring(const cs::Ref<Opportunity>& op, double jd, const cs::Ref<EventSources>& src)
+	{
+		auto s = op->Ship;
+		op->Sprung = true;
+		op->Kind = OpportunityKind::PirateAmbush;
+		op->Title = cs::Cat("Trap: ", op->Caller);
+		op->Hook = cs::Cat("There is no ", op->Caller, ". The call was a lure: ", s->Faction->Name, " raiders lying in wait off the ",
+			op->Lane->Name, " lane are coming about for you. Break them or run.");
+		op->ExpiresJd = jd + 0.5;
+		op->Patron = src->PirateHunters;
+		OpportunityReward reward;
+		reward.Credits = 300000;
+		reward.ReputationWith = src->PirateHunters;
+		reward.Reputation = 8;
+		op->Reward = reward;
+		Sprung.Add(op);
+		// Only the newest few wait for a helm (one never taken, the player having let go, is not kept for ever).
+		if (Sprung.Count() > 8) Sprung.RemoveRange(0, Sprung.Count() - 8);
+		Spawned.Invoke(op);
+	}
+
+	cs::List<cs::Ref<Opportunity>> EventDirector::TakeSprung()
+	{
+		cs::List<cs::Ref<Opportunity>> taken = Sprung;
+		Sprung.Clear();
+		return taken;
+	}
+
 	cs::Ref<Opportunity> EventDirector::Escort(const cs::Ref<Ship>& s, const cs::Ref<Lane>& lane, double /*jd*/, const cs::Ref<EventSources>& /*src*/)
 	{
 		auto op = cs::New<Opportunity>();
@@ -468,6 +540,12 @@ namespace SpaceGod::Core
 		switch (op->Kind)
 		{
 			case OpportunityKind::Distress:
+				if (op->Bait)
+				{
+					// A lure nobody answered: the call stops when the band moves on, is broken, or changes hands.
+					if (s->Destroyed || s->Derelict || !s->Faction->IsPirate || !s->Ambushing()) { Fail(op, jd, cs::Cat("The call from ", op->Caller, " fell silent.")); return; }
+					break;
+				}
 				if (s->Destroyed) { Fail(op, jd, cs::Cat(s->Name, " was destroyed.")); return; }
 				if (s->Derelict || s->Faction != op->Patron) { Fail(op, jd, cs::Cat(s->Name, " was taken.")); return; }
 				if (op->UnderAttack)

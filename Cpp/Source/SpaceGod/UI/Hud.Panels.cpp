@@ -36,6 +36,7 @@
 #include "Economy/Holdings.h"
 #include "Economy/Industry.h"
 #include "Economy/Settlement.h"
+#include "Comms/StoryVoice.h"
 #include "Events/EventDirector.h"
 #include "Events/Opportunity.h"
 #include "Infrastructure/Infrastructure.h"
@@ -317,7 +318,7 @@ namespace SpaceGod::UI
 		}
 		// US-T153: each entry as tall as its text wraps to (the headline can run to two lines, the hook to several), so a
 		// line never prints over the next entry and the panel is as tall as what it holds.
-		cs::List<cs::String> heads;
+		cs::List<cs::String> heads, hooks;
 		cs::List<float> headH, hookH;
 		float h = 30;
 		for (int i = 0; i < n; i++)
@@ -326,7 +327,9 @@ namespace SpaceGod::UI
 			heads.Add(cs::Cat(op->MarkerLabel(), "   ", op->Title, "   ", Km((op->HelioKm - player).Length()), "   ",
 				Duration(op->DaysLeft(jd)), " left", op->Engaged ? "   · on scene" : ""));
 			headH.Add(Mathf::Max(16.0f, opportunityHook->CalcHeight(GUIContent(heads[i]), textW)));
-			hookH.Add(op->Hook.empty() ? 0.0f : opportunityHook->CalcHeight(GUIContent(op->Hook), textW));
+			// US-T139: the caller's own words (a BYOKey voice when the player brought one, else the story pools).
+			hooks.Add(Core::StoryVoice::Hook(op));
+			hookH.Add(hooks[i].empty() ? 0.0f : opportunityHook->CalcHeight(GUIContent(hooks[i]), textW));
 			h += headH[i] + hookH[i] + 4;
 		}
 		auto r = Panel(layout.Take(HudRegion::TopRight, w, h)); // TopRight's first slot (HudLayout.h)
@@ -339,7 +342,7 @@ namespace SpaceGod::UI
 			GUI::Label(Rect(r.x + 12, y, textW, headH[i]), heads[i], opportunityHook);
 			y += headH[i];
 			GUI::contentColor = Dim;
-			if (hookH[i] > 0) GUI::Label(Rect(r.x + 12, y, textW, hookH[i]), op->Hook, opportunityHook);
+			if (hookH[i] > 0) GUI::Label(Rect(r.x + 12, y, textW, hookH[i]), hooks[i], opportunityHook);
 			y += hookH[i] + 4;
 		}
 		GUI::contentColor = old;

@@ -10,6 +10,7 @@
 #include "Input/InputDevice.h"
 #include "EngineSettings.h"
 #include "GameSettingsHost.h"
+#include "GameVoice.h" // US-T139
 #include "ModelViewer.h"
 #include "Rendering/Materials.h"
 #include "Rendering/Pipeline/RenderBackend.h"
@@ -197,6 +198,7 @@ namespace SpaceGod
 	void UnitySpaceApp::Awake()
 	{
 		GameSettingsHost::Bind(); // every declared setting, from the active profile (U.SPC-T431)
+		StartGameVoice(); // US-T139: the player's own LLM key and persona, if they brought them
 		UI::DisplayOptions::ApplySaved(); // the resolution, window mode and VSync last kept (VSync on until then)
 		pauseMenu->ShowSaves = [this] { ShowSaves = true; };
 		pauseMenu->ShowHelp = [this] { ShowHelp = true; };

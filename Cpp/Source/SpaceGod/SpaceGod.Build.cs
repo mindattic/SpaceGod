@@ -31,5 +31,7 @@ public class SpaceGod : ModuleRules
 		// US-T234: the shared --headless mode (Unreal.Shared's MindAtticShared plugin): Bootstrap and GameLaunch key the
 		// game's own opt-ins (scripted input, no main menu) off FMindAtticHeadless::IsActive().
 		PrivateDependencyModuleNames.Add("MindAtticHeadless");
+		// US-T139: the BYOKey voice (GameVoice) calls the player's own LLM over HTTPS.
+		PrivateDependencyModuleNames.Add("HTTP");
 	}
 }
