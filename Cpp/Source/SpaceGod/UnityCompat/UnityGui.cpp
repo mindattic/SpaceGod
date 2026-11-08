@@ -856,6 +856,31 @@ namespace SpaceGod::UnityCompat
 			DrawTextBlock(style, contentRect, content.text, DisabledFade(Tint(Tint(text.textColor, GUI::color), GUI::contentColor)));
 		}
 
+		/// US-T244: the control the pointer is over (its screen rect), this frame and the last: a hover sound plays once as
+		/// the pointer comes onto a button or toggle, not every frame it stays there.
+		Rect hoverRect;
+		bool hoverSeen = false, hoverHeld = false;
+
+		void PlayControlSound(GUI::ControlSound sound)
+		{
+			if (GUI::controlSound) GUI::controlSound(sound);
+		}
+
+		void NoteHover(const Rect& position)
+		{
+			if (!GUI::controlSound || !GUI::enabled || GUIUtility::hotControl != 0 || clips.empty()) return;
+			if (!position.Contains(Event::current().mousePosition)) return;
+			Rect screen = Intersect(ToScreen(position), clips.back().clip);
+			if (screen.width <= 0 || screen.height <= 0) return;
+			bool same = hoverHeld && Mathf::Abs(screen.x - hoverRect.x) < 0.5f && Mathf::Abs(screen.y - hoverRect.y) < 0.5f &&
+				Mathf::Abs(screen.width - hoverRect.width) < 0.5f && Mathf::Abs(screen.height - hoverRect.height) < 0.5f;
+			hoverSeen = true;
+			hoverHeld = true;
+			if (same) return;
+			hoverRect = screen;
+			PlayControlSound(GUI::ControlSound::Hover);
+		}
+
 		/// US-T250: an enabled control's Repaint makes it a stop for the pad's focus (GuiPadNav), ringed when focused.
 		void PadStop(int id, const Rect& position, GuiPadNav::Kind kind)
 		{
@@ -953,6 +978,9 @@ namespace SpaceGod::UnityCompat
 	{
 		// Names map control ids of the frame they were drawn in.
 		controlNames.clear();
+		// US-T244: a frame with the pointer over no control forgets the last one (coming back onto it hovers it again).
+		hoverHeld = hoverSeen;
+		hoverSeen = false;
 	}
 
 	void GUI::RunOnGUI(const std::function<void()>& onGui, Event& e, int handlerIndex)
@@ -1049,6 +1077,7 @@ namespace SpaceGod::UnityCompat
 					{
 						changed = true;
 						Stats().Clicks++;
+						PlayControlSound(ControlSound::Press); // US-T244
 						return true;
 					}
 				}
@@ -1058,6 +1087,7 @@ namespace SpaceGod::UnityCompat
 				return false;
 			case EventType::Repaint:
 				DrawControl(style, position, content, id, false);
+				NoteHover(position); // US-T244
 				Stats().Buttons++;
 				if (enabled && !content.text.empty() && !clips.empty())
 				{
@@ -1073,6 +1103,7 @@ namespace SpaceGod::UnityCompat
 					e.Use();
 					changed = true;
 					Stats().Clicks++;
+					PlayControlSound(ControlSound::Press); // US-T244
 					return true;
 				}
 				return false;
@@ -1104,6 +1135,7 @@ namespace SpaceGod::UnityCompat
 					if (position.Contains(e.mousePosition))
 					{
 						changed = true;
+						PlayControlSound(ControlSound::Toggle); // US-T244
 						return !value;
 					}
 				}
@@ -1113,6 +1145,7 @@ namespace SpaceGod::UnityCompat
 				break;
 			case EventType::Repaint:
 				DrawControl(style, position, content, id, value);
+				NoteHover(position); // US-T244
 				PadStop(id, position, GuiPadNav::Kind::Button); // US-T250
 				break;
 			case EventType::KeyDown:
@@ -1121,6 +1154,7 @@ namespace SpaceGod::UnityCompat
 				{
 					e.Use();
 					changed = true;
+					PlayControlSound(ControlSound::Toggle); // US-T244
 					return !value;
 				}
 				break;

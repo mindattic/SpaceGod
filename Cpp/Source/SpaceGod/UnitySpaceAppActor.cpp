@@ -1,4 +1,5 @@
 #include "UnitySpaceAppActor.h"
+#include "Audio/InterfaceSounds.h" // US-T244
 #include "UnitySpaceApp.h"
 #include "SessionAudio.h"
 #include "UnrealSpace.h"
@@ -163,6 +164,7 @@ void AUnitySpaceAppActor::Step(float RealDelta)
 		Capture->Start();
 	}
 	if (App->enabled) App->Update();
+	SpaceGod::Audio::InterfaceSounds::Poll(App.get()); // US-T244: panels, toasts, hails, comms, contracts and credits heard, on every peer
 	Input::Gamepad::MenuMode = App->PadMenusOpen(); // US-T250: the pad is the GUI's next frame while a menu or panel is up
 	// US-T44: the host's frame to its clients (the C# track's game mode Step: CoopPeer.HostEndUpdate after the Update).
 	if (Coop::CoopPeer* Peer = Coop::CoopPeer::Current(); Peer && Peer->IsHost()) Peer->HostEndUpdate(App.get());

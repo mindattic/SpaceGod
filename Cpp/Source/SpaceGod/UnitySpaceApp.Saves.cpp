@@ -4,6 +4,7 @@
 // ToString: type, message and stack) logs e.what(), and e.Message is e.what().
 
 #include "UnitySpaceApp.h"
+#include "Audio/InterfaceSounds.h" // US-T244
 #include "CaptureEvents.h" // US-T72
 #include "UI/UiMotion.h" // US-T255
 
@@ -131,7 +132,11 @@ namespace SpaceGod
 		try
 		{
 			cs::Ref<SaveHeader> h = Saves->Autosave(CaptureSave());
-			if (!quiet) ShowToast(cs::Cat("Autosaved  (", DescribeSave(h), ")"));
+			if (!quiet)
+			{
+				ShowToast(cs::Cat("Autosaved  (", DescribeSave(h), ")"));
+				Audio::InterfaceSounds::SaveDone(); // US-T244
+			}
 		}
 		catch (const std::exception& e)
 		{
@@ -154,6 +159,7 @@ namespace SpaceGod
 			cs::Ref<SaveHeader> h = Saves->Save(slot, data, !label.empty() ? label : SlotName(slot));
 			ShowToast(cs::Cat("Saved to ", SlotName(slot), "  (", DescribeSave(h), ")"));
 			CaptureEvents::GameSaved(SlotName(slot)); // US-T72
+			Audio::InterfaceSounds::SaveDone(); // US-T244
 			return true;
 		}
 		catch (const std::exception& e)

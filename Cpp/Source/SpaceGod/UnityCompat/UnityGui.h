@@ -282,6 +282,14 @@ namespace SpaceGod::UnityCompat
 		/// (0: at once, as Unity does). The host's setting, not reset per OnGUI call.
 		static inline float hoverSeconds = 0;
 
+		// ---- host extension (US-T244): the interface sounds. Not Unity's; null (the default) plays nothing.
+		/// What a button or toggle just did: the pointer came onto it, it was pressed (clicked or the pad's A), or a
+		/// toggle flipped.
+		enum class ControlSound : int { Hover, Press, Toggle };
+		/// Called once per hover start and per press of every enabled GUI::Button / GUI::Toggle (so every tab, which is a
+		/// button with an "on" style, too): Audio/InterfaceSounds sets it to play them on the Interface bus.
+		static inline void (*controlSound)(ControlSound) = nullptr;
+
 		// ---- host extensions (US-T252): the Accessibility settings' UI scale and text size (PlayerOptions sets them)
 		/// Screen pixels one GUI unit covers in the game's window: the host lays the GUI out on a screen this much smaller
 		/// (Screen::width/height read in GUI units during its passes) and draws it this much larger. 1 as Unity draws.

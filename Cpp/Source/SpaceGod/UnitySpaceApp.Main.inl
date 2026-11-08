@@ -352,6 +352,10 @@ public:
 	/// player clicks through): the gamepad is the GUI's (Input::Gamepad::MenuMode), its focus moved by the d-pad.</summary>
 	bool PadMenusOpen() const;
 
+	/// <summary>US-T244: every panel, board, screen and menu open now, one bit each (OpenScreens, then the system map, logs,
+	/// discoveries, boarding, comms, the bottom drawer, the pause and dev menus): the interface sounds' open and close.</summary>
+	int OpenPanels() const;
+
 	bool ShowLanes = true;
 
 	/// <summary>Satellite constellations (thousands of points round Earth); off by default, K toggles.</summary>
