@@ -8,6 +8,7 @@
 #include "Camera/SpaceCamera.h"
 #include "Camera/StarTravel.h"
 #include "Input/InputDevice.h"
+#include "Input/KeyBindings.h" // US-T249
 
 #include "BodyCatalog.h"
 #include "BodyDefinition.h"
@@ -59,7 +60,7 @@ namespace SpaceGod::UI
 		const Input::InputDevice& kb = Input::InputDevice::current();
 		auto pressed = [&](Input::Key k) { return kb[k].wasPressedThisFrame; };
 		bool shift = kb[Input::Key::LeftShift].isPressed || kb[Input::Key::RightShift].isPressed;
-		if (pressed(Input::Key::U) && shift)
+		if (Input::KeyBindings::Pressed(Input::KeyAction::Drawer, kb)) // US-T249: Shift+U unless rebound
 		{
 			drawerOpen = !drawerOpen;
 			drawerFollowRow = true;

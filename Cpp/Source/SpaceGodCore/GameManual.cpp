@@ -786,6 +786,14 @@ namespace SpaceGod::Core
 				  "arrows and the roster -- for a colour-blind safe orange / grey / blue. Reduce flashes and shake keeps the "
 				  "gate and drive flashes, the damage pulses at the screen's edge and the hyperspace toll's vignette faint and "
 				  "its heartbeat still, and stops menus sliding in."),
+				T("Key bindings",
+				  "Controls > Key bindings lists every key the game reads, each action with up to three keys. Click one and "
+				  "press the new key -- hold Shift, Ctrl or Alt with it for a chord, or press and let go of a modifier alone "
+				  "to bind it (Esc cancels, Clear empties the slot). A key given to two actions that are live in the same "
+				  "place is marked as a clash; keys that mean one thing in command and another at the controls (F, T, Tab, "
+				  "R, B, Backspace) share by design. Esc, the number keys, the mouse and the keys inside menus and panels "
+				  "stay fixed; the gamepad's buttons are under Controls. Your bindings are kept in your profile, and Help "
+				  "lists the keys you changed above its key lists."), // US-T249
 				T("Changing and resetting",
 				  "Each change takes effect at once and is kept in your profile. Reset puts back one setting, a group or "
 				  "everything found."),

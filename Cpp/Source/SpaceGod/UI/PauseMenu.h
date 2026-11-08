@@ -63,6 +63,10 @@ namespace SpaceGod::UI
 		bool advancedOpen = false;
 		Vector2 navScroll;
 
+		/// US-T249: the Key bindings page listening for a key: the action (an Input::KeyAction) and slot clicked, -1 while
+		/// it is not. Update takes the next chord pressed into it; Esc cancels.
+		int captureAction = -1, captureSlot = -1;
+
 		/// US-T252: Main Menu or Quit picked with Confirm before quitting on: the question shown over the first page.
 		enum class Leave : int { None, MainMenu, Quit };
 		Leave leaving = Leave::None;
@@ -140,6 +144,13 @@ namespace SpaceGod::UI
 
 		/// One setting's row: its name and what it does on the left, its control and Reset on the right.
 		void DrawSetting(const cs::Ref<Core::GameSetting>& setting, Rect r, bool showGroup);
+
+		/// US-T249: a key binding's row: its action and any clash on the left, its three key slots (click one, then press
+		/// the key) and Reset (Clear while a slot listens) on the right.
+		void DrawKeyBinding(const cs::Ref<Core::GameSetting>& setting, Rect r, bool showGroup);
+
+		/// US-T249: while a slot listens, the chord pressed this frame goes into it; Esc (or leaving the page) cancels.
+		void UpdateCapture(bool escape);
 
 		/// Whether every word of <paramref name="query"/> is among <paramref name="words"/>.
 		static bool MatchesAll(const cs::String& words, const cs::String& query);

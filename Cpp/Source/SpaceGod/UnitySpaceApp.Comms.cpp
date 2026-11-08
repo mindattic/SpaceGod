@@ -14,6 +14,7 @@
 #include "Fleet.h"
 #include "GameLore.h"
 #include "Input/InputDevice.h"
+#include "Input/KeyBindings.h" // US-T249
 #include "Law/Law.h"
 #include "Lore/LoreKeys.h"
 #include "PlayerOptions.h" // US-T252
@@ -343,8 +344,7 @@ namespace SpaceGod
 		TrackEmbodiedPilot();
 		const Input::InputDevice& kb = Input::InputDevice::current();
 		auto pressed = [&](Input::Key k) { return kb[k].wasPressedThisFrame; };
-		bool shift = kb[Input::Key::LeftShift].isPressed || kb[Input::Key::RightShift].isPressed;
-		bool toggle = pressed(Input::Key::H) && shift;
+		bool toggle = Input::KeyBindings::Pressed(Input::KeyAction::Comms, kb); // US-T249: Shift+H unless rebound
 		auto c = CommsHere();
 
 		// A hull that has struck its colours to the held unit's side hails on its own.

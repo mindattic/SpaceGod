@@ -4,6 +4,7 @@
 #include "Input/InputDevice.h"
 #include "Input/DriftKey.h"
 #include "Input/Gamepad.h" // US-T250
+#include "Input/KeyBindings.h" // US-T249
 #include "CaptureEvents.h"
 #include "Embodiment/SelfDestruct.h"
 
@@ -17,36 +18,39 @@ namespace SpaceGod::Input
 		Reset();
 		if (suspended || !kb.present || !mouse.present) return;
 
-		Move = Vector3(
-			Axis(kb[Key::D], kb[Key::A]),
-			Axis(kb[Key::E], kb[Key::Q]) + Axis(kb[Key::RightBracket], kb[Key::C]),
-			Axis(kb[Key::W], kb[Key::S]));
+		// US-T249: every key through the action map (Input/KeyBindings.h): the profile's bindings, the original's keys by default.
+		using A = KeyAction;
+		auto down = [&](KeyAction a) { return KeyBindings::Held(a, kb); };
+		auto hit = [&](KeyAction a) { return KeyBindings::Pressed(a, kb); };
+		auto axis = [&](KeyAction positive, KeyAction negative) { return (down(positive) ? 1.0f : 0.0f) - (down(negative) ? 1.0f : 0.0f); };
+
+		Move = Vector3(axis(A::StrafeRight, A::StrafeLeft), axis(A::Rise, A::Sink), axis(A::MoveForward, A::MoveBack));
 		Move.y = Mathf::Clamp(Move.y, -1.0f, 1.0f);
-		Boost = kb[Key::LeftShift].isPressed || kb[Key::RightShift].isPressed;
-		Slow = kb[Key::LeftCtrl].isPressed || kb[Key::RightCtrl].isPressed;
-		Cruise = kb[Key::J].isPressed;
-		ToggleSystemCruise = kb[Key::J].wasPressedThisFrame && Boost; // US-T127: Shift+J, the cruise drive
-		ThrottleStep = kb[Key::W].wasPressedThisFrame ? 1 : kb[Key::S].wasPressedThisFrame ? -1 : 0;
-		Roll = Axis(kb[Key::X], kb[Key::Z]);
+		Boost = down(A::Boost);
+		Slow = down(A::Slow);
+		Cruise = down(A::Cruise);
+		ToggleSystemCruise = hit(A::SystemCruise); // US-T127: Shift+J, the cruise drive
+		ThrottleStep = hit(A::MoveForward) ? 1 : hit(A::MoveBack) ? -1 : 0;
+		Roll = axis(A::RollRight, A::RollLeft);
 		// US-T87: Alt held is the manoeuvre key at the controls (a turn-and-burn's flip); with F9-F11 under capture, and
 		// Shift+Alt+K, Alt keeps its other meanings, which only read it with another key.
-		Manoeuvre = kb[Key::LeftAlt].isPressed || kb[Key::RightAlt].isPressed;
+		Manoeuvre = down(A::Manoeuvre);
 		// US-T165: at the controls, held (or pressed on, then off, set to toggle); R alone toggles auto-reorient in command.
 		// US-T250: the pad's drift button is R too (one latch for both in toggle mode), but only while the pad is the game's.
 		const ButtonControl& padDrift = Gamepad::MenuMode ? ButtonControl() : Gamepad::Action(PadAction::Drift);
-		Drift = DriftKey::Read(kb[Key::R].isPressed || padDrift.isPressed, kb[Key::R].wasPressedThisFrame || padDrift.wasPressedThisFrame);
+		Drift = DriftKey::Read(down(A::Drift) || padDrift.isPressed, hit(A::Drift) || padDrift.wasPressedThisFrame);
 		// US-T94: the arrows move reactor power at the controls (Core::PowerKey): Left weapons, Up shields, Right engines a
 		// pip at a time, Down an even share; Shift with one of the three, all the reactor can spare to it.
-		PowerKey = kb[Key::LeftArrow].wasPressedThisFrame ? (Boost ? 3 : 0)
-			: kb[Key::UpArrow].wasPressedThisFrame ? (Boost ? 4 : 1)
-			: kb[Key::RightArrow].wasPressedThisFrame ? (Boost ? 5 : 2)
-			: kb[Key::DownArrow].wasPressedThisFrame ? 6 : -1;
+		PowerKey = hit(A::PowerAllWeapons) ? 3 : hit(A::PowerWeapons) ? 0
+			: hit(A::PowerAllShields) ? 4 : hit(A::PowerShields) ? 1
+			: hit(A::PowerAllEngines) ? 5 : hit(A::PowerEngines) ? 2
+			: hit(A::PowerBalance) ? 6 : -1;
 
 		MousePosition = mouse.position;
 		MouseDelta = mouse.delta;
 		Fire = mouse.leftButton.isPressed && !pointerOverUi;
 		FireEmp = mouse.middleButton.isPressed && !pointerOverUi;
-		DropMine = kb[Key::LeftCtrl].wasPressedThisFrame || kb[Key::RightCtrl].wasPressedThisFrame;
+		DropMine = hit(A::DropMine);
 		LookHeld = mouse.rightButton.isPressed;
 		LookDelta = LookHeld ? MouseDelta : Vector2::zero();
 		if (mouse.rightButton.wasPressedThisFrame)
@@ -85,73 +89,70 @@ namespace SpaceGod::Input
 			lastClickPosition = MousePosition;
 		}
 
-		Focus = kb[Key::F].wasPressedThisFrame;
-		ToggleFlightAssist = kb[Key::F].wasPressedThisFrame;
-		Escape = kb[Key::Escape].wasPressedThisFrame;
-		ToggleScale = kb[Key::G].wasPressedThisFrame || kb[Key::Backquote].wasPressedThisFrame;
-		TimeFaster = kb[Key::Period].wasPressedThisFrame || kb[Key::Equals].wasPressedThisFrame || kb[Key::NumpadPlus].wasPressedThisFrame;
-		TimeSlower = kb[Key::Comma].wasPressedThisFrame || kb[Key::Minus].wasPressedThisFrame || kb[Key::NumpadMinus].wasPressedThisFrame;
-		TogglePause = kb[Key::Space].wasPressedThisFrame || kb[Key::Pause].wasPressedThisFrame;
-		ResetTime = kb[Key::T].wasPressedThisFrame;
-		LockTarget = kb[Key::T].wasPressedThisFrame && !Boost;
-		ToggleTractor = kb[Key::T].wasPressedThisFrame && Boost; // US-T95
-		ToggleOrbits = kb[Key::O].wasPressedThisFrame && !Boost;
-		ToggleDiscoveries = kb[Key::O].wasPressedThisFrame && Boost; // US-T259
-		ToggleLabels = kb[Key::L].wasPressedThisFrame && !Boost;
-		ToggleLogs = kb[Key::L].wasPressedThisFrame && Boost; // US-T261
+		Focus = hit(A::Focus);
+		ToggleFlightAssist = hit(A::FlightAssist);
+		Escape = kb[Key::Escape].wasPressedThisFrame; // fixed: Esc backs out of everything, menus included
+		ToggleScale = hit(A::ToggleScale);
+		TimeFaster = hit(A::TimeFaster);
+		TimeSlower = hit(A::TimeSlower);
+		TogglePause = hit(A::TogglePause);
+		ResetTime = hit(A::ResetTime);
+		LockTarget = hit(A::LockTarget);
+		ToggleTractor = hit(A::Tractor); // US-T95
+		ToggleOrbits = hit(A::Orbits);
+		ToggleDiscoveries = hit(A::Discoveries); // US-T259
+		ToggleLabels = hit(A::Labels);
+		ToggleLogs = hit(A::Logs); // US-T261
 		// US-T126: Shift+F1 is the dev menu's, F1 alone (or H) the help screen's.
-		ToggleHelp = kb[Key::H].wasPressedThisFrame || (kb[Key::F1].wasPressedThisFrame && !Boost);
-		ToggleCheatMenu = kb[Key::F1].wasPressedThisFrame && Boost;
-		ToggleHud = kb[Key::U].wasPressedThisFrame;
+		ToggleHelp = hit(A::Help);
+		ToggleCheatMenu = hit(A::CheatMenu);
+		ToggleHud = hit(A::ToggleHud);
 		// US-T266: Shift+M asks the port alongside for docking clearance (and opens or closes the port screen), M alone the market.
-		ToggleMarket = kb[Key::M].wasPressedThisFrame && !Boost;
-		DockPort = kb[Key::M].wasPressedThisFrame && Boost;
-		ToggleCargo = kb[Key::I].wasPressedThisFrame;
+		ToggleMarket = hit(A::Market);
+		DockPort = hit(A::DockPort);
+		ToggleCargo = hit(A::Cargo);
 		// US-T186: Shift+F2 is the spawn menu's (the dev menu on its Spawn tab), F2 alone outfitting's.
-		ToggleOutfit = kb[Key::F2].wasPressedThisFrame && !Boost;
-		ToggleSpawnMenu = kb[Key::F2].wasPressedThisFrame && Boost;
+		ToggleOutfit = hit(A::Outfit);
+		ToggleSpawnMenu = hit(A::SpawnMenu);
 		// US-T93: Shift+F3 powers down (or up again), F3 alone is silent running; Tab at a helm is the active ping.
-		ToggleSilent = kb[Key::F3].wasPressedThisFrame && !Boost;
-		PowerToggle = kb[Key::F3].wasPressedThisFrame && Boost;
-		SensorPing = kb[Key::Tab].wasPressedThisFrame;
-		ToggleBounties = kb[Key::F4].wasPressedThisFrame;
-		ToggleContracts = kb[Key::F7].wasPressedThisFrame;
-		ToggleFleet = kb[Key::F10].wasPressedThisFrame;
-		ToggleTrade = kb[Key::Backslash].wasPressedThisFrame;
-		ToggleGalaxyMap = kb[Key::LeftBracket].wasPressedThisFrame && !Boost;
-		ToggleSystemMap = kb[Key::LeftBracket].wasPressedThisFrame && Boost; // US-T258: Shift+[, the system map
-		ClearScreen = kb[Key::F11].wasPressedThisFrame;
-		HailPolity = kb[Key::F12].wasPressedThisFrame;
-		ToggleNews = kb[Key::X].wasPressedThisFrame;
-		ToggleSpawn = kb[Key::V].wasPressedThisFrame && !Boost;
-		SpawnPractice = kb[Key::V].wasPressedThisFrame && Boost;
-		WatchBattle = kb[Key::B].wasPressedThisFrame;
-		ToggleLanes = kb[Key::N].wasPressedThisFrame;
-		bool skyShift = kb[Key::LeftShift].isPressed || kb[Key::RightShift].isPressed;
-		bool skyAlt = kb[Key::LeftAlt].isPressed || kb[Key::RightAlt].isPressed;
-		ToggleSatellites = kb[Key::K].wasPressedThisFrame && !skyShift;
-		CycleSky = (kb[Key::K].wasPressedThisFrame && skyShift && skyAlt) || kb[Key::NumpadDivide].wasPressedThisFrame ? -1
-			: (kb[Key::K].wasPressedThisFrame && skyShift) || kb[Key::NumpadMultiply].wasPressedThisFrame ? 1 : 0;
-		ToggleReorient = kb[Key::R].wasPressedThisFrame;
-		CycleShips = kb[Key::Tab].wasPressedThisFrame;
-		CycleBackward = CycleShips && Boost;
-		// US-T97: Shift+Backspace is the self-destruct's, never home or up to the host.
-		bool backspaceAlone = kb[Key::Backspace].wasPressedThisFrame && !Boost;
-		Home = kb[Key::Home].wasPressedThisFrame || backspaceAlone;
-		Pilot = kb[Key::P].wasPressedThisFrame && !Boost;
-		EmbodyCrew = kb[Key::P].wasPressedThisFrame && Boost; // US-T135
-		Eject = kb[Key::Y].wasPressedThisFrame && Boost; // US-T166
-		CycleSeat = kb[Key::Quote].wasPressedThisFrame ? 1 : kb[Key::Semicolon].wasPressedThisFrame ? -1 : 0;
-		ManGun = kb[Key::Slash].wasPressedThisFrame && !Boost;
-		JumpToCraft = kb[Key::Slash].wasPressedThisFrame && Boost; // US-T106: Shift+/ into a launched craft
-		MoveToHost = backspaceAlone;
+		ToggleSilent = hit(A::SilentRunning);
+		PowerToggle = hit(A::PowerToggle);
+		SensorPing = hit(A::SensorPing);
+		ToggleBounties = hit(A::Bounties);
+		ToggleContracts = hit(A::Contracts);
+		ToggleFleet = hit(A::Fleet);
+		ToggleTrade = hit(A::Trade);
+		ToggleGalaxyMap = hit(A::GalaxyMap);
+		ToggleSystemMap = hit(A::SystemMap); // US-T258: Shift+[, the system map
+		ClearScreen = hit(A::ClearScreen);
+		HailPolity = hit(A::Hail);
+		ToggleNews = hit(A::News);
+		ToggleSpawn = hit(A::SpawnPilot);
+		SpawnPractice = hit(A::SpawnPractice);
+		WatchBattle = hit(A::WatchBattle);
+		ToggleLanes = hit(A::Lanes);
+		ToggleSatellites = hit(A::Satellites);
+		CycleSky = hit(A::SkyPrev) ? -1 : hit(A::SkyNext) ? 1 : 0;
+		ToggleReorient = hit(A::Reorient);
+		CycleBackward = hit(A::CycleBackward);
+		CycleShips = hit(A::CycleShips) || CycleBackward;
+		// US-T97: Shift+Backspace is the self-destruct's, never home or up to the host (the map gives the press to the
+		// more specific chord).
+		Home = hit(A::Home);
+		Pilot = hit(A::Pilot);
+		EmbodyCrew = hit(A::EmbodyCrew); // US-T135
+		Eject = hit(A::Eject); // US-T166
+		CycleSeat = hit(A::NextSeat) ? 1 : hit(A::PrevSeat) ? -1 : 0;
+		ManGun = hit(A::ManGun);
+		JumpToCraft = hit(A::JumpToCraft); // US-T106: Shift+/ into a launched craft
+		MoveToHost = hit(A::MoveToHost);
 		// US-T97, the self-destruct, two steps so it never goes off by accident: the press is a tap (it aborts a countdown
 		// under way), and held a second (Core::SelfDestruct::ArmHoldS) it arms, once a press. Let go of either key and the
 		// hold starts again.
 		{
-			bool held = Boost && kb[Key::Backspace].isPressed;
+			bool held = down(A::SelfDestruct);
 			float now = Time::unscaledTime;
-			SelfDestructTap = Boost && kb[Key::Backspace].wasPressedThisFrame;
+			SelfDestructTap = hit(A::SelfDestruct);
 			if (SelfDestructTap || (held && selfDestructDownAt < 0))
 			{
 				selfDestructDownAt = now;
@@ -165,7 +166,7 @@ namespace SpaceGod::Input
 				selfDestructArmed = true;
 			}
 		}
-		TogglePicker = kb[Key::F9].wasPressedThisFrame;
+		TogglePicker = hit(A::Picker);
 		// US-T72 (docs/CAPTURE.md section 5): while capture runs, Alt+F9 / Alt+F10 / Alt+F11 are its screenshot, toggle
 		// recording and save replay instead of the picker, fleet and clear screen. Without capture Alt changes nothing.
 		if (CaptureEvents::Running() && (kb[Key::LeftAlt].isPressed || kb[Key::RightAlt].isPressed))
@@ -175,19 +176,18 @@ namespace SpaceGod::Input
 			captureSaveReplay = ClearScreen;
 			TogglePicker = ToggleFleet = ClearScreen = false;
 		}
-		bool shifted = kb[Key::LeftShift].isPressed || kb[Key::RightShift].isPressed;
-		TunePhasers = kb[Key::Insert].wasPressedThisFrame && !shifted;
-		ToggleBoarding = kb[Key::B].wasPressedThisFrame;
-		ToggleRunHot = kb[Key::Insert].wasPressedThisFrame && shifted;
-		ActivateGate = kb[Key::Y].wasPressedThisFrame;
-		EngageFtl = kb[Key::Enter].wasPressedThisFrame || kb[Key::NumpadEnter].wasPressedThisFrame;
-		ToggleFtlAutopilot = kb[Key::End].wasPressedThisFrame;
-		CycleFtlTarget = kb[Key::PageDown].wasPressedThisFrame ? 1 : kb[Key::PageUp].wasPressedThisFrame ? -1 : 0;
-		ClearFtlCourse = kb[Key::Delete].wasPressedThisFrame && !shifted;
-		ToggleRollPatches = kb[Key::Delete].wasPressedThisFrame && shifted;
-		QuickSave = kb[Key::F5].wasPressedThisFrame;
-		QuickLoad = kb[Key::F8].wasPressedThisFrame;
-		ToggleSaves = kb[Key::F6].wasPressedThisFrame;
+		TunePhasers = hit(A::TunePhasers);
+		ToggleBoarding = hit(A::Boarding);
+		ToggleRunHot = hit(A::RunHot);
+		ActivateGate = hit(A::ActivateGate);
+		EngageFtl = hit(A::EngageFtl);
+		ToggleFtlAutopilot = hit(A::FtlAutopilot);
+		CycleFtlTarget = hit(A::NextFtlTarget) ? 1 : hit(A::PrevFtlTarget) ? -1 : 0;
+		ClearFtlCourse = hit(A::ClearFtlCourse);
+		ToggleRollPatches = hit(A::RollPatches);
+		QuickSave = hit(A::QuickSave);
+		QuickLoad = hit(A::QuickLoad);
+		ToggleSaves = hit(A::Saves);
 
 		const Key digits[] = { Key::Digit0, Key::Digit1, Key::Digit2, Key::Digit3, Key::Digit4, Key::Digit5, Key::Digit6, Key::Digit7, Key::Digit8, Key::Digit9 };
 		for (int i = 0; i < 10; i++)

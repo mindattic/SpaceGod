@@ -7,6 +7,7 @@
 #include "Camera/SpaceCamera.h"
 #include "Input/DriftKey.h"
 #include "Input/Gamepad.h" // US-T250
+#include "Input/KeyBindings.h" // US-T249
 #include "Rendering/Pipeline/RenderBackend.h"
 #include "Views/BattleFx.h"
 #include "UnityCompat/UnityTypes.h"
@@ -46,6 +47,7 @@ namespace SpaceGod
 		SettingsRegistry::AddDeclarationSource([] { Cameras::SpaceCamera::LookSensitivitySetting(); Cameras::SpaceCamera::InvertLook(); });
 		SettingsRegistry::AddDeclarationSource([] { ::SpaceGod::Input::DriftKey::ModeSetting(); }); // US-T165: drift on R, hold or toggle
 		SettingsRegistry::AddDeclarationSource([] { ::SpaceGod::Input::Gamepad::Declare(); }); // US-T250: the pad's dead zone, aim and buttons
+		SettingsRegistry::AddDeclarationSource([] { ::SpaceGod::Input::KeyBindings::Declare(); }); // US-T249: Controls > Key bindings
 		SettingsRegistry::AddDeclarationSource([]
 		{
 			using Rendering::RenderPipelineSettings;

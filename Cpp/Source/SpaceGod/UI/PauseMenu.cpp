@@ -3,6 +3,7 @@
 
 #include "ActiveProfile.h"
 #include "GameSettingsHost.h"
+#include "Input/KeyBindings.h" // US-T249
 #include "PlayerOptions.h" // US-T252
 #include "Settings/GameSetting.h"
 #include "Settings/SettingsRegistry.h"
@@ -37,6 +38,7 @@ namespace SpaceGod::UI
 		if (!IsOpen) return;
 		if (confirm != nullptr) Revert();
 		leaving = Leave::None;
+		captureAction = captureSlot = -1; // US-T249
 		IsOpen = false;
 		Time::timeScale = timeScaleBefore;
 	}
@@ -47,6 +49,11 @@ namespace SpaceGod::UI
 		if (confirm != nullptr)
 		{
 			if (escape || confirm->Tick(realSeconds)) Revert();
+			return;
+		}
+		if (captureAction >= 0)
+		{
+			UpdateCapture(escape); // US-T249: Esc cancels the listening slot, not the page
 			return;
 		}
 		if (!escape) return;
@@ -250,7 +257,9 @@ namespace SpaceGod::UI
 			};
 			for (const auto& g : playerGroups)
 			{
-				NavGroup(g, Rect(0, ny, bw, 30), searching);
+				// US-T249: Key bindings sits under Controls, indented as a page of it.
+				float gx = g == Input::KeyBindings::Group ? indent : 0.0f;
+				NavGroup(g, Rect(gx, ny, bw - gx, 30), searching);
 				ny += step;
 				if (g == SettingGroups::Graphics) displayButton();
 			}
@@ -287,6 +296,10 @@ namespace SpaceGod::UI
 		int rows = shown.Count() + (displayFound ? 1 : 0);
 		cs::String heading = searching ? cs::Cat(rows, " found for \"", cs::Strings::Trim(search), "\"") : !group.empty() ? group : cs::String("Nothing to set");
 		GUI::Label(Rect(px, top, pw, 22), heading, text);
+		if (!searching && group == Input::KeyBindings::Group) // US-T249: how the page works
+			GUI::Label(Rect(px + 110, top + 3, pw - 110, 18),
+				captureAction >= 0 ? cs::String("Press the key (hold Shift, Ctrl or Alt with it for a chord)  ·  Esc cancels  ·  Clear empties the slot")
+					: cs::String("Click a key to change it  ·  Esc, the number keys and the mouse stay fixed  ·  gamepad buttons: Controls"), small);
 
 		auto view = Rect(px, top + 28, pw, bottom - top - 28);
 		auto content = Rect(0, 0, pw - 18, Mathf::Max(rows * SettingRowH, 1.0f));
@@ -333,6 +346,8 @@ namespace SpaceGod::UI
 			group = g;
 			search = "";
 			settingsScroll = Vector2::zero();
+			captureAction = captureSlot = -1; // US-T249: a slot listening on the page left behind stops
+
 		}
 	}
 
@@ -368,6 +383,11 @@ namespace SpaceGod::UI
 
 	void PauseMenu::DrawSetting(const cs::Ref<GameSetting>& setting, Rect r, bool showGroup)
 	{
+		if (cs::As<Input::KeyBindingSetting>(setting))
+		{
+			DrawKeyBinding(setting, r, showGroup); // US-T249
+			return;
+		}
 		const float controlW = 250, resetW = 60;
 		float textW = r.width - controlW - resetW - 24;
 		GUI::Label(Rect(r.x + 4, r.y + 4, textW, 20), showGroup ? cs::Cat(setting->Group, "  ·  ", setting->Label) : setting->Label, label);
@@ -402,6 +422,76 @@ namespace SpaceGod::UI
 		GUI::enabled = enabled && !setting->IsDefault();
 		if (GUI::Button(Rect(r.xMax() - resetW, cy, resetW, 28), "Reset", button)) setting->Reset();
 		GUI::enabled = enabled;
+	}
+
+	void PauseMenu::DrawKeyBinding(const cs::Ref<GameSetting>& setting, Rect r, bool showGroup)
+	{
+		using namespace ::SpaceGod::Input;
+		auto binding = cs::As<KeyBindingSetting>(setting);
+		KeyAction action = KeyBindings::ActionOf(*setting);
+		const float slotW = 104, gap = 6, resetW = 60;
+		const float controlW = slotW * KeyBindingSetting::Slots + gap * (KeyBindingSetting::Slots - 1);
+		float textW = r.width - controlW - resetW - 24;
+		bool listeningHere = captureAction == static_cast<int>(action);
+
+		// A chord another action live in the same place also answers to (shared defaults aside: those are told apart by
+		// where each is live) is named under the label, so a clash is seen where it is made.
+		cs::String clash;
+		for (const KeyChord& c : binding->Value)
+			for (KeyAction other : KeyBindings::Conflicts(action, c))
+				clash = cs::Cat(clash, clash.empty() ? "" : ", ", c.Display(), " is also ", KeyBindings::Name(other));
+		GUI::Label(Rect(r.x + 4, r.y + 4, textW, 20), showGroup ? cs::Cat(setting->Group, "  ·  ", setting->Label) : setting->Label, label);
+		GUI::Label(Rect(r.x + 4, r.y + 24, textW, SettingRowH - 26), clash.empty() ? setting->Description : cs::Cat("CLASH: ", clash), small);
+
+		float cx = r.x + textW + 12, cy = r.y + 10;
+		int firstEmpty = KeyBindingSetting::Slots;
+		for (int i = KeyBindingSetting::Slots - 1; i >= 0; i--)
+			if (binding->Value[i].Empty()) firstEmpty = i;
+		for (int i = 0; i < KeyBindingSetting::Slots; i++)
+		{
+			bool listening = listeningHere && captureSlot == i;
+			const KeyChord& c = binding->Value[i];
+			cs::String shown = listening ? cs::String("press a key...") : c.Empty() ? cs::String("-") : c.Display();
+			if (GUI::Button(Rect(cx + i * (slotW + gap), cy, slotW, 28), shown, listening ? buttonActive : button))
+			{
+				if (listening) captureAction = captureSlot = -1; // clicked again: stop listening
+				else
+				{
+					captureAction = static_cast<int>(action);
+					captureSlot = c.Empty() ? firstEmpty : i; // the bound slots come first: an empty one fills the first gap
+				}
+			}
+		}
+
+		bool enabled = GUI::enabled;
+		if (listeningHere)
+		{
+			if (GUI::Button(Rect(r.xMax() - resetW, cy, resetW, 28), "Clear", button))
+			{
+				binding->Set(captureSlot, KeyChord());
+				captureAction = captureSlot = -1;
+			}
+			return;
+		}
+		GUI::enabled = enabled && !setting->IsDefault();
+		if (GUI::Button(Rect(r.xMax() - resetW, cy, resetW, 28), "Reset", button)) setting->Reset();
+		GUI::enabled = enabled;
+	}
+
+	void PauseMenu::UpdateCapture(bool escape)
+	{
+		using namespace ::SpaceGod::Input;
+		if (escape || page != Page::Settings || captureAction >= static_cast<int>(KeyAction::Count))
+		{
+			captureAction = captureSlot = -1;
+			return;
+		}
+		KeyChord chord;
+		if (KeyBindings::Capture(InputDevice::current(), chord))
+		{
+			KeyBindings::Binding(static_cast<KeyAction>(captureAction))->Set(captureSlot, chord);
+			captureAction = captureSlot = -1;
+		}
 	}
 
 	bool PauseMenu::MatchesAll(const cs::String& words, const cs::String& query)

@@ -31,6 +31,7 @@
 #include "Camera/SpaceCamera.h"
 #include "PlayerOptions.h" // US-T252
 #include "Input/InputDevice.h"
+#include "Input/KeyBindings.h" // US-T249
 #include "Rendering/AssetStreamer.h"
 #include "Streaming/AreaStreaming.h"
 #include "Views/InterstellarView.h"
@@ -332,13 +333,15 @@ namespace SpaceGod
 		if (c->AtVoidStop(jd) && CoopHelmMine())
 		{
 			const auto& kb = SpaceGod::Input::InputDevice::current();
-			bool shift = kb[SpaceGod::Input::Key::LeftShift].isPressed || kb[SpaceGod::Input::Key::RightShift].isPressed;
-			if (kb.present && kb[SpaceGod::Input::Key::Tab].wasPressedThisFrame)
+			// US-T249: the helm's ping and power keys as bound (Tab, Shift+F3 by default).
+			using SpaceGod::Input::KeyAction;
+			using SpaceGod::Input::KeyBindings;
+			if (KeyBindings::Pressed(KeyAction::SensorPing, kb))
 			{
 				cs::String why = Core::VoidRaiders::Ping(c, jd);
 				ShowToast(why.empty() ? cs::String("ACTIVE PING: anything out there closing on you shows now, and may break off; you are lit up a while (Shift+F3 runs dark)") : cs::Cat("NO PING: ", why));
 			}
-			else if (kb.present && kb[SpaceGod::Input::Key::F3].wasPressedThisFrame && shift)
+			else if (KeyBindings::Pressed(KeyAction::PowerToggle, kb))
 			{
 				bool changed;
 				ShowToast(Core::VoidRaiders::ToggleDark(c, jd, changed));

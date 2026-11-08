@@ -6,6 +6,7 @@
 #include "Misc/Parse.h"
 
 #include "MindAtticHeadless.h"
+#include "Input/KeyBindings.h" // US-T249
 #include "Settings/GameSetting.h"
 #include "UI/Hud.h"
 #include "UnityCompat/UnityGui.h"
@@ -30,7 +31,8 @@ namespace SpaceGod
 
 	const cs::List<cs::String>& PlayerOptions::PlayerGroups()
 	{
-		static const cs::List<cs::String> value{ Gameplay, SettingGroups::Graphics, SettingGroups::Audio, SettingGroups::Controls, Accessibility };
+		// US-T249: Key bindings right under Controls (the nav indents it there).
+		static const cs::List<cs::String> value{ Gameplay, SettingGroups::Graphics, SettingGroups::Audio, SettingGroups::Controls, Input::KeyBindings::Group, Accessibility };
 		return value;
 	}
 

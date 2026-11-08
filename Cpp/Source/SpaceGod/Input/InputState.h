@@ -1,7 +1,8 @@
 #pragma once
 // Port of Unity.SpaceGod Runtime/Input/InputState.cs (US-T29). Unity's Input System devices are read through the
-// seam in Input/InputDevice.h (fed from Unreal by Input/UnrealInputDevice), with every binding as the original's. The
-// gamepad (US-T250, Input/Gamepad.h) feeds the same fields after them.
+// seam in Input/InputDevice.h (fed from Unreal by Input/UnrealInputDevice), each key through the action map
+// (US-T249, Input/KeyBindings.h: the original's keys unless the profile rebinds them). The gamepad (US-T250,
+// Input/Gamepad.h) feeds the same fields after them.
 
 #include "UnityCompat/UnityTypes.h"
 

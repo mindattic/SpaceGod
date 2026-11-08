@@ -4,6 +4,7 @@
 #include "ControlsHelp.h"
 #include "GameManual.h"
 #include "Input/Gamepad.h" // US-T250
+#include "Input/KeyBindings.h" // US-T249
 #include "UI/Hud.h"
 #include "UI/ShipCatalogScreen.h"
 #include "UI/UiStyle.h"
@@ -12,6 +13,30 @@ using namespace SpaceGod::Core;
 
 namespace SpaceGod::UI
 {
+	namespace
+	{
+		/// US-T249: the keys the profile has rebound (Settings > Controls > Key bindings), each action with its keys now and
+		/// the default it replaced: printed above a chapter's key lists, which give the default keys. Null when none is.
+		cs::Ref<HelpSection> ReboundSection()
+		{
+			using namespace ::SpaceGod::Input;
+			if (!KeyBindings::AnyChanged()) return nullptr;
+			auto section = cs::New<HelpSection>("YOUR KEY BINDINGS (the lists below give the default keys)");
+			for (int i = 0; i < static_cast<int>(KeyAction::Count); i++)
+			{
+				auto a = static_cast<KeyAction>(i);
+				const auto& b = KeyBindings::Binding(a);
+				if (b->IsDefault()) continue;
+				cs::String was;
+				for (const KeyChord& c : b->Default)
+					if (!c.Empty()) was = cs::Cat(was, was.empty() ? "" : "  /  ", c.Display());
+				section->Lines.Add(HelpLine(b->ValueText(), cs::Cat(KeyBindings::Name(a), "  (default ", was.empty() ? cs::String("unbound") : was, ")")));
+			}
+			section->Lines.Add(HelpLine("", "Settings > Controls > Key bindings changes these; Reset there puts a key back."));
+			return section;
+		}
+	}
+
 	HelpScreen::HelpScreen() = default;
 
 	HelpScreen::~HelpScreen() = default;
@@ -115,6 +140,8 @@ namespace SpaceGod::UI
 		}
 
 		if (ShowsPad(c)) y = DrawPadSection(y, w); // US-T250
+		if (GameManual::ControlsOf(c).Count() > 0)
+			if (auto rebound = ReboundSection()) y = DrawSection(rebound, y, w); // US-T249
 		for (const auto& section : GameManual::ControlsOf(c))
 			y = DrawSection(section, y, w);
 		GUI::EndScrollView();
@@ -126,7 +153,10 @@ namespace SpaceGod::UI
 		for (const auto& t : c->Topics)
 			h += HeadingH - 2 + text->CalcHeight(GUIContent(t.Text), w) + TopicGap;
 		if (ShowsPad(c)) h += PadSectionHeight(w); // US-T250
-		for (const auto& section : GameManual::ControlsOf(c))
+		auto sections = GameManual::ControlsOf(c);
+		if (sections.Count() > 0)
+			if (auto rebound = ReboundSection()) sections.Insert(0, rebound); // US-T249
+		for (const auto& section : sections)
 		{
 			h += HeadingH;
 			for (const auto& line : section->Lines) h += LineHeight(line, w) + LineGap;
