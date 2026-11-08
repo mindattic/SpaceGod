@@ -83,6 +83,11 @@ namespace SpaceGod::Core
 		/// <summary>The side that fired (a shot or an interception) or was hit (an impact), and the battle's id.</summary>
 		int Side = 0;
 		int BattleId = 0;
+
+		/// <summary>US-T241, presentation only: the battle effect the cue was raised from (<see cref="WeaponSystems.CueFx"/>),
+		/// valid only for the call, so the audio can tell a vulcan from an autocannon or a rocket from a homing missile; null
+		/// for a cue the battle raises itself (a hit on a shield or a hull).</summary>
+		const CombatFx* Fx = nullptr;
 	};
 
 	/// <summary>Everything a family is (US-T189): its name, its damage profile, how its shot looks and whether it travels,
@@ -167,7 +172,9 @@ namespace SpaceGod::Core
 		static void Cue(WeaponFamily f, WeaponCueEvent e, DVec3 at, double size, int side, int battleId);
 
 		/// <summary>The cue a battle effect stands for, if it is a shot fired or a round shot down (called from
-		/// <see cref="Battle.Emit"/>); the family of a launch or a flak shell is read off the firing mount.</summary>
+		/// <see cref="Battle.Emit"/>); the family of a launch or a flak shell is read off the firing mount. Since US-T241 the
+		/// blasts are raised too, as family None impacts under their own keys ("ship.explosion", "subsystem.destroyed",
+		/// "hull.section", "mine.blast", "emp.burst", "mine.laid", "hive.split"), the effect itself in <see cref="WeaponSoundCue.Fx"/>.</summary>
 		static void CueFx(const CombatFx& fx, int battleId);
 
 		/// <summary>The family whose shot fired effect <paramref name="k"/> draws; None for an effect that is no shot fired.</summary>

@@ -1,4 +1,5 @@
 #include "UnitySpaceAppActor.h"
+#include "Audio/CombatSounds.h" // US-T241
 #include "Audio/FlightSounds.h" // US-T242
 #include "Audio/InterfaceSounds.h" // US-T244
 #include "Audio/Music.h" // US-T243
@@ -101,6 +102,7 @@ void AUnitySpaceAppActor::BeginPlay()
 
 void AUnitySpaceAppActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	SpaceGod::Audio::CombatSounds::Shutdown(); // US-T241: the Core's weapon sound hook let go before the app goes
 	if (App)
 	{
 		if (Capture)
@@ -155,6 +157,7 @@ void AUnitySpaceAppActor::Step(float RealDelta)
 		Rendering::HyperspaceToll::Tick(nullptr, RealDelta); // US-T191
 		SpaceGod::Audio::Music::Poll(nullptr); // US-T243: the menu's score
 		SpaceGod::Audio::FlightSounds::Poll(nullptr); // US-T242: no craft flown here, every engine stilled
+		SpaceGod::Audio::CombatSounds::Poll(nullptr); // US-T241: no fight here, the weapons' sound hook let go
 		ApplyCamera();
 		ApplyCursor();
 		ApplyAudio();
@@ -171,6 +174,7 @@ void AUnitySpaceAppActor::Step(float RealDelta)
 	SpaceGod::Audio::InterfaceSounds::Poll(App.get()); // US-T244: panels, toasts, hails, comms, contracts and credits heard, on every peer
 	SpaceGod::Audio::Music::Poll(App.get()); // US-T243: the adaptive score follows the game (local to this peer; reads the app, never writes it)
 	SpaceGod::Audio::FlightSounds::Poll(App.get()); // US-T242: the craft flown's engine, thrusters, drives and alerts, and engines passing (local)
+	SpaceGod::Audio::CombatSounds::Poll(App.get()); // US-T241: every gun, launch, hit and blast of the fights the frame raised (local; the hook only listens)
 	Input::Gamepad::MenuMode = App->PadMenusOpen(); // US-T250: the pad is the GUI's next frame while a menu or panel is up
 	// US-T44: the host's frame to its clients (the C# track's game mode Step: CoopPeer.HostEndUpdate after the Update).
 	if (Coop::CoopPeer* Peer = Coop::CoopPeer::Current(); Peer && Peer->IsHost()) Peer->HostEndUpdate(App.get());

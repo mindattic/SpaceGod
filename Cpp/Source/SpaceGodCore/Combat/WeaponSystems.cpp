@@ -234,11 +234,44 @@ namespace SpaceGod::Core
 
 	void WeaponSystems::CueFx(const CombatFx& fx, int battleId)
 	{
-		if (!SoundHook()) return;
+		const auto& hook = SoundHook();
+		if (!hook) return;
+		auto raise = [&](WeaponFamily f, WeaponCueEvent e, double size, const char* name)
+		{
+			WeaponSoundCue cue;
+			cue.Family = f;
+			cue.Event = e;
+			cue.Name = name != nullptr ? name : CueName(f, e);
+			cue.At = fx.A;
+			cue.Size = size;
+			cue.Side = fx.Side;
+			cue.BattleId = battleId;
+			cue.Fx = &fx; // US-T241
+			hook(cue);
+		};
 		// A round shot down (a screen's kill: the small pops are rounds fizzling out at the end of their reach).
 		if (fx.Kind == FxKind::MissileKill)
 		{
-			if (fx.Size >= 0.06) Cue(WeaponFamily::None, WeaponCueEvent::Intercepted, fx.A, fx.Size, fx.Side, battleId);
+			if (fx.Size >= 0.06) raise(WeaponFamily::None, WeaponCueEvent::Intercepted, fx.Size, nullptr);
+			return;
+		}
+		// The blasts (US-T241): a hull dying, a hardpoint or a piece of hull shot away, a mine or an EMP round going off, a
+		// mine laid, a hive round splitting. Size is the effect's own (a hull's length, a blast's reach, km).
+		const char* blast = nullptr;
+		switch (fx.Kind)
+		{
+			case FxKind::UnitDestroyed: blast = "ship.explosion"; break;
+			case FxKind::SubsystemDestroyed: blast = "subsystem.destroyed"; break;
+			case FxKind::SectionLost: blast = "hull.section"; break;
+			case FxKind::MineBlast: blast = "mine.blast"; break;
+			case FxKind::EmpBurst: blast = "emp.burst"; break;
+			case FxKind::Deployed: blast = "mine.laid"; break;
+			case FxKind::HiveSplit: blast = "hive.split"; break;
+			default: break;
+		}
+		if (blast != nullptr)
+		{
+			raise(WeaponFamily::None, WeaponCueEvent::Impact, fx.Size, blast);
 			return;
 		}
 		auto family = FamilyOfFx(fx.Kind);
@@ -249,7 +282,7 @@ namespace SpaceGod::Core
 			auto launcher = FamilyOf(fx.Unit->Combat->Subsystems[fx.Sub]->Kind());
 			if (launcher != WeaponFamily::None) family = launcher;
 		}
-		Cue(family, WeaponCueEvent::Fire, fx.A, 0, fx.Side, battleId);
+		raise(family, WeaponCueEvent::Fire, 0, nullptr);
 	}
 
 	// ---------------------------------------------------------------- fitting through the slot model
