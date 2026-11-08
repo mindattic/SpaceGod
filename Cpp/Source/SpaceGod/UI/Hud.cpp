@@ -142,6 +142,16 @@ namespace SpaceGod::UI
 			return;
 		}
 
+		// So are the discoveries (US-T259): everything found, by kind and the day it was found.
+		if (app->ShowDiscoveries)
+		{
+			auto whole = Rect(0, 0, static_cast<float>(Screen::width), static_cast<float>(Screen::height));
+			if (!app->UiRects.Contains(whole)) app->UiRects.Add(whole); // the world under it takes no clicks
+			app->DrawDiscoveries();
+			DrawToast();
+			return;
+		}
+
 		// So is the galaxy map (U.SPC-T103), between the stars aside: a trip under way has the screen.
 		if (app->ShowGalaxyMap && !app->Travel->Active)
 		{
@@ -1757,5 +1767,6 @@ namespace SpaceGod::UI
 		if (systemMap) systemMap->DestroyOwnedTextures(); // US-T258
 		if (helpScreen) helpScreen->DestroyOwnedTextures();
 		if (logsScreen) logsScreen->DestroyOwnedTextures(); // US-T261
+		app->DestroyDiscoveriesTextures(); // US-T259
 	}
 }

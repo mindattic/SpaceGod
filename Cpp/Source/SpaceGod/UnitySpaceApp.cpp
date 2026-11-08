@@ -147,7 +147,7 @@ namespace SpaceGod
 	bool UnitySpaceApp::ClickPanelOpen() const
 	{
 		if (coopPanelOverride.has_value()) return *coopPanelOverride; // US-T44 (US-T43): the helm holder's, while its frame is flown in co-op
-		return !ScreenCleared && (ShowSpawn || ShowSaves || ShowGalaxyMap || ShowSystemMap /* US-T258 */ || ShowHelp || ShowLogs /* US-T261 */ || (ShowHud && (ShowMarket || ShowCargo || ShowNews || ShowOutfit || ShowBounties || ShowContracts || ShowFleet || ShowTrade || ShowPicker || ShowPort))); // US-T266: the port screen too; a cleared screen (F11) shows none of them; market, cargo, outfitting, bounties, contracts and news are HUD panels, hidden with it
+		return !ScreenCleared && (ShowSpawn || ShowSaves || ShowGalaxyMap || ShowSystemMap /* US-T258 */ || ShowHelp || ShowLogs /* US-T261 */ || ShowDiscoveries /* US-T259 */ || (ShowHud && (ShowMarket || ShowCargo || ShowNews || ShowOutfit || ShowBounties || ShowContracts || ShowFleet || ShowTrade || ShowPicker || ShowPort))); // US-T266: the port screen too; a cleared screen (F11) shows none of them; market, cargo, outfitting, bounties, contracts and news are HUD panels, hidden with it
 	}
 
 	bool UnitySpaceApp::IsSol() const { return ActiveSystem->Catalog->Root()->Name == "Sun"; }
@@ -457,7 +457,7 @@ namespace SpaceGod
 		Input.Poll(overUi, ModelViewer::CapturesInput());
 		CaptureEvents::Hotkeys(Input); // US-T72: Alt+F9/F10/F11 while capture runs, on this machine only
 		// The galaxy map turns with its own drag: the camera behind it does not look about meanwhile.
-		if ((ShowGalaxyMap || ShowSystemMap /* US-T258 */ || ShowHelp || ShowLogs) && !ScreenCleared) Input.ReleaseLook(); // US-T261: the logs screen too
+		if ((ShowGalaxyMap || ShowSystemMap /* US-T258 */ || ShowHelp || ShowLogs || ShowDiscoveries) && !ScreenCleared) Input.ReleaseLook(); // US-T261: the logs screen too; US-T259: the discoveries
 		// The pause menu has the frame: nothing else moves, and the stick and trigger do nothing, until it closes.
 		if (pauseMenu->IsOpen)
 		{
@@ -674,6 +674,8 @@ namespace SpaceGod
 		if (i.ToggleLabels) ShowLabels = !ShowLabels;
 		if (i.ToggleHelp) ShowHelp = !ShowHelp;
 		if (i.ToggleLogs) ShowLogs = !ShowLogs; // US-T261: Shift+L, the recovered logs
+		if (i.ToggleDiscoveries) ShowDiscoveries = !ShowDiscoveries; // US-T259: Shift+O, the discoveries
+		UpdateDiscoveries(); // US-T259: what has been found, into the log
 		if (i.ToggleHud) ShowHud = !ShowHud;
 		UpdateDocking(); // US-T266: flying off the port (or leaving the helm) casts off
 		if (i.DockPort) DockKey(); // US-T266: Shift+M, docking clearance and the port screen
@@ -749,6 +751,7 @@ namespace SpaceGod
 				ShowPort = false; // US-T266: the screen closes, the hull stays docked (Shift+M opens it again)
 				ShowSystemMap = false; // US-T258
 				ShowLogs = false; // US-T261
+				ShowDiscoveries = false; // US-T259
 				break;
 			case EscapeAction::LeaveFocus:
 				SpaceCamera->ExitFocus();

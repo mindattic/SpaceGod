@@ -92,7 +92,8 @@ namespace SpaceGod::Input
 		ResetTime = kb[Key::T].wasPressedThisFrame;
 		LockTarget = kb[Key::T].wasPressedThisFrame && !Boost;
 		ToggleTractor = kb[Key::T].wasPressedThisFrame && Boost; // US-T95
-		ToggleOrbits = kb[Key::O].wasPressedThisFrame;
+		ToggleOrbits = kb[Key::O].wasPressedThisFrame && !Boost;
+		ToggleDiscoveries = kb[Key::O].wasPressedThisFrame && Boost; // US-T259
 		ToggleLabels = kb[Key::L].wasPressedThisFrame && !Boost;
 		ToggleLogs = kb[Key::L].wasPressedThisFrame && Boost; // US-T261
 		// US-T126: Shift+F1 is the dev menu's, F1 alone (or H) the help screen's.
@@ -272,6 +273,7 @@ namespace SpaceGod::Input
 		SpawnPractice = false;
 		ToggleCheatMenu = false; // US-T126
 		ToggleLogs = false; // US-T261
+		ToggleDiscoveries = false; // US-T259
 		ToggleSpawnMenu = false; // US-T186
 		ToggleSystemCruise = false; // US-T127
 		ToggleTractor = false; // US-T95

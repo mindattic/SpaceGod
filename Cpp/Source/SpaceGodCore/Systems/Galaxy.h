@@ -30,6 +30,7 @@ namespace SpaceGod::Core
 	class StarEntry;
 	class StarDiscoveredEvent;
 	class Territory;
+	class DiscoveryLog; // US-T259
 
 	/// <summary>
 	/// One star system as a self-contained world: its own bodies (body 0 is its root, the Sun or a
@@ -262,6 +263,12 @@ namespace SpaceGod::Core
 		/// <see cref="Update"/>; absent from older saves.
 		/// </summary>
 		cs::Ref<SpaceGod::Core::Territory> Territory;
+
+		/// <summary>
+		/// What the player has found (US-T259, see <see cref="DiscoveryLog"/>): kept by the game as the player goes, read by the
+		/// discoveries screen. Display only: no simulation code reads it. Null until the game first sweeps; absent from older saves.
+		/// </summary>
+		cs::Ref<SpaceGod::Core::DiscoveryLog> DiscoveryLog;
 
 		/// <summary>
 		/// The system simulated at full detail (U.SPC-T104): the one the player is in. Every other system keeps

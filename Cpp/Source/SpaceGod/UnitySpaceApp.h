@@ -43,6 +43,7 @@
 #include "UnitySpaceApp.SkyTravel.deps.h" // US-T145
 #include "UnitySpaceApp.Embody.deps.h" // US-T135
 #include "UnitySpaceApp.Influence.deps.h" // US-T140
+#include "UnitySpaceApp.Discoveries.deps.h" // US-T259
 
 namespace SpaceGod
 {
@@ -106,5 +107,6 @@ namespace SpaceGod
 #include "UnitySpaceApp.SkyTravel.inl" // US-T145: the sky's layers and the travel between them
 #include "UnitySpaceApp.Embody.inl" // US-T135: the universal embody layer
 #include "UnitySpaceApp.Influence.inl" // US-T140: embody limits, Influence and squad orders as the player meets them
+#include "UnitySpaceApp.Discoveries.inl" // US-T259: the discovery log and its screen
 	};
 }

@@ -91,6 +91,7 @@
 #include "Systems/Statecraft.h"
 #include "Systems/StrategicCommand.h"
 #include "Systems/Territory.h" // US-T190
+#include "Systems/DiscoveryLog.h" // US-T259
 #include "Trajectories.h"
 #include "World.h"
 #include "Persistence/Registrations/Registrations.h"
@@ -240,6 +241,7 @@ namespace SpaceGod::Core
 		SG_F(Viewpoint), SG_F(charted), SG_F(exploredAtLy), SG_F(lookedJd), SG_F(streamed), SG_F(undiscovered),
 		SG_F(undiscoveredNames),
 		SG_OPT(Territory), // US-T190: faction territory, absent from older saves (made on the first update)
+		SG_OPT(DiscoveryLog), // US-T259: the discovery log, absent from older saves (made on the game's first sweep)
 		b.Loaded(&::SpaceGod::Core::Registrations::RewireGalaxy))
 
 	SG_SERIALIZE(GateConstruction, "Unity.SpaceGod.Core.GateConstruction",
