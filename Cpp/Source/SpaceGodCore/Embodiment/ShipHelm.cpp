@@ -5,6 +5,7 @@
 #include "Embodiment/HelmFlight.h"
 #include "Embodiment/SelfDestruct.h"
 #include "Sensors/SensorPosture.h"
+#include "BodyCatalog.h"
 #include "Ephemeris.h"
 #include "Fleet.h"
 #include "Ships.h"
@@ -19,6 +20,7 @@
 #include "Combat/PilotTuning.h"
 #include "Combat/War.h"
 #include "Combat/WeakPatches.h"
+#include "Economy/HandMining.h"
 #include "Economy/Propulsion.h"
 #include "Infrastructure/Infrastructure.h" // DockingRing
 
@@ -127,6 +129,17 @@ namespace SpaceGod::Core
 			unit->PlayerAim = input.Aim;
 		}
 		if (Flight != nullptr && !Ship->Destroyed) Fly(Flight, input, dt);
+		// US-T264: out of a fight the primary trigger is the mining beam (a miner's own laser, or one a yard fitted), cut down
+		// the aim from where the helm has flown the hull; carried in the frames, so every peer cuts the same crates.
+		if (Flight != nullptr && Flight->FrameBody >= 0 && !Ship->Destroyed && world != nullptr && world->Ephemeris != nullptr
+			&& Flight->FrameBody < world->Catalog()->Count())
+		{
+			if (Beam == nullptr) Beam = cs::New<MiningBeam>();
+			bool mining = input.Primary && Ship->Battle == nullptr && HandMining::GradeOf(Ship) > 0;
+			auto helio = world->Ephemeris->Helio(Flight->FrameBody) + Flight->State.Pos;
+			auto aim = input.Aim.LengthSquared() > 1e-18 ? input.Aim : Flight->State.Forward;
+			HandMining::Step(world, Ship, Beam, mining, helio, aim, Flight->State.Vel.Length(), dt);
+		}
 	}
 
 	void ShipHelm::SetOff()

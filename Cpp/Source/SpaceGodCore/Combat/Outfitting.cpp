@@ -55,6 +55,7 @@ namespace SpaceGod::Core
 			case ModuleKind::VulcanCannon: return "VulcanCannon";
 			case ModuleKind::HiveLauncher: return "HiveLauncher";
 			case ModuleKind::RocketPod: return "RocketPod";
+			case ModuleKind::MiningLaser: return "MiningLaser"; // US-T264
 		}
 		return "";
 	}
@@ -165,6 +166,8 @@ namespace SpaceGod::Core
 			cs::New<ModuleSpec>(ModuleKind::VulcanCannon, "Vulcan cannon", 28, false, B, S, false, 100, cs::List<std::pair<Good, double>>{ { Good::Alloys, 10 }, { Good::Machinery, 6 }, { Good::Munitions, 4 } }),
 			cs::New<ModuleSpec>(ModuleKind::HiveLauncher, "Hive missiles", 45, false, Mi, S, false, 110, cs::List<std::pair<Good, double>>{ { Good::Alloys, 12 }, { Good::Electronics, 14 }, { Good::Machinery, 3 }, { Good::Munitions, 8 } }),
 			cs::New<ModuleSpec>(ModuleKind::RocketPod, "Rocket pod", 30, false, Mi, S, false, 110, cs::List<std::pair<Good, double>>{ { Good::Alloys, 8 }, { Good::Machinery, 2 }, { Good::Munitions, 6 } }),
+			// US-T264: a mining laser (a facility, inside the hull): the emitter, its cooling and the crusher that bags the ore.
+			cs::New<ModuleSpec>(ModuleKind::MiningLaser, "Mining laser", 40, false, NoMount, S, false, 180, cs::List<std::pair<Good, double>>{ { Good::Alloys, 14 }, { Good::Electronics, 10 }, { Good::Machinery, 8 } }),
 		};
 		return all;
 	}

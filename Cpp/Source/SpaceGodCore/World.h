@@ -183,6 +183,10 @@ namespace SpaceGod::Core
 		/// station shares and mining claims, and the house account their earnings go to (see <see cref="Core.Holdings"/>).</summary>
 		cs::Ref<::SpaceGod::Core::Holdings> Holdings;
 
+		/// <summary>US-T264: rock cut by hand at a helm's mining beam, tonnes by rock id (see <see cref="HandMining"/>): a rock is
+		/// worked out once its reserve is cut, and stays so. Absent from older saves (empty).</summary>
+		cs::Dictionary<cs::String, double> HandCut;
+
 		/// <summary>The player's trading career (U.SPC-T426): price intelligence, trade news, charters, insurance, the
 		/// back door and the trader's rank (see <see cref="Core.TradeDesk"/>).</summary>
 		cs::Ref<TradeDesk> Trade;

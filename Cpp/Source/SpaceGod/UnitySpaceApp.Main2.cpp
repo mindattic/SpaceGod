@@ -341,6 +341,7 @@ namespace SpaceGod
 	void UnitySpaceApp::UpdatePilotBattle(const cs::Ref<Core::Ship>& ship, float dt)
 	{
 		UpdateTractor(ship, dt); // US-T95: the tractor beam works in a fight too
+		UpdateMining(ship); // US-T264: the mining beam's notices and readout (the helm cut this frame's ore)
 		if (ship->Battle != nullptr && Salvage != nullptr) EndSalvage("Clamps released: battle stations");
 		if (ship->Battle != nullptr) SalvageApproach = cs::String();
 		if (ship->Battle == nullptr)

@@ -102,6 +102,7 @@ namespace SpaceGod
 #include "UnitySpaceApp.Cheats.inl" // US-T126: the dev menu
 #include "UnitySpaceApp.Cruise.inl" // US-T127: the in-system cruise drive
 #include "UnitySpaceApp.Tractor.inl" // US-T95: cargo pods and the tractor beam
+#include "UnitySpaceApp.Mining.inl" // US-T264: hands-on mining's readout and beam
 #include "UnitySpaceApp.SkyTravel.inl" // US-T145: the sky's layers and the travel between them
 #include "UnitySpaceApp.Embody.inl" // US-T135: the universal embody layer
 #include "UnitySpaceApp.Influence.inl" // US-T140: embody limits, Influence and squad orders as the player meets them

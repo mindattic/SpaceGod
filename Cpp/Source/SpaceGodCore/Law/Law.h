@@ -47,6 +47,9 @@ namespace SpaceGod::Core
 
 		/// <summary>Running from a patrol's scan, or from an interdiction once hailed.</summary>
 		FleeingScan,
+
+		/// <summary>US-T264: cutting ore by hand on a rock someone else holds the claim to (a settlement's own body).</summary>
+		ClaimJumping,
 	};
 	SPACEGODCORE_API const char* ToString(CrimeKind v);
 

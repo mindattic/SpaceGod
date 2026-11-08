@@ -185,6 +185,10 @@ namespace SpaceGod::Core
 		static constexpr const char* Scanner = "scanner-suite"; static constexpr const char* Brig = "brig";
 		static constexpr const char* MarineHabitat = "marine-habitat";
 
+		/// <summary>US-T264: a mining laser (see <see cref="HandMining"/>), any hull's to fit that has the space. Registered last,
+		/// so every kind registered before keeps its place in <see cref="All"/> (a save names kinds by their place).</summary>
+		static constexpr const char* MiningLaser = "mining-laser";
+
 		/// <summary>The firing room that launches Breacher rounds (U.SPC-T466, U.SPC-T521, see <see cref="BreacherBays"/>): any
 		/// ship's to fit that has the space, the reactor power and the crew for it, and only beside a marine habitat to
 		/// supply its teams.</summary>

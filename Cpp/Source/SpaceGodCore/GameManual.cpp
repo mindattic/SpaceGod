@@ -219,7 +219,21 @@ namespace SpaceGod::Core
 				  "Reach and pull go by hull class: a strike craft about 3 km, light hulls 5, freighters and destroyers 7-8, "
 				  "capital ships 12, the tugs 15 and hardest; heavy pods come in slower. Pirates who win a fight tractor in "
 				  "their share of the dead hulls' pods. The dev menu's Spawn > Cargo-laden wreck (or console sg.Tractor wreck) "
-				  "blows a laden freighter apart just ahead of you.")),
+				  "blows a laden freighter apart just ahead of you."),
+				T("Hands-on mining",
+				  "At the helm of a miner (or an ore or capture tug) you carry an industrial mining laser; any other hull can have "
+				  "mining lasers fitted into its free space at a yard (F2), each one a grade up to 3 (a miner with one fitted "
+				  "carries the best, deep-core rig). Out of a fight, hold left mouse to fire the beam down your aim at a rock in "
+				  "reach: one of the main belt's asteroids, a named one like Psyche, a void station's drift rock, a shattered "
+				  "planetoid and its chunks, or an ice field's chunk. The face heats and fractures; what breaks loose is ground "
+				  "by the rock's kind (carbonaceous: water, hydrocarbons and some nickel-iron; stony: nickel-iron and titanium; "
+				  "metallic: nearly all nickel-iron; ice: water and volatiles; a void drift's rocks also carry its rarer ore) and "
+				  "goes into ore crates in your hold (I) as each fills. A better laser reaches further (2, 3.5, 5 km off the "
+				  "surface), cuts faster, breaks more at a time and follows the rare elements' veins. A rock's face is worked "
+				  "out after a few hundred to a few thousand tonnes, and stays so. Claims matter: a rock on a body your house "
+				  "holds a claim on is yours to cut, but one on a body a settlement stands on (an assay camp's rock, a mining "
+				  "colony) is its owner's, and cutting it under any other flag is claim jumping, a crime on your pilot's record. "
+				  "Sell the ore at an assay camp or any market that buys it.")),
 
 			cs::New<ManualChapter>("Ships: strike craft", "Fighters, interceptors, bombers, heavy fighters, recon and boarding craft", Keys(),
 				T("Space superiority fighter",

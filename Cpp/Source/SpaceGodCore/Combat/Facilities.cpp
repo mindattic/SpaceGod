@@ -181,6 +181,10 @@ namespace SpaceGod::Core
 			/*categories*/ std::nullopt, /*fittable:*/ true, /*compartment*/ std::nullopt, /*module*/ std::nullopt,
 			/*effect:*/ [](cs::Ref<CombatSpec> spec, cs::Ref<Loadout> /*l*/, int n) { spec->PropellantTonnes = cs::Math::Max(0.0, spec->PropellantTonnes + n * BulkFreighters::SphereTonnes); },
 			/*berths*/ 0, /*cargoTonnes*/ 0, /*holdRows*/ 0, /*classes:*/ &BulkFreighters::TrussClasses()));
+
+		// US-T264: a mining laser in the free space, for hands-on mining at the helm (HandMining). Last, so the kinds above keep
+		// their places in All (a save names a kind by its place there).
+		Register(FacilityKind::OfModule(MiningLaser, ModuleKind::MiningLaser, 1));
 	}
 
 	cs::List<cs::Ref<FacilityKind>>& FacilityKinds::All()

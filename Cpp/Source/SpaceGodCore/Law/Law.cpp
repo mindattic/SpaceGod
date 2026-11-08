@@ -38,6 +38,7 @@ namespace SpaceGod::Core
 			case CrimeKind::Smuggling: return "Smuggling";
 			case CrimeKind::Trespass: return "Trespass";
 			case CrimeKind::FleeingScan: return "FleeingScan";
+			case CrimeKind::ClaimJumping: return "ClaimJumping"; // US-T264
 		}
 		return "";
 	}
@@ -91,6 +92,7 @@ namespace SpaceGod::Core
 			case CrimeKind::Piracy: return std::make_tuple(20.0, 25.0, 150000.0);
 			case CrimeKind::Smuggling: return std::make_tuple(5.0, 8.0, 20000.0);
 			case CrimeKind::Trespass: return std::make_tuple(3.0, 5.0, 10000.0);
+			case CrimeKind::ClaimJumping: return std::make_tuple(4.0, 6.0, 15000.0); // US-T264
 			default: return std::make_tuple(6.0, 10.0, 30000.0);
 		}
 	}
@@ -103,6 +105,7 @@ namespace SpaceGod::Core
 			case CrimeKind::Piracy: return "piracy";
 			case CrimeKind::Smuggling: return "smuggling contraband";
 			case CrimeKind::Trespass: return "trespass";
+			case CrimeKind::ClaimJumping: return "claim jumping"; // US-T264
 			default: return "fleeing a scan";
 		}
 	}

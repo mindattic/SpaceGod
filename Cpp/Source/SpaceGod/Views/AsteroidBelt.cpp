@@ -11,6 +11,7 @@
 #include "Astro.h"
 #include "AsteroidField.h"
 #include "BodyCatalog.h"
+#include "Economy/HandMining.h"
 #include "ScaleModel.h"
 
 #include "Engine/Texture2D.h"
@@ -80,6 +81,8 @@ namespace SpaceGod::Views
 		auto belt = cs::New<AsteroidBelt>();
 		belt->app = app;
 		belt->Field = AsteroidField::Parse(asset->bytes);
+		// US-T264: the helm's mining beam cuts the belt's real rocks too (the Core has no data files of its own).
+		Core::HandMining::Belt() = belt->Field;
 
 		cs::List<float> packed(std::vector<float>(static_cast<size_t>(belt->Field->Count) * AsteroidField::GpuFloatsPerAsteroid));
 		belt->Field->PackGpu(packed);

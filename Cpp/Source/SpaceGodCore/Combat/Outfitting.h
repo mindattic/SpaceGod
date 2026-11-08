@@ -101,6 +101,11 @@ namespace SpaceGod::Core
 
 		/// <summary>A dumb-fire rocket pod, with its first twenty-four rockets: any missile mount takes one.</summary>
 		RocketPod,
+
+		/// <summary>US-T264: a mining laser fitted into the hull's free space (a facility, see <see cref="HandMining"/>): the
+		/// primary trigger out of a fight cuts asteroids into ore crates. Each one fitted is a grade, up to 3, on top of a
+		/// miner's own industrial laser (grade 2).</summary>
+		MiningLaser,
 	};
 	SPACEGODCORE_API const char* ToString(ModuleKind v);
 

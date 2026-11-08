@@ -238,6 +238,7 @@ namespace SpaceGod
 
 	void UnitySpaceApp::DrawTractorHud()
 	{
+		DrawMiningHud(); // US-T264: the mining beam's readout, drawn with the tractor beam's
 		if (tractorReadout.empty() || !ShowHud || ScreenCleared) return;
 		if (tractorStyle == nullptr)
 		{

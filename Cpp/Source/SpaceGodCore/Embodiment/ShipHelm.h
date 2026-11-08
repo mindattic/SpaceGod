@@ -10,6 +10,7 @@ namespace SpaceGod::Core
 {
 	class BattleUnit;
 	class HelmFlight;
+	class MiningBeam;
 	struct PilotState;
 	class Ship;
 	class World;
@@ -74,6 +75,10 @@ namespace SpaceGod::Core
 		/// <summary>The motion this helm flies (U.SPC-T449): given by whoever hosts the helm, which keeps it across frames.
 		/// With none, <see cref="Control"/> hands over only the trigger and the crosshair.</summary>
 		cs::Ref<HelmFlight> Flight;
+
+		/// <summary>US-T264: the hull's mining beam (see <see cref="HandMining"/>): made on the first frame flown, advanced by the
+		/// primary trigger out of a fight. Not saved.</summary>
+		cs::Ref<MiningBeam> Beam;
 
 		/// <summary>The control set the hull is flown with, fitted to its role (U.SPC-T449).</summary>
 		HelmControls Controls() const;

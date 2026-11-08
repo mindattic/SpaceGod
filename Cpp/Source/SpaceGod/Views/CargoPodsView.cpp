@@ -117,6 +117,25 @@ namespace SpaceGod::Views
 			Sprite(a, PixelSize(a, 11.0f), Color::white() * (0.6f * pulse));
 		}
 
+		// US-T264: the mining beam, a flickering orange-white cutting lance from the hull to the face it heats, sparks at the face.
+		DVec3 mineFrom, mineTo;
+		if (app->MiningBeamScene(mineFrom, mineTo))
+		{
+			auto a = app->Relative(mineFrom);
+			auto b = app->Relative(mineTo);
+			float flicker = 0.8f + 0.2f * Mathf::Sin(now * 37.0f) * Mathf::Sin(now * 11.0f);
+			Color cut(1.0f, 0.55f, 0.18f);
+			Ribbon(a, b, 12.0f, cut * (0.3f * flicker));
+			Ribbon(a, b, 4.0f, cut * (0.9f * flicker));
+			Ribbon(a, b, 1.5f, Color::white());
+			for (int k = 0; k < 4; k++)
+			{
+				float f = Mathf::Repeat(now * 2.3f + k * 0.37f, 1.0f);
+				Sprite(b, PixelSize(b, 6.0f + 14.0f * f), Color(1.0f, 0.8f, 0.4f) * (0.9f * (1 - f)));
+			}
+			Sprite(b, PixelSize(b, 18.0f * flicker), cut * 0.9f);
+		}
+
 		gone.Clear();
 		for (const auto& p : views.Keys())
 			if (pods == nullptr || p->Expired(jd) || !pods->Items.Contains(p)) gone.Add(p);
