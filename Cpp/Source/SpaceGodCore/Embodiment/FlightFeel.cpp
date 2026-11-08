@@ -86,6 +86,7 @@ namespace SpaceGod::Core
 	{
 		if (!(dt > 0)) return;
 		t += dt;
+		Last = in;
 		const auto& p = Profile;
 		// The afterburner lighting kicks the view wide for a moment, over the steady widening it holds while lit.
 		if (in.Boosting && !boostWas) ignition = 1;
@@ -111,6 +112,7 @@ namespace SpaceGod::Core
 
 	void FlightFeel::Settle(double dt)
 	{
+		Last = FlightFeelInput();
 		if (!(dt > 0)) return;
 		t += dt;
 		double k = 1 - std::exp(-dt * 4.0);

@@ -84,6 +84,12 @@ public:
 	/// what stopping costs; empty otherwise.</summary>
 	cs::String PilotFlightNote;
 
+	/// <summary>US-T242: what the helm flew last frame (its stick, afterburner, drives), for the flight sounds; read only.</summary>
+	const Core::HelmFlight& PilotHelmFlight() const { return *helmFlight; }
+
+	/// <summary>US-T242: the feel of the hull or seat flown (its role, mass and last frame's thrust), for the engine's sound.</summary>
+	const Core::FlightFeel& FlightFeelNow() const { return flightFeel; }
+
 private:
 	int pilotFrameBody = 0;
 

@@ -285,6 +285,12 @@ namespace SpaceGod::Audio
 		}
 	}
 
+	void GameAudio::SetLoopPitch(LoopId loop, float pitch)
+	{
+		if (Voice* v = FindLoop(loop))
+			if (UAudioComponent* c = v->Component.Get()) c->SetPitchMultiplier(FMath::Clamp(pitch, 0.2f, 4.0f));
+	}
+
 	void GameAudio::SetLoopPosition(LoopId loop, UnityCompat::Vector3 position)
 	{
 		if (Voice* v = FindLoop(loop))

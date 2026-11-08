@@ -107,11 +107,13 @@ namespace SpaceGod::Views
 		lastRoll = rollClockwise;
 		hasLast = true;
 		float full = fullAccel > 1e-6f ? fullAccel : 1.0f;
+		firing = 0;
 		for (auto& j : jets)
 		{
 			float push = (j.Pitch * accPitch + j.Yaw * accYaw + j.Roll * accRoll) / full;
 			float want = Mathf::Clamp01((push - DeadShare) / (1 - DeadShare));
 			j.Level = want > j.Level ? want : Mathf::Max(want, j.Level - FadePerS * dt);
+			firing = Mathf::Max(firing, want);
 			bool on = j.Level > 0.02f;
 			j.R->enabled = on;
 			if (!on)
@@ -137,6 +139,7 @@ namespace SpaceGod::Views
 			if (j.T) j.T->localScale = Vector3::zero();
 		}
 		hasLast = false;
+		firing = 0;
 		accPitch = accYaw = accRoll = 0;
 	}
 }

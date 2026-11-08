@@ -34,6 +34,9 @@ namespace SpaceGod::Views
 		/// <summary>Puts every jet away and forgets the last spin, so the next shown frame does not flare from a stale one.</summary>
 		void Hide();
 
+		/// <summary>US-T242: how hard the hardest-pushing jet fires this frame, 0..1 (0 while they are put away): the puffs heard.</summary>
+		float Firing() const { return firing; }
+
 	private:
 		struct Jet
 		{
@@ -48,6 +51,7 @@ namespace SpaceGod::Views
 		cs::List<Jet> jets;
 		float lastPitch = 0, lastYaw = 0, lastRoll = 0;
 		bool hasLast = false;
+		float firing = 0;
 		/// <summary>The spin's change, smoothed a little so one frame's jitter does not strobe the jets.</summary>
 		float accPitch = 0, accYaw = 0, accRoll = 0;
 

@@ -43,6 +43,8 @@ namespace SpaceGod::Audio
 		static LoopId StartLoop(const SoundClip& clip, AudioBus bus, float volume = 1.0f, bool positional = false,
 			UnityCompat::Vector3 position = UnityCompat::Vector3(), float minDistance = 50.0f, float maxDistance = 5000.0f);
 		static void SetLoopVolume(LoopId loop, float volume);
+		/// A loop's speed and pitch together (US-T242: an engine's note following its throttle), 1 as recorded.
+		static void SetLoopPitch(LoopId loop, float pitch);
 		static void SetLoopPosition(LoopId loop, UnityCompat::Vector3 position);
 		static void StopLoop(LoopId loop, float fadeSeconds = 0.1f);
 		/// Whether a loop is still playing (US-T243): false once stopped, or when its world went away under it.

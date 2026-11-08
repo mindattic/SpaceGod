@@ -106,6 +106,10 @@ namespace SpaceGod::Core
 		/// <summary>The shake this frame, as turns of the view: yaw, pitch and roll, degrees.</summary>
 		double ShakeYawDeg = 0, ShakePitchDeg = 0, ShakeRollDeg = 0;
 
+		/// <summary>US-T242: the last frame flown as <see cref="Step"/> was given it (all zero once <see cref="Settle"/> runs: off
+		/// the controls), for the engine's sound to follow.</summary>
+		FlightFeelInput Last;
+
 		/// <summary>Starts over on a new hull with its own feel.</summary>
 		void Reset(const FlightFeelProfile& profile);
 

@@ -38,6 +38,8 @@ namespace SpaceGod
 		return f != nullptr && f->Battle != nullptr && f->Battle->Flown.TryGetValue(f->Unit, stick) && stick != nullptr && stick->Drift.Active;
 	}
 
+	float UnitySpaceApp::PilotRcsFiring() const { return pilotRcs != nullptr ? pilotRcs->Firing() : 0.0f; }
+
 	void UnitySpaceApp::PilotLookBy(double rightDeg, double upDeg)
 	{
 		pilotLookOwedRight += rightDeg * Astro::Deg2Rad;

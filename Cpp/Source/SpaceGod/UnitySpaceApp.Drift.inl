@@ -11,6 +11,9 @@ public:
 	/// <summary>The flown hull is drifting this frame: the helm's, or a launched craft's seat.</summary>
 	bool PilotDrifting();
 
+	/// <summary>US-T242: how hard the flown hull's RCS jets fire this frame, 0..1 (0 with none shown): the puffs heard.</summary>
+	float PilotRcsFiring() const;
+
 	/// <summary>sg.Drift's hand on R (DriftCommand.cpp): the helm drifts as if R were held. Never set by play.</summary>
 	bool DriftHeldByScript = false;
 
