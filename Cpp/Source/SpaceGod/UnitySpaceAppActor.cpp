@@ -1,5 +1,6 @@
 #include "UnitySpaceAppActor.h"
 #include "Audio/InterfaceSounds.h" // US-T244
+#include "Audio/Music.h" // US-T243
 #include "UnitySpaceApp.h"
 #include "SessionAudio.h"
 #include "UnrealSpace.h"
@@ -151,6 +152,7 @@ void AUnitySpaceAppActor::Step(float RealDelta)
 		UnityScene::Sync();
 		Rendering::HullLighting::Tick(nullptr, RealDelta); // US-T172
 		Rendering::HyperspaceToll::Tick(nullptr, RealDelta); // US-T191
+		SpaceGod::Audio::Music::Poll(nullptr); // US-T243: the menu's score
 		ApplyCamera();
 		ApplyCursor();
 		ApplyAudio();
@@ -165,6 +167,7 @@ void AUnitySpaceAppActor::Step(float RealDelta)
 	}
 	if (App->enabled) App->Update();
 	SpaceGod::Audio::InterfaceSounds::Poll(App.get()); // US-T244: panels, toasts, hails, comms, contracts and credits heard, on every peer
+	SpaceGod::Audio::Music::Poll(App.get()); // US-T243: the adaptive score follows the game (local to this peer; reads the app, never writes it)
 	Input::Gamepad::MenuMode = App->PadMenusOpen(); // US-T250: the pad is the GUI's next frame while a menu or panel is up
 	// US-T44: the host's frame to its clients (the C# track's game mode Step: CoopPeer.HostEndUpdate after the Update).
 	if (Coop::CoopPeer* Peer = Coop::CoopPeer::Current(); Peer && Peer->IsHost()) Peer->HostEndUpdate(App.get());

@@ -45,6 +45,8 @@ namespace SpaceGod::Audio
 		static void SetLoopVolume(LoopId loop, float volume);
 		static void SetLoopPosition(LoopId loop, UnityCompat::Vector3 position);
 		static void StopLoop(LoopId loop, float fadeSeconds = 0.1f);
+		/// Whether a loop is still playing (US-T243): false once stopped, or when its world went away under it.
+		static bool LoopPlaying(LoopId loop);
 		/// Stops every sound playing (a scene change).
 		static void StopAll();
 

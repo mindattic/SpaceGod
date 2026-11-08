@@ -307,6 +307,12 @@ namespace SpaceGod::Audio
 		}
 	}
 
+	bool GameAudio::LoopPlaying(LoopId loop)
+	{
+		const Voice* v = FindLoop(loop);
+		return v != nullptr && v->Component.IsValid();
+	}
+
 	void GameAudio::StopAll()
 	{
 		for (Voice& v : S().voices)
