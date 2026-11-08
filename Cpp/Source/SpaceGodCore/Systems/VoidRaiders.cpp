@@ -191,7 +191,7 @@ namespace SpaceGod::Core
 			lost > 0 ? cs::Cat(": ", lost, " escort", lost == 1 ? "" : "s", " lost") : cs::String(),
 			hits > 0 ? cs::Cat(lost > 0 ? ", " : ": ", "the flagship hit ", hits, " time", hits == 1 ? "" : "s", " and its drive scrambled") : cs::String(),
 			downed > 0 ? cs::Cat(lost + hits > 0 ? "; " : ": ", downed, " of them wrecked") : cs::String());
-		space.Log(jd, text, where);
+		space.Log(jd, text, where, DeepSpaceEvent::VoidRaid); // US-T262: the galaxy map's danger mode marks it
 		Report(c, text, jd);
 		// A raid on record, and a ghost wreck counts twice: there is something to look at.
 		Learn(space, c, 1 + downed, jd);

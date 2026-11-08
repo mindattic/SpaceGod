@@ -485,10 +485,10 @@ namespace SpaceGod::Core
 
 	// ---------------------------------------------------------------- what happens out here
 
-	void DeepSpace::Log(double jd, const cs::String& text, GalacticPosition where)
+	void DeepSpace::Log(double jd, const cs::String& text, GalacticPosition where, int kind)
 	{
 		auto e = cs::New<DeepSpaceEvent>();
-		e->Jd = jd; e->Text = text; e->Where = where;
+		e->Jd = jd; e->Text = text; e->Where = where; e->Kind = kind;
 		events.Add(e);
 		if (events.Count() > MaxEvents) events.RemoveRange(0, events.Count() - MaxEvents);
 	}

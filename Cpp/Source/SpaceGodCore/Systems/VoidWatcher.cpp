@@ -225,7 +225,7 @@ namespace SpaceGod::Core
 		c->WatcherSigns++;
 		c->WatcherSign = text;
 		// The deep-space log keeps the player's every sign, and a crew's once it is well past the first unease.
-		if (hand || stage >= 2) space.Log(jd, text, c->PositionAt(jd));
+		if (hand || stage >= 2) space.Log(jd, text, c->PositionAt(jd), DeepSpaceEvent::WatcherSign); // US-T262: on the map's danger mode
 		Learn(space, c, jd);
 	}
 

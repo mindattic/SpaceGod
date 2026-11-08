@@ -112,5 +112,6 @@ namespace SpaceGod::Core
 
 	SG_SERIALIZE(SystemReport, "Unity.SpaceGod.Core.SystemReport",
 		SG_F(AsOfJd), SG_F(CarriedBy), SG_F(Carrier), SG_F(Gates), SG_F(Havens), SG_F(Headlines), SG_F(Holder),
-		SG_F(Markets), SG_F(PirateShips), SG_F(PortThreats), SG_F(ReceivedJd), SG_F(Source), SG_F(Wars))
+		SG_F(Markets), SG_F(PirateShips), SG_F(PortThreats), SG_F(ReceivedJd), SG_F(Source), SG_F(Wars),
+		SG_OPT(BioGlobules)) // US-T262: the Bio Mass loose there, absent from older saves
 }

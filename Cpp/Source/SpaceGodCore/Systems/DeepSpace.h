@@ -285,6 +285,12 @@ namespace SpaceGod::Core
 		double Jd = 0;
 		cs::String Text;
 		GalacticPosition Where;
+
+		/// <summary>What kind of line it is, for the galaxy map's danger mode (US-T262): one of the constants below.</summary>
+		int Kind = 0;
+
+		/// <summary>Anything else; a Void Raider strike (US-T124); a sign of the Watcher (US-T178).</summary>
+		static constexpr int Note = 0, VoidRaid = 1, WatcherSign = 2;
 	};
 
 	/// <summary>
@@ -463,7 +469,7 @@ namespace SpaceGod::Core
 		// ---------------------------------------------------------------- what happens out here
 
 		/// <summary>Notes <paramref name="text"/> in the deep-space log.</summary>
-		void Log(double jd, const cs::String& text, GalacticPosition where);
+		void Log(double jd, const cs::String& text, GalacticPosition where, int kind = DeepSpaceEvent::Note);
 
 		/// <summary>Leaves <paramref name="o"/> out here (the oldest wrecks, derelicts and distress calls lost when there are
 		/// more than <see cref="MaxObjects"/> of them; what lies along the routes, U.SPC-T421, stays).</summary>

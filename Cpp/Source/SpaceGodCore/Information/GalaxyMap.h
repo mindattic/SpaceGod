@@ -74,6 +74,9 @@ namespace SpaceGod::Core
 
 		PirateActivity Pirates = PirateActivity::None;
 
+		/// <summary>Live Bio Mass blooms loose there, as last heard (US-T262: the map's danger mode).</summary>
+		int BioGlobules = 0;
+
 		/// <summary>Its ports under a declared blockade or a siege, as last heard.</summary>
 		cs::List<PortThreat> Threats;
 

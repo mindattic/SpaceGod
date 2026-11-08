@@ -121,6 +121,7 @@ namespace SpaceGod::Core
 			m->Threats.AddRange(r->PortThreats);
 			m->PirateShips = r->PirateShips;
 			m->Havens = r->Havens;
+			m->BioGlobules = r->BioGlobules; // US-T262
 			if (log != nullptr)
 				for (const auto& c : *log)
 					if (c->Purpose == VoyagePurpose::Raid && c->Jd <= r->AsOfJd && c->Jd > r->AsOfJd - FlowWindowDays && c->Link->Other(c->From) == m->System)

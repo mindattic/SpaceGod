@@ -203,7 +203,8 @@ namespace SpaceGod::Core
 		SG_F(Band), SG_F(LegJd), SG_F(Projector), SG_F(UntilJd), SG_F(Where))
 
 	SG_SERIALIZE(DeepSpaceEvent, "Unity.SpaceGod.Core.DeepSpaceEvent",
-		SG_F(Jd), SG_F(Text), SG_F(Where))
+		SG_F(Jd), SG_F(Text), SG_F(Where),
+		SG_OPT(Kind)) // US-T262: what kind of line, absent from older saves
 
 	SG_SERIALIZE(DeepSpaceObject, "Unity.SpaceGod.Core.DeepSpaceObject",
 		SG_F(ExpiresJd), SG_F(Gm), SG_F(Heard), SG_F(HomeName), SG_F(IceTonnes), SG_F(Kind), SG_F(LostBy),

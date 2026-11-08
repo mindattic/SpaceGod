@@ -3,6 +3,7 @@
 #include "Information/News.h"
 
 #include "BodyDefinition.h"
+#include "Combat/BioMass.h" // US-T262
 #include "Combat/CombatState.h"
 #include "Combat/Diplomacy.h"
 #include "Combat/War.h"
@@ -67,6 +68,7 @@ namespace SpaceGod::Core
 		r->Wars.AddRange(Wars);
 		r->PirateShips = PirateShips;
 		r->Havens = Havens;
+		r->BioGlobules = BioGlobules;
 		return r;
 	}
 
@@ -124,6 +126,9 @@ namespace SpaceGod::Core
 		for (const auto& ship : world->Fleet->Ships())
 			if (!ship->Destroyed && !ship->IsEscort() && !ship->Derelict && ship->Faction != nullptr && ship->Faction->IsPirate && ship->Combat != nullptr && ship->Combat->Armed())
 				r->PirateShips++;
+		if (world->BioMass != nullptr) // US-T262: the blooms loose there, for the galaxy map's danger mode
+			for (const auto& g : world->BioMass->Globules)
+				if (g->Alive() && cs::Double::IsNaN(g->ExitedJd)) r->BioGlobules++;
 		const auto& factions = world->Polities->Factions();
 		for (int i = 0; i < factions.Count(); i++)
 			for (int j = i + 1; j < factions.Count(); j++)

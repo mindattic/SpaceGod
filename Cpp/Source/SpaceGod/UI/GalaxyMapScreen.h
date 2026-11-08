@@ -12,6 +12,8 @@
 #include "UI/UiStyle.h"
 
 #include <vector> // US-T47
+#include <unordered_map> // US-T262
+#include <unordered_set>
 
 namespace SpaceGod
 {
@@ -23,6 +25,7 @@ namespace SpaceGod::Core
 	class StarSystem;
 	class GalaxyMapModel;
 	class MapLink;
+	class MapSystem; // US-T262
 	class Faction;
 	class Ship;
 	class PolityReport;
@@ -80,6 +83,81 @@ namespace SpaceGod::UI
 		void CoopSmokeProduction();
 		void CoopSmokeExplore(const cs::Ref<Core::StarSystem>& target);
 		void CoopSmokeGift(const cs::Ref<Core::Faction>& them);
+
+		// ---------------------------------------------------------------- US-T262: map modes (GalaxyMapScreen.Modes.cpp)
+
+		/// What the map is showing (US-T262): Political is the ownership, traffic, fronts and raiders it always showed; Trade
+		/// tints each system by the best price the player knows there for one good; Exploration shows what is charted,
+		/// visited, heard from and the undiscovered frontier just past the charts; Danger the raiders, the Bio Mass, the Void
+		/// Raiders' strikes and the Watcher's signs. Only what the player could know, as old as the news of it; the view
+		/// alone, so nothing is sent in co-op. Remembered in the profile (galaxyMapMode).
+		enum class MapMode : int { Political, Trade, Exploration, Danger };
+
+		MapMode Mode() const { return mode; }
+		void SetMode(MapMode m);
+
+	private:
+		MapMode mode = MapMode::Political;
+		bool modeLoaded = false;
+		/// The good the Trade mode prices (a Core::Good), and whether it shows where to sell it rather than buy it.
+		int tradeGood = 0;
+		bool tradeSell = false;
+
+		/// One system as the mode shows it, worked out with the model.
+		struct ModeLook
+		{
+			// Trade: the best known buy price (lowest, where some is to spare) and sell price (highest, where it is wanted),
+			// where, and how old that word is. NaN when not known.
+			double Buy = cs::Double::NaN, Sell = cs::Double::NaN, BuyAge = 0, SellAge = 0;
+			cs::String BuyAt, SellAt;
+			int Sheets = 0; // markets priced there
+			// Exploration.
+			bool Visited = false;
+			// Danger.
+			int VoidRaids = 0, WatcherSigns = 0;
+			double Danger = 0;
+		};
+		std::unordered_map<const Core::StarSystem*, ModeLook> looks;
+
+		/// A Void Raider strike or a Watcher sign out between the stars the player has word of, for the Danger mode.
+		struct VoidMark
+		{
+			Core::DVec3 Ly;
+			int Kind = 0;
+			double Jd = 0;
+			cs::String Text;
+		};
+		std::vector<VoidMark> voidMarks;
+
+		/// Systems the player has been in this session (with those whose markets they have seen in port).
+		std::unordered_set<const Core::StarSystem*> visited;
+
+		/// Undiscovered stars just past the charts (Exploration): detected, not yet found; kept until a discovery changes them.
+		std::vector<Core::DVec3> frontier;
+		int frontierFor = -1;
+		std::unordered_set<cs::String> voidStationNames;
+
+		void LoadMode();
+		void SaveMode();
+		void BuildLooks(double jd);
+		void BuildFrontier();
+		const ModeLook* LookOf(const cs::Ref<Core::StarSystem>& s) const;
+		Color ModeTint(const cs::Ref<Core::MapSystem>& m, bool& draw) const;
+		cs::String ModeSub(const cs::Ref<Core::MapSystem>& m) const;
+		void DrawModeTabs(Rect r);
+		void DrawModeUnderlay(Rect local, double jd);
+		void DrawModeLegend(Rect r, double jd);
+		void DrawModeDetail(float& y, float x, float w, const cs::Ref<Core::MapSystem>& m, double jd);
+		void LegendHelp(Rect r, float x, float w);
+		static cs::String ModeName(MapMode m);
+		static constexpr const char* ModeSetting = "galaxyMapMode";
+		static constexpr const char* GoodSetting = "galaxyMapGood";
+		static constexpr Color VisitedColor = Color(0.4f, 0.95f, 0.55f);
+		static constexpr Color HeardColor = Color(0.45f, 0.7f, 1.0f);
+		static constexpr Color VoidColor = Color(0.75f, 0.5f, 1.0f);
+		static constexpr Color FrontierColor = Color(1.0f, 0.85f, 0.45f);
+		static constexpr Color BioColor = Color(0.55f, 0.95f, 0.3f);
+		static constexpr Color WatcherColor = Color(0.8f, 0.45f, 1.0f);
 
 	private:
 		static bool CoopSendsText(UnitySpaceApp* app, const cs::String& verb, const cs::String& args);

@@ -118,6 +118,9 @@ namespace SpaceGod::Core
 		/// <summary>Armed raider hulls about the source, and the pirate havens known there (U.SPC-T103).</summary>
 		int PirateShips = 0, Havens = 0;
 
+		/// <summary>Live Bio Mass blooms loose in the source system, as they stood (US-T262: the galaxy map's danger mode).</summary>
+		int BioGlobules = 0;
+
 		/// <summary>Whether the report has <paramref name="a"/> and <paramref name="b"/> at war.</summary>
 		bool AtWar(const cs::Ref<Faction>& a, const cs::Ref<Faction>& b) const;
 

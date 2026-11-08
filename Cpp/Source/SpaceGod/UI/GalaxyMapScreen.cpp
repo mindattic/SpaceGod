@@ -45,6 +45,7 @@ namespace SpaceGod::UI
 		selectedStar.reset();
 		fitted = false;
 		builtAt = -10.0f;
+		if (!modeLoaded) LoadMode(); // US-T262: the mode this profile last used
 	}
 
 	void GalaxyMapScreen::Draw()
@@ -64,6 +65,7 @@ namespace SpaceGod::UI
 			builtAt = Time::unscaledTime;
 			builtFor = app->ActiveSystem;
 			GatherChartStars();
+			BuildLooks(jd); // US-T262: what the map modes show
 		}
 		if (selected == nullptr || model->Of(selected) == nullptr) selected = app->ActiveSystem;
 
@@ -271,8 +273,11 @@ namespace SpaceGod::UI
 			Disc(f, 3, Color(Dim.r, Dim.g, Dim.b, 0.25f));
 		}
 
+		bool political = mode == MapMode::Political; // US-T262: the other modes draw their own wash instead
+		if (!political) DrawModeUnderlay(local, jd);
+
 		// Territory: a wash of the holder's colour round each system it holds, every other holder's share a smaller one.
-		if (showTerritory)
+		if (showTerritory && political)
 			for (const auto& m : model->Systems)
 			{
 				if (!m->Known() || m->Holdings.Count() == 0) continue;
@@ -305,15 +310,16 @@ namespace SpaceGod::UI
 			bool routed = l->Link != nullptr && onRoute.Contains(l->Link);
 			if (!l->Known()) Dashed(a, b, Color(Unknown.r, Unknown.g, Unknown.b, 0.4f), 1.0f, 4, 6);
 			else Line(a, b, Color(0.45f, 0.75f, 0.95f, 0.45f), 1.4f);
-			if (showFlows && l->Crossings > 0)
+			if (showFlows && political && l->Crossings > 0)
 			{
 				float w = 2 + 7 * static_cast<float>(l->Flow);
 				Line(a, b, Color(FlowColor.r, FlowColor.g, FlowColor.b, 0.28f), w);
 				FlowDots(a, b, l);
 			}
 			if (routed) Line(a, b, Color(Accent.r, Accent.g, Accent.b, 0.95f), 3.0f);
-			if (showFronts && l->WarFront) Dashed(a, b, FrontColor, 3.5f, 10, 6);
-			if (showFronts && l->Shut())
+			bool fronts = showFronts && (political || mode == MapMode::Danger);
+			if (fronts && l->WarFront) Dashed(a, b, FrontColor, 3.5f, 10, 6);
+			if (fronts && l->Shut())
 			{
 				// A bar across the line at the shut end.
 				if (l->ShutAtA) Barrier(a, b);
@@ -358,16 +364,16 @@ namespace SpaceGod::UI
 			if (m->Here) Ring(p, 13, Accent, 2.0f);
 			if (m->System == selected) Brackets(p, 17, Accent);
 			else if (m->System == hovered) Brackets(p, 15, Color(1, 1, 1, 0.6f));
-			if (showFronts && (m->Contested || m->Threats.Count() > 0)) Ring(p, 20 + 2 * Mathf::Sin(Time::unscaledTime * 4), FrontColor, 2.0f);
+			if (showFronts && (political || mode == MapMode::Danger) && (m->Contested || m->Threats.Count() > 0)) Ring(p, 20 + 2 * Mathf::Sin(Time::unscaledTime * 4), FrontColor, 2.0f);
 			// Changed hands lately, as the news has it (US-T190): a slow ring in the new holder's colour, fading with the news.
-			if (showTerritory && m->ChangedWithin(jd, Territory::RecentDays))
+			if (showTerritory && political && m->ChangedWithin(jd, Territory::RecentDays))
 			{
 				float fresh = 1.0f - static_cast<float>((jd - m->HolderChangedJd) / Territory::RecentDays);
 				float pulse = 0.5f + 0.5f * Mathf::Sin(Time::unscaledTime * 2.5f);
 				auto ringColor = m->Holder != nullptr ? Tint(m->Holder->Color, 1) : UiStyle::Warning;
 				Ring(p, 25 + 5 * pulse, Color(ringColor.r, ringColor.g, ringColor.b, (0.35f + 0.5f * pulse) * (0.35f + 0.65f * fresh)), 2.0f);
 			}
-			if (showPirates && m->Pirates != PirateActivity::None)
+			if (showPirates && (political || mode == MapMode::Danger) && m->Pirates != PirateActivity::None)
 			{
 				float size = m->Pirates == PirateActivity::High ? 15 : 11;
 				auto at = p + Vector2(-20, 12);
@@ -379,6 +385,14 @@ namespace SpaceGod::UI
 
 			cs::String name = m->System->Name == "Sol System" ? cs::String("SOL") : cs::Strings::ToUpperInvariant(m->System->Name);
 			Label(p + Vector2(12, -20), name, m->Here ? Accent : m->Known() ? Color::white() : Unknown, false);
+			if (!political)
+			{
+				// US-T262: the mode's own line under the name.
+				bool tinted = false;
+				auto tint = ModeTint(m, tinted);
+				Label(p + Vector2(12, -5), ModeSub(m), tinted ? Color(tint.r, tint.g, tint.b, 0.95f) : Dim, true);
+				continue;
+			}
 			cs::String sub = m->Here ? cs::String("you are here")
 				: !m->Known() ? cs::String("no news")
 				: (m->Holder != nullptr ? cs::Cat(m->Holder->Name, "  ·  ") : cs::String("unclaimed  ·  ")) + Age(m->AgeDays);
@@ -437,7 +451,8 @@ namespace SpaceGod::UI
 	void GalaxyMapScreen::DrawHeader(Rect r, double jd)
 	{
 		GUI::Box(r, GUIContent::none(), Panel());
-		GUI::Label(Rect(r.x + 14, r.y + 7, 220, 20), "GALAXY MAP", title);
+		GUI::Label(Rect(r.x + 14, r.y + 7, 130, 20), "GALAXY MAP", title);
+		DrawModeTabs(r); // US-T262
 		int known = 0;
 		for (const auto& m : model->Systems)
 			if (m->Known()) known++;
@@ -465,6 +480,11 @@ namespace SpaceGod::UI
 
 	void GalaxyMapScreen::DrawLegend(Rect r)
 	{
+		if (mode != MapMode::Political)
+		{
+			DrawModeLegend(r, model->Jd); // US-T262: the mode's own legend
+			return;
+		}
 		GUI::Box(r, GUIContent::none(), Panel());
 		float y = r.y + 10;
 		float x = r.x + 12, w = r.width - 24;
@@ -535,11 +555,7 @@ namespace SpaceGod::UI
 			Line(y, x, w, cs::Cat("■  ", m->Holder->Name, "   ", held, (held == 1 ? " system" : " systems"), trend), Tint(m->Holder->Color, 1));
 		}
 
-		auto old = GUI::contentColor;
-		GUI::contentColor = Dim;
-		GUI::Label(Rect(x, r.yMax() - 92, w, 84),
-			"Click a star to inspect it, double-click to travel.\nAt the helm: plot an FTL course to any star.\nDrag to turn, shift-drag to pan, wheel to zoom.\n[ or Esc closes the map.", small);
-		GUI::contentColor = old;
+		LegendHelp(r, x, w);
 	}
 
 	void GalaxyMapScreen::DrawDetail(Rect r, double jd)
@@ -582,6 +598,7 @@ namespace SpaceGod::UI
 			DrawFtlSection(y, x, w, FtlTarget::OfStar(s));
 		}
 		y += 4;
+		if (mode != MapMode::Political) DrawModeDetail(y, x, w, m, jd); // US-T262: what the mode knows of it
 
 		if (!m->Known())
 		{
