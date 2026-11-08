@@ -3,6 +3,11 @@
 
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "HAL/PlatformProcess.h" // US-T248
+#include "IPAddress.h" // US-T248
+#include "Misc/CommandLine.h" // US-T248
+#include "Misc/Parse.h" // US-T248
+#include "SocketSubsystem.h" // US-T248
 #include "UObject/WeakObjectPtrTemplates.h"
 
 // Windows' rpcndr.h defines `small` as a macro (UnityGui.h undefines it, but an Unreal header may bring it back).
@@ -15,6 +20,7 @@
 #include "Difficulty.h" // US-T253
 #include "GameLaunch.h"
 #include "GameSettingsHost.h"
+#include "Persistence/Profiles.h" // US-T248: the co-op name and recent hosts
 #include "Persistence/SaveGame.h"
 #include "Settings/GameSetting.h" // US-T253
 #include "Shared/Profiles/ProfileStore.h"
@@ -52,6 +58,58 @@ namespace SpaceGod::UI
 			sceneWorldAlive.Reset();
 			GuiHost::Unregister(menu.get());
 			menu->OnDestroy();
+		}
+
+		// ---------------------------------------------------------------- co-op (US-T248)
+
+		constexpr int MaxCoopName = 32;
+		constexpr int MaxAddress = 255;
+
+		/// An address a client travel can take: a host name or IP with an optional :port, and nothing that would read as
+		/// a URL's options or path (? # / \) or split the recent hosts (|); no spaces or quotes.
+		bool IsValidAddress(const cs::String& a)
+		{
+			if (a.empty() || static_cast<int>(a.size()) > MaxAddress) return false;
+			for (char c : a)
+				if (static_cast<unsigned char>(c) <= ' ' || c == '?' || c == '#' || c == '/' || c == '\\' || c == '|' || c == '"') return false;
+			return true;
+		}
+
+		/// The UDP port a listen server opens: -Port=<n> on the command line, else the engine's default (7777).
+		int ListenPort()
+		{
+			int port = 0;
+			if (FParse::Value(FCommandLine::Get(), TEXT("Port="), port) && port > 0) return port;
+			return FURL::UrlConfig.DefaultPort;
+		}
+
+		/// This machine's own addresses (not loopback or link-local), for the host to give the players joining.
+		cs::List<cs::String> LocalAddresses()
+		{
+			cs::List<cs::String> found;
+			ISocketSubsystem* sockets = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM);
+			if (sockets == nullptr) return found;
+			TArray<TSharedPtr<FInternetAddr>> addresses;
+			if (sockets->GetLocalAdapterAddresses(addresses))
+			{
+				for (const TSharedPtr<FInternetAddr>& a : addresses)
+				{
+					if (!a.IsValid()) continue;
+					FString text = a->ToString(false);
+					if (text.IsEmpty() || text.StartsWith(TEXT("127.")) || text == TEXT("::1") || text.StartsWith(TEXT("fe80"), ESearchCase::IgnoreCase)
+						|| text.StartsWith(TEXT("169.254."))) continue;
+					cs::String one(TCHAR_TO_UTF8(*text));
+					if (!found.Contains(one)) found.Add(one);
+				}
+			}
+			if (found.Count() == 0)
+			{
+				bool canBindAll = false;
+				TSharedRef<FInternetAddr> host = sockets->GetLocalHostAddr(*GLog, canBindAll);
+				FString text = host->ToString(false);
+				if (!text.IsEmpty() && !text.StartsWith(TEXT("0.0.0.0"))) found.Add(cs::String(TCHAR_TO_UTF8(*text)));
+			}
+			return found;
 		}
 	}
 
@@ -110,6 +168,13 @@ namespace SpaceGod::UI
 		skyCamera = Camera::main();
 		Views::Starfield::Create(transform, 9000, 7, true);
 		ReadProfile();
+		// US-T248: back from a join that never connected, or from a host that went away: say why, on the Join page.
+		if (!GameLaunch::JoinFailure.empty())
+		{
+			Open(Page::Join);
+			notice = cs::Cat("Could not reach the host, or it went away: ", GameLaunch::JoinFailure);
+			GameLaunch::JoinFailure.clear();
+		}
 	}
 
 	void MainMenu::Update()
@@ -155,6 +220,88 @@ namespace SpaceGod::UI
 		notice.clear();
 		deleteArmed.clear();
 		ReadProfile();
+		if (p == Page::Host || p == Page::Join) ReadCoop(); // US-T248
+		if (p == Page::Host) localAddresses = LocalAddresses();
+	}
+
+	// ---------------------------------------------------------------- co-op (US-T248)
+
+	void MainMenu::ReadCoop()
+	{
+		recentHosts = cs::List<cs::String>();
+		cs::String saved;
+		cs::String hosts;
+		try
+		{
+			auto profile = ActiveProfile::Current();
+			saved = GameSettings::Setting(profile, GameLaunch::CoopNameKey);
+			hosts = GameSettings::Setting(profile, GameLaunch::RecentHostsKey);
+		}
+		catch (const std::exception& e)
+		{
+			notice = cs::Cat("Could not read the profile's co-op settings: ", e.what());
+		}
+		coopName = !saved.empty() ? saved
+			: !GameLaunch::CoopName.empty() ? GameLaunch::CoopName
+			: cs::String(TCHAR_TO_UTF8(FPlatformProcess::UserName()));
+		for (const auto& h : cs::Strings::Split(hosts, '|'))
+		{
+			cs::String one = cs::Strings::Trim(h);
+			if (IsValidAddress(one) && !recentHosts.Contains(one) && recentHosts.Count() < GameLaunch::MaxRecentHosts) recentHosts.Add(one);
+		}
+	}
+
+	void MainMenu::KeepCoopName()
+	{
+		cs::String name = cs::Strings::Trim(coopName);
+		if (static_cast<int>(name.size()) > MaxCoopName) name = name.substr(0, MaxCoopName);
+		for (char& c : name)
+			if (static_cast<unsigned char>(c) < ' ') c = ' ';
+		GameLaunch::CoopName = name; // CoopPeer::NameFromCommandLine (a -CoopName= on the command line still wins)
+		try
+		{
+			auto profile = ActiveProfile::Current();
+			if (GameSettings::Setting(profile, GameLaunch::CoopNameKey) != name) GameSettings::SetSetting(profile, GameLaunch::CoopNameKey, name);
+		}
+		catch (const std::exception& e)
+		{
+			Debug::LogWarning(cs::Cat("[Unity.SpaceGod] The co-op name could not be kept in the profile: ", e.what()));
+		}
+	}
+
+	void MainMenu::WriteRecentHosts()
+	{
+		try
+		{
+			GameSettings::SetSetting(ActiveProfile::Current(), GameLaunch::RecentHostsKey, cs::Strings::Join("|", recentHosts));
+		}
+		catch (const std::exception& e)
+		{
+			notice = cs::Cat("Could not keep the recent hosts: ", e.what());
+		}
+	}
+
+	void MainMenu::JoinHost(const cs::String& address)
+	{
+		cs::String a = cs::Strings::Trim(address);
+		if (!IsValidAddress(a))
+		{
+			notice = "A host address is a name or an IP, with :port when it is not 7777 (no spaces, quotes, ? # / \\ or |).";
+			return;
+		}
+		KeepCoopName();
+		recentHosts.Remove(a);
+		recentHosts.Insert(0, a);
+		while (recentHosts.Count() > GameLaunch::MaxRecentHosts) recentHosts.RemoveAt(recentHosts.Count() - 1);
+		WriteRecentHosts();
+		notice = cs::Cat("Joining ", a, " ...");
+		GameLaunch::Join(a);
+	}
+
+	void MainMenu::ForgetHost(const cs::String& address)
+	{
+		if (!recentHosts.Remove(address)) return;
+		WriteRecentHosts();
 	}
 
 	void MainMenu::CreateProfile()
@@ -208,11 +355,13 @@ namespace SpaceGod::UI
 			return;
 		}
 		// US-T255: each page eases in as it opens (Help fades itself in).
-		static const char* const pageIds[] = { "menu.main", "menu.load", "menu.profiles", "menu.assets", nullptr };
-		UiMotion::Scope motion(pageIds[Mathf::Clamp(static_cast<int>(page), 0, 4)]);
+		static const char* const pageIds[] = { "menu.main", "menu.load", "menu.profiles", "menu.assets", nullptr, "menu.host", "menu.join" };
+		UiMotion::Scope motion(pageIds[Mathf::Clamp(static_cast<int>(page), 0, 6)]);
 		switch (page)
 		{
 			case Page::Load: DrawLoad(); break;
+			case Page::Host: DrawHost(); break; // US-T248
+			case Page::Join: DrawJoin(); break; // US-T248
 			case Page::Profiles: DrawProfiles(); break;
 			case Page::AssetLibraries: DrawAssetLibraries(); break;
 			case Page::Help:
@@ -230,7 +379,7 @@ namespace SpaceGod::UI
 
 	void MainMenu::DrawMain()
 	{
-		const float w = 380, h = 564;
+		const float w = 380, h = 612;
 		auto r = Centred(w, h);
 		GUI::Label(Rect(r.x, r.y - 70, w, 48), "UNITYSPACE", heading);
 		GUI::Box(r, GUIContent::none(), panel);
@@ -251,26 +400,29 @@ namespace SpaceGod::UI
 		GUI::enabled = enabled && saveNames.Count() > 0;
 		if (GUI::Button(Rect(r.x + 20, y + 96, bw, 38), "Load Game", button)) Open(Page::Load);
 		GUI::enabled = enabled;
-		if (GUI::Button(Rect(r.x + 20, y + 144, bw, 38), "Profiles", button)) Open(Page::Profiles);
-		if (GUI::Button(Rect(r.x + 20, y + 192, bw, 38), "Settings", button)) settings->OpenSettings();
+		// US-T248: co-op from the menu, with no -CoopHost / -CoopJoin= or console needed.
+		float half = (bw - 10) * 0.5f;
+		if (GUI::Button(Rect(r.x + 20, y + 144, half, 38), "Host Co-op", button)) Open(Page::Host);
+		if (GUI::Button(Rect(r.x + 30 + half, y + 144, half, 38), "Join Co-op", button)) Open(Page::Join);
+		if (GUI::Button(Rect(r.x + 20, y + 192, bw, 38), "Profiles", button)) Open(Page::Profiles);
+		if (GUI::Button(Rect(r.x + 20, y + 240, bw, 38), "Settings", button)) settings->OpenSettings();
 		// US-T246: Credits beside Help.
 		const float helpW = (bw - 10) * 0.5f;
-		if (GUI::Button(Rect(r.x + 20, y + 240, helpW, 38), "Help", button)) Open(Page::Help);
-		if (GUI::Button(Rect(r.x + 30 + helpW, y + 240, helpW, 38), "Credits", button))
+		if (GUI::Button(Rect(r.x + 20, y + 288, helpW, 38), "Help", button)) Open(Page::Help);
+		if (GUI::Button(Rect(r.x + 30 + helpW, y + 288, helpW, 38), "Credits", button))
 		{
 			credits->Restart();
 			Open(Page::Credits);
 		}
-		if (GUI::Button(Rect(r.x + 20, y + 288, bw, 38), "Asset Library POC", button)) Open(Page::AssetLibraries);
+		if (GUI::Button(Rect(r.x + 20, y + 336, bw, 38), "Asset Library POC", button)) Open(Page::AssetLibraries);
 		// US-T88: a new game straight into the dogfight demo, at a light or a heavy fighter's helm (-dogfight / -dogfight-heavy).
-		float half = (bw - 10) * 0.5f;
-		if (GUI::Button(Rect(r.x + 20, y + 336, half, 38), "Dogfight Demo", button)) GameLaunch::DogfightDemo(false);
-		if (GUI::Button(Rect(r.x + 30 + half, y + 336, half, 38), "Dogfight (Heavy)", button)) GameLaunch::DogfightDemo(true);
+		if (GUI::Button(Rect(r.x + 20, y + 384, half, 38), "Dogfight Demo", button)) GameLaunch::DogfightDemo(false);
+		if (GUI::Button(Rect(r.x + 30 + half, y + 384, half, 38), "Dogfight (Heavy)", button)) GameLaunch::DogfightDemo(true);
 		// US-T147: a new game straight into the showcase tour, every feature in turn (sg.Tour waits for the game it starts).
 		// US-T254: the guided tutorial, played by doing, any time (a new game with it running).
-		if (GUI::Button(Rect(r.x + 20, y + 384, half, 38), "Tutorial", button)) GameLaunch::Tutorial();
-		if (GUI::Button(Rect(r.x + 30 + half, y + 384, half, 38), "Showcase Tour", button) && GEngine) GEngine->Exec(nullptr, TEXT("sg.Tour"));
-		if (GUI::Button(Rect(r.x + 20, y + 432, bw, 38), "Quit", button)) Quit();
+		if (GUI::Button(Rect(r.x + 20, y + 432, half, 38), "Tutorial", button)) GameLaunch::Tutorial();
+		if (GUI::Button(Rect(r.x + 30 + half, y + 432, half, 38), "Showcase Tour", button) && GEngine) GEngine->Exec(nullptr, TEXT("sg.Tour"));
+		if (GUI::Button(Rect(r.x + 20, y + 480, bw, 38), "Quit", button)) Quit();
 	}
 
 	void MainMenu::DrawLoad()
@@ -359,6 +511,149 @@ namespace SpaceGod::UI
 			if (submit) e.Use();
 		}
 		if (!notice.empty()) GUI::Label(Rect(r.x + 20, y + 58, w - 170, 36), notice, small);
+		if (GUI::Button(Rect(r.xMax() - 130, r.yMax() - 46, 110, 30), "Back", button)) Open(Page::Main);
+	}
+
+	// ---------------------------------------------------------------- co-op pages (US-T248)
+
+	float MainMenu::DrawCoopName(const Rect& r, float y)
+	{
+		GUI::Label(Rect(r.x + 20, y + 4, 110, 20), "Your name", text);
+		GUI::SetNextControlName("CoopName");
+		coopName = GUI::TextField(Rect(r.x + 130, y, r.width - 150, 28), coopName, MaxCoopName, field);
+		return 36;
+	}
+
+	void MainMenu::DrawHost()
+	{
+		const float w = 640;
+		const int shown = Mathf::Clamp(saveNames.Count(), 1, 8);
+		float listH = shown * RowH;
+		float addrH = Mathf::Max(1, localAddresses.Count()) * 18.0f;
+		float h = 300 + addrH + listH;
+		auto r = Centred(w, h);
+		GUI::Box(r, GUIContent::none(), panel);
+		GUI::Label(Rect(r.x + 20, r.y + 14, w - 40, 22), "HOST CO-OP", title);
+		GUI::Label(Rect(r.x + 20, r.y + 38, w - 40, 32),
+			cs::Cat("Start a game other players can join: they pick Join Co-op on their main menu and type one of the addresses below. ",
+				"UDP port ", ListenPort(), " must be reachable (forward it on your router to play over the internet)  ·  Esc to go back"), small);
+
+		float y = r.y + 78;
+		y += DrawCoopName(r, y);
+
+		GUI::Label(Rect(r.x + 20, y, w - 40, 20), "Your addresses", text);
+		y += 22;
+		if (localAddresses.Count() == 0) GUI::Label(Rect(r.x + 30, y, w - 60, 18), "None found (not on a network?); a player on this machine can join 127.0.0.1", small);
+		for (int i = 0; i < localAddresses.Count(); i++)
+		{
+			cs::String shownAddress = ListenPort() == 7777 ? localAddresses[i] : cs::Cat(localAddresses[i], ":", ListenPort());
+			GUI::Label(Rect(r.x + 30, y + i * 18, w - 60, 18), shownAddress, small);
+		}
+		y += addrH + 10;
+
+		float half = (w - 50) * 0.5f;
+		if (GUI::Button(Rect(r.x + 20, y, half, 34), cs::Cat("Host New Game  ·  ", Difficulty::Name()), buttonActive))
+		{
+			KeepCoopName();
+			GameLaunch::Host(cs::String());
+		}
+		bool enabled = GUI::enabled;
+		GUI::enabled = enabled && latest != nullptr;
+		if (GUI::Button(Rect(r.x + 30 + half, y, half, 34), "Host Continue", button) && latest != nullptr)
+		{
+			KeepCoopName();
+			GameLaunch::Host(latest->Slot);
+		}
+		GUI::enabled = enabled;
+		y += 44;
+
+		GUI::Label(Rect(r.x + 20, y, w - 40, 20), "Or host a save", text);
+		y += 22;
+		auto view = Rect(r.x + 20, y, w - 40, listH + 2);
+		auto content = Rect(0, 0, view.width - (saveNames.Count() > 8 ? 18 : 0), Mathf::Max(1, saveNames.Count()) * RowH);
+		hostScroll = GUI::BeginScrollView(view, hostScroll, content);
+		if (saveNames.Count() == 0) GUI::Label(Rect(6, 4, content.width, 18), "This profile has no saves.", small);
+		cs::List<int> order;
+		for (int i = 0; i < saveNames.Count(); i++) order.Add(i);
+		order.Sort([this](int a, int b) { return saveHeaders[b]->SavedUtc.CompareTo(saveHeaders[a]->SavedUtc); });
+		for (int n = 0; n < order.Count(); n++)
+		{
+			int i = order[n];
+			cs::String slot = saveNames[i];
+			auto hdr = saveHeaders[i];
+			auto row0 = Rect(0, n * RowH, content.width, RowH - 2);
+			GUI::Box(row0, GUIContent::none(), row);
+			GUI::Label(Rect(row0.x + 6, row0.y + 3, 150, 20), UnitySpaceApp::SaveTitle(slot, hdr), text);
+			GUI::Label(Rect(row0.x + 160, row0.y + 4, row0.width - 250, 20), UnitySpaceApp::DescribeSave(hdr), small);
+			if (GUI::Button(Rect(row0.xMax() - 78, row0.y + 2, 74, 20), "Host", buttonActive))
+			{
+				KeepCoopName();
+				GameLaunch::Host(slot);
+			}
+		}
+		GUI::EndScrollView();
+
+		if (!notice.empty()) GUI::Label(Rect(r.x + 20, r.yMax() - 44, w - 170, 36), notice, small);
+		if (GUI::Button(Rect(r.xMax() - 130, r.yMax() - 46, 110, 30), "Back", button)) Open(Page::Main);
+	}
+
+	void MainMenu::DrawJoin()
+	{
+		const float w = 560;
+		float listH = Mathf::Clamp(recentHosts.Count(), 1, GameLaunch::MaxRecentHosts) * RowH;
+		float h = 252 + listH;
+		auto r = Centred(w, h);
+		GUI::Box(r, GUIContent::none(), panel);
+		GUI::Label(Rect(r.x + 20, r.y + 14, w - 40, 22), "JOIN CO-OP", title);
+		GUI::Label(Rect(r.x + 20, r.y + 38, w - 40, 32),
+			"Join a game someone is hosting (Host Co-op on their main menu): type the address they give you, with :port when it is not 7777  ·  Esc to go back", small);
+
+		float y = r.y + 78;
+		y += DrawCoopName(r, y);
+
+		GUI::Label(Rect(r.x + 20, y + 4, 110, 20), "Host address", text);
+		GUI::SetNextControlName("JoinAddress");
+		Event& e = Event::current();
+		bool submit = e.type == EventType::KeyDown && GUI::GetNameOfFocusedControl() == "JoinAddress" && cs::Strings::Trim(joinAddress).size() > 0
+			&& (e.keyCode == KeyCode::Return || e.keyCode == KeyCode::KeypadEnter || e.character == U'\n' || e.character == U'\r');
+		joinAddress = GUI::TextField(Rect(r.x + 130, y, w - 260, 28), joinAddress, MaxAddress, field);
+		bool enabled = GUI::enabled;
+		GUI::enabled = enabled && cs::Strings::Trim(joinAddress).size() > 0;
+		if (GUI::Button(Rect(r.xMax() - 120, y, 100, 28), "Join", buttonActive) || submit)
+		{
+			if (submit) e.Use();
+			JoinHost(joinAddress);
+		}
+		GUI::enabled = enabled;
+		y += 40;
+
+		GUI::Label(Rect(r.x + 20, y, w - 40, 20), "Recent hosts", text);
+		y += 22;
+		auto view = Rect(r.x + 20, y, w - 40, listH + 2);
+		auto content = Rect(0, 0, view.width, Mathf::Max(1, recentHosts.Count()) * RowH);
+		recentScroll = GUI::BeginScrollView(view, recentScroll, content);
+		if (recentHosts.Count() == 0) GUI::Label(Rect(6, 4, content.width, 18), "None yet: the hosts you join are kept here.", small);
+		for (int i = 0; i < recentHosts.Count(); i++)
+		{
+			cs::String address = recentHosts[i];
+			auto row0 = Rect(0, i * RowH, content.width, RowH - 2);
+			GUI::Box(row0, GUIContent::none(), row);
+			GUI::Label(Rect(row0.x + 6, row0.y + 3, row0.width - 170, 20), address, text);
+			if (GUI::Button(Rect(row0.xMax() - 156, row0.y + 2, 74, 20), "Join", buttonActive))
+			{
+				joinAddress = address;
+				JoinHost(address);
+				GUIUtility::ExitGUI(); // the list just changed under this loop
+			}
+			if (GUI::Button(Rect(row0.xMax() - 78, row0.y + 2, 74, 20), "Forget", button))
+			{
+				ForgetHost(address);
+				GUIUtility::ExitGUI();
+			}
+		}
+		GUI::EndScrollView();
+
+		if (!notice.empty()) GUI::Label(Rect(r.x + 20, r.yMax() - 44, w - 170, 36), notice, small);
 		if (GUI::Button(Rect(r.xMax() - 130, r.yMax() - 46, 110, 30), "Back", button)) Open(Page::Main);
 	}
 

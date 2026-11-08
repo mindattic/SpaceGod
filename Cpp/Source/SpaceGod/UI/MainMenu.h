@@ -28,6 +28,7 @@ namespace SpaceGod::UI
 	class CreditsScreen;
 
 	/// The main menu, the scene the game opens on: Continue (the profile's latest save), New Game, Load Game,
+	/// Host Co-op and Join Co-op (US-T248: host a new game or a save, or join one by address or from the recent hosts),
 	/// Profiles (switch to another, or make a new one), Settings (the pause menu's own pages), Help (every key
 	/// and control, U.SPC-T494), Credits (US-T246: the rolling credits) and Quit, over a
 	/// slowly turning sky. The game scene is loaded only once the player picks a game; a run for the tour, a
@@ -70,6 +71,8 @@ namespace SpaceGod::UI
 			Profiles,
 			AssetLibraries,
 			Help,
+			Host, // US-T248: host a co-op game (a new game or a save, listening)
+			Join, // US-T248: join one, by address or from the recent hosts
 			Credits, // US-T246: the rolling credits (fades itself in)
 		};
 
@@ -97,6 +100,14 @@ namespace SpaceGod::UI
 
 		Camera* skyCamera = nullptr;
 
+		// US-T248: the Host and Join pages: the player's co-op name, the address being typed, the hosts joined lately
+		// (newest first, from the profile) and this machine's addresses (for the host to give out).
+		cs::String coopName;
+		cs::String joinAddress;
+		cs::List<cs::String> recentHosts;
+		cs::List<cs::String> localAddresses;
+		Vector2 hostScroll, recentScroll;
+
 		bool stylesReady = false;
 		cs::Ref<GUIStyle> panel, heading, title, text, small, button, buttonActive, row, field;
 		cs::Ref<Texture2D> panelTexture, buttonTexture, buttonActiveTexture, rowTexture, fieldTexture;
@@ -110,6 +121,21 @@ namespace SpaceGod::UI
 
 		void Delete(const cs::String& slot);
 
+		/// US-T248: the profile's co-op name and recent hosts, read again (Host and Join pages).
+		void ReadCoop();
+
+		/// US-T248: keeps the name typed on the page (the profile's, and the one CoopPeer gives the host).
+		void KeepCoopName();
+
+		/// US-T248: joins the host at this address, remembering it first among the recent hosts.
+		void JoinHost(const cs::String& address);
+
+		/// US-T248: drops an address from the recent hosts.
+		void ForgetHost(const cs::String& address);
+
+		/// US-T248: writes the recent hosts to the profile (a notice when the disk refuses).
+		void WriteRecentHosts();
+
 		static void Quit();
 
 		// ---------------------------------------------------------------- drawing
@@ -121,6 +147,11 @@ namespace SpaceGod::UI
 		void DrawMain();
 		void DrawLoad();
 		void DrawProfiles();
+		void DrawHost(); // US-T248
+		void DrawJoin(); // US-T248
+
+		/// US-T248: the "Your name" row the Host and Join pages share, at y; the row's height.
+		float DrawCoopName(const Rect& r, float y);
 
 		/// Whether a candidate's demo scene is in the build, so the menu can load it (U.SPC-T378).
 		static bool DemoInstalled(const cs::Ref<Core::AssetCandidate>& c);

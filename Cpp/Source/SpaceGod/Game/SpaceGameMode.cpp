@@ -20,6 +20,7 @@
 #include "World.h"
 #include "Shared/Profiles/Profiles.h"
 
+#include "Engine/Engine.h"
 #include "Engine/NetDriver.h"
 #include "Engine/World.h"
 #include "HAL/FileManager.h"
@@ -28,6 +29,7 @@
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
+#include "UObject/Package.h" // GetOutermost()->GetName()
 
 using SpaceGod::Coop::CoopPeer;
 namespace CoopSmoke = SpaceGod::Coop::CoopSmoke;
@@ -82,7 +84,13 @@ void ASpaceGameMode::StartPlay()
 		if (!World) return;
 		const FString Map = UWorld::RemovePIEPrefix(World->GetOutermost()->GetName());
 		FString Options = FString::Printf(TEXT("Scene=%s"), *SpaceGod::UnrealSpace::ToFString(SceneName));
-		if (World->GetNetMode() == NM_ListenServer)
+		// US-T248: the main menu's Host Co-op opens the game scene listening, as -CoopHost does.
+		const bool bHostAsked = SpaceGod::GameLaunch::TakeHost();
+		if (bHostAsked && World->GetNetMode() == NM_Standalone)
+		{
+			Options += TEXT("?listen");
+		}
+		else if (World->GetNetMode() == NM_ListenServer)
 		{
 			Options += TEXT("?listen");
 			if (World->GetNetDriver() && World->GetNetDriver()->ClientConnections.Num() > 0)
@@ -93,6 +101,32 @@ void ASpaceGameMode::StartPlay()
 		}
 		UGameplayStatics::OpenLevel(World, FName(*Map), true, Options);
 	};
+
+	// US-T248: the main menu's Join Co-op: a client travel to the host, as the console's "open <address>" does.
+	SpaceGod::GameLaunch::Connector = [WeakWorld](const cs::String& Address)
+	{
+		UWorld* World = WeakWorld.Get();
+		if (!World || !GEngine) return;
+		GEngine->SetClientTravel(World, *SpaceGod::UnrealSpace::ToFString(Address), TRAVEL_Absolute);
+	};
+	// US-T248: a join that never connects, or a host that goes away, brings the engine back to this map; say why on the
+	// menu's Join page. A listen server's own failures (a client dropping) are not the player's to read.
+	static bool bFailureHooked = false;
+	if (!bFailureHooked && GEngine)
+	{
+		bFailureHooked = true;
+		GEngine->OnNetworkFailure().AddLambda([](UWorld* World, UNetDriver*, ENetworkFailure::Type Type, const FString& Message)
+		{
+			if (World && World->GetNetMode() == NM_ListenServer) return;
+			FString Why = Message.IsEmpty() ? FString(ENetworkFailure::ToString(Type)) : Message;
+			SpaceGod::GameLaunch::JoinFailure = cs::String(TCHAR_TO_UTF8(*Why));
+		});
+		GEngine->OnTravelFailure().AddLambda([](UWorld*, ETravelFailure::Type Type, const FString& Message)
+		{
+			FString Why = Message.IsEmpty() ? FString(ETravelFailure::ToString(Type)) : Message;
+			SpaceGod::GameLaunch::JoinFailure = cs::String(TCHAR_TO_UTF8(*Why));
+		});
+	}
 
 	// The host (or a standalone game) decides the scene; the GameState carries it to clients.
 	if (ASpaceGameState* State = GetGameState<ASpaceGameState>()) State->SetScene(Scene);
@@ -165,6 +199,7 @@ void ASpaceGameMode::Logout(AController* Exiting)
 void ASpaceGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	SpaceGod::GameLaunch::SceneLoader = nullptr;
+	SpaceGod::GameLaunch::Connector = nullptr; // US-T248
 	if (CoopPeer* Peer = CoopPeer::Current(); Peer && Peer->IsHost()) CoopPeer::Stop(); // US-T44
 	CoopLinks.Empty();
 	Super::EndPlay(EndPlayReason);

@@ -50,7 +50,10 @@ Every game these scripts start records: they pass `-capture video hq` (see Recor
 Opening `Cpp/SpaceGod.uproject` in the editor works too; `Cpp/Content/Python/init_unreal.py` imports the
 colour maps from `Cpp/SourceArt/Textures/` on first open (the results are committed under `Cpp/Content/`).
 
-A packaged game hosts with `-CoopHost` and joins with `-CoopJoin=<address>`. In game, `Host` in the `` ` `` console
+Co-op is on the main menu: Host Co-op starts a new game or a save that others can join (it lists this machine's
+addresses and the UDP port, 7777 unless `-Port=`), and Join Co-op takes a host's address and keeps the recent hosts per
+profile; a failed join comes back to that page saying why. A packaged game also hosts with `-CoopHost` and joins with
+`-CoopJoin=<address>`. In game, `Host` in the `` ` `` console
 turns a solo session into a hosted one, and `open <ip>` joins one.
 
 ## The Bench

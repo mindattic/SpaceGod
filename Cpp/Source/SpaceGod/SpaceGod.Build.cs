@@ -33,5 +33,7 @@ public class SpaceGod : ModuleRules
 		PrivateDependencyModuleNames.Add("MindAtticHeadless");
 		// US-T139: the BYOKey voice (GameVoice) calls the player's own LLM over HTTPS.
 		PrivateDependencyModuleNames.Add("HTTP");
+		// US-T248: the main menu's Host Co-op page lists this machine's addresses for the players joining it.
+		PrivateDependencyModuleNames.Add("Sockets");
 	}
 }

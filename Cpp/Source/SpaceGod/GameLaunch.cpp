@@ -88,6 +88,27 @@ namespace SpaceGod
 
 	void GameLaunch::ToMainMenu() { Travel(MenuScene); }
 
+	void GameLaunch::Host(const cs::String& slot)
+	{
+		tutorial = 0;
+		hostCoop = true; // US-T248: the game scene opens listening (SceneLoader -> ?listen)
+		Start(slot);
+	}
+
+	bool GameLaunch::TakeHost()
+	{
+		bool asked = hostCoop;
+		hostCoop = false;
+		return asked;
+	}
+
+	void GameLaunch::Join(const cs::String& address)
+	{
+		// US-T248: through black, as a scene change; the engine brings the game back to the menu if the host never answers.
+		JoinFailure.clear();
+		UI::UiMotion::FadeOutThen([address] { if (Connector) Connector(address); });
+	}
+
 	void GameLaunch::Travel(const cs::String& scene)
 	{
 		// US-T255: through black, back in once the scene has arrived (Bootstrap::EnsureApp -> UiMotion::SceneArrived).

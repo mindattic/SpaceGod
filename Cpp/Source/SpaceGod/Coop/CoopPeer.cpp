@@ -7,6 +7,7 @@
 #include "Coop/CoopSmoke.h"
 #include "Coop/CoopSettings.h"
 #include "Bootstrap.h"
+#include "GameLaunch.h" // US-T248: CoopName
 #include "UnitySpaceApp.h"
 #include "SpaceGodLog.h"
 
@@ -146,6 +147,7 @@ namespace SpaceGod::Coop
 		FString v;
 		if (FParse::Value(FCommandLine::Get(), TEXT("-CoopName="), v)) return cs::String(TCHAR_TO_UTF8(*v));
 		if (!fallback.empty()) return fallback;
+		if (!GameLaunch::CoopName.empty()) return GameLaunch::CoopName; // US-T248: the name picked on the Host/Join page
 		return cs::String(TCHAR_TO_UTF8(FPlatformProcess::UserName()));
 	}
 

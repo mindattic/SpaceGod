@@ -51,6 +51,36 @@ namespace SpaceGod
 
 		static void ToMainMenu();
 
+		// ---------------------------------------------------------------- co-op from the menu (US-T248)
+
+		/// US-T248: the main menu's Host Co-op page: a new game (an empty slot) or a save, opened as a listen server, so
+		/// other players can join it (as -CoopHost does from the command line).
+		static void Host(const cs::String& slot);
+
+		/// US-T248: whether the next scene load should listen for co-op players, once (SceneLoader asks).
+		static bool TakeHost();
+
+		/// US-T248: the main menu's Join Co-op page: connect to a host at this address (as -CoopJoin=<address> or the
+		/// console's open <address> do), through a fade.
+		static void Join(const cs::String& address);
+
+		/// Set by the game mode: how a join reaches Unreal (a client travel to the address).
+		static inline cs::Action<cs::String> Connector;
+
+		/// US-T248: why the last join failed or the host was lost (empty: nothing to say), for the Join page to show
+		/// once the engine has brought the game back to the menu; taken (cleared) by the reader.
+		static inline cs::String JoinFailure;
+
+		/// US-T248: the name this player goes by in co-op, picked on the Host/Join pages (empty: -CoopName= or the
+		/// account's user name; CoopPeer::NameFromCommandLine).
+		static inline cs::String CoopName;
+
+		/// US-T248: the profile settings the Host/Join pages keep: the player's co-op name, and the hosts joined
+		/// lately (newest first, '|' between them).
+		static constexpr const char* CoopNameKey = "coopName";
+		static constexpr const char* RecentHostsKey = "coopRecentHosts";
+		static constexpr int MaxRecentHosts = 8;
+
 		/// SceneManager.LoadScene(name): the host travels to the map with this scene (set by ASpaceGameMode's world).
 		static void LoadScene(const cs::String& scene);
 
@@ -73,5 +103,6 @@ namespace SpaceGod
 		static inline int dogfightDemo = 0;
 		static inline bool dogfightFlagTaken = false;
 		static inline int tutorial = 0; // US-T254
+		static inline bool hostCoop = false; // US-T248
 	};
 }
