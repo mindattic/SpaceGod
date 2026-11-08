@@ -228,7 +228,9 @@ namespace SpaceGod::Smoke
 			KeyDown(KeyCode::DownArrow, "main menu > help, next chapter (Down)");
 			Click("Next", "main menu > help, next chapter (Next)");
 			Click("Back", "main menu");
-			Click("Asset Library POC", "main menu > asset library POC");
+			Click("Co-op", "main menu > co-op");
+			Click("Back", "main menu");
+			Click("Extras", "main menu > extras");
 			Click("Back", "main menu");
 			Click("New Game", "new game", /*travels*/ true);
 		}

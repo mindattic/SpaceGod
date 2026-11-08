@@ -10,6 +10,7 @@
 #include "Cs/Cs.h"
 #include "UnityCompat/UnityTypes.h"
 #include "UnityCompat/UnityGui.h"
+#include "UI/MenuBackdrop.h" // US-T245
 #include "UI/NewGamePage.h" // US-T247
 
 class UWorld;
@@ -19,7 +20,6 @@ namespace SpaceGod::Core
 {
 	class SaveSlots;
 	class SaveHeader;
-	class AssetCandidate;
 }
 
 namespace SpaceGod::UI
@@ -28,11 +28,13 @@ namespace SpaceGod::UI
 	class HelpScreen;
 	class CreditsScreen;
 
-	/// The main menu, the scene the game opens on: Continue (the profile's latest save), New Game, Load Game,
-	/// Host Co-op and Join Co-op (US-T248: host a new game or a save, or join one by address or from the recent hosts),
-	/// Profiles (switch to another, or make a new one), Settings (the pause menu's own pages), Help (every key
-	/// and control, U.SPC-T494), Credits (US-T246: the rolling credits) and Quit, over a
-	/// slowly turning sky. The game scene is loaded only once the player picks a game; a run for the tour, a
+	/// The main menu, SpaceGod's front door (US-T245): the logo over the player's list -- Continue (the profile's latest
+	/// save), New Game (US-T247's setup page, or Quick Start), Load Game, Co-op (US-T248's Host Co-op and Join Co-op:
+	/// host a new game or a save, or join one by address or from the recent hosts), Settings (the pause menu's own
+	/// pages), Help (every key and control, U.SPC-T494), Credits (US-T246: the rolling credits), Extras (the tutorial,
+	/// the dogfight demos and the showcase tour) and Quit -- with Profiles (switch to another, or make a new one) on the
+	/// profile line and the build's version and commit in the corner, over a slowly turning sky with Earth and the odd
+	/// passing ship (MenuBackdrop). The game scene is loaded only once the player picks a game; a run for the tour, a
 	/// capture or <c>-continue</c> never stops here (<see cref="Bootstrap"/>). Esc goes back a page.
 	class MainMenu final
 	{
@@ -70,12 +72,13 @@ namespace SpaceGod::UI
 			Main,
 			Load,
 			Profiles,
-			AssetLibraries,
+			Extras, // US-T245: the tutorial, the dogfight demos and the showcase tour (the Asset Library POC page is gone)
 			Help,
 			Host, // US-T248: host a co-op game (a new game or a save, listening)
 			Join, // US-T248: join one, by address or from the recent hosts
 			Credits, // US-T246: the rolling credits (fades itself in)
 			NewGame, // US-T247: the New Game setup page (a new game, or the Host Co-op page's)
+			Coop, // US-T245: the Co-op entry: Host Co-op or Join Co-op
 		};
 
 		Page page = Page::Main;
@@ -103,6 +106,9 @@ namespace SpaceGod::UI
 
 		Camera* skyCamera = nullptr;
 
+		/// US-T245: Earth and the passing ships behind the menu.
+		std::unique_ptr<MenuBackdrop> backdrop;
+
 		// US-T248: the Host and Join pages: the player's co-op name, the address being typed, the hosts joined lately
 		// (newest first, from the profile) and this machine's addresses (for the host to give out).
 		cs::String coopName;
@@ -113,7 +119,9 @@ namespace SpaceGod::UI
 
 		bool stylesReady = false;
 		cs::Ref<GUIStyle> panel, heading, title, text, small, button, buttonActive, row, field;
+		cs::Ref<GUIStyle> corner, profileButton; // US-T245: the version line, the profile line's Profiles button
 		cs::Ref<Texture2D> panelTexture, buttonTexture, buttonActiveTexture, rowTexture, fieldTexture;
+		cs::Ref<Texture2D> logo; // US-T245: the SpaceGod logo over the menu (null: the wordmark alone)
 
 		/// The profile in use and its saves, read again (after a switch, a delete, or coming back to the menu).
 		void ReadProfile();
@@ -157,10 +165,14 @@ namespace SpaceGod::UI
 		/// US-T248: the "Your name" row the Host and Join pages share, at y; the row's height.
 		float DrawCoopName(const Rect& r, float y);
 
-		/// Whether a candidate's demo scene is in the build, so the menu can load it (U.SPC-T378).
-		static bool DemoInstalled(const cs::Ref<Core::AssetCandidate>& c);
+		/// US-T245: the logo and the SPACEGOD wordmark over a page whose panel is <paramref name="r"/>.
+		void DrawHeading(const Rect& r);
 
-		void DrawAssetLibraries();
+		/// US-T245: the panel of the given size, centred with room above it for the heading.
+		static Rect UnderHeading(float w, float h);
+
+		void DrawCoop(); // US-T245
+		void DrawExtras(); // US-T245
 		void EnsureStyles();
 	};
 }

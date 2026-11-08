@@ -27,9 +27,14 @@ namespace SpaceGod::Core
 				  "own. You can play it as a strategy game, a dogfighter, a capital-ship broadside game, a trader's career or a "
 				  "diplomat's, or take nothing at all and let it play out."),
 				T("The main menu",
-				  "Continue loads the latest save, New Game opens the setup page (below), Quick Start starts at once at the "
-				  "current date beside Earth, Load Game opens the saves (each line says how its game began), Profiles switches player profile (each keeps its own saves and settings), Settings opens every "
-				  "tunable, Help opens this manual and Quit leaves."),
+				  "SpaceGod's logo sits over the list, Earth turns below it and now and then a ship crosses the sky. Continue "
+				  "loads the latest save, New Game opens the setup page (below), Quick Start starts at once at the current date "
+				  "beside Earth, Load Game opens the saves (each line says how its game began), Co-op hosts a game for friends "
+				  "to join (Host Co-op) or joins one by its address (Join Co-op), Settings opens every tunable, Help opens this "
+				  "manual, Credits rolls the credits and Quit leaves. "
+				  "Profiles, on the profile line at the top, switches player profile (each keeps its own saves and settings). "
+				  "Extras holds the guided tutorial, the dogfight demos (a light or a heavy fighter) and the showcase tour. The "
+				  "bottom-right corner names the build: its version, build number and commit."), // US-T245
 				T("Setting up a new game",
 				  "New Game asks how the game starts. Start date: today, or pick a day (yyyy-mm-dd, 1900 to 2300) and the worlds "
 				  "stand where they did, or will, that day. Galaxy seed: a random number, or type your own (a word works too); the "
@@ -512,6 +517,14 @@ namespace SpaceGod::Core
 				  "At a shipyard F2 (or Outfit on the market board) opens the hull's hardpoints and internal space: guns, "
 				  "shields and drives on the hardpoints; plate, cargo racks, scanners, a brig, marine habitats and more inside. "
 				  "Every part is bought from that yard's market, and every tonne costs acceleration."),
+				T("The Mechlab",
+				  "Mechlab view on the outfitting panel lays the hull out as its components: the bow, the midsections, "
+				  "engineering and any sponsons. Each card lists its hardpoints by type and size (E energy, B ballistic, "
+				  "M missile, SP spinal, SH shield, EN engine): a component takes only parts of the types its hardpoints "
+				  "allow, no bigger than each mount. Each also has utility sockets: manoeuvring thrusters on the bow, "
+				  "engineering and sponsons (faster turns, rolls and side thrust), life support amidships and in engineering "
+				  "(air for a bigger crew: more damage control teams and more hands against boarders; small craft have no "
+				  "room for it). The stats at the top are the ones the hull fights with."), // US-T89
 				T("The news",
 				  "X opens the news feed: shocks, price spikes, embargoes, battles and captures as they happen, with news from "
 				  "other systems as old as the gates made it.")),
@@ -843,8 +856,8 @@ namespace SpaceGod::Core
 				  "Esc closes. While it is open it has the keys and the mouse; the game runs on and the craft holds its "
 				  "heading. The console's sg.Cheat runs any entry by its path."),
 				T("The showcase tour", // US-T147
-				  "One guided run through every feature, so nothing has to be launched as a demo of its own: Showcase Tour on "
-				  "the main menu, the dev menu's Showcase category, or sg.Tour in the console. It plays in chapters (Flight and "
+				  "One guided run through every feature, so nothing has to be launched as a demo of its own: Showcase Tour under "
+				  "the main menu's Extras, the dev menu's Showcase category, or sg.Tour in the console. It plays in chapters (Flight and "
 				  "combat, Embodiment, Places, Threats, Presentation, Ships, Travel), each stop set up for you (the trip, the "
 				  "helm, the fight, the scale) with a line at the bottom saying what to look at. Right or N goes on, Left or B "
 				  "back, S skips the rest of the chapter, Space pauses, 1 to 9 jump to a chapter, O shows every stop again at "

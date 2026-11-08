@@ -16,7 +16,7 @@
 #endif
 
 #include "ActiveProfile.h"
-#include "AssetLibraryCandidates.h"
+#include "BuildInfo.h" // US-T245
 #include "Difficulty.h" // US-T253
 #include "GameLaunch.h"
 #include "GameSettingsHost.h"
@@ -167,6 +167,7 @@ namespace SpaceGod::UI
 		Cursor::visible = true;
 		skyCamera = Camera::main();
 		Views::Starfield::Create(transform, 9000, 7, true);
+		backdrop = std::make_unique<MenuBackdrop>(transform); // US-T245: Earth and the odd passing ship
 		ReadProfile();
 		// US-T248: back from a join that never connected, or from a host that went away: say why, on the Join page.
 		if (!GameLaunch::JoinFailure.empty())
@@ -180,19 +181,25 @@ namespace SpaceGod::UI
 	void MainMenu::Update()
 	{
 		if (skyCamera != nullptr) skyCamera->transform->SetRotation(Quaternion::Euler(-12.0f, Time::unscaledTime * 1.5f, 0));
+		if (backdrop) backdrop->Update(skyCamera, Time::unscaledTime); // US-T245
 		bool escape = UiInput::present() && UiInput::WasPressedThisFrame(KeyCode::Escape);
 		if (settings->IsOpen)
 		{
 			settings->Update(escape, Time::unscaledDeltaTime);
 			return;
 		}
-		if (escape && page != Page::Main) Open(page == Page::NewGame && newGame.Hosting() ? Page::Host : Page::Main); // US-T247: back to Host Co-op
+		// US-T247: back to Host Co-op from its setup page; US-T245: Host and Join back to the Co-op page.
+		if (escape && page != Page::Main)
+			Open(page == Page::NewGame && newGame.Hosting() ? Page::Host : page == Page::Host || page == Page::Join ? Page::Coop : Page::Main);
 	}
 
 	void MainMenu::OnDestroy()
 	{
 		// Object.Destroy(texture): dropping the last reference.
 		panelTexture = buttonTexture = buttonActiveTexture = rowTexture = fieldTexture = nullptr;
+		logo = nullptr; // US-T245
+		if (backdrop) backdrop->Destroy();
+		backdrop.reset();
 		settings->DestroyOwnedTextures();
 		help->DestroyOwnedTextures();
 		credits->DestroyOwnedTextures(); // US-T246
@@ -355,8 +362,10 @@ namespace SpaceGod::UI
 			return;
 		}
 		// US-T255: each page eases in as it opens (Help fades itself in).
-		static const char* const pageIds[] = { "menu.main", "menu.load", "menu.profiles", "menu.assets", nullptr, "menu.host", "menu.join", nullptr, "menu.newgame" };
-		UiMotion::Scope motion(pageIds[Mathf::Clamp(static_cast<int>(page), 0, 8)]);
+		// US-T245: the build's version and commit in the bottom-right corner, under every page but the credits.
+		GUI::Label(Rect(Screen::width - 420.0f, Screen::height - 30.0f, 404, 20), BuildInfo::Describe(), corner);
+		static const char* const pageIds[] = { "menu.main", "menu.load", "menu.profiles", "menu.extras", nullptr, "menu.host", "menu.join", nullptr, "menu.newgame", "menu.coop" };
+		UiMotion::Scope motion(pageIds[Mathf::Clamp(static_cast<int>(page), 0, 9)]);
 		switch (page)
 		{
 			case Page::Load: DrawLoad(); break;
@@ -364,7 +373,8 @@ namespace SpaceGod::UI
 			case Page::Join: DrawJoin(); break; // US-T248
 			case Page::NewGame: DrawNewGame(); break; // US-T247
 			case Page::Profiles: DrawProfiles(); break;
-			case Page::AssetLibraries: DrawAssetLibraries(); break;
+			case Page::Extras: DrawExtras(); break; // US-T245
+			case Page::Coop: DrawCoop(); break; // US-T245
 			case Page::Help:
 				help->OnTutorial = [] { GameLaunch::Tutorial(); }; // US-T254: Help's Tutorial button starts one
 				if (help->Draw("Esc to go back")) Open(Page::Main);
@@ -378,13 +388,32 @@ namespace SpaceGod::UI
 		return Rect((Screen::width - w) * 0.5f, (Screen::height - h) * 0.5f, w, h);
 	}
 
+	Rect MainMenu::UnderHeading(float w, float h)
+	{
+		// US-T245: room above the panel for the logo and the wordmark (HeadingH), the two centred together.
+		constexpr float HeadingH = 176;
+		auto r = Centred(w, h);
+		r.y = Mathf::Max(HeadingH + 8, (Screen::height - h - HeadingH) * 0.5f + HeadingH);
+		return r;
+	}
+
+	void MainMenu::DrawHeading(const Rect& r)
+	{
+		// US-T245: SpaceGod's logo (assets/logo.png) over its wordmark, not the Unity project's old name.
+		float cx = r.x + r.width * 0.5f;
+		if (logo != nullptr) GUI::DrawTexture(Rect(cx - 52, r.y - 172, 104, 104), logo, ScaleMode::ScaleToFit, true);
+		GUI::Label(Rect(cx - 200, r.y - 64, 400, 48), "SPACEGOD", heading);
+	}
+
 	void MainMenu::DrawMain()
 	{
-		const float w = 380, h = 612;
-		auto r = Centred(w, h);
-		GUI::Label(Rect(r.x, r.y - 70, w, 48), "UNITYSPACE", heading);
+		const float w = 380, h = 474;
+		auto r = UnderHeading(w, h);
+		DrawHeading(r);
 		GUI::Box(r, GUIContent::none(), panel);
-		GUI::Label(Rect(r.x + 20, r.y + 14, w - 40, 22), cs::Cat("PROFILE  ·  ", cs::Strings::ToUpperInvariant(ActiveProfile::Current()->Name)), title);
+		// US-T245: Profiles from the profile line (it left the player's list).
+		GUI::Label(Rect(r.x + 20, r.y + 14, w - 130, 22), cs::Cat("PROFILE  ·  ", cs::Strings::ToUpperInvariant(ActiveProfile::Current()->Name)), title);
+		if (GUI::Button(Rect(r.xMax() - 104, r.y + 12, 84, 24), "Profiles", profileButton)) Open(Page::Profiles);
 		GUI::Label(Rect(r.x + 20, r.y + 38, w - 40, 32),
 			latest == nullptr ? cs::String("No saves yet") : cs::Cat("Latest: ", UnitySpaceApp::SaveTitle(latest->Slot, latest), "  ·  ", UnitySpaceApp::DescribeSave(latest)), small);
 
@@ -405,29 +434,61 @@ namespace SpaceGod::UI
 		GUI::enabled = enabled && saveNames.Count() > 0;
 		if (GUI::Button(Rect(r.x + 20, y + 96, bw, 38), "Load Game", button)) Open(Page::Load);
 		GUI::enabled = enabled;
-		// US-T248: co-op from the menu, with no -CoopHost / -CoopJoin= or console needed.
-		float half = (bw - 10) * 0.5f;
-		if (GUI::Button(Rect(r.x + 20, y + 144, half, 38), "Host Co-op", button)) Open(Page::Host);
-		if (GUI::Button(Rect(r.x + 30 + half, y + 144, half, 38), "Join Co-op", button)) Open(Page::Join);
-		if (GUI::Button(Rect(r.x + 20, y + 192, bw, 38), "Profiles", button)) Open(Page::Profiles);
-		if (GUI::Button(Rect(r.x + 20, y + 240, bw, 38), "Settings", button)) settings->OpenSettings();
+		// US-T245: one Co-op entry, leading to US-T248's Host Co-op and Join Co-op pages.
+		if (GUI::Button(Rect(r.x + 20, y + 144, bw, 38), "Co-op", button)) Open(Page::Coop);
+		if (GUI::Button(Rect(r.x + 20, y + 192, bw, 38), "Settings", button)) settings->OpenSettings();
 		// US-T246: Credits beside Help.
-		const float helpW = (bw - 10) * 0.5f;
-		if (GUI::Button(Rect(r.x + 20, y + 288, helpW, 38), "Help", button)) Open(Page::Help);
-		if (GUI::Button(Rect(r.x + 30 + helpW, y + 288, helpW, 38), "Credits", button))
+		const float half = (bw - 10) * 0.5f;
+		if (GUI::Button(Rect(r.x + 20, y + 240, half, 38), "Help", button)) Open(Page::Help);
+		if (GUI::Button(Rect(r.x + 30 + half, y + 240, half, 38), "Credits", button))
 		{
 			credits->Restart();
 			Open(Page::Credits);
 		}
-		if (GUI::Button(Rect(r.x + 20, y + 336, bw, 38), "Asset Library POC", button)) Open(Page::AssetLibraries);
+		// US-T245: the demos and the tour on a page of their own, out of the player's list.
+		if (GUI::Button(Rect(r.x + 20, y + 288, bw, 38), "Extras", button)) Open(Page::Extras);
+		if (GUI::Button(Rect(r.x + 20, y + 336, bw, 38), "Quit", button)) Quit();
+	}
+
+	void MainMenu::DrawCoop()
+	{
+		// US-T245: the Co-op entry's two ways in (US-T248's pages).
+		const float w = 480, h = 262;
+		auto r = UnderHeading(w, h);
+		DrawHeading(r);
+		GUI::Box(r, GUIContent::none(), panel);
+		GUI::Label(Rect(r.x + 20, r.y + 14, w - 40, 22), "CO-OP", title);
+		GUI::Label(Rect(r.x + 20, r.y + 38, w - 40, 18), "Play the same galaxy with friends  ·  Esc to go back", small);
+		float y = r.y + 70, bw = w - 40;
+		if (GUI::Button(Rect(r.x + 20, y, bw, 38), "Host Co-op", buttonActive)) Open(Page::Host);
+		GUI::Label(Rect(r.x + 24, y + 40, bw - 8, 18), "Start a new game, Continue or any save, and let others join it", small);
+		if (GUI::Button(Rect(r.x + 20, y + 66, bw, 38), "Join Co-op", button)) Open(Page::Join);
+		GUI::Label(Rect(r.x + 24, y + 106, bw - 8, 18), "Join a game someone is hosting, by address or from your recent hosts", small);
+		if (GUI::Button(Rect(r.xMax() - 130, r.yMax() - 46, 110, 30), "Back", button)) Open(Page::Main);
+	}
+
+	void MainMenu::DrawExtras()
+	{
+		// US-T245: what used to crowd the player's list. Each starts a new game of its own.
+		const float w = 480, h = 380;
+		auto r = UnderHeading(w, h);
+		DrawHeading(r);
+		GUI::Box(r, GUIContent::none(), panel);
+		GUI::Label(Rect(r.x + 20, r.y + 14, w - 40, 22), "EXTRAS", title);
+		GUI::Label(Rect(r.x + 20, r.y + 38, w - 40, 18), "Each starts a new game of its own  ·  Esc to go back", small);
+		float y = r.y + 70, bw = w - 40;
+		// US-T254: the guided tutorial, played by doing, any time (a new game with it running; Help has it too).
+		if (GUI::Button(Rect(r.x + 20, y, bw, 38), "Tutorial", button)) GameLaunch::Tutorial();
+		GUI::Label(Rect(r.x + 24, y + 40, bw - 8, 18), "The guided tutorial: the basics, played by doing", small);
 		// US-T88: a new game straight into the dogfight demo, at a light or a heavy fighter's helm (-dogfight / -dogfight-heavy).
-		if (GUI::Button(Rect(r.x + 20, y + 384, half, 38), "Dogfight Demo", button)) GameLaunch::DogfightDemo(false);
-		if (GUI::Button(Rect(r.x + 30 + half, y + 384, half, 38), "Dogfight (Heavy)", button)) GameLaunch::DogfightDemo(true);
+		const float half = (bw - 10) * 0.5f;
+		if (GUI::Button(Rect(r.x + 20, y + 66, half, 38), "Dogfight Demo", button)) GameLaunch::DogfightDemo(false);
+		if (GUI::Button(Rect(r.x + 30 + half, y + 66, half, 38), "Dogfight (Heavy)", button)) GameLaunch::DogfightDemo(true);
+		GUI::Label(Rect(r.x + 24, y + 106, bw - 8, 18), "Straight into a fight at a light or a heavy fighter's helm", small);
 		// US-T147: a new game straight into the showcase tour, every feature in turn (sg.Tour waits for the game it starts).
-		// US-T254: the guided tutorial, played by doing, any time (a new game with it running).
-		if (GUI::Button(Rect(r.x + 20, y + 432, half, 38), "Tutorial", button)) GameLaunch::Tutorial();
-		if (GUI::Button(Rect(r.x + 30 + half, y + 432, half, 38), "Showcase Tour", button) && GEngine) GEngine->Exec(nullptr, TEXT("sg.Tour"));
-		if (GUI::Button(Rect(r.x + 20, y + 480, bw, 38), "Quit", button)) Quit();
+		if (GUI::Button(Rect(r.x + 20, y + 132, bw, 38), "Showcase Tour", button) && GEngine) GEngine->Exec(nullptr, TEXT("sg.Tour"));
+		GUI::Label(Rect(r.x + 24, y + 172, bw - 8, 18), "Every feature in turn, played for you (Esc ends it)", small);
+		if (GUI::Button(Rect(r.xMax() - 130, r.yMax() - 46, 110, 30), "Back", button)) Open(Page::Main);
 	}
 
 	void MainMenu::DrawLoad()
@@ -602,7 +663,7 @@ namespace SpaceGod::UI
 		GUI::EndScrollView();
 
 		if (!notice.empty()) GUI::Label(Rect(r.x + 20, r.yMax() - 44, w - 170, 36), notice, small);
-		if (GUI::Button(Rect(r.xMax() - 130, r.yMax() - 46, 110, 30), "Back", button)) Open(Page::Main);
+		if (GUI::Button(Rect(r.xMax() - 130, r.yMax() - 46, 110, 30), "Back", button)) Open(Page::Coop); // US-T245
 	}
 
 	// ---------------------------------------------------------------- the New Game setup page (US-T247)
@@ -684,42 +745,7 @@ namespace SpaceGod::UI
 		GUI::EndScrollView();
 
 		if (!notice.empty()) GUI::Label(Rect(r.x + 20, r.yMax() - 44, w - 170, 36), notice, small);
-		if (GUI::Button(Rect(r.xMax() - 130, r.yMax() - 46, 110, 30), "Back", button)) Open(Page::Main);
-	}
-
-	bool MainMenu::DemoInstalled(const cs::Ref<AssetCandidate>& c)
-	{
-		// C#: SceneUtility.GetBuildIndexByScenePath(c.DemoScenePath) >= 0.
-		return GameLaunch::SceneInBuild(c->DemoScenePath);
-	}
-
-	void MainMenu::DrawAssetLibraries()
-	{
-		const float w = 760;
-		const auto& list = AssetLibraryCandidates::All();
-		float h = 150 + list.Count() * 52;
-		auto r = Centred(w, h);
-		GUI::Box(r, GUIContent::none(), panel);
-		GUI::Label(Rect(r.x + 20, r.y + 14, w - 40, 22), "ASSET LIBRARY POC", title);
-		GUI::Label(Rect(r.x + 20, r.y + 38, w - 40, 32),
-			"Candidate Asset Store packages, to judge in game before buying for real. Buy and import a package, add its demo scene to the build at the path shown, then launch it here  ·  Esc to go back", small);
-		for (int i = 0; i < list.Count(); i++)
-		{
-			auto c = list[i];
-			bool installed = DemoInstalled(c);
-			auto row0 = Rect(r.x + 20, r.y + 78 + i * 52, w - 40, 48);
-			GUI::Box(row0, GUIContent::none(), row);
-			GUI::Label(Rect(row0.x + 6, row0.y + 3, 300, 20), c->Name, text);
-			GUI::Label(Rect(row0.x + 6, row0.y + 22, row0.width - 130, 24),
-				cs::Cat(c->Purpose, "  ·  Unity 6: ", AssetCandidate::Describe(c->Unity6), ", URP: ", AssetCandidate::Describe(c->Urp),
-					", HDRP: ", AssetCandidate::Describe(c->Hdrp), "  ·  ", (installed ? cs::String("demo installed") : cs::Cat("not installed (", c->DemoScenePath, ")"))), small);
-			bool enabled = GUI::enabled;
-			GUI::enabled = enabled && installed;
-			if (GUI::Button(Rect(row0.xMax() - 110, row0.y + 10, 104, 28), "Launch demo", installed ? buttonActive : button))
-				GameLaunch::Travel(c->DemoScenePath); // US-T255: through black
-			GUI::enabled = enabled;
-		}
-		if (GUI::Button(Rect(r.xMax() - 130, r.yMax() - 46, 110, 30), "Back", button)) Open(Page::Main);
+		if (GUI::Button(Rect(r.xMax() - 130, r.yMax() - 46, 110, 30), "Back", button)) Open(Page::Coop); // US-T245
 	}
 
 	void MainMenu::EnsureStyles()
@@ -749,5 +775,11 @@ namespace SpaceGod::UI
 		row = cs::New<GUIStyle>();
 		row->normal.background = rowTexture;
 		field = S::FieldStyle(T::Heading, fieldTexture);
+		// US-T245: the version line, bottom right and dim; the profile line's small Profiles button; the logo.
+		corner = S::CaptionStyle(T::Caption);
+		corner->alignment = TextAnchor::LowerRight;
+		corner->clipping = TextClipping::Clip;
+		profileButton = S::ButtonStyle(T::Caption, buttonTexture, buttonActiveTexture);
+		logo = MenuBackdrop::LoadLogo();
 	}
 }
