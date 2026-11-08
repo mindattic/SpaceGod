@@ -64,7 +64,8 @@ namespace SpaceGod::Core
 		/// </summary>
 		static double FocusWeight(const cs::Ref<ShipCombat>& c, const cs::Ref<Subsystem>& s);
 
-		/// <summary>Whether a shot-away mount is one emergency repair crews can bring back: a shield emitter or a gun mount.</summary>
+		/// <summary>Whether a shot-away mount is one emergency repair crews can bring back: a shield emitter, a nanite repair
+		/// system on a shield mount (US-T102) or a gun mount.</summary>
 		static bool Restorable(const cs::Ref<Subsystem>& s);
 	};
 }

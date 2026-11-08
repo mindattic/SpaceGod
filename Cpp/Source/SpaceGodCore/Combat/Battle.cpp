@@ -29,6 +29,7 @@
 #include "Combat/GateBreakers.h"
 #include "Combat/Gunnery.h"
 #include "Combat/ModularHull.h"
+#include "Combat/NaniteRepairs.h"
 #include "Combat/Morale.h"
 #include "Combat/PilotAim.h"
 #include "Combat/PilotFlight.h"
@@ -421,6 +422,8 @@ namespace SpaceGod::Core
 			if (Broadsides::Commands(u)) Broadsides::Step(self, u, dt);
 			// A big ship's heat fills or drains, and past its sinks' limit its crew and systems cook (U.SPC-T491).
 			StepHeat(u, dt);
+			// A nanite repair system rebuilds the hull, its damaged sections and its standing mounts (US-T102).
+			NaniteRepairs::Step(u, dt);
 			if (u->Stunned > 0) u->Stunned -= dt;
 			// A small craft with power to spare for its shields recharges them that much faster (U.SPC-T424).
 			// A charging tachyon lance draws on the reactor, and the shields recover that much slower (U.SPC-T487).
@@ -2299,6 +2302,8 @@ namespace SpaceGod::Core
 				case SubsystemKind::Reactor: w = 0.25; break;
 				// A radiator panel is a weak point, the more worth it on a hull already running hot (U.SPC-T491).
 				case SubsystemKind::Radiator: w = Radiators::TargetWeight(target); break;
+				// A nanite system is worth silencing on a hull it is rebuilding (US-T102).
+				case SubsystemKind::NaniteRepair: w = target->Combat->HullFraction() < 0.95 ? 1.6 : 0.6; break;
 				default: w = 0.5; break;
 			}
 			// A bridge buried at the centre of the hull (U.SPC-T492) is worth aiming at only once the hull is holed deep

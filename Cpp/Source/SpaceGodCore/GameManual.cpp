@@ -408,8 +408,15 @@ namespace SpaceGod::Core
 				  "lock, hitting only what they fly into); the homing missile is the missile launcher every warship carries."),
 				T("Shields and armour",
 				  "Shields come from emitters on the hull, each covering the patch around it; a patch shot down is holed while "
-				  "the rest stays covered, so gunners go for the weak spot. Shots that meet the plate slanted glance off, so "
-				  "angling the hull to the enemy's line pays. A warship's bridge is buried at its centre."),
+				  "the rest stays covered, so gunners go for the weak spot. Each emitter is a hardpoint that can be shot out, "
+				  "leaving its patch bare. Shots that meet the plate slanted glance off, so angling the hull to the enemy's line "
+				  "pays. A warship's bridge is buried at its centre."),
+				T("Nanite repair",
+				  "A shield mount can take a nanite repair system instead of a shield array (outfitting, F2): that patch loses "
+				  "its field, but in a fight the swarm rebuilds the hull to three quarters, every damaged section still on it "
+				  "and the hardpoints still standing, the worst first. It cannot raise a section shattered or a mount shot "
+				  "out, an EMP stops it while the hull is stunned, and gunners go for it on a hurt hull. Shot out, a "
+				  "capital's damage control teams bring it back like an emitter."), // US-T102
 				T("Broadsides at a capital's helm",
 				  "Look at a side and hold left mouse to build a volley with every gun that bears, release to fire. The number "
 				  "keys are the captain's orders: battery orders, focus or spread fire, brace, damage control focus, the "

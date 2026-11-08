@@ -107,6 +107,10 @@ namespace SpaceGod::Core
 		/// hostile hull it flies into and nothing it does not.</summary>
 		RocketPod,
 
+		/// <summary>A nanite repair system (US-T102, see <see cref="NaniteRepairs"/>): a shield mount's module that rebuilds
+		/// the hull, its damaged sections and its standing hardpoints over time instead of projecting a field. Appended.</summary>
+		NaniteRepair,
+
 		/// <summary>A hull's broadcast array (US-T96, see <see cref="BroadcastArrays"/>): the comms mast it reports an attack
 		/// with. Never one of a design's hardpoints (it lives on the battle unit), so it is numbered apart from them.</summary>
 		BroadcastArray = 100,

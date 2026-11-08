@@ -106,6 +106,11 @@ namespace SpaceGod::Core
 		/// primary trigger out of a fight cuts asteroids into ore crates. Each one fitted is a grade, up to 3, on top of a
 		/// miner's own industrial laser (grade 2).</summary>
 		MiningLaser,
+
+		/// <summary>US-T102: a nanite repair system (see <see cref="NaniteRepairs"/>): a shield mount takes one in place of
+		/// a shield array, giving up that patch's field for a swarm that rebuilds the hull, its damaged sections and its
+		/// standing hardpoints over a fight. It can be shot out like any mount.</summary>
+		NaniteRepair,
 	};
 	SPACEGODCORE_API const char* ToString(ModuleKind v);
 

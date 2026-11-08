@@ -509,6 +509,15 @@ namespace SpaceGod::Rendering
 			case SubsystemKind::Hangar:
 				b.Box(Vector3(0, 0, 0), Vector3(0.05f, 0.014f, 0.006f), b.Glow(Color(1.0f, 0.85f, 0.55f)));
 				break;
+			case SubsystemKind::NaniteRepair:
+				// A nanite repair system (US-T102): a squat foundry drum under a ring of assembler vents glowing green.
+				b.Cylinder(Vector3(0, 0.006f, 0), 0.01f, 0.012f, b.Dark);
+				for (int k = 0; k < 4; k++)
+				{
+					float a = k * Mathf::PI * 0.5f;
+					b.Box(Vector3(Mathf::Cos(a) * 0.009f, 0.013f, Mathf::Sin(a) * 0.009f), Vector3(0.004f, 0.003f, 0.004f), b.Glow(Color(0.45f, 1.0f, 0.55f)));
+				}
+				break;
 			case SubsystemKind::Radiator:
 				// A radiator panel (U.SPC-T491): a broad thin sheet spread flat to the sky across the flank, on a
 				// stub boom, its coolant channels glowing a dull red.

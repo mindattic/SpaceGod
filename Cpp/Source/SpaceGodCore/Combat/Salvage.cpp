@@ -243,6 +243,7 @@ namespace SpaceGod::Core
 			case SubsystemKind::ShieldGenerator:
 			case SubsystemKind::TachyonLance:
 			case SubsystemKind::PhaserArray:
+			case SubsystemKind::NaniteRepair: // US-T102
 				return Good::Electronics;
 			case SubsystemKind::MissileLauncher:
 			case SubsystemKind::Torpedo:
@@ -401,6 +402,7 @@ namespace SpaceGod::Core
 			case SubsystemKind::Drill: return "drill prow";
 			case SubsystemKind::Engine: return "engine";
 			case SubsystemKind::ShieldGenerator: return "shield generator";
+			case SubsystemKind::NaniteRepair: return "nanite repair system"; // US-T102
 			default: return cs::Strings::ToLowerInvariant(cs::Str(k));
 		}
 	}

@@ -51,6 +51,7 @@ namespace SpaceGod::Core
 			case SubsystemKind::VulcanCannon: return "VulcanCannon";
 			case SubsystemKind::HiveLauncher: return "HiveLauncher";
 			case SubsystemKind::RocketPod: return "RocketPod";
+			case SubsystemKind::NaniteRepair: return "NaniteRepair"; // US-T102
 			case SubsystemKind::BroadcastArray: return "BroadcastArray"; // US-T96
 		}
 		return "";
@@ -279,6 +280,7 @@ namespace SpaceGod::Core
 			case SubsystemKind::VulcanCannon: return 60;
 			case SubsystemKind::HiveLauncher: return 40;
 			case SubsystemKind::RocketPod: return 40;
+			case SubsystemKind::NaniteRepair: return 180; // US-T102
 			default: return 200;
 		}
 	}
@@ -351,6 +353,7 @@ namespace SpaceGod::Core
 			case SubsystemKind::VulcanCannon: return "Vulcan cannon";
 			case SubsystemKind::HiveLauncher: return "Hive missiles";
 			case SubsystemKind::RocketPod: return "Rocket pod";
+			case SubsystemKind::NaniteRepair: return "Nanite repair"; // US-T102
 			case SubsystemKind::BroadcastArray: return "Broadcast array"; // US-T96
 			default: return "Reactor";
 		}

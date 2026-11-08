@@ -113,6 +113,7 @@ namespace SpaceGod::Core
 
 	bool ShieldEmitters::Restorable(const cs::Ref<Subsystem>& s)
 	{
-		return s->Destroyed() && (s->Kind() == SubsystemKind::ShieldGenerator || s->Def->IsWeapon());
+		// A nanite repair system on a shield mount (US-T102) is brought back as the emitter it stands in for would be.
+		return s->Destroyed() && (s->Kind() == SubsystemKind::ShieldGenerator || s->Kind() == SubsystemKind::NaniteRepair || s->Def->IsWeapon());
 	}
 }

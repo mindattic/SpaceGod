@@ -56,6 +56,7 @@ namespace SpaceGod::Core
 			case ModuleKind::HiveLauncher: return "HiveLauncher";
 			case ModuleKind::RocketPod: return "RocketPod";
 			case ModuleKind::MiningLaser: return "MiningLaser"; // US-T264
+			case ModuleKind::NaniteRepair: return "NaniteRepair"; // US-T102
 		}
 		return "";
 	}
@@ -168,6 +169,9 @@ namespace SpaceGod::Core
 			cs::New<ModuleSpec>(ModuleKind::RocketPod, "Rocket pod", 30, false, Mi, S, false, 110, cs::List<std::pair<Good, double>>{ { Good::Alloys, 8 }, { Good::Machinery, 2 }, { Good::Munitions, 6 } }),
 			// US-T264: a mining laser (a facility, inside the hull): the emitter, its cooling and the crusher that bags the ore.
 			cs::New<ModuleSpec>(ModuleKind::MiningLaser, "Mining laser", 40, false, NoMount, S, false, 180, cs::List<std::pair<Good, double>>{ { Good::Alloys, 14 }, { Good::Electronics, 10 }, { Good::Machinery, 8 } }),
+			// US-T102: a nanite repair system on a shield mount: the swarm's foundry, its feedstock bins and the platinum of
+			// its assemblers, dearer than the generator it replaces.
+			cs::New<ModuleSpec>(ModuleKind::NaniteRepair, "Nanite repair", 70, true, Sh, S, false, 180, cs::List<std::pair<Good, double>>{ { Good::Alloys, 25 }, { Good::Electronics, 40 }, { Good::Machinery, 20 }, { Good::Platinum, 3 } }),
 		};
 		return all;
 	}
@@ -221,6 +225,7 @@ namespace SpaceGod::Core
 			case ModuleKind::RocketPod: return SubsystemKind::RocketPod;
 			case ModuleKind::ShieldGenerator:
 			case ModuleKind::HardenedShield: return SubsystemKind::ShieldGenerator;
+			case ModuleKind::NaniteRepair: return SubsystemKind::NaniteRepair; // US-T102
 			default: return SubsystemKind::Engine;
 		}
 	}
@@ -327,6 +332,7 @@ namespace SpaceGod::Core
 			case SubsystemKind::VulcanCannon: return ModuleKind::VulcanCannon;
 			case SubsystemKind::HiveLauncher: return ModuleKind::HiveLauncher;
 			case SubsystemKind::RocketPod: return ModuleKind::RocketPod;
+			case SubsystemKind::NaniteRepair: return ModuleKind::NaniteRepair; // US-T102: still a shield mount
 			default: return std::nullopt;
 		}
 	}
@@ -498,7 +504,8 @@ namespace SpaceGod::Core
 			if (!Fitted[i].has_value()) continue;
 			ModuleKind m = *Fitted[i];
 			double rating = m == ModuleKind::HardenedShield ? HardenedRating : m == ModuleKind::TorchEngine ? TorchRating : 1;
-			if (slot->Type == MountType::Shield) ratings += rating;
+			// A nanite repair system on a shield mount (US-T102) projects no field: the hull gives up that emitter's share.
+			if (slot->Type == MountType::Shield && m != ModuleKind::NaniteRepair) ratings += rating;
 			if (slot->Type == MountType::Engine) { engines++; thrust += rating; }
 			if (m == slot->Stock) continue;
 			const auto& was = Base->Layout[slot->LayoutIndex];

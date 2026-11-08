@@ -38,6 +38,7 @@
 #include "Combat/GatePickets.h"
 #include "Combat/LaneInterdictors.h"
 #include "Combat/MarineHabitats.h"
+#include "Combat/NaniteRepairs.h"
 #include "Combat/Radiators.h"
 #include "Combat/RearLine.h"
 #include "Combat/ScreenWeapons.h"
@@ -93,6 +94,7 @@ namespace SpaceGod::Core
 		GatePickets::PerGate(); GatePickets::JumpWatchAu(); found++;
 		LaneInterdictors::RechargeDays(); LaneInterdictors::PicketChance(); found++;
 		MarineHabitats::DrillDays(); MarineHabitats::DrillBonus(); found++;
+		NaniteRepairs::RunClassConstructor(); found++;                      // US-T102 (not a C# source)
 		Radiators::RunClassConstructor(); found++;
 		RearLine::Standoff(); RearLine::GuardKm(); RearLine::RearBias(); RearLine::CapitalBias(); found++;
 		ScreenWeapons::RunClassConstructor(); found++;
