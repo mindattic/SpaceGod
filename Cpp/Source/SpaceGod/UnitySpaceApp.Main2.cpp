@@ -1722,14 +1722,17 @@ namespace SpaceGod
 		auto rel = Relative(scene);
 		auto sp = UnityCamera->WorldToScreenPoint(rel);
 		depth = sp.z;
-		gui = Vector2(sp.x, Screen::height - sp.y);
+		// US-T252: in GUI units under the Accessibility UI scale while the GUI's passes run (Screen::height is then in them too).
+		float k = GUI::passScale;
+		gui = Vector2(sp.x / k, Screen::height - sp.y / k);
 		return sp.z > 0;
 	}
 
 	bool UnitySpaceApp::RelativeToGui(Vector3 rel, Vector2& gui)
 	{
 		auto sp = UnityCamera->WorldToScreenPoint(rel);
-		gui = Vector2(sp.x, Screen::height - sp.y);
+		float k = GUI::passScale; // US-T252: as ToGui
+		gui = Vector2(sp.x / k, Screen::height - sp.y / k);
 		return sp.z > 0;
 	}
 

@@ -29,6 +29,7 @@
 #include "Systems/VoidWatcher.h"
 
 #include "Camera/SpaceCamera.h"
+#include "PlayerOptions.h" // US-T252
 #include "Input/InputDevice.h"
 #include "Rendering/AssetStreamer.h"
 #include "Streaming/AreaStreaming.h"
@@ -173,8 +174,9 @@ namespace SpaceGod
 	cs::String UnitySpaceApp::DistanceText(double km)
 	{
 		if (km >= 0.01 * Core::Astro::LightYearKm) return cs::Fmt(km / Core::Astro::LightYearKm, "0.00") + " ly";
-		if (km >= 0.01 * Core::Astro::AuKm) return cs::Fmt(km / Core::Astro::AuKm, "0.00") + " AU";
-		return cs::Fmt(km, "N0") + " km";
+		// US-T252: Settings > Gameplay > Distances.
+		if (PlayerOptions::WriteAu(km, 0.01 * Core::Astro::AuKm)) return cs::Fmt(km / Core::Astro::AuKm, km < 0.01 * Core::Astro::AuKm ? "0.0000" : "0.00") + " AU";
+		return PlayerOptions::KmText(km);
 	}
 
 	// ---------------------------------------------------------------- between the stars

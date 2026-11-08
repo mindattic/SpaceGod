@@ -3,6 +3,7 @@
 
 #include "ActiveProfile.h"
 #include "GameSettingsHost.h"
+#include "PlayerOptions.h" // US-T252
 #include "Settings/GameSetting.h"
 #include "Settings/SettingsRegistry.h"
 #include "Shared/Profiles/ProfileStore.h"
@@ -35,6 +36,7 @@ namespace SpaceGod::UI
 	{
 		if (!IsOpen) return;
 		if (confirm != nullptr) Revert();
+		leaving = Leave::None;
 		IsOpen = false;
 		Time::timeScale = timeScaleBefore;
 	}
@@ -48,6 +50,11 @@ namespace SpaceGod::UI
 			return;
 		}
 		if (!escape) return;
+		if (leaving != Leave::None)
+		{
+			leaving = Leave::None; // US-T252: Esc answers the question with Stay
+			return;
+		}
 		Back();
 	}
 
@@ -138,7 +145,8 @@ namespace SpaceGod::UI
 		}
 		UiMotion::Scope motion(page == Page::Main ? "pause.main" : page == Page::Settings ? "pause.settings" : "pause.display");
 		bool enabled = GUI::enabled;
-		GUI::enabled = confirm == nullptr;
+		bool asking = leaving != Leave::None && page == Page::Main; // US-T252
+		GUI::enabled = confirm == nullptr && !asking;
 		switch (page)
 		{
 			case Page::Main: DrawMain(); break;
@@ -147,6 +155,7 @@ namespace SpaceGod::UI
 		}
 		GUI::enabled = enabled;
 		if (confirm != nullptr) DrawConfirm();
+		else if (asking) DrawLeave();
 	}
 
 	Rect PauseMenu::Centred(float w, float h) const
@@ -174,15 +183,17 @@ namespace SpaceGod::UI
 			if (ShowSaves) ShowSaves();
 		}
 		if (GUI::Button(Rect(r.x + 20, y + 132, w - 40, 34), "Settings", button)) page = Page::Settings;
+		// US-T252: Confirm before quitting (Settings > Gameplay) asks first.
+		bool ask = PlayerOptions::ConfirmQuit()->Value && !PlayerOptions::ScriptedRun(); // a driven run leaves in one click
 		if (GUI::Button(Rect(r.x + 20, y + 176, w - 40, 34), "Main Menu", button))
 		{
-			Close();
-			if (ToMainMenu) ToMainMenu();
+			if (ask) leaving = Leave::MainMenu;
+			else LeaveNow(Leave::MainMenu);
 		}
 		if (GUI::Button(Rect(r.x + 20, y + 220, w - 40, 34), "Quit", button))
 		{
-			Time::timeScale = timeScaleBefore;
-			Quit();
+			if (ask) leaving = Leave::Quit;
+			else LeaveNow(Leave::Quit);
 		}
 	}
 
@@ -190,7 +201,14 @@ namespace SpaceGod::UI
 	{
 		const auto& registry = GameSettingsHost::Registry();
 		auto groups = registry->Groups();
-		if (group.empty() || !groups.Contains(group)) group = groups.Count() > 0 ? groups[0] : cs::String();
+		// US-T252: the player's own groups first, in their order; every other group is design tuning, folded under Advanced.
+		cs::List<cs::String> playerGroups, advancedGroups;
+		for (const auto& g : PlayerOptions::PlayerGroups())
+			if (groups.Contains(g)) playerGroups.Add(g);
+		for (const auto& g : groups)
+			if (!PlayerOptions::IsPlayerGroup(g)) advancedGroups.Add(g);
+		if (group.empty() || !groups.Contains(group))
+			group = playerGroups.Count() > 0 ? playerGroups[0] : groups.Count() > 0 ? groups[0] : cs::String();
 
 		float w = Mathf::Min(820, Screen::width - 40), h = Mathf::Min(560, Screen::height - 40);
 		auto r = Centred(w, h);
@@ -212,19 +230,54 @@ namespace SpaceGod::UI
 		// The groups.
 		const float navW = 190;
 		float top = r.y + 70, bottom = r.yMax() - 56;
-		float ny = top;
-		if (GUI::Button(Rect(r.x + 20, ny, navW, 30), "Display", button)) OpenDisplay();
-		ny += 36;
-		for (const auto& g : groups)
 		{
-			if (ny + 30 > bottom) break;
-			if (GUI::Button(Rect(r.x + 20, ny, navW, 30), g, !searching && g == group ? buttonActive : button))
+			// US-T252: Gameplay, Graphics, Display, Audio, Controls, Accessibility; then "Advanced (simulation)", folded until
+			// opened, over the design groups. Scrolls when it runs past the panel (a small window, or a large UI scale).
+			const float step = 34, indent = 12;
+			bool displayShown = false;
+			int rowsNeeded = playerGroups.Count() + 1 + (advancedGroups.Count() > 0 ? 1 : 0) + (advancedOpen ? advancedGroups.Count() : 0);
+			auto navView = Rect(r.x + 20, top, navW, bottom - top);
+			float navH = rowsNeeded * step;
+			bool overflow = navH > navView.height;
+			float bw = overflow ? navW - 18 : navW;
+			navScroll = GUI::BeginScrollView(navView, navScroll, Rect(0, 0, bw, Mathf::Max(navH, 1.0f)));
+			float ny = 0;
+			auto displayButton = [&]
 			{
-				group = g;
-				search = "";
-				settingsScroll = Vector2::zero();
+				if (GUI::Button(Rect(0, ny, bw, 30), "Display", button)) OpenDisplay();
+				ny += step;
+				displayShown = true;
+			};
+			for (const auto& g : playerGroups)
+			{
+				NavGroup(g, Rect(0, ny, bw, 30), searching);
+				ny += step;
+				if (g == SettingGroups::Graphics) displayButton();
 			}
-			ny += 34;
+			if (!displayShown) displayButton();
+			if (advancedGroups.Count() > 0)
+			{
+				bool shownInside = !searching && advancedGroups.Contains(group);
+				cs::String head = cs::Cat(advancedOpen ? "-  " : "+  ", "Advanced (simulation)");
+				if (GUI::Button(Rect(0, ny, bw, 30), head, shownInside && !advancedOpen ? buttonActive : button))
+				{
+					advancedOpen = !advancedOpen;
+					// Folding it away from under the group shown goes back to the player's first group.
+					if (!advancedOpen && advancedGroups.Contains(group) && playerGroups.Count() > 0)
+					{
+						group = playerGroups[0];
+						settingsScroll = Vector2::zero();
+					}
+				}
+				ny += step;
+				if (advancedOpen)
+					for (const auto& g : advancedGroups)
+					{
+						NavGroup(g, Rect(indent, ny, bw - indent, 30), searching);
+						ny += step;
+					}
+			}
+			GUI::EndScrollView();
 		}
 
 		// The settings.
@@ -270,6 +323,46 @@ namespace SpaceGod::UI
 		{
 			search = ""; // the button leaves the page outright; only Esc stops at clearing a search first
 			Back();
+		}
+	}
+
+	void PauseMenu::NavGroup(const cs::String& g, Rect r, bool searching)
+	{
+		if (GUI::Button(r, g, !searching && g == group ? buttonActive : button))
+		{
+			group = g;
+			search = "";
+			settingsScroll = Vector2::zero();
+		}
+	}
+
+	void PauseMenu::DrawLeave()
+	{
+		const float w = 380, h = 132;
+		auto r = Centred(w, h);
+		GUI::DrawTexture(Rect(0, 0, static_cast<float>(Screen::width), static_cast<float>(Screen::height)), shadeTexture); // over the first page
+		GUI::Box(r, GUIContent::none(), panel);
+		bool quit = leaving == Leave::Quit;
+		GUI::Label(Rect(r.x + 20, r.y + 14, w - 40, 22), quit ? "Quit the game?" : "Leave for the main menu?", title);
+		GUI::Label(Rect(r.x + 20, r.y + 40, w - 40, 36),
+			quit ? "The game autosaves on the way out." : "The game autosaves on the way.  (Settings > Gameplay stops this question.)", small);
+		float bw = (w - 50) * 0.5f;
+		if (GUI::Button(Rect(r.x + 20, r.yMax() - 46, bw, 30), quit ? "Quit" : "Main Menu", buttonActive)) LeaveNow(leaving);
+		else if (GUI::Button(Rect(r.x + 30 + bw, r.yMax() - 46, bw, 30), "Stay", button)) leaving = Leave::None;
+	}
+
+	void PauseMenu::LeaveNow(Leave what)
+	{
+		leaving = Leave::None;
+		if (what == Leave::MainMenu)
+		{
+			Close();
+			if (ToMainMenu) ToMainMenu();
+		}
+		else if (what == Leave::Quit)
+		{
+			Time::timeScale = timeScaleBefore;
+			Quit();
 		}
 	}
 

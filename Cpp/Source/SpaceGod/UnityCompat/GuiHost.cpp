@@ -734,11 +734,18 @@ namespace SpaceGod::UnityCompat
 			float scale = allotted.Scale > 0 ? allotted.Scale : 1.0f;
 			FVector2f localSize = allotted.GetLocalSize();
 			int pw = FMath::RoundToInt(localSize.X * scale), ph = FMath::RoundToInt(localSize.Y * scale);
+			// US-T252: the Accessibility UI scale. The GUI is laid out on a screen that many times smaller (Screen::width and
+			// height read in GUI units while the passes run, the pointer divided to match) and drawn that many times larger
+			// by the child geometry; outside the passes Screen keeps the real pixels the camera and the game's input use.
+			float ui = FMath::Clamp(GUI::uiScale > 0 ? GUI::uiScale : 1.0f, 0.5f, 3.0f);
+			int gw = FMath::Max(1, FMath::RoundToInt(pw / ui)), gh = FMath::Max(1, FMath::RoundToInt(ph / ui));
 			if (pw > 0 && ph > 0)
 			{
-				Screen::width = pw;
-				Screen::height = ph;
+				Screen::width = gw;
+				Screen::height = gh;
 			}
+			GUI::passScale = GUI::frameScale = ui;
+			auto toGui = [ui](Vector2 p) { return Vector2(p.x / ui, p.y / ui); };
 			// Paint geometry is window space, the input events' positions desktop space (US-T77: with the window anywhere
 			// but the desktop's top-left, every click and hover missed the controls by the window's position).
 			input.overlayAbsTopLeft = FVector2f(allotted.GetAbsolutePosition()) + FVector2f(args.GetWindowToDesktopTransform());
@@ -747,7 +754,7 @@ namespace SpaceGod::UnityCompat
 			input.absToPixel = absSize.X > 0 ? static_cast<float>(pw) / absSize.X : 1.0f;
 			input.present = true;
 
-			FGeometry px = allotted.MakeChild(FVector2f(static_cast<float>(pw), static_cast<float>(ph)), FSlateLayoutTransform(1.0f / scale));
+			FGeometry px = allotted.MakeChild(FVector2f(static_cast<float>(gw), static_cast<float>(gh)), FSlateLayoutTransform(ui / scale));
 			GUI::SetRenderer(&slateRenderer);
 			GUI::BeginFrame();
 			GUI::Stats() = GUI::FrameStats();
@@ -756,19 +763,20 @@ namespace SpaceGod::UnityCompat
 			events.swap(input.queue);
 			for (PendingEvent& p : events)
 			{
-				Vector2 mouse = ToPixels(p.absMouse);
+				Vector2 mouse = toGui(ToPixels(p.absMouse));
 				Event layout;
 				layout.type = layout.rawType = EventType::Layout;
 				layout.mousePosition = mouse;
 				RunPass(layout);
 				Event e = p.e;
 				e.mousePosition = mouse;
+				e.delta = toGui(e.delta);
 				RunPass(e);
 				// A press released with no control left to take it must not stay hot (its panel may have closed).
 				if (p.e.type == EventType::MouseUp) GUIUtility::hotControl = 0;
 			}
 
-			Vector2 mouse = input.haveMouse ? ToPixels(input.absMouse) : Vector2(-10000, -10000);
+			Vector2 mouse = input.haveMouse ? toGui(ToPixels(input.absMouse)) : Vector2(-10000, -10000);
 			Event layout;
 			layout.type = layout.rawType = EventType::Layout;
 			layout.mousePosition = mouse;
@@ -781,6 +789,13 @@ namespace SpaceGod::UnityCompat
 			repaint.mousePosition = mouse;
 			RunPass(repaint);
 			int32 last = slateRenderer.End();
+			// US-T252: back to the real pixels for everything outside the passes.
+			if (pw > 0 && ph > 0)
+			{
+				Screen::width = pw;
+				Screen::height = ph;
+			}
+			GUI::passScale = 1;
 			inFrame = false;
 			Race::Probe::GuiMs = Race::Probe::Now() - raceT0; // US-T46
 			return last;

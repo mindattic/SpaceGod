@@ -58,7 +58,7 @@ namespace SpaceGod
 
 	const cs::Ref<ToggleSetting>& UnitySpaceApp::TutorialHintsSetting()
 	{
-		static const cs::Ref<ToggleSetting> value = cs::New<ToggleSetting>("controls.tutorialHints", SettingGroups::Controls,
+		static const cs::Ref<ToggleSetting> value = cs::New<ToggleSetting>("controls.tutorialHints", SettingGroups::Gameplay, // US-T252: under Gameplay (the key kept)
 			"Tutorial hints", true,
 			"A short card the first time you meet a battle, a hyperlane, a jump gate, a void stop or a fight aboard (each once per profile). The tutorial itself is under Help.",
 			"tutorial hints tips help first time new player");
@@ -349,7 +349,7 @@ namespace SpaceGod
 			GUI::Label(Rect(r.x + 16, r.y + 10, w - 32, 16), "TUTORIAL", tutorialHeading);
 			GUI::Label(Rect(r.x + 16, r.y + 28, w - 32, 22), "That is the heart of it", tutorialTitle);
 			GUI::Label(Rect(r.x + 16, r.y + 54, w - 32, 60),
-				"The manual (F1) has every chapter and every key. A short hint will come up the first time you meet a battle, a hyperlane, a jump gate, a void stop or a fight aboard (Settings > Controls turns them off).",
+				"The manual (F1) has every chapter and every key. A short hint will come up the first time you meet a battle, a hyperlane, a jump gate, a void stop or a fight aboard (Settings > Gameplay turns them off).",
 				tutorialText);
 			if (GUI::Button(Rect(r.x + 16, r.y + h - 34, 96, 24), "Close", tutorialButton)) tutorialDoneAge = -1;
 			return;

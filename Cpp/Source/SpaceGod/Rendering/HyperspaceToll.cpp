@@ -5,6 +5,7 @@
 
 #include "UnitySpaceApp.h"
 #include "ModelViewer.h"
+#include "PlayerOptions.h" // US-T252
 #include "Streaming.h"
 #include "Camera/SpaceCamera.h"
 #include "Camera/StarTravel.h"
@@ -357,6 +358,8 @@ namespace SpaceGod::Rendering
 		float lub = std::exp(-std::pow(std::min(p, 1 - p) / 0.05f, 2.0f));
 		float dub = std::exp(-std::pow((p - 0.2f) / 0.06f, 2.0f));
 		st.beat = Clamp01(lub + 0.65f * dub);
+		// US-T252: Reduce flashes and shake stills the heartbeat (no throb of the vignette, the veins, the fringe or the red wash).
+		if (PlayerOptions::Calm()) st.beat = 0;
 
 		// The view itself: colour drained out, its edges split, a vignette and grain, in a volume of its own over the game's look.
 		UWorld* world = UnityScene::World();
@@ -427,6 +430,7 @@ namespace SpaceGod::Rendering
 		// The darkness closing in behind the veins, swelling with each beat, its edge split red.
 		float k = std::max(1.0f, (front + 0.08f) / 0.38f) * (1 - 0.025f * beat * sev);
 		float dark = std::pow(sev, 0.6f);
+		if (PlayerOptions::Calm()) dark *= 0.6f; // US-T252: a lighter vignette under Reduce flashes and shake
 		Centred(st.vignette, centre, W * k * 1.04f, H * k * 1.04f, Color(0.45f, 0.0f, 0.04f, dark * 0.35f));
 		Centred(st.vignette, centre, W * k, H * k, Color(0.025f, 0.0f, 0.03f, dark * 0.96f));
 		Centred(st.vignette, centre, W * k * 0.975f, H * k * 0.975f, Color(0.0f, 0.3f, 0.35f, dark * 0.08f));

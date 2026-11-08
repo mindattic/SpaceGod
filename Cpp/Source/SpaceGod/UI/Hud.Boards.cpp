@@ -3,6 +3,7 @@
 #include "UI/Hud.h"
 #include "UI/UiMotion.h" // US-T255
 #include "CaptureEvents.h" // US-T72
+#include "PlayerOptions.h" // US-T252
 
 #include "UnitySpaceApp.h"
 #include "Coop/CoopPeer.h" // US-T265: plants are bought and run outside co-op
@@ -1186,8 +1187,20 @@ namespace SpaceGod::UI
 
 	void Hud::DrawTicker()
 	{
-		const auto& events = app->World()->Events;
-		int n = cs::Math::Min(4, events.Count());
+		const auto& all = app->World()->Events;
+		// US-T252: Settings > Gameplay > Toasts and news: Quiet shows no ticker, Important only battles, captures and diplomacy
+		// (the news screen keeps every report).
+		auto notices = PlayerOptions::NoticeMode();
+		if (notices == PlayerOptions::NoticeLevel::Quiet) return;
+		cs::List<WorldEvent> events;
+		for (int i = all.Count() - 1; i >= 0 && events.Count() < 4; i--)
+		{
+			auto k = all[i].Kind;
+			if (notices == PlayerOptions::NoticeLevel::Important && k != WorldEventKind::Battle && k != WorldEventKind::Capture && k != WorldEventKind::Diplomacy)
+				continue;
+			events.Insert(0, all[i]);
+		}
+		int n = events.Count();
 		if (n == 0) return;
 		// US-T255: when the newest report came in (told apart by its date and text: the list is trimmed at its cap).
 		static cs::String tickerNewest;

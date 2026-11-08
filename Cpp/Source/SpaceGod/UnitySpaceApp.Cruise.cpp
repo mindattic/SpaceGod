@@ -21,6 +21,7 @@
 #include "Sensors/SensorPosture.h"
 #include "Ships.h"
 #include "SimClock.h"
+#include "PlayerOptions.h" // US-T252
 #include "UI/CheatMenu.h"
 #include "UI/Hud.h"
 #include "UI/Icons.h"
@@ -47,8 +48,9 @@ namespace SpaceGod
 
 		cs::String CruiseDistanceText(double km)
 		{
-			if (km >= 0.01 * Astro::AuKm) return cs::Cat(cs::Fmt(km / Astro::AuKm, "0.00"), " AU");
-			return cs::Cat(cs::Fmt(km, "N0"), " km");
+			// US-T252: Settings > Gameplay > Distances.
+			if (PlayerOptions::WriteAu(km, 0.01 * Astro::AuKm)) return cs::Cat(cs::Fmt(km / Astro::AuKm, km < 0.01 * Astro::AuKm ? "0.0000" : "0.00"), " AU");
+			return PlayerOptions::KmText(km);
 		}
 
 		cs::String CruiseSecondsText(double s)
@@ -80,6 +82,7 @@ namespace SpaceGod
 
 		void CruiseWash(Color color, float alpha)
 		{
+			alpha *= PlayerOptions::FlashScale(); // US-T252: Reduce flashes and shake
 			if (alpha < 0.002f) return;
 			auto old = GUI::color;
 			GUI::color = Color(color.r, color.g, color.b, alpha);
@@ -92,6 +95,7 @@ namespace SpaceGod
 		{
 			float t = Time::unscaledTime;
 			float a = (0.12f + 0.38f * fraction) * (0.65f + 0.35f * Mathf::Sin(t * (3.0f + 9.0f * fraction)));
+			if (PlayerOptions::Calm()) a = (0.06f + 0.14f * fraction) * 0.8f; // US-T252: a steady, faint glow, no pulse
 			float w = static_cast<float>(Screen::width), h = static_cast<float>(Screen::height);
 			auto old = GUI::color;
 			for (int i = 0; i < 4; i++)

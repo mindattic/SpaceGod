@@ -58,6 +58,15 @@ namespace SpaceGod::UI
 		cs::String search = "";
 		Vector2 settingsScroll;
 
+		/// US-T252: whether the nav's "Advanced (simulation)" section (the design groups) is unfolded -- folded until the
+		/// player opens it -- and how far the nav is scrolled when its groups run past the panel.
+		bool advancedOpen = false;
+		Vector2 navScroll;
+
+		/// US-T252: Main Menu or Quit picked with Confirm before quitting on: the question shown over the first page.
+		enum class Leave : int { None, MainMenu, Quit };
+		Leave leaving = Leave::None;
+
 		/// The words that find the Display page in a search, as the registry's settings are found by theirs.
 		static constexpr const char* DisplaySearchWords = "display graphics resolution screen window mode borderless fullscreen exclusive vsync aspect ratio ultrawide";
 
@@ -124,8 +133,9 @@ namespace SpaceGod::UI
 
 		static constexpr float SettingRowH = 58;
 
-		/// The Settings page (U.SPC-T431): Display and every group the registry holds down the left, the chosen
-		/// group's settings (or, while something is typed in Search, every setting it finds) on the right.
+		/// The Settings page (U.SPC-T431): the player's groups and Display down the left, then the design groups folded
+		/// under "Advanced (simulation)" (US-T252), the chosen group's settings (or, while something is typed in Search,
+		/// every setting it finds, folded or not) on the right.
 		void DrawSettings();
 
 		/// One setting's row: its name and what it does on the left, its control and Reset on the right.
@@ -136,6 +146,14 @@ namespace SpaceGod::UI
 
 		void DrawDisplay();
 		void DrawConfirm();
+
+		/// US-T252: "Leave for the main menu?" / "Quit the game?" over the first page; Yes leaves, No (or Esc) stays.
+		void DrawLeave();
+		/// Main Menu or Quit, now (the question answered, or none asked).
+		void LeaveNow(Leave what);
+
+		/// US-T252: one nav button for a group (highlighted while shown); picking it shows the group.
+		void NavGroup(const cs::String& g, Rect r, bool searching);
 		void EnsureStyles();
 
 	public:

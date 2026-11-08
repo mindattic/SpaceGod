@@ -12,6 +12,7 @@
 #include "Combat/CombatSpecs.h"
 #include "Combat/CombatState.h"
 #include "Embodiment/MountedTurret.h"
+#include "PlayerOptions.h" // US-T252
 
 using namespace SpaceGod::Core;
 
@@ -188,6 +189,7 @@ namespace SpaceGod::UI
 
 	void Hud::DrawEdgePulse(Color tint, float alpha)
 	{
+		if (PlayerOptions::Calm()) alpha *= 0.45f; // US-T252: Reduce flashes and shake (fainter, still read as a warning)
 		if (alpha < 0.004f) return;
 		auto old = GUI::color;
 		const auto& tex = Icons::White();

@@ -28,6 +28,7 @@
 #include "ActiveProfile.h"
 #include "Bootstrap.h"
 #include "GameLaunch.h"
+#include "PlayerOptions.h" // US-T252
 #include "Camera/SpaceCamera.h"
 #include "Camera/StarTravel.h"
 #include "Rendering/Materials.h"
@@ -58,11 +59,15 @@ namespace SpaceGod
 	void UnitySpaceApp::UpdateSaves(float dt)
 	{
 		if (!autosaveEnabled) return;
-		autosaveDueS -= dt;
+		// US-T252: Settings > Gameplay > Autosave (off, or every 2 to 30 minutes); a shorter interval picked takes hold at once.
+		float every = PlayerOptions::AutosaveSeconds();
+		if (every <= 0) return;
+		autosaveDueS = Mathf::Min(autosaveDueS, every) - dt;
 		// Between the stars there is no system to come back to (nor, latched to a hulk, a session to keep): try again once that is over.
 		if (autosaveDueS > 0 || !SaveBlocker().empty()) return;
-		autosaveDueS = AutosaveIntervalS;
-		Autosave(false);
+		autosaveDueS = every;
+		// US-T252: Toasts and news below Everything takes the autosave without its toast.
+		Autosave(PlayerOptions::NoticeMode() != PlayerOptions::NoticeLevel::Everything);
 	}
 
 	void UnitySpaceApp::OnApplicationQuit()
@@ -253,7 +258,7 @@ namespace SpaceGod
 			World()->PilotedShip = nullptr;
 			FocusSystemOverview();
 		}
-		autosaveDueS = AutosaveIntervalS;
+		autosaveDueS = PlayerOptions::AutosaveSeconds() > 0 ? PlayerOptions::AutosaveSeconds() : AutosaveIntervalS; // US-T252
 		CoopLoaded(); // US-T44
 	}
 

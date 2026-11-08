@@ -282,6 +282,17 @@ namespace SpaceGod::UnityCompat
 		/// (0: at once, as Unity does). The host's setting, not reset per OnGUI call.
 		static inline float hoverSeconds = 0;
 
+		// ---- host extensions (US-T252): the Accessibility settings' UI scale and text size (PlayerOptions sets them)
+		/// Screen pixels one GUI unit covers in the game's window: the host lays the GUI out on a screen this much smaller
+		/// (Screen::width/height read in GUI units during its passes) and draws it this much larger. 1 as Unity draws.
+		static inline float uiScale = 1;
+		/// Every font size is multiplied by it (GUIStyle::EffectiveFontSize). 1 as Unity draws.
+		static inline float textScale = 1;
+		/// While the host's passes run, the scale they run at; 1 outside them (a world point to the GUI divides by it).
+		static inline float passScale = 1;
+		/// The scale the last frame's passes ran at: what a rect recorded in them is measured in (the pointer-over-UI test).
+		static inline float frameScale = 1;
+
 		// ---- controls
 		static void Label(const Rect& position, const cs::String& text);
 		static void Label(const Rect& position, const GUIContent& content);

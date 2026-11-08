@@ -5,6 +5,7 @@
 
 #include "UnitySpaceApp.h"
 #include "ActiveProfile.h"
+#include "PlayerOptions.h" // US-T252
 #include "UI/GalaxyMapScreen.h"
 #include "UI/SystemMapScreen.h" // US-T258
 #include "UI/HelpScreen.h"
@@ -269,7 +270,9 @@ namespace SpaceGod::UI
 		GUI::contentColor = Dim;
 		cs::String blocked = app->SaveBlocker();
 		GUI::Label(Rect(r.x + 12, r.y + 30, w - 24, 18), !blocked.empty() ? blocked :
-			cs::Cat("F5 quicksave   F8 quickload   F6 close   ·   autosaves every ", cs::Fmt(UnitySpaceApp::AutosaveIntervalS / 60.0f, "0"), " minutes and on quit"), small);
+			PlayerOptions::AutosaveSeconds() > 0 // US-T252: Settings > Gameplay > Autosave
+				? cs::Cat("F5 quicksave   F8 quickload   F6 close   ·   autosaves every ", cs::Fmt(PlayerOptions::AutosaveSeconds() / 60.0f, "0"), " minutes and on quit")
+				: cs::String("F5 quicksave   F8 quickload   F6 close   ·   autosaves on quit (Settings > Gameplay)"), small);
 		GUI::contentColor = old;
 
 		bool enabled = GUI::enabled;
@@ -1576,7 +1579,7 @@ namespace SpaceGod::UI
 		if (app->GateFlash > 0.001f)
 		{
 			auto old = GUI::color;
-			GUI::color = Color(0.78f, 0.93f, 1.0f, app->GateFlash * app->GateFlash * 0.85f);
+			GUI::color = Color(0.78f, 0.93f, 1.0f, app->GateFlash * app->GateFlash * 0.85f * PlayerOptions::FlashScale()); // US-T252
 			GUI::DrawTexture(Rect(0, 0, static_cast<float>(Screen::width), static_cast<float>(Screen::height)), Icons::White());
 			GUI::color = old;
 		}
@@ -1613,6 +1616,7 @@ namespace SpaceGod::UI
 
 	void Hud::DrawGateLight(float amount, Color color, float opacity)
 	{
+		amount *= PlayerOptions::FlashScale(); // US-T252: Reduce flashes and shake
 		if (amount < 0.001f) return;
 		auto old = GUI::color;
 		GUI::color = Color(color.r, color.g, color.b, amount * opacity);
@@ -1681,18 +1685,21 @@ namespace SpaceGod::UI
 	cs::String Hud::Km(double km)
 	{
 		if (km < 1) return cs::Cat(cs::Fmt(km * 1000, "N0"), " m");
-		if (km < 1e7) return cs::Cat(cs::Fmt(km, "N0"), " km");
+		// US-T252: Settings > Gameplay > Distances.
+		if (!PlayerOptions::WriteAu(km, 1e7)) return km < 1e7 ? cs::Cat(cs::Fmt(km, "N0"), " km") : PlayerOptions::KmText(km);
 		return Au(km);
 	}
 
 	cs::String Hud::StellarDistance(double km)
 	{
-		return km < 1e6 ? Km(km) : km > 1000 * Astro::AuKm ? cs::Cat(cs::Fmt(km / Astro::AuKm, "N0"), " AU") : Au(km);
+		if (!PlayerOptions::WriteAu(km, 1e6)) return Km(km); // US-T252
+		return km > 1000 * Astro::AuKm ? cs::Cat(cs::Fmt(km / Astro::AuKm, "N0"), " AU") : Au(km);
 	}
 
 	cs::String Hud::Au(double km)
 	{
-		return cs::Cat(cs::Fmt(km / Astro::AuKm, km / Astro::AuKm < 10 ? "0.000" : "0.00"), " AU");
+		double au = km / Astro::AuKm;
+		return cs::Cat(cs::Fmt(au, au < 0.01 && PlayerOptions::DistanceMode() == PlayerOptions::Units::Au ? "0.00000" : au < 10 ? "0.000" : "0.00"), " AU"); // US-T252: AU when far reaches small ones
 	}
 
 	cs::String Hud::LightTime(double km)

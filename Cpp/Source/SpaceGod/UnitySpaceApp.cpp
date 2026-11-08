@@ -10,6 +10,7 @@
 #include "Input/InputDevice.h"
 #include "EngineSettings.h"
 #include "GameSettingsHost.h"
+#include "PlayerOptions.h" // US-T252
 #include "GameVoice.h" // US-T139
 #include "ModelViewer.h"
 #include "Rendering/Materials.h"
@@ -617,6 +618,8 @@ namespace SpaceGod
 		// Under the pause menu the HUD is shown but cannot be clicked.
 		bool menu = pauseMenu->IsOpen;
 		if (menu) GUI::enabled = false;
+		// US-T252: Settings > Accessibility > HUD opacity, over the view's overlays only (a screen or menu open stays solid).
+		if (!menu && OpenScreens() == 0 && !ShowSystemMap && !ShowLogs && !ShowDiscoveries) GUI::fade = PlayerOptions::HudAlpha();
 		hud->Draw();
 		DrawComms(); // US-T137: the comms panel, over the HUD
 		DrawSystemCruise(); // US-T127: the cruise drive's readout
@@ -637,7 +640,9 @@ namespace SpaceGod
 		const Input::InputDevice& mouse = Input::InputDevice::current();
 		if (!mouse.present) return false;
 		auto p = mouse.position;
-		auto gui = Vector2(p.x, Screen::height - p.y);
+		// US-T252: the rects were recorded in GUI units, under the Accessibility UI scale the last frame drew at.
+		float k = GUI::frameScale > 0 ? GUI::frameScale : 1.0f;
+		auto gui = Vector2(p.x / k, (Screen::height - p.y) / k);
 		for (const auto& r : UiRects)
 			if (r.Contains(gui)) return true;
 		return false;

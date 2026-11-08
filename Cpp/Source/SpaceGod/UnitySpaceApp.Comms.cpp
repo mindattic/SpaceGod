@@ -16,6 +16,7 @@
 #include "Input/InputDevice.h"
 #include "Law/Law.h"
 #include "Lore/LoreKeys.h"
+#include "PlayerOptions.h" // US-T252
 #include "Systems/Galaxy.h"
 #include "ScaleModel.h"
 #include "Sensors/Sensors.h"
@@ -37,12 +38,14 @@ namespace SpaceGod
 
 		Color StanceColor(CommsStance s)
 		{
+			// US-T252: the Accessibility stance palette (red / green, or the colour-blind safe orange / blue).
+			bool safe = PlayerOptions::ColourBlindStances();
 			switch (s)
 			{
-			case CommsStance::Friendly: return Color(0.45f, 1.0f, 0.6f);
-			case CommsStance::Neutral: return Color(0.8f, 0.88f, 0.95f);
-			case CommsStance::Wary: return Color(1.0f, 0.78f, 0.35f);
-			default: return Color(1.0f, 0.4f, 0.35f);
+			case CommsStance::Friendly: return safe ? PlayerOptions::FriendlyColor() : Color(0.45f, 1.0f, 0.6f);
+			case CommsStance::Neutral: return safe ? PlayerOptions::NeutralColor() : Color(0.8f, 0.88f, 0.95f);
+			case CommsStance::Wary: return PlayerOptions::WaryColor();
+			default: return PlayerOptions::HostileColor();
 			}
 		}
 	}

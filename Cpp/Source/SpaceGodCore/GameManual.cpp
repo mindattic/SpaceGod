@@ -769,9 +769,23 @@ namespace SpaceGod::Core
 
 			cs::New<ManualChapter>("Settings", "Everything you can change from the game", Keys(),
 				T("The settings menu",
-				  "Settings, from the main menu or the Esc menu, lists every tunable the game's systems declare by group: "
-				  "Graphics, Render pipeline, LOD & render budget, Simulation, Economy, Controls, Audio, Dogfighting, "
-				  "Broadsides, Weapons, FTL, AI, Civilizations and more. Search finds a setting across all of them."),
+				  "Settings, from the main menu or the Esc menu, lists your own options first -- Gameplay, Graphics, Display, "
+				  "Audio, Controls and Accessibility -- and folds the game's design tuning (Render pipeline, LOD & render "
+				  "budget, Streaming, Simulation, FTL, Civilizations, AI, Dogfighting, Broadsides, Weapons, Economy and more) "
+				  "under Advanced (simulation), closed until you open it. Search finds a setting across all of them, folded or not."),
+				T("Gameplay",
+				  "Difficulty; how often the game autosaves (off, or every 2 to 30 minutes; it always saves on quitting and on "
+				  "the way to the main menu); the first-time hints; how distances are written (km then AU, always km, or AU "
+				  "from a tenth of the Moon's distance out, a fight's ranges staying in km); Toasts and news (Important only "
+				  "keeps battles, captures and diplomacy on the news ticker and drops the autosave notice, Quiet hides the "
+				  "ticker; the news screen keeps every report); and whether Main Menu and Quit ask before they leave."),
+				T("Accessibility",
+				  "UI scale draws every screen, menu and the HUD from 75% to 200%; Text size makes every piece of text larger "
+				  "or smaller on top of it; HUD opacity lets the view show through the HUD's overlays (full screens stay solid). "
+				  "Stance colours swaps the red / grey / green of hostile, neutral and friendly -- in comms, markers, edge "
+				  "arrows and the roster -- for a colour-blind safe orange / grey / blue. Reduce flashes and shake keeps the "
+				  "gate and drive flashes, the damage pulses at the screen's edge and the hyperspace toll's vignette faint and "
+				  "its heartbeat still, and stops menus sliding in."),
 				T("Changing and resetting",
 				  "Each change takes effect at once and is kept in your profile. Reset puts back one setting, a group or "
 				  "everything found."),

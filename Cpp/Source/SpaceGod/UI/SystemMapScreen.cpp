@@ -5,6 +5,7 @@
 
 #include "UnitySpaceApp.h"
 #include "Camera/SpaceCamera.h"
+#include "PlayerOptions.h" // US-T252
 #include "UI/Icons.h"
 #include "UI/UiStyle.h"
 
@@ -55,7 +56,9 @@ namespace SpaceGod::UI
 
 		cs::String Km(double km)
 		{
-			if (km >= 0.01 * Astro::AuKm) return cs::Cat(cs::Fmt(km / Astro::AuKm, "0.00"), " AU");
+			// US-T252: Settings > Gameplay > Distances.
+			if (PlayerOptions::WriteAu(km, 0.01 * Astro::AuKm)) return cs::Cat(cs::Fmt(km / Astro::AuKm, km < 0.01 * Astro::AuKm ? "0.0000" : "0.00"), " AU");
+			if (km >= 1e9) return PlayerOptions::KmText(km);
 			if (km >= 1e6) return cs::Cat(cs::Fmt(km / 1e6, "0.0"), " million km");
 			return cs::Cat(cs::Fmt(km, "N0"), " km");
 		}

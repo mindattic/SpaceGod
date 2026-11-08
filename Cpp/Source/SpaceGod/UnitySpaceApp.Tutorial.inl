@@ -7,7 +7,7 @@
 // game's own state says so: Core::Tutorial's rules), and outlines the HUD element involved. It never takes the keys: the
 // player plays as ever, and Shift+Enter skips a step, Shift+Esc ends it. Afterwards a short card says what to do the first
 // time the player meets a battle, a hyperlane, a jump gate, a void stop and a fight aboard, once each per profile, while
-// the Tutorial hints setting (Controls) is on. Local to this machine, like the Help screen; never in a scripted run's own
+// the Tutorial hints setting (Gameplay) is on. Local to this machine, like the Help screen; never in a scripted run's own
 // play (the audit drives it on purpose).
 // </summary>
 
@@ -27,7 +27,7 @@ public:
 	/// <summary>The audit's stand-in for clicking the NAVIGATOR's title bar (the tutorial's navigator step).</summary>
 	void SetNavigatorOpen(bool open);
 
-	/// <summary>The first-time hints, on or off (Settings > Controls); remembered per profile like every setting.</summary>
+	/// <summary>The first-time hints, on or off (Settings > Gameplay); remembered per profile like every setting.</summary>
 	static const cs::Ref<Core::ToggleSetting>& TutorialHintsSetting();
 
 private:

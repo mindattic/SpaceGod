@@ -1,6 +1,7 @@
 #include "GameSettingsHost.h"
 #include "ActiveProfile.h"
 #include "EngineSettings.h"
+#include "PlayerOptions.h" // US-T252
 #include "UnitySpaceApp.h"
 #include "Camera/SpaceCamera.h"
 #include "Input/DriftKey.h"
@@ -34,6 +35,7 @@ namespace SpaceGod
 		});
 		// The Runtime assembly's [SettingsSource] classes, each accessor touched in C# field order.
 		SettingsRegistry::AddDeclarationSource([] { EngineSettings::FrameRateCap(); EngineSettings::Msaa(); EngineSettings::MasterVolume(); });
+		SettingsRegistry::AddDeclarationSource([] { PlayerOptions::Declare(); }); // US-T252: Settings > Gameplay and Accessibility
 		SettingsRegistry::AddDeclarationSource([] { UnitySpaceApp::AutoReorientSetting(); });
 		SettingsRegistry::AddDeclarationSource([] { UnitySpaceApp::TutorialHintsSetting(); }); // US-T254: the first-time hints
 		SettingsRegistry::AddDeclarationSource([] { Cameras::SpaceCamera::LookSensitivitySetting(); Cameras::SpaceCamera::InvertLook(); });

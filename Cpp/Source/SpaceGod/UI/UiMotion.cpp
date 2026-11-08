@@ -11,6 +11,7 @@
 
 #include "ActiveProfile.h"
 #include "MindAtticHeadless.h"
+#include "PlayerOptions.h" // US-T252
 #include "Shared/Profiles/ProfileStore.h"
 #include "UnityCompat/GuiHost.h"
 
@@ -38,7 +39,8 @@ namespace SpaceGod::UI::UiMotion
 			{
 				auto profile = ActiveProfile::Current();
 				auto settings = profile != nullptr ? profile->Settings() : nullptr;
-				return settings != nullptr && settings->Common != nullptr && settings->Common->ReduceMotion();
+				// US-T252: or Settings > Accessibility > Reduce flashes and shake.
+				return PlayerOptions::Calm() || (settings != nullptr && settings->Common != nullptr && settings->Common->ReduceMotion());
 			}
 			catch (...)
 			{

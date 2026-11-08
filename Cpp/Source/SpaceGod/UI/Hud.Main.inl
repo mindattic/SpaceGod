@@ -252,8 +252,9 @@ private:
 	static constexpr double ArrowFallbackGunKm = 20;
 	/// <summary>At most this many hostile arrows, the nearest (a locked hull always has one).</summary>
 	static constexpr int ArrowMaxCount = 16;
-	static constexpr Color ArrowFriendlyColor{0.45f, 0.95f, 0.6f, 0.95f};
-	static constexpr Color ArrowNeutralColor{0.85f, 0.85f, 0.8f, 0.9f};
+	// US-T252: the stance colours are the Accessibility palette's (PlayerOptions repaints them: red / green, or orange / blue).
+	static inline Color ArrowFriendlyColor{0.45f, 0.95f, 0.6f, 0.95f};
+	static inline Color ArrowNeutralColor{0.85f, 0.85f, 0.8f, 0.9f};
 
 	/// <summary>
 	/// At any controls (US-T128): an arrow on the screen's edge for each target off it, pointing the way to turn: every hostile
@@ -294,7 +295,7 @@ private:
 
 	// ---------------------------------------------------------------- aimed combat (U.SPC-T270)
 
-	static constexpr Color HostileColor{1.0f, 0.4f, 0.35f, 0.95f};
+	static inline Color HostileColor{1.0f, 0.4f, 0.35f, 0.95f}; // US-T252: repainted by the stance palette
 	static constexpr Color LockColor{1.0f, 0.85f, 0.3f, 0.95f};
 
 	/// In a fight at the helm: the locked hull's box with the lock building on it, the lead pip where the
@@ -406,6 +407,14 @@ private:
 
 public:
 	static cs::Ref<Texture2D> Solid(Color fill, Color edge);
+
+	/// US-T252: the stance palette's hostile, friendly and neutral (Settings > Accessibility > Stance colours, PlayerOptions).
+	static void SetStanceColours(Color hostile, Color friendly, Color neutral)
+	{
+		HostileColor = hostile;
+		ArrowFriendlyColor = friendly;
+		ArrowNeutralColor = neutral;
+	}
 
 	/// The HUD's own styles are going with the app that owns it (U.SPC-T366): DontSave outlives the scene
 	/// otherwise, so each game session (and every galaxy map it opened) would leave its textures behind.

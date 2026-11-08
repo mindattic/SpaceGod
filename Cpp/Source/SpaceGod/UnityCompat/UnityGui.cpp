@@ -704,7 +704,13 @@ namespace SpaceGod::UnityCompat
 		return n;
 	}
 
-	int GUIStyle::EffectiveFontSize() const { return fontSize > 0 ? fontSize : DefaultFontSize; }
+	int GUIStyle::EffectiveFontSize() const
+	{
+		int size = fontSize > 0 ? fontSize : DefaultFontSize;
+		// US-T252: the Accessibility text size, measured and drawn alike.
+		if (GUI::textScale != 1 && GUI::textScale > 0) size = Mathf::Max(1, Mathf::RoundToInt(static_cast<float>(size) * GUI::textScale));
+		return size;
+	}
 
 	float GUIStyle::lineHeight() const { return LineHeightOf(EffectiveFontSize(), fontStyle); }
 
