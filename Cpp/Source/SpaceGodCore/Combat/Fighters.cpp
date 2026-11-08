@@ -647,6 +647,8 @@ namespace SpaceGod::Core
 			s->Cooldown = s->Def->Weapon->Cooldown;
 			auto sub = TorpedoAimPoint(b, u, target);
 			auto m = cs::New<Missile>();
+			m->Shooter = u; // US-T257: presentation only
+			m->Mount = s;
 			m->Pos = u->Pos;
 			m->Vel = u->Vel;
 			m->Target = target;

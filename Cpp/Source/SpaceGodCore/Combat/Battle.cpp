@@ -59,6 +59,33 @@
 
 namespace SpaceGod::Core
 {
+	namespace
+	{
+		/// <summary>US-T257: tags the effects a hit emits with whose shot it was (<see cref="CombatFx.By"/>), for the HUD's
+		/// hit markers alone, while it resolves; puts back whatever was set before. Nothing in the fight reads it.</summary>
+		struct FxShot
+		{
+			Battle& b;
+			cs::Ref<BattleUnit> by;
+			cs::Ref<Subsystem> mount;
+			FxShot(Battle& battle, const cs::Ref<BattleUnit>& u, const cs::Ref<Subsystem>& s) : b(battle), by(battle.FxBy), mount(battle.FxByMount)
+			{
+				b.FxBy = u;
+				b.FxByMount = s;
+			}
+			~FxShot()
+			{
+				b.FxBy = by;
+				b.FxByMount = mount;
+			}
+			FxShot(const FxShot&) = delete;
+			FxShot& operator=(const FxShot&) = delete;
+		};
+
+		/// <summary>Who fired a missile, pod or breacher, as far as it is known (US-T257).</summary>
+		cs::Ref<BattleUnit> ShooterOf(const cs::Ref<Missile>& m) { return m->Shooter != nullptr ? m->Shooter : m->Source; }
+	}
+
 	const char* ToString(UnitKind v)
 	{
 		switch (v)
@@ -1354,6 +1381,8 @@ namespace SpaceGod::Core
 					double rz = rng.NextDouble() - 0.5;
 					auto spread = DVec3(rx, ry, rz) * 0.4;
 					auto m = cs::New<Missile>();
+					m->Shooter = u; // US-T257: presentation only
+					m->Mount = s;
 					m->Pos = origin;
 					m->Vel = (u->Forward + spread + s->Aim).Normalized() * (w->MissileSpeedKmS * 0.3) + u->Vel;
 					m->Target = target;
@@ -1420,6 +1449,7 @@ namespace SpaceGod::Core
 			{
 				// A plasma bolt bleeds off over the distance it crossed (U.SPC-T488); every other beam hits as hard at any range.
 				double landed = w->DamageAt(dist) * volley;
+				FxShot shot(*this, u, s); // US-T257
 				Emit(kind, origin, aimPoint, landed, u->Side, target, sub ? sub->Index : -1);
 				ApplyDamage(target, sub, landed, aimPoint, std::nullopt, small ? WeakPoints::Factor(target, sub, aimPoint - origin) : 1, aimPoint - origin,
 					false, WeaponSystems::FamilyOf(s->Kind()));
@@ -1470,6 +1500,8 @@ namespace SpaceGod::Core
 		r->Railgun = SpinalMounts::IsSlug(mount->Kind());
 		r->Tracer = Arsenal::IsRotary(w);
 		r->SmallCraft = WeakPoints::IsSmallCraft(u);
+		r->Shooter = u; // US-T257
+		r->Mount = mount;
 		Rounds.Add(r);
 	}
 
@@ -1495,6 +1527,7 @@ namespace SpaceGod::Core
 				if (r->Target->Present() && r->Target->Side != r->Side && !r->Target->Surrendering)
 				{
 					auto sub = r->TargetSub != nullptr && !r->TargetSub->Destroyed() ? r->TargetSub : nullptr;
+					FxShot shot(*this, r->Shooter, r->Mount); // US-T257
 					ApplyDamage(r->Target, sub, r->Damage, r->Pos, std::nullopt, r->SmallCraft ? WeakPoints::Factor(r->Target, sub, r->Vel - r->Target->Vel) : 1, r->Vel - r->Target->Vel,
 						false, WeaponSystems::FamilyOfRound(*r));
 				}
@@ -1587,6 +1620,8 @@ namespace SpaceGod::Core
 			r->Tracer = rotary;
 			r->Aimed = true;
 			r->SmallCraft = WeakPoints::IsSmallCraft(u);
+			r->Shooter = u; // US-T257
+			r->Mount = s;
 			Rounds.Add(r);
 			return;
 		}
@@ -1601,6 +1636,7 @@ namespace SpaceGod::Core
 		auto sub = SubsystemNear(hit, at);
 		// A plasma bolt bleeds off over the distance it crossed (U.SPC-T488).
 		if (w->FalloffEdgeShare < 1 && w->Damage > 0) damage *= w->DamageAt(t) / w->Damage;
+		FxShot shot(*this, u, s); // US-T257
 		Emit(EnergyWeapons::FxOf(s->Kind(), true).value_or(w->AntiSmall ? FxKind::PointDefense : w->Lance ? FxKind::TachyonLance : FxKind::Beam), origin, at, damage, u->Side, hit, sub ? sub->Index : -1);
 		ApplyDamage(hit, sub, damage, at, std::nullopt, WeakPoints::IsSmallCraft(u) ? WeakPoints::Factor(hit, sub, dir) : 1, dir, false, WeaponSystems::FamilyOf(s->Kind()));
 	}
@@ -1619,6 +1655,7 @@ namespace SpaceGod::Core
 				auto at = r->Pos + step / len * t;
 				r->Gone = true;
 				auto sub = SubsystemNear(hit, at);
+				FxShot shot(*this, r->Shooter, r->Mount); // US-T257
 				ApplyDamage(hit, sub, r->Damage, at, std::nullopt, r->SmallCraft ? WeakPoints::Factor(hit, sub, r->Vel - hit->Vel) : 1, r->Vel - hit->Vel,
 					false, WeaponSystems::FamilyOfRound(*r));
 				return;
@@ -2073,6 +2110,8 @@ namespace SpaceGod::Core
 			if (s->Ammo <= 0) return;
 			s->Ammo--;
 			auto m = cs::New<Missile>();
+			m->Shooter = u; // US-T257: presentation only
+			m->Mount = s;
 			m->Pos = origin;
 			m->Vel = s->Aim * (w->MissileSpeedKmS * 0.4) + u->Vel;
 			m->Target = craft;
@@ -2323,6 +2362,7 @@ namespace SpaceGod::Core
 		}
 		damage = cs::Math::Max(damage * 0.15, damage - armour);
 		Emit(FxKind::Impact, at, at, damage, target->Side, target, sub ? sub->Index : -1);
+		Fx[Fx.Count() - 1].WeakPoint = sub != nullptr && exposed > 1; // US-T257: the HUD's weak-point hit marker
 		WeaponSystems::Cue(family, WeaponCueEvent::Impact, at, damage, target->Side, Id);
 		if (sub != nullptr && !sub->Destroyed())
 		{
@@ -2525,6 +2565,7 @@ namespace SpaceGod::Core
 				auto from = start - t->Pos;
 				if (from.LengthSquared() < 1e-12) from = m->Vel * -1;
 				auto entry = t->Pos + from.Normalized() * t->Radius();
+				FxShot shot(*this, ShooterOf(m), m->Mount); // US-T257
 				if (m->Kind == MissileKind::Pod) PodHit(m, t, aim, entry);
 				else if (m->Kind == MissileKind::Emp) EmpBurst(m->Pos, m->Side, m->EmpSeconds, m->EmpRadiusKm);
 				else
@@ -2551,6 +2592,8 @@ namespace SpaceGod::Core
 			s->Ammo--;
 			auto line = Gunnery::Scatter(dir, Arsenal::RocketSpreadDeg * Astro::Deg2Rad, rng);
 			auto m = cs::New<Missile>();
+			m->Shooter = u; // US-T257: presentation only
+			m->Mount = s;
 			// Rippled off the rail one behind another, not all from one point.
 			m->Pos = origin - line * (k * 0.004);
 			m->Vel = u->Vel + line * speed;
@@ -2579,6 +2622,7 @@ namespace SpaceGod::Core
 				auto at = m->Pos + step / len * t;
 				m->Gone = true;
 				auto sub = SubsystemNear(hit, at);
+				FxShot shot(*this, ShooterOf(m), m->Mount); // US-T257
 				ApplyDamage(hit, sub, m->Damage, at, at, m->SmallCraft ? WeakPoints::Factor(hit, sub, m->Vel - hit->Vel) : 1, m->Vel - hit->Vel,
 					false, WeaponFamily::Missile);
 				return;
@@ -2604,6 +2648,8 @@ namespace SpaceGod::Core
 		{
 			auto line = Gunnery::Scatter(heading, Arsenal::SplitSpreadDeg * Astro::Deg2Rad, rng);
 			auto micro = cs::New<Missile>();
+			micro->Shooter = m->Shooter; // US-T257: presentation only
+			micro->Mount = m->Mount;
 			micro->Pos = m->Pos;
 			// Kicked out of the casing across its line, the seekers then turn in onto the target on their own.
 			micro->Vel = m->Vel * 0.6 + line * (speed * 0.5);
@@ -2671,6 +2717,8 @@ namespace SpaceGod::Core
 			double rz = rng.NextDouble() - 0.5;
 			auto spread = DVec3(rx, ry, rz) * 0.3;
 			auto m = cs::New<Missile>();
+			m->Shooter = u; // US-T257: presentation only
+			m->Mount = s;
 			m->Pos = origin;
 			m->Vel = ((target->Pos - origin).Normalized() + spread).Normalized() * 0.3 + u->Vel;
 			m->Target = target;
@@ -2768,6 +2816,8 @@ namespace SpaceGod::Core
 		if (dir.LengthSquared() < 1e-18) dir = u->Forward;
 		double team = MarineHabitats::Draw(interior, BreacherBays::TeamSize()->Value);
 		auto m = cs::New<Missile>();
+		m->Shooter = u; // US-T257: presentation only
+		m->Mount = nullptr;
 		m->Pos = origin;
 		m->Vel = u->Vel + dir.Normalized() * speed;
 		m->Target = target;
@@ -2855,6 +2905,7 @@ namespace SpaceGod::Core
 		if (hit == nullptr) return;
 		auto from = start - hit->Pos;
 		if (from.LengthSquared() < 1e-12) from = m->Vel * -1;
+		FxShot shot(*this, ShooterOf(m), m->Mount); // US-T257
 		m->Gone = BreacherHit(m, hit, from.Normalized());
 	}
 
@@ -3275,6 +3326,8 @@ namespace SpaceGod::Core
 		fx.Side = side;
 		fx.Unit = unit;
 		fx.Sub = sub;
+		fx.By = FxBy; // US-T257: presentation only
+		fx.ByMount = FxByMount;
 		Fx.Add(fx);
 		// A shot fired or a round shot down raises its weapon's sound cue (US-T189), if anything is listening.
 		if (WeaponSystems::SoundHook()) WeaponSystems::CueFx(fx, Id);

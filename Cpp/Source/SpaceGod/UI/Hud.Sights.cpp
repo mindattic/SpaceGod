@@ -161,6 +161,8 @@ namespace SpaceGod::UI
 
 	void Hud::DrawOffscreenArrows()
 	{
+		// US-T257: the hit markers, kill feed, damage arcs and edge pulses go first, under the arrows and the combat HUD.
+		DrawHitFeedback();
 		if (Event::current().type != EventType::Repaint || app->Travel->Active) return;
 		// Only at the controls: the command view keeps its own pointer to the selection (DrawOffscreenPointer).
 		auto held = app->HeldSeat();

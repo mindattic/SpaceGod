@@ -277,6 +277,14 @@ namespace SpaceGod::Core
 				  "grows as its target closes, measured against four times your longest gun's reach (the scanners' reach for the "
 				  "selection out of a fight and for the course) in true kilometres, so it reads the same at the realistic and the "
 				  "game scale. Red is hostile, green your own side, grey anyone else, blue the course."),
+				T("Hit and damage feedback",
+				  "In every seat that fires -- a helm, a launched craft, a gun (only its own rounds count) or a station -- a hit "
+				  "marker flicks round the reticle when your round, beam or missile lands: blue on a shield, white on the hull, "
+				  "larger and gold on an exposed weak point or a subsystem knocked out. A hull you have been hitting that is "
+				  "destroyed, disabled or strikes its colours earns a kill marker and a line in the small combat feed beside the "
+				  "reticle. When your own hull takes fire, arcs round the reticle point the way it came from, blue on the shield "
+				  "and red on the hull, fading as they go; the screen's edge pulses blue as your shields fail and red as the hull "
+				  "goes critical, glowing faintly for as long as it stays so."),
 				T("Reactor power",
 				  "Whatever you take the controls of -- a ship's helm, a fighter, a gun (which draws on the hull it is mounted on) or "
 				  "a station -- shares its reactor three ways, six pips in all and at most four to one system, two each at an even "

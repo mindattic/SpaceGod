@@ -467,6 +467,11 @@ namespace SpaceGod::Core
 		/// <summary>Fired by a small craft, so it hits a capital ship's weak points as hard as one (U.SPC-T424, see <see cref="WeakPoints"/>).</summary>
 		bool SmallCraft = false;
 
+		/// <summary>Who fired it and from which mount (US-T257): presentation only, for the HUD's hit markers; never read by the
+		/// fight and not saved.</summary>
+		cs::Ref<BattleUnit> Shooter;
+		cs::Ref<Subsystem> Mount;
+
 		/// <summary>The flare-and-chaff cloud it has been drawn off onto, or null (U.SPC-T424).</summary>
 		cs::Ref<Core::Decoy> Decoy;
 
@@ -521,6 +526,11 @@ namespace SpaceGod::Core
 
 		/// <summary>Fired by a small craft (U.SPC-T424, see <see cref="WeakPoints"/>).</summary>
 		bool SmallCraft = false;
+
+		/// <summary>Who fired it and from which mount (US-T257): presentation only, for the HUD's hit markers; never read by the
+		/// fight and not saved.</summary>
+		cs::Ref<BattleUnit> Shooter;
+		cs::Ref<Subsystem> Mount;
 
 		/// <summary>A vulcan's round (US-T101): drawn as a hot tracer rather than a plain gun round -- cosmetic only.</summary>
 		bool Tracer = false;
@@ -623,6 +633,15 @@ namespace SpaceGod::Core
 		/// <summary>The subsystem index concerned, or -1: the hardpoint hit or lost, or for a
 		/// <see cref="FxKind.ShieldHit"/> the shield emitter whose patch took the hit.</summary>
 		int Sub = 0;
+
+		/// <summary>US-T257, presentation only (not saved, never read by the fight): the unit whose shot this is and the
+		/// mount it came from, where the fight knows them (null otherwise), so the HUD can mark the embodied unit's own hits
+		/// and show where the held hull is being hit from.</summary>
+		cs::Ref<BattleUnit> By;
+		cs::Ref<Subsystem> ByMount;
+
+		/// <summary>US-T257: an <see cref="FxKind.Impact"/> on an exposed weak point (see <see cref="WeakPoints"/>).</summary>
+		bool WeakPoint = false;
 	};
 
 	class Interior;
@@ -701,6 +720,11 @@ namespace SpaceGod::Core
 		int Winner = -1;
 
 		int FxSeq = 0;
+
+		/// <summary>US-T257: whose shot the effects emitted now belong to (see <see cref="CombatFx.By"/>), set round each
+		/// hit while it resolves. Presentation only: not saved, never read by the fight.</summary>
+		cs::Ref<BattleUnit> FxBy;
+		cs::Ref<Subsystem> FxByMount;
 
 		/// <summary>Raised when a unit is destroyed (the world books the loss).</summary>
 		cs::Action<cs::Ref<Battle>, cs::Ref<BattleUnit>> UnitDestroyed;
