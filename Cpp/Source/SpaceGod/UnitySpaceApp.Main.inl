@@ -257,6 +257,48 @@ public:
 	/// <summary>The trade desk (backslash, U.SPC-T426): the trader's rank, runs, brokers, trade news, charters, insurance, warehouses, the back door.</summary>
 	bool ShowTrade = false;
 
+	// ---------------------------------------------------------------- the port screen (US-T266)
+
+	/// <summary>The port screen's tabs, in the order its strip shows them.</summary>
+	enum class PortTab : int { Market, Outfitting, Repair, Contracts, Bounties, Fleet, Trade, Crew, News };
+
+	/// <summary>US-T266: the port the held hull is docked at (Shift+M alongside it at a helm, with the port's clearance), or
+	/// null. Docked, the port screen gathers what the port offers under one strip of tabs; flying off (or leaving the helm)
+	/// undocks and closes it.</summary>
+	cs::Ref<Core::Settlement> DockedAt;
+
+	/// <summary>The port screen (US-T266), open while docked; Esc closes it without undocking (Shift+M opens it again).</summary>
+	bool ShowPort = false;
+
+	/// <summary>The port screen's tab open now.</summary>
+	PortTab PortTabOpen = PortTab::Repair;
+
+	/// <summary>A discovered, standing port the held hull is alongside now (a yard first), or null.</summary>
+	cs::Ref<Core::Settlement> PortAlongside();
+
+	/// <summary>Shift+M at a helm: asks the port alongside for docking clearance (by its owner's standing toward the pilot and
+	/// whether it trades with the hull at all); docked, opens the port screen, or closes it when it is open.</summary>
+	void DockKey();
+
+	/// <summary>Asks <paramref name="port"/> for clearance and docks there; says why not on a toast.</summary>
+	bool Dock(const cs::Ref<Core::Settlement>& port);
+
+	/// <summary>Casts off from the port docked at: closes the port screen and the panel its tab opened. Says <paramref name="why"/>.</summary>
+	void Undock(const cs::String& why);
+
+	/// <summary>Opens a tab of the port screen: the panel the tab stands for (the market, outfitting, the boards, the fleet,
+	/// the trade desk, the news) in place of the one the last tab opened. The Repair and Crew tabs are the screen's own.</summary>
+	void OpenPortTab(PortTab tab);
+
+	/// <summary>Every frame: undocks once the hull has left the port (or the helm), or the port no longer lets it in.</summary>
+	void UpdateDocking();
+
+private:
+	/// <summary>The panel a tab of the port screen opens, or null for one the screen draws itself.</summary>
+	bool* PortTabPanel(PortTab tab);
+
+public:
+
 	/// <summary>The galaxy map ([, U.SPC-T103): a full screen of every system, its holder, the gate traffic, fronts and raiders.</summary>
 	bool ShowGalaxyMap = false;
 

@@ -26,4 +26,7 @@ namespace SpaceGod::Core
 	enum class Good : int;
 	enum class ShipClass : int;
 	enum class ModuleKind : int;
+	struct RepairItem; // US-T266
+	enum class RepairItemKind : int; // US-T266
+	enum class RepairOutcome : int; // US-T266
 }

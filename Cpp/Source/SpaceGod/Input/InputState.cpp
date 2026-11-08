@@ -98,7 +98,9 @@ namespace SpaceGod::Input
 		ToggleHelp = kb[Key::H].wasPressedThisFrame || (kb[Key::F1].wasPressedThisFrame && !Boost);
 		ToggleCheatMenu = kb[Key::F1].wasPressedThisFrame && Boost;
 		ToggleHud = kb[Key::U].wasPressedThisFrame;
-		ToggleMarket = kb[Key::M].wasPressedThisFrame;
+		// US-T266: Shift+M asks the port alongside for docking clearance (and opens or closes the port screen), M alone the market.
+		ToggleMarket = kb[Key::M].wasPressedThisFrame && !Boost;
+		DockPort = kb[Key::M].wasPressedThisFrame && Boost;
 		ToggleCargo = kb[Key::I].wasPressedThisFrame;
 		// US-T186: Shift+F2 is the spawn menu's (the dev menu on its Spawn tab), F2 alone outfitting's.
 		ToggleOutfit = kb[Key::F2].wasPressedThisFrame && !Boost;
@@ -262,7 +264,7 @@ namespace SpaceGod::Input
 		Boost = Slow = Fire = Cruise = FireEmp = DropMine = false;
 		SelectClicked = SelectDoubleClicked = RightClicked = false;
 		Focus = Escape = ToggleScale = TimeFaster = TimeSlower = TogglePause = ResetTime = false;
-		ToggleOrbits = ToggleLabels = ToggleHelp = ToggleHud = ClearScreen = ToggleMarket = ToggleCargo = ToggleOutfit = ToggleSilent = ToggleBounties = ToggleContracts = ToggleFleet = ToggleTrade = ToggleGalaxyMap = ToggleNews = ToggleSpawn = WatchBattle = ToggleLanes = ToggleSatellites = ToggleReorient = CycleShips = CycleBackward = Home = Pilot = LockTarget = ActivateGate = EngageFtl = false;
+		ToggleOrbits = ToggleLabels = ToggleHelp = ToggleHud = ClearScreen = ToggleMarket = DockPort = ToggleCargo = ToggleOutfit = ToggleSilent = ToggleBounties = ToggleContracts = ToggleFleet = ToggleTrade = ToggleGalaxyMap = ToggleNews = ToggleSpawn = WatchBattle = ToggleLanes = ToggleSatellites = ToggleReorient = CycleShips = CycleBackward = Home = Pilot = LockTarget = ActivateGate = EngageFtl = false;
 		QuickSave = QuickLoad = ToggleSaves = false;
 		SpawnPractice = false;
 		ToggleCheatMenu = false; // US-T126

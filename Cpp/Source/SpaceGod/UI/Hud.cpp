@@ -152,6 +152,7 @@ namespace SpaceGod::UI
 			// A plotted course over the gates: the way and the next leg (U.SPC-T516).
 			auto courseLine = app->CourseLine();
 			if (!courseLine.empty()) DrawBanner(courseLine);
+			if (app->ShowHud) DrawDockPrompt(); // US-T266: alongside a port, Shift+M to dock
 			if (app->CourseAutopilotOffered())
 			{
 				auto autopilot = layout.Take(HudRegion::TopCentre, 240.0f, 26.0f);
@@ -197,6 +198,7 @@ namespace SpaceGod::UI
 		if (app->ShowContracts) DrawContracts();
 		if (app->ShowFleet) DrawFleet();
 		if (app->ShowTrade) DrawTradeDesk();
+		if (app->ShowPort) DrawPort(); // US-T266: the port screen, docked
 		if (app->ShowPicker) DrawPicker();
 		DrawDrawer(); // US-T200: pulled up over the docked panels
 		if (app->ShowSaves) DrawSaves();

@@ -86,6 +86,36 @@ private:
 	void OutfitOption(const cs::Ref<Core::Ship>& ship, const cs::Ref<Core::Settlement>& yard, const cs::Ref<Core::Loadout>& loadout,
 		const OutfitChoice& option, float x, float y, float w, float rowH);
 
+	// ---------------------------------------------------------------- the port screen (US-T266, UI/Hud.Port.cpp)
+
+	/// <summary>The player's price factor at <paramref name="port"/> (their standing with its owner), 1 with no law.</summary>
+	double PortPriceFactor(const cs::Ref<Core::Ship>& ship, const cs::Ref<Core::Settlement>& port);
+
+	/// <summary>At a helm alongside a port, a banner offering Shift+M to request docking; docked with the screen closed, one to open it.</summary>
+	void DrawDockPrompt();
+
+	/// <summary>
+	/// The port screen (Shift+M, docked): the port, its owner and the player's standing there, Undock, and one strip of tabs
+	/// for everything it offers -- Market, Outfitting (at a yard), Repair &amp; Rearm, Contracts, Bounties, Fleet &amp; property,
+	/// Trade desk, Crew, News. A tab for an existing panel opens that panel; Repair &amp; Rearm and Crew are drawn here.
+	/// </summary>
+	void DrawPort();
+
+	/// <summary>Repair &amp; Rearm (<see cref="Core::PortRepairs"/>): a quote per item with its parts and price, and Repair all.</summary>
+	void DrawPortRepairs(const cs::Ref<Core::Ship>& ship, const cs::Ref<Core::Settlement>& port, double factor, const cs::List<Core::RepairItem>& quote,
+		Rect area, float rowH, int maxRows);
+
+	/// <summary>The Crew tab: who is aboard against the hull's complement, the brig, and the fleet's captains.</summary>
+	void DrawPortCrew(const cs::Ref<Core::Ship>& ship, Rect area, float rowH);
+
+	/// <summary>One line of Repair &amp; Rearm, as its button does it (also a co-op frame's "repair").</summary>
+	void RepairAt(const cs::Ref<Core::Settlement>& port, Core::RepairItemKind kind, int index);
+
+	/// <summary>Repair all, as its button does it (also a co-op frame's "repairall").</summary>
+	void RepairAllAt(const cs::Ref<Core::Settlement>& port);
+
+	static cs::String RepairText(Core::RepairOutcome outcome, const cs::Ref<Core::Settlement>& port, double cost, const cs::String& done);
+
 	// ---------------------------------------------------------------- spawn (dev/sandbox)
 
 	/// C#: static readonly ShipClass[] SpawnClasses = (ShipClass[])Enum.GetValues(typeof(ShipClass));

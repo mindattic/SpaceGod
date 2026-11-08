@@ -252,6 +252,14 @@ namespace SpaceGod::Core
 		else if (structure) structure->Repair(share);
 	}
 
+	void ShipCombat::RepairHull(double share)
+	{
+		if (share <= 0) return;
+		Hull = cs::Math::Min(Spec->Hull, Hull + Spec->Hull * share);
+		if (Hull >= Spec->Hull) structure = nullptr;
+		else if (structure) structure->Repair(share);
+	}
+
 	void ShipCombat::FreeResupply()
 	{
 		for (const auto& s : Subsystems)

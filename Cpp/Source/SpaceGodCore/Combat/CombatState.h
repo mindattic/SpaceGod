@@ -248,6 +248,11 @@ namespace SpaceGod::Core
 		/// gate them separately; callers with no such cost (defence platforms) call <see cref="FreeResupply"/> too.</summary>
 		void Repair(double share);
 
+		/// <summary>US-T266: mends up to <paramref name="share"/> of the hull alone (and its structure), leaving the hardpoints
+		/// as they are: the port's Repair &amp; Rearm (<see cref="PortRepairs"/>) quotes and sells each of those apart. A hull
+		/// mended whole has its structure rebuilt whole, as <see cref="Repair"/> does.</summary>
+		void RepairHull(double share);
+
 		/// <summary>Fully restocks ammo and musters crew/marines back to spec, free. Only for callers (defence
 		/// platforms) with no costed resupply logic of their own; ships are resupplied via <see cref="War"/>'s refit.</summary>
 		void FreeResupply();

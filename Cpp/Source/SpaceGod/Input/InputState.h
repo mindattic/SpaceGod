@@ -102,6 +102,9 @@ namespace SpaceGod::Input
 		/// <summary>F11 (U.SPC-T496): clears the screen of all its UI but the reticle in use, and brings it all back.</summary>
 		bool ClearScreen = false;
 		bool ToggleMarket = false;
+
+		/// <summary>US-T266, Shift+M at a helm: docking clearance at the port alongside, then the port screen open or closed.</summary>
+		bool DockPort = false;
 		bool ToggleCargo = false;
 		bool ToggleOutfit = false;
 

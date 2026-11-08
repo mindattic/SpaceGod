@@ -16,6 +16,7 @@
 #include "Combat/CombatState.h"
 #include "Combat/Facilities.h"
 #include "Combat/Outfitting.h"
+#include "Combat/PortRepairs.h" // US-T266
 #include "Economy/Charters.h"
 #include "Economy/Companies.h"
 #include "Economy/Contracts.h"
@@ -149,6 +150,19 @@ namespace SpaceGod::UI
 		{
 			auto market = Port(a.at(0));
 			if (market != nullptr && world->Law != nullptr) PayBounty(market);
+			return true;
+		}
+		// ---- the port screen's Repair & Rearm (US-T266)
+		if (verb == "repair")
+		{
+			auto port = Port(a.at(0));
+			if (port != nullptr && world->PilotedShip != nullptr) RepairAt(port, static_cast<RepairItemKind>(Wire::ParseI(a.at(1))), Wire::ParseI(a.at(2)));
+			return true;
+		}
+		if (verb == "repairall")
+		{
+			auto port = Port(a.at(0));
+			if (port != nullptr && world->PilotedShip != nullptr) RepairAllAt(port);
 			return true;
 		}
 		// ---- outfitting

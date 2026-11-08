@@ -147,7 +147,7 @@ namespace SpaceGod
 	bool UnitySpaceApp::ClickPanelOpen() const
 	{
 		if (coopPanelOverride.has_value()) return *coopPanelOverride; // US-T44 (US-T43): the helm holder's, while its frame is flown in co-op
-		return !ScreenCleared && (ShowSpawn || ShowSaves || ShowGalaxyMap || ShowHelp || (ShowHud && (ShowMarket || ShowCargo || ShowNews || ShowOutfit || ShowBounties || ShowContracts || ShowFleet || ShowTrade || ShowPicker))); // a cleared screen (F11) shows none of them; market, cargo, outfitting, bounties, contracts and news are HUD panels, hidden with it
+		return !ScreenCleared && (ShowSpawn || ShowSaves || ShowGalaxyMap || ShowHelp || (ShowHud && (ShowMarket || ShowCargo || ShowNews || ShowOutfit || ShowBounties || ShowContracts || ShowFleet || ShowTrade || ShowPicker || ShowPort))); // US-T266: the port screen too; a cleared screen (F11) shows none of them; market, cargo, outfitting, bounties, contracts and news are HUD panels, hidden with it
 	}
 
 	bool UnitySpaceApp::IsSol() const { return ActiveSystem->Catalog->Root()->Name == "Sun"; }
@@ -644,7 +644,7 @@ namespace SpaceGod
 	int UnitySpaceApp::OpenScreens() const
 	{
 		return (ShowSpawn ? 1 : 0) | (ShowSaves ? 2 : 0) | (ShowGalaxyMap ? 4 : 0) | (ShowMarket ? 8 : 0) | (ShowCargo ? 16 : 0) | (ShowNews ? 32 : 0) |
-			(ShowOutfit ? 64 : 0) | (ShowBounties ? 128 : 0) | (ShowContracts ? 256 : 0) | (ShowFleet ? 512 : 0) | (ShowTrade ? 1024 : 0) | (ShowHelp ? 2048 : 0) | (ShowPicker ? 4096 : 0);
+			(ShowOutfit ? 64 : 0) | (ShowBounties ? 128 : 0) | (ShowContracts ? 256 : 0) | (ShowFleet ? 512 : 0) | (ShowTrade ? 1024 : 0) | (ShowHelp ? 2048 : 0) | (ShowPicker ? 4096 : 0) | (ShowPort ? 8192 : 0); // US-T266
 	}
 
 	void UnitySpaceApp::HandleCommands()
@@ -674,6 +674,8 @@ namespace SpaceGod
 		if (i.ToggleLabels) ShowLabels = !ShowLabels;
 		if (i.ToggleHelp) ShowHelp = !ShowHelp;
 		if (i.ToggleHud) ShowHud = !ShowHud;
+		UpdateDocking(); // US-T266: flying off the port (or leaving the helm) casts off
+		if (i.DockPort) DockKey(); // US-T266: Shift+M, docking clearance and the port screen
 		if (i.ToggleMarket) ShowMarket = !ShowMarket;
 		if (i.ToggleCargo) ShowCargo = !ShowCargo;
 		if (i.ToggleOutfit) ShowOutfit = !ShowOutfit;
@@ -738,6 +740,7 @@ namespace SpaceGod
 		{
 			case EscapeAction::ClosePanels:
 				ShowSpawn = ShowSaves = ShowMarket = ShowCargo = ShowNews = ShowOutfit = ShowBounties = ShowContracts = ShowFleet = ShowTrade = ShowGalaxyMap = ShowHelp = ShowPicker = false;
+				ShowPort = false; // US-T266: the screen closes, the hull stays docked (Shift+M opens it again)
 				break;
 			case EscapeAction::LeaveFocus:
 				SpaceCamera->ExitFocus();
