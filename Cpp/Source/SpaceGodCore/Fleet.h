@@ -192,6 +192,10 @@ namespace SpaceGod::Core
 		/// <summary>How long (days) a held hull's reported pose stands for it: about two minutes, extrapolated on its velocity.</summary>
 		static constexpr double HeldReportDays = 0.0015;
 
+		/// <summary>US-T260: where the helm last reported <paramref name="ship"/> (see <see cref="ReportHeld"/>), carried on its
+		/// velocity to <paramref name="jd"/>; false with no fresh report (no helm flies it, or the Bench).</summary>
+		bool HeldPoseOf(const cs::Ref<Ship>& ship, double jd, DVec3& helioKm) const;
+
 	private:
 		// (DVec3 offset, DVec3 velocity): .first is the offset, .second the velocity.
 		cs::Dictionary<cs::Ref<Ship>, std::pair<DVec3, DVec3>> evasion = cs::Dictionary<cs::Ref<Ship>, std::pair<DVec3, DVec3>>();

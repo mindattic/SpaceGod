@@ -71,6 +71,7 @@ namespace SpaceGod::Core
 		case LifeEventKind::OwnedAct: return "OwnedAct";
 		case LifeEventKind::CrownedKing: return "CrownedKing";
 		case LifeEventKind::Salvaged: return "Salvaged";
+		case LifeEventKind::Discovered: return "Discovered";
 		}
 		return "?";
 	}

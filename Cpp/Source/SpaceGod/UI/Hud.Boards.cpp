@@ -51,6 +51,7 @@
 #include "Sensors/Sensors.h"
 #include "Sensors/SensorPosture.h"
 #include "Systems/CruiseDrive.h"
+#include "Systems/Exploration.h" // US-T260: survey data sold to cartographers
 #include "Systems/Galaxy.h"
 #include "Systems/InterstellarTraffic.h"
 #include "UI/Icons.h" // US-T263: the market board's sparklines
@@ -517,13 +518,18 @@ namespace SpaceGod::UI
 			for (const auto& e : app->World()->Shocks->At(market))
 				shocks = !shocks.has_value() ? e->Label : cs::Cat(*shocks, "  ·  ", e->Label);
 		float extra = shocks.has_value() ? 18.0f : 0.0f;
+		// US-T260: survey data aboard the piloted hull, and what this port's cartographer (if it keeps one) would pay.
+		auto exploration = canTrade && app->Galaxy != nullptr ? Exploration::Find(*app->Galaxy) : nullptr;
+		auto surveyHull = app->World()->PilotedShip;
+		int surveyHeld = exploration != nullptr ? exploration->HeldBy(surveyHull).Count() : 0;
+		float surveyRow = surveyHeld > 0 ? 20.0f : 0.0f;
 
 		constexpr float rowH = 17;
 		// US-T263: the board's price history (a 90-day sparkline and the 30- and 90-day low-high / average) for a port.
 		float histW = market != nullptr ? 360.0f : 0.0f;
 		float w = (canTrade ? 600.0f : 430.0f) + histW;
 		// US-T208: 78 = the 50 above the column header, its row, and 11 of padding under the last good (it was 62: Munitions sat on the border).
-		float h = marketOpen ? 78 + GoodInfo::Count * rowH + (canTrade ? 20 : 0) + extra + lawRow : 34;
+		float h = marketOpen ? 78 + GoodInfo::Count * rowH + (canTrade ? 20 : 0) + extra + lawRow + surveyRow : 34;
 		auto r = Panel(layout.Take(HudRegion::TopRight, w, h)); // TopRight's first slot (US-T153)
 		cs::String heading = market != nullptr ? cs::Cat("MARKET  ·  ", market->Name) : cs::String("MARKET  ·  system average");
 		if (GUI::Button(Rect(r.x + 8, r.y + 6, w - 16, 22), UiStyle::Fold(marketOpen, heading), title)) marketOpen = !marketOpen;
@@ -568,6 +574,18 @@ namespace SpaceGod::UI
 			if (GUI::Button(Rect(r.xMax() - 40, top - 2, 22, 20), "+", button)) tradeCrates++;
 		}
 		float y = top + (canTrade ? 20 : 0);
+		if (surveyRow > 0)
+		{
+			int reports = 0;
+			double offer = exploration->OfferAt(market, surveyHull, reports);
+			GUI::contentColor = Color(0.6f, 0.85f, 1.0f);
+			GUI::Label(Rect(r.x + 12, y, w - 240, 18), cs::Cat("Survey data aboard: ", surveyHeld, " report", surveyHeld == 1 ? "" : "s", ", worth ",
+				Credits(exploration->ValueHeldBy(surveyHull)), !Exploration::IsCartographer(market) ? cs::String("   (no cartographer here)")
+				: reports == 0 ? cs::Cat("   (", market->Owner->Name, "'s maps have it all)") : cs::String()), small);
+			if (reports > 0 && GUI::Button(Rect(r.xMax() - 222, y - 2, 210, 20), cs::Cat("Sell ", reports, " to cartographer  ", Credits(offer)), button))
+				ClickSellSurvey(market);
+			y += surveyRow;
+		}
 		GUI::contentColor = Dim;
 		GUI::Label(Rect(r.x + 12, y, 150, rowH), "Good", small);
 		GUI::Label(Rect(r.x + 170, y, 80, rowH), market != nullptr ? "Stock" : "", small);
@@ -713,6 +731,20 @@ namespace SpaceGod::UI
 			}
 			app->ShowToast(message);
 		}
+	}
+
+	void Hud::ClickSellSurvey(const cs::Ref<Settlement>& market)
+	{
+		if (CoopSends("survey", K(market))) return; // an entry in co-op, as every trade at the board is
+		auto ship = app->World()->PilotedShip;
+		auto exploration = app->Galaxy != nullptr ? Exploration::Find(*app->Galaxy) : nullptr;
+		if (ship == nullptr || exploration == nullptr || market == nullptr || !app->CanTradeNow(market)) return;
+		int reports = 0;
+		double paid = exploration->SellAt(app->World(), market, ship, app->Clock->Jd, reports);
+		app->ShowToast(reports > 0
+			? cs::Cat("Sold ", reports, " survey report", reports == 1 ? "" : "s", " to ", market->Name, "'s cartographers for ", Credits(paid),
+				": ", market->Owner->Name, "'s maps gain ", reports == 1 ? "it" : "them")
+			: cs::String("The cartographers here have nothing to buy"));
 	}
 
 	// ---------------------------------------------------------------- outfitting (U.SPC-T65)

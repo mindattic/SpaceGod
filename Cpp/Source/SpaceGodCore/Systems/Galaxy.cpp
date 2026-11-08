@@ -20,6 +20,7 @@
 #include "Systems/Statecraft.h"
 #include "Systems/Territory.h" // US-T190
 #include "Systems/GalaxyLife.h" // US-T100
+#include "Systems/Exploration.h" // US-T260
 #include "Systems/VoidBaseBuilder.h"
 #include "Systems/VoidSites.h"
 #include "Combat/GatePickets.h"
@@ -240,6 +241,8 @@ namespace SpaceGod::Core
 		DeepSpace->Update(jd);
 		// The pilot and the groups out there find the undiscovered stars they come near (U.SPC-T456).
 		LookForStars(jd);
+		// What the embodied hull finds pays (US-T260): bodies, void sights, graveyards and anomalies come on near the helm.
+		Exploration::Run(*this, jd);
 		if (Construction) Construction->Update(jd);
 		if (Wars) Wars->Update(jd);
 		// Wars leave consequences (US-T105): objectives for the SpaceGod, refugee tribes, their grudges and plots (only once the game has made them).

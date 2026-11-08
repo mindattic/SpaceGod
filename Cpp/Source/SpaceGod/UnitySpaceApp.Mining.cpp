@@ -5,6 +5,8 @@
 #include "Economy/HandMining.h"
 #include "Embodiment/ShipHelm.h"
 #include "Ships.h"
+#include "Systems/Exploration.h" // US-T260
+#include "Systems/Galaxy.h"
 #include "UI/Hud.h"
 #include "World.h"
 
@@ -12,8 +14,16 @@ namespace SpaceGod
 {
 	using namespace Core;
 
+	void UnitySpaceApp::ShowSurveyNotices()
+	{
+		auto exploration = Galaxy != nullptr ? Exploration::Find(*Galaxy) : nullptr;
+		if (exploration == nullptr || exploration->Notices.Count() == 0) return;
+		for (const auto& n : exploration->TakeNotices()) ShowToast(n);
+	}
+
 	void UnitySpaceApp::UpdateMining(const cs::Ref<Ship>& ship)
 	{
+		ShowSurveyNotices(); // US-T260: finds made at the helm
 		miningReadout = cs::String();
 		if (ship == nullptr || pilotHelm == nullptr || pilotHelm->Ship != ship) return;
 		auto beam = pilotHelm->Beam;

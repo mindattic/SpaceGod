@@ -88,6 +88,8 @@ namespace SpaceGod::Core
 		CrownedKing,
 		/// <summary>Tractored a drifting cargo pod aboard (US-T95): spilled from a wreck, or dropped under threat.</summary>
 		Salvaged,
+		/// <summary>US-T260: first to chart a star, a body, a void sight, an anomaly or a graveyard.</summary>
+		Discovered,
 	};
 	SPACEGODCORE_API const char* ToString(LifeEventKind v);
 

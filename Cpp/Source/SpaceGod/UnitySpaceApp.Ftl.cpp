@@ -249,6 +249,7 @@ namespace SpaceGod
 		{
 			// The galaxy is charted and built about the hull as it goes (U.SPC-T413).
 			Galaxy->Viewpoint = c->PositionAt(jd);
+			ShowSurveyNotices(); // US-T260: stars charted on the way are survey data aboard
 			// A new leg (pulled out by a well or a gravity projector, or spooled again past it, U.SPC-T418): the clock
 			// is compressed again for what is left of it (U.SPC-T420).
 			bool atStop = c->AtVoidStop(jd);

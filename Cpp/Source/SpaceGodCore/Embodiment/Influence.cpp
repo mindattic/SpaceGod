@@ -28,6 +28,7 @@ namespace SpaceGod::Core
 		case InfluenceSource::Mission: return "Mission";
 		case InfluenceSource::Career: return "Career";
 		case InfluenceSource::Dev: return "Dev";
+		case InfluenceSource::Discovery: return "Discovery";
 		}
 		return "?";
 	}
@@ -82,6 +83,7 @@ namespace SpaceGod::Core
 		case InfluenceSource::Intervention: inf->Interventions++; break;
 		case InfluenceSource::Mission: inf->Missions++; break;
 		case InfluenceSource::Career: inf->CareersSteered++; break;
+		case InfluenceSource::Discovery: inf->Discoveries++; break;
 		default: break;
 		}
 		inf->LastGain = why;
@@ -191,5 +193,6 @@ namespace SpaceGod::Core
 	// ================================================================ ObjectGraph registration (docs/PERSISTENCE.md)
 
 	SG_SERIALIZE(SpaceGodInfluence, "SpaceGod.Core.SpaceGodInfluence",
-		SG_F(Xp), SG_F(Interventions), SG_F(Missions), SG_F(CareersSteered))
+		SG_F(Xp), SG_F(Interventions), SG_F(Missions), SG_F(CareersSteered),
+		SG_OPT(Discoveries)) // US-T260, absent from older saves
 }

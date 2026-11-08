@@ -657,6 +657,18 @@ namespace SpaceGod::Core
 		heldPoses.Add(p);
 	}
 
+	bool Fleet::HeldPoseOf(const cs::Ref<Ship>& ship, double jd, DVec3& helioKm) const
+	{
+		if (ship == nullptr) return false;
+		for (const auto& h : heldPoses)
+			if (h.Hull == ship && h.Jd <= jd + 1e-9 && jd - h.Jd <= HeldReportDays)
+			{
+				helioKm = h.HelioKm + h.VelocityKmPerDay * (jd - h.Jd);
+				return true;
+			}
+		return false;
+	}
+
 	bool Fleet::RunsSchedule(cs::Ref<Ship> ship) { return !ship->IsEscort() && !ship->Destroyed && (IsHeld == nullptr || !IsHeld(ship)); }
 
 	ShipState Fleet::StateOf(cs::Ref<Ship> ship, double jd)

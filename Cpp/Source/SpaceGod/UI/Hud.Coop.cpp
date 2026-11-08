@@ -140,6 +140,12 @@ namespace SpaceGod::UI
 			if (market != nullptr && world->PilotedShip != nullptr) ClickRefuel(market);
 			return true;
 		}
+		if (verb == "survey") // US-T260: survey data sold to the port's cartographer
+		{
+			auto market = Port(a.at(0));
+			if (market != nullptr && world->PilotedShip != nullptr) ClickSellSurvey(market);
+			return true;
+		}
 		if (verb == "observe")
 		{
 			auto market = Port(a.at(0));

@@ -33,6 +33,8 @@ namespace SpaceGod::Core
 		Career,
 		/// <summary>The dev menu's grant (testing only, single-player).</summary>
 		Dev,
+		/// <summary>US-T260: a first discovery made in a body (a star charted, a body, sight, anomaly or graveyard surveyed).</summary>
+		Discovery,
 	};
 	SPACEGODCORE_API const char* ToString(InfluenceSource v);
 
@@ -49,6 +51,9 @@ namespace SpaceGod::Core
 
 		/// <summary>What the XP was earned for, counted.</summary>
 		int Interventions = 0, Missions = 0, CareersSteered = 0;
+
+		/// <summary>US-T260: first discoveries credited (absent from older saves).</summary>
+		int Discoveries = 0;
 
 		// ---- transient (not saved): the HUD's flash of the last gain, and the dev waiver.
 

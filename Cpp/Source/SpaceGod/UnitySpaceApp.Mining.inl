@@ -19,3 +19,7 @@ private:
 
 	/// <summary>The beam's readout over the bottom of the HUD, above the tractor beam's when both show.</summary>
 	void DrawMiningHud();
+
+	/// <summary>US-T260: the survey finds made since the last frame (Core::Exploration's notices) on toasts; at a helm and in
+	/// an FTL cruise.</summary>
+	void ShowSurveyNotices();

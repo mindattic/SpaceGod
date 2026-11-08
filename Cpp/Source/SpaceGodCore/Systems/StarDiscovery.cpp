@@ -7,6 +7,7 @@
 #include "Systems/CatalogueStars.h"
 #include "Systems/VoidStations.h"
 #include "Systems/DeepSpace.h"
+#include "Systems/Exploration.h" // US-T260
 #include "Settings/GameSetting.h"
 #include "Ships.h"
 
@@ -93,6 +94,13 @@ namespace SpaceGod::Core
 		DeepSpace->Log(jd, cs::Cat(star.Name, " is discovered", (!by.empty() ? " by " + by : cs::String()), ", ") +
 			cs::Cat(cs::Fmt(star.PositionLy.Length(), "0.0"), " ly from Sol"), star.Origin());
 		ChartVersion++;
+		// US-T260: found by the pilot's own lookout, it is survey data aboard the embodied hull and a first discovery.
+		if (by == "you")
+		{
+			cs::Ref<SpaceGod::Core::World> pilotWorld;
+			cs::Ref<StarSystem> pilotSystem;
+			if (Exploration::EmbodiedHull(*this, pilotWorld, pilotSystem) != nullptr) Exploration::Of(*this)->StarFound(*this, star.Name, star.PositionLy.Length(), jd);
+		}
 		StarDiscovered.Invoke(e);
 		return true;
 	}

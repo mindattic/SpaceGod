@@ -53,6 +53,9 @@ private:
 
 	void ClickSell(const cs::Ref<Core::Settlement>& market, Core::Good good);
 
+	/// <summary>US-T260: sells the piloted hull's survey data to the port's cartographer (see <see cref="Core::Exploration"/>).</summary>
+	void ClickSellSurvey(const cs::Ref<Core::Settlement>& market);
+
 	// ---------------------------------------------------------------- outfitting (U.SPC-T65)
 
 	/// <summary>

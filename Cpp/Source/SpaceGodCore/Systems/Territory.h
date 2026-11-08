@@ -23,6 +23,7 @@ namespace SpaceGod::Core
 	class Galaxy;
 	class GalaxyLife;
 	class LastingConsequences;
+	class Exploration;
 	class Settlement;
 	class Ship;
 	class StarSystem;
@@ -155,6 +156,11 @@ namespace SpaceGod::Core
 		/// <see cref="LastingConsequences"/>), kept here so they are saved with the territory; made by the game, null in a
 		/// Core-only run and in older saves.</summary>
 		cs::Ref<LastingConsequences> Consequences;
+
+		/// <summary>US-T260: the exploration ledger (survey data held aboard hulls, what each faction's cartographers have
+		/// bought, the first discoveries; see <see cref="Exploration"/>), kept here so it saves with the territory; null until
+		/// the first find (and in older saves).</summary>
+		cs::Ref<SpaceGod::Core::Exploration> Exploration;
 
 	private:
 		/// <summary>Who held each system at the last review.</summary>
