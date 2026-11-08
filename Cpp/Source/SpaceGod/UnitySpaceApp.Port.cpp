@@ -9,6 +9,8 @@
 #include "Economy/Economy.h"
 #include "Economy/Settlement.h"
 #include "Law/Law.h"
+#include "Lore/LoreBooks.h"
+#include "Systems/Galaxy.h" // StarSystem::Name (US-T261)
 
 namespace SpaceGod
 {
@@ -69,6 +71,8 @@ namespace SpaceGod
 		ShowPort = true;
 		OpenPortTab(PortTabOpen);
 		ShowToast(cs::Cat("DOCKED at ", port->Name, ": cleared by ", port->Owner->Name, standing, "   (Shift+M closes the port screen)"));
+		// US-T261: cleared in, the port's records are open to read (when Prose wrote them).
+		if (ActiveSystem != nullptr) RecoverLog(LoreBooks::StationRecords(ActiveSystem->Name, port->Name));
 		return true;
 	}
 

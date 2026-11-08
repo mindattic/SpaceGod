@@ -140,7 +140,7 @@ namespace SpaceGod
 			float w = 268, h = 46;
 			auto r = Rect(10, 50, w, h);
 			// US-T208: a full-screen screen (spawn, manual, galaxy map) owns the top left: the badge would sit on its titles.
-			bool fullScreen = ShowSpawn || ShowHelp || (ShowGalaxyMap && !Travel->Active);
+			bool fullScreen = ShowSpawn || ShowHelp || ShowLogs /* US-T261 */ || (ShowGalaxyMap && !Travel->Active);
 			if (!fullScreen)
 			{
 			if (!UiRects.Contains(r)) UiRects.Add(r); // US-T212: world names skip it

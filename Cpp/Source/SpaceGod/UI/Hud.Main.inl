@@ -72,6 +72,9 @@ private:
 	/// The Help screen (H / F1, or Help in the Esc menu), made the first time it is opened.
 	cs::Ref<HelpScreen> helpScreen;
 
+	/// US-T261: the logs screen (Shift+L), made the first time it is opened.
+	cs::Ref<LogsScreen> logsScreen;
+
 	/// US-T152..T155: where every docked panel goes this draw (HudLayout.h has the rule), reset at the top of Draw.
 	HudLayout layout;
 	/// The news ticker's or the open news panel's rect, taken from TopCentre first thing in Draw so every alert and

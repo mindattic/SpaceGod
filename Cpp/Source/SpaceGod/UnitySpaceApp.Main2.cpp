@@ -440,6 +440,7 @@ namespace SpaceGod
 		if (lockUnit != unit->PlayerLockTarget) unit->LockProgress = 0;
 		unit->PlayerLockTarget = lockUnit;
 		UpdateSurrenderPrompts(ship->Battle, unit);
+		RecoverPrizeLogs(ship->Battle, unit); // US-T261: a taken hull's log (when Prose wrote one)
 		// A fight aboard, this hull's own or one its marines are in (U.SPC-T468).
 		UpdateBoardingCommand(ship->Battle, unit);
 		// A capital ship's captain's orders: batteries, shields, brace, damage control, the line (U.SPC-T425).
@@ -604,6 +605,7 @@ namespace SpaceGod
 		// The fight aboard runs on the sim clock (real time while piloting, faster under warp).
 		s->Step(cs::Math::Min(10, dt * Clock->Warp().SimSecondsPerSecond * Clock->Speed));
 		ShowSalvageLog();
+		RecoverHulkLog(s); // US-T261: its log, once nobody hostile is aboard (when Prose wrote one)
 
 		int key = SalvageKey();
 		if (key == 4) { EndSalvage("Clamps released"); return true; }

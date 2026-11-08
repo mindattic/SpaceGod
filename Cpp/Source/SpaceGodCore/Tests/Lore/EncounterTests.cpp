@@ -1,4 +1,5 @@
-// EncounterTests: unit checks of US-T239's Prose encounters and scan tabs (Lore/Encounters.h, Lore/ScanTabs.h) on the
+// EncounterTests: unit checks of US-T239's Prose encounters and scan tabs (Lore/Encounters.h, Lore/ScanTabs.h) and of
+// US-T261's recoverable books (Lore/LoreBooks.h) on the
 // test-only fixture/LoreEncounters (fixture texts, never story), and that the tag vocabulary the game executes is exactly the
 // one Data/Prose/prose.config.json gives Prose.
 //
@@ -19,6 +20,7 @@
 #include "Comms/Comms.h"
 #include "Cs/Cs.h"
 #include "Lore/Encounters.h"
+#include "Lore/LoreBooks.h"
 #include "Lore/LoreKeys.h"
 #include "Lore/LoreLibrary.h"
 #include "Lore/ScanTabs.h"
@@ -183,6 +185,40 @@ namespace
 		Check(std::isnan(ScanFacts::EquilibriumK(*sol, (*sol)["Sun"]->Index)), "a star has none");
 		Check(cs::String(ScanFacts::Atmosphere(*earth)) == "thick" && cs::String(ScanFacts::Atmosphere(*moon)) == "none to speak of", "atmospheres from the catalogue");
 	}
+
+	// US-T261: the book keys the game reads (a ship's log, a port's records) and what makes a recoverable book, on the
+	// test-only fixture/LoreBooks.
+	void Books(const cs::String& fixture)
+	{
+		auto lib = LoreLibrary::Load(fixture + "/LoreBooks");
+		Check(lib.Problems().Count() == 0, "fixture/LoreBooks loads cleanly");
+		Check(LoreBooks::ShipLog("Sol System", "Test Hull") == "ship-sol-test-hull/log", "a ship's log is ship-<sys>-<name>/log");
+		Check(LoreBooks::StationRecords("Sol System", "Test Port") == "settlement-sol-test-port/records",
+			"a port's records are settlement-<sys>-<name>/records");
+
+		LoreBook book;
+		Check(LoreBooks::Read(lib, LoreBooks::ShipLog("Sol System", "Test Hull"), book), "a ship's log reads");
+		Check(book.Title == "Fixture Log" && book.Author == "Fixture Captain", "its title and author");
+		Check(book.Pages.Count() == 2 && book.Pages[0] == "Fixture page one." && book.Pages[1] == "Fixture page two.", "its pages, blank ones left out");
+
+		LoreBook records;
+		Check(LoreBooks::Read(lib, LoreBooks::StationRecords("Sol System", "Test Port"), records), "a port's records read");
+		Check(records.Title == "Records of Sol Test Port" && records.Author.empty(), "no title: the entity's words name it");
+
+		LoreBook none;
+		Check(!LoreBooks::Read(lib, LoreBooks::ShipLog("Sol System", "Blank Hull"), none), "a book with no words is no book");
+		Check(!LoreBooks::Has(lib, "ship-sol-other-hull/log"), "a text of another kind under a book key is no book");
+		Check(!LoreBooks::Has(lib, LoreBooks::ShipLog("Sol System", "Unwritten Hull")), "no text, no book");
+		Check(!LoreBooks::Has(lib, ""), "no key, no book");
+
+		cs::List<cs::String> recovered;
+		Check(LoreBooks::Recover(recovered, lib, LoreBooks::ShipLog("Sol System", "Test Hull")), "a new log is recovered");
+		Check(!LoreBooks::Recover(recovered, lib, LoreBooks::ShipLog("Sol System", "Test Hull")), "the same log only once");
+		Check(!LoreBooks::Recover(recovered, lib, LoreBooks::ShipLog("Sol System", "Unwritten Hull")), "no book, no item");
+		Check(!LoreBooks::Recover(recovered, lib, LoreBooks::ShipLog("Sol System", "Blank Hull")), "never a placeholder book");
+		Check(LoreBooks::Recover(recovered, lib, LoreBooks::StationRecords("Sol System", "Test Port")), "a port's records are recovered");
+		Check(recovered.Count() == 2 && recovered[0] == "ship-sol-test-hull/log", "recovered in the order found");
+	}
 }
 
 int main(int argc, char** argv)
@@ -198,6 +234,7 @@ int main(int argc, char** argv)
 	Nodes(fixture);
 	Placeholders(fixture);
 	Scan(fixture);
+	Books(fixture);
 	std::printf("EncounterTests: %d checks, %d failed\n", checks, failures);
 	return failures == 0 ? 0 : 1;
 }

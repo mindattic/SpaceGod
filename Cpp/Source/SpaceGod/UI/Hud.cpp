@@ -7,6 +7,8 @@
 #include "ActiveProfile.h"
 #include "UI/GalaxyMapScreen.h"
 #include "UI/HelpScreen.h"
+#include "UI/LogsScreen.h"
+#include "GameLore.h"
 #include "UI/Icons.h"
 #include "Camera/SpaceCamera.h"
 #include "Camera/StarTravel.h"
@@ -124,6 +126,17 @@ namespace SpaceGod::UI
 			auto whole = Rect(0, 0, static_cast<float>(Screen::width), static_cast<float>(Screen::height));
 			if (!app->UiRects.Contains(whole)) app->UiRects.Add(whole); // the world under it takes no clicks
 			if (helpScreen->Draw("Esc, H or F1 to close")) app->ShowHelp = false;
+			DrawToast();
+			return;
+		}
+
+		// So are the recovered logs (US-T261): the ship logs and station records found, to read.
+		if (app->ShowLogs)
+		{
+			if (!logsScreen) logsScreen = cs::New<LogsScreen>();
+			auto whole = Rect(0, 0, static_cast<float>(Screen::width), static_cast<float>(Screen::height));
+			if (!app->UiRects.Contains(whole)) app->UiRects.Add(whole); // the world under it takes no clicks
+			if (logsScreen->Draw(app->RecoveredLogKeys(), GameLore(), "Esc or Shift+L to close")) app->ShowLogs = false;
 			DrawToast();
 			return;
 		}
@@ -1729,5 +1742,6 @@ namespace SpaceGod::UI
 		panelTexture = rowHoverTexture = rowSelectedTexture = buttonTexture = buttonActiveTexture = nullptr;
 		if (galaxyMap) galaxyMap->DestroyOwnedTextures();
 		if (helpScreen) helpScreen->DestroyOwnedTextures();
+		if (logsScreen) logsScreen->DestroyOwnedTextures(); // US-T261
 	}
 }

@@ -187,6 +187,11 @@ namespace SpaceGod::Core
 		/// worked out once its reserve is cut, and stays so. Absent from older saves (empty).</summary>
 		cs::Dictionary<cs::String, double> HandCut;
 
+		/// <summary>US-T261: the Prose books recovered here (ship logs, station records), by key, in the order found (see
+		/// <see cref="LoreBooks"/>; the logs screen reads every system's). Display only: no simulation code reads it. Absent
+		/// from older saves (empty).</summary>
+		cs::List<cs::String> RecoveredLogs;
+
 		/// <summary>The player's trading career (U.SPC-T426): price intelligence, trade news, charters, insurance, the
 		/// back door and the trader's rank (see <see cref="Core.TradeDesk"/>).</summary>
 		cs::Ref<TradeDesk> Trade;

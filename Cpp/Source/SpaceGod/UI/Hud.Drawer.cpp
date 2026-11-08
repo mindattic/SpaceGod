@@ -44,7 +44,7 @@ namespace SpaceGod::UI
 
 	bool Hud::DrawerAvailable() const
 	{
-		return app->ShowHud && !app->ScreenCleared && !app->ShowSpawn && !app->ShowHelp && !(app->ShowGalaxyMap && !app->Travel->Active);
+		return app->ShowHud && !app->ScreenCleared && !app->ShowSpawn && !app->ShowHelp && !app->ShowLogs /* US-T261 */ && !(app->ShowGalaxyMap && !app->Travel->Active);
 	}
 
 	bool Hud::UpdateDrawer(bool keysFree)

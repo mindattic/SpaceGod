@@ -255,6 +255,8 @@ makes one lookup through GameLore (`LoreShort`, `LoreLong`, `LoreBark`); with no
 | Galaxy map, a known system's detail | `system-<sys>` | short | no line |
 | Comms channel header, the party hailed (pilot or station) | `pilot-<name>` / `settlement-<sys>-<name>` | short | no line |
 | Comms, the answer to a hail | bark `<speaker>/hail`, else any bark naming the speaker; then the hull's `ship-<sys>-<name>/hail` | one line, picked from the pilot's seed and times hailed (a station: its key and the day); it replaces only the flavour, and the greeting's gameplay rider (`CommsLine::Rider`: a trader's cargo offer, a raider's demand) always follows it (US-T238) | the generated greeting |
+| Logs screen (Shift+L), a ship's log: recovered salvaging its derelict or wreck once nobody hostile is aboard, or taking it as a prize | book `ship-<sys>-<name>/log` | title, author, pages (section "Books" below) | nothing recovered |
+| Logs screen, a port's records: recovered when it clears you to dock | book `settlement-<sys>-<name>/records` | title, author, pages | nothing recovered |
 
 Lore is display only: no simulation code reads it, and a hail's bark replaces only the logged words after `Comms::Apply`
 has done what the hail does. A key the game cannot rebuild never matches and keeps its placeholder: an entity the export
@@ -383,6 +385,24 @@ not hostile and logs the encounter kind and the conversation found. `Tests/Lore/
 `tools/build-core.ps1`) checks the tag vocabulary against this config, the lookup order, choices offered, `$outcome`, the
 placeholders, the tab keys and the scanner readings on the test-only `fixture/LoreEncounters`.
 
+### Books (US-T261)
+
+A `book` is something the player finds and reads: a ship's log, a port's records. The game reads exactly two book keys,
+both made by `Core/Lore/LoreBooks` from `LoreKeys`:
+
+| Key | Found | Example |
+|---|---|---|
+| `ship-<sys>-<name>/log` | salvaging the hull's derelict, or the wreck it left, once nobody hostile is left aboard; or taking it as a prize in a fight the player's hull is in | `ship-sol-sfs-resolute/log` |
+| `settlement-<sys>-<name>/records` | docking at the port (Shift+M at a helm alongside it, with its clearance) | `settlement-sol-armstrong-station/records` |
+
+Write `title` (the logs screen lists it; with none the game shows "Log of ..." / "Records of ..." and the entity's
+words), `author` if anyone signs it, and `pages[]`, one screen each: the reader turns them with Left / Right. Blank
+pages are left out. **No book, no item**: a hull or port with no book (or one whose pages are all blank) gives the
+player nothing, never a placeholder. A recovered book is kept by key in the saved game (`World::RecoveredLogs`), so a
+later version of its text is what the player reads, and a retired text drops off the list. Like every other surface
+it is display only. `Tests/Lore/EncounterTests.cpp` pins both keys and the recovery rules on the test-only
+`fixture/LoreBooks`.
+
 ### What to write first
 
 1. The four generic encounters, `spacegod/encounter-trader`, `-patrol`, `-pirate` and `-distress`, and the fallback
@@ -391,6 +411,7 @@ placeholders, the tab keys and the scanner readings on the test-only `fixture/Lo
 3. Overview descriptions of the places players see first (Sol's worlds and ports), then their `history` and `culture` tabs.
 4. Faction encounters (`faction-<name>/encounter-patrol` for each navy, `.../encounter-pirate` for each clan), then
    pilots players meet often.
+5. Records for the ports players dock at first, and logs for named hulls likely to end up derelict or taken.
 
 ## 6. The Outbox
 

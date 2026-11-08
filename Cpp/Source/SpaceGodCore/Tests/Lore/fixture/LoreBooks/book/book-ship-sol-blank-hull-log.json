@@ -1,0 +1,19 @@
+{
+  "schema": "spacegod-text/1",
+  "id": "book-ship-sol-blank-hull-log",
+  "kind": "book",
+  "key": "ship-sol-blank-hull/log",
+  "version": 1,
+  "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000103",
+  "about": [
+    "ship-sol-blank-hull"
+  ],
+  "speakers": [],
+  "payload": {
+    "title": "Fixture Blank Log",
+    "pages": [
+      "",
+      "  "
+    ]
+  }
+}

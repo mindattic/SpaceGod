@@ -88,6 +88,10 @@ namespace SpaceGod::Input
 		bool ToggleLabels = false;
 		bool ToggleHelp = false;
 
+		/// <summary>US-T261: Shift+L opens the logs screen (the ship logs and station records recovered, to read), or closes it.
+		/// L alone stays the labels. Local to this machine, like the Help screen.</summary>
+		bool ToggleLogs = false;
+
 		/// <summary>US-T126: Shift+F1 pulls the dev menu down (spawn ships and enemies, travel, helm, time, scale), or puts
 		/// it away. F1 alone stays the help screen. Local to this machine: the menu is never a co-op peer's.</summary>
 		bool ToggleCheatMenu = false;

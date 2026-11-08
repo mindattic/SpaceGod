@@ -1,0 +1,21 @@
+{
+  "schema": "spacegod-text/1",
+  "id": "book-ship-sol-test-hull-log",
+  "kind": "book",
+  "key": "ship-sol-test-hull/log",
+  "version": 1,
+  "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000101",
+  "about": [
+    "ship-sol-test-hull"
+  ],
+  "speakers": [],
+  "payload": {
+    "title": "Fixture Log",
+    "author": "Fixture Captain",
+    "pages": [
+      "Fixture page one.",
+      "",
+      "Fixture page two."
+    ]
+  }
+}

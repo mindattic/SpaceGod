@@ -37,4 +37,5 @@ namespace SpaceGod::UI
 {
 	class GalaxyMapScreen;
 	class HelpScreen;
+	class LogsScreen; // US-T261
 }

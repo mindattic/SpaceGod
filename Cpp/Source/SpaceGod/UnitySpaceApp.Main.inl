@@ -293,6 +293,26 @@ public:
 	/// <summary>Every frame: undocks once the hull has left the port (or the helm), or the port no longer lets it in.</summary>
 	void UpdateDocking();
 
+	// ---------------------------------------------------------------- recovered logs (US-T261)
+
+	/// <summary>US-T261: the logs screen (Shift+L): every Prose book recovered (ship logs, station records), to read.
+	/// Local to this machine, like the Help screen; Esc closes it.</summary>
+	bool ShowLogs = false;
+
+	/// <summary>Recovers the Prose book keyed <paramref name="key"/> (Core::LoreBooks) into the system's
+	/// World::RecoveredLogs when there is one and it is new, and says so on a toast; else nothing (no book, no item).</summary>
+	void RecoverLog(const cs::String& key);
+
+	/// <summary>Every recovered book's key: each system's World::RecoveredLogs, the system in view first.</summary>
+	cs::List<cs::String> RecoveredLogKeys() const;
+
+	/// <summary>Recovers the log of the hulk latched to, once nobody hostile is left aboard (a derelict's, or the ship a
+	/// wreck was).</summary>
+	void RecoverHulkLog(const cs::Ref<Core::SalvageSession>& s);
+
+	/// <summary>Recovers the log of every prize the held unit's side has taken in <paramref name="battle"/>.</summary>
+	void RecoverPrizeLogs(const cs::Ref<Core::Battle>& battle, const cs::Ref<Core::BattleUnit>& unit);
+
 private:
 	/// <summary>The panel a tab of the port screen opens, or null for one the screen draws itself.</summary>
 	bool* PortTabPanel(PortTab tab);

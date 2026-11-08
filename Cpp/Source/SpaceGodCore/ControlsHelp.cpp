@@ -28,6 +28,7 @@ namespace SpaceGod::Core
 				L("R", "auto-reorient on / off (keep this system's plane level); at a fighter's controls, held, R is drift"),
 				L("O", "orbits"),
 				L("L", "labels"),
+				L("Shift+L", "recovered logs: the ship logs and station records you have found, to read (Up / Down a log, Left / Right a page)"), // US-T261
 				L("N", "hyperlanes"),
 				L("K", "satellites"),
 				L("Shift+K  or  numpad *", "skybox: the next sky for the system in view, which keeps it (Shift+Alt+K or numpad / goes back)"),

@@ -1,0 +1,15 @@
+{
+  "schema": "spacegod-text/1",
+  "id": "description-ship-sol-other-hull-log",
+  "kind": "description",
+  "key": "ship-sol-other-hull/log",
+  "version": 1,
+  "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000104",
+  "about": [
+    "ship-sol-other-hull"
+  ],
+  "speakers": [],
+  "payload": {
+    "short": "Fixture not a book."
+  }
+}

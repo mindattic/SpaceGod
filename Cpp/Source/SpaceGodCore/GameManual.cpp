@@ -209,6 +209,10 @@ namespace SpaceGod::Core
 				  "Come alongside a derelict or wreck, match velocity (within about a kilometre and 20 m/s) and press 1 to "
 				  "latch on. Fight off any raiders aboard, then salvage cargo, strip a component or claim the hull with a "
 				  "prize crew."),
+				T("Recovered logs", // US-T261
+				  "Some hulls keep a log and some ports keep records. A hulk's log comes off it once nobody hostile is left "
+				  "aboard, a prize's when it is taken, and a port's records when it clears you in to dock. Shift+L opens "
+				  "every log you have found, to read page by page."),
 				T("Tractor beam and cargo pods",
 				  "Blow a laden ship open and most of the cargo it carried spills as drifting pods (amber canisters with a "
 				  "faint blinking marker; red, stolen goods), the rest staying in the wreck's hold for latching. Cargo a "

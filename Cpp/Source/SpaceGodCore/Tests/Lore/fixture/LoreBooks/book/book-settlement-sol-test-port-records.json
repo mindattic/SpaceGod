@@ -1,0 +1,17 @@
+{
+  "schema": "spacegod-text/1",
+  "id": "book-settlement-sol-test-port-records",
+  "kind": "book",
+  "key": "settlement-sol-test-port/records",
+  "version": 1,
+  "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000102",
+  "about": [
+    "settlement-sol-test-port"
+  ],
+  "speakers": [],
+  "payload": {
+    "pages": [
+      "Fixture records."
+    ]
+  }
+}
