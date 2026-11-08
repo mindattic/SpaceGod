@@ -65,4 +65,6 @@ namespace SpaceGod::Core
 	cs::String LoreKeys::Pilot(const cs::String& pilotName) { return "pilot-" + Slug(pilotName); }
 
 	cs::String LoreKeys::Named(const cs::String& entity, const cs::String& name) { return entity + "/" + name; }
+
+	cs::String LoreKeys::Faction(const cs::String& factionName) { return "faction-" + Slug(factionName); }
 }

@@ -7,6 +7,7 @@
   "mapper": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/universe-export.ps1 -BuildCore",
   "applier": "python tools/prose_apply.py Data/Prose/pending --lore Data/Lore --universe Data/Prose/spacegod.universe.json",
   "kinds": ["description", "book", "bark", "conversation"],
+  "tags": ["rumours", "advice", "news", "trade", "buy", "story", "threaten", "accept-surrender", "plunder", "let-go", "refuse-surrender", "sign-off"],
   "universeFile": "spacegod.universe.json",
   "pending": "pending",
   "applied": "applied.jsonl",

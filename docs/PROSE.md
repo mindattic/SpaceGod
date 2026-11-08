@@ -46,7 +46,7 @@ committed `Data/Lore` files are what ships.
 
 | Path | What | In git |
 |---|---|---|
-| `Data/Prose/prose.config.json` | the kit config: consumer and universe `spacegod`, the mapper, the applier, the kinds SpaceGod uses (`description`, `book`, `bark`, `conversation`) | committed |
+| `Data/Prose/prose.config.json` | the kit config: consumer and universe `spacegod`, the mapper, the applier, the kinds SpaceGod uses (`description`, `book`, `bark`, `conversation`), the choice `tags` the game executes (section 5, "Encounters") | committed |
 | `Data/Prose/spacegod.universe.json` | the mapper's output | ignored (derived) |
 | `Data/Prose/pending/` | pulled `prose-text/1` texts waiting to be applied | ignored |
 | `Data/Prose/applied.jsonl` | one line per applied text `{id, version, hash, key, kind, status, appliedAt}`, written by the kit | committed (once there is one) |
@@ -245,10 +245,13 @@ makes one lookup through GameLore (`LoreShort`, `LoreLong`, `LoreBark`); with no
 
 | Surface | Key | Form | With no text |
 |---|---|---|---|
-| Selection card, a body (planet, moon, dwarf planet, asteroid, star, station body) | `<type>-<sys>-<name>` | long | the catalogue summary |
-| Selection card, each settlement listed on its world (colonies, stations, outposts, havens) | `settlement-<sys>-<name>` | short | no line |
-| Selection card, a ship | `ship-<sys>-<name>` | long | no line |
-| Selection card, a ship's named pilot (once met at a hail or a fight) | `pilot-<name>` | short, after their styled name | no line |
+| Scan panel (the selection card), a body's Overview tab (planet, moon, dwarf planet, asteroid, star, station body) | `<type>-<sys>-<name>` | long | the catalogue summary |
+| Scan panel, a settlement's subtab on its world (colonies, stations, outposts, havens), Overview tab | `settlement-<sys>-<name>` | long | no line |
+| Scan panel, a ship's Overview tab | `ship-<sys>-<name>` | long | no line |
+| Scan panel, a ship's Crew tab: its named pilot (once met at a hail or a fight) | `pilot-<name>` | short, after their styled name | their styled name |
+| Scan panel, a met pilot's subtab, Overview tab | `pilot-<name>` | long | no line |
+| Scan panel, every other tab | `<entity>/<tab>` (section "Scan panels" below) | long | "No record on file." |
+| Comms, an encounter's conversation | `<pilot>/encounter-<kind>`, `<faction>/encounter-<kind>`, `spacegod/encounter-<kind>` (section "Encounters" below) | conversation | the plain comms panel |
 | Galaxy map, a known system's detail | `system-<sys>` | short | no line |
 | Comms channel header, the party hailed (pilot or station) | `pilot-<name>` / `settlement-<sys>-<name>` | short | no line |
 | Comms, the answer to a hail | bark `<speaker>/hail`, else any bark naming the speaker; then the hull's `ship-<sys>-<name>/hail` | one line, picked from the pilot's seed and times hailed (a station: its key and the day); it replaces only the flavour, and the greeting's gameplay rider (`CommsLine::Rider`: a trader's cargo offer, a raider's demand) always follows it (US-T238) | the generated greeting |
@@ -258,6 +261,136 @@ has done what the hail does. A key the game cannot rebuild never matches and kee
 suffixed (`-2`) because two things slug alike, the bodies of a void station, and orbital structures and docking rings
 (not exported). `sg.LoreView [<body>] [shot <file>] [quit]` selects a body and logs every lookup its card and its ports
 make; point `SPACEGOD_LORE_DIR` at a folder of test texts to see them on screen without approved lore.
+
+### Encounters (US-T239)
+
+When the unit the SpaceGod holds hails someone, or a beaten hull hails it for terms, the game decides what kind of
+encounter it is from the simulation alone (`Core/Lore/Encounters`, `KindOf`) and looks for a `conversation` text for it.
+With none, the comms panel runs exactly as it always has.
+
+| Kind | When |
+|---|---|
+| `trader` | a civilian hull: merchant, courier, miner, independent |
+| `patrol` | a lawful warship (any navy that is not a pirate clan) |
+| `pirate` | a pirate clan's hull |
+| `distress` | a hull in trouble: dry tanks, pulled out of a lane and adrift, or in a battle the speaker is not part of |
+| `surrender` | a hull that has struck its colours to the speaker's side and hails for terms |
+| `station` | a settlement's traffic control |
+| `hail` | the generic hail: the last fallback of every kind |
+
+**Keys**, looked up in this order, the first conversation found wins:
+
+1. `pilot-<name>/encounter-<kind>`: one pilot's own (`pilot-tomas-brennan/encounter-pirate`), once the game knows the pilot;
+2. `faction-<name>/encounter-<kind>`: their faction's (`faction-sol-federation/encounter-patrol`);
+3. `spacegod/encounter-<kind>`: the generic one of the kind (`spacegod/encounter-trader`);
+4. `spacegod/encounter-hail`: the generic hail, for any kind.
+
+**Speakers.** `$them` is whoever was hailed (or hails); `$player` (also `$me`, `$hero`) is the unit the SpaceGod holds. An
+entity id may also be a speaker in a pilot's own text. A node's `line` is said by its `speaker`; its `choices` are the
+player's answers. A node with no choices goes on to its `next`; with neither, the talk ends.
+
+**What the opening does.** The start node's line is the answer to the hail: it stands in for the generated greeting, and
+the greeting's gameplay rider (a merchant's cargo offer, a raider's demand, US-T238) is still added after it. For a
+surrender the game's own line of terms is said first and the conversation follows.
+
+**Choices and tags.** The text never decides an outcome. A choice that does something carries one of the tags below (the
+config's `tags`, so `kit validate` warns on any other): the panel offers it only while the game offers that verb (a crate to
+buy only when they carry cargo, terms only from a struck hull), and choosing it says the verb exactly as the panel's button
+would (`Comms::Apply`, the same command a co-op peer or replay runs). The player's line in the log is the choice's text;
+everything after it is the simulation's answer. A choice with no tag (or an unknown one) only moves the talk to its `next`.
+The panel always adds a last choice, "(other options)", back to the plain verbs.
+
+| Tag | Game action (comms verb) | Offered when |
+|---|---|---|
+| `rumours` | ask what they have heard | any hull or station not surrendering |
+| `advice` | ask about the area (contacts, bearings, threats) | same |
+| `news` | ask the system's news | same |
+| `trade` | ask to trade (their offer and price) | anyone but a lawful warship |
+| `buy` | buy a crate of their cargo at their price | they carry cargo and the speaker has a hull |
+| `story` | ask who they are (their life story) | a hull |
+| `threaten` | demand their cargo or their life: they comply, run or fight | a hull, from a hull |
+| `accept-surrender` | take what a struck hull offers | a hull hailing for terms |
+| `plunder` | board and strip a struck hull | same |
+| `let-go` | let a struck hull go | same |
+| `refuse-surrender` | no quarter: the fight goes on | same |
+| `sign-off` | close the channel | always |
+
+There is no `pay`, `fight`, `flee`, `bluff` or `comply` tag because the game has no such comms action: paying off a raider,
+bluffing a patrol or complying with an inspection would be new game mechanics (a Core ticket), not text. Fighting or
+fleeing is done at the helm, not by a choice.
+
+**`$outcome`.** A tagged choice whose `next` is `$outcome` goes to the node named after what the action came to:
+`talked`, `complied`, `ran`, `fought`, `refused`, `traded`, `surrender-taken`, `no-quarter`, `plundered`, `let-go`. With no
+such node the talk ends. `$end` (or any other `$token`, or no `next`) ends it. A threat answered with guns closes the panel
+and the hands go back to the helm, whatever the text says next.
+
+**Placeholders.** Any line or choice may show these game values; the game fills them every time a line is shown. An
+unknown `{name}` is left as written, so a typo shows on screen.
+
+| Placeholder | Value |
+|---|---|
+| `{ship}` | their hull's name |
+| `{pilot}` | their pilot's styled name ("Pirate fighter Sefa Voss"), else "the captain of the <ship>" |
+| `{callsign}` | their pilot's callsign, or empty |
+| `{faction}` | their faction |
+| `{station}` | the station's name (a station encounter), else empty |
+| `{system}` | the system the talk happens in |
+| `{stance}` | how they feel about the speaker: friendly, neutral, wary, hostile |
+| `{range}` | how far they are, as comms says it ("320 klicks") |
+| `{cargo}` | their hold ("40 t of helium-3", "nothing") |
+| `{my-ship}`, `{my-pilot}`, `{my-faction}` | the speaker's hull, pilot and faction |
+| `{my-cargo}` | the speaker's hold |
+| `{credits}` | the speaker's credits ("12,400"): what a purchase is paid from |
+| `{entity:<id>}` | the entity's name when the game can resolve it (pilots met, factions, the active system's bodies, ports and hulls), else the id's words |
+
+Prices are not placeholders: the price is in the game's own answer to `trade` or `buy`, which follows the choice.
+
+### Scan panels (US-T239)
+
+The selection card is a scan: a row of **subtabs** picks what it is about (a body and each discovered settlement on it; a
+ship and its named pilot once met) and a row of **tabs** picks the aspect. Each tab shows the simulation's numbers for it,
+which stay game-owned, then its **narrative**: one `description` text, shown long, else a placeholder.
+
+| Subject | Tabs (id) | The game's numbers on them |
+|---|---|---|
+| Star | `overview`, `history`, `notable` | photosphere, radius, mass, orbit, discovery |
+| World (planet, moon, dwarf planet, asteroid) | `overview`, `industry`, `culture`, `history`, `notable` | overview: radius, mass, gravity, atmosphere, equilibrium temperature, orbit, day, habitable zone, a battle there; industry: docking rings, each settlement, population, who holds it |
+| Station body | the same as a world | the same, without gravity and atmosphere |
+| Settlement (its world's subtab) | `overview`, `industry`, `culture`, `history`, `notable` | overview: holder, population, migration, jobs, wage tax, defences; industry: companies, works (recipe, level, running), exports, shortages; culture: unrest; history: occupation, fallen |
+| Ship (civilian) | `overview`, `cargo`, `crew`, `history`, `reputation` | overview: length, drive, propellant, status, hull, armament, damage; cargo: cargo, hold, paid, profit, owner; crew: aboard, boarders, its pilot; history: trips; reputation: the law's record |
+| Warship (navy or pirate) | `overview`, `orders`, `crew`, `history`, `reputation` | orders: orders or bounty contract; reputation: the law's record, outlaw file |
+| Pilot (the ship's subtab once met) | `overview`, `history`, `reputation` | overview: age, birthplace, faction, career and next step; history: ships flown, battles, robberies, salvage, their life as the simulation wrote it; reputation: renown, grudges, record |
+
+**Keys** (`Core/Lore/ScanTabs::Key`, every entity id from `LoreKeys`): the `overview` tab's narrative is the entity's own
+description, keyed by its id (`planet-sol-earth`, `settlement-sol-ceres-hub`, `ship-sol-sfs-resolute`,
+`pilot-tomas-brennan`), the same text US-T237 already shows; every other tab is `<entity>/<tab>`
+(`planet-sol-earth/history`, `settlement-sol-ceres-hub/industry`, `ship-sol-sfs-resolute/reputation`,
+`pilot-tomas-brennan/history`). A description's `long` is shown (else its `short`). With no text the overview shows what
+it did before (a body's catalogue summary, else nothing) and any other tab "No record on file." Orbital structures and
+docking rings keep their one-page card (not exported, no keys).
+
+**The numbers in Prose.** The export carries what the scan shows, so a writer reads the player's numbers in the entity's
+`details`: bodies have a `scan` block (`surfaceGravityG`, `atmosphere`, `equilibriumTempK`, `habitableZone`) beside
+`radiusKm`, `gmKm3S2`, `rotationHours` and `orbit`; settlements add `industry` (`recipe`, `level`, `utilisation` per
+works), `staffing`, `netMigrationPerDay` and `capital` to `population`, `owner`, `unrest`, `stockTonnes` and the rest;
+ships add a `scan` block (`hullClass`, `lengthKm`, `accelG`, `crew`, `marines`) to `class`, `cargo`, `faction`; pilots
+already carry their career, traits, grudges and life story. The text may describe these; it must not contradict them, and
+the game never reads a number from text.
+
+`sg.ScanView [<body>] [ship] [tab <id>] [subtab <n>] [shot <file>] [quit]` opens the scan on a body (or a hull) and logs
+every tab's key and what it found; `sg.EncounterView [shot <file>] [quit]` takes a helm, hails the nearest hull that is
+not hostile and logs the encounter kind and the conversation found. `Tests/Lore/EncounterTests.cpp` (built by
+`tools/build-core.ps1`) checks the tag vocabulary against this config, the lookup order, choices offered, `$outcome`, the
+placeholders, the tab keys and the scanner readings on the test-only `fixture/LoreEncounters`.
+
+### What to write first
+
+1. The four generic encounters, `spacegod/encounter-trader`, `-patrol`, `-pirate` and `-distress`, and the fallback
+   `spacegod/encounter-hail`: every hail in the game reaches one of them.
+2. `spacegod/encounter-surrender` and `spacegod/encounter-station`.
+3. Overview descriptions of the places players see first (Sol's worlds and ports), then their `history` and `culture` tabs.
+4. Faction encounters (`faction-<name>/encounter-patrol` for each navy, `.../encounter-pirate` for each clan), then
+   pilots players meet often.
 
 ## 6. The Outbox
 

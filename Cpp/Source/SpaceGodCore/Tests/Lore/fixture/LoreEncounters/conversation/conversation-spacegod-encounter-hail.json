@@ -1,0 +1,25 @@
+{
+  "schema": "spacegod-text/1",
+  "id": "conversation-spacegod-encounter-hail",
+  "kind": "conversation",
+  "key": "spacegod/encounter-hail",
+  "version": 1,
+  "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000103",
+  "about": [],
+  "speakers": [
+    "$them"
+  ],
+  "payload": {
+    "start": "open",
+    "nodes": [
+      {
+        "id": "open",
+        "speaker": "$them",
+        "line": "Fixture generic hail.",
+        "choices": [
+          { "text": "Fixture news.", "next": "$outcome", "tags": ["news"] }
+        ]
+      }
+    ]
+  }
+}

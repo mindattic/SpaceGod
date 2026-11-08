@@ -21,6 +21,8 @@ namespace SpaceGod::Core
 	class Company;
 	class Faction;
 	class Settlement;
+	class NamedPilot; // US-T239: the scan's pilot page
+	class LawRecord;
 	enum class EngineTelegraph : int;
 	enum class PilotControl : int;
 	enum class SettlementKind : int;

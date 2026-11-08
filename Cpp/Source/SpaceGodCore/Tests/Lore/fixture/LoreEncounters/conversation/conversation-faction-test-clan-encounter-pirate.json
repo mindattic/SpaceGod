@@ -1,0 +1,22 @@
+{
+  "schema": "spacegod-text/1",
+  "id": "conversation-faction-test-clan-encounter-pirate",
+  "kind": "conversation",
+  "key": "faction-test-clan/encounter-pirate",
+  "version": 1,
+  "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000102",
+  "about": [],
+  "speakers": [
+    "$them"
+  ],
+  "payload": {
+    "start": "open",
+    "nodes": [
+      {
+        "id": "open",
+        "speaker": "$them",
+        "line": "Fixture clan line."
+      }
+    ]
+  }
+}

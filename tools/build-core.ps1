@@ -225,4 +225,16 @@ if (-not $SkipParity) {
   & $ltExe (Join-Path $loreDir 'fixture')
   if ($LASTEXITCODE -ne 0) { Write-Host 'LoreLibraryTests: failures (see above).' -ForegroundColor Red; exit $LASTEXITCODE }
 }
+
+# ---------------------------------------------------------------- EncounterTests (US-T239)
+$et = Invoke-Compile @(Get-Item -LiteralPath (Join-Path $loreDir 'EncounterTests.cpp')) $parityObjRoot
+if ($et.Failed.Count -gt 0) { exit 1 }
+$etExe = Join-Path $out 'EncounterTests.exe'
+& link.exe /nologo /DEBUG @linkOpt "/OUT:$etExe" $et.Objs $lib
+if ($LASTEXITCODE -ne 0) { throw 'link.exe failed (EncounterTests).' }
+Write-Host "exe     $etExe"
+if (-not $SkipParity) {
+  & $etExe (Join-Path $loreDir 'fixture') (Join-Path $repo 'Data\Prose\prose.config.json')
+  if ($LASTEXITCODE -ne 0) { Write-Host 'EncounterTests: failures (see above).' -ForegroundColor Red; exit $LASTEXITCODE }
+}
 exit 0

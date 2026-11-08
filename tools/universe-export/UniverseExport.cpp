@@ -33,6 +33,9 @@
 #include "Combat/Outfitting.h"
 #include "Comms/Pilots.h"
 #include "Lore/LoreKeys.h"
+#include "Lore/ScanTabs.h" // US-T239: the scanner readings the scan card shows
+#include "Economy/Industry.h"
+#include "Combat/Boarding.h" // Interior: a hull's crew and marines
 #include "Economy/BeltMining.h"
 #include "Economy/Companies.h"
 #include "Law/Law.h"
@@ -254,7 +257,7 @@ namespace
 
 	// ------------------------------------------------------------------ helpers
 
-	std::string FactionId(const cs::Ref<Faction>& f) { return f ? "faction-" + Slug(f->Name) : std::string(); }
+	std::string FactionId(const cs::Ref<Faction>& f) { return f ? LoreKeys::Faction(f->Name) : std::string(); }
 
 	const char* KindType(BodyKind k) { return LoreKeys::BodyType(k); }
 
@@ -571,6 +574,16 @@ namespace
 					e.Details.O("orbit", orbit);
 				}
 				if (b->IsStar()) e.Details.S("spectralType", b->SpectralType).N("teffK", b->TeffK).N("luminositySolar", b->LuminositySolar).B("singularity", b->Singularity);
+				// US-T239: what the scan card reads off a world, so a writer sees the numbers a player sees.
+				if (b->IsVisible() && !b->IsStar())
+				{
+					Obj scan;
+					if (b->Kind != BodyKind::Station) scan.N("surfaceGravityG", ScanFacts::SurfaceGravityG(*b)).S("atmosphere", ScanFacts::Atmosphere(*b));
+					double teq = ScanFacts::EquilibriumK(*cat, i);
+					if (std::isfinite(teq)) scan.N("equilibriumTempK", teq);
+					if (b->DiscoveryYear > 0) scan.S("habitableZone", ToString(b->HabitableZone));
+					e.Details.O("scan", scan);
+				}
 				if (b->DiscoveryYear) e.Details.I("discoveryYear", b->DiscoveryYear);
 				if (b->MassIsMinimum) e.Details.B("massIsMinimum", true);
 				if (!b->CoOrbitalWith.empty()) e.Details.S("coOrbitalWith", b->CoOrbitalWith);
@@ -605,6 +618,19 @@ namespace
 					.N("population", st->Population).B("shipyard", st->HasShipyard()).B("hidden", st->Hidden).B("lawless", st->Lawless).B("fallen", st->Fallen)
 					.N("unrest", st->Unrest).S("occupiedFrom", st->OccupiedFrom ? st->OccupiedFrom->Name : "").I("defencePlatforms", st->Platforms.Count())
 					.O("stockTonnes", stock).O("pricePerTonne", price);
+				{
+					// US-T239: the scan card's industry and people lines.
+					std::vector<Obj> industry;
+					for (const auto& f : st->Facilities)
+					{
+						if (f == nullptr || f->Recipe == nullptr) continue;
+						Obj o;
+						o.S("recipe", f->Recipe->Name).N("level", f->Level).N("utilisation", f->Utilisation);
+						industry.push_back(o);
+					}
+					e.Details.Raw("industry", ArrOfObj(industry)).N("staffing", st->Staffing).N("netMigrationPerDay", st->NetMigration)
+						.B("capital", st->Owner != nullptr && st->Owner->Capital == st);
+				}
 				e.Tags = { type, EnumSlug(ToString(st->Kind)) };
 				if (st->HasShipyard()) e.Tags.push_back("shipyard");
 				auto id = Add(std::move(e));
@@ -726,6 +752,14 @@ namespace
 				.N("capacityTonnes", ship->CapacityTonnes).I("tripsCompleted", ship->TripsCompleted).N("credits", ship->Credits);
 			if (ship->Leader) e.Details.S("leader", ship->Leader->Name);
 			if (ship->Company) e.Details.S("company", ship->Company->Name);
+			if (ship->Combat != nullptr && ship->Combat->Interior != nullptr)
+			{
+				// US-T239: the scan card's crew and hull lines.
+				Obj scan;
+				scan.S("hullClass", ship->Spec ? ship->Spec->DisplayName : std::string()).N("lengthKm", ship->LengthKm())
+					.N("accelG", ship->Spec ? ship->Spec->AccelG : 0.0).N("crew", ship->Combat->Interior->Crew()).N("marines", ship->Combat->Interior->Marines());
+				e.Details.O("scan", scan);
+			}
 			e.Tags = { "ship", military ? "military" : "civilian", EnumSlug(ToString(cls)) };
 			auto id = Add(std::move(e));
 			shipIds[ship.get()] = id;
@@ -1110,7 +1144,7 @@ namespace
 			std::string l = Lower(name);
 			if (auto it = pilotByName.find(l); it != pilotByName.end()) return it->second;
 			if (auto it = placeByName.find(l); it != placeByName.end()) return it->second;
-			std::string f = "faction-" + Slug(name);
+			std::string f = LoreKeys::Faction(name);
 			if (U.Has(f)) return f;
 			for (const auto& [ship, id] : shipIds) if (Lower(ship->Name) == l) return id;
 			return std::string();

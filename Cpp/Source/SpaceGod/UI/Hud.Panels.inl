@@ -116,7 +116,47 @@ private:
 	{
 		cs::String key;
 		cs::String value;
+		/// <summary>US-T239: the scan tab it shows under (Core::ScanTabs ids); "" is the overview.</summary>
+		cs::String tab;
 	};
+
+	// US-T239: the selection card is a scan with subtabs (what it is about: the body and each settlement on it; a ship and its
+	// pilot once met) and tabs (Core::ScanTabs: overview, industry, culture, history...). Each tab is the simulation's numbers
+	// for it and one Prose description (Core::ScanTabs::Key), else a placeholder.
+	cs::String scanTab = "overview";
+	int scanSubtab = 0;
+	Target scanFor;
+	/// <summary>The subtab/tab the card's scroll position belongs to (a new page starts at the top).</summary>
+	cs::String selectionScrollTab;
+
+	/// <summary>One subtab: its label, its Prose entity id, its subject (Core::ScanSubject), and what it shows.</summary>
+	struct ScanSubtab
+	{
+		cs::String label;
+		cs::String entity;
+		int subject = 0;
+		cs::Ref<Core::Settlement> settlement;
+		bool pilot = false;
+	};
+
+	/// <summary>Retags lines[from..] to <paramref name="tab"/>.</summary>
+	static void TagLines(cs::List<SelectionLine>& lines, int from, const char* tab);
+
+	/// <summary>A met pilot's scan page: who they are, what they have done and what is held against them (the simulation's
+	/// record of them, Core::NamedPilot), tagged overview / history / reputation; <paramref name="record"/> is their hull's law file.</summary>
+	void PilotLines(cs::List<SelectionLine>& lines, const cs::Ref<Core::NamedPilot>& p, const cs::Ref<Core::LawRecord>& record);
+
+public:
+	/// <summary>US-T239: shows <paramref name="tab"/> of the <paramref name="subtab"/>-th subtab of the selection's scan
+	/// (sg.ScanView's way in; a click on the card does the same).</summary>
+	void SetScan(const cs::String& tab, int subtab) { scanTab = tab; scanSubtab = subtab; scanFor = Target::None(); scanPinned = true; }
+
+	/// <summary>The tab and subtab the scan shows now.</summary>
+	const cs::String& ScanTabShown() const { return scanTab; }
+	int ScanSubtabShown() const { return scanSubtab; }
+
+private:
+	bool scanPinned = false;
 
 	/// AddSettlementLines' exports: the C# tuple (double value, string name).
 	struct ExportShare

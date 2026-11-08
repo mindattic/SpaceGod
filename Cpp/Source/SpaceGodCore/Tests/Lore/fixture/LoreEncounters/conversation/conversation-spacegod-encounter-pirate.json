@@ -1,0 +1,52 @@
+{
+  "schema": "spacegod-text/1",
+  "id": "conversation-spacegod-encounter-pirate",
+  "kind": "conversation",
+  "key": "spacegod/encounter-pirate",
+  "version": 1,
+  "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000101",
+  "about": [],
+  "speakers": [
+    "$them",
+    "$player"
+  ],
+  "payload": {
+    "title": "Fixture: generic pirate encounter",
+    "start": "open",
+    "nodes": [
+      {
+        "id": "open",
+        "speaker": "$them",
+        "line": "Fixture pirate {pilot} of the {ship}, {range} out. You carry {my-cargo} and {credits} credits.",
+        "next": "ask"
+      },
+      {
+        "id": "ask",
+        "speaker": "$them",
+        "line": "Fixture: choose.",
+        "choices": [
+          { "text": "Fixture threaten.", "next": "$outcome", "tags": ["threaten"] },
+          { "text": "Fixture trade.", "next": "ask", "tags": ["trade"] },
+          { "text": "Fixture surrender terms.", "next": "$outcome", "tags": ["accept-surrender"] },
+          { "text": "Fixture talk.", "next": "talk", "tags": ["flavour"] },
+          { "text": "Fixture leave.", "next": "$end", "tags": ["sign-off"] }
+        ]
+      },
+      {
+        "id": "talk",
+        "speaker": "$player",
+        "line": "Fixture {unknown} stays and {entity:faction-test-clan} is named."
+      },
+      {
+        "id": "complied",
+        "speaker": "$them",
+        "line": "Fixture: they complied."
+      },
+      {
+        "id": "fought",
+        "speaker": "$them",
+        "line": "Fixture: they fought."
+      }
+    ]
+  }
+}

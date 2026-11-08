@@ -57,6 +57,7 @@
 #include "Comms/Pilots.h"
 #include "GameLore.h"
 #include "Lore/LoreKeys.h"
+#include "Lore/ScanTabs.h" // US-T239: the scan's tabs and keys
 
 using namespace SpaceGod::Core;
 
@@ -825,19 +826,42 @@ namespace SpaceGod::UI
 		return cs::Cat(c->Phase == ShipPhase::Lane ? "=> " : "-> ", (*app->Catalog())[dest]->Name);
 	}
 
+	void Hud::TagLines(cs::List<SelectionLine>& lines, int from, const char* tab)
+	{
+		for (int i = from; i < lines.Count(); i++) lines[i].tab = tab;
+	}
+
 	void Hud::DrawSelection()
 	{
 		auto t = app->Selected;
 		if (t.IsNone()) return;
+		// US-T239: a new selection opens on its overview (unless sg.ScanView has just asked for a tab).
+		if (scanFor != t)
+		{
+			scanFor = t;
+			if (!scanPinned)
+			{
+				scanTab = ScanTabs::Overview;
+				scanSubtab = 0;
+			}
+			scanPinned = false;
+		}
 		cs::List<SelectionLine> lines;
 		cs::String heading, sub;
 		Color headingColor = Accent;
+		cs::List<ScanSubtab> subtabs; // none for an orbital structure or a docking ring: one page, as before
+		cs::String overviewFallback;  // what the overview shows with no Prose text (a body's catalogue summary)
+		const cs::String loreSystem = LoreSystem(app->ActiveSystem);
 
 		if (t.IsStructure()) StructureLines(t.Structure, lines, heading, sub, headingColor);
 		else if (t.IsRing()) RingLines(t.Ring, lines, heading, sub, headingColor);
 		else if (t.IsBody())
 		{
 			auto b = (*app->Catalog())[t.Body];
+			subtabs.Add(ScanSubtab{ b->Name, LoreKeys::Body(b->Kind, loreSystem, b->Name), static_cast<int>(ScanTabs::OfBody(b->Kind)) });
+			for (const auto& s : app->Economy()->At(t.Body))
+				if (s->Discovered()) subtabs.Add(ScanSubtab{ s->Name, LoreKeys::Settlement(loreSystem, s->Name), static_cast<int>(ScanSubject::Settlement), s });
+			if (scanSubtab >= subtabs.Count()) scanSubtab = 0;
 			heading = b->Name;
 			sub = cs::Cat(KindName(b), b->Status == BodyStatus::Candidate ? "  ·  CANDIDATE, unconfirmed" : b->Status == BodyStatus::Disputed ? "  ·  DISPUTED" : b->Status == BodyStatus::Fictional ? "  ·  fiction (game layer)" : "");
 			auto eph = app->Ephemeris();
@@ -865,7 +889,17 @@ namespace SpaceGod::UI
 			}
 			if (b->RotationHours != 0)
 				lines.Add(SelectionLine{ "Day (sidereal)", cs::Cat(cs::Math::Abs(b->RotationHours) < 48 ? cs::Cat(cs::Fmt(cs::Math::Abs(b->RotationHours), "0.00"), " h") : Duration(cs::Math::Abs(b->RotationHours) / 24), b->RotationHours < 0 ? " retro" : "") });
-			if (b->Kind != BodyKind::Station) lines.Add(SelectionLine{ "Surface gravity", cs::Cat(cs::Fmt(b->Gm / (b->RadiusKm * b->RadiusKm) * 1000 / 9.80665, "0.000"), " g") });
+			if (b->Kind != BodyKind::Station) lines.Add(SelectionLine{ "Surface gravity", cs::Cat(cs::Fmt(ScanFacts::SurfaceGravityG(*b), "0.000"), " g") });
+			// US-T239: the scanner's atmosphere and equilibrium temperature (Core::ScanFacts, the same numbers the export carries).
+			if (!b->IsStar() && b->Kind != BodyKind::Station) lines.Add(SelectionLine{ "Atmosphere", ScanFacts::Atmosphere(*b) });
+			double teq = b->IsStar() ? cs::Double::NaN : ScanFacts::EquilibriumK(*app->Catalog(), t.Body);
+			if (cs::Double::IsFinite(teq)) lines.Add(SelectionLine{ "Temperature", cs::Cat(cs::Fmt(teq, "N0"), " K equilibrium  (", cs::Fmt(teq - 273.15, "N0"), " °C, bare rock)") });
+			auto battleHere = app->World()->War->BattleAt(t.Body);
+			if (battleHere != nullptr) lines.Add(SelectionLine{ "Battle", cs::Cat(battleHere->Name, ", ", BattleScore(battleHere), ", ", Duration(battleHere->Seconds / Astro::SecondsPerDay)) });
+			// US-T237/US-T239: the body's approved Prose description is the overview's narrative, else its catalogue summary.
+			overviewFallback = b->Summary;
+			// Industry: who lives here and who holds it; each port's own numbers are its subtab.
+			int industry = lines.Count();
 			auto infraHere = app->World()->Infrastructure;
 			cs::List<cs::Ref<DockingRing>> ringsHere = infraHere ? infraHere->RingsAt(t.Body) : cs::List<cs::Ref<DockingRing>>();
 			if (ringsHere.Count() > 0)
@@ -874,19 +908,52 @@ namespace SpaceGod::UI
 				for (const auto& x : ringsHere) cities.Add(x->City);
 				lines.Add(SelectionLine{ "Docking rings", cs::Cat(ringsHere.Count(), ": ", cs::Strings::Join(", ", cities)) });
 			}
-			// US-T237: the body's approved Prose description (long: this is the detail view), else its catalogue summary.
-			cs::String about = LoreLong(LoreKeys::Body(b->Kind, LoreSystem(app->ActiveSystem), b->Name), b->Summary);
-			if (!about.empty()) lines.Add(SelectionLine{ "", about });
-			for (const auto& s : app->Economy()->At(t.Body))
-				if (s->Discovered()) AddSettlementLines(lines, s);
-			auto battleHere = app->World()->War->BattleAt(t.Body);
-			if (battleHere != nullptr) lines.Add(SelectionLine{ "Battle", cs::Cat(battleHere->Name, ", ", BattleScore(battleHere), ", ", Duration(battleHere->Seconds / Astro::SecondsPerDay)) });
+			double people = 0;
+			cs::List<cs::String> holders;
+			for (int i = 1; i < subtabs.Count(); i++)
+			{
+				const auto& s = subtabs[i].settlement;
+				people += s->Population;
+				if (s->Owner != nullptr && !holders.Contains(s->Owner->Name)) holders.Add(s->Owner->Name);
+				bool seat = app->World()->Polities->CapitalOf(s->Owner) == s;
+				lines.Add(SelectionLine{ s->Name, cs::Cat(s->Owner->Name, " ", KindName(s->Kind), seat ? " (capital)" : "", ", pop ", People(s->Population)) });
+			}
+			if (subtabs.Count() > 1)
+			{
+				lines.Add(SelectionLine{ "Population", People(people) });
+				lines.Add(SelectionLine{ "Held by", cs::Strings::Join(", ", holders) });
+			}
+			else lines.Add(SelectionLine{ "Settled", "No known settlement" });
+			TagLines(lines, industry, "industry");
+			if (scanSubtab > 0)
+			{
+				// A port on this world: its own page, its world named in the line under its name.
+				const auto& s = subtabs[scanSubtab].settlement;
+				lines.Clear();
+				overviewFallback = cs::String();
+				heading = s->Name;
+				sub = cs::Cat(s->Owner != nullptr ? s->Owner->Name : cs::String(), " ", KindName(s->Kind), " on ", b->Name);
+				AddSettlementLines(lines, s);
+			}
 		}
 		else
 		{
 			auto ship = t.Ship;
 			auto c = ship->Controller();
 			auto st = app->ShipStateOf(ship);
+			// US-T239: the hull, and its named pilot once met (never met here, so a glance at the card changes nothing).
+			auto lawHere = app->World()->Law;
+			auto pilotsHere = lawHere != nullptr ? lawHere->Pilots : nullptr;
+			auto metPilot = pilotsHere != nullptr ? pilotsHere->Find(ship) : nullptr;
+			bool warship = (ship->Spec != nullptr && ship->Spec->IsMilitary) || (ship->Faction != nullptr && ship->Faction->IsPirate);
+			subtabs.Add(ScanSubtab{ ship->Name, LoreKeys::Ship(loreSystem, ship->Name), static_cast<int>(warship ? ScanSubject::Warship : ScanSubject::Ship) });
+			if (metPilot != nullptr)
+			{
+				ScanSubtab ps{ metPilot->Name, LoreKeys::Pilot(metPilot->Name), static_cast<int>(ScanSubject::Pilot) };
+				ps.pilot = true;
+				subtabs.Add(ps);
+			}
+			if (scanSubtab >= subtabs.Count()) scanSubtab = 0;
 			heading = ship->Name;
 			auto company = c->Company;
 			sub = company != nullptr
@@ -1006,6 +1073,7 @@ namespace SpaceGod::UI
 			for (const auto& hp : combat->Subsystems) if (hp->Destroyed()) lost++;
 			if (lost > 0) lines.Add(SelectionLine{ "Damage", cs::Cat(lost, " of ", combat->Subsystems.Count(), " hardpoints destroyed") });
 			if (combat->Spec->Squadrons > 0) lines.Add(SelectionLine{ "Fighters", CarrierWings::Describe(combat) });
+			int crewFrom = lines.Count(); // US-T239: who is aboard is the crew tab
 			auto inside = combat->Interior;
 			lines.Add(SelectionLine{ "Aboard", cs::Cat(cs::Fmt(inside->Crew(), "0"), " crew, ", cs::Fmt(inside->Marines(), "0"), " marines",
 				combat->Disabled() ? "  ·  DISABLED" : "") });
@@ -1019,8 +1087,10 @@ namespace SpaceGod::UI
 						cs::Fmt(p->Progress(), "P0"), " across") });
 				if (inside->Log.Count() > 0) lines.Add(SelectionLine{ "", inside->Log[inside->Log.Count() - 1].Text });
 			}
+			TagLines(lines, crewFrom, "crew");
 			if (ship->Derelict) lines.Add(SelectionLine{ "DERELICT", "Boarded, stripped and abandoned" });
 			if (ship->Battle != nullptr) lines.Add(SelectionLine{ "In battle", cs::Cat(ship->Battle->Name, ", ", BattleScore(ship->Battle)) });
+			int serviceFrom = lines.Count(); // US-T239: a warship's orders, or a merchant's cargo
 			if (ship->Spec->IsMilitary || ship->Faction->IsPirate)
 			{
 				auto order = app->World()->War->OrderOf(c);
@@ -1052,28 +1122,56 @@ namespace SpaceGod::UI
 				lines.Add(SelectionLine{ "Trade profit", Credits(c->Credits) });
 				if (c->Company != nullptr) lines.Add(SelectionLine{ "Owner", CompanyText(c->Company) });
 			}
-			lines.Add(SelectionLine{ "Trips", cs::Str(c->TripsCompleted) });
+			TagLines(lines, serviceFrom, warship ? "orders" : "cargo");
+			// An outlaw's file is their reputation, not their orders.
+			for (int i = serviceFrom; i < lines.Count(); i++)
+				if (lines[i].key == "Outlaw") lines[i].tab = "reputation";
+			lines.Add(SelectionLine{ "Trips", cs::Str(c->TripsCompleted), "history" });
 			// The law's file on whoever commands it: the player's own record for the ship they fly.
-			auto law = app->World()->Law;
+			auto law = lawHere;
 			cs::Ref<LawRecord> record = law ? law->FindRecord(ship) : nullptr;
 			if (record != nullptr && (record->Wanted() || record->Crimes.Count() > 0))
 			{
 				bool mine = law->IsPlayer(record); // the pilot the player is embodied in (US-T148)
-				lines.Add(SelectionLine{ mine ? "Your record" : "Captain", cs::Cat(mine ? cs::String() : cs::Cat(record->Name, ", "), RecordText(record)) });
+				lines.Add(SelectionLine{ mine ? "Your record" : "Captain", cs::Cat(mine ? cs::String() : cs::Cat(record->Name, ", "), RecordText(record)), "reputation" });
 			}
-			// US-T237: the hull's approved Prose description (long, the detail view), and its named pilot's short one once the
-			// pilot is known (met at a hail or a fight; never met here, so a glance at the card changes nothing). With no text,
-			// neither line shows: the card is what it was.
-			cs::String about = LoreLong(LoreKeys::Ship(LoreSystem(app->ActiveSystem), ship->Name));
-			if (!about.empty()) lines.Add(SelectionLine{ "", about });
-			auto pilots = law != nullptr ? law->Pilots : nullptr;
-			auto pilot = pilots != nullptr ? pilots->Find(ship) : nullptr;
-			if (pilot != nullptr)
+			// US-T237: the named pilot's short Prose line once the pilot is known; with no text, just who they are. The hull's
+			// own description is the overview's narrative (US-T239).
+			if (metPilot != nullptr)
 			{
-				cs::String who = LoreShort(LoreKeys::Pilot(pilot->Name));
-				if (!who.empty()) lines.Add(SelectionLine{ "Pilot", cs::Cat(pilot->Styled(), "  ·  ", who) });
+				cs::String who = LoreShort(LoreKeys::Pilot(metPilot->Name));
+				lines.Add(SelectionLine{ "Pilot", who.empty() ? metPilot->Styled() : cs::Cat(metPilot->Styled(), "  ·  ", who), "crew" });
+			}
+			if (scanSubtab > 0 && metPilot != nullptr)
+			{
+				// The pilot's own page (the simulation's record of them: Comms/Pilots), under the hull's name.
+				lines.Clear();
+				heading = metPilot->Styled();
+				sub = cs::Cat(metPilot->Callsign.empty() ? cs::String() : cs::Cat("\"", metPilot->Callsign, "\"  ·  "), "flying the ", ship->Name);
+				PilotLines(lines, metPilot, record);
 			}
 		}
+
+		// US-T239: the tab's page: its own lines (game-owned numbers) and its Prose narrative, else a placeholder.
+		ScanSubject subject = ScanSubject::World;
+		if (subtabs.Count() > 0)
+		{
+			const auto& at = subtabs[scanSubtab];
+			subject = static_cast<ScanSubject>(at.subject);
+			if (!ScanTabs::Has(subject, scanTab)) scanTab = ScanTabs::Overview;
+			bool overview = scanTab == ScanTabs::Overview;
+			cs::List<SelectionLine> page;
+			for (const auto& l : lines)
+				if (overview ? l.tab.empty() || l.tab == ScanTabs::Overview : l.tab == scanTab) page.Add(l);
+			cs::String narrative = LoreLong(ScanTabs::Key(at.entity, scanTab), overview ? overviewFallback : ScanTabs::Placeholder(scanTab));
+			if (!narrative.empty())
+			{
+				if (page.Count() > 0) page.Add(SelectionLine{ "", "" });
+				page.Add(SelectionLine{ "", narrative });
+			}
+			lines = page;
+		}
+		float tabsH = subtabs.Count() == 0 ? 0.0f : subtabs.Count() > 1 ? 54.0f : 28.0f;
 
 		float w = 410;
 		// US-T208: a long value wraps inside the card instead of running off its right edge (a row is as tall as its wrapped value).
@@ -1093,7 +1191,7 @@ namespace SpaceGod::UI
 		// A long card (a boarded hull lists every compartment) never runs into the right-hand column's other panels (the
 		// reactor and sensors under it, the opportunities or market and the HUNTED list over it, US-T152): it takes what
 		// BottomRight has left up to TopRight, and its lines scroll in that.
-		float maxLinesH = Mathf::Max(19.0f * 2, layout.FreeRight() - (64 + 30));
+		float maxLinesH = Mathf::Max(19.0f * 2, layout.FreeRight() - (64 + 30 + tabsH));
 		bool scrolls = linesH > maxLinesH;
 		if (scrolls)
 		{
@@ -1101,7 +1199,7 @@ namespace SpaceGod::UI
 			for (const auto& l : lines) linesH += rowHeight(l, w - 162);
 		}
 		float shownH = scrolls ? maxLinesH : linesH;
-		float h = 64 + shownH + 30;
+		float h = 64 + tabsH + shownH + 30;
 		auto r = Panel(layout.Take(HudRegion::BottomRight, w, h));
 		auto old = GUI::contentColor;
 		GUI::contentColor = headingColor;
@@ -1110,12 +1208,34 @@ namespace SpaceGod::UI
 		GUI::Label(Rect(r.x + 14, r.y + 30, w - 28, 18), sub, small);
 		GUI::contentColor = old;
 
-		if (selectionScrollFor != t)
+		// US-T239: the subtabs (what the scan is about) over the tabs (which aspect); a click picks one.
+		float tabY = r.y + 52;
+		if (subtabs.Count() > 1)
+		{
+			float sw = (w - 28) / subtabs.Count();
+			for (int i = 0; i < subtabs.Count(); i++)
+				if (GUI::Button(Rect(r.x + 14 + i * sw, tabY, sw - 3, 22), subtabs[i].label, i == scanSubtab ? buttonActive : button) && i != scanSubtab)
+				{
+					scanSubtab = i;
+					scanTab = ScanTabs::Overview;
+				}
+			tabY += 26;
+		}
+		if (subtabs.Count() > 0)
+		{
+			const auto& tabs = ScanTabs::Of(subject);
+			float tw = (w - 28) / tabs.Count();
+			for (int i = 0; i < tabs.Count(); i++)
+				if (GUI::Button(Rect(r.x + 14 + i * tw, tabY, tw - 3, 22), tabs[i].Label, scanTab == tabs[i].Id ? buttonActive : button)) scanTab = tabs[i].Id;
+		}
+
+		if (selectionScrollFor != t || selectionScrollTab != cs::Cat(scanSubtab, "/", scanTab))
 		{
 			selectionScrollFor = t;
+			selectionScrollTab = cs::Cat(scanSubtab, "/", scanTab);
 			selectionScroll = Vector2::zero();
 		}
-		float x0 = r.x, y = r.y + 54, valueW = w - 146;
+		float x0 = r.x, y = r.y + 54 + tabsH, valueW = w - 146;
 		if (scrolls)
 		{
 			selectionScroll = GUI::BeginScrollView(Rect(r.x, y, w - 4, shownH), selectionScroll, Rect(0, 0, w - 20, linesH));
@@ -1123,9 +1243,11 @@ namespace SpaceGod::UI
 			y = 0;
 			valueW = w - 162;
 		}
-		for (const auto& [key, value] : lines)
+		for (const auto& line : lines)
 		{
-			float rowH = rowHeight(SelectionLine{ key, value }, valueW);
+			const cs::String& key = line.key;
+			const cs::String& value = line.value;
+			float rowH = rowHeight(line, valueW);
 			if (key.empty())
 			{
 				GUI::Label(Rect(x0 + 14, y, w - 28, rowH), value, small);
@@ -1265,16 +1387,12 @@ namespace SpaceGod::UI
 
 	void Hud::AddSettlementLines(cs::List<SelectionLine>& lines, const cs::Ref<Settlement>& s)
 	{
-		lines.Add(SelectionLine{ "", "" });
+		// US-T239: a port's scan page (its subtab on its world's card), tagged by tab: who holds it and its people (overview),
+		// its trade and works (industry), its mood (culture), what the wars have done to it (history). Its approved Prose
+		// description is the overview's narrative (US-T237 showed its short line here).
 		bool seat = app->World()->Polities->CapitalOf(s->Owner) == s;
-		lines.Add(SelectionLine{ s->Name, cs::Cat(s->Owner->Name, " ", KindName(s->Kind), seat ? " (capital)" : "", ", pop ", People(s->Population)) });
-		// US-T237: its approved Prose description, short (a world's card can list several ports); none, no line.
-		cs::String about = LoreShort(LoreKeys::Settlement(LoreSystem(app->ActiveSystem), s->Name));
-		if (!about.empty()) lines.Add(SelectionLine{ "", about });
-		auto houses = app->World()->Companies;
-		if (houses != nullptr)
-			for (const auto& co : houses->All)
-				if (co->Trading() && co->HomePort == s) lines.Add(SelectionLine{ "Company", CompanyText(co) });
+		lines.Add(SelectionLine{ "Held by", cs::Cat(s->Owner->Name, seat ? "  (capital)" : "") });
+		lines.Add(SelectionLine{ "Population", People(s->Population) });
 		if (s->Kind != SettlementKind::Haven && !s->Fallen)
 		{
 			double moving = s->NetMigration;
@@ -1282,6 +1400,17 @@ namespace SpaceGod::UI
 				cs::Cat(moving > 0 ? "+" : "-", cs::Fmt(cs::Math::Abs(moving), "N0"), "/day ", moving > 0 ? "moving in" : "leaving");
 			lines.Add(SelectionLine{ "People", cs::Cat(migration, "  ·  jobs ", cs::Fmt(s->Staffing * 100, "0"), "% filled  ·  wage tax ", Credits(s->WageTax), "/day") });
 		}
+		lines.Add(SelectionLine{ "Unrest", s->Unrest < 0.05 ? cs::String("content") : cs::Cat(cs::Fmt(s->Unrest * 100, "0"), "%", s->Unrest > 0.7 ? "  ·  near revolt" : ""), "culture" });
+		if (s->OccupiedFrom != nullptr) lines.Add(SelectionLine{ "Occupied", cs::Cat("taken from ", s->OccupiedFrom->Name, " in a war still being fought"), "history" });
+		if (s->Fallen) lines.Add(SelectionLine{ "Fallen", "taken or destroyed; out of action until it is rebuilt", "history" });
+		int industry = lines.Count();
+		auto houses = app->World()->Companies;
+		if (houses != nullptr)
+			for (const auto& co : houses->All)
+				if (co->Trading() && co->HomePort == s) lines.Add(SelectionLine{ "Company", CompanyText(co) });
+		for (const auto& f : s->Facilities)
+			if (f != nullptr && f->Recipe != nullptr)
+				lines.Add(SelectionLine{ "Works", cs::Cat(f->Recipe->Name, ", level ", cs::Fmt(f->Level, "0.0"), ", running ", Percent(f->Utilisation)) });
 		cs::List<ExportShare> exports;
 		cs::List<Shortage> shortages;
 		for (int g = 0; g < GoodInfo::Count; g++)
@@ -1308,9 +1437,31 @@ namespace SpaceGod::UI
 			shortOf = cs::Strings::Join(", ", names);
 		}
 		lines.Add(SelectionLine{ "Short of", shortOf });
+		TagLines(lines, industry, "industry");
 		double siege = app->World()->War->SiegeDays(s);
 		lines.Add(SelectionLine{ "Defences", cs::Cat(s->Platforms.Count(), " of ", s->MaxPlatforms, " platforms",
 			siege > 0 ? cs::Cat("  ·  under siege ", cs::Fmt(siege, "0"), " of ", cs::Fmt(War::SiegeNeeded(s), "0"), " days") : cs::String()) });
+	}
+
+	void Hud::PilotLines(cs::List<SelectionLine>& lines, const cs::Ref<NamedPilot>& p, const cs::Ref<LawRecord>& record)
+	{
+		double jd = app->Clock->Jd;
+		cs::String rank = Careers::Title(p->Track, p->Rank);
+		lines.Add(SelectionLine{ "Age", cs::Cat(p->AgeAt(jd), ",  from ", p->Birthplace.empty() ? cs::String("nowhere they will say") : p->Birthplace) });
+		lines.Add(SelectionLine{ "Flies for", p->Faction != nullptr ? p->Faction->Name : cs::String("no one") });
+		lines.Add(SelectionLine{ "Career", cs::Cat(rank.empty() ? cs::String("no rank") : rank, "  ·  next: ", Careers::NextStep(p, jd)) });
+		if (!p->Ashore.empty()) lines.Add(SelectionLine{ "Ashore", p->Ashore });
+		int history = lines.Count();
+		if (p->ShipsFlown.Count() > 0) lines.Add(SelectionLine{ "Ships flown", cs::Strings::Join(", ", p->ShipsFlown) });
+		lines.Add(SelectionLine{ "Battles", cs::Cat(p->BattlesSurvived, " survived,  ", p->Surrenders, " surrenders") });
+		if (p->Robberies > 0 || p->TimesRobbed > 0) lines.Add(SelectionLine{ "Robberies", cs::Cat(p->Robberies, " done,  robbed ", p->TimesRobbed, " times") });
+		if (p->PodsSalvaged > 0) lines.Add(SelectionLine{ "Salvage", cs::Cat(p->PodsSalvaged, " pods,  ", Tonnes(p->TonnesSalvaged)) });
+		// Their past as the simulation wrote it (the template teller's lines; Prose's history tab is the story told of it).
+		for (const auto& line : Characters::LifeStory(p, jd, false, 8)) lines.Add(SelectionLine{ "", line });
+		TagLines(lines, history, "history");
+		lines.Add(SelectionLine{ "Renown", cs::Fmt(p->Renown, "N0"), "reputation" });
+		lines.Add(SelectionLine{ "Grudges", p->Grudges.Count() > 0 ? cs::Strings::Join(", ", p->Grudges) : cs::String("none known"), "reputation" });
+		if (record != nullptr && (record->Wanted() || record->Crimes.Count() > 0)) lines.Add(SelectionLine{ "Record", RecordText(record), "reputation" });
 	}
 
 	cs::String Hud::HavenMark(const cs::Ref<BodyDefinition>& body)

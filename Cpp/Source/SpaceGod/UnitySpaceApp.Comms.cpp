@@ -143,6 +143,7 @@ namespace SpaceGod
 	{
 		commsOpen = false;
 		commsTalking = false;
+		EncounterEnd(); // US-T239
 		inputHandover = true; // keys still held from the panel wait to be let go before the craft takes them
 	}
 
@@ -166,6 +167,12 @@ namespace SpaceGod
 		{
 			cs::String bark = HailBark(commsTarget, cs::String());
 			if (!bark.empty()) r.Lines[0].Text = Comms::WithRider(bark, r.Lines[0].Rider);
+		}
+		// US-T239: a Prose conversation for this encounter, when there is one, opens on the hail's answer and offers its choices.
+		if (verb == CommsVerb::Hail)
+		{
+			EncounterEnd();
+			if (r.Lines.Count() == 1 && !r.Lines[0].FromSpeaker && r.Lines[0].Who != "comms") EncounterStart(c, commsTarget, r.Lines, &r.Lines[0]);
 		}
 		for (const auto& l : r.Lines) commsLog.Add(l);
 		while (commsLog.Count() > CommsLogKept) commsLog.RemoveAt(0);
@@ -345,6 +352,10 @@ namespace SpaceGod
 			auto who = hailing->Ship != nullptr && Characters::Of(World())->Find(hailing->Ship) != nullptr
 				? Characters::Of(World())->Find(hailing->Ship)->Name : hailing->Name();
 			commsLog.Add({ who, offer, false });
+			// US-T239: the terms stay the game's line; a Prose surrender conversation, when there is one, follows it.
+			cs::List<CommsLine> opening;
+			if (hailing->Ship != nullptr && EncounterStart(c, CommsParty::OfShip(hailing->Ship), opening, nullptr))
+				for (const auto& l : opening) commsLog.Add(l);
 			ShowToast(cs::Cat("INCOMING HAIL: the ", hailing->Name(), " strikes its colours  (Shift+H to answer)"));
 			if (commsOpen && hailing->Ship != nullptr)
 			{
@@ -380,7 +391,8 @@ namespace SpaceGod
 			commsTalking = true;
 		}
 		int sayIndex = commsClickedVerb;
-		commsClickedContact = commsClickedVerb = -1;
+		int choiceIndex = commsClickedChoice; // US-T239
+		commsClickedContact = commsClickedVerb = commsClickedChoice = -1;
 
 		commsRefresh -= Time::unscaledDeltaTime;
 		if (commsRefresh <= 0)
@@ -414,8 +426,19 @@ namespace SpaceGod
 				Input::Key::Digit6, Input::Key::Digit7, Input::Key::Digit8, Input::Key::Digit9 };
 			for (int i = 0; i < 9; i++)
 				if (pressed(digits[i])) sayIndex = i;
-			auto verbs = Comms::Verbs(c, commsTarget);
-			if (sayIndex >= 0 && sayIndex < verbs.Count()) CommsSay(verbs[sayIndex]);
+			// US-T239: in a Prose conversation the numbers pick its choices (the last one: back to the plain verbs).
+			EncounterNode node;
+			cs::List<int> offered;
+			if (EncounterNow(c, node, offered))
+			{
+				int pick = choiceIndex >= 0 ? choiceIndex : sayIndex;
+				if (pick >= 0 && pick <= offered.Count()) EncounterChoose(pick);
+			}
+			else
+			{
+				auto verbs = Comms::Verbs(c, commsTarget);
+				if (sayIndex >= 0 && sayIndex < verbs.Count()) CommsSay(verbs[sayIndex]);
+			}
 		}
 		return true;
 	}
@@ -486,14 +509,30 @@ namespace SpaceGod
 				ry += 18;
 			}
 			ry += 6;
-			auto verbs = Comms::Verbs(c, commsTarget);
-			float bx = rx, bw = (rw - 8) / 3;
-			for (int i = 0; i < verbs.Count(); i++)
+			EncounterNode node;
+			cs::List<int> offered;
+			if (EncounterNow(c, node, offered))
 			{
-				auto br = Rect(bx + (i % 3) * (bw + 4), ry + (i / 3) * 28, bw, 24);
-				if (GUI::Button(br, cs::Cat(i + 1, "  ", VerbLabel(verbs[i])), commsButton)) commsClickedVerb = i;
+				// US-T239: the conversation's choices, one a row (they are sentences), then the way back to the plain verbs.
+				for (int i = 0; i <= offered.Count(); i++)
+				{
+					cs::String label = i < offered.Count() ? EncounterFill(c, node.Choices[offered[i]].Text) : cs::String("(other options)");
+					if (GUI::Button(Rect(rx, ry, rw, 24), cs::Cat(i + 1, "  ", label), commsButton)) commsClickedChoice = i;
+					ry += 28;
+				}
+				ry += 6;
 			}
-			ry += ((verbs.Count() + 2) / 3) * 28 + 6;
+			else
+			{
+				auto verbs = Comms::Verbs(c, commsTarget);
+				float bx = rx, bw = (rw - 8) / 3;
+				for (int i = 0; i < verbs.Count(); i++)
+				{
+					auto br = Rect(bx + (i % 3) * (bw + 4), ry + (i / 3) * 28, bw, 24);
+					if (GUI::Button(br, cs::Cat(i + 1, "  ", VerbLabel(verbs[i])), commsButton)) commsClickedVerb = i;
+				}
+				ry += ((verbs.Count() + 2) / 3) * 28 + 6;
+			}
 		}
 		else
 		{

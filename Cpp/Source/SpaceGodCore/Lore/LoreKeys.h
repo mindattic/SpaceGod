@@ -48,7 +48,13 @@ namespace SpaceGod::Core
 		/// <summary>A text about an entity other than its description: &lt;entity&gt;/&lt;name&gt; (pilot-tomas-brennan/hail).</summary>
 		static cs::String Named(const cs::String& entity, const cs::String& name);
 
+		/// <summary>US-T239: a faction (a state, company, free traders or pirate clan): faction-&lt;name&gt;.</summary>
+		static cs::String Faction(const cs::String& factionName);
+
 		/// <summary>The name of the bark a speaker answers a hail with.</summary>
 		static constexpr const char* Hail = "hail";
+
+		/// <summary>US-T239: the key of a text about the universe as a whole, and the head of its named texts (spacegod/&lt;name&gt;).</summary>
+		static constexpr const char* Universe = "spacegod";
 	};
 }

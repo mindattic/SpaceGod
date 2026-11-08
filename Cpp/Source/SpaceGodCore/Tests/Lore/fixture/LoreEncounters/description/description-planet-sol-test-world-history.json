@@ -1,0 +1,15 @@
+{
+  "schema": "spacegod-text/1",
+  "id": "description-planet-sol-test-world-history",
+  "kind": "description",
+  "key": "planet-sol-test-world/history",
+  "version": 1,
+  "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000105",
+  "about": [
+    "planet-sol-test-world"
+  ],
+  "speakers": [],
+  "payload": {
+    "long": "Fixture world history."
+  }
+}

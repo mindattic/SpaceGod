@@ -85,3 +85,39 @@ private:
 
 	/// <summary>US-T237: a hail's answer as the panel shows it: the speaker's (or the hull's) approved hail bark, else <paramref name="generated"/>.</summary>
 	cs::String HailBark(const Core::CommsParty& p, const cs::String& generated);
+
+	// US-T239: an encounter as a Prose conversation (bodies in UnitySpaceApp.Encounter.cpp, docs/PROSE.md "Encounters"). When a
+	// hail (or a struck hull's call for terms) finds a conversation for the encounter (Core::Encounters: the pilot's, else the
+	// faction's, else the generic one of its kind), its lines are said and its choices stand in for the verb buttons; a tagged
+	// choice says its verb through Comms::Apply exactly as the button would, so the simulation decides what happens. With no
+	// conversation, nothing here runs. Local display state only: the commands it sends are the ordinary comms commands.
+public:
+	/// <summary>The key of the conversation being talked through, or "" (none: the plain verb panel).</summary>
+	const cs::String& EncounterKey() const { return encounterKey; }
+
+private:
+	const Core::LoreText* encounterText = nullptr;
+	cs::String encounterKey, encounterNodeId;
+	Core::CommsParty encounterParty;
+	int commsClickedChoice = -1;
+
+	bool EncounterActive() const { return encounterText != nullptr; }
+	void EncounterEnd();
+
+	/// <summary>Looks up the conversation for talking to <paramref name="to"/>; with one, starts it and appends its opening lines
+	/// to <paramref name="lines"/>. When <paramref name="greeting"/> is given (a hail's answer), the opening line stands in for its
+	/// flavour and its gameplay rider is kept. False when there is no conversation (the panel runs as before).</summary>
+	bool EncounterStart(const Core::CommsContext& c, const Core::CommsParty& to, cs::List<Core::CommsLine>& lines, Core::CommsLine* greeting);
+
+	/// <summary>Goes to node <paramref name="id"/> and on through nodes without choices, appending each line; ends the talk at
+	/// an end, a $token, or a node the text does not have.</summary>
+	void EncounterGo(const Core::CommsContext& c, const cs::String& id, cs::List<Core::CommsLine>& lines);
+
+	/// <summary>The node being talked through and the indices of its choices offered now (Core::Encounters::Offered); false when none.</summary>
+	bool EncounterNow(const Core::CommsContext& c, Core::EncounterNode& node, cs::List<int>& offered);
+
+	/// <summary>The player picks the <paramref name="index"/>-th offered choice (the last index past them: back to the verbs).</summary>
+	void EncounterChoose(int index);
+
+	cs::String EncounterFill(const Core::CommsContext& c, const cs::String& line);
+	cs::String EncounterWho(const Core::CommsContext& c, bool player);
