@@ -26,6 +26,9 @@
 #include "Systems/Territory.h" // US-T190
 #include "Systems/TravelCourse.h"
 
+#include "GameLore.h"
+#include "Lore/LoreKeys.h"
+
 #include <iterator>
 
 using namespace SpaceGod::Core;
@@ -555,6 +558,12 @@ namespace SpaceGod::UI
 		float x = r.x + 14, w = r.width - 28, y = r.y + 10;
 		GUI::Label(Rect(x, y, w, 22), cs::Strings::ToUpperInvariant(s->Name), title);
 		y += 24;
+		// US-T237: a known system's approved Prose description, short (one line under its name); none, no line.
+		if (m->Known())
+		{
+			cs::String about = LoreShort(Core::LoreKeys::System(s->Name));
+			if (!about.empty()) Line(y, x, w, about, Dim);
+		}
 		bool here = s == app->ActiveSystem;
 		if (here) Line(y, x, w, "You are here: seen as it is.", Accent);
 		else

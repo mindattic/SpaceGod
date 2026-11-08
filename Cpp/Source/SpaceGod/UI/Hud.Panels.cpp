@@ -54,10 +54,20 @@
 #include "Camera/SpaceCamera.h"
 #include "Camera/StarTravel.h"
 
+#include "Comms/Pilots.h"
+#include "GameLore.h"
+#include "Lore/LoreKeys.h"
+
 using namespace SpaceGod::Core;
 
 namespace SpaceGod::UI
 {
+	namespace
+	{
+		/// US-T237: the name the Prose keys of the active system's things are made from ("" between systems: no text matches).
+		cs::String LoreSystem(const cs::Ref<StarSystem>& system) { return system != nullptr ? system->Name : cs::String(); }
+	}
+
 	// ---------------------------------------------------------------- between the stars
 
 	void Hud::DrawWarp()
@@ -864,7 +874,9 @@ namespace SpaceGod::UI
 				for (const auto& x : ringsHere) cities.Add(x->City);
 				lines.Add(SelectionLine{ "Docking rings", cs::Cat(ringsHere.Count(), ": ", cs::Strings::Join(", ", cities)) });
 			}
-			if (!b->Summary.empty()) lines.Add(SelectionLine{ "", b->Summary });
+			// US-T237: the body's approved Prose description (long: this is the detail view), else its catalogue summary.
+			cs::String about = LoreLong(LoreKeys::Body(b->Kind, LoreSystem(app->ActiveSystem), b->Name), b->Summary);
+			if (!about.empty()) lines.Add(SelectionLine{ "", about });
 			for (const auto& s : app->Economy()->At(t.Body))
 				if (s->Discovered()) AddSettlementLines(lines, s);
 			auto battleHere = app->World()->War->BattleAt(t.Body);
@@ -1048,6 +1060,18 @@ namespace SpaceGod::UI
 			{
 				bool mine = law->IsPlayer(record); // the pilot the player is embodied in (US-T148)
 				lines.Add(SelectionLine{ mine ? "Your record" : "Captain", cs::Cat(mine ? cs::String() : cs::Cat(record->Name, ", "), RecordText(record)) });
+			}
+			// US-T237: the hull's approved Prose description (long, the detail view), and its named pilot's short one once the
+			// pilot is known (met at a hail or a fight; never met here, so a glance at the card changes nothing). With no text,
+			// neither line shows: the card is what it was.
+			cs::String about = LoreLong(LoreKeys::Ship(LoreSystem(app->ActiveSystem), ship->Name));
+			if (!about.empty()) lines.Add(SelectionLine{ "", about });
+			auto pilots = law != nullptr ? law->Pilots : nullptr;
+			auto pilot = pilots != nullptr ? pilots->Find(ship) : nullptr;
+			if (pilot != nullptr)
+			{
+				cs::String who = LoreShort(LoreKeys::Pilot(pilot->Name));
+				if (!who.empty()) lines.Add(SelectionLine{ "Pilot", cs::Cat(pilot->Styled(), "  ·  ", who) });
 			}
 		}
 
@@ -1244,6 +1268,9 @@ namespace SpaceGod::UI
 		lines.Add(SelectionLine{ "", "" });
 		bool seat = app->World()->Polities->CapitalOf(s->Owner) == s;
 		lines.Add(SelectionLine{ s->Name, cs::Cat(s->Owner->Name, " ", KindName(s->Kind), seat ? " (capital)" : "", ", pop ", People(s->Population)) });
+		// US-T237: its approved Prose description, short (a world's card can list several ports); none, no line.
+		cs::String about = LoreShort(LoreKeys::Settlement(LoreSystem(app->ActiveSystem), s->Name));
+		if (!about.empty()) lines.Add(SelectionLine{ "", about });
 		auto houses = app->World()->Companies;
 		if (houses != nullptr)
 			for (const auto& co : houses->All)

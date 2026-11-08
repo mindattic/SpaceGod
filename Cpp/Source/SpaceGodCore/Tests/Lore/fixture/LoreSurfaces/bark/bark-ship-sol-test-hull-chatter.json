@@ -1,0 +1,20 @@
+{
+  "schema": "spacegod-text/1",
+  "id": "bark-ship-sol-test-hull-chatter",
+  "kind": "bark",
+  "key": "ship-sol-test-hull/chatter",
+  "version": 1,
+  "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000003",
+  "about": [
+    "ship-sol-test-hull"
+  ],
+  "speakers": [
+    "pilot-test-pilot"
+  ],
+  "payload": {
+    "speaker": "pilot-test-pilot",
+    "lines": [
+      "Fixture chatter."
+    ]
+  }
+}

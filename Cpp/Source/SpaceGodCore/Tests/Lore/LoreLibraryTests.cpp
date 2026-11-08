@@ -12,6 +12,7 @@
 #include <string>
 
 #include "Cs/Cs.h"
+#include "Lore/LoreKeys.h"
 #include "Lore/LoreLibrary.h"
 
 using namespace SpaceGod::Core;
@@ -100,6 +101,52 @@ namespace
 		for (int i = 0; i < p.Count(); i++) std::printf("      (reported) %s\n", p[i].c_str());
 	}
 
+	// US-T237: the keys the panels ask with are the universe export's ids (tools/universe-export calls these same functions).
+	void Keys()
+	{
+		Check(LoreKeys::Slug("SFS Resolute") == "sfs-resolute", "a slug: lowercase, single hyphens");
+		Check(LoreKeys::Slug("  --Ceres  Hub!! ") == "ceres-hub", "a slug drops leading, trailing and repeated separators");
+		Check(LoreKeys::Slug("???") == "unnamed", "a name with nothing to slug");
+		Check(LoreKeys::SystemSlug("Sol System") == "sol", "a system's slug drops -system");
+		Check(LoreKeys::SystemSlug("Alpha Centauri") == "alpha-centauri", "a system without the suffix keeps its slug");
+		Check(LoreKeys::System("Alpha Centauri System") == "system-alpha-centauri", "a system's key");
+		Check(LoreKeys::Body(BodyKind::Planet, "Sol System", "Earth") == "planet-sol-earth", "a planet's key");
+		Check(LoreKeys::Body(BodyKind::Moon, "Sol System", "Europa") == "moon-sol-europa", "a moon's key");
+		Check(LoreKeys::Body(BodyKind::DwarfPlanet, "Sol System", "Ceres") == "dwarf-planet-sol-ceres", "a dwarf planet's key");
+		Check(LoreKeys::Body(BodyKind::Station, "Sol System", "ISS") == "station-sol-iss", "a station body's key");
+		Check(LoreKeys::Settlement("Sol System", "Ceres Hub") == "settlement-sol-ceres-hub", "a settlement's key");
+		Check(LoreKeys::Ship("Sol System", "SFS Resolute") == "ship-sol-sfs-resolute", "a ship's key");
+		Check(LoreKeys::Pilot("Tomas Brennan") == "pilot-tomas-brennan", "a pilot's key");
+		Check(LoreKeys::Named(LoreKeys::Pilot("Tomas Brennan"), LoreKeys::Hail) == "pilot-tomas-brennan/hail", "a pilot's hail bark key");
+	}
+
+	// US-T237: what each surface asks for, on fixture texts (test-only: no real lore is committed).
+	void Surfaces(const cs::String& fixture)
+	{
+		auto lib = LoreLibrary::Load(fixture + "/Lore");
+		const cs::String earth = LoreKeys::Body(BodyKind::Planet, "Sol System", "Earth");
+		Check(cs::Strings::StartsWith(lib.Long(earth, "summary"), "Blue, crowded"), "the selection card's body lookup finds the long text");
+		Check(lib.Short(earth, "") == "Cradle world of the Sol Federation.", "a tight space gets the short line");
+		Check(lib.Long(LoreKeys::Body(BodyKind::Planet, "Sol System", "Mars"), "catalogue summary") == "catalogue summary",
+			"a body with no text keeps its catalogue summary");
+		Check(lib.BarkLine(LoreKeys::Pilot("Tomas Brennan"), LoreKeys::Hail, 0, "generated") == "Brennan here. Make it quick.", "a hail bark by its key");
+		Check(lib.BarkLine(LoreKeys::Pilot("Tomas Brennan"), LoreKeys::Hail, 3, "generated") == "You're on my vector, friend.", "the pick wraps");
+		Check(lib.BarkLine(LoreKeys::Pilot("Mara Seddon"), LoreKeys::Hail, 0, "generated") == "generated", "no bark: the generated greeting");
+		Check(lib.BarkLine("", LoreKeys::Hail, 0, "generated") == "generated", "no speaker (an unmet pilot): the generated greeting");
+
+		auto s = LoreLibrary::Load(fixture + "/LoreSurfaces");
+		Check(s.Count() == 3 && s.Problems().Count() == 0, "fixture/LoreSurfaces loads");
+		const cs::String port = LoreKeys::Settlement("Sol System", "Test Port");
+		Check(s.Short(port, "") == "Fixture short line.", "a settlement's short line");
+		Check(s.Long(port, "") == "Fixture short line.", "a description with only a short line answers it for the long one");
+		Check(s.BarkLine(port, LoreKeys::Hail, 4, "generated") == "Fixture hail two.", "a station's hail bark, picked");
+		Check(s.BarkLines(LoreKeys::Pilot("Test Pilot"), LoreKeys::Hail).Count() == 1, "a bark that lists the speaker stands in when there is no <speaker>/hail");
+		Check(s.BarkLine(LoreKeys::Pilot("Test Pilot"), LoreKeys::Hail, 7, "generated") == "Fixture chatter.", "and gives its line");
+		Check(s.BarkLines(port, "chatter").Count() == 3, "a speaker's own bark answers any name it lacks");
+		Check(s.BarkLines("ship-sol-nobody", LoreKeys::Hail).Count() == 0, "a speaker no bark names has none");
+		Check(s.Short(LoreKeys::Named(port, LoreKeys::Hail), "placeholder") == "placeholder", "a bark is never a description");
+	}
+
 	void Deterministic(const cs::String& fixture)
 	{
 		auto a = LoreLibrary::Load(fixture + "/LoreBroken");
@@ -124,6 +171,8 @@ int main(int argc, char** argv)
 	Placeholders(fixture);
 	Broken(fixture);
 	Deterministic(fixture);
+	Keys();
+	Surfaces(fixture);
 	std::printf("LoreLibraryTests: %d checks, %d failed\n", checks, failures);
 	return failures == 0 ? 0 : 1;
 }

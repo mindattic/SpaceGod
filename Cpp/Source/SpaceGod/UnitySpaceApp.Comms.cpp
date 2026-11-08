@@ -12,7 +12,11 @@
 #include "Economy/Settlement.h"
 #include "Ephemeris.h"
 #include "Fleet.h"
+#include "GameLore.h"
 #include "Input/InputDevice.h"
+#include "Law/Law.h"
+#include "Lore/LoreKeys.h"
+#include "Systems/Galaxy.h"
 #include "ScaleModel.h"
 #include "Sensors/Sensors.h"
 #include "Ships.h"
@@ -155,11 +159,40 @@ namespace SpaceGod
 		// Solo, the panel says it straight away; the command (Core::CommsCommand, "comms <player> <target> <verb>") carries the
 		// same two numbers for a co-op peer or a replay, and Comms::Apply gives the same answer there.
 		auto r = Comms::Apply(c, commsTarget.Key(), static_cast<int>(verb));
+		// US-T237: the answer to a hail is the speaker's approved Prose bark when there is one; else the generated greeting.
+		// Only the panel's log changes: Comms::Apply has already done whatever the hail does.
+		if (verb == CommsVerb::Hail && r.Lines.Count() == 1 && !r.Lines[0].FromSpeaker && r.Lines[0].Who != "comms")
+			r.Lines[0].Text = HailBark(commsTarget, r.Lines[0].Text);
 		for (const auto& l : r.Lines) commsLog.Add(l);
 		while (commsLog.Count() > CommsLogKept) commsLog.RemoveAt(0);
 		if (!r.Toast.empty()) ShowToast(r.Toast);
 		if (r.Battle != nullptr) CloseComms(); // a fight has started: the hands go back to the helm
 		commsContacts = Comms::Contacts(c);
+	}
+
+	cs::String UnitySpaceApp::CommsLoreSpeaker(const CommsParty& p)
+	{
+		cs::String system = ActiveSystem != nullptr ? ActiveSystem->Name : cs::String();
+		if (p.IsStation()) return LoreKeys::Settlement(system, p.Station->Name);
+		if (p.Ship == nullptr) return cs::String();
+		auto pilots = World() != nullptr && World()->Law != nullptr ? World()->Law->Pilots : nullptr;
+		auto pilot = pilots != nullptr ? pilots->Find(p.Ship) : nullptr;
+		return pilot != nullptr ? LoreKeys::Pilot(pilot->Name) : cs::String();
+	}
+
+	cs::String UnitySpaceApp::HailBark(const CommsParty& p, const cs::String& generated)
+	{
+		// A pilot's bark is theirs; a hull with no named pilot (or none with a bark) may still have one as the ship itself.
+		// The line is picked as Comms::Greeting picks its own: the pilot's seed and how often they have been hailed, or the
+		// party and the day for a station, so every peer and replay shows the same one.
+		cs::String speaker = CommsLoreSpeaker(p);
+		auto pilots = World() != nullptr && World()->Law != nullptr ? World()->Law->Pilots : nullptr;
+		auto pilot = p.Ship != nullptr && pilots != nullptr ? pilots->Find(p.Ship) : nullptr;
+		uint32_t pick = static_cast<uint32_t>(pilot != nullptr ? pilot->Seed + pilot->TimesHailed : p.Key() * 131 + static_cast<int>(Clock->Jd));
+		cs::String line = LoreBark(speaker, LoreKeys::Hail, pick, cs::String());
+		if (line.empty() && p.Ship != nullptr)
+			line = LoreBark(LoreKeys::Ship(ActiveSystem != nullptr ? ActiveSystem->Name : cs::String(), p.Ship->Name), LoreKeys::Hail, pick, cs::String());
+		return line.empty() ? generated : line;
 	}
 
 	bool UnitySpaceApp::CommsShowcase(int step, cs::String& failed)
@@ -440,7 +473,15 @@ namespace SpaceGod
 			cs::String sub = cs::Cat(f != nullptr ? f->Name : cs::String("unknown"), "  ·  ", cs::Strings::ToLowerInvariant(ToString(stance)));
 			if (them != nullptr) sub = cs::Cat(sub, "  ·  age ", them->AgeAt(c.Jd), ", from ", them->Birthplace, "  ·  next: ", Careers::NextStep(them, c.Jd));
 			GUI::Label(Rect(rx, ry, rw, 18), sub, commsSmall);
-			ry += 24;
+			ry += 18;
+			// US-T237: who they are, in the approved Prose description's short line (the header has one line for it); none, no line.
+			cs::String about = LoreShort(CommsLoreSpeaker(commsTarget));
+			if (!about.empty())
+			{
+				GUI::Label(Rect(rx, ry, rw, 18), about, commsSmall);
+				ry += 18;
+			}
+			ry += 6;
 			auto verbs = Comms::Verbs(c, commsTarget);
 			float bx = rx, bw = (rw - 8) / 3;
 			for (int i = 0; i < verbs.Count(); i++)

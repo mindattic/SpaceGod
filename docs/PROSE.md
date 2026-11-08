@@ -233,11 +233,31 @@ unchanged writes the same bytes.
 - **Tests**: `tools/test_prose_apply.py` (`python -m unittest tools/test_prose_apply.py`) applies the fixture
   `Cpp/Source/SpaceGodCore/Tests/Lore/fixture/pending` and requires exactly the files in `fixture/Lore`, plus the orphan,
   skipped, retired, idempotent, hand-edit and dry-run cases; `Tests/Lore/LoreLibraryTests.cpp` (built and run by
-  `tools/build-core.ps1`) loads `fixture/Lore` and `fixture/LoreBroken`. Together they cover the return path from a
-  pulled text to the game's lookup with no Hub and no approval.
+  `tools/build-core.ps1`) loads `fixture/Lore`, `fixture/LoreBroken` and `fixture/LoreSurfaces` (test-only texts for the
+  panel lookups, US-T237). Together they cover the return path from a pulled text to the game's lookup with no Hub and
+  no approval.
 
-Nothing in the game shows a text yet: wiring descriptions, barks and hails into the HUD and comms panels is follow-up
-work, one key lookup each, on placeholders until the owner approves texts.
+### Where the game shows texts (US-T237)
+
+Every key is made by `Core/Lore/LoreKeys` (`Slug`, `SystemSlug`, `System`, `Body`, `Settlement`, `Ship`, `Pilot`,
+`Named`), which `tools/universe-export` itself calls, so a panel asks for exactly the id the export wrote. Each surface
+makes one lookup through GameLore (`LoreShort`, `LoreLong`, `LoreBark`); with no text it shows what it showed before.
+
+| Surface | Key | Form | With no text |
+|---|---|---|---|
+| Selection card, a body (planet, moon, dwarf planet, asteroid, star, station body) | `<type>-<sys>-<name>` | long | the catalogue summary |
+| Selection card, each settlement listed on its world (colonies, stations, outposts, havens) | `settlement-<sys>-<name>` | short | no line |
+| Selection card, a ship | `ship-<sys>-<name>` | long | no line |
+| Selection card, a ship's named pilot (once met at a hail or a fight) | `pilot-<name>` | short, after their styled name | no line |
+| Galaxy map, a known system's detail | `system-<sys>` | short | no line |
+| Comms channel header, the party hailed (pilot or station) | `pilot-<name>` / `settlement-<sys>-<name>` | short | no line |
+| Comms, the answer to a hail | bark `<speaker>/hail`, else any bark naming the speaker; then the hull's `ship-<sys>-<name>/hail` | one line, picked from the pilot's seed and times hailed (a station: its key and the day) | the generated greeting |
+
+Lore is display only: no simulation code reads it, and a hail's bark replaces only the logged words after `Comms::Apply`
+has done what the hail does. A key the game cannot rebuild never matches and keeps its placeholder: an entity the export
+suffixed (`-2`) because two things slug alike, the bodies of a void station, and orbital structures and docking rings
+(not exported). `sg.LoreView [<body>] [shot <file>] [quit]` selects a body and logs every lookup its card and its ports
+make; point `SPACEGOD_LORE_DIR` at a folder of test texts to see them on screen without approved lore.
 
 ## 6. The Outbox
 

@@ -32,6 +32,7 @@
 #include "Combat/Diplomacy.h"
 #include "Combat/Outfitting.h"
 #include "Comms/Pilots.h"
+#include "Lore/LoreKeys.h"
 #include "Economy/BeltMining.h"
 #include "Economy/Companies.h"
 #include "Law/Law.h"
@@ -161,23 +162,8 @@ namespace
 	/// id with exactly this rule, so an id already in this form comes back unchanged -- the EVE post-mortem's re-slugify bug
 	/// cannot bite it).
 	/// </summary>
-	std::string Slug(const std::string& s)
-	{
-		std::string o;
-		bool dash = false;
-		for (unsigned char c : s)
-		{
-			if (c >= 'A' && c <= 'Z') c = static_cast<unsigned char>(c - 'A' + 'a');
-			if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9'))
-			{
-				if (dash && !o.empty()) o += '-';
-				dash = false;
-				o += static_cast<char>(c);
-			}
-			else dash = true;
-		}
-		return o.empty() ? "unnamed" : o;
-	}
+	/// US-T237: Core's LoreKeys makes it, so the game's panels look texts up by exactly the ids written here.
+	std::string Slug(const std::string& s) { return LoreKeys::Slug(s); }
 
 	std::string Lower(std::string s)
 	{
@@ -216,13 +202,7 @@ namespace
 	}
 
 	/// <summary>A system's short slug ("Sol System" -> "sol").</summary>
-	std::string SysSlug(const std::string& name)
-	{
-		std::string s = Slug(name);
-		const std::string suffix = "-system";
-		if (s.size() > suffix.size() && s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0) s.resize(s.size() - suffix.size());
-		return s;
-	}
+	std::string SysSlug(const std::string& name) { return LoreKeys::SystemSlug(name); }
 
 	// ------------------------------------------------------------------ the file
 
@@ -276,20 +256,7 @@ namespace
 
 	std::string FactionId(const cs::Ref<Faction>& f) { return f ? "faction-" + Slug(f->Name) : std::string(); }
 
-	const char* KindType(BodyKind k)
-	{
-		switch (k)
-		{
-		case BodyKind::Star: return "star";
-		case BodyKind::Planet: return "planet";
-		case BodyKind::DwarfPlanet: return "dwarf-planet";
-		case BodyKind::Moon: return "moon";
-		case BodyKind::Barycentre: return "barycentre";
-		case BodyKind::Station: return "station";
-		case BodyKind::Asteroid: return "asteroid";
-		}
-		return "body";
-	}
+	const char* KindType(BodyKind k) { return LoreKeys::BodyType(k); }
 
 	Obj Coords(const GalacticPosition& p)
 	{

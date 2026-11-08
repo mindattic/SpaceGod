@@ -79,3 +79,9 @@ private:
 
 	/// <summary>A contact as the held unit's sensors make it out ("the Kestrel", "unidentified destroyer", "unknown contact").</summary>
 	cs::String CommsLabel(const Core::CommsContext& c, const Core::CommsParty& p);
+
+	/// <summary>US-T237: the Prose speaker id of a party: a station's settlement, a hull's named pilot once met; "" for none.</summary>
+	cs::String CommsLoreSpeaker(const Core::CommsParty& p);
+
+	/// <summary>US-T237: a hail's answer as the panel shows it: the speaker's (or the hull's) approved hail bark, else <paramref name="generated"/>.</summary>
+	cs::String HailBark(const Core::CommsParty& p, const cs::String& generated);

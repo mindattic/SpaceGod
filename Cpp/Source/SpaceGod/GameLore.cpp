@@ -39,6 +39,15 @@ namespace SpaceGod
 		return lore;
 	}
 
+	cs::String LoreShort(const cs::String& key, const cs::String& placeholder) { return GameLore().Short(key, placeholder); }
+
+	cs::String LoreLong(const cs::String& key, const cs::String& placeholder) { return GameLore().Long(key, placeholder); }
+
+	cs::String LoreBark(const cs::String& speaker, const cs::String& name, uint32_t pick, const cs::String& placeholder)
+	{
+		return GameLore().BarkLine(speaker, name, pick, placeholder);
+	}
+
 	namespace
 	{
 		void LoreCommand(const TArray<FString>& args)

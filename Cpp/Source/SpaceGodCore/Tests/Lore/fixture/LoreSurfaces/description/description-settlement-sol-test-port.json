@@ -1,0 +1,15 @@
+{
+  "schema": "spacegod-text/1",
+  "id": "description-settlement-sol-test-port",
+  "kind": "description",
+  "key": "settlement-sol-test-port",
+  "version": 1,
+  "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000001",
+  "about": [
+    "settlement-sol-test-port"
+  ],
+  "speakers": [],
+  "payload": {
+    "short": "Fixture short line."
+  }
+}

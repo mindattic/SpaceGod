@@ -162,6 +162,33 @@ namespace SpaceGod::Core
 		return {};
 	}
 
+	cs::List<cs::String> LoreLibrary::BarkLines(const cs::String& speaker, const cs::String& name) const
+	{
+		if (speaker.empty()) return {};
+		const LoreText* t = Find(cs::Cat(speaker, "/", name));
+		if (t != nullptr && t->Kind == "bark") return Strings(t->Payload->GetArray("lines"));
+		for (const auto& kv : texts)
+		{
+			if (kv.second.Kind != "bark") continue;
+			for (const auto& s : kv.second.Speakers)
+				if (s == speaker)
+				{
+					auto lines = Strings(kv.second.Payload->GetArray("lines"));
+					if (lines.Count() > 0) return lines;
+					break;
+				}
+		}
+		return {};
+	}
+
+	cs::String LoreLibrary::BarkLine(const cs::String& speaker, const cs::String& name, uint32_t pick, const cs::String& placeholder) const
+	{
+		auto lines = BarkLines(speaker, name);
+		if (lines.Count() == 0) return placeholder;
+		const cs::String& line = lines[static_cast<int>(pick % static_cast<uint32_t>(lines.Count()))];
+		return line.empty() ? placeholder : line;
+	}
+
 	cs::List<cs::String> LoreLibrary::Keys() const
 	{
 		cs::List<cs::String> keys;

@@ -1,0 +1,22 @@
+{
+  "schema": "spacegod-text/1",
+  "id": "bark-settlement-sol-test-port-hail",
+  "kind": "bark",
+  "key": "settlement-sol-test-port/hail",
+  "version": 1,
+  "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000002",
+  "about": [
+    "settlement-sol-test-port"
+  ],
+  "speakers": [
+    "settlement-sol-test-port"
+  ],
+  "payload": {
+    "speaker": "settlement-sol-test-port",
+    "lines": [
+      "Fixture hail one.",
+      "Fixture hail two.",
+      "Fixture hail three."
+    ]
+  }
+}

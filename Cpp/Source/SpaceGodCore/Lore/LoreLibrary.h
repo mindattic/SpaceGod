@@ -69,6 +69,18 @@ namespace SpaceGod::Core
 		/// <summary>A bark's lines (or a book's pages), empty when there is no such text.</summary>
 		cs::List<cs::String> Lines(const cs::String& key) const;
 
+		/// <summary>
+		/// US-T237: the lines a speaker says as the bark <paramref name="name"/>: the bark keyed &lt;speaker&gt;/&lt;name&gt;,
+		/// else the first bark (in key order) that lists <paramref name="speaker"/> among its speakers. Empty when neither.
+		/// </summary>
+		cs::List<cs::String> BarkLines(const cs::String& speaker, const cs::String& name) const;
+
+		/// <summary>
+		/// US-T237: one of <see cref="BarkLines"/>, the <paramref name="pick"/>-th (wrapping), else <paramref name="placeholder"/>.
+		/// The caller picks from state it already has (never a random draw), so every peer and every replay shows the same line.
+		/// </summary>
+		cs::String BarkLine(const cs::String& speaker, const cs::String& name, uint32_t pick, const cs::String& placeholder) const;
+
 		/// <summary>Every key, in ordinal order.</summary>
 		cs::List<cs::String> Keys() const;
 
