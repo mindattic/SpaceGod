@@ -92,6 +92,7 @@
 #include "Systems/StrategicCommand.h"
 #include "Systems/Territory.h" // US-T190
 #include "Systems/DiscoveryLog.h" // US-T259
+#include "Lore/Encyclopedia.h" // US-T271
 #include "Trajectories.h"
 #include "World.h"
 #include "Persistence/Registrations/Registrations.h"
@@ -242,6 +243,7 @@ namespace SpaceGod::Core
 		SG_F(undiscoveredNames),
 		SG_OPT(Territory), // US-T190: faction territory, absent from older saves (made on the first update)
 		SG_OPT(DiscoveryLog), // US-T259: the discovery log, absent from older saves (made on the game's first sweep)
+		SG_OPT(Knowledge), // US-T271: the Encyclopedia's unlocks, absent from older saves (made on the game's first sweep)
 		SG_OPT(DifficultyRecord), // US-T253: the difficulty, absent from older saves (the setting then stands)
 		SG_OPT(SetupRecord), // US-T247: how the game began (New Game setup), absent from older saves
 		b.Loaded(&::SpaceGod::Core::Registrations::RewireGalaxy))

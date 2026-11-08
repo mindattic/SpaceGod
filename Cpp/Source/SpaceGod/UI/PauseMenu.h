@@ -99,6 +99,9 @@ namespace SpaceGod::UI
 		/// Help: the game's Help screen, every key and control (the menu closes first, U.SPC-T494).
 		cs::Action<> ShowHelp;
 
+		/// Encyclopedia: the game's Encyclopedia, every article in one place (the menu closes first, US-T271).
+		cs::Action<> ShowEncyclopedia;
+
 		/// Main Menu: leaves the game for the main menu scene.
 		cs::Action<> ToMainMenu;
 

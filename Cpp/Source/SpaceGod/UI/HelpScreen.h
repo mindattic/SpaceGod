@@ -38,6 +38,10 @@ namespace SpaceGod::UI
 		/// US-T254: what the Tutorial button does (start the guided tutorial); the button is shown only when it is set.
 		cs::Action<> OnTutorial;
 
+		/// US-T271: what the Encyclopedia button does (open the game's Encyclopedia); the button is shown only when it is set
+		/// (in a game, not on the main menu).
+		cs::Action<> OnEncyclopedia;
+
 	private:
 		static constexpr float Margin = 40, Gutter = 28, KeyW = 150, LineGap = 3, TopicGap = 14, HeadingH = 24, ContentsRowH = 30;
 

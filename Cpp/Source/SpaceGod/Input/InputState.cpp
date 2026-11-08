@@ -104,6 +104,7 @@ namespace SpaceGod::Input
 		ToggleTractor = hit(A::Tractor); // US-T95
 		ToggleOrbits = hit(A::Orbits);
 		ToggleDiscoveries = hit(A::Discoveries); // US-T259
+		ToggleEncyclopedia = hit(A::Encyclopedia); // US-T271
 		ToggleLabels = hit(A::Labels);
 		ToggleLogs = hit(A::Logs); // US-T261
 		// US-T126: Shift+F1 is the dev menu's, F1 alone (or H) the help screen's.
@@ -374,6 +375,7 @@ namespace SpaceGod::Input
 		ToggleCheatMenu = false; // US-T126
 		ToggleLogs = false; // US-T261
 		ToggleDiscoveries = false; // US-T259
+		ToggleEncyclopedia = false; // US-T271
 		ToggleSpawnMenu = false; // US-T186
 		ToggleSystemCruise = false; // US-T127
 		ToggleTractor = false; // US-T95

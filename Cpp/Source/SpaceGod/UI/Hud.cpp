@@ -128,6 +128,7 @@ namespace SpaceGod::UI
 			{
 				helpScreen = cs::New<HelpScreen>();
 				helpScreen->OnTutorial = [this] { app->ShowHelp = false; app->StartTutorial(); }; // US-T254: replayed over the game
+				helpScreen->OnEncyclopedia = [this] { app->ShowHelp = false; app->ShowEncyclopedia = true; }; // US-T271
 			}
 			auto whole = Rect(0, 0, static_cast<float>(Screen::width), static_cast<float>(Screen::height));
 			if (!app->UiRects.Contains(whole)) app->UiRects.Add(whole); // the world under it takes no clicks
@@ -153,6 +154,16 @@ namespace SpaceGod::UI
 			auto whole = Rect(0, 0, static_cast<float>(Screen::width), static_cast<float>(Screen::height));
 			if (!app->UiRects.Contains(whole)) app->UiRects.Add(whole); // the world under it takes no clicks
 			app->DrawDiscoveries();
+			DrawToast();
+			return;
+		}
+
+		// So is the Encyclopedia (US-T271): every article in one place, searched as it is typed.
+		if (app->ShowEncyclopedia)
+		{
+			auto whole = Rect(0, 0, static_cast<float>(Screen::width), static_cast<float>(Screen::height));
+			if (!app->UiRects.Contains(whole)) app->UiRects.Add(whole); // the world under it takes no clicks
+			app->DrawEncyclopedia();
 			DrawToast();
 			return;
 		}
@@ -1779,5 +1790,6 @@ namespace SpaceGod::UI
 		if (helpScreen) helpScreen->DestroyOwnedTextures();
 		if (logsScreen) logsScreen->DestroyOwnedTextures(); // US-T261
 		app->DestroyDiscoveriesTextures(); // US-T259
+		app->DestroyEncyclopediaTextures(); // US-T271
 	}
 }

@@ -31,6 +31,7 @@ namespace SpaceGod::Core
 	class StarDiscoveredEvent;
 	class Territory;
 	class DiscoveryLog; // US-T259
+	class EncyclopediaKnowledge; // US-T271
 
 	/// <summary>
 	/// One star system as a self-contained world: its own bodies (body 0 is its root, the Sun or a
@@ -269,6 +270,13 @@ namespace SpaceGod::Core
 		/// discoveries screen. Display only: no simulation code reads it. Null until the game first sweeps; absent from older saves.
 		/// </summary>
 		cs::Ref<SpaceGod::Core::DiscoveryLog> DiscoveryLog;
+
+		/// <summary>
+		/// What the player has come to know beyond the discovery log (US-T271, see <see cref="EncyclopediaKnowledge"/>): the
+		/// Encyclopedia's articles unlocked (factions, goods, industries, hulls, Prose texts). Display only: no simulation code
+		/// reads it. Null until the game first sweeps; absent from older saves.
+		/// </summary>
+		cs::Ref<SpaceGod::Core::EncyclopediaKnowledge> Knowledge;
 
 		/// <summary>
 		/// The difficulty this game is played at (US-T253, see <see cref="Difficulty.Record"/>): written by the game when it captures

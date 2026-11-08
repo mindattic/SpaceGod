@@ -38,6 +38,7 @@ namespace SpaceGod
 		add(19, hud != nullptr && hud->DrawerOpen());
 		add(20, pauseMenu != nullptr && pauseMenu->IsOpen);
 		add(21, cheatMenu != nullptr && cheatMenu->IsOpen);
+		add(22, ShowEncyclopedia); // US-T271
 		return bits;
 	}
 }

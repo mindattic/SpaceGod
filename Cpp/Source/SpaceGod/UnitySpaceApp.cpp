@@ -150,7 +150,7 @@ namespace SpaceGod
 	bool UnitySpaceApp::ClickPanelOpen() const
 	{
 		if (coopPanelOverride.has_value()) return *coopPanelOverride; // US-T44 (US-T43): the helm holder's, while its frame is flown in co-op
-		return !ScreenCleared && (ShowSpawn || ShowSaves || ShowGalaxyMap || ShowSystemMap /* US-T258 */ || ShowHelp || ShowLogs /* US-T261 */ || ShowDiscoveries /* US-T259 */ || (ShowHud && (ShowMarket || ShowCargo || ShowNews || ShowOutfit || ShowBounties || ShowContracts || ShowFleet || ShowTrade || ShowPicker || ShowPort))); // US-T266: the port screen too; a cleared screen (F11) shows none of them; market, cargo, outfitting, bounties, contracts and news are HUD panels, hidden with it
+		return !ScreenCleared && (ShowSpawn || ShowSaves || ShowGalaxyMap || ShowSystemMap /* US-T258 */ || ShowHelp || ShowLogs /* US-T261 */ || ShowDiscoveries /* US-T259 */ || ShowEncyclopedia /* US-T271 */ || (ShowHud && (ShowMarket || ShowCargo || ShowNews || ShowOutfit || ShowBounties || ShowContracts || ShowFleet || ShowTrade || ShowPicker || ShowPort))); // US-T266: the port screen too; a cleared screen (F11) shows none of them; market, cargo, outfitting, bounties, contracts and news are HUD panels, hidden with it
 	}
 
 	bool UnitySpaceApp::IsSol() const { return ActiveSystem->Catalog->Root()->Name == "Sun"; }
@@ -205,6 +205,7 @@ namespace SpaceGod
 		UI::DisplayOptions::ApplySaved(); // the resolution, window mode and VSync last kept (VSync on until then)
 		pauseMenu->ShowSaves = [this] { ShowSaves = true; };
 		pauseMenu->ShowHelp = [this] { ShowHelp = true; };
+		pauseMenu->ShowEncyclopedia = [this] { ShowEncyclopedia = true; }; // US-T271
 		pauseMenu->ToMainMenu = [this] { pendingMainMenu = true; };
 
 		// US-T247: a new game set up on the main menu's New Game page starts on its day, from its seed, in its situation.
@@ -474,7 +475,7 @@ namespace SpaceGod
 		Input.Poll(overUi, ModelViewer::CapturesInput());
 		CaptureEvents::Hotkeys(Input); // US-T72: Alt+F9/F10/F11 while capture runs, on this machine only
 		// The galaxy map turns with its own drag: the camera behind it does not look about meanwhile.
-		if ((ShowGalaxyMap || ShowSystemMap /* US-T258 */ || ShowHelp || ShowLogs || ShowDiscoveries) && !ScreenCleared) Input.ReleaseLook(); // US-T261: the logs screen too; US-T259: the discoveries
+		if ((ShowGalaxyMap || ShowSystemMap /* US-T258 */ || ShowHelp || ShowLogs || ShowDiscoveries || ShowEncyclopedia) && !ScreenCleared) Input.ReleaseLook(); // US-T261: the logs screen too; US-T259: the discoveries; US-T271: the Encyclopedia
 		// The pause menu has the frame: nothing else moves, and the stick and trigger do nothing, until it closes.
 		if (pauseMenu->IsOpen)
 		{
@@ -489,6 +490,7 @@ namespace SpaceGod
 		if (hud != nullptr && hud->UpdateDrawer(!cheatMenu->IsOpen && !commsOpen)) Input.Handover(); // US-T200: the bottom drawer (Shift+U) has the keys while open
 		UpdateInfluence(); // US-T140: the embody gate's world, this frame
 		if (Tour::ShowcaseTour::Update(*this, !cheatMenu->IsOpen)) Input.Handover(); // US-T147: the showcase tour has the keys while it runs
+		if (UpdateEncyclopediaKeys()) Input.Handover(); // US-T271: the Encyclopedia's search has the keys while typed in
 		TutorialKeys(); // US-T254: Shift+Enter / Shift+Esc on the tutorial's card (it never takes the other keys)
 		ArbitrateInput(true); // US-T90: one owner per input this frame (the craft held, else the command view)
 		int screensOpen = OpenScreens();
@@ -635,7 +637,7 @@ namespace SpaceGod
 		bool menu = pauseMenu->IsOpen;
 		if (menu) GUI::enabled = false;
 		// US-T252: Settings > Accessibility > HUD opacity, over the view's overlays only (a screen or menu open stays solid).
-		if (!menu && OpenScreens() == 0 && !ShowSystemMap && !ShowLogs && !ShowDiscoveries) GUI::fade = PlayerOptions::HudAlpha();
+		if (!menu && OpenScreens() == 0 && !ShowSystemMap && !ShowLogs && !ShowDiscoveries && !ShowEncyclopedia /* US-T271 */) GUI::fade = PlayerOptions::HudAlpha();
 		hud->Draw();
 		DrawComms(); // US-T137: the comms panel, over the HUD
 		DrawSystemCruise(); // US-T127: the cruise drive's readout
@@ -700,7 +702,9 @@ namespace SpaceGod
 		if (i.ToggleHelp) ShowHelp = !ShowHelp;
 		if (i.ToggleLogs) ShowLogs = !ShowLogs; // US-T261: Shift+L, the recovered logs
 		if (i.ToggleDiscoveries) ShowDiscoveries = !ShowDiscoveries; // US-T259: Shift+O, the discoveries
+		if (i.ToggleEncyclopedia) ShowEncyclopedia = !ShowEncyclopedia; // US-T271: Shift+I, the Encyclopedia
 		UpdateDiscoveries(); // US-T259: what has been found, into the log
+		UpdateKnowledge(); // US-T271: what the player has come to know, into the Encyclopedia's unlocks
 		if (i.ToggleHud) ShowHud = !ShowHud;
 		UpdateDocking(); // US-T266: flying off the port (or leaving the helm) casts off
 		if (i.DockPort) DockKey(); // US-T266: Shift+M, docking clearance and the port screen
@@ -778,6 +782,7 @@ namespace SpaceGod
 				ShowSystemMap = false; // US-T258
 				ShowLogs = false; // US-T261
 				ShowDiscoveries = false; // US-T259
+				ShowEncyclopedia = false; // US-T271
 				break;
 			case EscapeAction::LeaveFocus:
 				SpaceCamera->ExitFocus();

@@ -98,6 +98,10 @@ namespace SpaceGod::Input
 		/// the orbits. Local to this machine, like the Help screen.</summary>
 		bool ToggleDiscoveries = false;
 
+		/// <summary>US-T271: Shift+I opens the Encyclopedia (every article: controls, guides, lore and everything learned, with
+		/// a search), or closes it. I alone stays the cargo hold. Local to this machine, like the Help screen.</summary>
+		bool ToggleEncyclopedia = false;
+
 		/// <summary>US-T126: Shift+F1 pulls the dev menu down (spawn ships and enemies, travel, helm, time, scale), or puts
 		/// it away. F1 alone stays the help screen. Local to this machine: the menu is never a co-op peer's.</summary>
 		bool ToggleCheatMenu = false;

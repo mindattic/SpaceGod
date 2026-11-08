@@ -30,6 +30,7 @@ namespace SpaceGod::Core
 				L("L", "labels"),
 				L("Shift+L", "recovered logs: the ship logs and station records you have found, to read (Up / Down a log, Left / Right a page)"), // US-T261
 				L("Shift+O", "discoveries: everything you have found, by kind and the day (stars charted or visited, bodies surveyed, settlements, pirate havens, graveyards, derelict stations, void sights, sightings, pilots met); each shows its readings and description, with Select, Focus and Plot course buttons; O alone stays the orbits"), // US-T259
+				L("Shift+I", "Encyclopedia: every article in one place, the controls as bound now, the manual's guides, the lore, and everything you have learned of (bodies and stars, goods, industries and markets, factions, hulls, stations, settlements, systems, pilots), unlocked as you find them; type to search titles, text and keywords, click a see-also link to follow it, Back / Forward (Alt+Left / Alt+Right) through what you read; I alone stays the cargo hold"), // US-T271
 				L("N", "hyperlanes"),
 				L("K", "satellites"),
 				L("Shift+K  or  numpad *", "skybox: the next sky for the system in view, which keeps it (Shift+Alt+K or numpad / goes back)"),

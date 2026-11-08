@@ -334,6 +334,7 @@ namespace SpaceGod::Input
 				{ KeyAction::Hail, "hail", "Screen: envoy (hail polity)", Both, EdgeKind, { Key::F12 }, "Hail the polity of the ship locked, selected or hailing you." },
 				{ KeyAction::Logs, "logs", "Screen: recovered logs", Both, EdgeKind, { KeyChord(Key::L, S) }, "The ship logs and station records recovered." },
 				{ KeyAction::Discoveries, "discoveries", "Screen: discoveries", Both, EdgeKind, { KeyChord(Key::O, S) }, "Everything found, by kind and day." },
+				{ KeyAction::Encyclopedia, "encyclopedia", "Screen: encyclopedia", Both, EdgeKind, { KeyChord(Key::I, S) }, "Every article in one place: controls, guides, lore and all you have learned, with a search." }, // US-T271
 				{ KeyAction::SpawnPilot, "spawnPilot", "Screen: spawn & pilot", Both, EdgeKind, { Key::V }, "Pick a hull to spawn and pilot at the camera." },
 				{ KeyAction::SpawnPractice, "spawnPractice", "Screen: practice fighter", Both, EdgeKind, { KeyChord(Key::V, S) }, "The practice fighter at the camera, you at its helm." },
 				{ KeyAction::QuickSave, "quickSave", "Game: quicksave", Both, EdgeKind, { Key::F5 }, "Save to the quicksave slot." },

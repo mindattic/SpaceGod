@@ -45,7 +45,7 @@ namespace SpaceGod::UI
 
 	bool Hud::DrawerAvailable() const
 	{
-		return app->ShowHud && !app->ScreenCleared && !app->ShowSpawn && !app->ShowHelp && !app->ShowLogs /* US-T261 */ && !app->ShowDiscoveries /* US-T259 */ && !(app->ShowGalaxyMap && !app->Travel->Active) && !(app->ShowSystemMap && !app->Travel->Active) /* US-T258 */;
+		return app->ShowHud && !app->ScreenCleared && !app->ShowSpawn && !app->ShowHelp && !app->ShowLogs /* US-T261 */ && !app->ShowDiscoveries /* US-T259 */ && !app->ShowEncyclopedia /* US-T271 */ && !(app->ShowGalaxyMap && !app->Travel->Active) && !(app->ShowSystemMap && !app->Travel->Active) /* US-T258 */;
 	}
 
 	bool Hud::UpdateDrawer(bool keysFree)
@@ -377,6 +377,9 @@ namespace SpaceGod::UI
 		// US-T258: the system map, this system drawn top-down (Shift+[).
 		if (GUI::Button(Rect(x, y, 150, 22), "SYSTEM MAP  Shift+[", button)) app->ShowSystemMap = true;
 		x += 154;
+		// US-T271: the Encyclopedia, every article in one place.
+		if (GUI::Button(Rect(x, y, 170, 22), cs::Cat("ENCYCLOPEDIA  ", Input::KeyBindings::Keys(Input::KeyAction::Encyclopedia)), button)) app->ShowEncyclopedia = true;
+		x += 174;
 		// The height: a step up or down (the keys' PgUp / PgDn), and close.
 		float right = r.xMax() - pad;
 		if (GUI::Button(Rect(right - 24, y, 24, 22), "X", button)) drawerOpen = false;

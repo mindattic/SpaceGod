@@ -886,7 +886,20 @@ namespace SpaceGod::Core
 				  "U hides the HUD panels and readouts (the names and markers in the view stay); F11 clears everything but "
 				  "the reticle in use. Esc closes panels, then opens the pause menu."),
 				T("The pause menu",
-				  "Resume, Help, Save / Load, Settings, Main Menu (with an autosave) and Quit."),
+				  "Resume, Help, Encyclopedia, Save / Load, Settings, Main Menu (with an autosave) and Quit."),
+				T("The Encyclopedia", // US-T271
+				  "Shift+I (or Encyclopedia in the pause menu, on the Help screen and in the bottom drawer) opens one screen holding "
+				  "every article in the game: Controls (each group of keys as you have them bound now, the gamepad's buttons and the Help "
+				  "card), Guides (this manual, chapter by chapter), Lore (the logs and records you recover, the Bio Mass, Void Raider "
+				  "strikes and signs of the Watcher you come across), Astronomy (the bodies you scan or fly close to, the stars you "
+				  "visit), Commerce (each good and industry once you meet it in a market, and the markets you have found), Factions, "
+				  "Ships (each hull class once one is in a system with you), Stations, Settlements, Systems and Pilots. Knowledge is "
+				  "collected: the controls and guides are always there, everything else is written in as you discover, scan or visit "
+				  "it, and every save keeps what you have learned. Type in the search at the top and every article you know holding the "
+				  "word in its title, text or keywords is listed, title matches first and the word marked; the categories then count "
+				  "the matches, and a click narrows the list to one. An article's See also links the articles its text names; Back and "
+				  "Forward (Alt+Left / Alt+Right) step through what you have read. While you type, the search has the keys; Esc closes "
+				  "the screen, Enter leaves the search."),
 				T("The dev menu", // US-T126
 				  "Shift+F1 pulls a menu down over the top of the view with every dev and debug function in one place, by "
 				  "category: Spawn (any hull beside you, friendly or neutral), Enemies (pirate raiders small, medium and "

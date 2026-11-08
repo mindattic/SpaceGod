@@ -85,6 +85,10 @@ namespace SpaceGod::UI
 		// US-T254: the guided tutorial, replayed from here (the owner says what starting one means: a new game from the menu,
 		// the tutorial over the game in play).
 		if (OnTutorial && GUI::Button(Rect(screen.width - Margin - 120 - 12 - 150 - 12 - 120, screen.height - 50, 120, 32), "Tutorial", button)) OnTutorial();
+		// US-T271: the Encyclopedia, every article (this manual among them) searched in one place.
+		// Left of Tutorial, where it clears Previous / Next (Shift+I and the pause menu open it too on a narrow screen).
+		float encyclopediaX = screen.width - Margin - 120 - 12 - 150 - 12 - 120 - 12 - 150;
+		if (OnEncyclopedia && encyclopediaX >= x + 264 && GUI::Button(Rect(encyclopediaX, screen.height - 50, 150, 32), "Encyclopedia", button)) OnEncyclopedia();
 		return GUI::Button(Rect(screen.width - Margin - 120, screen.height - 50, 120, 32), "Back", button);
 	}
 
