@@ -91,6 +91,8 @@ namespace SpaceGod::Core
 				More("off-screen targets: an arrow on the screen's edge points the way to turn to each hostile, the locked hull (ringed), the selection, the hunters and a plotted course; the closer it is (against your guns' reach, the same at either scale), the bigger; red hostile, green your side, grey neutral, blue the course"),
 				L("Right mouse", "homing and hive missiles once locked; dumb-fire rockets straight down the nose, no lock"),
 				More("a vulcan rotary cannon spins up as it fires: short bursts from cold, a torrent once spun (watch the heat)"),
+				L("Alt+1-9", "picks which of your guided weapons (missiles, torpedoes, rockets, hive) the right mouse fires, instead of cycling"), // US-T284
+
 				L("Middle mouse", "EMP (knocks out a small craft's drives and shields)"),
 				L("Ctrl", "drop a mine astern; an auto turret fires on its own"),
 				L("Insert", "retune the phaser arrays: a narrow lance for hulls or a wide sweep for fighters and missiles"),
@@ -106,7 +108,7 @@ namespace SpaceGod::Core
 				L("8  9", "screen, engage at will"),
 				L("0", "all batteries at will"),
 				L("Alt+1-9", "fire a weapon group now (1-6 bow/stern/starboard/port/dorsal/ventral, 7 spinal, 8 missiles and torpedoes, 9 everything) on the locked target, wherever you are looking"),
-				L("Ctrl+1-9", "that weapon group: chain fire (one mount a press) / volley (every bearing, loaded mount together)"),
+				L("Alt+Shift+1-9", "that weapon group: chain fire (one mount a press) / volley (every bearing, loaded mount together)"),
 				More("angle the hull to the enemy's line to make shots glance"),
 				L("Shift+Insert", "big ships: run hot (guns and drive at full past the heat limit, the crew and systems cook) or throttle for the heat"),
 				More("shoot a hull's radiators away to make it overheat"),

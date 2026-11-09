@@ -171,11 +171,19 @@ namespace SpaceGod::Input
 		bool Home = false;
 		int NumberKey = -1;
 
-		/// <summary>U.SPC-T277: Alt+1-9 at a capital ship's helm, fires that weapon group now (<see cref="Core::Broadsides::FireGroupMounts"/>),
-		/// apart from the look-direction trigger and whatever arc order its mounts stand under; -1 none.</summary>
+		/// <summary>U.SPC-T277/US-T284: Alt+1-9 fires a weapon group now (<see cref="Core::Broadsides::FireGroupMounts"/> at a
+		/// capital ship's helm, apart from the look-direction trigger and whatever arc order its mounts stand under; a
+		/// launched fighter's cockpit reads it instead as which guided group the second trigger fires, see
+		/// <see cref="Core::EmbodimentInput::FireGroup"/>). -1 none. Alt is also held's own Manoeuvre action for that one
+		/// frame (a harmless blip, same as Shift+digit's own Boost -- see <see cref="GroupModeKey"/>'s note on why Ctrl was
+		/// never used here).</summary>
 		int FireGroupKey = -1;
 
-		/// <summary>U.SPC-T277: Ctrl+1-9 at a capital ship's helm, toggles that weapon group between chained and volley fire; -1 none.</summary>
+		/// <summary>U.SPC-T277: Alt+Shift+1-9 at a capital ship's helm, toggles that weapon group between chained and volley
+		/// fire; -1 none. Deliberately not Ctrl+digit: Ctrl alone is already bound to Slow (held: fine control / docking
+		/// mode) and DropMine (an edge: actually spends a mine), so Ctrl+digit would dock or drop a mine on every press --
+		/// Alt+Shift+digit's own side effects (Manoeuvre and Boost, both plain held states with nothing to spend) are
+		/// harmless by the same reasoning Shift+digit already relies on for the ability slots.</summary>
 		int GroupModeKey = -1;
 
 		/// <summary>P, the embody key (US-T135): embodies what is selected (or under the mouse), whatever it is -- a ship's helm, a hull

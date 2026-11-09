@@ -16,8 +16,8 @@ namespace SpaceGod
 		if (unit->CargoDemandedBy != nullptr || battle->AwaitingTermsFrom(unit->Side) != nullptr) return;
 		// The boarding panel, while open, has the number keys (U.SPC-T468).
 		if (BoardingPanelOpen()) return;
-		// Weapon groups (U.SPC-T277, MechWarrior style): Alt+1-9 fires one now, apart from the number keys' own
-		// captain's orders below and whatever the mouse's own arc and trigger are doing; Ctrl+1-9 toggles it between
+		// Weapon groups (U.SPC-T277/US-T284, MechWarrior style): Alt+1-9 fires one now, apart from the number keys' own
+		// captain's orders below and whatever the mouse's own arc and trigger are doing; Alt+Shift+1-9 toggles it between
 		// chained fire (one mount a press) and a volley (every bearing, loaded mount together).
 		if (Input.FireGroupKey >= 1 && Input.FireGroupKey <= 9) unit->PlayerFireGroup = Input.FireGroupKey;
 		if (Input.GroupModeKey >= 1 && Input.GroupModeKey <= 9)

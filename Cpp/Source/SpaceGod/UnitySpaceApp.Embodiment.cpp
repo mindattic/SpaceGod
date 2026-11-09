@@ -617,6 +617,9 @@ namespace SpaceGod
 		input.JumpJets = Input.JumpJets; // US-T83: Space held, a mech's jump jets (other seats ignore it)
 		input.Primary = Input.Fire && !ClickPanelOpen();
 		input.Secondary = Input.LookHeld && !ClickPanelOpen();
+		// US-T284: Alt+1-9, the same numbered weapon-group binding a capital ship's helm has (U.SPC-T277), picked directly
+		// here as which of the cockpit's guided groups the second trigger fires (FighterSeat::Control); other seats ignore it.
+		input.FireGroup = (!ClickPanelOpen() && Input.FireGroupKey >= 1 && Input.FireGroupKey <= 9) ? Input.FireGroupKey : 0;
 		// The arrows share the reactor the seat draws on (US-T94): a craft's own, a gun's hull's, a station's.
 		input.PowerSplit = CraftPower::After(held, Input.PowerKey);
 		// Shift+Backspace, the self-destruct (US-T97): held a second it arms, pressed again it aborts.

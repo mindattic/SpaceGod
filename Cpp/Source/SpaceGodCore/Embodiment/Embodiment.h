@@ -248,6 +248,13 @@ namespace SpaceGod::Core
 		/// <summary>The sensor and power command at a helm this frame (US-T93, a <see cref="SensorKey"/>), 0 for none: an active
 		/// ping, go dark, or power up. A command, landed once. See <see cref="SensorPosture"/>.</summary>
 		int Sensor = 0;
+
+		/// <summary>US-T284: a weapon group picked this frame (Alt+1-9, 0 for none), standardizing the numbered group
+		/// bindings a capital ship's helm already has (<see cref="Broadsides.FireGroupMounts"/>) onto every other craft a
+		/// player flies -- a launched fighter's cockpit (<see cref="FighterSeat"/>) reads it as which of its guided groups
+		/// (<see cref="WeaponGroups.Secondaries"/>) the second trigger fires, picked directly instead of cycled one at a
+		/// time; other seats ignore it.</summary>
+		int FireGroup = 0;
 	};
 
 	/// <summary>

@@ -435,9 +435,11 @@ namespace SpaceGod::Core
 				  "layout: 1-6 are its battery guns nearest the bow, stern, starboard, port, dorsal and ventral, 7 its spinal "
 				  "mounts, 8 its missile and torpedo launchers, 9 every weapon together. Alt+1-9 fires a group on the locked "
 				  "hull now, wherever it bears and whatever the mouse's own trigger and look-direction battery are doing, so "
-				  "you can keep working an arc while you manoeuvre onto another; Ctrl+1-9 toggles that group between chain "
-				  "fire (one mount a press, so it keeps firing while the rest reload) and a volley (every bearing, loaded "
-				  "mount together, a harder alpha strike)."),
+				  "you can keep working an arc while you manoeuvre onto another; Alt+Shift+1-9 toggles that group between "
+				  "chain fire (one mount a press, so it keeps firing while the rest reload) and a volley (every bearing, "
+				  "loaded mount together, a harder alpha strike). A launched fighter, interceptor, heavy fighter or bomber "
+				  "carries the same binding in miniature: Alt+1-9 picks which guided weapon (missiles, torpedoes, rockets, "
+				  "hive) the right mouse fires, straight away instead of cycling one at a time on the number key."),
 				T("Heat",
 				  "Big ships shed heat through radiators. Lose enough and the crew throttles the guns and drive; Shift+Insert "
 				  "runs hot instead, at full past the limit, at a cost in crew and systems."),

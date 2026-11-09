@@ -118,6 +118,13 @@ namespace SpaceGod::Core
 		stick->Secondary = input.Secondary;
 		Unit->PlayerFireHeld = input.Primary;
 		Unit->PlayerAim = stick->Aim;
+		// US-T284: Alt+1-9 picks a guided group straight onto the second trigger (the same numbered binding a capital
+		// ship's helm has, U.SPC-T277), instead of cycling one at a time; out of range for what it carries, ignored.
+		if (input.FireGroup > 0)
+		{
+			auto groups = WeaponGroups::Secondaries(Unit);
+			if (input.FireGroup <= groups.Count()) stick->SecondaryGroup = groups[input.FireGroup - 1];
+		}
 	}
 
 	void FighterSeat::HandBack()
