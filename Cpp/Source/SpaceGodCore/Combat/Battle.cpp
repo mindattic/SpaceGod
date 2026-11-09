@@ -1280,8 +1280,10 @@ namespace SpaceGod::Core
 				if (w->EmpSeconds > 0) target = u->PlayerEmpHeld ? PlayerEmpTarget(u, origin, w) : nullptr;
 				else if (!w->Missile)
 				{
-					// Down the crosshair, hitting only what the shot really meets (U.SPC-T270).
-					if (u->PlayerFireHeld && !u->Overheated) FirePlayerGun(u, s, origin, w);
+					// Down the crosshair, hitting only what the shot really meets (U.SPC-T270). A hull with more than one
+					// direct-fire mount also answers its own numbered group on demand (US-T289), apart from the main
+					// trigger -- a spinal railgun held back from the constant fire-at-will, loosed on its own.
+					if (!u->Overheated && (u->PlayerFireHeld || (u->PlayerFireGroup > 0 && PlayerWeaponGroupFires(u, s)))) FirePlayerGun(u, s, origin, w);
 					else s->Aim = DVec3::Zero;
 					continue;
 				}
@@ -1776,6 +1778,21 @@ namespace SpaceGod::Core
 		s->Cooldown = w->Cooldown;
 		ResolveShot(u, s, origin, dir, w);
 		return true;
+	}
+
+	bool Battle::PlayerWeaponGroupFires(const cs::Ref<BattleUnit>& u, const cs::Ref<Subsystem>& s) const
+	{
+		if (u->PlayerFireGroup <= 0 || u->Combat == nullptr) return false;
+		int total = 0, mine = -1;
+		for (const auto& o : u->Combat->Subsystems)
+		{
+			auto w = EnergyWeapons::Effective(o, u->Combat);
+			if (w == nullptr || o->Destroyed() || w->Missile || w->EmpSeconds > 0 || !IsPlayerAimable(u, o->Def)) continue;
+			total++;
+			if (o == s) mine = total;
+		}
+		// A hull of one direct-fire mount has nothing to pick among: the main trigger already fires it.
+		return total > 1 && mine == u->PlayerFireGroup;
 	}
 
 	cs::Ref<BattleUnit> Battle::VolleyTarget(const cs::Ref<BattleUnit>& u, DVec3 look, double rangeKm)

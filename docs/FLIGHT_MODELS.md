@@ -79,6 +79,15 @@ with `Alt+Shift+1-9`), fitted to what that craft actually carries:
   primary trigger; `Alt+1-9` instead picks which guided weapon (`WeaponGroups::Secondaries`: missiles,
   torpedoes, rockets, hive) the second trigger fires, directly instead of only cycling one at a time on
   the plain `1` key (`FighterSeat::CycleSecondaryGroup`, still available).
+- **Directly piloted, non-capital hulls with more than one direct-fire mount** (US-T289,
+  `Battle::PlayerWeaponGroupFires`): the Gunship and GatePicket (`FlightFamily::HeavyFighter`) are not
+  single-gun craft the way the rest of the small-craft roster is — their layout carries a spinal
+  railgun fixed along the keel plus independently-cued turrets (`CombatSpecs.cpp`'s Gunship entry:
+  `LightRailgun`, two `LaserTurret`s, a `MissileLauncher`). Left mouse still fires every direct-fire
+  mount that bears, as always; `Alt+1-9` additionally fires one specific mount on its own, numbered in
+  hull-layout order, so a railgun can be held back from the constant fire-at-will and loosed only when
+  it is worth the shot. A hull of one such mount (every ordinary fighter, interceptor, courier) never
+  answers this: there is nothing to pick among, and the main trigger already fires it.
 
 `Alt` and `Alt+Shift` were picked deliberately, not arbitrarily: Ctrl is already bound to `Slow` (held:
 fine control / docking mode) and `DropMine` (an edge that spends a mine), so `Ctrl+digit` would dock or
@@ -91,7 +100,7 @@ ability-slot system (`UnitySpaceApp.Embodiment.cpp`) already relies on.
 U.SPC-T17/U.SPC-T59 (the original Newtonian model and the `IFlightModel` split), US-T79/US-T80/US-T81
 (the player-facing feel: the light fighter's snap and dash, the heavy fighter's weight and surge, the
 capital's broadside translation), U.SPC-T440/U.SPC-T441/U.SPC-T484/U.SPC-T499 (the light fighter, heavy
-fighter, interceptor/bomber/runner and capital handling tables), US-T276 (chain fire), US-T279/US-T284
+fighter, interceptor/bomber/runner and capital handling tables), US-T276 (chain fire), US-T279/US-T284/US-T289
 (weapon groups), US-T281 (`AimLeadRad` standardized onto `IFlightModel`), US-T287 (this page).
 
 Note on prefixes: `U.SPC-Txxx` is this feature line's own older ticket series, named that way in the

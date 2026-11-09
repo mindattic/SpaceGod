@@ -439,7 +439,11 @@ namespace SpaceGod::Core
 				  "chain fire (one mount a press, so it keeps firing while the rest reload) and a volley (every bearing, "
 				  "loaded mount together, a harder alpha strike). A launched fighter, interceptor, heavy fighter or bomber "
 				  "carries the same binding in miniature: Alt+1-9 picks which guided weapon (missiles, torpedoes, rockets, "
-				  "hive) the right mouse fires, straight away instead of cycling one at a time on the number key."),
+				  "hive) the right mouse fires, straight away instead of cycling one at a time on the number key. A hull "
+				  "with more than one direct-fire mount of its own -- the Gunship and the GatePicket, a spinal railgun "
+				  "plus independent turrets, rather than a single fixed gun -- answers Alt+1-9 the same way guided weapons "
+				  "do: it fires that one mount on its own, apart from left mouse, so a railgun held back from the "
+				  "constant fire-at-will can still be loosed on its own shot."),
 				T("Heat",
 				  "Big ships shed heat through radiators. Lose enough and the crew throttles the guns and drive; Shift+Insert "
 				  "runs hot instead, at full past the limit, at a cost in crew and systems."),

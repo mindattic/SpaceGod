@@ -92,7 +92,7 @@ namespace SpaceGod::Core
 				L("Right mouse", "homing and hive missiles once locked; dumb-fire rockets straight down the nose, no lock"),
 				More("a vulcan rotary cannon spins up as it fires: short bursts from cold, a torrent once spun (watch the heat)"),
 				L("Alt+1-9", "picks which of your guided weapons (missiles, torpedoes, rockets, hive) the right mouse fires, instead of cycling"), // US-T284
-
+				More("a hull with more than one direct-fire mount (a gunship's spinal railgun and turrets): Alt+1-9 instead fires that mount on its own, apart from left mouse"), // US-T289
 				L("Middle mouse", "EMP (knocks out a small craft's drives and shields)"),
 				L("Ctrl", "drop a mine astern; an auto turret fires on its own"),
 				L("Insert", "retune the phaser arrays: a narrow lance for hulls or a wide sweep for fighters and missiles"),

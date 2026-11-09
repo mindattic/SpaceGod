@@ -1080,6 +1080,16 @@ namespace SpaceGod::Core
 		/// </summary>
 		bool HelmFireGroup(const cs::Ref<BattleUnit>& u, const cs::Ref<Subsystem>& s, DVec3 origin, const cs::Ref<WeaponSpec>& w, double accuracyScale);
 
+		/// <summary>
+		/// Weapon groups for a directly piloted, non-capital hull with more than one direct-fire mount (US-T289: the
+		/// Gunship and GatePicket heavy fighters, a spinal railgun plus independent turrets, not a single
+		/// <c>FighterGuns</c> mount): whether <paramref name="s"/> is the one <paramref name="u"/>'s
+		/// <see cref="BattleUnit.PlayerFireGroup"/> names this step, numbered 1 up in hull-layout order among its own
+		/// direct-fire mounts. A hull of one such mount never answers (nothing to pick among), so this is always false
+		/// for an ordinary fighter: the main trigger already fires its one gun.
+		/// </summary>
+		bool PlayerWeaponGroupFires(const cs::Ref<BattleUnit>& u, const cs::Ref<Subsystem>& s) const;
+
 		/// <summary>What a volley called along <paramref name="look"/> is fired at: the locked hull if it lies near that
 		/// line, else the hostile nearest it within <see cref="VolleyConeDeg"/> and <paramref name="rangeKm"/>.</summary>
 		cs::Ref<BattleUnit> VolleyTarget(const cs::Ref<BattleUnit>& u, DVec3 look, double rangeKm);

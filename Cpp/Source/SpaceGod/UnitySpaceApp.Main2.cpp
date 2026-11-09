@@ -413,6 +413,9 @@ namespace SpaceGod
 		bool helm = PilotControlMode == Core::PilotControl::Helm;
 		unit->PlayerHelm = helm;
 		unit->PlayerVolleyAim = helm ? PilotLookDirection() : Core::DVec3::Zero;
+		// US-T289: a non-capital hull with more than one direct-fire mount (a gunship's spinal railgun and turrets)
+		// also answers Alt+1-9 on demand, apart from the main trigger; UpdateHelmCommand below is a capital's own.
+		if (!helm && armed && Input.FireGroupKey >= 1 && Input.FireGroupKey <= 9) unit->PlayerFireGroup = Input.FireGroupKey;
 		if (helm && helmTriggerWas && !unit->PlayerFireHeld)
 		{
 			unit->PlayerVolleyRelease = true;
