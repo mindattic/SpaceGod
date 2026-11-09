@@ -37,6 +37,12 @@ namespace SpaceGod::Core
 		/// <summary>The gun holds until every gun of the volley bearing on the same hull is loaded, then they fire together: a
 		/// broadside, telegraphed to the target while it builds, surer and harder than fire at will.</summary>
 		Volley,
+
+		/// <summary>Chain fire (U.SPC-T276, MechWarrior style): of the battery's guns bearing and loaded for the same mark,
+		/// only one fires each time it is its turn, the rest standing down to wait theirs (<see cref="Broadsides.ChainFires"/>,
+		/// <see cref="BroadsideCommand.ChainCursor"/>), so the battery strings its shots out over time instead of a volley's
+		/// simultaneous alpha or fire at will's every gun going as it is ready.</summary>
+		Chain,
 	};
 
 	SPACEGODCORE_API const char* ToString(BatteryOrder v);
@@ -154,6 +160,12 @@ namespace SpaceGod::Core
 		/// WeakPatches::RollAngle; <see cref="CapitalManeuver.Roll"/>). Absent from older saves: then at rest.</summary>
 		double RollSpin = 0;
 
+		/// <summary>U.SPC-T276: whose turn it is next among a <see cref="BatteryOrder.Chain"/> battery's bearing, loaded guns
+		/// (an index mod their count, worked out fresh each time, so a mount shot away or out of its cone never jams the
+		/// rotation). One counter for the whole hull, as chain fire is a cadence, not a per-target lock. Absent from older
+		/// saves: then at the first gun.</summary>
+		int ChainCursor = 0;
+
 		/// <summary>This step: whether the volley on each hull goes now, worked out the first time one of its guns asks.</summary>
 		cs::Dictionary<cs::Ref<BattleUnit>, bool> Releasing; // internal in C#
 		SG_SERIALIZABLE(BroadsideCommand); // ObjectGraph registration (Persistence/Registrations)
@@ -265,6 +277,15 @@ namespace SpaceGod::Core
 		/// <summary>A gun holds its fire for the volley building on <paramref name="target"/>: the telegraph shows it, with how
 		/// loaded the guns of the volley bearing on it are.</summary>
 		static void Holding(const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& target);
+
+		/// <summary>
+		/// Chain fire (U.SPC-T276): whether <paramref name="s"/>, one of <paramref name="u"/>'s <see cref="BatteryOrder.Chain"/>
+		/// guns bearing and loaded for <paramref name="target"/>, has the turn this step. Of that battery (sorted by hardpoint
+		/// index, so the order is stable frame to frame) one gun gets the turn, worked out from
+		/// <see cref="BroadsideCommand.ChainCursor"/> mod the battery's size; that gun's turn taken advances the cursor to the
+		/// next. A battery of one gun (or none at all bearing) always fires: there is nothing to take turns with.
+		/// </summary>
+		static bool ChainFires(const cs::Ref<BattleUnit>& u, const cs::Ref<Subsystem>& s, const cs::Ref<BattleUnit>& target);
 
 		// ------------------------------------------------------------ focus fire
 

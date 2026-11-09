@@ -22,6 +22,7 @@ namespace SpaceGod::Core
 			case BatteryOrder::FireAtWill: return "FireAtWill";
 			case BatteryOrder::HoldFire: return "HoldFire";
 			case BatteryOrder::Volley: return "Volley";
+			case BatteryOrder::Chain: return "Chain";
 		}
 		return "";
 	}
@@ -225,7 +226,7 @@ namespace SpaceGod::Core
 		if (Of(u) == nullptr) return { BatteryOrder::FireAtWill, 0 };
 		auto [now, n] = OrderAlong(u, dir);
 		if (n == 0) return { BatteryOrder::FireAtWill, 0 };
-		auto next = static_cast<BatteryOrder>((static_cast<int>(now.has_value() ? *now : BatteryOrder::Volley) + 1) % 3);
+		auto next = static_cast<BatteryOrder>((static_cast<int>(now.has_value() ? *now : BatteryOrder::Chain) + 1) % 4);
 		OrderAlong(u, dir, next);
 		return { next, n };
 	}
@@ -265,6 +266,21 @@ namespace SpaceGod::Core
 		auto [loaded, guns] = VolleyOn(u, target);
 		cmd->ReadyingOn = target;
 		cmd->ReadyingLoaded = guns == 0 ? 1 : static_cast<double>(loaded) / guns;
+	}
+
+	bool Broadsides::ChainFires(const cs::Ref<BattleUnit>& u, const cs::Ref<Subsystem>& s, const cs::Ref<BattleUnit>& target)
+	{
+		auto cmd = u->Broadside;
+		if (cmd == nullptr || target == nullptr) return true;
+		cs::List<cs::Ref<Subsystem>> battery;
+		for (const auto& o : u->Combat->Subsystems)
+			if (IsBatteryGun(o) && o->Cooldown <= 0 && cmd->OrderOf(o) == BatteryOrder::Chain && u->Bears(o->Def, target->Pos)) battery.Add(o);
+		if (battery.Count() <= 1) return true; // nothing to take turns with
+		int index = battery.IndexOf(s);
+		if (index < 0) return true; // not loaded, bearing or ordered to chain itself: never held back by someone else's turn
+		bool turn = index == cmd->ChainCursor % battery.Count();
+		if (turn) cmd->ChainCursor++;
+		return turn;
 	}
 
 	// ------------------------------------------------------------ focus fire
@@ -561,7 +577,10 @@ namespace SpaceGod::Core
 		}
 	}
 
-	cs::String Broadsides::Label(BatteryOrder o) { return o == BatteryOrder::HoldFire ? "hold fire" : o == BatteryOrder::Volley ? "volley" : "fire at will"; }
+	cs::String Broadsides::Label(BatteryOrder o)
+	{
+		return o == BatteryOrder::HoldFire ? "hold fire" : o == BatteryOrder::Volley ? "volley" : o == BatteryOrder::Chain ? "chain fire" : "fire at will";
+	}
 
 	cs::String Broadsides::Label(DamageControlFocus f)
 	{

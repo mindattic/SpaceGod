@@ -98,7 +98,7 @@ namespace SpaceGod::Core
 				L("Hold left mouse", "capital ships: look at a side and hold to build a broadside, let go to fire it"),
 				More("the turrets fight on their own, at the locked hull first"),
 				More("captain's orders, to the side you look at:"),
-				L("1", "that battery at will / hold fire / volley"),
+				L("1", "that battery at will / hold fire / volley / chain fire"),
 				L("2", "gunners: focus the weakest shield patch / spread fire"),
 				L("3", "brace"),
 				L("4", "damage control focus"),

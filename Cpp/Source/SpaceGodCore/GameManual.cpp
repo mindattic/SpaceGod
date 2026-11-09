@@ -425,8 +425,11 @@ namespace SpaceGod::Core
 				T("Broadsides at a capital's helm",
 				  "Look at a side and hold left mouse to build a volley with every gun that bears, release to fire. The number "
 				  "keys are the captain's orders: battery orders, focus or spread fire, brace, damage control focus, the "
-				  "formation of your own warships, and all batteries at will. Shift+Delete has the helm roll weak shield "
-				  "patches away from the heaviest fire."),
+				  "formation of your own warships, and all batteries at will. A battery's order cycles at will, hold fire, "
+				  "volley, chain fire and back: a volley holds every gun until the whole battery is loaded and fires them "
+				  "together, a harder alpha strike; chain fire (MechWarrior style) strings the same guns' shots out one at a "
+				  "time instead, so the battery keeps firing while the rest stay loaded and ready. Shift+Delete has the helm "
+				  "roll weak shield patches away from the heaviest fire."),
 				T("Heat",
 				  "Big ships shed heat through radiators. Lose enough and the crew throttles the guns and drive; Shift+Insert "
 				  "runs hot instead, at full past the limit, at a cost in crew and systems."),

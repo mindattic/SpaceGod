@@ -1410,7 +1410,8 @@ namespace SpaceGod::UI
 		auto alongLook = Broadsides::OrderAlong(me, app->PilotLookDirection());
 		cs::Nullable<BatteryOrder> order = alongLook.first;
 		int mounts = alongLook.second;
-		cs::String battery = mounts == 0 ? "none bear here" : !order.has_value() ? "mixed" : *order == BatteryOrder::HoldFire ? "HOLD" : *order == BatteryOrder::Volley ? "VOLLEY" : "AT WILL";
+		cs::String battery = mounts == 0 ? "none bear here" : !order.has_value() ? "mixed"
+			: *order == BatteryOrder::HoldFire ? "HOLD" : *order == BatteryOrder::Volley ? "VOLLEY" : *order == BatteryOrder::Chain ? "CHAIN" : "AT WILL";
 		cs::String brace = cmd->Braced() ? cs::String("BRACED") : cmd->BraceCooldown > 0 ? cs::Cat("brace in ", Mathf::CeilToInt(static_cast<float>(cmd->BraceCooldown)), "s") : cs::String("3 brace");
 		cs::String orders = cs::Cat("1 BATTERY ", battery, mounts > 0 ? cs::Cat(" (", mounts, ")") : cs::String(),
 			"    2 GUNNERS ", cmd->SpreadFire ? "spread" : "focus",

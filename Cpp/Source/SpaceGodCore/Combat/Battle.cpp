@@ -1313,7 +1313,8 @@ namespace SpaceGod::Core
 			if (target != nullptr && !u->Bears(s->Def, u->PlayerControlled() ? target->Pos : Choreography::BearingPoint(u, target))) target = nullptr;
 			// A capital ship's mounts fire under their own orders (U.SPC-T425, given to the guns that bear where the captain
 			// looks): held, not at all; in a volley, a gun holds until every gun of the volley bearing on the same hull is
-			// loaded, and they go together, surer and harder.
+			// loaded, and they go together, surer and harder; in chain fire (U.SPC-T276), only one of them fires each time
+			// it is its turn, the rest standing down to wait theirs, so the battery strings its shots out over time.
 			double volley = 1;
 			if (target != nullptr && u->Broadside != nullptr && Broadsides::IsOrdered(s))
 			{
@@ -1328,6 +1329,11 @@ namespace SpaceGod::Core
 						continue;
 					}
 					volley = 1 + Broadsides::CrewVolleyDamageBonus;
+				}
+				else if (order == BatteryOrder::Chain && Broadsides::IsBatteryGun(s) && !Broadsides::ChainFires(u, s, target))
+				{
+					s->Aim = (target->Pos - origin).Normalized();
+					continue;
 				}
 			}
 			if (target == nullptr)
