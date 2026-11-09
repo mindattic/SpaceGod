@@ -195,8 +195,18 @@ namespace SpaceGod::Input
 		ToggleSaves = hit(A::Saves);
 
 		const Key digits[] = { Key::Digit0, Key::Digit1, Key::Digit2, Key::Digit3, Key::Digit4, Key::Digit5, Key::Digit6, Key::Digit7, Key::Digit8, Key::Digit9 };
+		// U.SPC-T277: Alt+digit is a weapon group fired, Ctrl+digit toggles its fire mode, each exclusive of the plain
+		// digit's own meaning (captain's orders, hails, lane choice and the rest), same as Shift+digit already is for an
+		// ability slot (UnitySpaceApp.Embodiment.cpp).
+		bool altHeld = kb[Key::LeftAlt].isPressed || kb[Key::RightAlt].isPressed;
+		bool ctrlHeld = kb[Key::LeftCtrl].isPressed || kb[Key::RightCtrl].isPressed;
 		for (int i = 0; i < 10; i++)
-			if (kb[digits[i]].wasPressedThisFrame) NumberKey = i;
+		{
+			if (!kb[digits[i]].wasPressedThisFrame) continue;
+			if (altHeld) FireGroupKey = i;
+			else if (ctrlHeld) GroupModeKey = i;
+			else NumberKey = i;
+		}
 
 		PollPad(); // US-T250
 	}
@@ -397,6 +407,8 @@ namespace SpaceGod::Input
 		ToggleRunHot = false;
 		ToggleRollPatches = false;
 		NumberKey = -1;
+		FireGroupKey = -1; // U.SPC-T277
+		GroupModeKey = -1;
 		HailPolity = false; // US-T70: as Unity's Reset; without it a suspended frame kept F12's last edge and hailed again
 		captureScreenshot = false; // US-T72
 		captureToggleRecording = false;

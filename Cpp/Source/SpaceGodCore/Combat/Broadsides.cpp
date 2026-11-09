@@ -268,6 +268,16 @@ namespace SpaceGod::Core
 		cmd->ReadyingLoaded = guns == 0 ? 1 : static_cast<double>(loaded) / guns;
 	}
 
+	bool Broadsides::TakesTurn(const cs::List<cs::Ref<Subsystem>>& battery, const cs::Ref<Subsystem>& s, int& cursor)
+	{
+		if (battery.Count() <= 1) return true; // nothing to take turns with
+		int index = battery.IndexOf(s);
+		if (index < 0) return true; // not in the list: never held back by someone else's turn
+		bool turn = index == cursor % battery.Count();
+		if (turn) cursor++;
+		return turn;
+	}
+
 	bool Broadsides::ChainFires(const cs::Ref<BattleUnit>& u, const cs::Ref<Subsystem>& s, const cs::Ref<BattleUnit>& target)
 	{
 		auto cmd = u->Broadside;
@@ -275,12 +285,76 @@ namespace SpaceGod::Core
 		cs::List<cs::Ref<Subsystem>> battery;
 		for (const auto& o : u->Combat->Subsystems)
 			if (IsBatteryGun(o) && o->Cooldown <= 0 && cmd->OrderOf(o) == BatteryOrder::Chain && u->Bears(o->Def, target->Pos)) battery.Add(o);
-		if (battery.Count() <= 1) return true; // nothing to take turns with
-		int index = battery.IndexOf(s);
-		if (index < 0) return true; // not loaded, bearing or ordered to chain itself: never held back by someone else's turn
-		bool turn = index == cmd->ChainCursor % battery.Count();
-		if (turn) cmd->ChainCursor++;
-		return turn;
+		return TakesTurn(battery, s, cmd->ChainCursor);
+	}
+
+	// ------------------------------------------------------------ weapon groups (U.SPC-T277)
+
+	static int ArcGroupOf(const cs::Ref<Subsystem>& s, const cs::Ref<CombatSpec>& spec)
+	{
+		auto axis = FireCones::Axis(s->Def, spec);
+		const DVec3 dirs[6] = { FireCones::Bow, FireCones::Stern, FireCones::Starboard, FireCones::Port, FireCones::Dorsal, FireCones::Ventral };
+		int best = 0;
+		double bestDot = -2;
+		for (int i = 0; i < 6; i++)
+		{
+			double d = DVec3::Dot(axis, dirs[i]);
+			if (d > bestDot) { bestDot = d; best = i; }
+		}
+		return best + 1; // 1-6
+	}
+
+	cs::List<cs::Ref<Subsystem>> Broadsides::FireGroupMounts(const cs::Ref<BattleUnit>& u, int group)
+	{
+		cs::List<cs::Ref<Subsystem>> result;
+		if (u == nullptr || u->Combat == nullptr || group < 1 || group > 9) return result;
+		for (const auto& s : u->Combat->Subsystems)
+		{
+			if (!IsOrdered(s)) continue;
+			if (group == 9) { result.Add(s); continue; }
+			bool guided = s->Def->Weapon != nullptr && s->Def->Weapon->Missile;
+			if (guided) { if (group == 8) result.Add(s); continue; }
+			if (s->Def->Spinal) { if (group == 7) result.Add(s); continue; }
+			if (group == ArcGroupOf(s, u->Combat->Spec)) result.Add(s);
+		}
+		return result;
+	}
+
+	cs::String Broadsides::GroupLabel(int group)
+	{
+		switch (group)
+		{
+			case 1: return "bow"; case 2: return "stern"; case 3: return "starboard"; case 4: return "port";
+			case 5: return "dorsal"; case 6: return "ventral"; case 7: return "spinal mounts";
+			case 8: return "missiles and torpedoes"; case 9: return "every weapon";
+		}
+		return "";
+	}
+
+	bool Broadsides::GroupChained(const cs::Ref<BattleUnit>& u, int group)
+	{
+		auto cmd = u != nullptr ? u->Broadside : nullptr;
+		bool chained = true;
+		return cmd == nullptr || !cmd->ChainGroups.TryGetValue(group, chained) || chained;
+	}
+
+	bool Broadsides::ToggleGroupChain(const cs::Ref<BattleUnit>& u, int group)
+	{
+		auto cmd = Of(u);
+		if (cmd == nullptr) return true;
+		bool chained = !GroupChained(u, group);
+		cmd->ChainGroups[group] = chained;
+		return chained;
+	}
+
+	bool Broadsides::GroupChainFires(const cs::Ref<BattleUnit>& u, const cs::Ref<Subsystem>& s, int group, const cs::Ref<BattleUnit>& target)
+	{
+		auto cmd = u->Broadside;
+		if (cmd == nullptr || target == nullptr) return true;
+		cs::List<cs::Ref<Subsystem>> battery;
+		for (const auto& o : FireGroupMounts(u, group))
+			if (o->Cooldown <= 0 && u->Bears(o->Def, target->Pos)) battery.Add(o);
+		return TakesTurn(battery, s, cmd->GroupCursor[group]);
 	}
 
 	// ------------------------------------------------------------ focus fire

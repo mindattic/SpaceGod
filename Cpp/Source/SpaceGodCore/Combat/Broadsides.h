@@ -166,6 +166,16 @@ namespace SpaceGod::Core
 		/// saves: then at the first gun.</summary>
 		int ChainCursor = 0;
 
+		/// <summary>U.SPC-T277: whether weapon group 1-9 fires chained (true, the default once it is asked at all: one mount
+		/// a press) or as a volley (false: every bearing, loaded mount of it together); absent for a group never toggled,
+		/// which <see cref="Broadsides.GroupChained"/> then reads as chained.</summary>
+		cs::Dictionary<int, bool> ChainGroups;
+
+		/// <summary>U.SPC-T277: whose turn it is next in weapon group 1-9's own rotation, among its bearing, loaded mounts
+		/// (an index mod their count, worked out fresh each time); one cursor a group, so groups 1-9 each keep their own
+		/// cadence. Absent for a group never fired: then at its first mount.</summary>
+		cs::Dictionary<int, int> GroupCursor;
+
 		/// <summary>This step: whether the volley on each hull goes now, worked out the first time one of its guns asks.</summary>
 		cs::Dictionary<cs::Ref<BattleUnit>, bool> Releasing; // internal in C#
 		SG_SERIALIZABLE(BroadsideCommand); // ObjectGraph registration (Persistence/Registrations)
@@ -286,6 +296,44 @@ namespace SpaceGod::Core
 		/// next. A battery of one gun (or none at all bearing) always fires: there is nothing to take turns with.
 		/// </summary>
 		static bool ChainFires(const cs::Ref<BattleUnit>& u, const cs::Ref<Subsystem>& s, const cs::Ref<BattleUnit>& target);
+
+	private:
+		/// <summary>Whose turn it is in <paramref name="battery"/> (any ordered list of mounts): true for
+		/// <paramref name="s"/> when its position in the list is <paramref name="cursor"/> mod the list's size, which is then
+		/// advanced to the next; a list of one mount, or <paramref name="s"/> not in it, always answers true (nothing, or
+		/// nobody else, to take a turn with).</summary>
+		static bool TakesTurn(const cs::List<cs::Ref<Subsystem>>& battery, const cs::Ref<Subsystem>& s, int& cursor);
+
+	public:
+		// ------------------------------------------------------------ weapon groups (U.SPC-T277)
+
+		/// <summary>
+		/// A standing, numbered cluster of <paramref name="u"/>'s weapons (1-9, MechWarrior style): not hand-picked, but
+		/// auto-assigned from the hull's own layout, so every capital ship has its nine from the moment it is taken --
+		/// 1-6 the battery guns nearest each of the six hull-frame arcs (<see cref="FireCones.Bow"/> and the rest), 7 its
+		/// spinal mounts, 8 its missile and torpedo launchers, 9 every weapon together. A destroyer with no mount in an
+		/// arc or no spinal mount simply has nothing in that group. Live, ordered mounts only (<see cref="IsOrdered"/>).
+		/// </summary>
+		static cs::List<cs::Ref<Subsystem>> FireGroupMounts(const cs::Ref<BattleUnit>& u, int group);
+
+		/// <summary>"bow", "spinal mounts", "missiles and torpedoes", "every weapon" and so on: what group <paramref name="group"/>
+		/// (1-9) is, for the HUD and the manual.</summary>
+		static cs::String GroupLabel(int group);
+
+		/// <summary>Whether weapon group <paramref name="group"/> fires chained (the default) rather than as a volley.</summary>
+		static bool GroupChained(const cs::Ref<BattleUnit>& u, int group);
+
+		/// <summary>Toggles whether weapon group <paramref name="group"/> fires chained or as a volley; returns the new state
+		/// (true: chained).</summary>
+		static bool ToggleGroupChain(const cs::Ref<BattleUnit>& u, int group);
+
+		/// <summary>
+		/// Chained weapon-group fire (U.SPC-T277): whether <paramref name="s"/>, one of weapon group <paramref name="group"/>'s
+		/// mounts bearing and loaded for <paramref name="target"/>, has the turn this step, from that group's own
+		/// <see cref="BroadsideCommand.GroupCursor"/> (as <see cref="ChainFires"/>, but the battery is the group's standing
+		/// mounts, not an arc's).
+		/// </summary>
+		static bool GroupChainFires(const cs::Ref<BattleUnit>& u, const cs::Ref<Subsystem>& s, int group, const cs::Ref<BattleUnit>& target);
 
 		// ------------------------------------------------------------ focus fire
 

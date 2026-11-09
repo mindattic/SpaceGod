@@ -171,6 +171,13 @@ namespace SpaceGod::Input
 		bool Home = false;
 		int NumberKey = -1;
 
+		/// <summary>U.SPC-T277: Alt+1-9 at a capital ship's helm, fires that weapon group now (<see cref="Core::Broadsides::FireGroupMounts"/>),
+		/// apart from the look-direction trigger and whatever arc order its mounts stand under; -1 none.</summary>
+		int FireGroupKey = -1;
+
+		/// <summary>U.SPC-T277: Ctrl+1-9 at a capital ship's helm, toggles that weapon group between chained and volley fire; -1 none.</summary>
+		int GroupModeKey = -1;
+
 		/// <summary>P, the embody key (US-T135): embodies what is selected (or under the mouse), whatever it is -- a ship's helm, a hull
 		/// or station in a fight -- or, at any controls, lets go back to the free SpaceGod view.</summary>
 		bool Pilot = false;

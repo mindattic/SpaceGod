@@ -212,7 +212,8 @@ namespace SpaceGod::Core
 		SG_F(Vel), SG_F(VolleyCharge), SG_F(Wander), SG_F(dockSideFor), SG_F(playerControlled),
 		SG_OPT(WingCall), SG_OPT(WingHeld), SG_OPT(WingRecalled), // US-T106: a carrier's wing orders from the helm, absent from older saves
 		SG_OPT(JumpChargeS), SG_OPT(JumpDriveAt), SG_OPT(JumpHullAt), SG_OPT(JumpNeedS), SG_OPT(JumpRestartS), // US-T98: an escape jump's charge, absent from older saves
-		SG_OPT(Broadcast)) // US-T96: its broadcast array, absent from older saves
+		SG_OPT(Broadcast), // US-T96: its broadcast array, absent from older saves
+		SG_OPT(PlayerFireGroup)) // U.SPC-T277: a weapon group fired this step, absent from older saves
 
 	SG_SERIALIZE(BoardingParty, "Unity.SpaceGod.Core.BoardingParty",
 		SG_F(Faction), SG_F(Landed), SG_F(Order), SG_F(Strength))
@@ -222,7 +223,8 @@ namespace SpaceGod::Core
 		SG_F(Releasing), SG_F(Repaired), SG_F(Restored), SG_F(RollBearing), SG_F(RollChosen), SG_F(RollDeg),
 		SG_F(RollReconsider), SG_F(RollWeakPatches), SG_F(RunHot), SG_F(SpreadFire), SG_ARRAY(orders),
 		SG_OPT(RollSpin), // US-T187: the heavy roll's swing, absent from older saves
-		SG_OPT(ChainCursor)) // US-T276: chain fire's turn counter, absent from older saves
+		SG_OPT(ChainCursor), // US-T276: chain fire's turn counter, absent from older saves
+		SG_OPT(ChainGroups), SG_OPT(GroupCursor)) // U.SPC-T277: weapon groups' fire mode and turn counters, absent from older saves
 
 	SG_SERIALIZE(Captives, "Unity.SpaceGod.Core.Captives",
 		SG_F(Buyer), SG_F(Captors), SG_F(From), SG_F(Haven), SG_F(Marines), SG_F(Owners), SG_F(People),

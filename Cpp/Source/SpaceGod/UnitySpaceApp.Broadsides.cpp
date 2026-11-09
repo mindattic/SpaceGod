@@ -16,6 +16,16 @@ namespace SpaceGod
 		if (unit->CargoDemandedBy != nullptr || battle->AwaitingTermsFrom(unit->Side) != nullptr) return;
 		// The boarding panel, while open, has the number keys (U.SPC-T468).
 		if (BoardingPanelOpen()) return;
+		// Weapon groups (U.SPC-T277, MechWarrior style): Alt+1-9 fires one now, apart from the number keys' own
+		// captain's orders below and whatever the mouse's own arc and trigger are doing; Ctrl+1-9 toggles it between
+		// chained fire (one mount a press) and a volley (every bearing, loaded mount together).
+		if (Input.FireGroupKey >= 1 && Input.FireGroupKey <= 9) unit->PlayerFireGroup = Input.FireGroupKey;
+		if (Input.GroupModeKey >= 1 && Input.GroupModeKey <= 9)
+		{
+			int group = Input.GroupModeKey;
+			bool chained = Core::Broadsides::ToggleGroupChain(unit, group);
+			ShowToast(cs::Cat("Weapon group ", group, " (", Core::Broadsides::GroupLabel(group), "): ", chained ? "chain fire" : "volley"));
+		}
 		int key = Input.NumberKey;
 		if (key < 0) return;
 		auto look = PilotLookDirection();

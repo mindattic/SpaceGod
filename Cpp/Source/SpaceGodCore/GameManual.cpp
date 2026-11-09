@@ -430,6 +430,14 @@ namespace SpaceGod::Core
 				  "together, a harder alpha strike; chain fire (MechWarrior style) strings the same guns' shots out one at a "
 				  "time instead, so the battery keeps firing while the rest stay loaded and ready. Shift+Delete has the helm "
 				  "roll weak shield patches away from the heaviest fire."),
+				T("Weapon groups",
+				  "Every capital ship also carries nine standing weapon groups (MechWarrior style), assigned from its own "
+				  "layout: 1-6 are its battery guns nearest the bow, stern, starboard, port, dorsal and ventral, 7 its spinal "
+				  "mounts, 8 its missile and torpedo launchers, 9 every weapon together. Alt+1-9 fires a group on the locked "
+				  "hull now, wherever it bears and whatever the mouse's own trigger and look-direction battery are doing, so "
+				  "you can keep working an arc while you manoeuvre onto another; Ctrl+1-9 toggles that group between chain "
+				  "fire (one mount a press, so it keeps firing while the rest reload) and a volley (every bearing, loaded "
+				  "mount together, a harder alpha strike)."),
 				T("Heat",
 				  "Big ships shed heat through radiators. Lose enough and the crew throttles the guns and drive; Shift+Insert "
 				  "runs hot instead, at full past the limit, at a cost in crew and systems."),

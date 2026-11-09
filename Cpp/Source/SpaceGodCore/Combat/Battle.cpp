@@ -406,6 +406,7 @@ namespace SpaceGod::Core
 				u->PlayerDecoyRequested = false;
 				if (u->PlayerVolleyRelease) u->VolleyCharge = 0;
 				u->PlayerVolleyRelease = false;
+				u->PlayerFireGroup = 0;
 			}
 		}
 		StepMissiles(dt);
@@ -1269,6 +1270,7 @@ namespace SpaceGod::Core
 
 			cs::Ref<BattleUnit> target;
 			bool helm = u->PlayerControlled() && u->PlayerHelm;
+			if (helm && u->PlayerFireGroup > 0 && HelmFireGroup(u, s, origin, w, accuracyScale)) continue;
 			if (helm && HelmVolley(u, s, origin, w, accuracyScale)) continue;
 			if (u->PlayerControlled() && !helm && IsPlayerAimable(u, s->Def))
 			{
@@ -1745,6 +1747,34 @@ namespace SpaceGod::Core
 		}
 		if (!u->PlayerFireHeld) return false;
 		s->Aim = look;
+		return true;
+	}
+
+	bool Battle::HelmFireGroup(const cs::Ref<BattleUnit>& u, const cs::Ref<Subsystem>& s, DVec3 origin, const cs::Ref<WeaponSpec>& w, double accuracyScale)
+	{
+		if (w->Missile || w->AntiSmall || w->Supporting()) return false;
+		if (!Broadsides::FireGroupMounts(u, u->PlayerFireGroup).Contains(s)) return false;
+		// The group's mount: fires at the locked hull if it bears and is in reach, apart from the look-direction trigger
+		// and whatever arc order the mount otherwise stands under; nothing to fire at (or out of reach or cone) just
+		// stands down for this press, same as a volley held on nothing.
+		auto target = u->PlayerLockTarget;
+		if (target == nullptr || !Hostile(u, target) || target->Surrendering || target->Captured) return true;
+		if ((target->Pos - origin).Length() - target->Radius() > w->RangeKm || !u->Bears(s->Def, target->Pos))
+		{
+			s->Aim = (target->Pos - origin).Normalized();
+			return true;
+		}
+		if (Broadsides::GroupChained(u, u->PlayerFireGroup) && !Broadsides::GroupChainFires(u, s, u->PlayerFireGroup, target))
+		{
+			s->Aim = (target->Pos - origin).Normalized();
+			return true;
+		}
+		auto sub = PickSubsystem(target);
+		auto aimPoint = sub != nullptr ? target->PointOf(sub->Def) : target->Pos;
+		auto dir = AimAt(u, origin, target, aimPoint, w, accuracyScale);
+		s->Aim = dir;
+		s->Cooldown = w->Cooldown;
+		ResolveShot(u, s, origin, dir, w);
 		return true;
 	}
 

@@ -298,6 +298,11 @@ namespace SpaceGod::Core
 		/// <summary>At the helm: seconds the volley has been building, up to <see cref="Battle.VolleyBuildSeconds"/>.</summary>
 		double VolleyCharge = 0;
 
+		/// <summary>At the helm: a weapon group, 1-9 (U.SPC-T277, MechWarrior style), fired this frame apart from whatever
+		/// the mouse's own trigger and arc are doing -- 0 none. Cleared once the battle has fired it
+		/// (<see cref="Broadsides.FireGroupMounts"/>, <see cref="Broadsides.GroupChained"/>).</summary>
+		int PlayerFireGroup = 0;
+
 		/// <summary>How a small craft shares its reactor between weapons, shields and engines (U.SPC-T424); null runs
 		/// everything as designed.</summary>
 		cs::Ref<PowerDistribution> Power;
@@ -1066,6 +1071,14 @@ namespace SpaceGod::Core
 		/// if it is near it), harder and surer the longer the volley was built. True if the mount was the volley's.
 		/// </summary>
 		bool HelmVolley(const cs::Ref<BattleUnit>& u, const cs::Ref<Subsystem>& s, DVec3 origin, const cs::Ref<WeaponSpec>& w, double accuracyScale);
+
+		/// <summary>
+		/// A mount of <see cref="BattleUnit.PlayerFireGroup"/>: fires at the player's locked hull now, apart from the
+		/// look-direction trigger and whatever arc order the mount stands under, if it bears and is loaded -- every mount
+		/// of the group together, or, chained (<see cref="Broadsides.GroupChained"/>), only the one whose turn it is. True
+		/// if the mount was the group's (whether or not it actually fired this step).
+		/// </summary>
+		bool HelmFireGroup(const cs::Ref<BattleUnit>& u, const cs::Ref<Subsystem>& s, DVec3 origin, const cs::Ref<WeaponSpec>& w, double accuracyScale);
 
 		/// <summary>What a volley called along <paramref name="look"/> is fired at: the locked hull if it lies near that
 		/// line, else the hostile nearest it within <see cref="VolleyConeDeg"/> and <paramref name="rangeKm"/>.</summary>
