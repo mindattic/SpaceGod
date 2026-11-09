@@ -23,6 +23,7 @@ namespace SpaceGod::Core
 	class Galaxy;
 	class GalaxyLife;
 	class LastingConsequences;
+	class Society;
 	class Exploration;
 	class Settlement;
 	class Ship;
@@ -156,6 +157,10 @@ namespace SpaceGod::Core
 		/// <see cref="LastingConsequences"/>), kept here so they are saved with the territory; made by the game, null in a
 		/// Core-only run and in older saves.</summary>
 		cs::Ref<LastingConsequences> Consequences;
+
+		/// <summary>US-T273: the galaxy's people (families, businesses, trips, conferences, bribes and the feed, see <see cref="Society"/>),
+		/// kept here so they are saved with the territory; made by the game, null in a Core-only run and in older saves.</summary>
+		cs::Ref<SpaceGod::Core::Society> Society;
 
 		/// <summary>US-T260: the exploration ledger (survey data held aboard hulls, what each faction's cartographers have
 		/// bought, the first discoveries; see <see cref="Exploration"/>), kept here so it saves with the territory; null until

@@ -20,6 +20,7 @@
 #include "Systems/Statecraft.h"
 #include "Systems/Territory.h" // US-T190
 #include "Systems/GalaxyLife.h" // US-T100
+#include "Systems/Society.h" // US-T273
 #include "Systems/Exploration.h" // US-T260
 #include "Systems/VoidBaseBuilder.h"
 #include "Systems/VoidSites.h"
@@ -251,6 +252,8 @@ namespace SpaceGod::Core
 		SpaceGod::Core::Territory::Of(*this)->Update(*this, jd);
 		// And the settled worlds go on growing (US-T100): new stations, satellites and moon bases, and distant colonies seceding.
 		GalaxyLife::Of(*this)->Update(*this, jd);
+		// And their people live (US-T273): families, businesses, trips, conferences, bribes and the feed (only once the game has made them).
+		if (auto society = Society::Find(*this)) society->Update(*this, jd);
 		// The polities' standing directives: research accrues, and groups given objectives elsewhere are sent (U.SPC-T423).
 		Polities->Command->Update(jd);
 		// The diplomacy game: opinions, pacts kept, allies called to arms, and the AI's proposals (U.SPC-T427).

@@ -570,7 +570,20 @@ namespace SpaceGod::Core
 				T("Bounties and outlaws",
 				  "Every raider captain has a record and a price. The bounty board (F4) lists who is wanted, where last seen "
 				  "and who hunts them. A bounty pays in full alive (board the flagship and hand the captain over) and half "
-				  "dead, on proof from close to the wreck. Bounty hunters come for you too once your price is high enough.")),
+				  "dead, on proof from close to the wreck. Bounty hunters come for you too once your price is high enough."),
+				T("The galaxy's people", // US-T273
+				  "Every settled world has its founding families, more the bigger it is, each with a business: trading houses, "
+				  "shipwrights, mining concerns, refineries, brokers, shipping lines, media houses and hotels. People are born, "
+				  "marry into other houses (across the stars and across flags, which warms their states to each other), grow old "
+				  "and die, and heirs take over. Businesses earn with their world's wellbeing and lose with its unrest and its "
+				  "wars; they open offices where their ships may trade and shut them when war cuts the trade off; a failing one is "
+				  "bought by its richest rival, and a rich house sends an heir to found a new firm on another of its flag's worlds. "
+				  "People write to each other, plan trips (business, family visits, holidays, honeymoons) and take them, called "
+				  "off if war breaks out and robbed if raiders hold the system. Big worlds host summits that firms send delegates "
+				  "to, sealing deals. Firms bribe governors now and then; restless worlds expose them. It all runs with nobody "
+				  "watching, as news, commercials, scam spam and people's own messages. The console's sg.Society shows the feed, "
+				  "the houses, the businesses, the trips and the bribes, and lets the SpaceGod step in: expose a bribe, have a firm "
+				  "pay one, send someone on a trip, fund a firm or start a run on it.")),
 
 			cs::New<ManualChapter>("Comms and pilots", "Hailing ships and stations, piracy by radio, and the people you meet", Keys("COMMS AND PILOTS"),
 				T("Hailing",
