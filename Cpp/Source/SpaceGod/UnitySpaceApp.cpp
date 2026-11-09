@@ -1237,8 +1237,10 @@ namespace SpaceGod
 		auto control = PilotControlMode = controls.Stick;
 		auto model = FlightModelRegistry::Default()->For(ship->Spec->Class);
 		auto capital = cs::As<CapitalFlightModel>(model);
-		// A capital's helm leads the nose by what its own swing needs (U.SPC-T499).
-		double leadRad = capital != nullptr ? capital->AimLeadRad(hull) : PilotFlight::AimLeadRad(hull, tuning);
+		// US-T281: every family answers the same standardized question, from its own swing and spin-up -- the heavy
+		// fighter's capped rate, the capital's fitted to its come-about, the rest the shared Newtonian brake distance --
+		// so this never needs to special-case which one a hull flies.
+		double leadRad = model->AimLeadRad(hull, tuning);
 		auto look = ClickPanelOpen() ? Vector2::zero() : Input.MouseDelta;
 		look.y = Cameras::SpaceCamera::LookY(look.y);
 		// float products, widened to double after (as C#).

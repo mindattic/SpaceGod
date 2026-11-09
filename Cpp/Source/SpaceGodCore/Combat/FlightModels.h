@@ -70,6 +70,16 @@ namespace SpaceGod::Core
 		/// <summary>Advances the hull by <paramref name="dt"/> seconds; see <see cref="PilotFlight.Step"/>
 		/// for what each argument means.</summary>
 		virtual void Step(PilotState& s, const cs::Ref<ShipCombat>& combat, const HullDynamics& hull, const PilotTuning& tuning, const PilotInput& input, DVec3 gravityKmS2, double dt) = 0;
+
+		/// <summary>
+		/// How far the stick's aim may run ahead of the nose, radians (US-T281): the one standardized entry point every
+		/// family answers, so a caller never needs to special-case which one a hull flies. The default is the shared
+		/// Newtonian brake distance (<see cref="PilotFlight.AimLeadRad"/>, the hull's own turn rate and torque); a family
+		/// with a swing and spin-up of its own -- the heavy fighter's capped rate (<see cref="HeavyFighterFlightModel"/>),
+		/// the capital's fitted to its come-about (<see cref="CapitalFlightModel"/>) -- overrides it with that instead, the
+		/// same brake-distance formula on its own numbers.
+		/// </summary>
+		virtual double AimLeadRad(const HullDynamics& hull, const PilotTuning& tuning) const;
 	};
 
 	/// <summary>
@@ -508,7 +518,7 @@ namespace SpaceGod::Core
 
 		/// <summary>How far the stick's aim may run ahead of the nose, radians (as <see cref="PilotFlight.AimLeadRad"/>, for
 		/// this model's own swing and spin-up).</summary>
-		double AimLeadRad(const HullDynamics& hull, const PilotTuning& tuning) const;
+		double AimLeadRad(const HullDynamics& hull, const PilotTuning& tuning) const override;
 
 		void Step(PilotState& s, const cs::Ref<ShipCombat>& combat, const HullDynamics& hull, const PilotTuning& tuning, const PilotInput& input, DVec3 gravityKmS2, double dt) override;
 
@@ -676,8 +686,10 @@ namespace SpaceGod::Core
 		double KeelAccel(const HullDynamics& hull, const PilotTuning& tuning) const;
 
 		/// <summary>How far the helm's heading may run ahead of the nose, radians (as <see cref="PilotFlight.AimLeadRad"/>,
-		/// for this model's own swing): enough for the nose to reach its peak rate while a turn key is held.</summary>
-		double AimLeadRad(const HullDynamics& hull) const;
+		/// for this model's own swing): enough for the nose to reach its peak rate while a turn key is held.
+		/// <paramref name="tuning"/> is unread: the capital's peak rate is fitted to its come-about, not the class's flat
+		/// tuning figure, but the standardized <see cref="IFlightModel.AimLeadRad"/> signature takes it regardless.</summary>
+		double AimLeadRad(const HullDynamics& hull, const PilotTuning& tuning) const override;
 
 		void Step(PilotState& s, const cs::Ref<ShipCombat>& combat, const HullDynamics& hull, const PilotTuning& tuning, const PilotInput& input, DVec3 gravityKmS2, double dt) override;
 

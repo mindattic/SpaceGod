@@ -51,6 +51,8 @@ namespace SpaceGod::Core
 		return "";
 	}
 
+	double IFlightModel::AimLeadRad(const HullDynamics& hull, const PilotTuning& tuning) const { return PilotFlight::AimLeadRad(hull, tuning); }
+
 	// ---------------------------------------------------------------- NewtonianFlightModel
 
 	const cs::Ref<NewtonianFlightModel>& NewtonianFlightModel::Instance()
@@ -463,8 +465,10 @@ namespace SpaceGod::Core
 		return Handling.Keel * tuning.MaxSpeed * PeakTurnRateDegS(hull) * Astro::Deg2Rad;
 	}
 
-	double CapitalFlightModel::AimLeadRad(const HullDynamics& hull) const
+	double CapitalFlightModel::AimLeadRad(const HullDynamics& hull, const PilotTuning& tuning) const
 	{
+		(void)tuning; // the capital's peak rate is fitted to its come-about, not the class's flat tuning figure
+
 		double rate = PeakTurnRateDegS(hull) * Astro::Deg2Rad;
 		double brake = rate * rate / (2 * TurnAlpha(hull));
 		return Min(cs::Math::PI, Max(PilotFlight::MinAimLeadDeg * Astro::Deg2Rad, brake));
