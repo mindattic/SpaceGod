@@ -582,6 +582,13 @@ namespace SpaceGod::UI
 			cs::String about = LoreShort(Core::LoreKeys::System(s->Name));
 			if (!about.empty()) Line(y, x, w, about, Dim);
 		}
+		// US-T272: its Encyclopedia entry, once charted or visited.
+		cs::String article = app->EntityArticleId(cs::Cat("star|", s->Name, "|", s->Name));
+		if (!article.empty())
+		{
+			if (GUI::Button(Rect(x, y + 2, w, 24), "ENCYCLOPEDIA", button)) app->OpenArticle(article);
+			y += 30;
+		}
 		bool here = s == app->ActiveSystem;
 		if (here) Line(y, x, w, "You are here: seen as it is.", Accent);
 		else
@@ -1031,6 +1038,13 @@ namespace SpaceGod::UI
 			(star.SpectralType.empty() ? cs::String("type unknown") : cs::Cat(star.SpectralType, " star"))), Color::white());
 		Line(y, x, w, "A star on the charts: nobody simulates it yet and no gate goes there. A hull with its own FTL drive can fly "
 			"to it, and drops out at the edge of its well.", Dim);
+		// US-T272: its Encyclopedia entry, once charted.
+		cs::String article = app->EntityArticleId(cs::Cat("star|", star.Name, "|", star.Name));
+		if (!article.empty())
+		{
+			if (GUI::Button(Rect(x, y + 2, w, 24), "ENCYCLOPEDIA", button)) app->OpenArticle(article);
+			y += 30;
+		}
 		y += 6;
 		DrawFtlSection(y, x, w, FtlTarget::OfStar(star));
 	}

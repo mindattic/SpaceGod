@@ -854,6 +854,17 @@ namespace SpaceGod::UI
 			}
 			y += 10;
 
+			// US-T272: its Encyclopedia entry, over the map (closing it comes back here).
+			if (!it->What.IsNone() && it->Kind != ItemKind::You)
+			{
+				cs::String article = app->TargetArticleId(it->What);
+				if (!article.empty())
+				{
+					if (GUI::Button(Rect(x, y, w, 24), "ENCYCLOPEDIA", button)) app->OpenArticle(article);
+					y += 28;
+				}
+			}
+
 			// What can be done with it.
 			if (!it->What.IsNone() && it->Kind != ItemKind::You)
 			{

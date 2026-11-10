@@ -38,6 +38,38 @@ public:
 	/// </summary>
 	cs::List<cs::String> ArticleLiveStats(const Core::EncyclopediaArticle& a);
 
+	// ---------------------------------------------------------------- US-T272 (UnitySpaceApp.ScanLinks.cpp)
+
+	/// <summary>
+	/// What an entity's entry shows for its readings, refreshed while it is open: with the thing in sight in this system (a
+	/// body, a settlement, a met pilot's hull), the scan card's own readings (UI::Hud::ScanReadings, the same code, so they
+	/// always match); out of sight, the card's last readings and how old they are; never scanned, the log's
+	/// (<see cref="ArticleLiveStats"/>) and when it was found. Empty for an article about no such thing.
+	/// </summary>
+	cs::List<cs::String> ArticleScanStats(const Core::EncyclopediaArticle& a);
+
+	/// <summary>Whether the last <see cref="ArticleScanStats"/> were read live, rather than the last known ones or the log's.</summary>
+	bool ArticleStatsLive() const { return articleStatsLive; }
+
+	/// <summary>An entity entry's Prose beyond its description: the text of each of its scan card's other tabs (history,
+	/// culture, industry...) that Prose has written, headed by the tab's label.</summary>
+	cs::List<Core::EncyclopediaSection> ArticleScanTabs(const Core::EncyclopediaArticle& a);
+
+	/// <summary>The id of the Encyclopedia article about the discovery log's find <paramref name="logId"/>, "" for none.</summary>
+	cs::String EntityArticleId(const cs::String& logId);
+
+	/// <summary>What an entry about <paramref name="t"/>'s <paramref name="subtab"/>-th scan subtab is keyed on: the discovery
+	/// log's id of it (a body, a settlement on it, a met pilot), or a star's Prose key; "" for a thing no entry is about.</summary>
+	cs::String TargetEntityKey(const Target& t, int subtab);
+
+	/// <summary>The id of the Encyclopedia article about <paramref name="t"/> (a body, a settlement, a met pilot, else a hull's
+	/// class), "" for none: the maps' "Encyclopedia" link.</summary>
+	cs::String TargetArticleId(const Target& t);
+
+	/// <summary>Keeps the scan card's readings of the find <paramref name="logId"/> as they stood now, so its Encyclopedia
+	/// entry shows them (and how old they are) once it is out of sight. This session only.</summary>
+	void RememberReadings(const cs::String& logId, const cs::List<cs::String>& lines);
+
 	/// <summary>Before the commands each frame: while the screen's filter is being typed in it has the keys (true: the
 	/// owner hands the input over).</summary>
 	bool UpdateEncyclopediaKeys();
@@ -57,5 +89,11 @@ private:
 	bool encyclopediaWasShown = false, encyclopediaStale = true;
 	int knowledgeFrames = 0, knowledgeLog = -1, knowledgeBooks = -1;
 	const void* knowledgeGalaxy = nullptr;
+	// US-T272: the live readings' state, the articles by the find they are about, and the last readings of each find.
+	bool articleStatsLive = false;
+	int entityArticlesBuilds = -1;
+	cs::Dictionary<cs::String, cs::String> entityArticles;
+	cs::Dictionary<cs::String, cs::List<cs::String>> lastReadings;
+	cs::Dictionary<cs::String, double> lastReadingsJd;
 	/// <summary>Adds the controls articles from the key bindings as they stand and the gamepad's map.</summary>
 	void AddControlArticles(Core::Encyclopedia& book);

@@ -384,18 +384,23 @@ namespace SpaceGod::UI
 			linksFor = a->Id;
 			linksBuilds = app->EncyclopediaBuilds();
 		}
-		// US-T272's hook: the thing the article is about, as it stands now, in place of the readings taken when it was built.
-		auto live = app->ArticleLiveStats(*a);
+		// US-T272: the thing the article is about, as the scan card reads it now (the same code as the card), or its last
+		// known readings and how old they are, in place of the readings taken when it was built; and the Prose of the card's
+		// other tabs (its history, culture...) after its own sections.
+		auto live = app->ArticleScanStats(*a);
 		cs::String liveText;
 		for (const auto& l : live) liveText = cs::Cat(liveText, liveText.empty() ? "" : "\n", l);
+		const cs::String liveHeading = app->ArticleStatsLive() ? "READINGS (LIVE)" : "READINGS (LAST KNOWN)";
 		bool controls = a->Category == EncyclopediaCategory::Controls;
+		cs::List<EncyclopediaSection> sections = a->Sections;
+		for (const auto& s : app->ArticleScanTabs(*a)) sections.Add(s);
 
 		float w = view.width - 16;
 		float contentH = 30 + 22 + 12;
-		for (const auto& s : a->Sections)
+		for (const auto& s : sections)
 		{
 			bool isLive = !liveText.empty() && s.Heading == EncyclopediaArticle::LiveSection;
-			contentH += SectionHeight(isLive ? cs::String("READINGS (LIVE)") : s.Heading, isLive ? liveText : s.Text, controls, w);
+			contentH += SectionHeight(isLive ? liveHeading : s.Heading, isLive ? liveText : s.Text, controls, w);
 		}
 		if (controls) contentH += SectionGap;
 		contentH += LinksHeight(w);
@@ -409,7 +414,7 @@ namespace SpaceGod::UI
 		y += 22;
 		GUI::DrawTexture(Rect(0, y + 4, w, 1), buttonActiveTexture);
 		y += 12;
-		for (const auto& s : a->Sections)
+		for (const auto& s : sections)
 		{
 			bool isLive = !liveText.empty() && s.Heading == EncyclopediaArticle::LiveSection;
 			const cs::String& body = isLive ? liveText : s.Text;
@@ -423,7 +428,7 @@ namespace SpaceGod::UI
 			}
 			if (!s.Heading.empty())
 			{
-				GUI::Label(Rect(0, y, w, HeadingH - 4), isLive ? cs::String("READINGS (LIVE)") : cs::Strings::ToUpperInvariant(s.Heading), heading);
+				GUI::Label(Rect(0, y, w, HeadingH - 4), isLive ? liveHeading : cs::Strings::ToUpperInvariant(s.Heading), heading);
 				y += HeadingH;
 			}
 			if (!body.empty())

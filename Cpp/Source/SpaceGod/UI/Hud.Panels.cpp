@@ -834,28 +834,16 @@ namespace SpaceGod::UI
 		for (int i = from; i < lines.Count(); i++) lines[i].tab = tab;
 	}
 
-	void Hud::DrawSelection()
+	void Hud::BuildSelection(const Target& t, int& subtab, SelectionCard& card)
 	{
-		// US-T256: the locked hull's card takes its BottomRight slot first, so the selection card fits what is left.
-		DrawTargetCard();
-		auto t = app->Selected;
-		if (t.IsNone()) return;
-		// US-T239: a new selection opens on its overview (unless sg.ScanView has just asked for a tab).
-		if (scanFor != t)
-		{
-			scanFor = t;
-			if (!scanPinned)
-			{
-				scanTab = ScanTabs::Overview;
-				scanSubtab = 0;
-			}
-			scanPinned = false;
-		}
-		cs::List<SelectionLine> lines;
-		cs::String heading, sub;
-		Color headingColor = Accent;
-		cs::List<ScanSubtab> subtabs; // none for an orbital structure or a docking ring: one page, as before
-		cs::String overviewFallback;  // what the overview shows with no Prose text (a body's catalogue summary)
+		// US-T272: the card's lines, built here for the card and for the Encyclopedia's live readings alike.
+		auto& lines = card.lines;
+		auto& heading = card.heading;
+		auto& sub = card.sub;
+		auto& headingColor = card.headingColor;
+		auto& subtabs = card.subtabs; // none for an orbital structure or a docking ring: one page, as before
+		auto& overviewFallback = card.overviewFallback; // what the overview shows with no Prose text (a body's catalogue summary)
+		headingColor = Accent;
 		const cs::String loreSystem = LoreSystem(app->ActiveSystem);
 
 		if (t.IsStructure()) StructureLines(t.Structure, lines, heading, sub, headingColor);
@@ -866,7 +854,7 @@ namespace SpaceGod::UI
 			subtabs.Add(ScanSubtab{ b->Name, LoreKeys::Body(b->Kind, loreSystem, b->Name), static_cast<int>(ScanTabs::OfBody(b->Kind)) });
 			for (const auto& s : app->Economy()->At(t.Body))
 				if (s->Discovered()) subtabs.Add(ScanSubtab{ s->Name, LoreKeys::Settlement(loreSystem, s->Name), static_cast<int>(ScanSubject::Settlement), s });
-			if (scanSubtab >= subtabs.Count()) scanSubtab = 0;
+			if (subtab >= subtabs.Count()) subtab = 0;
 			heading = b->Name;
 			sub = cs::Cat(KindName(b), b->Status == BodyStatus::Candidate ? "  ·  CANDIDATE, unconfirmed" : b->Status == BodyStatus::Disputed ? "  ·  DISPUTED" : b->Status == BodyStatus::Fictional ? "  ·  fiction (game layer)" : "");
 			auto eph = app->Ephemeris();
@@ -930,10 +918,10 @@ namespace SpaceGod::UI
 			}
 			else lines.Add(SelectionLine{ "Settled", "No known settlement" });
 			TagLines(lines, industry, "industry");
-			if (scanSubtab > 0)
+			if (subtab > 0)
 			{
 				// A port on this world: its own page, its world named in the line under its name.
-				const auto& s = subtabs[scanSubtab].settlement;
+				const auto& s = subtabs[subtab].settlement;
 				lines.Clear();
 				overviewFallback = cs::String();
 				heading = s->Name;
@@ -958,7 +946,8 @@ namespace SpaceGod::UI
 				ps.pilot = true;
 				subtabs.Add(ps);
 			}
-			if (scanSubtab >= subtabs.Count()) scanSubtab = 0;
+			card.pilot = metPilot; // US-T272: the pilot's links
+			if (subtab >= subtabs.Count()) subtab = 0;
 			heading = ship->Name;
 			auto company = c->Company;
 			sub = company != nullptr
@@ -1147,7 +1136,7 @@ namespace SpaceGod::UI
 				cs::String who = LoreShort(LoreKeys::Pilot(metPilot->Name));
 				lines.Add(SelectionLine{ "Pilot", who.empty() ? metPilot->Styled() : cs::Cat(metPilot->Styled(), "  ·  ", who), "crew" });
 			}
-			if (scanSubtab > 0 && metPilot != nullptr)
+			if (subtab > 0 && metPilot != nullptr)
 			{
 				// The pilot's own page (the simulation's record of them: Comms/Pilots), under the hull's name.
 				lines.Clear();
@@ -1156,6 +1145,55 @@ namespace SpaceGod::UI
 				PilotLines(lines, metPilot, record);
 			}
 		}
+	}
+
+	cs::List<cs::String> Hud::ScanReadings(const Target& t, int subtab)
+	{
+		if (t.IsNone() || t.IsUnit() || (t.IsShip() && t.Ship == nullptr) || app->ActiveSystem == nullptr) return {};
+		SelectionCard card;
+		BuildSelection(t, subtab, card);
+		return ReadingsOf(card.lines);
+	}
+
+	cs::List<cs::String> Hud::ReadingsOf(const cs::List<SelectionLine>& lines)
+	{
+		cs::List<cs::String> out;
+		for (const auto& l : lines)
+		{
+			if (l.key.empty()) continue; // the card's prose and notes, not readings
+			cs::String key = cs::Strings::Trim(l.key);
+			out.Add(cs::Cat(key, ": ", l.value));
+		}
+		return out;
+	}
+
+	void Hud::DrawSelection()
+	{
+		// US-T256: the locked hull's card takes its BottomRight slot first, so the selection card fits what is left.
+		DrawTargetCard();
+		auto t = app->Selected;
+		if (t.IsNone()) return;
+		// US-T239: a new selection opens on its overview (unless sg.ScanView has just asked for a tab).
+		if (scanFor != t)
+		{
+			scanFor = t;
+			if (!scanPinned)
+			{
+				scanTab = ScanTabs::Overview;
+				scanSubtab = 0;
+			}
+			scanPinned = false;
+		}
+		SelectionCard card;
+		BuildSelection(t, scanSubtab, card);
+		// US-T272: the Encyclopedia's keywords for what the card shows (and the readings it remembers for its entry).
+		RefreshScanLinks(t, scanSubtab, card);
+		auto& lines = card.lines;
+		const auto& heading = card.heading;
+		const auto& sub = card.sub;
+		const auto& headingColor = card.headingColor;
+		const auto& subtabs = card.subtabs;
+		const auto& overviewFallback = card.overviewFallback;
 
 		// US-T239: the tab's page: its own lines (game-owned numbers) and its Prose narrative, else a placeholder.
 		ScanSubject subject = ScanSubject::World;
@@ -1196,7 +1234,10 @@ namespace SpaceGod::UI
 		// A long card (a boarded hull lists every compartment) never runs into the right-hand column's other panels (the
 		// reactor and sensors under it, the opportunities or market and the HUNTED list over it, US-T152): it takes what
 		// BottomRight has left up to TopRight, and its lines scroll in that.
-		float maxLinesH = Mathf::Max(19.0f * 2, layout.FreeRight() - (64 + 30 + tabsH));
+		// US-T272: the Encyclopedia's keywords, a wrapped row of links over the buttons.
+		cs::List<Rect> linkRects = ScanLinkRects(w - 28);
+		float linksH = linkRects.Count() == 0 ? 0.0f : linkRects[linkRects.Count() - 1].yMax() + 8;
+		float maxLinesH = Mathf::Max(19.0f * 2, layout.FreeRight() - (64 + 30 + tabsH + linksH));
 		bool scrolls = linesH > maxLinesH;
 		if (scrolls)
 		{
@@ -1204,7 +1245,7 @@ namespace SpaceGod::UI
 			for (const auto& l : lines) linesH += rowHeight(l, w - 162);
 		}
 		float shownH = scrolls ? maxLinesH : linesH;
-		float h = 64 + tabsH + shownH + 30;
+		float h = 64 + tabsH + shownH + 30 + linksH;
 		auto r = Panel(layout.Take(HudRegion::BottomRight, w, h));
 		auto old = GUI::contentColor;
 		GUI::contentColor = headingColor;
@@ -1267,6 +1308,16 @@ namespace SpaceGod::UI
 		}
 		if (scrolls) GUI::EndScrollView();
 		GUI::contentColor = old;
+
+		// US-T272: each keyword opens its Encyclopedia article (the first is the thing itself, where it has one).
+		float linksY = r.yMax() - 32 - linksH + 2;
+		for (int i = 0; i < linkRects.Count() && i < scanLinks.Count(); i++)
+		{
+			Rect lr = linkRects[i];
+			lr.x += r.x + 14;
+			lr.y += linksY;
+			if (GUI::Button(lr, scanLinks[i].label, scanLinks[i].self ? buttonActive : button)) app->OpenArticle(scanLinks[i].id);
+		}
 
 		bool focused = app->SpaceCamera->FocusTarget == t && app->SpaceCamera->Mode != Cameras::SpaceCamera::CameraMode::Free;
 		if (GUI::Button(Rect(r.x + 14, r.yMax() - 32, 150, 24), focused ? "Re-frame  [F]" : "Focus  [F]", buttonActive)) app->FocusSelected();

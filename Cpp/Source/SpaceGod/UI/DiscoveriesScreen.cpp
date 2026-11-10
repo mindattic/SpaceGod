@@ -196,6 +196,17 @@ namespace SpaceGod::UI
 
 		// Go to it here, or plot a course to where it is.
 		float bx = view.x;
+		// US-T272: its Encyclopedia entry (the readings live, with its Prose).
+		cs::String article = app->EntityArticleId(e.Id);
+		if (!article.empty())
+		{
+			if (GUI::Button(Rect(bx, buttonsY, 140, 32), "Encyclopedia", button))
+			{
+				app->OpenArticle(article);
+				return true;
+			}
+			bx += 152;
+		}
 		Target target = Target::None();
 		if (app->DiscoveryTarget(e, target))
 		{

@@ -6,6 +6,7 @@ namespace SpaceGod::Core
 	class Encyclopedia;
 	class EncyclopediaArticle;
 	class EncyclopediaKnowledge;
+	struct EncyclopediaSection; // US-T272
 }
 
 namespace SpaceGod::UI

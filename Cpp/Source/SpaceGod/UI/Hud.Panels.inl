@@ -146,7 +146,51 @@ private:
 	/// record of them, Core::NamedPilot), tagged overview / history / reputation; <paramref name="record"/> is their hull's law file.</summary>
 	void PilotLines(cs::List<SelectionLine>& lines, const cs::Ref<Core::NamedPilot>& p, const cs::Ref<Core::LawRecord>& record);
 
+	/// <summary>US-T272: what the selection card shows of a target: every tab's lines, the heading, the subtabs, and the
+	/// pilot met (for the links). Built by <see cref="BuildSelection"/> for the card and the Encyclopedia's live readings.</summary>
+	struct SelectionCard
+	{
+		cs::List<SelectionLine> lines;
+		cs::String heading, sub;
+		Color headingColor = Color::white();
+		cs::List<ScanSubtab> subtabs;
+		cs::String overviewFallback;
+		cs::Ref<Core::NamedPilot> pilot;
+	};
+
+	/// <summary>US-T272: builds the card of <paramref name="t"/>'s <paramref name="subtab"/>-th subtab (clamped to those it
+	/// has). One code for the card and the Encyclopedia entry, so their readings always match.</summary>
+	void BuildSelection(const Target& t, int& subtab, SelectionCard& card);
+
+	/// <summary>US-T272: the card's keyed lines as readings, "Key: value" each (its prose left out).</summary>
+	static cs::List<cs::String> ReadingsOf(const cs::List<SelectionLine>& lines);
+
+	/// <summary>US-T272: one keyword link on the card: its label, the Encyclopedia article it opens, and whether it is the
+	/// thing itself (drawn lit).</summary>
+	struct ScanLink
+	{
+		cs::String label;
+		cs::String id;
+		bool self = false;
+	};
+	cs::List<ScanLink> scanLinks;
+	Target scanLinksFor;
+	int scanLinksSubtab = -1, scanLinksFrames = 0;
+
+	/// <summary>US-T272 (Hud.ScanLinks.cpp): the card's keyword links (the thing itself, its system, star, world, flag, hull,
+	/// pilot, goods, industries and notable features), each a known article (scanning unlocks the faction, hull, goods and
+	/// industry ones); also hands the card's readings to the game for the thing's entry to show when out of sight. Every
+	/// couple of seconds, or when the selection or subtab changes.</summary>
+	void RefreshScanLinks(const Target& t, int subtab, const SelectionCard& card);
+
+	/// <summary>US-T272: where the links sit in a row <paramref name="w"/> wide, wrapped (relative to the row's top left).</summary>
+	cs::List<Rect> ScanLinkRects(float w);
+
 public:
+	/// <summary>US-T272: the scan card's readings of <paramref name="t"/>'s <paramref name="subtab"/>-th subtab as it stands
+	/// now, every tab's, "Key: value" each (UnitySpaceApp::ArticleLiveStats shows them in the thing's Encyclopedia entry).</summary>
+	cs::List<cs::String> ScanReadings(const Target& t, int subtab);
+
 	/// <summary>US-T239: shows <paramref name="tab"/> of the <paramref name="subtab"/>-th subtab of the selection's scan
 	/// (sg.ScanView's way in; a click on the card does the same).</summary>
 	void SetScan(const cs::String& tab, int subtab) { scanTab = tab; scanSubtab = subtab; scanFor = Target::None(); scanPinned = true; }
