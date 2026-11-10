@@ -134,7 +134,8 @@ namespace SpaceGod::Core
 		cs::Ref<SystemReport> Delivered(double receivedJd, NewsCarrier carrier, const cs::String& carriedBy) const; // internal
 
 		/// <summary>The news kinds worth sending beyond the gates: captures, diplomacy and economic shocks.</summary>
-		static bool Notable(WorldEventKind k) { return k == WorldEventKind::Capture || k == WorldEventKind::Diplomacy || k == WorldEventKind::Economy; }
+		/// US-T275: and the people's notable happenings (only the game's Civilization layer logs them, so a Core-only run is unchanged).
+		static bool Notable(WorldEventKind k) { return k == WorldEventKind::Capture || k == WorldEventKind::Diplomacy || k == WorldEventKind::Economy || k == WorldEventKind::Society; }
 
 		/// <summary>The prefix news from abroad is logged under, so it is never sent on again as the receiver's own.</summary>
 		static inline const cs::String ForeignPrefix = "News from ";

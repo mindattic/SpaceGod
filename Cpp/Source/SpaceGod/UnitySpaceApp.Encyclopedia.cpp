@@ -118,6 +118,7 @@ namespace SpaceGod
 		book.AddDiscoveries(*Galaxy, log, lore, Clock != nullptr ? Clock->Jd : 0.0);
 		book.AddCommerce(*Galaxy, &log);
 		book.AddFactions(*Galaxy, lore);
+		book.AddCivilization(*Galaxy, lore); // US-T288
 		book.AddShips();
 		book.Finish();
 		encyclopediaBuilds++;

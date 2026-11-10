@@ -86,6 +86,7 @@ namespace SpaceGod::Core
 		case WorldEventKind::Economy: return "Economy";
 		case WorldEventKind::Market: return "Market";
 		case WorldEventKind::Law: return "Law";
+		case WorldEventKind::Society: return "Society";
 		}
 		return "";
 	}

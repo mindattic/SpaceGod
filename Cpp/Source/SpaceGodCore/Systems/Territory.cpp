@@ -14,6 +14,7 @@
 #include "Systems/GalaxyLife.h" // US-T100
 #include "Systems/LastingConsequences.h" // US-T105
 #include "Systems/Society.h" // US-T273
+#include "Systems/Civilization/Civilization.h" // US-T274
 #include "Systems/Exploration.h" // US-T260
 #include "Systems/Polities.h"
 #include "World.h"
@@ -324,5 +325,6 @@ namespace SpaceGod::Core
 		SG_OPT(Life), // US-T100, absent from older saves
 		SG_OPT(Consequences), // US-T105, absent from older saves
 		SG_OPT(Society), // US-T273, absent from older saves
+		SG_OPT(Civilization), // US-T274, absent from older saves
 		SG_OPT(Exploration)) // US-T260, absent from older saves
 }

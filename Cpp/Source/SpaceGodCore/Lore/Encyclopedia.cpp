@@ -24,6 +24,10 @@
 #include "Systems/DiscoveryLog.h"
 #include "Systems/Galaxy.h"
 #include "Systems/Polities.h"
+#include "Systems/Society.h" // US-T288
+#include "Systems/Civilization/Civilization.h"
+#include "Systems/Civilization/Culture.h"
+#include "Systems/Civilization/Narrator.h"
 
 #include <algorithm>
 
@@ -232,6 +236,7 @@ namespace SpaceGod::Core
 			case EncyclopediaCategory::Settlements: return "settlements";
 			case EncyclopediaCategory::Systems: return "systems";
 			case EncyclopediaCategory::Pilots: return "pilots";
+			case EncyclopediaCategory::Society: return "society";
 		}
 		return "guides";
 	}
@@ -251,6 +256,7 @@ namespace SpaceGod::Core
 			case EncyclopediaCategory::Settlements: return "Settlements";
 			case EncyclopediaCategory::Systems: return "Systems";
 			case EncyclopediaCategory::Pilots: return "Pilots";
+			case EncyclopediaCategory::Society: return "Society";
 		}
 		return "";
 	}
@@ -270,6 +276,7 @@ namespace SpaceGod::Core
 			case EncyclopediaCategory::Settlements: return "The colonies, outposts and pirate havens of each system are written in as you find them.";
 			case EncyclopediaCategory::Systems: return "A system is written in when a lookout charts its star or you visit it.";
 			case EncyclopediaCategory::Pilots: return "A pilot is written in when you hail them, fly their hull, fight them or pull them out of a wreck.";
+			case EncyclopediaCategory::Society: return "The galaxy's houses and organisations appear here once its people have lived a while.";
 		}
 		return "";
 	}
@@ -780,6 +787,74 @@ namespace SpaceGod::Core
 			for (int g = 0; g < GoodInfo::Count; g++)
 				if (f->Contraband.Contains(static_cast<Good>(g))) banned = cs::Cat(banned, banned.empty() ? "" : ", ", GoodInfo::Of(static_cast<Good>(g))->Name);
 			if (!banned.empty()) a->AddSection("Contraband", cs::Cat("Its law bans ", banned, "."));
+			Add(a);
+		}
+	}
+
+	void Encyclopedia::AddCivilization(const Galaxy& galaxy, const LoreLibrary& lore)
+	{
+		auto society = Society::Find(galaxy);
+		if (society == nullptr) return;
+		for (const auto& h : society->HousesOf(nullptr))
+		{
+			auto a = cs::New<EncyclopediaArticle>();
+			a->Id = MakeId(EncyclopediaCategory::Society, cs::Cat("house-", h->Surname, "-", h->Id));
+			a->Category = EncyclopediaCategory::Society;
+			a->Title = cs::Cat("House ", h->Surname, h->Home != nullptr ? cs::Cat(" of ", h->Home->Name) : cs::String());
+			a->Subtitle = h->Business != nullptr && h->Business->Trading() ? cs::Cat("A family of ", h->Home != nullptr ? h->Home->Name : cs::String("nowhere"), ", running ", h->Business->Name)
+				: cs::Cat("A family of ", h->Home != nullptr ? h->Home->Name : cs::String("nowhere"));
+			a->AlwaysKnown = true;
+			a->LoreKey = LoreKeys::Slug(cs::Cat("house-", h->Surname, "-", h->Id));
+			a->AddKeywords(cs::Cat("house family society ", h->Surname));
+			cs::String record = lore.Long(a->LoreKey, "");
+			if (!record.empty()) a->AddSection("", record);
+			cs::String people;
+			for (const auto& c : h->Members)
+			{
+				if (!c->Alive()) continue;
+				cs::String traits;
+				for (int bit = 1; bit <= (1 << 11); bit <<= 1)
+					if (c->Traits & bit) traits = cs::Cat(traits, traits.empty() ? "" : ", ", cs::Strings::ToLowerInvariant(cs::String(Core::ToString(static_cast<Trait>(bit)))));
+				people = cs::Cat(people, people.empty() ? "" : "\n", c->FullName(), " (", Core::ToString(c->Role), ")", traits.empty() ? cs::String() : cs::Cat(": ", traits),
+					c->Faith != nullptr ? cs::Cat("; keeps ", Narrator::OrgName(*c->Faith)) : cs::String());
+			}
+			a->AddSection("Members", people);
+			a->AddSection("Fortune", cs::Cat(Narrator::Money(h->Wealth), h->Business != nullptr && h->Business->Trading() ? cs::Cat("; ", h->Business->Name, " holds ", Narrator::Money(h->Business->Capital)) : cs::String()));
+			Add(a);
+		}
+		auto civ = Civilization::Find(galaxy);
+		if (civ == nullptr) return;
+		for (const auto& o : civ->Orgs)
+		{
+			if (!o->Active()) continue;
+			auto a = cs::New<EncyclopediaArticle>();
+			cs::String kind = cs::Strings::ToLowerInvariant(cs::String(Core::ToString(o->Kind)));
+			a->Id = MakeId(EncyclopediaCategory::Society, cs::Cat("org-", kind, "-", o->Name, "-", o->Id));
+			a->Category = EncyclopediaCategory::Society;
+			a->Title = Narrator::OrgName(*o);
+			a->Subtitle = cs::Cat("A ", kind, o->Seat != nullptr ? cs::Cat(" of ", o->Seat->Name) : cs::String(), o->Faction != nullptr ? cs::Cat(", under ", o->Faction->Name) : cs::String());
+			a->AlwaysKnown = true;
+			a->LoreKey = LoreKeys::Slug(cs::Cat("org-", kind, "-", o->Name, "-", o->Id));
+			a->AddKeywords(cs::Cat("society organisation ", kind, " ", o->Name));
+			cs::String record = lore.Long(a->LoreKey, "");
+			if (!record.empty()) a->AddSection("", record);
+			a->AddSection("Standing", cs::Cat(o->Leader != nullptr ? cs::Cat("Led by ", o->Leader->FullName(), ". ") : cs::String(), o->Members.Count(), " members. Strength ",
+				cs::Fmt(o->Strength * 100, "0"), "%. Funds ", Narrator::Money(o->Funds), ". Founded ", static_cast<int>(2000 + (o->FoundedJd - 2451544.5) / 365.25), "."));
+			Add(a);
+		}
+		if (civ->Culture != nullptr && civ->Culture->Chronicle.Count() > 0)
+		{
+			auto a = cs::New<EncyclopediaArticle>();
+			a->Id = MakeId(EncyclopediaCategory::Society, "chronicle");
+			a->Category = EncyclopediaCategory::Society;
+			a->Title = "The Chronicle";
+			a->Subtitle = "The great events of the galaxy's people, as the historians kept them";
+			a->AlwaysKnown = true;
+			a->AddKeywords("chronicle history historians events");
+			cs::String text;
+			for (const auto& e : civ->Culture->Chronicle)
+				text = cs::Cat(text, text.empty() ? "" : "\n", static_cast<int>(2000 + (e->Jd - 2451544.5) / 365.25), ": ", e->ToString());
+			a->AddSection("", text);
 			Add(a);
 		}
 	}

@@ -8,6 +8,7 @@
 #include "Economy/Economy.h"
 #include "Persistence/ObjectGraph.h"
 #include "Ships.h"
+#include "Systems/Civilization/Civilization.h" // US-T275
 #include "Systems/Galaxy.h"
 #include "Systems/Polities.h"
 #include "Systems/Statecraft.h"
@@ -65,6 +66,10 @@ namespace SpaceGod::Core
 			case TripPurpose::FamilyVisit: return "FamilyVisit";
 			case TripPurpose::Holiday: return "Holiday";
 			case TripPurpose::Honeymoon: return "Honeymoon";
+			case TripPurpose::Pilgrimage: return "Pilgrimage";
+			case TripPurpose::Study: return "Study";
+			case TripPurpose::Festival: return "Festival";
+			case TripPurpose::Match: return "Match";
 		}
 		return "";
 	}
@@ -222,6 +227,25 @@ namespace SpaceGod::Core
 			return cs::Cat(cs::Fmt(credits, "#,0"), " credits");
 		}
 
+		/// US-T275: mirrors a society happening as a Civilization event (no feed item and no log: Society posts and logs its own),
+		/// so the modules on top can react to it (a feud to a buyout, an inheritance quarrel to a death).
+		void Mirror(Galaxy& galaxy, SocialKind kind, double jd, const cs::Ref<Settlement>& where, const cs::Ref<StarSystem>& sys,
+			const cs::Ref<Citizen>& who, const cs::Ref<Citizen>& whom, const cs::Ref<Household>& house, const cs::Ref<Household>& other,
+			const cs::Ref<Business>& business, double amount)
+		{
+			auto civ = Civilization::Find(galaxy);
+			if (civ == nullptr) return;
+			auto e = Civilization::Make(kind, jd, where, sys);
+			e->Faction = where != nullptr ? where->Owner : nullptr;
+			e->Who = who;
+			e->Whom = whom;
+			e->House = house;
+			e->OtherHouse = other;
+			e->Business = business;
+			e->Amount = amount;
+			civ->Publish(galaxy, e, false, false);
+		}
+
 		cs::String SystemName(const cs::Ref<StarSystem>& s) { return s != nullptr ? s->Name : cs::String("deep space"); }
 
 		bool Adult(const cs::Ref<Citizen>& c, double jd) { return c != nullptr && c->Alive() && c->AgeYears(jd) >= 18; }
@@ -248,6 +272,17 @@ namespace SpaceGod::Core
 
 	cs::String FeedItem::ToString() const
 	{
+		if (Event != nullptr && Text.empty())
+		{
+			cs::String text = Event->ToString(); // US-T275: worded by the Narrator when shown
+			switch (Kind)
+			{
+				case FeedKind::Message: return cs::Cat("[Message] ", text);
+				case FeedKind::Commercial: return cs::Cat("[Ad] ", text);
+				case FeedKind::Spam: return cs::Cat("[Spam] ", text);
+				default: return cs::Cat("[News] ", text);
+			}
+		}
 		switch (Kind)
 		{
 			case FeedKind::Message: return cs::Cat("[Message] ", From, " to ", To, ": ", Text);
@@ -508,6 +543,7 @@ namespace SpaceGod::Core
 			if (age < 70 || Unit(H(r, static_cast<std::uint32_t>(c->Id))) > (age - 70) / 30) continue;
 			c->DiedJd = jd;
 			Deaths++;
+			Mirror(galaxy, SocialKind::Death, jd, h->Home, sys, c, nullptr, h, nullptr, nullptr, age);
 			if (c->Spouse != nullptr && c->Spouse->Spouse == c) c->Spouse->Spouse = nullptr;
 			if (c->Role == CitizenRole::Head)
 			{
@@ -544,6 +580,7 @@ namespace SpaceGod::Core
 				{
 					auto baby = Born(h, CitizenRole::Child, jd, H(r, 0xBAB1u));
 					Births++;
+					Mirror(galaxy, SocialKind::Birth, jd, h->Home, sys, baby, c, h, nullptr, nullptr, 0);
 					Post(FeedKind::Message, jd, sys, c->FullName(), "family and friends", cs::Cat("Welcome to the world, little ", baby->Given, "!"));
 					return;
 				}
@@ -570,6 +607,7 @@ namespace SpaceGod::Core
 					other->Spouse = single;
 					Weddings++;
 					auto oh = other->House;
+					Mirror(galaxy, SocialKind::Wedding, jd, h->Home, sys, single, other, h, oh, nullptr, 0);
 					cs::String text = cs::Cat(single->FullName(), " of ", h->Home->Name, " weds ", other->FullName(), " of ", oh->Home->Name, ": Houses ", h->Surname, " and ", oh->Surname, " are joined");
 					Post(FeedKind::News, jd, sys, "", "", text);
 					// Two great houses of different flags joined warm their owners to each other a little.
@@ -714,12 +752,14 @@ namespace SpaceGod::Core
 			b->Status = BusinessStatus::Acquired;
 			b->Buyer = buyer;
 			Acquisitions++;
+			Mirror(galaxy, SocialKind::Buyout, jd, b->Home, b->System, nullptr, nullptr, b->Owner, buyer->Owner, b, price * 0.5);
 			text = cs::Cat(buyer->Name, " buys out the failing ", b->Name, " of ", b->Home != nullptr ? b->Home->Name : cs::String("?"), " for ", Money(price * 0.5));
 		}
 		else
 		{
 			b->Status = BusinessStatus::Bankrupt;
 			Bankruptcies++;
+			Mirror(galaxy, SocialKind::Bankruptcy, jd, b->Home, b->System, nullptr, nullptr, b->Owner, nullptr, b, 0);
 			text = cs::Cat(b->Name, " of ", b->Home != nullptr ? b->Home->Name : cs::String("?"), " goes bankrupt; its staff are let go");
 		}
 		b->Capital = 0;
@@ -798,7 +838,8 @@ namespace SpaceGod::Core
 		double travel = TravelDays(t->FromSystem, t->ToSystem, h);
 		t->DepartJd = cs::Math::Floor(jd) + (why == TripPurpose::Honeymoon ? 7 : 4 + (h % 21u));
 		t->ArriveJd = t->DepartJd + travel;
-		double stay = why == TripPurpose::Holiday || why == TripPurpose::Honeymoon ? 7 + (h >> 4) % 14u : 2 + (h >> 4) % 6u;
+		double stay = why == TripPurpose::Holiday || why == TripPurpose::Honeymoon || why == TripPurpose::Pilgrimage ? 7 + (h >> 4) % 14u
+			: why == TripPurpose::Study ? 90 + (h >> 4) % 60u : why == TripPurpose::Festival ? 4 + (h >> 4) % 6u : 2 + (h >> 4) % 6u;
 		t->LeaveJd = t->ArriveJd + stay;
 		t->HomeJd = t->LeaveJd + travel;
 		c->TripId = t->Id;
@@ -819,6 +860,10 @@ namespace SpaceGod::Core
 				cs::Cat("Off to ", to->Name, " for a rest. Leaving in ", static_cast<int>(t->DepartJd - jd), " days.") }, h >> 6); break;
 			case TripPurpose::Honeymoon: text = cs::Cat("We're away to ", to->Name, " for our honeymoon. Back in ", static_cast<int>(t->HomeJd - jd), " days!"); break;
 			case TripPurpose::Conference: text = cs::Cat("Registered for the ", t->Conference != nullptr ? t->Conference->Name : cs::String("summit"), " on ", to->Name, ". See you there?"); break;
+			case TripPurpose::Pilgrimage: text = Pick({ cs::Cat("I am going on pilgrimage to ", to->Name, ". Keep me in your prayers."), cs::Cat("Leaving for the holy places of ", to->Name, " in ", static_cast<int>(t->DepartJd - jd), " days.") }, h >> 6); break;
+			case TripPurpose::Study: text = cs::Cat("Off to ", to->Name, " to study. Write to me!"); break;
+			case TripPurpose::Festival: text = Pick({ cs::Cat("We're going to the festival on ", to->Name, "! Can't wait."), cs::Cat("Festival season on ", to->Name, ". Tickets booked.") }, h >> 6); break;
+			case TripPurpose::Match: text = Pick({ cs::Cat("Got tickets for the big match on ", to->Name, "!"), cs::Cat("Flying to ", to->Name, " to see the game. Come on you lot!") }, h >> 6); break;
 		}
 		Post(FeedKind::Message, jd, t->FromSystem, c->FullName(), to_, text);
 		return t;
@@ -843,6 +888,8 @@ namespace SpaceGod::Core
 				cs::String why;
 				if (c == nullptr || !c->Alive()) why = "the traveller died";
 				else if (!Stands(t->To)) why = cs::Cat(t->To->Name, " has fallen");
+				// US-T286: a quarantined world takes no visitors.
+				else if (auto civ = Civilization::Find(galaxy); civ != nullptr && civ->CivicsOf(t->To) != nullptr && civ->CivicsOf(t->To)->Quarantined(jd)) why = cs::Cat(t->To->Name, " is under quarantine");
 				else if (home != nullptr && Hostile(galaxy, home->Owner, t->To->Owner)) why = cs::Cat("the ", home->Owner->Name, " and the ", t->To->Owner->Name, " are at war");
 				if (!why.empty())
 				{
@@ -1068,6 +1115,8 @@ namespace SpaceGod::Core
 		br->ExposedJd = jd;
 		Scandals++;
 		auto gov = br->Official;
+		Mirror(galaxy, SocialKind::Scandal, jd, br->Where, br->Briber != nullptr ? br->Briber->System : SystemOf(galaxy, br->Where), gov, nullptr,
+			gov != nullptr ? gov->House : nullptr, br->Briber != nullptr ? br->Briber->Owner : nullptr, br->Briber, br->Amount);
 		if (gov != nullptr && gov->Role == CitizenRole::Governor) gov->Role = CitizenRole::Heir;
 		if (br->Briber != nullptr && br->Briber->Trading())
 		{
@@ -1271,6 +1320,19 @@ namespace SpaceGod::Core
 		return "";
 	}
 
+	bool Society::Reveal(Galaxy& galaxy, const cs::Ref<Bribe>& b, double jd)
+	{
+		if (b == nullptr || b->Exposed) return false;
+		Scandal(galaxy, b, jd);
+		return true;
+	}
+
+	cs::Ref<Trip> Society::Book(Galaxy& galaxy, const cs::Ref<Citizen>& c, const cs::Ref<Settlement>& to, TripPurpose why, const cs::Ref<Citizen>& meeting, double jd)
+	{
+		if (c == nullptr || !c->Alive() || c->TripId != 0 || c->AgeYears(jd) < 14 || !Stands(to) || ActiveTrips().Count() >= MaxTrips) return nullptr;
+		return Plan(galaxy, c, to, why, meeting, jd, H(static_cast<std::uint32_t>(c->Id), DayOf(jd), 0xB00Fu + static_cast<std::uint32_t>(why)));
+	}
+
 	// ================================================================ ObjectGraph registrations (docs/PERSISTENCE.md)
 
 	SG_ENUM(CitizenRole, "SpaceGod.Core.CitizenRole")
@@ -1281,7 +1343,8 @@ namespace SpaceGod::Core
 	SG_ENUM(FeedKind, "SpaceGod.Core.FeedKind")
 
 	SG_SERIALIZE(Citizen, "SpaceGod.Core.Citizen",
-		SG_F(Id), SG_F(Given), SG_F(House), SG_F(Role), SG_F(BornJd), SG_F(DiedJd), SG_F(Spouse), SG_F(TripId), SG_F(Bribes))
+		SG_F(Id), SG_F(Given), SG_F(House), SG_F(Role), SG_F(BornJd), SG_F(DiedJd), SG_F(Spouse), SG_F(TripId), SG_F(Bribes),
+		SG_OPT(Persona), SG_OPT(Traits), SG_OPT(Goal), SG_OPT(Reputation), SG_OPT(Skill), SG_OPT(Ties), SG_OPT(Faith), SG_OPT(Orgs)) // US-T275, absent from older saves
 
 	SG_SERIALIZE(Household, "SpaceGod.Core.Household",
 		SG_F(Id), SG_F(Surname), SG_F(Home), SG_F(System), SG_F(Members), SG_F(Business), SG_F(Wealth), SG_F(FoundedJd), SG_F(Scattered), SG_F(NextEventJd))
@@ -1300,7 +1363,7 @@ namespace SpaceGod::Core
 		SG_F(Id), SG_F(Briber), SG_F(Official), SG_F(Government), SG_F(Where), SG_F(Amount), SG_F(Jd), SG_F(Favour), SG_F(Exposed), SG_F(ExposedJd), SG_F(Steered))
 
 	SG_SERIALIZE(FeedItem, "SpaceGod.Core.FeedItem",
-		SG_F(Jd), SG_F(Kind), SG_F(From), SG_F(To), SG_F(System), SG_F(Text))
+		SG_F(Jd), SG_F(Kind), SG_F(From), SG_F(To), SG_F(System), SG_F(Text), SG_OPT(Event)) // US-T275, absent from older saves
 
 	SG_SERIALIZE(Society, "SpaceGod.Core.Society",
 		SG_F(NextId), SG_F(Houses), SG_F(Businesses), SG_F(Trips), SG_F(Conferences), SG_F(Bribes), SG_F(Feed),

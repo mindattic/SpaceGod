@@ -81,6 +81,9 @@ namespace SpaceGod::Core
 
 		/// <summary>A crime recorded, a bounty posted, paid or collected (see <see cref="Law"/>).</summary>
 		Law,
+
+		/// <summary>US-T275: a notable happening among the galaxy's people (see <see cref="Civilization"/>), relayed as news.</summary>
+		Society,
 	};
 	SPACEGODCORE_API const char* ToString(WorldEventKind v);
 

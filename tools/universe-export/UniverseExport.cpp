@@ -58,6 +58,9 @@
 #include "Systems/StarSystemSpec.h"
 #include "Systems/Statecraft.h"
 #include "Systems/StrategicCommand.h"
+#include "Systems/Society.h" // US-T274: the people and their organisations, for Prose to write about
+#include "Systems/Civilization/Civilization.h"
+#include "Systems/Civilization/Narrator.h"
 #include "Systems/SystemSources.h"
 #include "Systems/VoidSites.h"
 #include "Systems/VoidStations.h"
@@ -280,6 +283,8 @@ namespace
 		double Days = 30;
 		std::string Build = "unknown";
 		bool Pilots = true;
+		/// <summary>US-T274: run the game's Society and Civilization layers too (houses, firms, parties, faiths, teams...); "--society none" leaves them out.</summary>
+		bool Society = true;
 	};
 
 	Args Parse(int argc, char** argv)
@@ -295,6 +300,7 @@ namespace
 			else if (k == "--days") a.Days = std::stod(next());
 			else if (k == "--build") a.Build = next();
 			else if (k == "--pilots") a.Pilots = next() != "none";
+			else if (k == "--society") a.Society = next() != "none";
 			else throw std::runtime_error("unknown argument " + k);
 		}
 		return a;
@@ -319,6 +325,12 @@ namespace
 			galaxy->Promote(sol, args.StartJd);
 			galaxy->Viewpoint = sol->Origin;
 			jd = args.StartJd;
+			// US-T274: as the game makes them (UnitySpaceApp::UpdateInfluence), so the export carries the galaxy's people.
+			if (args.Society)
+			{
+				SpaceGod::Core::Society::Of(*galaxy);
+				SpaceGod::Core::Civilization::Of(*galaxy);
+			}
 			if (args.Days > 0)
 			{
 				std::cout << "running " << Num(args.Days) << " days\n";
@@ -338,6 +350,7 @@ namespace
 			DeepSpaceObjects();
 			InTransit();
 			if (args.Pilots) PilotsAll();
+			if (args.Society) People();
 			Politics();
 			Prune();
 			Manifest();
@@ -1136,6 +1149,71 @@ namespace
 		}
 
 		std::unordered_map<std::string, std::string> pilotByName;
+
+		// -------------------------------------------------------------- US-T274: the galaxy's people and organisations
+
+		void People()
+		{
+			auto society = SpaceGod::Core::Society::Find(*galaxy);
+			auto civ = SpaceGod::Core::Civilization::Find(*galaxy);
+			if (society == nullptr) return;
+			std::unordered_map<const Household*, std::string> houseIds;
+			for (const auto& h : society->HousesOf(nullptr))
+			{
+				auto head = h->Head();
+				Entity e{ "house-" + Slug(h->Surname) + "-" + std::to_string(h->Id), "faction", cs::Cat("House ", h->Surname),
+					cs::Cat("House ", h->Surname, ", a family of ", h->Home != nullptr ? h->Home->Name : cs::String("nowhere"), h->Business != nullptr && h->Business->Trading() ? cs::Cat(", running ", h->Business->Name) : cs::String(""), ".") };
+				e.Details.S("kind", "house").S("home", h->Home != nullptr ? h->Home->Name : "").N("wealth", h->Wealth).I("living", h->Living())
+					.S("business", h->Business != nullptr ? h->Business->Name : "").S("businessKind", h->Business != nullptr ? ToString(h->Business->Kind) : "")
+					.S("head", head != nullptr ? head->FullName() : "");
+				e.Tags = { "faction", "house" };
+				auto id = Add(std::move(e));
+				houseIds[h.get()] = id;
+				if (h->Home != nullptr && h->Home->Owner != nullptr) U.Rel(id, FactionId(h->Home->Owner), "member-of");
+				// Its notable people: the head, and anyone famous.
+				for (const auto& c : h->Members)
+				{
+					if (!c->Alive() || (c->Role != CitizenRole::Head && c->Reputation < 0.5)) continue;
+					std::string traits;
+					for (int bit = 1; bit <= (1 << 11); bit <<= 1)
+						if (c->Traits & bit) { if (!traits.empty()) traits += ", "; traits += ToString(static_cast<Trait>(bit)); }
+					Entity p{ "citizen-" + Slug(c->FullName()) + "-" + std::to_string(c->Id), "character", c->FullName(),
+						cs::Cat(c->FullName(), ", ", std::to_string(static_cast<int>(c->AgeYears(jd))), ", ", ToString(c->Role), " of House ", h->Surname, ".") };
+					p.Details.S("role", "citizen").S("houseRole", ToString(c->Role)).I("ageYears", static_cast<int>(c->AgeYears(jd))).S("traits", traits)
+						.S("ambition", ToString(c->Goal)).N("reputation", c->Reputation).N("skill", c->Skill).S("faith", c->Faith != nullptr ? c->Faith->Name : "");
+					p.Tags = { "character", "citizen" };
+					auto pid = Add(std::move(p));
+					U.Rel(pid, id, "member-of");
+				}
+			}
+			if (civ == nullptr) return;
+			for (const auto& o : civ->Orgs)
+			{
+				if (!o->Active()) continue;
+				std::string kind = LoreKeys::Slug(ToString(o->Kind));
+				Entity e{ "org-" + kind + "-" + Slug(o->Name) + "-" + std::to_string(o->Id), "faction", o->Name,
+					cs::Cat(o->Name, ", a ", ToString(o->Kind), o->Seat != nullptr ? cs::Cat(" of ", o->Seat->Name) : cs::String(""), o->Leader != nullptr ? cs::Cat(", led by ", o->Leader->FullName()) : cs::String(""), ".") };
+				e.Details.S("kind", ToString(o->Kind)).S("seat", o->Seat != nullptr ? o->Seat->Name : "").N("strength", o->Strength).N("stance", o->Stance)
+					.N("funds", o->Funds).I("members", o->Members.Count()).S("leader", o->Leader != nullptr ? o->Leader->FullName() : "")
+					.S("nameKey", SpaceGod::Core::Narrator::NamesKey(o->Kind));
+				e.Tags = { "faction", "org", kind };
+				auto id = Add(std::move(e));
+				if (o->Faction != nullptr) U.Rel(id, FactionId(o->Faction), o->Kind == OrgKind::Agency || o->Kind == OrgKind::Party ? "member-of" : "allied-with");
+				if (o->Owner != nullptr)
+					if (auto it = houseIds.find(o->Owner.get()); it != houseIds.end()) U.Rel(id, it->second, "owned-by");
+			}
+			// The kinds of event the Narrator words, each a Prose bark pool (docs/PROSE.md, "Social narration").
+			for (int i = 1; i < static_cast<int>(SocialKind::Count_); i++)
+			{
+				auto k = static_cast<SocialKind>(i);
+				std::string lines;
+				for (const auto& l : SpaceGod::Core::Narrator::Templates(k)) { if (!lines.empty()) lines += " | "; lines += l; }
+				Entity e{ "social-" + SpaceGod::Core::Narrator::Slug(k), "concept", ToString(k), cs::Cat("A kind of happening among the galaxy's people, worded from the bark pool ", SpaceGod::Core::Narrator::Key(k), ".") };
+				e.Details.S("kind", "social-event").S("key", SpaceGod::Core::Narrator::Key(k)).S("fallbackLines", lines).I("count", civ->Count(k));
+				e.Tags = { "concept", "social-event" };
+				Add(std::move(e));
+			}
+		}
 
 		// -------------------------------------------------------------- politics and the edges by name
 

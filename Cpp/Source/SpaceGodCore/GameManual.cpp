@@ -602,6 +602,51 @@ namespace SpaceGod::Core
 				  "the houses, the businesses, the trips and the bribes, and lets the SpaceGod step in: expose a bribe, have a firm "
 				  "pay one, send someone on a trip, fund a firm or start a run on it.")),
 
+			// US-T274..US-T288: the Civilization layer.
+			cs::New<ManualChapter>("Civilization", "What the galaxy's people do with nobody watching, and how a god meddles", Keys(),
+				T("A civilization of its own",
+				  "On top of the families and businesses, every world has a mood: how it feels about its rulers, its politics, "
+				  "its crime, its sickness, how tired it is of war, its faith and its fashions. Every person has traits (greedy, "
+				  "pious, reckless, loyal, vengeful, charming, honest, cruel, curious, brave, gifted), an ambition and a name to "
+				  "keep, and ties to friends, rivals, lovers, patrons and enemies. Everything below follows from those and from "
+				  "what has already happened in your galaxy, never from dice, so no two galaxies grow alike and co-op peers and "
+				  "replays see the same one. The console's sg.Civ shows the events, each world's mood (worlds), the "
+				  "organisations (orgs) and a person's traits and ties (person <id>)."),
+				T("Families",
+				  "Buyouts, scandals, stolen patents and friendships gone bad start feuds between houses; a hot feud sabotages "
+				  "the other side's business and may hire killers, and a marriage between them ends it. Heirs quarrel over a "
+				  "fortune and split a house in two. The charming and the reckless stray; found out, a marriage may end and a "
+				  "hidden heir turn up years later. Rich houses send their young to academies, and the famous endorse brands "
+				  "until they fall from grace. Hands: feud, reconcile, fame, seduce."),
+				T("Politics",
+				  "Worlds lean hawk or dove, crown or vote, and their states follow: hawks cool toward everyone and may start a "
+				  "war, doves warm. States that vote keep parties funded by the houses and hold elections every four years, "
+				  "sometimes rigged. Each state has a named ruler; unrest and ambitious plotters make coups, a ruler's death a "
+				  "succession crisis. Scandals, frauds and murders go to trial, and judges can be bought. War-weary states meet on "
+				  "neutral worlds to make peace. Polls come out every quarter. Views: regimes, trials. Hands: elect, coup, acquit, summit."),
+				T("Strife and crime",
+				  "Unhappy worlds protest, riot and strike. Drifting, occupied or furious worlds grow armed cells that sabotage "
+				  "and, strong enough, rise and break away. States spy on their rivals: leaked pacts, stolen research, turned "
+				  "governors. Long wars wear people out until their state sues for peace; hawks conscript. Free companies hire out "
+				  "and change sides. Admirals become heroes. Syndicates take protection money and run contraband through embargoes "
+				  "and quarantines; the convicted go to penal colonies, which have breakouts; greedy heads cook their books. "
+				  "Views: admirals, crime. Hands: riot, arm, spy, hire, hit, racket, crackdown."),
+				T("Money, culture and health",
+				  "Unions bargain and strike; refugees flee wars, famine and plague; houses buy stakes and take firms over; banks "
+				  "lend, suffer defaults and fail; piracy raises insurance; rivals fight ad wars; famous landmarks fill hotels; "
+				  "inventions are patented and stolen. Faiths are founded, spread along the trips, split and preach holy war; "
+				  "every world has its festival; a league plays a season and crowns a champion; fashions sweep the worlds; far "
+				  "colonies drift and yearn to secede; historians keep a chronicle; rumours and propaganda fly. Fevers break out "
+				  "and travel with the trips (a quarantined world takes no visitors); hospitals save lives; peace brings baby "
+				  "booms; disasters strike and friends send relief. Views: money, chronicle. Hands: takeover, bankrun, landmark, "
+				  "preach, festival, rig, rumour, plague, cure, disaster, aid."),
+				T("The press, and the words",
+				  "Media houses found outlets that slant the news for or against their flag, which moves their readers as far as "
+				  "they trust the press. Reporters expose frauds and bribes, and some are silenced. Charities turn fortunes into "
+				  "care and good names. People react on public boards. Every line the feed shows is written in Prose (the "
+				  "narrative engine) and picked by the event itself; until the author approves a pool the game uses its own "
+				  "lines. Hands: slant, investigate, donate. The hands are single player for now.")),
+
 			cs::New<ManualChapter>("Comms and pilots", "Hailing ships and stations, piracy by radio, and the people you meet", Keys("COMMS AND PILOTS"),
 				T("Hailing",
 				  "Shift+H opens comms at any controls. The contacts are every hull your sensors hold in hailing range, and the "

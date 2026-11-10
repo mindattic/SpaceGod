@@ -46,6 +46,11 @@ namespace SpaceGod::Core
 	class Business;
 	class Conference;
 	enum class WorldEventKind : int;
+	// US-T275: the Civilization layer's persona and organisations (Systems/Civilization/Civilization.h).
+	class Tie;
+	class Org;
+	class SocialEvent;
+	enum class Ambition : int;
 
 	/// <summary>What someone is in their house (US-T273).</summary>
 	enum class CitizenRole : int
@@ -78,6 +83,19 @@ namespace SpaceGod::Core
 
 		/// <summary>Credits taken in bribes (a governor's).</summary>
 		double Bribes = 0;
+
+		// US-T275 Persona (Systems/Civilization): set by the Civilization layer, absent from older saves.
+		/// <summary>Whether the persona has been given (traits rolled), its traits (a Trait bit set) and what they want most.</summary>
+		bool Persona = false;
+		int Traits = 0;
+		SpaceGod::Core::Ambition Goal{};
+		/// <summary>-1..1: what people think of them; 0..1: how good they are at what they do.</summary>
+		double Reputation = 0, Skill = 0.5;
+		/// <summary>Their ties to people outside the family (friends, rivals, lovers, patrons, enemies).</summary>
+		cs::List<cs::Ref<SpaceGod::Core::Tie>> Ties = cs::List<cs::Ref<SpaceGod::Core::Tie>>();
+		/// <summary>The faith they keep (null: none) and the organisations they belong to beyond it (a party, a union, a school).</summary>
+		cs::Ref<SpaceGod::Core::Org> Faith;
+		cs::List<cs::Ref<SpaceGod::Core::Org>> Orgs = cs::List<cs::Ref<SpaceGod::Core::Org>>();
 
 		bool Alive() const { return cs::Double::IsNaN(DiedJd); }
 		double AgeYears(double jd) const { return (jd - BornJd) / 365.25; }
@@ -172,6 +190,11 @@ namespace SpaceGod::Core
 		FamilyVisit,
 		Holiday,
 		Honeymoon,
+		// US-T285: the Civilization layer's journeys.
+		Pilgrimage,
+		Study,
+		Festival,
+		Match,
 	};
 	SPACEGODCORE_API const char* ToString(TripPurpose v);
 
@@ -267,6 +290,8 @@ namespace SpaceGod::Core
 		cs::String From, To;
 		cs::Ref<StarSystem> System;
 		cs::String Text;
+		/// <summary>US-T275: the Civilization event it shows (worded by the Narrator when shown; Text is then empty), or null.</summary>
+		cs::Ref<SpaceGod::Core::SocialEvent> Event;
 		cs::String ToString() const;
 	};
 
@@ -345,6 +370,15 @@ namespace SpaceGod::Core
 		cs::String Send(Galaxy& galaxy, const cs::Ref<Citizen>& c, const cs::Ref<Settlement>& to, double jd);
 		/// <summary>An anonymous backer puts <paramref name="credits"/> into a business.</summary>
 		cs::String Fund(Galaxy& galaxy, const cs::Ref<Business>& b, double credits, double jd);
+
+		/// <summary>
+		/// US-T285: books a trip for the Civilization layer (a pilgrimage, a festival, a match, a course of study): null when the
+		/// traveller is away already, too young, or the galaxy has as many trips under way as it keeps.
+		/// </summary>
+		/// <summary>US-T288: a bribe brought to light by the simulation itself (a journalist's digging), not the SpaceGod's hand; false if already public.</summary>
+		bool Reveal(Galaxy& galaxy, const cs::Ref<Bribe>& b, double jd);
+
+		cs::Ref<Trip> Book(Galaxy& galaxy, const cs::Ref<Citizen>& c, const cs::Ref<Settlement>& to, TripPurpose why, const cs::Ref<Citizen>& meeting, double jd);
 		/// <summary>A run on a business: its capital is gone and it goes to the wall (or a rival) at once.</summary>
 		cs::String Ruin(Galaxy& galaxy, const cs::Ref<Business>& b, double jd);
 

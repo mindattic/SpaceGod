@@ -413,6 +413,59 @@ it is display only. `Tests/Lore/EncounterTests.cpp` pins both keys and the recov
    pilots players meet often.
 5. Records for the ports players dock at first, and logs for named hulls likely to end up derelict or taken.
 
+### Social narration (US-T274..US-T288)
+
+The Civilization layer (`Cpp/Source/SpaceGodCore/Systems/Civilization/`) records what the galaxy's people do as
+structured `SocialEvent`s and never as prose. The `Narrator` (`Systems/Civilization/Narrator.h`) words an event when it
+is shown. It uses the event kind's **bark** pool, else the built-in template, and picks the line by the event's seed, so every peer and
+every replay reads the same words. The events are saved and the words are not, so a newly approved pool rewords old
+events too. A notable event is also logged on its system for the news relays, in the template's words only (the
+simulation's state never depends on Prose). `sg.Civ keys` lists every key in game; `sg.Civ` shows the events.
+
+**Bark pools**, one per kind, kind `bark`, key `spacegod/social-<slug>`, payload `lines[]` (one line is picked):
+
+- Society (US-T273), mirrored as events: `birth`, `death`, `wedding`, `business-founded`, `bankruptcy`, `buyout`, `scandal`
+- Persona (US-T275): `friendship`, `rivalry`, `falling-out`, `mood`
+- Kinship (US-T276): `feud-declared`, `feud-sabotage`, `feud-ended`, `inheritance-dispute`, `house-split`, `affair`, `divorce`, `hidden-heir`, `graduation`, `school-founded`, `celebrity-rise`, `celebrity-scandal`, `endorsement`
+- Politics (US-T277): `ideology-shift`, `party-founded`, `election-called`, `election-won`, `election-rigged`, `coup`, `coup-failed`, `succession-crisis`, `trial-opened`, `verdict`, `judge-bribed`, `peace-summit`, `summit-failed`, `poll-published`
+- Strife (US-T278): `protest`, `riot`, `cell-formed`, `sabotage`, `uprising`, `spy-caught`, `pact-leaked`, `tech-stolen`, `war-weariness`, `conscription`, `peace-forced`, `mercs-hired`, `mercs-turned`, `admiral-rises`, `prisoners-exchanged`
+- Underworld (US-T279): `syndicate-rises`, `protection`, `smuggling-run`, `smuggler-caught`, `prison-opened`, `prison-break`, `assassination`, `assassination-foiled`, `fraud`, `fraud-exposed`, `crime-wave`, `crackdown`
+- Commerce (US-T280): `union-formed`, `wage-deal`, `strike-called`, `refugees`, `takeover`, `shares-crash`, `bank-founded`, `loan-default`, `bank-run`, `premiums-rise`, `ad-war`, `landmark-found`, `tourist-boom`, `patent-filed`, `patent-stolen`
+- Culture (US-T281): `faith-founded`, `conversion`, `schism`, `pilgrimage`, `holy-war`, `festival`, `match-played`, `match-rigged`, `championship`, `trend-sweeps`, `cultural-drift`, `monument-raised`, `chronicle`, `rumour`, `propaganda`
+- Health (US-T284): `outbreak`, `spread`, `quarantine`, `cured`, `hospital-built`, `medicine-shortage`, `baby-boom`, `ageing`, `disaster`, `relief`, `famine`, `food-aid`
+- Press (US-T283): `outlet-founded`, `slanted-story`, `board-post`, `investigation`, `journalist-silenced`, `charity-founded`, `donation`
+
+The prefix `spacegod/social-` is the same for every pool, so `feud-declared` is `spacegod/social-feud-declared`. Lines
+may use these placeholders; one an event lacks reads as a plain noun ("someone", "a family"):
+
+| Placeholder | What |
+|---|---|
+| `{who}`, `{whom}` | the people in it (full names) |
+| `{house}`, `{otherhouse}` | "House <surname>" |
+| `{business}` | a family business |
+| `{org}`, `{otherorg}`, `{outlet}` | organisations (their Prose name, see below) |
+| `{world}`, `{system}` | the settlement and its star system |
+| `{faction}`, `{rival}` | the states in it |
+| `{money}`, `{amount}`, `{pct}` | the event's amount as credits, a plain number, or a percentage |
+
+**Slant tags**: `spacegod/social-slant-for` and `spacegod/social-slant-against` are short tails an outlet adds when it
+runs a story for or against `{faction}` (" A triumph for {faction}.").
+
+**Organisation names**: `spacegod/names-<kind>` for each kind (`party`, `faith`, `syndicate`, `union`, `bank`, `outlet`, `team`, `charity`, `mercenaries`, `school`, `agency`, `insurgents`). A
+name pool's lines are names, picked by the organisation's seed; `{world}` and `{house}` are filled. With no pool the
+organisation keeps the name the simulation gave it.
+
+**The cast**: `tools/universe-export` runs the Society and Civilization layers too (`--society none` leaves them out;
+pass `-Days 730` or more so the people have lived a while). It exports houses (`house-<surname>-<id>`, type `faction`),
+their heads and famous members (`citizen-<name>-<id>`, `character`), every active organisation
+(`org-<kind>-<name>-<id>`, `faction`, with its `nameKey`), and one `concept` per event kind (`social-<slug>`, with its key
+and fallback lines) for Prose to draft from.
+
+**What to write first**: the kinds the feed shows most (`birth`, `death`, `wedding`, `friendship`, `falling-out`,
+`board-post`, `protest`, `festival`, `match-played`, `trend-sweeps`, `rumour`, `propaganda`), then the notable ones the
+relays carry (`feud-declared`, `election-won`, `coup`, `riot`, `uprising`, `peace-summit`, `outbreak`, `quarantine`,
+`disaster`, `assassination`), then the name pools for faiths, parties and teams.
+
 ## 6. The Outbox
 
 `kit outbox` drains `GET /api/outbox/spacegod` (Prose's notices: one per import session, one `texts.published` per publish

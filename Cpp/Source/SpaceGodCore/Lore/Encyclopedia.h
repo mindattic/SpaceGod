@@ -54,6 +54,8 @@ namespace SpaceGod::Core
 		Settlements,
 		Systems,
 		Pilots,
+		/// <summary>US-T288: the galaxy's houses, organisations and chronicle (the Civilization layer).</summary>
+		Society,
 	};
 	SPACEGODCORE_API const char* ToString(EncyclopediaCategory v);
 
@@ -144,7 +146,7 @@ namespace SpaceGod::Core
 	class SPACEGODCORE_API Encyclopedia final
 	{
 	public:
-		static constexpr int CategoryCount = static_cast<int>(EncyclopediaCategory::Pilots) + 1;
+		static constexpr int CategoryCount = static_cast<int>(EncyclopediaCategory::Society) + 1;
 
 		/// <summary>The category's id prefix ("astronomy").</summary>
 		static const char* Slug(EncyclopediaCategory c);
@@ -225,6 +227,9 @@ namespace SpaceGod::Core
 		void AddShips();
 		/// <summary>Every faction.</summary>
 		void AddFactions(const Galaxy& galaxy, const LoreLibrary& lore);
+		/// <summary>US-T288: the Society category: each standing house, each active organisation (a Prose description keyed
+		/// org-&lt;kind&gt;-&lt;name&gt;-&lt;id&gt; when approved) and the historians' chronicle. All known: the SpaceGod sees its people.</summary>
+		void AddCivilization(const Galaxy& galaxy, const LoreLibrary& lore);
 		/// <summary>An article for every find of the log (bodies and stars, settlements and stations, systems, pilots,
 		/// sightings), with its readings as they stand at <paramref name="jd"/> and its Prose description.</summary>
 		void AddDiscoveries(const Galaxy& galaxy, const DiscoveryLog& log, const LoreLibrary& lore, double jd);

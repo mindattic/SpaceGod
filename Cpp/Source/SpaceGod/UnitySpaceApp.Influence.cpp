@@ -19,6 +19,9 @@
 #include "SimClock.h"
 #include "Systems/Galaxy.h"
 #include "Systems/Society.h" // US-T273
+#include "Systems/Civilization/Civilization.h" // US-T274
+#include "Systems/Civilization/Narrator.h" // US-T275
+#include "GameLore.h"
 #include "Systems/LastingConsequences.h" // US-T105
 #include "UI/CheatMenu.h"
 #include "UI/Hud.h"
@@ -65,6 +68,9 @@ namespace SpaceGod
 		if (Galaxy != nullptr) LastingConsequences::Of(*Galaxy);
 		// US-T273: and its people live on, families, businesses, trips, conferences, bribes and the feed (the same: the game makes it).
 		if (Galaxy != nullptr) Society::Of(*Galaxy);
+		// US-T274: and the social systems on top of it, worded by Prose (the Narrator reads the game's Data/Lore; display only).
+		if (Galaxy != nullptr) Core::Civilization::Of(*Galaxy);
+		if (!Narrator::HasSource()) Narrator::SetSource([](const cs::String& key) { return GameLore().Lines(key); });
 	}
 
 	void UnitySpaceApp::NoteEmbodyRefusal(const cs::String& what, const EmbodyVerdict& verdict)
