@@ -134,12 +134,12 @@ namespace
 			return;
 		}
 		EncounterValues v;
-		v["pilot"] = "Pirate fighter Sefa Voss";
+		v["pilot"] = "Pirate fighter Sefa Corwin";
 		v["ship"] = "Kestrel";
 		v["range"] = "10 klicks";
 		v["my-cargo"] = "40 t of ore";
 		v["credits"] = "12,400";
-		Check(Encounters::Fill(open.Line, v) == "Fixture pirate Pirate fighter Sefa Voss of the Kestrel, 10 klicks out. You carry 40 t of ore and 12,400 credits.",
+		Check(Encounters::Fill(open.Line, v) == "Fixture pirate Pirate fighter Sefa Corwin of the Kestrel, 10 klicks out. You carry 40 t of ore and 12,400 credits.",
 			"placeholders filled from the game's values");
 		Check(Encounters::Fill(talk.Line, v) == "Fixture {unknown} stays and Test Clan is named.", "an unknown placeholder stays; an entity reference reads its id");
 		Check(Encounters::Fill(talk.Line, v, [](const cs::String& id) { return id == "faction-test-clan" ? cs::String("the Test Clan") : cs::String(); }) ==

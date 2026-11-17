@@ -110,7 +110,7 @@ namespace SpaceGod::Core
 
 	const cs::List<cs::String>& World::TugNames()
 	{
-		static const cs::List<cs::String> names = { "Bulldog", "Sisyphus", "Atlas", "Yoke", "Plough Horse", "Long Shove", "Hauler's Oath", "Mule" };
+		static const cs::List<cs::String> names = { "Bulldog", "Sisyphus", "Workhorse", "Yoke", "Plough Horse", "Long Shove", "Hauler's Oath", "Mule" };
 		return names;
 	}
 

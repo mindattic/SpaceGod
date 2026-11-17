@@ -196,7 +196,7 @@ namespace SpaceGod::Core
 		/// <summary>Their age in years at <paramref name="jd"/>.</summary>
 		int AgeAt(double jd) const;
 
-		/// <summary>"Pirate fighter Sefa Voss", "Officer Lena Okafor".</summary>
+		/// <summary>"Pirate fighter Sefa Corwin", "Officer Lena Okafor".</summary>
 		cs::String Styled() const;
 
 		cs::String ToString() const { return Name; }

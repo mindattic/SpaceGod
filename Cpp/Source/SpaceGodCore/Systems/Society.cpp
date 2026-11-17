@@ -131,7 +131,7 @@ namespace SpaceGod::Core
 
 		const char* const Given[] = {
 			"Ama", "Dev", "Ilse", "Tomas", "Mei", "Kofi", "Sana", "Pavel", "Noor", "Rafael", "Yuki", "Odile", "Bram", "Leila", "Arjun",
-			"Zofia", "Emeka", "Ines", "Haruto", "Freya", "Malik", "Elena", "Teo", "Aiyana", "Soren", "Priya", "Joaquin", "Nadia", "Kai",
+			"Zofia", "Emeka", "Ines", "Haruto", "Freya", "Malik", "Elena", "Teo", "Aiyana", "Soren", "Priya", "Joaquin", "Thea", "Kai",
 			"Amara", "Lucien", "Wren", "Idris", "Mira", "Bastian", "Talia", "Oren", "Saoirse", "Hamza", "Linnea", "Dario", "Chiamaka",
 			"Ezra", "Ayesha", "Viktor", "Imani", "Callum", "Rosalind", "Tariq", "Junie", "Anselm", "Yara", "Niko", "Ottilie",
 		};

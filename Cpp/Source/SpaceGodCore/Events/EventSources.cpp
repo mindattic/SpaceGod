@@ -87,7 +87,7 @@ namespace SpaceGod::Core
 	{
 		static const cs::List<cs::String> value
 		{
-			"Voss", "Kade", "Marrow", "Thorne", "Okafor", "Lisk", "Varga", "Cray", "Hale", "Seddon",
+			"Corwin", "Kade", "Marrow", "Thorne", "Okafor", "Lisk", "Varga", "Cray", "Hale", "Seddon",
 			"Brask", "Ivers", "Quell", "Mendez", "Strand", "Tolliver", "Raske", "Ngata", "Fenn", "Ulver",
 		};
 		return value;

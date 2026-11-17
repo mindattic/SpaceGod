@@ -150,7 +150,7 @@ namespace SpaceGod::Core
 	{
 		static const cs::List<cs::String> names =
 		{
-			"Ada Okonkwo", "Bram Teller", "Calla Voss", "Dmitri Hale", "Esme Rourke", "Farouk Bey", "Greta Lind", "Hollis Crane",
+			"Ada Okonkwo", "Bram Teller", "Calla Brightwater", "Dmitri Hale", "Esme Rourke", "Farouk Bey", "Greta Lind", "Hollis Crane",
 			"Ines Navarro", "Jory Kade", "Kaito Mbeki", "Lena Strand", "Marek Oduya", "Nell Quarry", "Oren Sallow", "Priya Haldane",
 		};
 		return names;
