@@ -179,7 +179,7 @@ namespace SpaceGod::UI
 
 	void PauseMenu::DrawMain()
 	{
-		const float w = 320, h = 434; // US-T271: one more button, the Encyclopedia
+		const float w = 320, h = 478; // US-T271: one more button, the Encyclopedia; US-T293: and Society
 		auto r = Centred(w, h);
 		GUI::Box(r, GUIContent::none(), panel);
 		GUI::Label(Rect(r.x + 20, r.y + 14, w - 40, 22), "PAUSED", title);
@@ -195,6 +195,12 @@ namespace SpaceGod::UI
 		{
 			Close();
 			if (ShowEncyclopedia) ShowEncyclopedia();
+		}
+		y += 44;
+		if (GUI::Button(Rect(r.x + 20, y + 88, w - 40, 34), "Society", button)) // US-T293
+		{
+			Close();
+			if (ShowSociety) ShowSociety();
 		}
 		y += 44;
 		if (GUI::Button(Rect(r.x + 20, y + 88, w - 40, 34), "Save / Load", button))

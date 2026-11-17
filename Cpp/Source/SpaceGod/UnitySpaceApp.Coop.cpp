@@ -1207,6 +1207,7 @@ namespace SpaceGod
 		}
 		else if (verb == "tanker") CallTanker();
 		else if (verb == "mech") CoopDeployMech(peer, seat, Wire::ParseI(a.at(0)), Wire::ParseI(a.at(1))); // US-T270: Shift+N
+		else if (verb == "civ") CoopCivHand(peer, seat, args); // US-T293: the SpaceGod's hand in people's affairs, sg.Civ's or the Society screen's
 		else if (verb == "ftlplot")
 		{
 			cs::String name = JoinFrom(a, 1);

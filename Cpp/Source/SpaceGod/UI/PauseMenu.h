@@ -102,6 +102,9 @@ namespace SpaceGod::UI
 		/// Encyclopedia: the game's Encyclopedia, every article in one place (the menu closes first, US-T271).
 		cs::Action<> ShowEncyclopedia;
 
+		/// Society: the Society screen, the galaxy's people and the SpaceGod's hand in them (the menu closes first, US-T293).
+		cs::Action<> ShowSociety;
+
 		/// Main Menu: leaves the game for the main menu scene.
 		cs::Action<> ToMainMenu;
 

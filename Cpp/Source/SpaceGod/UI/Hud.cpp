@@ -168,6 +168,16 @@ namespace SpaceGod::UI
 			return;
 		}
 
+		// So is the Society screen (US-T293): the galaxy's people, and the SpaceGod's hand in their affairs.
+		if (app->ShowSociety)
+		{
+			auto whole = Rect(0, 0, static_cast<float>(Screen::width), static_cast<float>(Screen::height));
+			if (!app->UiRects.Contains(whole)) app->UiRects.Add(whole); // the world under it takes no clicks
+			app->DrawSociety();
+			DrawToast();
+			return;
+		}
+
 		// So is the galaxy map (U.SPC-T103), between the stars aside: a trip under way has the screen.
 		if (app->ShowGalaxyMap && !app->Travel->Active)
 		{
@@ -1792,5 +1802,6 @@ namespace SpaceGod::UI
 		if (logsScreen) logsScreen->DestroyOwnedTextures(); // US-T261
 		app->DestroyDiscoveriesTextures(); // US-T259
 		app->DestroyEncyclopediaTextures(); // US-T271
+		app->DestroySocietyTextures(); // US-T293
 	}
 }

@@ -645,7 +645,23 @@ namespace SpaceGod::Core
 				  "they trust the press. Reporters expose frauds and bribes, and some are silenced. Charities turn fortunes into "
 				  "care and good names. People react on public boards. Every line the feed shows is written in Prose (the "
 				  "narrative engine) and picked by the event itself; until the author approves a pool the game uses its own "
-				  "lines. Hands: slant, investigate, donate. The hands are single player for now.")),
+				  "lines. Hands: slant, investigate, donate."),
+				T("The Society screen", // US-T293
+				  "Shift+G (or Society in the pause menu and in the bottom drawer) opens the galaxy's people on one screen. Down the "
+				  "left: the Feed, every event as the feed tells it, newest first; Houses; People, the living by renown; "
+				  "Organisations (parties, faiths, syndicates, unions, banks, outlets, teams, charities, free companies, schools, "
+				  "agencies and cells), stepped through by kind; Worlds, each one's mood (approval of its flag, politics, crime, "
+				  "sickness, war weariness, faith, fashion, quarantine, its landmark and monument); and the modules' own views: "
+				  "feuds, regimes, trials, admirals and strikes, crime, money and the chronicle. The feed filters by module, by "
+				  "kind (each kind that has happened, with how often), to the world picked, and to Steered only, the things your "
+				  "own hand brought about. Pick anything and the right shows what it is, with links to the people, houses, "
+				  "worlds and organisations about it, and below, the SpaceGod's hand: every verb that applies to it (a person can "
+				  "be made famous, back a coup, have a price put on their head, preach or be rumoured about; a world can riot, "
+				  "arm, fall to a syndicate, be swept by the police, hold a festival, find a landmark, catch a plague or be cured, "
+				  "be struck by disaster). A hand that takes two (a feud, an affair, a takeover, a summit, spies, relief, hiring "
+				  "a free company) takes its second from the one you mark: pick it, Mark as the second, then pick the first. Each "
+				  "button runs the very sg.Civ line shown beside it, and the outcome (or why not) shows at the foot. In co-op the "
+				  "hand goes to the whole party and every player's galaxy feels it on the same day, the same way.")),
 
 			cs::New<ManualChapter>("Comms and pilots", "Hailing ships and stations, piracy by radio, and the people you meet", Keys("COMMS AND PILOTS"),
 				T("Hailing",
@@ -961,7 +977,7 @@ namespace SpaceGod::Core
 				  "U hides the HUD panels and readouts (the names and markers in the view stay); F11 clears everything but "
 				  "the reticle in use. Esc closes panels, then opens the pause menu."),
 				T("The pause menu",
-				  "Resume, Help, Encyclopedia, Save / Load, Settings, Main Menu (with an autosave) and Quit."),
+				  "Resume, Help, Encyclopedia, Society, Save / Load, Settings, Main Menu (with an autosave) and Quit."),
 				T("The Encyclopedia", // US-T271
 				  "Shift+I (or Encyclopedia in the pause menu, on the Help screen and in the bottom drawer) opens one screen holding "
 				  "every article in the game: Controls (each group of keys as you have them bound now, the gamepad's buttons and the Help "

@@ -102,6 +102,10 @@ namespace SpaceGod::Input
 		/// a search), or closes it. I alone stays the cargo hold. Local to this machine, like the Help screen.</summary>
 		bool ToggleEncyclopedia = false;
 
+		/// <summary>US-T293: Shift+G opens the Society screen (the Civilization layer's feed, houses, people, organisations and
+		/// worlds, and the SpaceGod's hand in them), or closes it. G alone stays the scale. Local to this machine.</summary>
+		bool ToggleSociety = false;
+
 		/// <summary>US-T126: Shift+F1 pulls the dev menu down (spawn ships and enemies, travel, helm, time, scale), or puts
 		/// it away. F1 alone stays the help screen. Local to this machine: the menu is never a co-op peer's.</summary>
 		bool ToggleCheatMenu = false;

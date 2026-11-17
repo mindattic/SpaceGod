@@ -150,7 +150,7 @@ namespace SpaceGod
 	bool UnitySpaceApp::ClickPanelOpen() const
 	{
 		if (coopPanelOverride.has_value()) return *coopPanelOverride; // US-T44 (US-T43): the helm holder's, while its frame is flown in co-op
-		return !ScreenCleared && (ShowSpawn || ShowSaves || ShowGalaxyMap || ShowSystemMap /* US-T258 */ || ShowHelp || ShowLogs /* US-T261 */ || ShowDiscoveries /* US-T259 */ || ShowEncyclopedia /* US-T271 */ || (ShowHud && (ShowMarket || ShowCargo || ShowNews || ShowOutfit || ShowBounties || ShowContracts || ShowFleet || ShowTrade || ShowPicker || ShowPort))); // US-T266: the port screen too; a cleared screen (F11) shows none of them; market, cargo, outfitting, bounties, contracts and news are HUD panels, hidden with it
+		return !ScreenCleared && (ShowSpawn || ShowSaves || ShowGalaxyMap || ShowSystemMap /* US-T258 */ || ShowHelp || ShowLogs /* US-T261 */ || ShowDiscoveries /* US-T259 */ || ShowEncyclopedia /* US-T271 */ || ShowSociety /* US-T293 */ || (ShowHud && (ShowMarket || ShowCargo || ShowNews || ShowOutfit || ShowBounties || ShowContracts || ShowFleet || ShowTrade || ShowPicker || ShowPort))); // US-T266: the port screen too; a cleared screen (F11) shows none of them; market, cargo, outfitting, bounties, contracts and news are HUD panels, hidden with it
 	}
 
 	bool UnitySpaceApp::IsSol() const { return ActiveSystem->Catalog->Root()->Name == "Sun"; }
@@ -206,6 +206,7 @@ namespace SpaceGod
 		pauseMenu->ShowSaves = [this] { ShowSaves = true; };
 		pauseMenu->ShowHelp = [this] { ShowHelp = true; };
 		pauseMenu->ShowEncyclopedia = [this] { ShowEncyclopedia = true; }; // US-T271
+		pauseMenu->ShowSociety = [this] { ShowSociety = true; }; // US-T293
 		pauseMenu->ToMainMenu = [this] { pendingMainMenu = true; };
 
 		// US-T247: a new game set up on the main menu's New Game page starts on its day, from its seed, in its situation.
@@ -475,7 +476,7 @@ namespace SpaceGod
 		Input.Poll(overUi, ModelViewer::CapturesInput());
 		CaptureEvents::Hotkeys(Input); // US-T72: Alt+F9/F10/F11 while capture runs, on this machine only
 		// The galaxy map turns with its own drag: the camera behind it does not look about meanwhile.
-		if ((ShowGalaxyMap || ShowSystemMap /* US-T258 */ || ShowHelp || ShowLogs || ShowDiscoveries || ShowEncyclopedia) && !ScreenCleared) Input.ReleaseLook(); // US-T261: the logs screen too; US-T259: the discoveries; US-T271: the Encyclopedia
+		if ((ShowGalaxyMap || ShowSystemMap /* US-T258 */ || ShowHelp || ShowLogs || ShowDiscoveries || ShowEncyclopedia || ShowSociety /* US-T293 */) && !ScreenCleared) Input.ReleaseLook(); // US-T261: the logs screen too; US-T259: the discoveries; US-T271: the Encyclopedia
 		// The pause menu has the frame: nothing else moves, and the stick and trigger do nothing, until it closes.
 		if (pauseMenu->IsOpen)
 		{
@@ -637,7 +638,7 @@ namespace SpaceGod
 		bool menu = pauseMenu->IsOpen;
 		if (menu) GUI::enabled = false;
 		// US-T252: Settings > Accessibility > HUD opacity, over the view's overlays only (a screen or menu open stays solid).
-		if (!menu && OpenScreens() == 0 && !ShowSystemMap && !ShowLogs && !ShowDiscoveries && !ShowEncyclopedia /* US-T271 */) GUI::fade = PlayerOptions::HudAlpha();
+		if (!menu && OpenScreens() == 0 && !ShowSystemMap && !ShowLogs && !ShowDiscoveries && !ShowEncyclopedia /* US-T271 */ && !ShowSociety /* US-T293 */) GUI::fade = PlayerOptions::HudAlpha();
 		hud->Draw();
 		DrawComms(); // US-T137: the comms panel, over the HUD
 		DrawSystemCruise(); // US-T127: the cruise drive's readout
@@ -703,6 +704,7 @@ namespace SpaceGod
 		if (i.ToggleLogs) ShowLogs = !ShowLogs; // US-T261: Shift+L, the recovered logs
 		if (i.ToggleDiscoveries) ShowDiscoveries = !ShowDiscoveries; // US-T259: Shift+O, the discoveries
 		if (i.ToggleEncyclopedia) ShowEncyclopedia = !ShowEncyclopedia; // US-T271: Shift+I, the Encyclopedia
+		if (i.ToggleSociety) ShowSociety = !ShowSociety; // US-T293: Shift+G, the Society screen
 		UpdateDiscoveries(); // US-T259: what has been found, into the log
 		UpdateKnowledge(); // US-T271: what the player has come to know, into the Encyclopedia's unlocks
 		if (i.ToggleHud) ShowHud = !ShowHud;
@@ -783,6 +785,7 @@ namespace SpaceGod
 				ShowLogs = false; // US-T261
 				ShowDiscoveries = false; // US-T259
 				ShowEncyclopedia = false; // US-T271
+				ShowSociety = false; // US-T293
 				break;
 			case EscapeAction::LeaveFocus:
 				SpaceCamera->ExitFocus();

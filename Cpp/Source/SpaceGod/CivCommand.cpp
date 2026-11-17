@@ -6,7 +6,8 @@
 //   sg.Civ person <id>             one person's traits, ambition, reputation and ties
 //   sg.Civ keys                    every Prose key the Narrator reads (docs/PROSE.md, "Social narration")
 // The module groups add their own verbs (Systems/Civilization/*: kinship, politics, strife, underworld, commerce, culture,
-// health, press); see CivHand below.
+// health, press); see CivHand below. US-T293: the same views and hands are the Society screen's (Shift+G, UI/SocietyScreen),
+// and in co-op a hand goes to every peer (UnitySpaceApp::CivHandAsk).
 
 #include "UnitySpaceApp.h"
 
