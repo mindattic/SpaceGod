@@ -575,9 +575,12 @@ namespace SpaceGod::Core
 		double roll = Unit(r >> 3);
 		// A birth to a married couple young enough.
 		if (roll < 0.35)
-			for (const auto& c : h->Members)
-				if (c->Alive() && c->Spouse != nullptr && c->Spouse->Alive() && c->AgeYears(jd) < 45 && (c->Role == CitizenRole::Head || c->Role == CitizenRole::Heir))
+			for (const auto& member : h->Members)
+				if (member->Alive() && member->Spouse != nullptr && member->Spouse->Alive() && member->AgeYears(jd) < 45 && (member->Role == CitizenRole::Head || member->Role == CitizenRole::Heir))
 				{
+					// Born() adds the baby to h->Members, which can reallocate it: hold the parent by value, and return
+					// before the loop's iterator is touched again.
+					cs::Ref<Citizen> c = member;
 					auto baby = Born(h, CitizenRole::Child, jd, H(r, 0xBAB1u));
 					Births++;
 					Mirror(galaxy, SocialKind::Birth, jd, h->Home, sys, baby, c, h, nullptr, nullptr, 0);
