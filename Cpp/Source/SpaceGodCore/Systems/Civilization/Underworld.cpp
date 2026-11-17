@@ -10,6 +10,7 @@
 #include "Systems/Civilization/Civilization.h"
 #include "Systems/Civilization/Kinship.h"
 #include "Systems/Civilization/Politics.h"
+#include "Systems/Civilization/Witness.h"
 #include "Systems/Galaxy.h"
 #include "Systems/Polities.h"
 #include "Systems/Society.h"
@@ -391,6 +392,114 @@ namespace SpaceGod::Core
 			if (e->Id <= seenEvent) continue;
 			seenEvent = e->Id;
 			if (e->Kind == SocialKind::Verdict) Imprison(civ, galaxy, e->Who, jd);
+			else if (Witness::IsWitnessed(e->Kind)) Witnessed(civ, galaxy, *e, jd);
+		}
+	}
+
+	// ---------------------------------------------------------------- the wider simulation (US-T292, Witness)
+
+	void Underworld::Free(Civilization& civ, Galaxy& galaxy, const cs::Ref<Prison>& p, double jd)
+	{
+		if (p->Inmates.Count() == 0) return;
+		p->Breakouts++;
+		auto e = Civilization::Make(SocialKind::PrisonBreak, jd, p->Where, Civilization::SystemOf(galaxy, p->Where));
+		e->Faction = p->Faction;
+		e->Amount = p->Inmates.Count();
+		e->Who = p->Inmates[0];
+		civ.Publish(galaxy, e);
+		if (auto c = civ.CivicsOf(p->Where)) c->Crime = cs::Math::Min(1.0, c->Crime + 0.05);
+		p->Inmates.Clear();
+		p->ReleaseJd.Clear();
+	}
+
+	void Underworld::Witnessed(Civilization& civ, Galaxy& galaxy, const SocialEvent& e, double jd)
+	{
+		std::uint32_t r = H(static_cast<std::uint32_t>(e.Id), 0x0DE2u);
+		auto rise = [&](const cs::Ref<Civics>& c, double by)
+		{
+			double before = c->Crime;
+			c->Crime = cs::Math::Clamp(c->Crime + by, 0.0, 1.0);
+			if (before < 0.45 && c->Crime >= 0.45) civ.Publish(galaxy, Civilization::Make(SocialKind::CrimeWave, jd, c->Where, c->System));
+		};
+		switch (e.Kind)
+		{
+			case SocialKind::PirateRaid:
+			{
+				// Raided lanes mean fenced goods and harder men in the port; a strong state hits back.
+				auto c = civ.CivicsOf(e.Where);
+				if (c == nullptr) break;
+				rise(c, 0.03);
+				if (auto syn = SyndicateOf(civ, e.Where)) syn->Strength = cs::Math::Min(1.0, syn->Strength + 0.03);
+				auto owner = e.Where->Owner;
+				if (owner != nullptr && !owner->IsPirate && owner->Treasury > 1e8 && c->Crime > 0.3 && Roll(r, 0.15)) Crackdown(civ, galaxy, e.Where, jd);
+				break;
+			}
+			case SocialKind::PirateHold:
+			{
+				// A nest in the system: its worlds' back streets answer to the clan, now and then through a syndicate of its own.
+				for (const auto& c : civ.Worlds)
+				{
+					if (c->System != e.System) continue;
+					rise(c, 0.06);
+					if (SyndicateOf(civ, c->Where) != nullptr || !Roll(H(r, HashText(c->Where->Name)), 0.3)) continue;
+					auto syn = civ.Found(OrgKind::Syndicate, c->Where, c->System, e.Faction, nullptr, 1e6, jd, H(r, HashText(c->Where->Name), 0x5D3u));
+					syn->Strength = 0.25;
+					auto x = Civilization::Make(SocialKind::SyndicateRises, jd, c->Where, c->System);
+					x->Org = syn;
+					civ.Publish(galaxy, x);
+				}
+				break;
+			}
+			case SocialKind::HavenStormed:
+			{
+				// The clan's fences and friends lose their backers.
+				for (const auto& c : civ.Worlds)
+				{
+					if (c->System != e.System) continue;
+					c->Crime = cs::Math::Max(0.0, c->Crime - 0.08);
+					if (auto syn = SyndicateOf(civ, c->Where)) syn->Strength = cs::Math::Max(0.0, syn->Strength - 0.15);
+				}
+				break;
+			}
+			case SocialKind::WorldConquered:
+			case SocialKind::WorldSeceded:
+			{
+				// The old flag's jail opens as its guards go; disorder in the streets.
+				for (const auto& p : Prisons)
+					if (p->Where == e.Where && p->Faction != e.Where->Owner) { Free(civ, galaxy, p, jd); p->Faction = e.Where->Owner; }
+				if (auto c = civ.CivicsOf(e.Where)) rise(c, 0.05);
+				break;
+			}
+			case SocialKind::WorldFallen:
+			{
+				for (int i = 0; i < Prisons.Count();)
+				{
+					if (Prisons[i]->Where == e.Where) Prisons.RemoveAt(i);
+					else i++;
+				}
+				if (auto syn = SyndicateOf(civ, e.Where)) syn->EndedJd = jd;
+				break;
+			}
+			case SocialKind::FactionFallen:
+			{
+				for (const auto& p : Prisons)
+					if (p->Faction == e.Faction) Free(civ, galaxy, p, jd);
+				break;
+			}
+			case SocialKind::Blockade:
+			case SocialKind::Embargo:
+			{
+				// A closed port is a smuggler's market.
+				auto c = civ.CivicsOf(e.Where);
+				if (c == nullptr || !Roll(r, 0.5)) break;
+				rise(c, 0.03);
+				if (auto syn = SyndicateOf(civ, e.Where)) syn->Funds += 1e6;
+				auto x = Civilization::Make(SocialKind::SmugglingRun, jd, e.Where, c->System);
+				x->Faction = e.Where->Owner;
+				civ.Publish(galaxy, x);
+				break;
+			}
+			default: break;
 		}
 	}
 

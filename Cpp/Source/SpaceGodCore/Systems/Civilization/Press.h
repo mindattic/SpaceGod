@@ -21,6 +21,7 @@ namespace SpaceGod::Core
 	class Household;
 	class Org;
 	class Settlement;
+	class SocialEvent;
 	class Society;
 
 	class SPACEGODCORE_API Press final
@@ -47,6 +48,8 @@ namespace SpaceGod::Core
 		void Boards(Civilization& civ, Galaxy& galaxy, Society& society, double jd);
 		bool Dig(Civilization& civ, Galaxy& galaxy, Society& society, const cs::Ref<Org>& outlet, double jd, bool steered);
 		void Charities(Civilization& civ, Galaxy& galaxy, Society& society, double jd);
+		/// <summary>US-T292: what the wider simulation did (Witness): conquerors take the presses, war feeds and gags them.</summary>
+		void Witnessed(Civilization& civ, Galaxy& galaxy, const SocialEvent& e, double jd);
 		cs::Ref<Org> Found(Civilization& civ, Galaxy& galaxy, const cs::Ref<Household>& h, double jd, bool steered);
 
 		SG_SERIALIZABLE(Press);

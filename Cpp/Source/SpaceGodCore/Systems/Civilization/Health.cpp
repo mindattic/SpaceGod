@@ -7,6 +7,7 @@
 #include "Ships.h"
 #include "Systems/Civilization/CivHash.h"
 #include "Systems/Civilization/Civilization.h"
+#include "Systems/Civilization/Witness.h"
 #include "Systems/Galaxy.h"
 #include "Systems/Polities.h"
 #include "Systems/Society.h"
@@ -21,7 +22,97 @@ namespace SpaceGod::Core
 		int NameKey(const cs::Ref<Settlement>& s) { return static_cast<int>(HashText(s->Name) & 0x7fffffffu); }
 	}
 
-	void Health::Day(Civilization& civ, Galaxy& galaxy, Society& society, double jd) { (void)civ; (void)galaxy; (void)society; (void)jd; }
+	void Health::Day(Civilization& civ, Galaxy& galaxy, Society& society, double jd) { React(civ, galaxy, society, jd); }
+
+	// ---------------------------------------------------------------- the wider simulation (US-T292, Witness)
+
+	void Health::React(Civilization& civ, Galaxy& galaxy, Society& society, double jd)
+	{
+		// (An older save starts from 0, harmlessly: it holds none of the witnessed kinds this reads.)
+		for (const auto& e : civ.Events.ToArray())
+		{
+			if (e->Id <= seenEvent) continue;
+			seenEvent = e->Id;
+			if (!Witness::IsWitnessed(e->Kind)) continue;
+			std::uint32_t r = H(static_cast<std::uint32_t>(e->Id), 0x4EA1u);
+			auto c = civ.CivicsOf(e->Where);
+			switch (e->Kind)
+			{
+				case SocialKind::Blight:
+				{
+					// The farms fail: the world goes hungry, and its friends may ship food.
+					if (c == nullptr || !Roll(r, 0.6)) break;
+					civ.Stir(e->Where, 0.03, -0.04);
+					civ.Publish(galaxy, Civilization::Make(SocialKind::Famine, jd, e->Where, c->System));
+					Help(civ, galaxy, e->Where, true, jd, nullptr);
+					break;
+				}
+				case SocialKind::Blockade:
+				{
+					// Nothing gets in: the sick go short of medicine, the rest of food.
+					if (c == nullptr) break;
+					if (c->Infected > 0.02)
+					{
+						civ.Stir(e->Where, 0.03, -0.05);
+						civ.Publish(galaxy, Civilization::Make(SocialKind::MedicineShortage, jd, e->Where, c->System));
+					}
+					else if (Roll(r, 0.4))
+					{
+						civ.Stir(e->Where, 0.03, -0.04);
+						civ.Publish(galaxy, Civilization::Make(SocialKind::Famine, jd, e->Where, c->System));
+					}
+					break;
+				}
+				case SocialKind::Rationing:
+				{
+					// A rationed state's sick worlds run short of medicine.
+					for (const auto& w : civ.Worlds)
+						if (w->Where->Owner == e->Faction && w->Infected > 0.02 && w->Care < 0.6)
+						{
+							civ.Stir(w->Where, 0.02, -0.04);
+							civ.Publish(galaxy, Civilization::Make(SocialKind::MedicineShortage, jd, w->Where, w->System));
+							break;
+						}
+					break;
+				}
+				case SocialKind::WorldDevastated:
+				{
+					// Hospitals overrun, friends send relief, and fever follows the dead.
+					if (c == nullptr) break;
+					c->Care = cs::Math::Max(0.1, c->Care - 0.05);
+					Help(civ, galaxy, e->Where, false, jd, nullptr);
+					if (c->Infected <= 0 && Roll(r >> 4, 0.25))
+					{
+						c->Infected = 0.02;
+						Outbreaks++;
+						civ.Publish(galaxy, Civilization::Make(SocialKind::Outbreak, jd, e->Where, c->System));
+					}
+					break;
+				}
+				case SocialKind::WorldConquered:
+				{
+					// The fighting kills (named people too, now and then).
+					if (c == nullptr) break;
+					Kill(civ, galaxy, society, e->Where, 0.003, jd);
+					if (c->Infected > 0.02 && c->Care < 0.5)
+						civ.Publish(galaxy, Civilization::Make(SocialKind::MedicineShortage, jd, e->Where, c->System));
+					break;
+				}
+				case SocialKind::BattleFought:
+				{
+					// The wounded fill the wards.
+					if (c != nullptr && e->Amount >= 5) c->Care = cs::Math::Max(0.1, c->Care - 0.02);
+					break;
+				}
+				case SocialKind::MineAccident:
+				{
+					if (c != nullptr) Kill(civ, galaxy, society, e->Where, 0.0005, jd);
+					break;
+				}
+				default: break;
+			}
+		}
+	}
 
 	void Health::Month(Civilization& civ, Galaxy& galaxy, Society& society, double jd)
 	{
@@ -283,5 +374,6 @@ namespace SpaceGod::Core
 	// ================================================================ ObjectGraph registrations
 
 	SG_SERIALIZE(Health, "SpaceGod.Core.Health",
-		SG_F(Active), SG_F(Outbreaks), SG_F(lastWar))
+		SG_F(Active), SG_F(Outbreaks), SG_F(lastWar),
+		SG_OPT(seenEvent)) // US-T292, absent from saves made before it
 }

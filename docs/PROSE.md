@@ -413,7 +413,7 @@ it is display only. `Tests/Lore/EncounterTests.cpp` pins both keys and the recov
    pilots players meet often.
 5. Records for the ports players dock at first, and logs for named hulls likely to end up derelict or taken.
 
-### Social narration (US-T274..US-T288)
+### Social narration (US-T274..US-T292)
 
 The Civilization layer (`Cpp/Source/SpaceGodCore/Systems/Civilization/`) records what the galaxy's people do as
 structured `SocialEvent`s and never as prose. The `Narrator` (`Systems/Civilization/Narrator.h`) words an event when it
@@ -434,6 +434,20 @@ simulation's state never depends on Prose). `sg.Civ keys` lists every key in gam
 - Culture (US-T281): `faith-founded`, `conversion`, `schism`, `pilgrimage`, `holy-war`, `festival`, `match-played`, `match-rigged`, `championship`, `trend-sweeps`, `cultural-drift`, `monument-raised`, `chronicle`, `rumour`, `propaganda`
 - Health (US-T284): `outbreak`, `spread`, `quarantine`, `cured`, `hospital-built`, `medicine-shortage`, `baby-boom`, `ageing`, `disaster`, `relief`, `famine`, `food-aid`
 - Press (US-T283): `outlet-founded`, `slanted-story`, `board-post`, `investigation`, `journalist-silenced`, `charity-founded`, `donation`
+- Witness (US-T292): `world-conquered`, `world-liberated`, `world-ceded`, `world-seceded`, `world-fallen`, `world-devastated`, `war-declared`, `peace-made`, `pact-signed`, `pact-broken`, `pirate-hold`, `haven-stormed`, `pirate-raid`, `battle-fought`, `faction-fallen`, `mine-accident`, `blight`, `rationing`, `blockade`, `embargo`
+
+**Witnessed events (US-T292).** The galaxy runs whether or not anyone plays it: wars, conquests, pirate havens and
+market shocks happen in the Core simulation on their own. The `Witness` module (`Systems/Civilization/Witness.h`) runs
+first in the Civilization's day. It compares what Core shows against the day before and publishes each change as one of
+the kinds above. A market strike reuses `strike-called`. Every module's `React` then answers it the way it answers its
+own events. A conquered world turns on its new flag and grows a rebel cell, its firms are bought up or crash, and its
+people flee. A war calls up the reserves, moves the shares, heats the feuds across the two flags and starts the
+propaganda. A peace sends the prisoners home and fills the chronicles. A raid feeds the syndicates and raises the
+premiums. A blight brings famine and food aid. The SpaceGod's hand goes through the same events: a battle it flew in,
+a world taken by the polity it commands, or a war or pact that polity chose all arrive as ordinary witnessed events.
+Those events are marked Steered, and the people react to them as they would to any other. So these pools word the
+galaxy's own history and the SpaceGod's interference alike. Lines should read as the people's view of the event (a
+street, a newsroom, a family), not as the battle report the system log already carries.
 
 The prefix `spacegod/social-` is the same for every pool, so `feud-declared` is `spacegod/social-feud-declared`. Lines
 may use these placeholders; one an event lacks reads as a plain noun ("someone", "a family"):

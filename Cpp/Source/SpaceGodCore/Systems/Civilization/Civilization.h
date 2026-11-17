@@ -47,6 +47,7 @@ namespace SpaceGod::Core
 	class Culture;
 	class Health;
 	class Press;
+	class Witness;
 
 	/// <summary>What a social event is (US-T274). Append only: saves hold the numbers, Prose keys hold the slugs.</summary>
 	enum class SocialKind : int
@@ -78,6 +79,9 @@ namespace SpaceGod::Core
 		Outbreak, Spread, Quarantine, Cured, HospitalBuilt, MedicineShortage, BabyBoom, Ageing, Disaster, Relief, Famine, FoodAid,
 		// Press (US-T283).
 		OutletFounded, SlantedStory, BoardPost, Investigation, JournalistSilenced, CharityFounded, Donation,
+		// Witness (US-T292): the wider simulation, as the people see it.
+		WorldConquered, WorldLiberated, WorldCeded, WorldSeceded, WorldFallen, WorldDevastated, WarDeclared, PeaceMade, PactSigned,
+		PactBroken, PirateHold, HavenStormed, PirateRaid, BattleFought, FactionFallen, MineAccident, Blight, Rationing, Blockade, Embargo,
 		Count_
 	};
 	SPACEGODCORE_API const char* ToString(SocialKind v);
@@ -240,6 +244,8 @@ namespace SpaceGod::Core
 		cs::Ref<SpaceGod::Core::Culture> Culture;
 		cs::Ref<SpaceGod::Core::Health> Health;
 		cs::Ref<SpaceGod::Core::Press> Press;
+		/// <summary>US-T292: the eyes on the wider simulation, run first each day.</summary>
+		cs::Ref<SpaceGod::Core::Witness> Witness;
 
 		/// <summary>Running tallies of events by kind (index = SocialKind).</summary>
 		cs::List<int> Tally = cs::List<int>();

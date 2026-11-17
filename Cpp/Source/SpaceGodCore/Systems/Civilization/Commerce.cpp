@@ -9,6 +9,9 @@
 #include "Systems/Civilization/CivHash.h"
 #include "Systems/Civilization/Civilization.h"
 #include "Systems/Civilization/Strife.h"
+#include "Systems/Civilization/Witness.h"
+
+#include <initializer_list>
 #include "Systems/Galaxy.h"
 #include "Systems/Polities.h"
 #include "Systems/Society.h"
@@ -445,6 +448,144 @@ namespace SpaceGod::Core
 			if (e->Id <= seenEvent) continue;
 			seenEvent = e->Id;
 			if (e->Kind == SocialKind::FraudExposed && e->Business != nullptr) Crash(civ, galaxy, e->Business, jd);
+			else if (Witness::IsWitnessed(e->Kind)) Witnessed(civ, galaxy, *e, jd);
+		}
+	}
+
+	// ---------------------------------------------------------------- the wider simulation (US-T292, Witness)
+
+	bool Commerce::Flee(Civilization& civ, Galaxy& galaxy, const cs::Ref<Settlement>& s, const cs::Ref<Faction>& flag, double people, double jd)
+	{
+		if (s == nullptr || flag == nullptr || people < 1) return false;
+		cs::Ref<Civics> haven;
+		for (const auto& d : civ.Worlds)
+			if (d->Where != s && d->Where->Owner == flag && d->Infected < 0.1
+				&& (haven == nullptr || d->Where->Attraction * Civilization::Wellbeing(d->Where) > haven->Where->Attraction * Civilization::Wellbeing(haven->Where))) haven = d;
+		if (haven == nullptr) return false;
+		double n = cs::Math::Floor(people);
+		if (Civilization::Stands(s)) s->Population = cs::Math::Max(0.0, s->Population - n);
+		haven->Where->Population += n;
+		civ.Stir(haven->Where, 0.02, -0.02);
+		auto e = Civilization::Make(SocialKind::Refugees, jd, s, Civilization::SystemOf(galaxy, s));
+		e->Amount = n;
+		e->Faction = flag;
+		civ.Publish(galaxy, e);
+		return true;
+	}
+
+	void Commerce::Witnessed(Civilization& civ, Galaxy& galaxy, const SocialEvent& e, double jd)
+	{
+		auto society = Society::Find(galaxy);
+		if (society == nullptr) return;
+		std::uint32_t r = H(static_cast<std::uint32_t>(e.Id), 0xC033u);
+		// The biggest trading firm of a world (of a kind, unless any).
+		auto biggest = [&](const cs::Ref<Settlement>& s, int kind) -> cs::Ref<Business>
+		{
+			cs::Ref<Business> best;
+			for (const auto& b : society->Businesses)
+				if (b->Trading() && b->Home == s && (kind < 0 || static_cast<int>(b->Kind) == kind) && (best == nullptr || b->Capital > best->Capital)) best = b;
+			return best;
+		};
+		// Moves the capital of the trading firms of a flag's worlds (or one world's) in some lines of work.
+		auto shift = [&](const cs::Ref<Faction>& flag, const cs::Ref<Settlement>& only, std::initializer_list<BusinessKind> kinds, double by)
+		{
+			for (const auto& b : society->Businesses)
+			{
+				if (!b->Trading() || b->Home == nullptr || (only != nullptr ? b->Home != only : b->Home->Owner != flag)) continue;
+				for (auto k : kinds)
+					if (b->Kind == k) { b->Capital *= by; break; }
+			}
+		};
+		switch (e.Kind)
+		{
+			case SocialKind::WorldConquered:
+			case SocialKind::WorldCeded:
+			{
+				// The conqueror's money buys up the big firm cheap, or its shares crash; those who can, flee to the old flag.
+				auto b = biggest(e.Where, -1);
+				if (b != nullptr)
+				{
+					cs::Ref<Household> raider;
+					for (const auto& h : society->HousesOf(nullptr))
+						if (!h->Scattered && h->Home != nullptr && h->Home->Owner == e.Faction && h->Wealth > b->Capital * 0.3 && (raider == nullptr || h->Wealth > raider->Wealth)) raider = h;
+					if (raider != nullptr && raider != b->Owner && Roll(r, 0.35)) Seize(civ, galaxy, *society, raider, b, jd, false);
+					else Crash(civ, galaxy, b, jd);
+				}
+				Flee(civ, galaxy, e.Where, e.Rival, e.Where->Population * (0.01 + 0.03 * Unit(r >> 6)), jd);
+				break;
+			}
+			case SocialKind::WorldLiberated: shift(nullptr, e.Where, { BusinessKind::TradingHouse, BusinessKind::Hospitality, BusinessKind::Shipping }, 1.05); break;
+			case SocialKind::WorldFallen:
+			{
+				// Its firms are worth nothing now; its few survivors make for the flag's other worlds.
+				int n = 0;
+				for (const auto& b : society->Businesses)
+					if (b->Trading() && b->Home == e.Where && n++ < 3) Crash(civ, galaxy, b, jd);
+				Flee(civ, galaxy, e.Where, e.Faction, e.Amount * 0.1, jd);
+				break;
+			}
+			case SocialKind::WorldDevastated:
+			{
+				if (auto b = biggest(e.Where, -1)) Crash(civ, galaxy, b, jd);
+				break;
+			}
+			case SocialKind::WarDeclared:
+			{
+				// The yards boom, the shippers' shares fall.
+				for (const auto& f : { e.Faction, e.Rival })
+				{
+					if (f == nullptr) continue;
+					shift(f, nullptr, { BusinessKind::Shipwright }, 1.08);
+					shift(f, nullptr, { BusinessKind::Shipping, BusinessKind::TradingHouse }, 0.97);
+				}
+				cs::Ref<Business> shipper;
+				for (const auto& b : society->Businesses)
+					if (b->Trading() && b->Kind == BusinessKind::Shipping && b->Home != nullptr && (b->Home->Owner == e.Faction || b->Home->Owner == e.Rival)
+						&& (shipper == nullptr || b->Capital > shipper->Capital)) shipper = b;
+				if (shipper != nullptr && Roll(r, 0.5)) Crash(civ, galaxy, shipper, jd);
+				break;
+			}
+			case SocialKind::PeaceMade:
+			{
+				for (const auto& f : { e.Faction, e.Rival })
+				{
+					if (f == nullptr) continue;
+					shift(f, nullptr, { BusinessKind::TradingHouse, BusinessKind::Shipping, BusinessKind::Hospitality }, 1.02);
+					shift(f, nullptr, { BusinessKind::Shipwright }, 0.97);
+				}
+				break;
+			}
+			case SocialKind::PirateRaid:
+			case SocialKind::PirateHold:
+			{
+				// Underwriters price the raids in.
+				for (const auto& b : society->Businesses)
+					if (b->Trading() && b->System == e.System && (b->Kind == BusinessKind::Shipping || b->Kind == BusinessKind::TradingHouse)) b->Capital *= 0.98;
+				bool told = false;
+				for (const auto& x : civ.Latest(60, SocialKind::PremiumsRise))
+					if (x->System == e.System && x->Jd > jd - 30) told = true;
+				if (!told && e.Where != nullptr && Roll(r, 0.5))
+				{
+					auto x = Civilization::Make(SocialKind::PremiumsRise, jd, e.Kind == SocialKind::PirateHold ? nullptr : e.Where, e.System);
+					x->Faction = e.Kind == SocialKind::PirateHold ? e.Rival : e.Faction;
+					civ.Publish(galaxy, x);
+				}
+				break;
+			}
+			case SocialKind::MineAccident:
+			{
+				// The mine's owners lose; the union takes up the dead men's cause, and may call the pits out.
+				shift(nullptr, e.Where, { BusinessKind::MiningConcern }, 0.95);
+				auto u = UnionOf(civ, e.Where);
+				if (u == nullptr) break;
+				u->Strength = cs::Math::Min(1.0, u->Strength + 0.1);
+				if (civ.Strife != nullptr && Roll(r >> 3, u->Strength * 0.5)) civ.Strife->CallStrike(civ, galaxy, e.Where, u, 5 + (r % 8u), jd);
+				break;
+			}
+			case SocialKind::Blight: shift(nullptr, e.Where, { BusinessKind::Hospitality }, 0.97); break;
+			case SocialKind::Blockade: shift(nullptr, e.Where, { BusinessKind::TradingHouse, BusinessKind::Shipping }, 0.95); break;
+			case SocialKind::Embargo: shift(e.Rival, nullptr, { BusinessKind::Shipping }, 0.98); break;
+			default: break;
 		}
 	}
 

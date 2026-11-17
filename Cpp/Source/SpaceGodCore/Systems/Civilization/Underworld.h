@@ -28,6 +28,7 @@ namespace SpaceGod::Core
 	class Household;
 	class Org;
 	class Settlement;
+	class SocialEvent;
 	class Society;
 
 	/// <summary>A killing paid for (US-T282).</summary>
@@ -97,6 +98,10 @@ namespace SpaceGod::Core
 		void Jails(Civilization& civ, Galaxy& galaxy, double jd);
 		void Imprison(Civilization& civ, Galaxy& galaxy, const cs::Ref<Citizen>& c, double jd);
 		void React(Civilization& civ, Galaxy& galaxy, double jd);
+		/// <summary>US-T292: what the wider simulation did (Witness): raids feed crime, conquest opens the jails.</summary>
+		void Witnessed(Civilization& civ, Galaxy& galaxy, const SocialEvent& e, double jd);
+		/// <summary>Empties a prison (a breakout, its guards gone).</summary>
+		void Free(Civilization& civ, Galaxy& galaxy, const cs::Ref<Prison>& p, double jd);
 
 		SG_SERIALIZABLE(Underworld);
 	};

@@ -7,6 +7,7 @@
 #include "Ships.h"
 #include "Systems/Civilization/CivHash.h"
 #include "Systems/Civilization/Civilization.h"
+#include "Systems/Civilization/Witness.h"
 #include "Systems/Galaxy.h"
 #include "Systems/Polities.h"
 #include "Systems/Society.h"
@@ -162,8 +163,96 @@ namespace SpaceGod::Core
 					if (e->Who != nullptr && e->Who->Role == CitizenRole::Head && e->House != nullptr) Inherit(civ, galaxy, society, e->House, jd);
 					break;
 				}
-				default: break;
+				default:
+					if (Witness::IsWitnessed(e->Kind)) Witnessed(civ, galaxy, society, *e, jd);
+					break;
 			}
+		}
+	}
+
+	// ---------------------------------------------------------------- the wider simulation (US-T292, Witness)
+
+	void Kinship::Bury(Civilization& civ, Galaxy& galaxy, Society& society, const cs::Ref<Citizen>& c, double jd)
+	{
+		if (c == nullptr || !c->Alive()) return;
+		auto h = c->House;
+		c->DiedJd = jd;
+		society.Deaths++;
+		if (c->Spouse != nullptr && c->Spouse->Spouse == c) c->Spouse->Spouse = nullptr;
+		if (c->Role == CitizenRole::Head && h != nullptr)
+		{
+			cs::Ref<Citizen> heir;
+			for (const auto& m : h->Members)
+				if (m->Alive() && m->Role == CitizenRole::Heir && (heir == nullptr || m->BornJd < heir->BornJd)) heir = m;
+			if (heir != nullptr) heir->Role = CitizenRole::Head;
+		}
+		// The death is mirrored as an event: tomorrow's React passes the house to its heir (and Politics its seat, if it ruled).
+		auto d = Civilization::Make(SocialKind::Death, jd, h != nullptr ? h->Home : nullptr, h != nullptr ? h->System : nullptr);
+		d->Who = c;
+		d->House = h;
+		civ.Publish(galaxy, d);
+	}
+
+	void Kinship::Witnessed(Civilization& civ, Galaxy& galaxy, Society& society, const SocialEvent& e, double jd)
+	{
+		std::uint32_t r = H(static_cast<std::uint32_t>(e.Id), 0x4E0Eu);
+		auto flagOf = [](const cs::Ref<Household>& h) { return h != nullptr && h->Home != nullptr ? h->Home->Owner : nullptr; };
+		switch (e.Kind)
+		{
+			case SocialKind::WarDeclared:
+			case SocialKind::PeaceMade:
+			{
+				// Feuds across the two flags run hotter in a war, and cool with the peace.
+				for (const auto& f : Feuds)
+				{
+					if (!f->Active()) continue;
+					auto fa = flagOf(f->A), fb = flagOf(f->B);
+					if (!((fa == e.Faction && fb == e.Rival) || (fa == e.Rival && fb == e.Faction))) continue;
+					f->Heat = e.Kind == SocialKind::WarDeclared ? cs::Math::Min(1.0, f->Heat + 0.2) : f->Heat * 0.7;
+				}
+				break;
+			}
+			case SocialKind::WorldConquered:
+			{
+				// The brave die resisting; the vengeful swear a feud on the conquerors' richest house.
+				cs::Ref<Household> victors;
+				for (const auto& h : society.HousesOf(nullptr))
+					if (Standing(h) && flagOf(h) == e.Faction && h->Home != e.Where && (victors == nullptr || h->Wealth > victors->Wealth)) victors = h;
+				for (const auto& h : society.HousesOf(e.Where))
+				{
+					auto head = h->Head();
+					if (!Standing(h) || head == nullptr) continue;
+					std::uint32_t hr = H(r, static_cast<std::uint32_t>(h->Id));
+					if (Civilization::Has(head, Trait::Brave) && Roll(hr, 0.15)) { Bury(civ, galaxy, society, head, jd); continue; }
+					if (victors != nullptr && (Civilization::Has(head, Trait::Vengeful) || Civilization::Has(head, Trait::Loyal)) && Roll(hr >> 5, 0.3))
+						Start(civ, galaxy, h, victors, "a conquest", 0.6, jd, e.Steered);
+				}
+				break;
+			}
+			case SocialKind::BattleFought:
+			{
+				// A big battle takes someone's son or daughter from the losers' worlds of that system.
+				if (e.Amount < 4) break;
+				cs::List<cs::Ref<Citizen>> young;
+				for (const auto& h : society.HousesOf(nullptr))
+					if (Standing(h) && h->System == e.System && flagOf(h) == e.Rival)
+						for (const auto& m : h->Members)
+							if (m->Alive() && m->Role != CitizenRole::Head && m->AgeYears(jd) >= 18 && m->AgeYears(jd) < 35) young.Add(m);
+				if (young.Count() > 0 && Roll(r, 0.25)) Bury(civ, galaxy, society, Pick(young, r >> 7), jd);
+				break;
+			}
+			case SocialKind::WorldDevastated:
+			case SocialKind::WorldFallen:
+			{
+				// Named people die with their world, a handful at most.
+				double share = e.Kind == SocialKind::WorldFallen ? 0.4 : 0.2;
+				int dead = 0;
+				for (const auto& h : society.HousesOf(e.Where))
+					for (const auto& m : h->Members.ToArray())
+						if (dead < 6 && m->Alive() && Roll(H(r, static_cast<std::uint32_t>(m->Id)), share)) { Bury(civ, galaxy, society, m, jd); dead++; }
+				break;
+			}
+			default: break;
 		}
 	}
 

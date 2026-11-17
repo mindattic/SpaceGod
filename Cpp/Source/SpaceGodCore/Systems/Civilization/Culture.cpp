@@ -9,6 +9,7 @@
 #include "Systems/Civilization/CivHash.h"
 #include "Systems/Civilization/Civilization.h"
 #include "Systems/Civilization/Politics.h"
+#include "Systems/Civilization/Witness.h"
 #include "Systems/Galaxy.h"
 #include "Systems/GalaxyLife.h"
 #include "Systems/Polities.h"
@@ -405,12 +406,21 @@ namespace SpaceGod::Core
 				case SocialKind::Coup: case SocialKind::PeaceSummit: case SocialKind::Uprising: case SocialKind::HolyWar: case SocialKind::Schism:
 				case SocialKind::FaithFounded: case SocialKind::Championship: case SocialKind::Disaster: case SocialKind::Outbreak: case SocialKind::ElectionWon:
 				case SocialKind::Assassination: case SocialKind::BankRun: case SocialKind::PeaceForced: case SocialKind::Famine:
+				// US-T292: the wider simulation's great events (Witness).
+				case SocialKind::WorldConquered: case SocialKind::WorldLiberated: case SocialKind::WorldSeceded: case SocialKind::WorldFallen:
+				case SocialKind::WorldDevastated: case SocialKind::WarDeclared: case SocialKind::PeaceMade: case SocialKind::FactionFallen:
+				case SocialKind::HavenStormed: case SocialKind::BattleFought:
 				{
+					if (Witness::IsWitnessed(e->Kind)) Witnessed(civ, galaxy, *e, jd);
+					// Only the big battles make the histories.
+					if (e->Kind == SocialKind::BattleFought && e->Amount < 6) break;
 					Chronicle.Add(e);
 					if (Chronicle.Count() > MaxChronicle) Chronicle.RemoveAt(0);
 					std::uint32_t h = H(static_cast<std::uint32_t>(e->Id), 0xC4A0u);
 					// The greatest are carved in stone.
-					bool great = e->Kind == SocialKind::Coup || e->Kind == SocialKind::PeaceSummit || e->Kind == SocialKind::Uprising || e->Kind == SocialKind::Championship || e->Kind == SocialKind::Disaster;
+					bool great = e->Kind == SocialKind::Coup || e->Kind == SocialKind::PeaceSummit || e->Kind == SocialKind::Uprising || e->Kind == SocialKind::Championship || e->Kind == SocialKind::Disaster
+						|| e->Kind == SocialKind::WorldLiberated || e->Kind == SocialKind::WorldSeceded || e->Kind == SocialKind::PeaceMade || e->Kind == SocialKind::BattleFought
+						|| e->Kind == SocialKind::FactionFallen || e->Kind == SocialKind::HavenStormed;
 					if (great && e->Where != nullptr && Roll(h, 0.3))
 						if (auto c = civ.CivicsOf(e->Where); c != nullptr && c->Monument.empty())
 						{
@@ -427,8 +437,63 @@ namespace SpaceGod::Core
 					}
 					break;
 				}
-				default: break;
+				default:
+					if (Witness::IsWitnessed(e->Kind)) Witnessed(civ, galaxy, *e, jd);
+					break;
 			}
+		}
+	}
+
+	// ---------------------------------------------------------------- the wider simulation (US-T292, Witness)
+
+	void Culture::Witnessed(Civilization& civ, Galaxy& galaxy, const SocialEvent& e, double jd)
+	{
+		auto society = Society::Find(galaxy);
+		std::uint32_t r = H(static_cast<std::uint32_t>(e.Id), 0xC4A1u);
+		switch (e.Kind)
+		{
+			case SocialKind::WorldConquered:
+			{
+				// Under a foreign flag a world keeps its own ways the harder: it drifts from its rulers (feeding secession).
+				if (auto c = civ.CivicsOf(e.Where)) c->Drift = cs::Math::Min(1.0, c->Drift + 0.25);
+				break;
+			}
+			case SocialKind::WorldLiberated:
+			case SocialKind::WorldSeceded:
+			{
+				// The streets fill: a festival of freedom.
+				if (society != nullptr && civ.CivicsOf(e.Where) != nullptr) Festival(civ, galaxy, *society, e.Where, jd, e.Steered);
+				if (auto c = civ.CivicsOf(e.Where)) c->Drift = cs::Math::Max(0.0, c->Drift - 0.2);
+				break;
+			}
+			case SocialKind::PeaceMade:
+			{
+				// Each capital may celebrate the peace.
+				if (society == nullptr || galaxy.Polities == nullptr) break;
+				int i = 0;
+				for (const auto& f : { e.Faction, e.Rival })
+				{
+					auto capital = f != nullptr ? galaxy.Polities->CapitalOf(f) : nullptr;
+					if (capital != nullptr && civ.CivicsOf(capital) != nullptr && Roll(r >> (4 * i), 0.5)) Festival(civ, galaxy, *society, capital, jd, false);
+					i++;
+				}
+				break;
+			}
+			case SocialKind::WarDeclared:
+			{
+				// The aggressor's presses roll: its people are told the war is just, and believe it as far as they trust them.
+				if (e.Faction == nullptr || galaxy.Polities == nullptr) break;
+				auto capital = galaxy.Polities->CapitalOf(e.Faction);
+				auto p = Civilization::Make(SocialKind::Propaganda, jd, capital, Civilization::SystemOf(galaxy, capital));
+				p->Faction = e.Faction;
+				p->Rival = e.Rival;
+				p->Unverified = true;
+				civ.Publish(galaxy, p);
+				for (const auto& c : civ.Worlds)
+					if (c->Where->Owner == e.Faction) c->Approval = cs::Math::Min(1.0, c->Approval + 0.03 * c->PressTrust);
+				break;
+			}
+			default: break;
 		}
 	}
 

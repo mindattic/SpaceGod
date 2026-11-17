@@ -36,6 +36,19 @@ namespace SpaceGod::Core
 
 		/// Every state that rules people: owns a standing settlement and is no pirate band.
 		bool Ruling(const cs::Ref<Faction>& f) { return f != nullptr && !f->IsPirate; }
+
+		/// US-T292: moves the mood of every world of <paramref name="f"/>: its approval, and how hawkish it leans (hawks move
+		/// the approval by <paramref name="hawkish"/> times their lean, so a war cheers hawks and sours doves).
+		void Lean(Civilization& civ, const cs::Ref<Faction>& f, double approval, double hawk, double hawkish = 0)
+		{
+			if (f == nullptr) return;
+			for (const auto& c : civ.Worlds)
+				if (c->Where->Owner == f)
+				{
+					c->Approval = cs::Math::Clamp(c->Approval + approval + hawkish * c->Hawk, -1.0, 1.0);
+					c->Hawk = cs::Math::Clamp(c->Hawk + hawk, -1.0, 1.0);
+				}
+		}
 	}
 
 	cs::Ref<Regime> Politics::RegimeOf(const cs::Ref<Faction>& f) const
@@ -536,6 +549,74 @@ namespace SpaceGod::Core
 								if (c->Where->Owner == r->Faction) civ.Stir(c->Where, 0.03, -0.05);
 						}
 					break;
+
+				// US-T292: what the wider simulation did (Witness), whoever's hand did it.
+				case SocialKind::WorldConquered:
+				case SocialKind::WorldCeded:
+				{
+					// Its people hate the new flag and turn to the strongman; the losers grieve and harden; the victors cheer.
+					if (auto c = civ.CivicsOf(e->Where))
+					{
+						c->Approval = cs::Math::Min(c->Approval, e->Kind == SocialKind::WorldCeded ? -0.35 : -0.5);
+						c->Hawk = cs::Math::Clamp(c->Hawk + 0.2, -1.0, 1.0);
+						c->Liberty = cs::Math::Clamp(c->Liberty - 0.1, -1.0, 1.0);
+					}
+					Lean(civ, e->Rival, e->Kind == SocialKind::WorldCeded ? -0.08 : -0.05, 0.05);
+					Lean(civ, e->Faction, 0.02, 0.02);
+					break;
+				}
+				case SocialKind::WorldLiberated:
+				{
+					if (auto c = civ.CivicsOf(e->Where)) c->Approval = cs::Math::Max(c->Approval, 0.5);
+					Lean(civ, e->Faction, 0.04, 0);
+					break;
+				}
+				case SocialKind::WorldSeceded:
+				{
+					// Free at last: they love their own flag, and want a say in it.
+					if (auto c = civ.CivicsOf(e->Where))
+					{
+						c->Approval = cs::Math::Max(c->Approval, 0.4);
+						c->Liberty = cs::Math::Clamp(c->Liberty + 0.2, -1.0, 1.0);
+					}
+					Lean(civ, e->Rival, -0.04, 0.03);
+					break;
+				}
+				case SocialKind::WorldFallen: Lean(civ, e->Faction, -0.03, 0.03); break;
+				case SocialKind::WarDeclared:
+				{
+					// The aggressor's hawks cheer and its doves sour; the attacked rally round their flag.
+					Lean(civ, e->Faction, 0.01, 0.03, 0.06);
+					Lean(civ, e->Rival, 0.05, 0.1);
+					break;
+				}
+				case SocialKind::PeaceMade:
+				{
+					// The weary are glad of it, the hawks call it a sell-out.
+					for (const auto& c : civ.Worlds)
+						if (c->Where->Owner == e->Faction || c->Where->Owner == e->Rival)
+						{
+							c->Approval = cs::Math::Clamp(c->Approval + 0.02 + c->Weariness * 0.08 - cs::Math::Max(0.0, c->Hawk) * 0.05, -1.0, 1.0);
+							c->Hawk = cs::Math::Clamp(c->Hawk - 0.05, -1.0, 1.0);
+						}
+					break;
+				}
+				case SocialKind::PactBroken: Lean(civ, e->Faction, -0.02, 0.02); Lean(civ, e->Rival, -0.02, 0.02); break;
+				case SocialKind::BattleFought: Lean(civ, e->Faction, 0.02, 0.01); Lean(civ, e->Rival, -0.03, 0.02); break;
+				case SocialKind::Blockade: civ.Stir(e->Where, 0.02, -0.06); break;
+				case SocialKind::Rationing: Lean(civ, e->Faction, -0.03, 0); break;
+				case SocialKind::FactionFallen:
+				{
+					// A state gone: its government and its parties with it.
+					for (int i = 0; i < Regimes.Count();)
+					{
+						if (Regimes[i]->Faction == e->Faction) Regimes.RemoveAt(i);
+						else i++;
+					}
+					for (const auto& o : civ.OrgsOf(OrgKind::Party))
+						if (o->Faction == e->Faction) o->EndedJd = jd;
+					break;
+				}
 				default: break;
 			}
 		}

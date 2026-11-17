@@ -63,6 +63,8 @@ namespace SpaceGod::Core
 		void Drift(Civilization& civ, Galaxy& galaxy, double jd);
 		void Talk(Civilization& civ, Galaxy& galaxy, Society& society, double jd);
 		void React(Civilization& civ, Galaxy& galaxy, double jd);
+		/// <summary>US-T292: what the wider simulation did (Witness): conquest drives drift, liberation and peace a festival.</summary>
+		void Witnessed(Civilization& civ, Galaxy& galaxy, const SocialEvent& e, double jd);
 
 		SG_SERIALIZABLE(Culture);
 	};

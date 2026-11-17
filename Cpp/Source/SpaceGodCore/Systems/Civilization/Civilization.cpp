@@ -18,6 +18,7 @@
 #include "Systems/Civilization/Health.h"
 #include "Systems/Civilization/Press.h"
 #include "Systems/Civilization/Narrator.h"
+#include "Systems/Civilization/Witness.h"
 #include "Systems/Galaxy.h"
 #include "Systems/InterstellarWars.h"
 #include "Systems/Polities.h"
@@ -47,6 +48,9 @@ namespace SpaceGod::Core
 			"Outbreak", "Spread", "Quarantine", "Cured", "HospitalBuilt", "MedicineShortage", "BabyBoom", "Ageing",
 			"Disaster", "Relief", "Famine", "FoodAid", "OutletFounded", "SlantedStory", "BoardPost", "Investigation",
 			"JournalistSilenced", "CharityFounded", "Donation",
+			"WorldConquered", "WorldLiberated", "WorldCeded", "WorldSeceded", "WorldFallen", "WorldDevastated", "WarDeclared", "PeaceMade",
+			"PactSigned", "PactBroken", "PirateHold", "HavenStormed", "PirateRaid", "BattleFought", "FactionFallen", "MineAccident",
+			"Blight", "Rationing", "Blockade", "Embargo",
 		};
 		static_assert(sizeof(SocialKindNames) / sizeof(SocialKindNames[0]) == static_cast<std::size_t>(SocialKind::Count_), "a SocialKind without a name");
 	}
@@ -384,6 +388,9 @@ namespace SpaceGod::Core
 		auto society = Society::Find(galaxy);
 		if (society == nullptr) return;
 		Personas(*society, jd);
+		// US-T292: first, so every module's React sees what the wider simulation did today.
+		if (Witness == nullptr) Witness = cs::New<SpaceGod::Core::Witness>();
+		Witness->Day(*this, galaxy, jd);
 		if (Kinship == nullptr) Kinship = cs::New<SpaceGod::Core::Kinship>();
 		Kinship->Day(*this, galaxy, *society, jd);
 		if (Politics == nullptr) Politics = cs::New<SpaceGod::Core::Politics>();
@@ -618,5 +625,6 @@ namespace SpaceGod::Core
 		SG_OPT(Commerce), // US-T283
 		SG_OPT(Culture), // US-T285
 		SG_OPT(Health), // US-T286
-		SG_OPT(Press)) // US-T288
+		SG_OPT(Press), // US-T288
+		SG_OPT(Witness)) // US-T292
 }

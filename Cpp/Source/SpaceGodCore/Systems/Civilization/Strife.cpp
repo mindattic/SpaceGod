@@ -8,6 +8,7 @@
 #include "Systems/Civilization/CivHash.h"
 #include "Systems/Civilization/Civilization.h"
 #include "Systems/Civilization/Kinship.h"
+#include "Systems/Civilization/Witness.h"
 #include "Systems/Galaxy.h"
 #include "Systems/GalaxyLife.h"
 #include "Systems/InterstellarWars.h"
@@ -354,23 +355,26 @@ namespace SpaceGod::Core
 				int n = 0;
 				for (const auto& c : civ.Worlds)
 					if (c->Where->Owner == f) { hawk += c->Hawk; n++; }
-				if (n > 0 && hawk / n > 0.2 && weary < 0.5 && Roll(h >> 6, 0.05))
-				{
-					if (f->Manpower < 1e300)
-					{
-						double pop = 0;
-						for (const auto& c : civ.Worlds)
-							if (c->Where->Owner == f) pop += c->Where->Population;
-						f->Manpower += pop * 0.0005;
-					}
-					Weary(civ, f, 0.08);
-					for (const auto& c : civ.Worlds)
-						if (c->Where->Owner == f) civ.Stir(c->Where, 0.02, -0.05);
-					auto e = Civilization::Make(SocialKind::Conscription, jd, capital, Civilization::SystemOf(galaxy, capital));
-					e->Faction = f;
-					civ.Publish(galaxy, e);
-				}
+				if (n > 0 && hawk / n > 0.2 && weary < 0.5 && Roll(h >> 6, 0.05)) Draft(civ, galaxy, f, jd);
 			}
+	}
+
+	void Strife::Draft(Civilization& civ, Galaxy& galaxy, const cs::Ref<Faction>& f, double jd)
+	{
+		auto capital = galaxy.Polities != nullptr ? galaxy.Polities->CapitalOf(f) : nullptr;
+		if (f->Manpower < 1e300)
+		{
+			double pop = 0;
+			for (const auto& c : civ.Worlds)
+				if (c->Where->Owner == f) pop += c->Where->Population;
+			f->Manpower += pop * 0.0005;
+		}
+		Weary(civ, f, 0.08);
+		for (const auto& c : civ.Worlds)
+			if (c->Where->Owner == f) civ.Stir(c->Where, 0.02, -0.05);
+		auto e = Civilization::Make(SocialKind::Conscription, jd, capital, Civilization::SystemOf(galaxy, capital));
+		e->Faction = f;
+		civ.Publish(galaxy, e);
 	}
 
 	// ---------------------------------------------------------------- free companies
@@ -497,6 +501,96 @@ namespace SpaceGod::Core
 			}
 	}
 
+	// ---------------------------------------------------------------- the wider simulation (US-T292, Witness)
+
+	void Strife::Witnessed(Civilization& civ, Galaxy& galaxy, const SocialEvent& e, double jd)
+	{
+		std::uint32_t r = H(static_cast<std::uint32_t>(e.Id), 0x5792u);
+		switch (e.Kind)
+		{
+			case SocialKind::WorldConquered:
+			case SocialKind::WorldCeded:
+			{
+				// The conquered take to the streets, and the brave among them to the hills: a cell for the old flag.
+				auto c = civ.CivicsOf(e.Where);
+				if (c == nullptr) break;
+				civ.Stir(e.Where, 0.08, 0);
+				if (InsurgentsOf(civ, e.Where) != nullptr || !Roll(r, e.Kind == SocialKind::WorldCeded ? 0.25 : 0.5)) break;
+				cs::Ref<Citizen> leader;
+				if (auto society = Society::Find(galaxy))
+					for (const auto& hh : society->HousesOf(e.Where))
+						for (const auto& m : hh->Members)
+							if (leader == nullptr && m->Alive() && m->AgeYears(jd) >= 18 && m->AgeYears(jd) < 55 && (Civilization::Has(m, Trait::Brave) || Civilization::Has(m, Trait::Vengeful) || Civilization::Has(m, Trait::Loyal)))
+								leader = m;
+				auto cell = civ.Found(OrgKind::Insurgents, e.Where, c->System, e.Rival, leader, 2e5, jd, r >> 3);
+				cell->Strength = 0.15;
+				auto x = Civilization::Make(SocialKind::CellFormed, jd, e.Where, c->System);
+				x->Org = cell;
+				x->Who = leader;
+				x->Faction = e.Faction;
+				civ.Publish(galaxy, x);
+				break;
+			}
+			case SocialKind::WarDeclared:
+			{
+				// Hawkish states call up their reserves at once; every side feels the war begin.
+				for (const auto& f : { e.Faction, e.Rival })
+				{
+					if (f == nullptr || f->IsPirate) continue;
+					Weary(civ, f, 0.02);
+					double hawk = 0;
+					int n = 0;
+					for (const auto& c : civ.Worlds)
+						if (c->Where->Owner == f) { hawk += c->Hawk; n++; }
+					if (n > 0 && hawk / n > 0.1 && Roll(H(r, FH(f)), 0.4)) Draft(civ, galaxy, f, jd);
+				}
+				break;
+			}
+			case SocialKind::BattleFought:
+			{
+				// The victor's admiral is a hero; the loser's is disgraced, or lost with the fleet, and the losers' people tire.
+				if (auto hero = AdmiralOf(e.Faction)) hero->Who->Reputation = cs::Math::Min(1.0, hero->Who->Reputation + 0.05);
+				Weary(civ, e.Rival, 0.03);
+				auto a = AdmiralOf(e.Rival);
+				if (a == nullptr) break;
+				a->Who->Reputation = cs::Math::Max(-1.0, a->Who->Reputation - 0.1);
+				if (e.Amount < 5 || !a->Who->Alive() || !Roll(r >> 4, 0.1)) break;
+				auto society = Society::Find(galaxy);
+				if (society == nullptr || civ.Kinship == nullptr) break;
+				civ.Kinship->Bury(civ, galaxy, *society, a->Who, jd);
+				Admirals.Remove(a);
+				break;
+			}
+			case SocialKind::Blockade:
+			case SocialKind::Rationing:
+			{
+				// Hungry, cut-off people protest.
+				auto c = civ.CivicsOf(e.Where);
+				if (c == nullptr || !Roll(r, 0.5)) break;
+				civ.Stir(e.Where, 0.03, -0.02);
+				civ.Publish(galaxy, Civilization::Make(SocialKind::Protest, jd, e.Where, c->System));
+				break;
+			}
+			case SocialKind::FactionFallen:
+			{
+				// Its cells fight on for nobody, its hired guns are free, its admirals and spies out of work.
+				for (const auto& o : civ.OrgsOf(OrgKind::Insurgents))
+					if (o->Faction == e.Faction) o->Faction = nullptr;
+				for (const auto& o : civ.OrgsOf(OrgKind::Mercenaries))
+					if (o->Faction == e.Faction) o->Faction = nullptr;
+				for (const auto& o : civ.OrgsOf(OrgKind::Agency))
+					if (o->Faction == e.Faction) o->EndedJd = jd;
+				for (int i = 0; i < Admirals.Count();)
+				{
+					if (Admirals[i]->Faction == e.Faction) Admirals.RemoveAt(i);
+					else i++;
+				}
+				break;
+			}
+			default: break;
+		}
+	}
+
 	// ---------------------------------------------------------------- peace sends the prisoners home
 
 	void Strife::React(Civilization& civ, Galaxy& galaxy, double jd)
@@ -505,7 +599,8 @@ namespace SpaceGod::Core
 		{
 			if (e->Id <= seenEvent) continue;
 			seenEvent = e->Id;
-			if ((e->Kind != SocialKind::PeaceSummit && e->Kind != SocialKind::PeaceForced) || e->Faction == nullptr || e->Rival == nullptr) continue;
+			if (Witness::IsWitnessed(e->Kind)) { Witnessed(civ, galaxy, *e, jd); if (e->Kind != SocialKind::PeaceMade) continue; }
+			if ((e->Kind != SocialKind::PeaceSummit && e->Kind != SocialKind::PeaceForced && e->Kind != SocialKind::PeaceMade) || e->Faction == nullptr || e->Rival == nullptr) continue;
 			auto x = Civilization::Make(SocialKind::PrisonersExchanged, jd, e->Where, e->System);
 			x->Faction = e->Faction;
 			x->Rival = e->Rival;

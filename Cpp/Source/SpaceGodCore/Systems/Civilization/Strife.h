@@ -25,6 +25,7 @@ namespace SpaceGod::Core
 	class Galaxy;
 	class Org;
 	class Settlement;
+	class SocialEvent;
 	class Society;
 
 	/// <summary>A world downing tools (US-T280; Commerce's unions call them too).</summary>
@@ -79,6 +80,10 @@ namespace SpaceGod::Core
 		void Mercenaries(Civilization& civ, Galaxy& galaxy, Society& society, double jd);
 		void Admiralty(Civilization& civ, Galaxy& galaxy, Society& society, double jd);
 		void React(Civilization& civ, Galaxy& galaxy, double jd);
+		/// <summary>US-T292: what the wider simulation did (Witness): conquest grows cells, war calls up the reserves.</summary>
+		void Witnessed(Civilization& civ, Galaxy& galaxy, const SocialEvent& e, double jd);
+		/// <summary>Calls up a state's reserves (Conscription): manpower, at a price in weariness and mood.</summary>
+		void Draft(Civilization& civ, Galaxy& galaxy, const cs::Ref<Faction>& f, double jd);
 		void Burn(Civilization& civ, Galaxy& galaxy, Society& society, const cs::Ref<Settlement>& s, double share, double jd);
 
 		SG_SERIALIZABLE(Strife);

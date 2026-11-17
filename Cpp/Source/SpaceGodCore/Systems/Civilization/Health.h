@@ -52,6 +52,11 @@ namespace SpaceGod::Core
 		/// <summary>Worlds that were at war last month (for the baby boom), by name hash.</summary>
 		cs::List<int> lastWar = cs::List<int>();
 
+		/// <summary>US-T292: the last event read, and what the wider simulation did (Witness): a blight brings famine, a
+		/// devastated world relief and fever, a blockade empties the pharmacies.</summary>
+		int seenEvent = 0;
+		void React(Civilization& civ, Galaxy& galaxy, Society& society, double jd);
+
 		SG_SERIALIZABLE(Health);
 	};
 }

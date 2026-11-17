@@ -103,6 +103,11 @@ namespace SpaceGod::Core
 			case SocialKind::Championship: case SocialKind::MonumentRaised: case SocialKind::Outbreak: case SocialKind::Quarantine:
 			case SocialKind::Cured: case SocialKind::Disaster: case SocialKind::Relief: case SocialKind::Famine: case SocialKind::FoodAid:
 			case SocialKind::Investigation: case SocialKind::JournalistSilenced: case SocialKind::BabyBoom:
+			// Witness (US-T292): the wider simulation as the people take it.
+			case SocialKind::WorldConquered: case SocialKind::WorldLiberated: case SocialKind::WorldCeded: case SocialKind::WorldSeceded:
+			case SocialKind::WorldFallen: case SocialKind::WorldDevastated: case SocialKind::WarDeclared: case SocialKind::PeaceMade:
+			case SocialKind::PactBroken: case SocialKind::HavenStormed: case SocialKind::BattleFought: case SocialKind::FactionFallen:
+			case SocialKind::Blockade:
 				return true;
 			default:
 				return false;
@@ -236,6 +241,27 @@ namespace SpaceGod::Core
 			case SocialKind::JournalistSilenced: return L({ "Journalist {who} found dead on {world}.", "{who}, who was investigating {business}, has vanished." });
 			case SocialKind::CharityFounded: return L({ "{house} founds {org} on {world}.", "{org}, a new charity, opens on {world}." });
 			case SocialKind::Donation: return L({ "{org} gives {money} to the poor of {world}.", "{house} donates {money} through {org}." });
+
+			case SocialKind::WorldConquered: return L({ "{world} falls to {faction}; {rival}'s flag comes down.", "{faction} takes {world} from {rival}. Its people wake under a new flag." });
+			case SocialKind::WorldLiberated: return L({ "{world} is free: {faction}'s flag flies there again, and the streets fill.", "{faction} wins {world} back from {rival}, to cheers." });
+			case SocialKind::WorldCeded: return L({ "By the treaty, {world} is {faction}'s now; {rival} signs it away.", "{rival} cedes {world} to {faction}. Its people were not asked." });
+			case SocialKind::WorldSeceded: return L({ "{world} breaks from {rival} and flies a flag of its own.", "{world} declares itself free of {rival}." });
+			case SocialKind::WorldFallen: return L({ "{world} is lost, and {amount} people of {faction} with it.", "{world} falls silent; {faction} mourns." });
+			case SocialKind::WorldDevastated: return L({ "{world} is devastated: {amount} of its people are gone.", "Ruin on {world}; {faction} counts its dead." });
+			case SocialKind::WarDeclared: return L({ "War: {faction} declares war on {rival}.", "{faction} goes to war with {rival}; the recruiting offices open on {world}." });
+			case SocialKind::PeaceMade: return L({ "Peace between {faction} and {rival} after {amount} days of war.", "The war between {faction} and {rival} is over." });
+			case SocialKind::PactSigned: return L({ "{faction} and {rival} sign a pact.", "A new pact binds {faction} and {rival}." });
+			case SocialKind::PactBroken: return L({ "The pact between {faction} and {rival} is broken.", "{faction} and {rival} tear up their pact." });
+			case SocialKind::PirateHold: return L({ "Raiders of {faction} make their nest in {system}.", "Pirates hold a haven in {system}; traders fear the lanes." });
+			case SocialKind::HavenStormed: return L({ "The pirate nest of {rival} at {world} is stormed.", "{rival}'s haven at {world} burns; {system} breathes again." });
+			case SocialKind::PirateRaid: return L({ "Raiders of {rival} strike {faction}'s shipping off {world}.", "{amount} hulls lost to {rival}'s raiders near {world}." });
+			case SocialKind::BattleFought: return L({ "Battle at {system}: {faction} holds the field against {rival}; {amount} hulls lost.", "{faction} and {rival} clash at {system}." });
+			case SocialKind::FactionFallen: return L({ "{faction} is no more: its last world falls to {rival}.", "The end of {faction}." });
+			case SocialKind::MineAccident: return L({ "Accident in the mines of {world}.", "Miners trapped on {world}." });
+			case SocialKind::Blight: return L({ "Blight in the farms of {world}.", "{world}'s crops fail." });
+			case SocialKind::Rationing: return L({ "{faction} puts its people on rations.", "Ration books are issued on {world}." });
+			case SocialKind::Blockade: return L({ "{rival} blockades {world}.", "No ship gets through to {world}: {rival}'s blockade holds." });
+			case SocialKind::Embargo: return L({ "{faction} closes its ports to {rival}.", "Embargo: {rival}'s ships are turned away by {faction}." });
 			default: return L({ "Something happened on {world}." });
 		}
 	}

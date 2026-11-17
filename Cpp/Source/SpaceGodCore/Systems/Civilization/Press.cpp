@@ -10,6 +10,7 @@
 #include "Systems/Civilization/Narrator.h"
 #include "Systems/Civilization/Politics.h"
 #include "Systems/Civilization/Underworld.h"
+#include "Systems/Civilization/Witness.h"
 #include "Systems/Galaxy.h"
 #include "Systems/Society.h"
 
@@ -111,6 +112,7 @@ namespace SpaceGod::Core
 					if (c->System == e->System) c->PressTrust = cs::Math::Max(0.05, c->PressTrust - 0.05);
 				continue;
 			}
+			if (Witness::IsWitnessed(e->Kind)) Witnessed(civ, galaxy, *e, jd);
 			if (!Narrator::Notable(e->Kind) || e->Faction == nullptr || e->RunBy != nullptr || e->Unverified) continue;
 			// The outlets of the system run it, their way.
 			for (const auto& o : outlets)
@@ -127,6 +129,57 @@ namespace SpaceGod::Core
 				o->Strength = cs::Math::Min(1.0, o->Strength + 0.005);
 				break;
 			}
+		}
+	}
+
+	// ---------------------------------------------------------------- the wider simulation (US-T292, Witness)
+
+	void Press::Witnessed(Civilization& civ, Galaxy& galaxy, const SocialEvent& e, double jd)
+	{
+		std::uint32_t r = H(static_cast<std::uint32_t>(e.Id), 0x0474u);
+		switch (e.Kind)
+		{
+			case SocialKind::WorldConquered:
+			case SocialKind::WorldCeded:
+			{
+				// The new masters take the presses: an outlet of the world speaks for them now, or its brave editor is silenced.
+				for (const auto& o : civ.OrgsOf(OrgKind::Outlet))
+				{
+					if (o->Seat != e.Where || o->Faction == e.Faction) continue;
+					auto editor = o->Leader;
+					if (editor != nullptr && editor->Alive() && (Civilization::Has(editor, Trait::Brave) || Civilization::Has(editor, Trait::Honest))
+						&& Roll(H(r, static_cast<std::uint32_t>(o->Id)), 0.3))
+					{
+						o->EndedJd = jd;
+						auto x = Civilization::Make(SocialKind::JournalistSilenced, jd, e.Where, e.System);
+						x->Who = editor;
+						x->House = editor->House;
+						x->Org = o;
+						civ.Publish(galaxy, x);
+						continue;
+					}
+					o->Faction = e.Faction;
+					o->Stance = 0.6;
+				}
+				if (auto c = civ.CivicsOf(e.Where)) c->PressTrust = cs::Math::Max(0.05, c->PressTrust - 0.1);
+				break;
+			}
+			case SocialKind::WarDeclared:
+			{
+				// War sells papers, and the censors read them first.
+				for (const auto& o : civ.OrgsOf(OrgKind::Outlet))
+					if ((o->Faction == e.Faction || o->Faction == e.Rival) && o->Stance > 0) o->Strength = cs::Math::Min(1.0, o->Strength + 0.03);
+				for (const auto& c : civ.Worlds)
+					if (c->Where->Owner == e.Faction || c->Where->Owner == e.Rival) c->PressTrust = cs::Math::Max(0.05, c->PressTrust - 0.02);
+				break;
+			}
+			case SocialKind::FactionFallen:
+			{
+				for (const auto& o : civ.OrgsOf(OrgKind::Outlet))
+					if (o->Faction == e.Faction) o->Faction = nullptr;
+				break;
+			}
+			default: break;
 		}
 	}
 

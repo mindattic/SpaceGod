@@ -20,10 +20,12 @@ namespace SpaceGod::Core
 {
 	class Business;
 	class Civilization;
+	class Faction;
 	class Galaxy;
 	class Household;
 	class Org;
 	class Settlement;
+	class SocialEvent;
 	class Society;
 
 	/// <summary>A house's share of a business (US-T283).</summary>
@@ -79,6 +81,10 @@ namespace SpaceGod::Core
 		void Inventions(Civilization& civ, Galaxy& galaxy, Society& society, double jd);
 		void Crash(Civilization& civ, Galaxy& galaxy, const cs::Ref<Business>& b, double jd);
 		void React(Civilization& civ, Galaxy& galaxy, double jd);
+		/// <summary>US-T292: what the wider simulation did (Witness): conquest buys up or crashes firms, war moves the shares.</summary>
+		void Witnessed(Civilization& civ, Galaxy& galaxy, const SocialEvent& e, double jd);
+		/// <summary>Sends <paramref name="people"/> from a world to the best world of <paramref name="flag"/> (Refugees); false if none would have them.</summary>
+		bool Flee(Civilization& civ, Galaxy& galaxy, const cs::Ref<Settlement>& s, const cs::Ref<Faction>& flag, double people, double jd);
 
 		SG_SERIALIZABLE(Commerce);
 	};

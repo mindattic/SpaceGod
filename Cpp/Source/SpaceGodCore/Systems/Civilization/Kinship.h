@@ -22,6 +22,7 @@ namespace SpaceGod::Core
 	class Civilization;
 	class Galaxy;
 	class Household;
+	class SocialEvent;
 	class Society;
 
 	/// <summary>Two houses at daggers drawn (US-T277).</summary>
@@ -66,6 +67,9 @@ namespace SpaceGod::Core
 		cs::Ref<Feud> FeudBetween(const cs::Ref<Household>& a, const cs::Ref<Household>& b) const;
 		/// <summary>The hottest feud a house is in, or null.</summary>
 		cs::Ref<Feud> FeudOf(const cs::Ref<Household>& h) const;
+		/// <summary>US-T292: someone dies of what the galaxy did (a battle, a conquest, a fallen world): the eldest heir takes a
+		/// head's place, and the death is mirrored as an event so the inheritance and any succession follow.</summary>
+		void Bury(Civilization& civ, Galaxy& galaxy, Society& society, const cs::Ref<Citizen>& c, double jd);
 
 		// ---------------------------------------------------------------- the SpaceGod's hand (each returns "" or why not)
 		cs::String Declare(Civilization& civ, Galaxy& galaxy, const cs::Ref<Household>& a, const cs::Ref<Household>& b, double jd);
@@ -79,6 +83,8 @@ namespace SpaceGod::Core
 		cs::Ref<Feud> Start(Civilization& civ, Galaxy& galaxy, const cs::Ref<Household>& a, const cs::Ref<Household>& b, const cs::String& cause, double heat, double jd, bool steered);
 		void End(Civilization& civ, Galaxy& galaxy, const cs::Ref<Feud>& f, double jd);
 		void React(Civilization& civ, Galaxy& galaxy, Society& society, double jd);
+		/// <summary>US-T292: what the wider simulation did (Witness): conquest kills the brave and starts feuds, war heats them.</summary>
+		void Witnessed(Civilization& civ, Galaxy& galaxy, Society& society, const SocialEvent& e, double jd);
 		void Inherit(Civilization& civ, Galaxy& galaxy, Society& society, const cs::Ref<Household>& h, double jd);
 		void Feuding(Civilization& civ, Galaxy& galaxy, double jd);
 		void Straying(Civilization& civ, Galaxy& galaxy, Society& society, double jd);
