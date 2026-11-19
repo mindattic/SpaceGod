@@ -228,10 +228,12 @@ namespace SpaceGod::UI
 		int patchRows = static_cast<int>((patches.size() + 1) / 2);
 		bool weakLine = fighterSeat || weak != nullptr;
 		bool focusLine = battle->Hostile(me, t); // US-T339: how many of ours are on it, and how long it has left
+		bool prize = focusLine && Battle::OpenPrize(t); // US-T380: stunned, and whether it lies open to boarding
+		bool stunLine = t->Stunned > 0 || prize;
 
-		// Heading, name, class line, range line, (the focus line,) hull, heat, the shields' caption and rows, the subsystems' caption, the
+		// Heading, name, class line, range line, (the focus line,) (the stun line,) hull, heat, the shields' caption and rows, the subsystems' caption, the
 		// weak point and its key; then as many subsystem kinds as the column has room for.
-		float fixedH = 6 + RowH * 4 + (focusLine ? RowH : 0) + RowH * 2 + RowH + patchRows * RowH + RowH + (weakLine ? RowH * 2 : 0) + 8;
+		float fixedH = 6 + RowH * 4 + (focusLine ? RowH : 0) + (stunLine ? RowH : 0) + RowH * 2 + RowH + patchRows * RowH + RowH + (weakLine ? RowH * 2 : 0) + 8;
 		float room = layout.FreeRight() - HudLayout::Gap;
 		int kindRows = static_cast<int>(kinds.size());
 		if (fixedH + kindRows * RowH > room) kindRows = std::max(0, static_cast<int>((room - fixedH) / RowH));
@@ -272,6 +274,15 @@ namespace SpaceGod::UI
 			double eta = TimeToKill(*battle, *t, c->Hull + c->Shield());
 			cs::String who = ours == 0 ? cs::String("you alone") : cs::Cat("you + ", ours, " of ours");
 			DrawLabel(FitText(cs::Cat("FOCUS  ", who, "  \xC2\xB7  ", KillText(eta)), minorLabel, w), Vector2(x, y), ours > 0 ? Accent : Dim, true);
+			y += RowH;
+		}
+		// US-T380: an EMP's stun on it, and whether it lies open to boarding (Battle::OpenPrize).
+		if (stunLine)
+		{
+			cs::String stun = t->Stunned > 0 ? cs::Cat("STUNNED ", Mathf::CeilToInt(static_cast<float>(t->Stunned)), " s") : cs::String();
+			cs::String open = prize ? cs::String("OPEN PRIZE  \xC2\xB7  open to boarding") : cs::String();
+			DrawLabel(FitText(stun.empty() ? open : open.empty() ? stun : cs::Cat(stun, "  \xC2\xB7  ", open), minorLabel, w), Vector2(x, y),
+				prize ? LockColor : Color(1.0f, 0.62f, 0.32f, 1.0f), true);
 			y += RowH;
 		}
 

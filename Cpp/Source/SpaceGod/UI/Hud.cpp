@@ -1143,7 +1143,21 @@ namespace SpaceGod::UI
 			DrawBrackets(Rect(lp.x - half, lp.y - half, half * 2, half * 2), made ? LockColor : HostileColor, made ? 2.5f : 1.5f);
 			cs::String state = made ? cs::String("LOCKED") : cs::Cat("LOCKING ", Mathf::RoundToInt(static_cast<float>(me->LockProgress) * 100), "%");
 			WorldLabels wl(worldLabelPass); // US-T214
-			DrawLabel(cs::Cat(state, "  ", RangeText((locked->Pos - me->Pos).Length())), lp + Vector2(half + 6, -8), made ? LockColor : HostileColor, true);
+			DrawLabel(cs::Cat(state, "  ", RangeText((locked->Pos - me->Pos).Length()),
+				Battle::OpenPrize(locked) && battle->Hostile(me, locked) ? cs::String("  OPEN PRIZE") : cs::String()), // US-T380
+				lp + Vector2(half + 6, -8), made ? LockColor : HostileColor, true);
+		}
+		// US-T380: every other hostile hull on screen that lies open to boarding (Battle::OpenPrize) is tagged, so a prize
+		// is seen before it is locked.
+		for (const auto& o : battle->Units)
+		{
+			if (o == me || o == locked || !o->Present() || o->Captured || !battle->Hostile(me, o) || !Battle::OpenPrize(o)) continue;
+			Vector2 op;
+			float od = 0;
+			if (!app->ToGui(app->BattleScene(battle, o->Pos), op, od)) continue;
+			WorldLabels wl(worldLabelPass);
+			DrawRing(op, 12, LockColor);
+			DrawLabel("OPEN PRIZE", op + Vector2(16, -8), LockColor, true);
 		}
 
 		// The lead pip for the guns' rounds, on the locked hull or else the one nearest the crosshair.
@@ -1173,6 +1187,9 @@ namespace SpaceGod::UI
 		for (const auto& s : c->Subsystems) shieldSum += s->Shield;
 		DrawGauge(Rect(x0 + 2 * (w + 14), y, w, 6), static_cast<float>(shieldSum / maxShield), Color(0.45f, 0.7f, 1.0f), "SHIELDS");
 		DrawGauge(Rect(x0 + 3 * (w + 14), y, w, 6), static_cast<float>(c->Hull / cs::Math::Max(1e-9, c->Spec->Hull)), ProgradeColor, "HULL");
+		// US-T380: an EMP's stun, which silences the guns and drives, said plainly over the gauges while it lasts.
+		if (me->Stunned > 0)
+			DrawLabel(cs::Cat("SYSTEMS KNOCKED OUT ", Mathf::CeilToInt(static_cast<float>(me->Stunned)), " s"), Vector2(x0, y - 34), HostileColor, true);
 		// The guided rounds, homing and hive, apart from the dumb-fire rockets, which need no lock (US-T101).
 		int missiles = 0, hive = 0, rockets = 0; // c.Subsystems.Where(...).Sum(s => s.Ammo)
 		for (const auto& s : c->Subsystems)
