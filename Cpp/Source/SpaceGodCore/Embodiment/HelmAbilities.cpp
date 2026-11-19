@@ -252,6 +252,22 @@ namespace SpaceGod::Core
 				bar.Add(e);
 			}
 		}
+		// US-T350: with hulls of its side in reach, it can call them to hold fire, and the same slot calls weapons free.
+		if (fight)
+		{
+			int holders = b->HoldersInReach(u);
+			bool standing = b->Seconds < u->HoldFireCallUntil;
+			if (holders > 0 || standing)
+			{
+				HelmAbilityEntry e;
+				e.Ability = HelmAbility::HoldFire;
+				e.Label = standing ? "Weapons free" : "Hold fire";
+				e.State = standing ? cs::Cat("holding fire, ", cs::Fmt(u->HoldFireCallUntil - b->Seconds, "0"), " s")
+					: cs::Cat(holders, holders == 1 ? " hull in reach" : " hulls in reach");
+				e.Ready = true;
+				bar.Add(e);
+			}
+		}
 		// US-T140: a hull with a squad of its band about it orders it through its captain, before any fight (last, so the
 		// slots above keep their keys).
 		if (world != nullptr && SquadOrders::SquadOf(world, ship).Count() > 0)
@@ -431,6 +447,16 @@ namespace SpaceGod::Core
 				auto why = b->OrderRushRepair(u, worst);
 				return why.empty() ? cs::Cat("Damage control: every team to the repairs for ", cs::Fmt(Battle::RushRepairSeconds, "0"),
 					" s, the ", worst, " first; the guns reload at half pace") : cs::Cat("No damage control rush: ", why);
+			}
+			case HelmAbility::HoldFire:
+			{
+				int answering = 0;
+				bool lifted = false;
+				auto why = b->OrderHoldFireCall(u, answering, lifted);
+				if (!why.empty()) return cs::Cat("No hold fire: ", why);
+				if (lifted) return "Weapons free: our hulls open fire again";
+				return cs::Cat("Hold fire: ", answering, answering == 1 ? " hull holds its guns" : " hulls hold their guns", " for ",
+					cs::Fmt(Battle::HoldFireCallSeconds, "0"), " s, point defence still up (again: weapons free)");
 			}
 			default:
 				return "";

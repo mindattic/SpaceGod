@@ -392,6 +392,14 @@ namespace SpaceGod::Core
 		FlightDecks::Step(self, dt);
 		// Nothing overlaps: hulls push apart and take the knock on the section struck (US-T177).
 		StepCollisions();
+		// US-T350: whether a player's helm has a call to hold fire standing (never, in a fight nobody holds).
+		HoldFireStanding = false;
+		for (const auto& c : Units)
+			if (Seconds < c->HoldFireCallUntil)
+			{
+				HoldFireStanding = true;
+				break;
+			}
 		for (int i = 0; i < Units.Count(); i++)
 		{
 			auto u = Units[i];
@@ -1217,6 +1225,8 @@ namespace SpaceGod::Core
 		}
 		// A braced crew is holding on, not working its guns: they load, but only point defence fires (U.SPC-T425).
 		bool braced = !Broadsides::Fires(u);
+		// US-T350: held by a player's call to hold fire, the same: the guns load, only point defence fires.
+		if (!braced && HeldFireByCall(u)) braced = true;
 		// The volleys are worked out afresh this step, now every gun is as loaded as it will be (U.SPC-T425).
 		Broadsides::BeginVolleys(u);
 		// The captain tunes the phaser arrays for the fight as it stands: a lance or a sweep (U.SPC-T488).

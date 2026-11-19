@@ -272,6 +272,10 @@ namespace SpaceGod::Core
 		/// <see cref="Battle.RushRepairFireScale"/> of their pace. Never set by the AI.</summary>
 		double RushRepairUntil = 0;
 
+		/// <summary>US-T350: the battle second the player at this helm's call to hold fire lapses (<see cref="Battle.OrderHoldFireCall"/>):
+		/// until then its side's hulls within reach hold every gun but their point defence. Never set by the AI.</summary>
+		double HoldFireCallUntil = 0;
+
 		/// <summary>Taken by boarders: it has changed sides and carries a prize crew, so it no longer fights.</summary>
 		bool Captured = false;
 
@@ -1475,6 +1479,28 @@ namespace SpaceGod::Core
 		/// when given, else why not.
 		/// </summary>
 		cs::String OrderRushRepair(const cs::Ref<BattleUnit>& u, cs::String& worst);
+
+		/// <summary>US-T350: how long a call to hold fire stands unless weapons free is called first, battle seconds.</summary>
+		static constexpr double HoldFireCallSeconds = 60;
+
+		/// <summary>US-T350: whether any call to hold fire stands this step (worked out at the top of each <see cref="Step"/>, so
+		/// not saved; false in any fight nobody holds, where <see cref="HeldFireByCall"/> then costs nothing).</summary>
+		bool HoldFireStanding = false;
+
+		/// <summary>
+		/// US-T350: the helm's call to hold fire, or weapons free when one of its own stands. Held, its side's hulls (not craft, not
+		/// a player's) within <see cref="FleetCoordination.ReachKm"/> hold every gun but their point defence for
+		/// <see cref="HoldFireCallSeconds"/>. <paramref name="answering"/> is how many heard it; <paramref name="lifted"/> is true
+		/// when it called weapons free. Empty when given, else why not.
+		/// </summary>
+		cs::String OrderHoldFireCall(const cs::Ref<BattleUnit>& u, int& answering, bool& lifted);
+
+		/// <summary>US-T350: whether a standing call to hold fire from a hull of <paramref name="u"/>'s side within reach holds its
+		/// guns. Always false for craft, a player's hull, or while no call stands.</summary>
+		bool HeldFireByCall(const cs::Ref<BattleUnit>& u);
+
+		/// <summary>US-T350: how many hulls of <paramref name="u"/>'s side within reach a call to hold fire would hold (the bar's count).</summary>
+		int HoldersInReach(const cs::Ref<BattleUnit>& u);
 
 		/// <summary>A carrier's helm orders (<see cref="BattleUnit.WingHeld"/>) lapse once nobody holds its helm or flies one of
 		/// its craft: the recall and the call are lifted and its captain launches the wing held aboard, as at the start of a fight.</summary>

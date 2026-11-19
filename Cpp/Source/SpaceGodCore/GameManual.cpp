@@ -896,6 +896,8 @@ namespace SpaceGod::Core
 				  "just behind you, away from the enemy, for 30 seconds. "
 				  "While a system of yours can still be mended, Damage control sends every team aboard to the repairs for 20 seconds: "
 				  "they work three times as fast, the worst-hurt system first, while your guns reload at half pace. "
+				  "Hold fire has your side's hulls within reach hold every gun but their point defence for 60 seconds; the same slot, "
+				  "then Weapons free, lifts it at once. "
 				  "Out of a fight a hull with none of these has no bar. The orders are for a fight: out of one they are refused, "
 				  "saying why, and a carrier you fly into a fight holds its wing aboard for you to launch. Shift+/ then jumps you "
 				  "straight into the craft launched last, again into the next, and past the last back to the carrier's helm; "

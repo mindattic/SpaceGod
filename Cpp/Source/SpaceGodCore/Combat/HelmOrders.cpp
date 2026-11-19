@@ -326,6 +326,63 @@ namespace SpaceGod::Core
 		return cs::String();
 	}
 
+	namespace
+	{
+		/// <summary>US-T350: whether <paramref name="o"/> is a hull a call to hold fire holds (an AI hull still fighting; not a craft).</summary>
+		bool HoldsOnCall(const cs::Ref<BattleUnit>& o)
+		{
+			return o->Kind != UnitKind::Fighter && o->Combat != nullptr && !o->PlayerControlled() && o->Present() && !o->Captured
+				&& !o->Surrendering;
+		}
+	}
+
+	int Battle::HoldersInReach(const cs::Ref<BattleUnit>& u)
+	{
+		if (u == nullptr) return 0;
+		double reach = FleetCoordination::ReachKm()->Value;
+		int n = 0;
+		for (const auto& o : Units)
+		{
+			if (o == u || o->Side != u->Side || !HoldsOnCall(o)) continue;
+			if ((o->Pos - u->Pos).Length() > reach) continue;
+			n++;
+		}
+		return n;
+	}
+
+	cs::String Battle::OrderHoldFireCall(const cs::Ref<BattleUnit>& u, int& answering, bool& lifted)
+	{
+		answering = 0;
+		lifted = false;
+		if (u == nullptr || u->Combat == nullptr) return "no hull at the helm";
+		if (Seconds < u->HoldFireCallUntil)
+		{
+			// Weapons free: the call is lifted now, whoever was holding on it.
+			u->HoldFireCallUntil = 0;
+			lifted = true;
+			answering = HoldersInReach(u);
+			return cs::String();
+		}
+		if (!u->Present() || u->Captured || u->Surrendering) return "the hull is out of the fight";
+		answering = HoldersInReach(u);
+		if (answering == 0) return cs::Cat("no hull of ours within ", Km(FleetCoordination::ReachKm()->Value));
+		u->HoldFireCallUntil = Seconds + HoldFireCallSeconds;
+		HoldFireStanding = true;
+		return cs::String();
+	}
+
+	bool Battle::HeldFireByCall(const cs::Ref<BattleUnit>& u)
+	{
+		if (!HoldFireStanding || u == nullptr || !HoldsOnCall(u)) return false;
+		double reach = FleetCoordination::ReachKm()->Value;
+		for (const auto& c : Units)
+		{
+			if (c == u || Seconds >= c->HoldFireCallUntil || c->Side != u->Side || !c->Present() || c->Captured || c->Surrendering) continue;
+			if ((c->Pos - u->Pos).Length() <= reach) return true;
+		}
+		return false;
+	}
+
 	void Battle::HelmOrdersLapse(const cs::Ref<BattleUnit>& u)
 	{
 		if (!(u->WingHeld || u->WingRecalled || u->WingCall != 0) || u->PlayerControlled()) return;

@@ -59,6 +59,10 @@ namespace SpaceGod::Core
 		/// <summary>US-T347: send every damage control team to the repairs for a while, the guns slower meanwhile
 		/// (<see cref="Battle.OrderRushRepair"/>), on the bar in a fight while a system can be mended, after the call to fall back.</summary>
 		RushRepairs = 18,
+
+		/// <summary>US-T350: call the side's hulls within reach to hold fire, or weapons free while the call stands
+		/// (<see cref="Battle.OrderHoldFireCall"/>), on the bar in a fight while one is in reach, after damage control.</summary>
+		HoldFire = 19,
 	};
 
 	/// <summary>One entry of a helm's ability bar: what it does, and how it stands now (craft aboard, reloading, ready).</summary>
