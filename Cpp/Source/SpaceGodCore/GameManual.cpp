@@ -524,10 +524,13 @@ namespace SpaceGod::Core
 				T("Port services and docking clearance", // US-T266
 				  "At a helm alongside a port, Shift+M asks for docking clearance: the port weighs its trade with your hull and "
 				  "its owner's standing toward the pilot. Once docked, one port screen holds tabs for the Market, Outfitting (at a "
-				  "yard), Repair and Rearm, Contracts, Bounties, Fleet and property, the Trade desk, Crew and News; their own keys "
+				  "yard), Repair and Rearm, Contracts, Bounties, Fleet and property, the Trade desk, Crew, Locals and News; their own keys "
 				  "still open them directly. Repair and Rearm quotes the hull, each hurt hardpoint, the shields, magazines and tanks "
-				  "with parts at the yard's prices and labour, item by item or Repair all. Flying off, or leaving the helm, undocks "
-				  "and closes the screen."),
+				  "with parts at the yard's prices and labour, item by item or Repair all. Locals is the world's people: how they "
+				  "feel about their flag, its unrest, crime, sickness and war weariness, its fashion, faith, landmark and monument, "
+				  "any quarantine, the houses that live there, the family firms with an office there and the latest local news; its "
+				  "Society screen button opens that screen on this world. Flying off, or leaving the helm, undocks "
+				  "and closes the screen."), // US-T313
 				T("Exploration rewards and cartographers", // US-T260
 				  "Exploring pays. Charting a star past the known neighbourhood, being first to a body there, visiting a void sight, "
 				  "seeing an anomaly through or coming on a graveyard leaves survey data aboard the hull you are embodied in, worth "

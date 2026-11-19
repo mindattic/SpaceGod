@@ -136,6 +136,10 @@ private:
 	/// <summary>The Crew tab: who is aboard against the hull's complement, the brig, and the fleet's captains.</summary>
 	void DrawPortCrew(const cs::Ref<Core::Ship>& ship, Rect area, float rowH);
 
+	/// <summary>US-T313: the Locals tab, the docked world's people: its mood, its houses, the firms with an office there and
+	/// the latest local news, with a button to the Society screen on this world. Read only.</summary>
+	void DrawPortLocals(const cs::Ref<Core::Settlement>& port, Rect area, float rowH);
+
 	/// <summary>One line of Repair &amp; Rearm, as its button does it (also a co-op frame's "repair").</summary>
 	void RepairAt(const cs::Ref<Core::Settlement>& port, Core::RepairItemKind kind, int index);
 

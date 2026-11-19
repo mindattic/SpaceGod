@@ -66,6 +66,13 @@ namespace SpaceGod
 		if (societyScreen->Draw(cs::Cat("Esc or ", Input::KeyBindings::Keys(Input::KeyAction::Society), " to close"))) ShowSociety = false;
 	}
 
+	void UnitySpaceApp::OpenSocietyAt(const CivPick& p)
+	{
+		if (!societyScreen) societyScreen = cs::New<UI::SocietyScreen>(this);
+		societyScreen->Show(p);
+		ShowSociety = true;
+	}
+
 	void UnitySpaceApp::DestroySocietyTextures()
 	{
 		if (societyScreen) societyScreen->DestroyOwnedTextures();

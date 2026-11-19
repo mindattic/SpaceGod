@@ -56,6 +56,9 @@ namespace SpaceGod::UI
 		/// Whether the search has the keys (the owner hands the game's input over meanwhile; US-T298).
 		bool Typing() const { return typing; }
 
+		/// US-T313: picks <paramref name="p"/> (remembered for Back), on the page that lists it.
+		void Show(const CivPick& p);
+
 		/// US-T299: whether <paramref name="e"/> is about <paramref name="p"/> (a house's people's doings are the house's).
 		/// Public for the watch list's news (US-T304, UnitySpaceApp::UpdateSocietyWatch).
 		static bool About(const Core::SocialEvent& e, const CivPick& p);

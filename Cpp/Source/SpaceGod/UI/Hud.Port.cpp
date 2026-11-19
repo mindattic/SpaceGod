@@ -20,6 +20,12 @@
 #include "Economy/Holdings.h"
 #include "Economy/Settlement.h"
 #include "Law/Law.h"
+#include "Astro.h"
+#include "SimClock.h"
+#include "Systems/Civilization/Civilization.h"
+#include "Systems/Civilization/Culture.h"
+#include "Systems/Civilization/Narrator.h"
+#include "Systems/Society.h"
 
 using namespace SpaceGod::Core;
 
@@ -41,6 +47,7 @@ namespace SpaceGod::UI
 				case Tab::Fleet: return "Fleet & property";
 				case Tab::Trade: return "Trade desk";
 				case Tab::Crew: return "Crew";
+				case Tab::Locals: return "Locals";
 				case Tab::News: return "News";
 			}
 			return "";
@@ -104,6 +111,7 @@ namespace SpaceGod::UI
 		float body = 24;
 		if (app->PortTabOpen == Tab::Repair) body = 26 + static_cast<float>(cs::Math::Max(1, cs::Math::Min(quote.Count(), maxRows))) * rowH + (quote.Count() > maxRows ? rowH : 0);
 		else if (app->PortTabOpen == Tab::Crew) body = 5 * rowH;
+		else if (app->PortTabOpen == Tab::Locals) body = 11 * rowH; // US-T313
 		float h = 84 + body;
 		auto r = Panel(Rect((Screen::width - w) * 0.5f, Screen::height - h - 48, w, h));
 
@@ -131,6 +139,7 @@ namespace SpaceGod::UI
 		{
 			case Tab::Repair: DrawPortRepairs(ship, port, factor, quote, Rect(r.x, y, w, body), rowH, maxRows); break;
 			case Tab::Crew: DrawPortCrew(ship, Rect(r.x, y, w, body), rowH); break;
+			case Tab::Locals: DrawPortLocals(port, Rect(r.x, y, w, body), rowH); break;
 			default:
 			{
 				cs::String key = TabKey(app->PortTabOpen);
@@ -234,6 +243,98 @@ namespace SpaceGod::UI
 		GUI::Label(Rect(area.x + 12, y, area.width - 160, rowH), "Captains are hired and dismissed for each ship on Fleet & property.", small);
 		GUI::contentColor = Color::white();
 		if (GUI::Button(Rect(area.xMax() - 150, y - 1, 138, rowH - 2), "Fleet & property", button)) app->OpenPortTab(Tab::Fleet);
+	}
+
+	void Hud::DrawPortLocals(const cs::Ref<Settlement>& port, Rect area, float rowH)
+	{
+		float y = area.y, x = area.x + 12, lw = area.width - 24;
+		GUI::contentColor = Color::white();
+		auto pct = [](double v) { return cs::Cat(cs::Fmt(v * 100, "0"), "%"); };
+		auto date = [](double jd) { return jd <= 0 ? cs::String("?") : Astro::ToDateTime(jd).ToString("yyyy-MM-dd"); };
+		auto civ = app->Galaxy != nullptr ? Civilization::Find(*app->Galaxy) : nullptr;
+		auto society = app->Galaxy != nullptr ? Society::Find(*app->Galaxy) : nullptr;
+		double jd = app->Clock != nullptr ? app->Clock->Jd : 0;
+		if (GUI::Button(Rect(area.xMax() - 150, y - 1, 138, rowH - 2), "Society screen", button)) app->OpenSocietyAt(CivPick::World(port->Name));
+		if (civ == nullptr)
+		{
+			GUI::Label(Rect(x, y, lw - 150, rowH), cs::Cat("The people of ", port->Name, " have not woken yet: let a day pass and look again."), small);
+			return;
+		}
+
+		cs::Ref<Civics> c;
+		for (const auto& w : civ->Worlds)
+			if (w != nullptr && w->Where != nullptr && w->Where->Name == port->Name) { c = w; break; }
+		if (c != nullptr)
+		{
+			GUI::Label(Rect(x, y, lw - 150, rowH), cs::Cat("Approval of ", port->Owner != nullptr ? port->Owner->Name : cs::String("its flag"), " ", c->Approval >= 0 ? "+" : "",
+				cs::Fmt(c->Approval, "0.00"), "   ·   unrest ", pct(port->Unrest), "   ·   crime ", pct(c->Crime), "   ·   sick ", pct(c->Infected),
+				"   ·   war weariness ", pct(c->Weariness)), small);
+			y += rowH;
+			GUI::Label(Rect(x, y, lw, rowH), cs::Cat("Fashion: ", Culture::TrendName(c->Trend),
+				c->Faith != nullptr ? cs::Cat("   ·   faith: ", Narrator::OrgName(*c->Faith), " ", pct(c->FaithShare)) : cs::String(),
+				!c->Landmark.empty() ? cs::Cat("   ·   landmark: ", c->Landmark) : cs::String(),
+				!c->Monument.empty() ? cs::Cat("   ·   monument: ", c->Monument) : cs::String()), small);
+			y += rowH;
+			if (c->Quarantined(jd))
+			{
+				GUI::contentColor = HostileColor;
+				GUI::Label(Rect(x, y, lw, rowH), cs::Cat("QUARANTINED until ", date(c->QuarantineUntil), ": sickness is loose here"), small);
+				GUI::contentColor = Color::white();
+				y += rowH;
+			}
+		}
+		else
+		{
+			GUI::Label(Rect(x, y, lw - 150, rowH), cs::Cat(port->Name, " keeps no civic record yet   ·   unrest ", pct(port->Unrest)), small);
+			y += rowH;
+		}
+
+		if (society != nullptr)
+		{
+			auto houses = society->HousesOf(port);
+			cs::String names;
+			int shown = 0;
+			for (const auto& h : houses)
+			{
+				if (h == nullptr || shown >= 4) continue;
+				auto head = h->Head();
+				names = cs::Cat(names, names.empty() ? "" : ",  ", "House ", h->Surname, head != nullptr ? cs::Cat(" (", head->Given, ")") : cs::String());
+				shown++;
+			}
+			GUI::Label(Rect(x, y, lw, rowH), houses.Count() == 0 ? cs::String("No founding house lives here")
+				: cs::Cat("Houses here: ", names, houses.Count() > shown ? cs::Cat(" and ", houses.Count() - shown, " more") : cs::String()), small);
+			y += rowH;
+
+			cs::String firms;
+			int firmCount = 0;
+			for (const auto& b : society->Businesses)
+			{
+				if (b == nullptr || !b->Trading()) continue;
+				bool here = b->Home == port;
+				for (const auto& br : b->Branches)
+					if (br == port) here = true;
+				if (!here) continue;
+				if (firmCount++ < 4) firms = cs::Cat(firms, firms.empty() ? "" : ",  ", b->Name);
+			}
+			GUI::Label(Rect(x, y, lw, rowH), firmCount == 0 ? cs::String("No family firm keeps an office here")
+				: cs::Cat("Firms with an office here: ", firms, firmCount > 4 ? cs::Cat(" and ", firmCount - 4, " more") : cs::String()), small);
+			y += rowH;
+		}
+
+		GUI::contentColor = Dim;
+		GUI::Label(Rect(x, y, lw, rowH), "Local news", small);
+		y += rowH;
+		GUI::contentColor = Color::white();
+		int told = 0;
+		for (int i = civ->Events.Count() - 1; i >= 0 && told < 5; i--)
+		{
+			const auto& e = civ->Events[i];
+			if (e == nullptr || e->Where == nullptr || e->Where->Name != port->Name) continue;
+			GUI::Label(Rect(x, y, lw, rowH), cs::Cat(date(e->Jd), "   ", Narrator::Render(*e)), small);
+			y += rowH;
+			told++;
+		}
+		if (told == 0) GUI::Label(Rect(x, y, lw, rowH), cs::Cat("Nothing of note has happened on ", port->Name, " lately."), small);
 	}
 
 	void Hud::RepairAt(const cs::Ref<Settlement>& port, RepairItemKind kind, int index)

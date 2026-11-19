@@ -266,7 +266,7 @@ public:
 	// ---------------------------------------------------------------- the port screen (US-T266)
 
 	/// <summary>The port screen's tabs, in the order its strip shows them.</summary>
-	enum class PortTab : int { Market, Outfitting, Repair, Contracts, Bounties, Fleet, Trade, Crew, News };
+	enum class PortTab : int { Market, Outfitting, Repair, Contracts, Bounties, Fleet, Trade, Crew, Locals /* US-T313 */, News };
 
 	/// <summary>US-T266: the port the held hull is docked at (Shift+M alongside it at a helm, with the port's clearance), or
 	/// null. Docked, the port screen gathers what the port offers under one strip of tabs; flying off (or leaving the helm)

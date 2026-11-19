@@ -267,6 +267,19 @@ namespace SpaceGod::UI
 		result.clear();
 	}
 
+	void SocietyScreen::Show(const CivPick& p)
+	{
+		switch (p.Kind)
+		{
+		case CivPickKind::House: page = Houses; break;
+		case CivPickKind::Person: page = People; break;
+		case CivPickKind::Org: page = Orgs; break;
+		case CivPickKind::World: page = Worlds; break;
+		default: break;
+		}
+		Go(Visit{ p, 0 });
+	}
+
 	void SocietyScreen::StepBack()
 	{
 		if (back.empty()) return;

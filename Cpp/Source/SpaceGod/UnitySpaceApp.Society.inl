@@ -23,6 +23,9 @@ public:
 	/// <summary>Draws the Society screen over the whole view (the Hud calls it while <see cref="ShowSociety"/>).</summary>
 	void DrawSociety();
 
+	/// <summary>US-T313: opens the Society screen with <paramref name="p"/> picked (the port's Locals tab opens it on the world docked at).</summary>
+	void OpenSocietyAt(const CivPick& p);
+
 	/// <summary>The screen's own textures go with the Hud's (U.SPC-T366).</summary>
 	void DestroySocietyTextures();
 
