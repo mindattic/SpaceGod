@@ -141,6 +141,7 @@ namespace SpaceGod::UI
 			{
 				if (fx.Kind != FxKind::ShieldHit && !(fx.Kind == FxKind::Impact && fx.Size > 0)) continue;
 				bool shield = fx.Kind == FxKind::ShieldHit;
+				(shield ? hitTally.TakenShield : hitTally.TakenHull)++;
 				auto from = fx.By != nullptr && fx.By != me && (fx.By->Pos - me->Pos).LengthSquared() > 1e-18 ? fx.By->Pos - me->Pos : fx.A - me->Pos;
 				if (from.LengthSquared() < 1e-18) from = -me->Forward;
 				from = from.Normalized();
@@ -175,6 +176,7 @@ namespace SpaceGod::UI
 					if (!ours) break;
 					auto kind = fx.Kind == FxKind::ShieldHit ? HitMark::Shield
 						: fx.Kind == FxKind::SubsystemDestroyed || fx.WeakPoint ? HitMark::WeakPoint : HitMark::Hull;
+					(kind == HitMark::Shield ? hitTally.Shield : kind == HitMark::WeakPoint ? hitTally.Weak : hitTally.Hull)++;
 					// The strongest of the frame's hits is the one marked.
 					if (!marked || static_cast<int>(kind) > static_cast<int>(hitMark)) hitMark = kind;
 					marked = true;
@@ -191,6 +193,7 @@ namespace SpaceGod::UI
 					if (ours || (hitStruck.TryGetValue(fx.Unit, last) && now - last < 4.0f))
 					{
 						ConfirmKill(fx.Unit, "destroyed", KillMarkColor, now);
+						hitTally.Destroyed++;
 						hitStruck.Remove(fx.Unit);
 					}
 					break;
@@ -202,6 +205,7 @@ namespace SpaceGod::UI
 					if (fx.Unit->Surrendering && hitStruck.TryGetValue(fx.Unit, last) && now - last < HitCreditSeconds)
 					{
 						ConfirmKill(fx.Unit, "struck colours", LockColor, now);
+						hitTally.Struck++;
 						hitStruck.Remove(fx.Unit);
 					}
 					break;
@@ -219,6 +223,7 @@ namespace SpaceGod::UI
 			if (hitDisabled.ContainsKey(u) || u->Combat == nullptr || !u->Combat->Disabled()) continue;
 			hitDisabled[u] = now;
 			ConfirmKill(u, "disabled", Color(1.0f, 0.62f, 0.3f, 1.0f), now);
+			hitTally.Disabled++;
 		}
 		for (const auto& u : drop) hitStruck.Remove(u);
 	}
@@ -253,6 +258,8 @@ namespace SpaceGod::UI
 		auto me = app->Travel->Active ? nullptr : HeldUnit(battle);
 		if (me == nullptr || battle == nullptr || me->Combat == nullptr)
 		{
+			if (hitBattle != nullptr && hitUnit != nullptr) CloseHitTally(hitBattle, hitUnit, now);
+			DrawAfterAction(now);
 			hitBattle = nullptr;
 			hitUnit = nullptr;
 			hitArcs.Clear();
@@ -263,7 +270,14 @@ namespace SpaceGod::UI
 		}
 		if (battle != hitBattle || me != hitUnit)
 		{
-			// A new fight or a new seat: what came before is not this unit's.
+			// A new fight or a new seat: what came before is not this unit's. Leaving a fight reports it; a new seat in the
+			// same fight starts its own tally.
+			if (hitBattle != nullptr && hitUnit != nullptr && battle != hitBattle) CloseHitTally(hitBattle, hitUnit, now);
+			hitTally = HitTally();
+			hitTally.SecondsFrom = battle->Seconds;
+			hitTally.HullFrom = HullShare(me);
+			hitTally.Where = battle->Name;
+			hitTallyDone = false;
 			hitBattle = battle;
 			hitUnit = me;
 			hitSeq = battle->FxSeq;
@@ -279,6 +293,7 @@ namespace SpaceGod::UI
 		cs::Ref<Subsystem> mount;
 		if (auto m = cs::As<MountedTurret>(app->HeldSeat())) mount = m->Mount;
 		TakeHitFx(battle, me, mount, now);
+		if (battle->Over || me->Dead || me->Fled) CloseHitTally(battle, me, now);
 
 		// The held hull's own state: its shields going down, its hull going critical.
 		double shield = ShieldShare(me), hull = HullShare(me);
@@ -353,6 +368,8 @@ namespace SpaceGod::UI
 
 		if (me->Present()) DrawThreatWarning(battle, me, at, now);
 
+		DrawAfterAction(now);
+
 		// The combat feed, right of the middle of the screen, newest last.
 		hitFeed.RemoveAll([&](const HitFeedLine& l) { return now - l.Born > HitFeedSeconds; });
 		float y = Screen::height * 0.5f + 34.0f, x = Screen::width * 0.5f + 90.0f;
@@ -426,5 +443,62 @@ namespace SpaceGod::UI
 		float alpha = PlayerOptions::Calm() ? 0.8f : 0.55f + 0.45f * Mathf::Sin(now * (count > 0 ? 14.0f : 7.0f));
 		auto size = label->CalcSize(GUIContent(banner));
 		DrawLabel(banner, Vector2(at.x - size.x * 0.5f, at.y - ringRadius - 22.0f - size.y), WithAlpha(tint, alpha), false);
+	}
+
+	void Hud::CloseHitTally(const cs::Ref<Battle>& battle, const cs::Ref<BattleUnit>& me, float now)
+	{
+		if (hitTallyDone) return;
+		hitTallyDone = true;
+		auto& t = hitTally;
+		// A fight the unit neither fired in nor took fire in (a seat taken for a look) is not worth a report.
+		if (t.Shield + t.Hull + t.Weak + t.TakenShield + t.TakenHull + t.Destroyed + t.Disabled + t.Struck == 0) return;
+		t.SecondsTo = battle->Seconds;
+		t.HullTo = me->Dead ? 0.0 : HullShare(me);
+		if (me->Dead) { t.Outcome = "HULL LOST"; t.Tint = HostileColor; }
+		else if (battle->Over && battle->Winner == me->Side) { t.Outcome = "VICTORY"; t.Tint = Color(0.55f, 1.0f, 0.62f, 1.0f); }
+		else if (battle->Over && battle->Winner < 0) { t.Outcome = "BROKE OFF"; t.Tint = Accent; }
+		else if (battle->Over) { t.Outcome = "DEFEAT"; t.Tint = HostileColor; }
+		else if (me->Fled) { t.Outcome = "WITHDREW"; t.Tint = LockWarnColor; }
+		else { t.Outcome = "LEFT THE FIGHT"; t.Tint = Accent; }
+		hitReport = t;
+		hitReportAt = now;
+	}
+
+	void Hud::DrawAfterAction(float now)
+	{
+		float age = now - hitReportAt;
+		if (age < 0 || age > AfterActionSeconds) return;
+		const auto& t = hitReport;
+		float alpha = Mathf::Min(1.0f, (AfterActionSeconds - age) / 1.5f);
+
+		int secs = Mathf::Max(0, Mathf::RoundToInt(static_cast<float>(t.SecondsTo - t.SecondsFrom)));
+		cs::String length = cs::Cat(secs / 60, ":", secs % 60 < 10 ? "0" : "", secs % 60);
+		auto pct = [](double share) { return cs::Cat(Mathf::RoundToInt(Mathf::Clamp01(static_cast<float>(share)) * 100), "%"); };
+		int hits = t.Shield + t.Hull + t.Weak;
+
+		cs::List<cs::String> lines;
+		lines.Add(cs::Cat(t.Where.empty() ? cs::String("the fight") : t.Where, "  \xC2\xB7  ", length));
+		lines.Add(hits == 0 ? cs::String("No hits landed")
+			: cs::Cat(hits, hits == 1 ? " hit" : " hits", "  \xC2\xB7  shield ", t.Shield, "  hull ", t.Hull, "  weak point ", t.Weak));
+		int downed = t.Destroyed + t.Disabled + t.Struck;
+		lines.Add(downed == 0 ? cs::String("No hulls downed")
+			: cs::Cat(t.Destroyed, " destroyed  \xC2\xB7  ", t.Disabled, " disabled  \xC2\xB7  ", t.Struck, " struck colours"));
+		lines.Add(cs::Cat("Taken  shield ", t.TakenShield, "  hull ", t.TakenHull, "  \xC2\xB7  hull ", pct(t.HullFrom), " \xE2\x86\x92 ", pct(t.HullTo)));
+
+		constexpr float w = 340, pad = 12, rowH = 18;
+		float h = pad * 2 + rowH * (1 + lines.Count());
+		auto r = Rect(Screen::width * 0.5f - w * 0.5f, 96.0f, w, h);
+		auto old = GUI::color;
+		GUI::color = WithAlpha(Color(1, 1, 1, 1), alpha);
+		GUI::Box(r, GUIContent::none(), panel);
+		GUI::color = old;
+		float y = r.y + pad;
+		DrawLabel(cs::Cat("AFTER ACTION  \xC2\xB7  ", t.Outcome), Vector2(r.x + pad, y), WithAlpha(t.Tint, alpha), false);
+		y += rowH + 2;
+		for (const auto& l : lines)
+		{
+			DrawLabel(FitText(l, minorLabel, w - 2 * pad), Vector2(r.x + pad, y), WithAlpha(Dim, alpha), true);
+			y += rowH;
+		}
 	}
 }

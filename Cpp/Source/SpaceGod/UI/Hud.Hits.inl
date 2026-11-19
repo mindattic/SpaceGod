@@ -9,7 +9,8 @@
 //   - a kill marker and a line in a small combat feed when a hull it hit is destroyed, disabled or strikes its colours;
 //   - arcs round the reticle pointing where the held hull is taking fire from, blue on the shield and red on the hull,
 //     fading out; and a pulse round the screen's edge when its shields go down and when its hull goes critical;
-//   - US-T300: a threat warning for warheads homing on it and hostiles locking it (DrawThreatWarning).
+//   - US-T300: a threat warning for warheads homing on it and hostiles locking it (DrawThreatWarning);
+//   - US-T303: an after-action report when its fight ends or it leaves the fight (DrawAfterAction).
 
 private:
 	enum class HitMark : int { Shield, Hull, WeakPoint };
@@ -31,6 +32,16 @@ private:
 		float Born = 0;
 	};
 
+	/// US-T303: what the held unit did and took in one fight, for the after-action report.
+	struct HitTally
+	{
+		int Shield = 0, Hull = 0, Weak = 0, Destroyed = 0, Disabled = 0, Struck = 0, TakenShield = 0, TakenHull = 0;
+		double SecondsFrom = 0, SecondsTo = 0, HullFrom = 1, HullTo = 1;
+		cs::String Where, Outcome;
+		Color Tint;
+	};
+
+	static constexpr float AfterActionSeconds = 12.0f;
 	static constexpr float HitMarkSeconds = 0.22f;
 	static constexpr float KillMarkSeconds = 0.75f;
 	static constexpr float HitArcSeconds = 1.4f;
@@ -59,6 +70,17 @@ private:
 	cs::Dictionary<cs::Ref<Core::BattleUnit>, float> hitStruck;
 	/// The hulls already reported disabled (or found so when first hit), so each is reported once.
 	cs::Dictionary<cs::Ref<Core::BattleUnit>, float> hitDisabled;
+	/// US-T303: the fight running, whether it has been reported, and the last report and when it was made.
+	HitTally hitTally, hitReport;
+	bool hitTallyDone = true;
+	float hitReportAt = -100.0f;
+
+	/// US-T303: ends the tally of <paramref name="me"/>'s fight in <paramref name="battle"/> (over, or left), making the
+	/// report if the unit fired or was fired on.
+	void CloseHitTally(const cs::Ref<Core::Battle>& battle, const cs::Ref<Core::BattleUnit>& me, float now);
+
+	/// US-T303: the after-action card, top middle, for a while after a fight is reported.
+	void DrawAfterAction(float now);
 
 	/// The frame's feedback: reads the new effects, then draws the markers, arcs, feed and edge pulses. Repaint only.
 	void DrawHitFeedback();
