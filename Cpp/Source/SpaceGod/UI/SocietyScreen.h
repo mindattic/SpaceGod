@@ -85,6 +85,9 @@ namespace SpaceGod::UI
 		/// US-T348: the most years the TIMELINE strip shows (the latest), and the most events a year opened under it lists.
 		static constexpr int TimelineYearsMax = 40;
 		static constexpr int TimelineListMax = 20;
+		/// US-T375: the most events a house's CHRONICLE tells (the earliest; the rest are counted), and the most names a decade links.
+		static constexpr int ChronicleMax = 60;
+		static constexpr int ChronicleNamesMax = 12;
 		/// US-T368: the most RIPE rows Your hand opens with (the most urgent first).
 		static constexpr int RipeMax = 8;
 
@@ -162,6 +165,21 @@ namespace SpaceGod::UI
 		int timelineOpen = 0;
 		std::vector<Recent> timelineRows;
 		cs::String timelineKey, timelinePick;
+		/// US-T375: one paragraph of a house's CHRONICLE: its decade (0: how the house stands now), its prose, and the people,
+		/// houses, organisations and businesses it names (to follow).
+		struct ChronicleDecade
+		{
+			int Decade = 0;
+			cs::String Prose;
+			std::vector<CivPick> Names;
+		};
+		/// US-T375: whether a house's CHRONICLE is drawn open (UI-side, kept from house to house), its paragraphs, every event
+		/// about the house, those past ChronicleMax left untold, and what it was built for.
+		bool chronicleOpen = false;
+		std::vector<ChronicleDecade> chronicle;
+		int chronicleTotal = 0;
+		int chronicleMore = 0;
+		cs::String chronicleKey;
 		Vector2 listScroll, detailScroll, pageScroll;
 
 		int page = Feed;
@@ -241,6 +259,13 @@ namespace SpaceGod::UI
 		/// is a 25-year band of births, as in FAMILY), the spouse beside each and the dead greyed; returns its height, draws only
 		/// when <paramref name="draw"/>, and sets <paramref name="follow"/> to the person a box was clicked for.</summary>
 		float DrawFamilyTree(float y, float w, int personId, Core::Galaxy& galaxy, double jd, bool draw, CivPick& follow);
+		/// US-T375: the CHRONICLE of the house <paramref name="houseId"/>: its founding, then its events in order (each in the
+		/// narrator's words), a paragraph a decade, and how it stands now.
+		void BuildChronicle(int houseId, Core::Galaxy& galaxy, Core::Civilization& civ);
+		/// <summary>US-T375: the CHRONICLE section at <paramref name="y"/>: a Chronicle button that opens the house's history as
+		/// prose, the names each paragraph mentions as links under it; returns its height, draws only when <paramref name="draw"/>,
+		/// and sets <paramref name="follow"/> to the thing a name was clicked for.</summary>
+		float DrawChronicle(float y, float w, Core::Galaxy& galaxy, Core::Civilization& civ, bool draw, CivPick& follow);
 
 		/// US-T344: one row of the side-by-side compare: what it is, the picked one's value and the marked one's, and which is
 		/// better (0 neither or no better way, 1 the picked, 2 the marked).

@@ -1121,6 +1121,135 @@ namespace SpaceGod::UI
 		return h;
 	}
 
+	// ---------------------------------------------------------------- a house's history, told (US-T375)
+
+	void SocietyScreen::BuildChronicle(int houseId, Galaxy& galaxy, Civilization& civ)
+	{
+		int n = civ.Events.Count();
+		int lastId = n > 0 && civ.Events[n - 1] != nullptr ? civ.Events[n - 1]->Id : 0;
+		auto society = Society::Find(galaxy);
+		auto house = society != nullptr ? society->HouseById(houseId) : nullptr;
+		auto head = house != nullptr ? house->Head() : nullptr;
+		int living = house != nullptr ? house->Living() : 0;
+		cs::String key = cs::Cat(houseId, "|", n, "|", lastId, "|", living, "|", head != nullptr ? head->Id : 0);
+		if (key == chronicleKey) return;
+		chronicleKey = key;
+		chronicle.clear();
+		chronicleTotal = 0;
+		chronicleMore = 0;
+		if (house == nullptr) return;
+
+		auto self = CivPick::House(houseId);
+		// The paragraph of a decade: the last one when it is that decade's, else a new one after it.
+		auto paragraph = [&](int decade) -> ChronicleDecade&
+		{
+			if (chronicle.empty() || chronicle.back().Decade != decade)
+			{
+				ChronicleDecade fresh;
+				fresh.Decade = decade;
+				chronicle.push_back(fresh);
+			}
+			return chronicle.back();
+		};
+		auto append = [](ChronicleDecade& d, const cs::String& s) { d.Prose = d.Prose.empty() ? s : cs::Cat(d.Prose, " ", s); };
+		auto name = [&](ChronicleDecade& d, const CivPick& p)
+		{
+			if (p.IsNone() || p == self || p.Kind == CivPickKind::World || static_cast<int>(d.Names.size()) >= ChronicleNamesMax) return;
+			if (std::find(d.Names.begin(), d.Names.end(), p) == d.Names.end()) d.Names.push_back(p);
+		};
+
+		if (house->FoundedJd > 0)
+		{
+			int founded = Astro::ToDateTime(house->FoundedJd).Year();
+			append(paragraph(founded / 10 * 10), cs::Cat("House ", house->Surname, " was founded",
+				house->Home != nullptr ? cs::Cat(" on ", house->Home->Name) : cs::String(), " in ", founded, "."));
+		}
+		// Its events in the order they happened, each in the narrator's words, the year named when it turns.
+		int told = 0, lastYear = 0;
+		for (int i = 0; i < n; i++)
+		{
+			const auto& e = civ.Events[i];
+			if (e == nullptr || e->Jd <= 0 || !About(*e, self)) continue;
+			chronicleTotal++;
+			if (told >= ChronicleMax)
+			{
+				chronicleMore++;
+				continue;
+			}
+			told++;
+			int year = Astro::ToDateTime(e->Jd).Year();
+			auto& d = paragraph(year / 10 * 10);
+			cs::String sentence = Narrator::Render(*e);
+			append(d, year != lastYear ? cs::Cat("In ", year, ": ", sentence) : sentence);
+			lastYear = year;
+			for (const auto& p : SubjectsOf(*e)) name(d, p);
+		}
+
+		// How it stands now.
+		ChronicleDecade today;
+		if (house->Scattered)
+			today.Prose = cs::Cat("Its world fell and House ", house->Surname, " was scattered; ", living, living == 1 ? " of its blood lives on." : " of its blood live on.");
+		else if (living == 0)
+			today.Prose = cs::Cat("None of House ", house->Surname, " lives now.");
+		else
+			today.Prose = cs::Cat("Today House ", house->Surname, " numbers ", living, " living", head != nullptr ? cs::Cat(", headed by ", head->FullName()) : cs::String(), ".");
+		if (head != nullptr) today.Names.push_back(CivPick::Person(head->Id));
+		chronicle.push_back(today);
+	}
+
+	float SocietyScreen::DrawChronicle(float y, float w, Galaxy& galaxy, Civilization& civ, bool draw, CivPick& follow)
+	{
+		static constexpr float DecadeH = 22, LinkRowH = 28, MoreH = 20, EmptyH = 24;
+		float top = y;
+		bool open = chronicleOpen;
+		if (draw)
+		{
+			GUI::Label(Rect(0, y, Mathf::Max(0.0f, w - 160), HeadingH - 4), open && chronicleTotal > 0
+				? cs::Cat("CHRONICLE  (", chronicleTotal, chronicleTotal == 1 ? " event)" : " events)") : cs::String("CHRONICLE"), heading);
+			if (GUI::Button(Rect(Mathf::Max(0.0f, w - 150), y, 146, 22), open ? "Hide chronicle" : "Chronicle", button)) chronicleOpen = !chronicleOpen;
+		}
+		y += HeadingH;
+		if (!open) return y - top + SectionGap;
+		if (chronicle.empty())
+		{
+			if (draw) GUI::Label(Rect(0, y, w, EmptyH - 4), "Nothing kept about it yet: its history is told here as it happens.", small);
+			return y + EmptyH - top + SectionGap;
+		}
+		for (const auto& d : chronicle)
+		{
+			if (draw) GUI::Label(Rect(0, y, w, DecadeH - 2), d.Decade > 0 ? cs::Cat("The ", d.Decade, "s") : cs::String("Now"), rowTitle);
+			y += DecadeH;
+			float ph = text->CalcHeight(GUIContent(d.Prose), w);
+			if (draw) GUI::Label(Rect(0, y, w, ph), d.Prose, text);
+			y += ph + 4;
+			if (!d.Names.empty())
+			{
+				float x = 0;
+				for (const auto& p : d.Names)
+				{
+					cs::String label = NameOf(p, galaxy, civ);
+					float bw = Mathf::Min(w, link->CalcSize(GUIContent(label)).x + 16);
+					if (x > 0 && x + bw > w)
+					{
+						x = 0;
+						y += LinkRowH;
+					}
+					if (draw && GUI::Button(Rect(x, y, bw, 24), label, link)) follow = p;
+					x += bw + 6;
+				}
+				y += LinkRowH;
+			}
+			y += 6;
+		}
+		if (chronicleMore > 0)
+		{
+			if (draw) GUI::Label(Rect(8, y, w - 8, MoreH - 2), cs::Cat("and ", chronicleMore, chronicleMore == 1 ? " later event" : " later events",
+				" untold here (the TIMELINE lists every year)"), small);
+			y += MoreH;
+		}
+		return y - top + SectionGap;
+	}
+
 	// ---------------------------------------------------------------- what came of the SpaceGod's hand (US-T325)
 
 	std::vector<CivPick> SocietyScreen::SubjectsOf(const SocialEvent& e)
@@ -1852,6 +1981,10 @@ namespace SpaceGod::UI
 		bool showTree = event == nullptr && selected.Kind == CivPickKind::Person; // US-T358
 		CivPick treeFollow;
 		familyH += showTree ? DrawFamilyTree(0, w, selected.Id, galaxy, jd, false, treeFollow) : 0.0f;
+		bool showChronicle = showFamily; // US-T375: a house's history, told
+		if (showChronicle && chronicleOpen) BuildChronicle(selected.Id, galaxy, civ);
+		CivPick chronicleFollow;
+		familyH += showChronicle ? DrawChronicle(0, w, galaxy, civ, false, chronicleFollow) : 0.0f;
 		bool showCompare = event == nullptr && Comparable(); // US-T344
 		CivPick compareFollow;
 		float compareH = showCompare ? DrawCompare(0, w, galaxy, civ, jd, false, compareFollow) : 0.0f;
@@ -1895,9 +2028,10 @@ namespace SpaceGod::UI
 		y += SectionGap;
 		if (showTrends) y += DrawTrends(y, w, selected.Name, civ, jd, true);
 		if (showFamily) y += DrawFamily(y, w, selected.Id, galaxy, jd, true, familyFollow);
+		if (showChronicle) y += DrawChronicle(y, w, galaxy, civ, true, chronicleFollow);
 		if (showTree) y += DrawFamilyTree(y, w, selected.Id, galaxy, jd, true, treeFollow);
 		if (showCompare) y += DrawCompare(y, w, galaxy, civ, jd, true, compareFollow);
-		CivPick follow = !compareFollow.IsNone() ? compareFollow : !treeFollow.IsNone() ? treeFollow : familyFollow;
+		CivPick follow = !compareFollow.IsNone() ? compareFollow : !treeFollow.IsNone() ? treeFollow : !chronicleFollow.IsNone() ? chronicleFollow : familyFollow;
 		if (!links.empty())
 		{
 			GUI::Label(Rect(0, y, w, HeadingH - 4), "SEE ALSO", heading);
