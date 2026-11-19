@@ -769,7 +769,29 @@ namespace SpaceGod
 	void UnitySpaceApp::OrderWing(const cs::Ref<FighterSeat>& f, WingOrder order)
 	{
 		int heard = f->OrderWing(order);
-		ShowToast(heard == 0 ? cs::String("No wingmen left to order") : cs::Cat("Wing (", heard, "): ", Wing::Label(order)));
+		if (heard == 0)
+		{
+			ShowToast("No wingmen left to order");
+			return;
+		}
+		// US-T312: what the order means right now, so a wing left in the vee is never a surprise.
+		cs::String now;
+		auto lock = f->Unit->PlayerLockTarget;
+		switch (order)
+		{
+			case WingOrder::AttackMyTarget:
+				now = lock != nullptr && lock->Present() ? cs::Cat(": ", lock->Name()) : cs::String("  (nothing locked: lock one with T, until then they hold the vee)");
+				break;
+			case WingOrder::CoverMe:
+			{
+				auto threat = Wing::Threat(f->Battle, f->Unit);
+				now = threat != nullptr ? cs::Cat(": breaking on ", threat->Name()) : cs::String("  (nothing on you yet: they hold the vee and watch your six)");
+				break;
+			}
+			case WingOrder::EngageAtWill: now = "  (each picks its own fight)"; break;
+			default: now = "  (on your wing)"; break;
+		}
+		ShowToast(cs::Cat("Wing (", heard, "): ", Wing::Label(order), now));
 	}
 
 	// ---------------------------------------------------------------- the self-destruct (US-T97)

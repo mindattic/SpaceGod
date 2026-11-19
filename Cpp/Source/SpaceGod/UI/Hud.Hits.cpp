@@ -11,6 +11,9 @@
 #include "Combat/Battle.h"
 #include "Combat/CombatSpecs.h"
 #include "Combat/CombatState.h"
+#include "Combat/Dogfighting.h"
+#include "Combat/Fighters.h"
+#include "Combat/FlightDecks.h"
 #include "Embodiment/MountedTurret.h"
 #include "PlayerOptions.h" // US-T252
 
@@ -61,6 +64,12 @@ namespace SpaceGod::UI
 			if (ax >= ay) return d->X > 0 ? "STBD" : "PORT";
 			return d->Y > 0 ? "DORSAL" : "VENTRAL";
 		}
+
+		// US-T312: the wing's radio calls.
+		constexpr Color WingCallColor{0.62f, 0.86f, 1.0f, 1.0f};
+		constexpr Color WingLossColor{1.0f, 0.42f, 0.3f, 1.0f};
+		/// How long a call on a hull holds before a change of hull is called again (a threat flickering between two).
+		constexpr float WingCallHoldSeconds = 2.0f;
 
 		// US-T300: the threat warning.
 		constexpr Color MissileWarnColor{1.0f, 0.3f, 0.22f, 1.0f};
@@ -119,15 +128,94 @@ namespace SpaceGod::UI
 		return dir.sqrMagnitude() < 1e-12f ? Vector2(0, 1) : dir.normalized();
 	}
 
-	void Hud::ConfirmKill(const cs::Ref<BattleUnit>& unit, const cs::String& how, Color tint, float now)
+	void Hud::AddHitFeed(const cs::String& what, Color tint, float now)
 	{
-		killMarkAt = now;
 		HitFeedLine line;
-		line.Text = cs::Cat(unit->Name(), " ", how);
+		line.Text = what;
 		line.Tint = tint;
 		line.Born = now;
 		hitFeed.Add(line);
 		if (hitFeed.Count() > HitFeedMax) hitFeed.RemoveRange(0, hitFeed.Count() - HitFeedMax);
+	}
+
+	void Hud::ConfirmKill(const cs::Ref<BattleUnit>& unit, const cs::String& how, Color tint, float now)
+	{
+		killMarkAt = now;
+		AddHitFeed(cs::Cat(unit->Name(), " ", how), tint, now);
+	}
+
+	void Hud::TrackWing(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& me, float now, bool takeStock)
+	{
+		if (me->Fighter == nullptr)
+		{
+			hitWing.Clear();
+			hitWingCalled = nullptr;
+			return;
+		}
+		auto members = Wing::Members(b, me);
+		auto order = me->Fighter->Order;
+		// The hull the order has the wing on: the lead's lock under Attack my target, whatever is on the lead under Cover
+		// me; none in the vee or at will (each picks its own there).
+		cs::Ref<BattleUnit> on;
+		if (members.Count() > 0 && !b->Over)
+		{
+			if (order == WingOrder::AttackMyTarget && me->Target != nullptr && me->Target->Present()) on = me->Target;
+			else if (order == WingOrder::CoverMe) on = Wing::Threat(b, me);
+		}
+		if (takeStock)
+		{
+			hitWing.Clear();
+			for (const auto& m : members) hitWing[m] = FlightDecks::Away(m);
+			hitWingCalled = on;
+			hitWingCalledAt = now;
+			return;
+		}
+
+		// Shot down, or out of the fight on a deck or gone: a wingman no longer flying with the squadron.
+		cs::List<cs::Ref<BattleUnit>> gone;
+		for (const auto& u : hitWing.Keys())
+			if (!members.Contains(u)) gone.Add(u);
+		for (const auto& u : gone)
+		{
+			if (u != nullptr && u->Dead)
+			{
+				hitWing.Remove(u);
+				AddHitFeed(cs::Cat("WING  ", u->Name(), " is down  (", members.Count(), " left)"), WingLossColor, now);
+			}
+			// Down on a deck (it comes back as itself, U.SPC-T518): away until it flies again.
+			else if (u != nullptr && !u->Fled) hitWing[u] = true;
+			else hitWing.Remove(u);
+		}
+		for (const auto& m : members)
+		{
+			bool away = FlightDecks::Away(m);
+			bool was = false;
+			if (!hitWing.TryGetValue(m, was))
+			{
+				// A craft newly out of the hangar joins quietly.
+				hitWing[m] = away;
+				continue;
+			}
+			if (away == was) continue;
+			hitWing[m] = away;
+			// A recall at the end of the shooting takes them all home; that is not each one's news.
+			if (b->Mopping || b->Over) continue;
+			AddHitFeed(away ? cs::Cat("WING  ", m->Name(), " heading home to rearm") : cs::Cat("WING  ", m->Name(), " back in the fight"), WingCallColor, now);
+		}
+
+		if (on == hitWingCalled) return;
+		auto was = hitWingCalled;
+		// A threat that flickers from one hull to another, or in and out of reach, is called once, not every frame; a
+		// splash is called at once.
+		bool splash = was != nullptr && was->Dead;
+		if (!splash && now - hitWingCalledAt < WingCallHoldSeconds) return;
+		hitWingCalled = on;
+		hitWingCalledAt = now;
+		if (on != nullptr)
+			AddHitFeed(cs::Cat("WING  ", order == WingOrder::CoverMe ? "breaking on " : "engaging ", on->Name()), WingCallColor, now);
+		else if (members.Count() > 0 && !b->Over && (order == WingOrder::AttackMyTarget || order == WingOrder::CoverMe))
+			AddHitFeed(splash ? cs::Cat("WING  splash, ", was->Name(), " down; forming up")
+				: order == WingOrder::CoverMe ? cs::String("WING  you're clear; forming up") : cs::String("WING  no target; forming up"), WingCallColor, now);
 	}
 
 	void Hud::TrackOwnDamage(const cs::Ref<BattleUnit>& me, float now, bool takeStock)
@@ -310,6 +398,8 @@ namespace SpaceGod::UI
 			hitFeed.Clear();
 			hitStruck.Clear();
 			hitDisabled.Clear();
+			hitWing.Clear();
+			hitWingCalled = nullptr;
 			return;
 		}
 		bool freshSeat = battle != hitBattle || me != hitUnit;
@@ -341,6 +431,7 @@ namespace SpaceGod::UI
 		bool stale = now - hitSeenAt > 0.5f;
 		TakeHitFx(battle, me, mount, now);
 		TrackOwnDamage(me, now, freshSeat || stale);
+		TrackWing(battle, me, now, freshSeat || stale);
 		if (battle->Over || me->Dead || me->Fled) CloseHitTally(battle, me, now);
 
 		// The held hull's own state: its shields going down, its hull going critical.

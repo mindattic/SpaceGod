@@ -286,6 +286,12 @@ namespace SpaceGod::Core
 				  "nobody on you, the nearest hostile), Ctrl throws flares and chaff, 7 / 8 / 9 move reactor power to weapons, shields or "
 				  "engines and 0 evens it (the arrows too, as at any controls), 2-5 order your wingmen, and 6 picks a capital's next weak point "
 				  "or the locked ship's broadcast array."), // US-T96
+				T("Wing radio",
+				  "Leading a squadron from the cockpit, your wingmen call in on the combat feed by the crosshair: one shot down and "
+				  "how many are left, one heading home to its deck to rearm and back in the fight again, and under Attack my target "
+				  "(2) or Cover me (3), the hull they go onto, the splash when it falls and 'you're clear' when nothing is on you. "
+				  "Each order's notice says what it means right now: the hull they will attack, the one they break on, or that "
+				  "nothing is locked and they hold the vee until you lock one."), // US-T312
 				T("Off-screen arrows",
 				  "At any controls, whatever is worth turning to and off the screen gets an arrow on the screen's edge, pointing "
 				  "the way to turn: every hostile in the fight (the nearest named by its range), the hull you have locked, ringed "

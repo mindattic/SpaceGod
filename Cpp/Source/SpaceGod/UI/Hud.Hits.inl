@@ -11,7 +11,8 @@
 //     fading out; and a pulse round the screen's edge when its shields go down and when its hull goes critical;
 //   - US-T300: a threat warning for warheads homing on it and hostiles locking it (DrawThreatWarning);
 //   - US-T303: an after-action report when its fight ends or it leaves the fight (DrawAfterAction);
-//   - US-T309: a LOST / RESTORED line in the feed for each of its own subsystems shot away or repaired (TrackOwnDamage).
+//   - US-T309: a LOST / RESTORED line in the feed for each of its own subsystems shot away or repaired (TrackOwnDamage);
+//   - US-T312: leading a squadron, its wingmen's radio calls in the feed (TrackWing).
 
 private:
 	enum class HitMark : int { Shield, Hull, WeakPoint };
@@ -79,6 +80,22 @@ private:
 	float hitReportAt = -100.0f;
 	/// US-T309: which of the held hull's subsystems were down at the last look, by index.
 	cs::List<bool> hitSubDown;
+
+	/// US-T312: the wingmen of the craft held, and whether each was away (flying home to its deck or down on one) at the
+	/// last look; the one its order had it on (the lock it attacks, the threat it covers against), the last one called,
+	/// and when.
+	cs::Dictionary<cs::Ref<Core::BattleUnit>, bool> hitWing;
+	cs::Ref<Core::BattleUnit> hitWingCalled;
+	float hitWingCalledAt = -100.0f;
+
+	/// US-T312: the squadron's radio calls while <paramref name="me"/> leads it from the cockpit: a feed line when a
+	/// wingman is shot down (with how many are left), heads home to rearm or comes back into the fight, and, under Attack my
+	/// target or Cover me, when the wing goes onto a hull, splashes it or finds the lead clear. The first look after a new
+	/// fight or seat only takes stock.
+	void TrackWing(const cs::Ref<Core::Battle>& battle, const cs::Ref<Core::BattleUnit>& me, float now, bool takeStock);
+
+	/// A line of the combat feed, newest last.
+	void AddHitFeed(const cs::String& what, Color tint, float now);
 
 	/// US-T309: the held hull's own damage report: a feed line naming each of its subsystems shot away since the last look
 	/// (and each that damage control has brought back), counted for the after-action card. The first look after a new
