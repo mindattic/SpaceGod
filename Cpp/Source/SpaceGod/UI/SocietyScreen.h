@@ -170,6 +170,10 @@ namespace SpaceGod::UI
 		/// <summary>US-T308: the TRENDS section of the world called <paramref name="world"/> at <paramref name="y"/> (its mood over the
 		/// samples the game took, a bar chart a row); returns its height, and draws only when <paramref name="draw"/>.</summary>
 		float DrawTrends(float y, float w, const cs::String& world, Core::Civilization& civ, double jd, bool draw);
+		/// <summary>US-T315: the FAMILY section of the house <paramref name="houseId"/> at <paramref name="y"/> (its members by
+		/// generation, who each married, the dead greyed); returns its height, draws only when <paramref name="draw"/>, and sets
+		/// <paramref name="follow"/> to the person a row was clicked for.</summary>
+		float DrawFamily(float y, float w, int houseId, Core::Galaxy& galaxy, double jd, bool draw, CivPick& follow);
 
 		/// The module group of a kind (an index into the group names), and the names.
 		static int GroupOf(int kind);

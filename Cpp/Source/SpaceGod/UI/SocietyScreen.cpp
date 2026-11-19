@@ -835,7 +835,10 @@ namespace SpaceGod::UI
 		float recentH = showRecent ? HeadingH + (recent.empty() ? 24.0f : static_cast<float>(recent.size()) * 28.0f) + SectionGap : 0.0f;
 		bool showTrends = event == nullptr && selected.Kind == CivPickKind::World;
 		float trendsH = showTrends ? DrawTrends(0, w, selected.Name, civ, jd, false) : 0.0f;
-		float contentH = 30 + 22 + 12 + textH + SectionGap + trendsH + (links.empty() ? 0.0f : HeadingH + linkH + SectionGap) + recentH
+		bool showFamily = event == nullptr && selected.Kind == CivPickKind::House; // US-T315
+		CivPick familyFollow;
+		float familyH = showFamily ? DrawFamily(0, w, selected.Id, galaxy, jd, false, familyFollow) : 0.0f;
+		float contentH = 30 + 22 + 12 + textH + SectionGap + trendsH + familyH + (links.empty() ? 0.0f : HeadingH + linkH + SectionGap) + recentH
 			+ (selected.IsNone() || event != nullptr ? 0.0f : HeadingH + 30 + static_cast<float>(hands.size()) * 30.0f + SectionGap);
 		// US-T298: back and forward through what was picked, beside the title.
 		bool stepBack = false, stepForward = false;
@@ -874,7 +877,8 @@ namespace SpaceGod::UI
 		}
 		y += SectionGap;
 		if (showTrends) y += DrawTrends(y, w, selected.Name, civ, jd, true);
-		CivPick follow;
+		if (showFamily) y += DrawFamily(y, w, selected.Id, galaxy, jd, true, familyFollow);
+		CivPick follow = familyFollow;
 		if (!links.empty())
 		{
 			GUI::Label(Rect(0, y, w, HeadingH - 4), "SEE ALSO", heading);
@@ -1022,6 +1026,68 @@ namespace SpaceGod::UI
 			y += TrendRowH;
 		}
 		GUI::Label(Rect(0, y, w, 18), "Bars run oldest to newest; the brightest is today.", small);
+		return h;
+	}
+
+	float SocietyScreen::DrawFamily(float y, float w, int houseId, Galaxy& galaxy, double jd, bool draw, CivPick& follow)
+	{
+		static constexpr float GenH = 22, FamilyRowH = 28;
+		static constexpr double GenerationDays = 25 * 365.25;
+		static constexpr int MaxRows = 80;
+		auto society = Society::Find(galaxy);
+		auto house = society != nullptr ? society->HouseById(houseId) : nullptr;
+		if (house == nullptr) return 0;
+
+		// Citizens keep no parents, so a generation is a 25-year band of births from the house's eldest.
+		std::vector<cs::Ref<Citizen>> people;
+		for (const auto& m : house->Members)
+			if (m != nullptr) people.push_back(m);
+		std::stable_sort(people.begin(), people.end(), [](const cs::Ref<Citizen>& a, const cs::Ref<Citizen>& b) { return a->BornJd < b->BornJd; });
+		if (static_cast<int>(people.size()) > MaxRows) people.erase(people.begin(), people.end() - MaxRows);
+		auto generationOf = [&](const Citizen& c) { return people.empty() ? 0 : static_cast<int>((c.BornJd - people.front()->BornJd) / GenerationDays); };
+		int generations = 0, last = -1;
+		for (const auto& c : people)
+			if (int g = generationOf(*c); g != last) { generations++; last = g; }
+		int living = house->Living();
+		int remembered = house->Members.Count() - living;
+
+		float h = HeadingH + (people.empty() ? 24.0f : generations * GenH + static_cast<float>(people.size()) * FamilyRowH) + SectionGap;
+		if (!draw) return h;
+
+		auto year = [](double d) { return d <= 0 ? cs::String("?") : Astro::ToDateTime(d).ToString("yyyy"); };
+		GUI::Label(Rect(0, y, w, HeadingH - 4), cs::Cat("FAMILY  (", living, " living", remembered > 0 ? cs::Cat(", ", remembered, " remembered") : cs::String(), ")"), heading);
+		y += HeadingH;
+		if (people.empty())
+		{
+			GUI::Label(Rect(0, y, w, 20), "No one is left of this house.", small);
+			return h;
+		}
+		last = -1;
+		for (const auto& c : people)
+		{
+			int g = generationOf(*c);
+			if (g != last)
+			{
+				last = g;
+				double from = people.front()->BornJd + g * GenerationDays;
+				GUI::Label(Rect(0, y + 2, w, GenH - 2), cs::Cat("Generation ", g + 1, "  \xC2\xB7  born ", year(from), "-", year(from + GenerationDays - 1)), small);
+				y += GenH;
+			}
+			cs::String wed;
+			if (c->Spouse != nullptr)
+			{
+				bool across = c->Spouse->House != nullptr && c->Spouse->House != house;
+				wed = cs::Cat("  \xC2\xB7  wed ", across ? c->Spouse->FullName() : c->Spouse->Given,
+					across ? cs::Cat(" of House ", c->Spouse->House->Surname) : cs::String());
+			}
+			cs::String line = c->Alive()
+				? cs::Cat(c->FullName(), "  \xC2\xB7  ", Core::ToString(c->Role), ", ", static_cast<int>(c->AgeYears(jd)), wed)
+				: cs::Cat(c->FullName(), "  \xC2\xB7  ", year(c->BornJd), "-", year(c->DiedJd), wed);
+			auto row = Rect(0, y, w, FamilyRowH - 4);
+			if (GUI::Button(row, GUIContent::none(), entry)) follow = CivPick::Person(c->Id);
+			GUI::Label(Rect(row.x + 8, row.y + 3, row.width - 14, 20), line, c->Alive() ? rowLine : small);
+			y += FamilyRowH;
+		}
 		return h;
 	}
 

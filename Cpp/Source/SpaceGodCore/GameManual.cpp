@@ -690,7 +690,9 @@ namespace SpaceGod::Core
 				  "told as a notice on screen (with how many more came with it). The watch list is yours, on this machine, for "
 				  "this galaxy. A world picked shows its Trends: how its approval, unrest, crime, sickness and war weariness have "
 				  "moved, one bar for every 30 days you have played (up to two years; not kept in saves), today's brightest, with "
-				  "the change since the first.")), // US-T298, US-T299, US-T304, US-T308
+				  "the change since the first. A house picked shows its Family: its people by generation (born within the same 25 "
+				  "years), each with their role and age, who they wed (named with their own house when they married across houses), "
+				  "and the dead greyed with their years; click one to open them.")), // US-T298, US-T299, US-T304, US-T308, US-T315
 
 			cs::New<ManualChapter>("Comms and pilots", "Hailing ships and stations, piracy by radio, and the people you meet", Keys("COMMS AND PILOTS"),
 				T("Hailing",
