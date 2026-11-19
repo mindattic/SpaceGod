@@ -16,6 +16,7 @@
 #include "Systems/Civilization/Politics.h"
 #include "Systems/Civilization/Strife.h"
 #include "Systems/Galaxy.h"
+#include "Systems/InterstellarWars.h" // US-T383: the summit outlook reads the wars as the resolver does
 #include "Systems/Polities.h"
 #include "Systems/Society.h"
 
@@ -58,7 +59,7 @@ namespace SpaceGod::UI
 			{ "Society", SocialKind::Birth }, { "Persona", SocialKind::Friendship }, { "Kinship", SocialKind::FeudDeclared },
 			{ "Politics", SocialKind::IdeologyShift }, { "Strife", SocialKind::Protest }, { "Underworld", SocialKind::SyndicateRises },
 			{ "Commerce", SocialKind::UnionFormed }, { "Culture", SocialKind::FaithFounded }, { "Health", SocialKind::Outbreak },
-			{ "Press", SocialKind::OutletFounded },
+			{ "Press", SocialKind::OutletFounded }, { "Witness", SocialKind::WorldConquered }, // US-T383: the wider world as seen (US-T292)
 		};
 		constexpr int SocietyGroupsKnown = static_cast<int>(sizeof(SocietyGroups) / sizeof(SocietyGroups[0]));
 
@@ -253,7 +254,12 @@ namespace SpaceGod::UI
 			{
 				auto a = faction(1), b = faction(2);
 				if (a == nullptr || b == nullptr || a == b) return no("name two states");
-				if (!Civilization::Hostile(galaxy, a, b)) return "Refused unless they are at war: they are not hostile.";
+				// US-T383: the resolver's own test (Politics::Summit): no wars table refuses; at war or hostile passes.
+				if (galaxy.Wars == nullptr) return no("no wars");
+				bool atWar = false;
+				for (const auto& w : galaxy.Wars->Active())
+					if (w->Involves(a) && w->Involves(b)) atWar = true;
+				if (!atWar && !Civilization::Hostile(galaxy, a, b)) return no("they are not at war");
 				return sure("their leaders meet to talk peace");
 			}
 			if (verb == "riot")
@@ -400,7 +406,7 @@ namespace SpaceGod::UI
 
 	int SocietyScreen::GroupOf(int k)
 	{
-		if (k > static_cast<int>(SocialKind::Donation)) return SocietyGroupsKnown; // a kind added after the Press module's
+		if (k > static_cast<int>(SocialKind::Embargo)) return SocietyGroupsKnown; // a kind added after the Witness module's (US-T383)
 		int g = 0;
 		for (int i = 0; i < SocietyGroupsKnown; i++)
 			if (static_cast<int>(SocietyGroups[i].First) <= k) g = i;
@@ -420,7 +426,7 @@ namespace SpaceGod::UI
 	cs::String SocietyScreen::RowsKey() const
 	{
 		return cs::Cat(page, "|", group, "|", kind, "|", worldOnly ? 1 : 0, "|", doings, "|", orgKind, "|",
-			worldOnly && selected.Kind == CivPickKind::World ? selected.Name : cs::String(), "|", search, "|", static_cast<int>(app->SocietyWatched.size()),
+			worldOnly ? worldFilter : cs::String(), "|", search, "|", static_cast<int>(app->SocietyWatched.size()),
 			"|", page >= 0 && page < FirstView ? sortBy[page] : 0); // US-T354: a new sort shows at once
 	}
 
@@ -530,7 +536,7 @@ namespace SpaceGod::UI
 
 		if (page == Feed)
 		{
-			cs::String world = worldOnly && selected.Kind == CivPickKind::World ? selected.Name : cs::String();
+			cs::String world = worldOnly ? worldFilter : cs::String(); // US-T383: not the pick, which an event click clears
 			for (int i = civ->Events.Count() - 1; i >= 0; i--)
 			{
 				const auto& e = civ->Events[i];
@@ -1097,7 +1103,7 @@ namespace SpaceGod::UI
 		}
 		y += YearsH;
 		GUI::Label(Rect(0, y, w, NoteH), cs::Cat("A bar a year, the tallest ", most, most == 1 ? " event" : " events", "; bright: brought about by your hand. Click a year to list it",
-			timelineEarlier > 0 ? cs::Cat(" (", timelineEarlier, " earlier, under Recent events)") : cs::String(), "."), small);
+			timelineEarlier > 0 ? cs::Cat(" (", timelineEarlier, " earlier, not drawn: the feed's search finds them)") : cs::String(), "."), small); // US-T383
 		y += NoteH;
 		if (opened)
 		{
@@ -1452,8 +1458,12 @@ namespace SpaceGod::UI
 		bool canWorld = selected.Kind == CivPickKind::World;
 		bool enabled = GUI::enabled;
 		GUI::enabled = enabled && (canWorld || worldOnly);
-		if (GUI::Button(Rect(x + half + 6, r.y, half, r.height), worldOnly && canWorld ? cs::Cat("At ", selected.Name) : cs::String("Every world"), worldOnly && canWorld ? entrySelected : entry))
+		// US-T383: the filter holds the world it was turned on at, whatever is picked after.
+		if (GUI::Button(Rect(x + half + 6, r.y, half, r.height), worldOnly ? cs::Cat("At ", worldFilter) : cs::String("Every world"), worldOnly ? entrySelected : entry))
+		{
 			worldOnly = !worldOnly;
+			worldFilter = worldOnly ? selected.Name : cs::String();
+		}
 		GUI::enabled = enabled;
 	}
 
@@ -1848,7 +1858,8 @@ namespace SpaceGod::UI
 						if (o != b && o->Capital > b->Capital) rank++;
 					}
 				lines.Add(cs::Cat("Founded ", SocietyDate(b->FoundedJd), " (", static_cast<int>((jd - b->FoundedJd) / 365.25), " years ago)  \xC2\xB7  ",
-					rank, cs::String(rank == 1 ? "st" : rank == 2 ? "nd" : rank == 3 ? "rd" : "th"), " richest of ", trading, " trading firms"));
+					rank, cs::String(rank % 100 >= 11 && rank % 100 <= 13 ? "th" : rank % 10 == 1 ? "st" : rank % 10 == 2 ? "nd" : rank % 10 == 3 ? "rd" : "th"), // US-T383
+					" richest of ", trading, " trading firms"));
 			}
 			else
 				lines.Add(cs::Cat("Founded ", SocietyDate(b->FoundedJd), "; ", cs::String(b->Status == BusinessStatus::Acquired ? "bought out" : "went bankrupt"),
@@ -1891,7 +1902,9 @@ namespace SpaceGod::UI
 					{
 						lines.Add(cs::Cat("Ruled by ", r->Ruler != nullptr ? r->Ruler->FullName() : cs::String("nobody (crisis)"), r->Ruling != nullptr ? cs::Cat(" of ", Narrator::OrgName(*r->Ruling)) : cs::String()));
 						lines.Add(cs::Cat("Hawk ", SocietySigned(r->Hawk), ", liberty ", SocietySigned(r->Liberty), ", approval ", SocietySigned(r->Approval), ", ", r->Coups, " coups",
-							cs::Double::IsNaN(r->NextElectionJd) ? cs::String(", no elections") : cs::Cat(", votes in ", static_cast<int>(r->NextElectionJd - jd), " days")));
+							cs::Double::IsNaN(r->NextElectionJd) ? cs::String(", no elections") // US-T383: never "votes in 0 days" or less
+								: r->NextElectionJd - jd < 1 ? cs::String(", votes now")
+								: cs::Cat(r->Called ? ", election called, votes in " : ", votes in ", static_cast<int>(r->NextElectionJd - jd), " days")));
 						if (r->Ruler != nullptr) links.emplace_back(r->Ruler->FullName(), CivPick::Person(r->Ruler->Id));
 						if (r->Ruling != nullptr) links.emplace_back(Narrator::OrgName(*r->Ruling), CivPick::Org(r->Ruling->Id));
 					}

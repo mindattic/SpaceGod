@@ -188,6 +188,8 @@ namespace SpaceGod::UI
 		/// The feed's filters: a module group (-1 all), a kind (0 all), the world picked only, whose doings (Doings).
 		int group = -1, kind = 0, doings = AllDoings;
 		bool worldOnly = false;
+		/// US-T383: the world the feed is held to while worldOnly, kept apart from the pick so picking an event keeps it.
+		cs::String worldFilter;
 		/// The organisations' kind (-1 all).
 		int orgKind = -1;
 		/// US-T354: each list page's sort (0 its own order: founding, renown...; SortName names each), kept per page.

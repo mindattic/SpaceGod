@@ -104,7 +104,9 @@ namespace SpaceGod
 				for (const auto& r : civ.Politics->Regimes)
 					add(cs::Cat(r->Faction->Name, ": ruled by ", r->Ruler != nullptr ? r->Ruler->FullName() : cs::String("nobody (crisis)"),
 						r->Ruling != nullptr ? cs::Cat(" of ", r->Ruling->Name) : cs::String(""), "; hawk ", cs::Fmt(r->Hawk, "0.00"), ", liberty ", cs::Fmt(r->Liberty, "0.00"),
-						", approval ", cs::Fmt(r->Approval, "0.00"), cs::Double::IsNaN(r->NextElectionJd) ? cs::String(", no elections") : cs::Cat(", votes in ", static_cast<int>(r->NextElectionJd - jd), " days"),
+						", approval ", cs::Fmt(r->Approval, "0.00"), cs::Double::IsNaN(r->NextElectionJd) ? cs::String(", no elections")
+							: r->NextElectionJd - jd < 1 ? cs::String(", votes now") // US-T383
+							: cs::Cat(r->Called ? ", election called, votes in " : ", votes in ", static_cast<int>(r->NextElectionJd - jd), " days"),
 						", ", r->Coups, " coups"), CivPick::Faction(r->Faction->Name));
 				return true;
 			}
