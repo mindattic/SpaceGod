@@ -71,9 +71,12 @@ namespace SpaceGod::UI
 
 		/// The pages down the left: the lists (Watched: what the player watches, US-T304; YourHand: what the SpaceGod's hand
 		/// brought about, US-T325), then the module views (CivHands::Views()).
-		enum Page : int { Feed, Houses, People, Orgs, Worlds, Watched, YourHand, FirstView };
+		/// US-T337: Month, the last 30 days' events by kind.
+		enum Page : int { Feed, Houses, People, Orgs, Worlds, Watched, YourHand, Month, FirstView };
 		/// US-T325: how long after a steered event its aftermath is looked for, days, and the most it lists.
 		static constexpr double AftermathDays = 365;
+		/// US-T337: how far back the This month page looks, days.
+		static constexpr double MonthDays = 30;
 		static constexpr int AftermathMax = 12;
 		/// US-T327: the most lines a person's LIFE lists (born, the events about them oldest first, died).
 		static constexpr int LifeMax = 30;

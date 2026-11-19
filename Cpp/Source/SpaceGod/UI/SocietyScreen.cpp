@@ -29,7 +29,7 @@ namespace SpaceGod::UI
 {
 	namespace
 	{
-		const char* const SocietyPageNames[] = { "Feed", "Houses", "People", "Organisations", "Worlds", "Watched", "Your hand" };
+		const char* const SocietyPageNames[] = { "Feed", "Houses", "People", "Organisations", "Worlds", "Watched", "Your hand", "This month" };
 		const char* const SocietyDoingsNames[] = { "All doings", "Steered only", "Watched only" };
 
 		/// The module views' names on the screen (CivHands::Views(), in its order).
@@ -248,6 +248,47 @@ namespace SpaceGod::UI
 						: cs::Cat("  \xC2\xB7  then ", followed, followed == 1 ? " event" : " events", ", latest ", Core::ToString(latest->Kind)));
 				if (!search.empty() && !Matches(head, WordsOf(*e))) continue;
 				rows.push_back(Row{ head, cs::String(), CivPick(), e });
+			}
+			return;
+		}
+		if (page == Month)
+		{
+			// US-T337: the last 30 days by kind, the most frequent first; each row opens the kind's latest event.
+			struct Tally
+			{
+				int Count = 0, Steered = 0;
+				cs::Ref<SocialEvent> Latest;
+				std::vector<cs::String> Worlds;
+			};
+			std::vector<Tally> byKind(static_cast<size_t>(SocialKind::Count_) + 1);
+			for (int i = civ->Events.Count() - 1; i >= 0; i--)
+			{
+				const auto& e = civ->Events[i];
+				if (e == nullptr) continue;
+				if (e->Jd < jd - MonthDays) continue;
+				size_t k = static_cast<size_t>(e->Kind);
+				if (k >= byKind.size()) k = byKind.size() - 1;
+				auto& t = byKind[k];
+				if (t.Count++ == 0) t.Latest = e;
+				if (e->Steered) t.Steered++;
+				if (e->Where != nullptr && std::find(t.Worlds.begin(), t.Worlds.end(), e->Where->Name) == t.Worlds.end()) t.Worlds.push_back(e->Where->Name);
+			}
+			std::vector<size_t> order;
+			for (size_t k = 0; k < byKind.size(); k++)
+				if (byKind[k].Count > 0) order.push_back(k);
+			std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) { return byKind[a].Count > byKind[b].Count; });
+			for (size_t k : order)
+			{
+				const auto& t = byKind[k];
+				cs::String worlds;
+				for (size_t w = 0; w < t.Worlds.size() && w < 3; w++) worlds = cs::Cat(worlds, w == 0 ? "" : ", ", t.Worlds[w]);
+				if (t.Worlds.size() > 3) worlds = cs::Cat(worlds, " and ", static_cast<int>(t.Worlds.size() - 3), " more");
+				cs::String top = cs::Cat(Core::ToString(t.Latest->Kind), "  \xC3\x97", t.Count,
+					t.Steered > 0 ? cs::Cat("  \xC2\xB7  ", t.Steered, " steered") : cs::String(), worlds.empty() ? cs::String() : cs::Cat("  \xC2\xB7  ", worlds));
+				cs::String latest = cs::Cat("latest ", SocietyDate(t.Latest->Jd), ": ", WordsOf(*t.Latest));
+				if (!search.empty() && !Matches(top, latest)) continue;
+				// An event row draws Line above Title: the tally on top, the latest event's words below.
+				rows.push_back(Row{ latest, top, CivPick(), t.Latest });
 			}
 			return;
 		}
@@ -637,6 +678,7 @@ namespace SpaceGod::UI
 				page == Feed ? (doings == WatchedDoings && app->SocietyWatched.empty() ? "Nothing is watched yet: pick a house, a person, a world... and Watch it." : "Nothing of that kind has happened yet.")
 				: page == Watched ? "Nothing is watched yet. Pick a house, a person, an organisation, a business, a world or a state and Watch it: its news is told here and, while you play, as it happens."
 				: page == YourHand ? "Your hand has not touched the galaxy's people yet. Pick a house, a person, an organisation or a world and use the SpaceGod's hand on it: what it brings about, and what comes of that, is kept here."
+				: page == Month ? "Nothing has happened among the galaxy's people in the last 30 days."
 				: "Nobody here yet: that part of the civilization wakes as the days pass.", text);
 			return;
 		}
