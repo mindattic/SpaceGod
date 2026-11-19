@@ -69,8 +69,12 @@ namespace SpaceGod::UI
 		/// The most events the detail lists about the thing picked (US-T299), and the most picks Back remembers (US-T298).
 		static constexpr int RecentMax = 12, HistoryMax = 64;
 
-		/// The pages down the left: the lists (Watched: what the player watches, US-T304), then the module views (CivHands::Views()).
-		enum Page : int { Feed, Houses, People, Orgs, Worlds, Watched, FirstView };
+		/// The pages down the left: the lists (Watched: what the player watches, US-T304; YourHand: what the SpaceGod's hand
+		/// brought about, US-T325), then the module views (CivHands::Views()).
+		enum Page : int { Feed, Houses, People, Orgs, Worlds, Watched, YourHand, FirstView };
+		/// US-T325: how long after a steered event its aftermath is looked for, days, and the most it lists.
+		static constexpr double AftermathDays = 365;
+		static constexpr int AftermathMax = 12;
 
 		/// The feed's doings filter (US-T304; was the Steered toggle): every event, the SpaceGod's doings, or those about what is watched.
 		enum Doings : int { AllDoings, SteeredDoings, WatchedDoings, DoingsCount };
@@ -119,6 +123,10 @@ namespace SpaceGod::UI
 		std::vector<Recent> recent;
 		int recentTotal = 0;
 		cs::String recentKey;
+		/// US-T325: what followed the steered event picked (oldest first), how many in all, and what it was built for.
+		std::vector<Recent> aftermath;
+		int aftermathTotal = 0;
+		cs::String aftermathKey;
 		Vector2 listScroll, detailScroll, pageScroll;
 
 		int page = Feed;
@@ -167,6 +175,12 @@ namespace SpaceGod::UI
 
 		/// US-T299: the latest events about <paramref name="p"/>.
 		void BuildRecent(const CivPick& p, Core::Civilization& civ);
+		/// US-T325: the people, houses, organisations, businesses and (failing those) world an event is about.
+		static std::vector<CivPick> SubjectsOf(const Core::SocialEvent& e);
+		/// US-T325: whether <paramref name="later"/> followed <paramref name="steered"/> (after it, within AftermathDays, about one of its subjects).
+		static bool Follows(const Core::SocialEvent& later, const Core::SocialEvent& steered, const std::vector<CivPick>& subjects);
+		/// US-T325: what came of the steered event <paramref name="e"/>.
+		void BuildAftermath(const Core::SocialEvent& e, Core::Civilization& civ);
 		/// <summary>US-T308: the TRENDS section of the world called <paramref name="world"/> at <paramref name="y"/> (its mood over the
 		/// samples the game took, a bar chart a row); returns its height, and draws only when <paramref name="draw"/>.</summary>
 		float DrawTrends(float y, float w, const cs::String& world, Core::Civilization& civ, double jd, bool draw);

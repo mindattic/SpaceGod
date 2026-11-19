@@ -700,7 +700,9 @@ namespace SpaceGod::Core
 				  "years), each with their role and age, who they wed (named with their own house when they married across houses), "
 				  "and the dead greyed with their years; click one to open them. An organisation picked lists who is in it (how many "
 				  "living and dead, the best known by name with their role and house), what split from it and who is set against "
-				  "it.")), // US-T298, US-T299, US-T304, US-T308, US-T315, US-T323
+				  "it. Your hand lists everything the SpaceGod's hand brought about, newest first, with how many events followed "
+				  "about the same people, houses, organisations and businesses within a year; pick one to read What came of it, "
+				  "those later events in order, each a click away.")), // US-T298, US-T299, US-T304, US-T308, US-T315, US-T323, US-T325
 
 			cs::New<ManualChapter>("Comms and pilots", "Hailing ships and stations, piracy by radio, and the people you meet", Keys("COMMS AND PILOTS"),
 				T("Hailing",

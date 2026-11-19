@@ -29,7 +29,7 @@ namespace SpaceGod::UI
 {
 	namespace
 	{
-		const char* const SocietyPageNames[] = { "Feed", "Houses", "People", "Organisations", "Worlds", "Watched" };
+		const char* const SocietyPageNames[] = { "Feed", "Houses", "People", "Organisations", "Worlds", "Watched", "Your hand" };
 		const char* const SocietyDoingsNames[] = { "All doings", "Steered only", "Watched only" };
 
 		/// The module views' names on the screen (CivHands::Views(), in its order).
@@ -225,6 +225,32 @@ namespace SpaceGod::UI
 			}
 			return;
 		}
+		if (page == YourHand)
+		{
+			// US-T325: what the SpaceGod's hand brought about, newest first, each with how much followed it.
+			int n = civ->Events.Count();
+			for (int i = n - 1; i >= 0; i--)
+			{
+				const auto& e = civ->Events[i];
+				if (e == nullptr || !e->Steered) continue;
+				auto subjects = SubjectsOf(*e);
+				int followed = 0;
+				cs::Ref<SocialEvent> latest;
+				for (int j = i + 1; j < n; j++)
+				{
+					const auto& later = civ->Events[j];
+					if (later == nullptr || !Follows(*later, *e, subjects)) continue;
+					followed++;
+					latest = later;
+				}
+				cs::String head = cs::Cat(SocietyDate(e->Jd), "  \xC2\xB7  ", Core::ToString(e->Kind), e->Where != nullptr ? cs::Cat("  \xC2\xB7  ", e->Where->Name) : cs::String(),
+					followed == 0 ? cs::String("  \xC2\xB7  nothing has come of it yet")
+						: cs::Cat("  \xC2\xB7  then ", followed, followed == 1 ? " event" : " events", ", latest ", Core::ToString(latest->Kind)));
+				if (!search.empty() && !Matches(head, WordsOf(*e))) continue;
+				rows.push_back(Row{ head, cs::String(), CivPick(), e });
+			}
+			return;
+		}
 		int view = page - FirstView;
 		const auto& views = CivHands::Views();
 		if (view >= 0 && view < static_cast<int>(views.size()))
@@ -377,6 +403,48 @@ namespace SpaceGod::UI
 			const auto& e = civ.Events[i];
 			if (e == nullptr || !About(*e, p)) continue;
 			if (recentTotal++ < RecentMax) recent.push_back(Recent{ e->Id, cs::Cat(SocietyDate(e->Jd), "   ", Narrator::Render(*e)) });
+		}
+	}
+
+	// ---------------------------------------------------------------- what came of the SpaceGod's hand (US-T325)
+
+	std::vector<CivPick> SocietyScreen::SubjectsOf(const SocialEvent& e)
+	{
+		std::vector<CivPick> subjects;
+		auto add = [&](const CivPick& p) { if (std::find(subjects.begin(), subjects.end(), p) == subjects.end()) subjects.push_back(p); };
+		if (e.Who != nullptr) add(CivPick::Person(e.Who->Id));
+		if (e.Whom != nullptr) add(CivPick::Person(e.Whom->Id));
+		if (e.House != nullptr) add(CivPick::House(e.House->Id));
+		if (e.OtherHouse != nullptr) add(CivPick::House(e.OtherHouse->Id));
+		if (e.Org != nullptr) add(CivPick::Org(e.Org->Id));
+		if (e.OtherOrg != nullptr) add(CivPick::Org(e.OtherOrg->Id));
+		if (e.Business != nullptr) add(CivPick::Business(e.Business->Id));
+		// A world only when nothing narrower is named: everything on it would otherwise count as following.
+		if (subjects.empty() && e.Where != nullptr) add(CivPick::World(e.Where->Name));
+		return subjects;
+	}
+
+	bool SocietyScreen::Follows(const SocialEvent& later, const SocialEvent& steered, const std::vector<CivPick>& subjects)
+	{
+		if (later.Id == steered.Id || later.Jd < steered.Jd || later.Jd > steered.Jd + AftermathDays) return false;
+		return std::any_of(subjects.begin(), subjects.end(), [&](const CivPick& p) { return About(later, p); });
+	}
+
+	void SocietyScreen::BuildAftermath(const SocialEvent& e, Civilization& civ)
+	{
+		int n = civ.Events.Count();
+		int lastId = n > 0 && civ.Events[n - 1] != nullptr ? civ.Events[n - 1]->Id : 0;
+		cs::String key = cs::Cat(e.Id, "|", n, "|", lastId);
+		if (key == aftermathKey) return;
+		aftermathKey = key;
+		aftermath.clear();
+		aftermathTotal = 0;
+		auto subjects = SubjectsOf(e);
+		for (int i = 0; i < n; i++)
+		{
+			const auto& later = civ.Events[i];
+			if (later == nullptr || !Follows(*later, e, subjects)) continue;
+			if (aftermathTotal++ < AftermathMax) aftermath.push_back(Recent{ later->Id, cs::Cat(SocietyDate(later->Jd), "   ", Narrator::Render(*later)) });
 		}
 	}
 
@@ -537,6 +605,7 @@ namespace SpaceGod::UI
 			GUI::Label(Rect(list.x, list.y + 4, list.width, 80),
 				page == Feed ? (doings == WatchedDoings && app->SocietyWatched.empty() ? "Nothing is watched yet: pick a house, a person, a world... and Watch it." : "Nothing of that kind has happened yet.")
 				: page == Watched ? "Nothing is watched yet. Pick a house, a person, an organisation, a business, a world or a state and Watch it: its news is told here and, while you play, as it happens."
+				: page == YourHand ? "Your hand has not touched the galaxy's people yet. Pick a house, a person, an organisation or a world and use the SpaceGod's hand on it: what it brings about, and what comes of that, is kept here."
 				: "Nobody here yet: that part of the civilization wakes as the days pass.", text);
 			return;
 		}
@@ -863,6 +932,11 @@ namespace SpaceGod::UI
 		bool showRecent = event == nullptr && !selected.IsNone() && selected.Kind != CivPickKind::Trial;
 		if (showRecent) BuildRecent(selected, civ);
 		float recentH = showRecent ? HeadingH + (recent.empty() ? 24.0f : static_cast<float>(recent.size()) * 28.0f) + SectionGap : 0.0f;
+		// US-T325: what came of an event the SpaceGod's hand brought about.
+		bool showAftermath = event != nullptr && event->Steered;
+		if (showAftermath) BuildAftermath(*event, civ);
+		float aftermathH = showAftermath ? HeadingH + (aftermath.empty() ? 24.0f : static_cast<float>(aftermath.size()) * 28.0f) + SectionGap : 0.0f;
+		recentH += aftermathH;
 		bool showTrends = event == nullptr && selected.Kind == CivPickKind::World;
 		float trendsH = showTrends ? DrawTrends(0, w, selected.Name, civ, jd, false) : 0.0f;
 		bool showFamily = event == nullptr && selected.Kind == CivPickKind::House; // US-T315
@@ -924,6 +998,24 @@ namespace SpaceGod::UI
 			y += 28 + SectionGap;
 		}
 		int followEvent = 0;
+		if (showAftermath)
+		{
+			GUI::Label(Rect(0, y, w, HeadingH - 4), aftermathTotal > AftermathMax ? cs::Cat("WHAT CAME OF IT  (first ", AftermathMax, " of ", aftermathTotal, ")") : cs::Cat("WHAT CAME OF IT  (", aftermathTotal, ")"), heading);
+			y += HeadingH;
+			if (aftermath.empty())
+			{
+				GUI::Label(Rect(0, y, w, 20), "Nothing has come of it yet: what follows about the same people, houses and organisations within a year shows here.", small);
+				y += 24;
+			}
+			for (const auto& r : aftermath)
+			{
+				auto row = Rect(0, y, w, 24);
+				if (GUI::Button(row, GUIContent::none(), entry)) followEvent = r.Event;
+				GUI::Label(Rect(row.x + 8, row.y + 3, row.width - 14, 20), r.Line, rowLine);
+				y += 28;
+			}
+			y += SectionGap;
+		}
 		if (showRecent)
 		{
 			GUI::Label(Rect(0, y, w, HeadingH - 4), recentTotal > RecentMax ? cs::Cat("RECENT EVENTS  (latest ", RecentMax, " of ", recentTotal, ")") : cs::Cat("RECENT EVENTS  (", recentTotal, ")"), heading);
