@@ -720,7 +720,9 @@ namespace SpaceGod::Core
 				  "each kind of event that happened, the most frequent first, with how many, how many your hand steered, the worlds "
 				  "it touched and the latest one's words; click one to read it. The mark compares too: mark a person, house, "
 				  "organisation or business (C, or the Mark button) and pick another of the same kind, and the two show side by "
-				  "side, the better value of each row highlighted and the marked one's name a link.")), // US-T298, US-T299, US-T304, US-T308, US-T315, US-T323, US-T325, US-T327, US-T330, US-T334, US-T337, US-T344
+				  "side, the better value of each row highlighted and the marked one's name a link. A house, organisation, business "
+				  "or world picked has a TIMELINE: a bar a year for its events, your hand's share bright; click a year to list "
+				  "that year's events.")), // US-T298, US-T299, US-T304, US-T308, US-T315, US-T323, US-T325, US-T327, US-T330, US-T334, US-T337, US-T344, US-T348
 
 			cs::New<ManualChapter>("Comms and pilots", "Hailing ships and stations, piracy by radio, and the people you meet", Keys("COMMS AND PILOTS"),
 				T("Hailing",

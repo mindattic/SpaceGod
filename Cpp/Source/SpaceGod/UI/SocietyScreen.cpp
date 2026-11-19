@@ -480,6 +480,153 @@ namespace SpaceGod::UI
 			life.push_back(Recent{ 0, cs::Cat(SocietyDate(c->DiedJd), "   Died, aged ", static_cast<int>((c->DiedJd - c->BornJd) / 365.25)) });
 	}
 
+	// ---------------------------------------------------------------- a thing's years (US-T348)
+
+	void SocietyScreen::BuildTimeline(const CivPick& p, Civilization& civ, double jd)
+	{
+		cs::String pickKey = cs::Cat(static_cast<int>(p.Kind), "|", p.Id, "|", p.Name);
+		if (pickKey != timelinePick)
+		{
+			timelinePick = pickKey;
+			timelineOpen = 0; // another thing picked: its strip opens closed
+		}
+		int n = civ.Events.Count();
+		int lastId = n > 0 && civ.Events[n - 1] != nullptr ? civ.Events[n - 1]->Id : 0;
+		int nowYear = jd > 0 ? Astro::ToDateTime(jd).Year() : 0;
+		cs::String key = cs::Cat(pickKey, "|", n, "|", lastId, "|", timelineOpen, "|", nowYear);
+		if (key == timelineKey) return;
+		timelineKey = key;
+		timeline.clear();
+		timelineRows.clear();
+		timelineEarlier = 0;
+		timelineTotal = 0;
+
+		// Every event about it, counted by the year it happened (an event with no date has no year on the strip).
+		std::vector<TimelineYear> byYear; // sorted by year
+		auto yearOf = [](double whenJd) { return Astro::ToDateTime(whenJd).Year(); };
+		for (int i = 0; i < n; i++)
+		{
+			const auto& e = civ.Events[i];
+			if (e == nullptr || e->Jd <= 0 || !About(*e, p)) continue;
+			int y = yearOf(e->Jd);
+			auto at = std::lower_bound(byYear.begin(), byYear.end(), y, [](const TimelineYear& t, int v) { return t.Year < v; });
+			if (at == byYear.end() || at->Year != y)
+			{
+				TimelineYear fresh;
+				fresh.Year = y;
+				at = byYear.insert(at, fresh);
+			}
+			at->Count++;
+			if (e->Steered) at->Steered++;
+			timelineTotal++;
+			if (timelineOpen == y && static_cast<int>(timelineRows.size()) < TimelineListMax)
+				timelineRows.push_back(Recent{ e->Id, cs::Cat(SocietyDate(e->Jd), "   ", Narrator::Render(*e),
+					e->Steered ? cs::String("  \xC2\xB7  STEERED") : cs::String()) });
+		}
+		if (byYear.empty()) return;
+
+		// Every year from the first kept to now (or the latest event), the quiet ones too, the latest TimelineYearsMax only.
+		int lastYear = Mathf::Max(byYear.back().Year, nowYear);
+		int firstYear = Mathf::Max(byYear.front().Year, lastYear - TimelineYearsMax + 1);
+		size_t k = 0;
+		for (; k < byYear.size() && byYear[k].Year < firstYear; k++) timelineEarlier += byYear[k].Count;
+		for (int y = firstYear; y <= lastYear; y++)
+		{
+			if (k < byYear.size() && byYear[k].Year == y) timeline.push_back(byYear[k++]);
+			else
+			{
+				TimelineYear quiet;
+				quiet.Year = y;
+				timeline.push_back(quiet);
+			}
+		}
+	}
+
+	float SocietyScreen::DrawTimeline(float y, float w, bool draw, int& followEvent)
+	{
+		static constexpr float StripH = 44;
+		static constexpr float YearsH = 18;
+		static constexpr float NoteH = 20;
+		int openCount = 0;
+		for (const auto& t : timeline)
+			if (t.Year == timelineOpen) openCount = t.Count;
+		bool opened = timelineOpen != 0 && openCount > 0;
+		float h = HeadingH + (timeline.empty() ? 24.0f : StripH + YearsH + NoteH
+			+ (opened ? 22.0f + static_cast<float>(timelineRows.size()) * 28.0f + (openCount > static_cast<int>(timelineRows.size()) ? 20.0f : 0.0f) : 0.0f))
+			+ SectionGap;
+		if (!draw) return h;
+
+		GUI::Label(Rect(0, y, w, HeadingH - 4), timeline.empty() ? cs::String("TIMELINE")
+			: cs::Cat("TIMELINE  (", timelineTotal, timelineTotal == 1 ? " event, " : " events, ", timeline.front().Year, "-", timeline.back().Year, ")"), heading);
+		y += HeadingH;
+		if (timeline.empty())
+		{
+			GUI::Label(Rect(0, y, w, 20), "Nothing kept about it yet: its events show here, a bar a year.", small);
+			return h;
+		}
+
+		int most = 1;
+		for (const auto& t : timeline) most = Mathf::Max(most, t.Count);
+		float slot = w / static_cast<float>(timeline.size());
+		float barW = Mathf::Max(2.0f, slot - 2);
+		Color keep = GUI::color;
+		int clicked = 0;
+		for (size_t i = 0; i < timeline.size(); i++)
+		{
+			const auto& t = timeline[i];
+			auto cell = Rect(static_cast<float>(i) * slot, y, slot, StripH);
+			// The year is a button when it has events; the open one is lit.
+			if (t.Count > 0 && GUI::Button(cell, GUIContent(cs::String(), cs::Cat(t.Year, ": ", t.Count, t.Count == 1 ? " event" : " events",
+				t.Steered > 0 ? cs::Cat(", ", t.Steered, " steered") : cs::String())), t.Year == timelineOpen ? entrySelected : entry)) clicked = t.Year;
+			float x = cell.x + (slot - barW) * 0.5f;
+			float baseY = y + StripH - 2;
+			float full = StripH - 6;
+			float bh = t.Count > 0 ? Mathf::Max(2.0f, full * static_cast<float>(t.Count) / static_cast<float>(most)) : 1.0f;
+			GUI::color = t.Count > 0 ? Color(UiStyle::Accent.r, UiStyle::Accent.g, UiStyle::Accent.b, 0.55f) : Color(UiStyle::Edge.r, UiStyle::Edge.g, UiStyle::Edge.b, 0.4f);
+			GUI::DrawTexture(Rect(x, baseY - bh, barW, bh), Texture2D::whiteTexture());
+			if (t.Steered > 0)
+			{
+				// The hand's share, bright, at the foot of the bar.
+				float sh = Mathf::Max(2.0f, bh * static_cast<float>(t.Steered) / static_cast<float>(t.Count));
+				GUI::color = UiStyle::Good;
+				GUI::DrawTexture(Rect(x, baseY - sh, barW, sh), Texture2D::whiteTexture());
+			}
+			GUI::color = keep;
+		}
+		y += StripH;
+		GUI::Label(Rect(0, y, 80, YearsH), cs::Cat(timeline.front().Year), small);
+		if (timeline.size() > 1)
+		{
+			cs::String lastLabel = cs::Cat(timeline.back().Year);
+			float lw = small->CalcSize(GUIContent(lastLabel)).x;
+			GUI::Label(Rect(Mathf::Max(0.0f, w - lw - 2), y, lw + 2, YearsH), lastLabel, small);
+		}
+		y += YearsH;
+		GUI::Label(Rect(0, y, w, NoteH), cs::Cat("A bar a year, the tallest ", most, most == 1 ? " event" : " events", "; bright: brought about by your hand. Click a year to list it",
+			timelineEarlier > 0 ? cs::Cat(" (", timelineEarlier, " earlier, under Recent events)") : cs::String(), "."), small);
+		y += NoteH;
+		if (opened)
+		{
+			int steered = 0;
+			for (const auto& t : timeline)
+				if (t.Year == timelineOpen) steered = t.Steered;
+			GUI::Label(Rect(0, y, w, 20), cs::Cat(timelineOpen, ": ", openCount, openCount == 1 ? " event" : " events",
+				steered > 0 ? cs::Cat(", ", steered, " by your hand") : cs::String(), "  (click the year again to close)"), rowTitle);
+			y += 22;
+			for (const auto& r : timelineRows)
+			{
+				auto row = Rect(0, y, w, 24);
+				if (GUI::Button(row, GUIContent::none(), entry)) followEvent = r.Event;
+				GUI::Label(Rect(row.x + 8, row.y + 3, row.width - 14, 20), r.Line, rowLine);
+				y += 28;
+			}
+			if (openCount > static_cast<int>(timelineRows.size()))
+				GUI::Label(Rect(8, y, w - 8, 18), cs::Cat("and ", openCount - static_cast<int>(timelineRows.size()), " more that year"), small);
+		}
+		if (clicked != 0) timelineOpen = clicked == timelineOpen ? 0 : clicked;
+		return h;
+	}
+
 	// ---------------------------------------------------------------- what came of the SpaceGod's hand (US-T325)
 
 	std::vector<CivPick> SocietyScreen::SubjectsOf(const SocialEvent& e)
@@ -1161,6 +1308,12 @@ namespace SpaceGod::UI
 		if (showLife) BuildLife(selected.Id, galaxy, civ);
 		float lifeH = showLife && !life.empty() ? HeadingH + static_cast<float>(life.size()) * 28.0f + (lifeMore > 0 ? 20.0f : 0.0f) + SectionGap : 0.0f;
 		recentH += lifeH;
+		// US-T348: a house's, organisation's, business's or world's events, a bar a year.
+		bool showTimeline = event == nullptr && (selected.Kind == CivPickKind::House || selected.Kind == CivPickKind::Org
+			|| selected.Kind == CivPickKind::Business || selected.Kind == CivPickKind::World);
+		if (showTimeline) BuildTimeline(selected, civ, jd);
+		int timelineFollow = 0;
+		recentH += showTimeline ? DrawTimeline(0, w, false, timelineFollow) : 0.0f;
 		bool showTrends = event == nullptr && selected.Kind == CivPickKind::World;
 		float trendsH = showTrends ? DrawTrends(0, w, selected.Name, civ, jd, false) : 0.0f;
 		bool showFamily = event == nullptr && selected.Kind == CivPickKind::House; // US-T315
@@ -1265,6 +1418,11 @@ namespace SpaceGod::UI
 				y += 20;
 			}
 			y += SectionGap;
+		}
+		if (showTimeline)
+		{
+			y += DrawTimeline(y, w, true, timelineFollow);
+			if (timelineFollow != 0) followEvent = timelineFollow;
 		}
 		if (showRecent)
 		{

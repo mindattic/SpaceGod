@@ -82,6 +82,9 @@ namespace SpaceGod::UI
 		static constexpr int AftermathMax = 12;
 		/// US-T327: the most lines a person's LIFE lists (born, the events about them oldest first, died).
 		static constexpr int LifeMax = 30;
+		/// US-T348: the most years the TIMELINE strip shows (the latest), and the most events a year opened under it lists.
+		static constexpr int TimelineYearsMax = 40;
+		static constexpr int TimelineListMax = 20;
 
 		/// The feed's doings filter (US-T304; was the Steered toggle): every event, the SpaceGod's doings, or those about what is watched.
 		enum Doings : int { AllDoings, SteeredDoings, WatchedDoings, DoingsCount };
@@ -138,6 +141,21 @@ namespace SpaceGod::UI
 		std::vector<Recent> life;
 		int lifeMore = 0;
 		cs::String lifeKey;
+		/// US-T348: one year of the TIMELINE strip: how many events about the thing picked, and how many the hand steered.
+		struct TimelineYear
+		{
+			int Year = 0;
+			int Count = 0;
+			int Steered = 0;
+		};
+		/// US-T348: the strip's years (oldest first, every year from the first kept to now), the events before its first year,
+		/// all its events, the year opened under it (0 none) with that year's events (oldest first), and what each was built for.
+		std::vector<TimelineYear> timeline;
+		int timelineEarlier = 0;
+		int timelineTotal = 0;
+		int timelineOpen = 0;
+		std::vector<Recent> timelineRows;
+		cs::String timelineKey, timelinePick;
 		Vector2 listScroll, detailScroll, pageScroll;
 
 		int page = Feed;
@@ -194,6 +212,12 @@ namespace SpaceGod::UI
 		void BuildAftermath(const Core::SocialEvent& e, Core::Civilization& civ);
 		/// US-T327: the life of the person <paramref name="personId"/>, in order.
 		void BuildLife(int personId, Core::Galaxy& galaxy, Core::Civilization& civ);
+		/// US-T348: the TIMELINE of <paramref name="p"/> (its events by year to the year of <paramref name="jd"/>), and the year opened.
+		void BuildTimeline(const CivPick& p, Core::Civilization& civ, double jd);
+		/// <summary>US-T348: the TIMELINE section at <paramref name="y"/> (a bar a year, the steered share bright; a click opens the
+		/// year's events below it); returns its height, draws only when <paramref name="draw"/>, and sets
+		/// <paramref name="followEvent"/> to the event a row was clicked for.</summary>
+		float DrawTimeline(float y, float w, bool draw, int& followEvent);
 		/// <summary>US-T308: the TRENDS section of the world called <paramref name="world"/> at <paramref name="y"/> (its mood over the
 		/// samples the game took, a bar chart a row); returns its height, and draws only when <paramref name="draw"/>.</summary>
 		float DrawTrends(float y, float w, const cs::String& world, Core::Civilization& civ, double jd, bool draw);
