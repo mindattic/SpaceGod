@@ -85,6 +85,8 @@ namespace SpaceGod::UI
 		/// US-T348: the most years the TIMELINE strip shows (the latest), and the most events a year opened under it lists.
 		static constexpr int TimelineYearsMax = 40;
 		static constexpr int TimelineListMax = 20;
+		/// US-T368: the most RIPE rows Your hand opens with (the most urgent first).
+		static constexpr int RipeMax = 8;
 
 		/// The feed's doings filter (US-T304; was the Steered toggle): every event, the SpaceGod's doings, or those about what is watched.
 		enum Doings : int { AllDoings, SteeredDoings, WatchedDoings, DoingsCount };

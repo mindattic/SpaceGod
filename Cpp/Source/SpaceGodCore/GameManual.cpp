@@ -728,7 +728,9 @@ namespace SpaceGod::Core
 				  "orders: by name, age, wealth or size, reputation or strength, as each has. A person's Tree button draws their "
 				  "house two generations up and down from them, each spouse beside the one they wed and the dead greyed; click a "
 				  "box to go to them. A person's page opens with one sentence that sums them up: their traits, their place in their "
-				  "house, their marriage, what they lead or belong to, their faith and what they want.")), // US-T298, US-T299, US-T304, US-T308, US-T315, US-T323, US-T325, US-T327, US-T330, US-T334, US-T337, US-T344, US-T348, US-T351, US-T354, US-T358, US-T365
+				  "house, their marriage, what they lead or belong to, their faith and what they want. Your hand opens with what is "
+				  "ripe for it: feuds near open war, firms whose losses will close them within months, ageing heads with no heir and "
+				  "governors whose world has turned against them, the most urgent first.")), // US-T298, US-T299, US-T304, US-T308, US-T315, US-T323, US-T325, US-T327, US-T330, US-T334, US-T337, US-T344, US-T348, US-T351, US-T354, US-T358, US-T365, US-T368
 
 			cs::New<ManualChapter>("Comms and pilots", "Hailing ships and stations, piracy by radio, and the people you meet", Keys("COMMS AND PILOTS"),
 				T("Hailing",

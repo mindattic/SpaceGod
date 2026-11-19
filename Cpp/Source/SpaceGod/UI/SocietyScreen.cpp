@@ -410,6 +410,73 @@ namespace SpaceGod::UI
 		}
 		if (page == YourHand)
 		{
+			// US-T368: first, what is ripe for the hand now, the most urgent first (read only: thresholds the simulation
+			// itself works to): a feud running hot enough to come to blows, a firm whose losses will close it within months,
+			// an ageing head with nobody to follow them, a governor whose world has turned against its flag.
+			{
+				struct Ripe
+				{
+					double Urgency;
+					Row R;
+				};
+				std::vector<Ripe> ripe;
+				if (civ->Kinship != nullptr)
+					for (const auto& f : civ->Kinship->Feuds)
+					{
+						if (f == nullptr || !f->Active() || f->Heat < 0.7 || f->A == nullptr || f->B == nullptr) continue;
+						ripe.push_back(Ripe{ f->Heat, Row{ cs::Cat("RIPE  \xC2\xB7  House ", f->A->Surname, " and House ", f->B->Surname, " near open war"),
+							cs::Cat("feud over ", f->Cause, ", heat ", cs::Fmt(f->Heat, "0.00"), f->Incidents > 0 ? cs::Cat(", ", f->Incidents, f->Incidents == 1 ? " incident" : " incidents") : cs::String()),
+							CivPick::House(f->A->Id), nullptr } });
+					}
+				if (society != nullptr)
+				{
+					for (const auto& b : society->Businesses)
+					{
+						// A firm closes when its capital falls under 2e5 (Society::Books); ripe when last month's loss would take it
+						// there within three months.
+						if (b == nullptr || !b->Trading() || b->LastMonth >= 0) continue;
+						double monthsLeft = (b->Capital - 2e5) / -b->LastMonth;
+						if (monthsLeft > 3) continue;
+						ripe.push_back(Ripe{ 1.0 - cs::Math::Max(0.0, monthsLeft) / 4.0, Row{ cs::Cat("RIPE  \xC2\xB7  ", b->Name, " near failing"),
+							cs::Cat(Narrator::Money(b->Capital), " left, ", Narrator::Money(-b->LastMonth), " lost last month", monthsLeft <= 1 ? cs::String(", a month at most") : cs::Cat(", about ", static_cast<int>(monthsLeft), " months")),
+							CivPick::Business(b->Id), nullptr } });
+					}
+					for (const auto& h : society->Houses)
+					{
+						if (h == nullptr || h->Scattered) continue;
+						auto head = h->Head();
+						if (head != nullptr && head->Alive() && head->AgeYears(jd) >= 55)
+						{
+							bool heir = false;
+							for (const auto& m : h->Members)
+								if (m != nullptr && m != head && m->Alive() && (m->Role == CitizenRole::Heir || m->Role == CitizenRole::Child)) { heir = true; break; }
+							if (!heir)
+								ripe.push_back(Ripe{ cs::Math::Min(1.0, (head->AgeYears(jd) - 55) / 30.0), Row{ cs::Cat("RIPE  \xC2\xB7  House ", h->Surname, " has no heir"),
+									cs::Cat(head->FullName(), ", its head, is ", static_cast<int>(head->AgeYears(jd)), " with no son or daughter living"), CivPick::Person(head->Id), nullptr } });
+						}
+						for (const auto& m : h->Members)
+						{
+							if (m == nullptr || !m->Alive() || m->Role != CitizenRole::Governor || h->Home == nullptr) continue;
+							for (const auto& w : civ->Worlds)
+							{
+								if (w == nullptr || w->Where != h->Home || w->Approval >= -0.3) continue;
+								ripe.push_back(Ripe{ cs::Math::Min(1.0, static_cast<double>(-w->Approval)), Row{ cs::Cat("RIPE  \xC2\xB7  ", m->FullName(), " near ousting"),
+									cs::Cat("governor of ", h->Home->Name, ", where approval of its flag is ", SocietySigned(w->Approval)), CivPick::Person(m->Id), nullptr } });
+								break;
+							}
+						}
+					}
+				}
+				std::stable_sort(ripe.begin(), ripe.end(), [](const Ripe& a, const Ripe& b) { return a.Urgency > b.Urgency; });
+				int shown = 0;
+				for (const auto& r : ripe)
+				{
+					if (shown >= RipeMax) break;
+					if (!Matches(r.R.Title, r.R.Line)) continue;
+					rows.push_back(r.R);
+					shown++;
+				}
+			}
 			// US-T325: what the SpaceGod's hand brought about, newest first, each with how much followed it.
 			int n = civ->Events.Count();
 			for (int i = n - 1; i >= 0; i--)
