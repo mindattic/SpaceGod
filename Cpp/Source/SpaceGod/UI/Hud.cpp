@@ -1146,6 +1146,32 @@ namespace SpaceGod::UI
 			DrawLabel(cs::Cat(state, "  ", RangeText((locked->Pos - me->Pos).Length()),
 				Battle::OpenPrize(locked) && battle->Hostile(me, locked) ? cs::String("  OPEN PRIZE") : cs::String()), // US-T380
 				lp + Vector2(half + 6, -8), made ? LockColor : HostileColor, true);
+			// US-T381: how many of your weapons reach it at this range, and how far short the nearest of the rest falls. Read only.
+			if (c != nullptr && battle->Hostile(me, locked))
+			{
+				double lockKm = (locked->Pos - me->Pos).Length();
+				int weapons = 0, reaching = 0;
+				double shortest = cs::Double::MaxValue;
+				cs::String shortName;
+				for (const auto& s : c->Subsystems)
+				{
+					auto wpn = s->Def->Weapon;
+					if (s->Destroyed() || wpn == nullptr || wpn->AntiSmall || wpn->Supporting()) continue;
+					weapons++;
+					if (wpn->RangeKm >= lockKm) { reaching++; continue; }
+					if (lockKm - wpn->RangeKm < shortest)
+					{
+						shortest = lockKm - wpn->RangeKm;
+						shortName = cs::Strings::ToLowerInvariant(cs::String(SubsystemDef::Name(s->Kind())));
+					}
+				}
+				if (weapons > 0)
+				{
+					cs::String reachText = cs::Cat("IN REACH ", reaching, "/", weapons,
+						reaching < weapons ? cs::Cat("  \xC2\xB7  ", shortName, " ", RangeText(shortest), " short") : cs::String());
+					DrawLabel(reachText, lp + Vector2(half + 6, 8), reaching > 0 ? Dim : HostileColor, true);
+				}
+			}
 		}
 		// US-T380: every other hostile hull on screen that lies open to boarding (Battle::OpenPrize) is tagged, so a prize
 		// is seen before it is locked.

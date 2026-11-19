@@ -230,10 +230,11 @@ namespace SpaceGod::UI
 		bool focusLine = battle->Hostile(me, t); // US-T339: how many of ours are on it, and how long it has left
 		bool prize = focusLine && Battle::OpenPrize(t); // US-T380: stunned, and whether it lies open to boarding
 		bool stunLine = t->Stunned > 0 || prize;
+		bool threatLine = focusLine; // US-T381: which of its batteries bear on you
 
 		// Heading, name, class line, range line, (the focus line,) (the stun line,) hull, heat, the shields' caption and rows, the subsystems' caption, the
 		// weak point and its key; then as many subsystem kinds as the column has room for.
-		float fixedH = 6 + RowH * 4 + (focusLine ? RowH : 0) + (stunLine ? RowH : 0) + RowH * 2 + RowH + patchRows * RowH + RowH + (weakLine ? RowH * 2 : 0) + 8;
+		float fixedH = 6 + RowH * 4 + (focusLine ? RowH : 0) + (stunLine ? RowH : 0) + (threatLine ? RowH : 0) + RowH * 2 + RowH + patchRows * RowH + RowH + (weakLine ? RowH * 2 : 0) + 8;
 		float room = layout.FreeRight() - HudLayout::Gap;
 		int kindRows = static_cast<int>(kinds.size());
 		if (fixedH + kindRows * RowH > room) kindRows = std::max(0, static_cast<int>((room - fixedH) / RowH));
@@ -283,6 +284,38 @@ namespace SpaceGod::UI
 			cs::String open = prize ? cs::String("OPEN PRIZE  \xC2\xB7  open to boarding") : cs::String();
 			DrawLabel(FitText(stun.empty() ? open : open.empty() ? stun : cs::Cat(stun, "  \xC2\xB7  ", open), minorLabel, w), Vector2(x, y),
 				prize ? LockColor : Color(1.0f, 0.62f, 0.32f, 1.0f), true);
+			y += RowH;
+		}
+		// US-T381: its guns that bear on you now (the same arcs the broadside readout uses for yours), named by the side of
+		// its hull that has the most of them. Read only.
+		if (threatLine)
+		{
+			int guns = 0, bearOnMe = 0;
+			std::vector<std::pair<cs::String, int>> sides;
+			for (const auto& s : c->Subsystems)
+			{
+				auto wpn = s->Def->Weapon;
+				if (s->Destroyed() || wpn == nullptr || wpn->Missile || wpn->AntiSmall || wpn->Supporting()) continue;
+				guns++;
+				if (!t->Bears(s->Def, me->Pos)) continue;
+				bearOnMe++;
+				auto side = Side(s->Def);
+				size_t i = 0;
+				while (i < sides.size() && sides[i].first != side) i++;
+				if (i == sides.size()) sides.emplace_back(side, 0);
+				sides[i].second++;
+			}
+			cs::String threat;
+			if (guns == 0) threat = "THREAT  \xC2\xB7  no gun left";
+			else if (bearOnMe == 0) threat = cs::Cat("THREAT  \xC2\xB7  none of its ", guns, " guns bears on you");
+			else
+			{
+				size_t top = 0;
+				for (size_t i = 1; i < sides.size(); i++)
+					if (sides[i].second > sides[top].second) top = i;
+				threat = cs::Cat("THREAT  \xC2\xB7  ", sides[top].first, " battery bears on you, ", bearOnMe, "/", guns, " guns");
+			}
+			DrawLabel(FitText(threat, minorLabel, w), Vector2(x, y), bearOnMe > 0 ? HostileColor : Dim, true);
 			y += RowH;
 		}
 
