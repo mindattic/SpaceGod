@@ -8,7 +8,8 @@
 //     shield (blue), the hull (white) or an exposed weak point (gold, larger);
 //   - a kill marker and a line in a small combat feed when a hull it hit is destroyed, disabled or strikes its colours;
 //   - arcs round the reticle pointing where the held hull is taking fire from, blue on the shield and red on the hull,
-//     fading out; and a pulse round the screen's edge when its shields go down and when its hull goes critical.
+//     fading out; and a pulse round the screen's edge when its shields go down and when its hull goes critical;
+//   - US-T300: a threat warning for warheads homing on it and hostiles locking it (DrawThreatWarning).
 
 private:
 	enum class HitMark : int { Shield, Hull, WeakPoint };
@@ -77,3 +78,9 @@ private:
 
 	/// A band of light round the screen's edge, <paramref name="alpha"/> at its outer rim.
 	void DrawEdgePulse(Color tint, float alpha);
+
+	/// US-T300: the threat warning for the held hull, round the reticle at <paramref name="at"/>: a chevron the way each
+	/// hostile warhead homing on it comes from (the nearer its impact, the brighter), a ring and time to impact on the
+	/// round itself when it is on screen, and a banner over the reticle (MISSILE / TORPEDO / EMP with the count and the
+	/// soonest impact, else LOCK while a hostile holds its nose on the hull). Read only, as the warning tones are.
+	void DrawThreatWarning(const cs::Ref<Core::Battle>& battle, const cs::Ref<Core::BattleUnit>& me, Vector2 at, float now);

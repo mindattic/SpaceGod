@@ -300,6 +300,13 @@ namespace SpaceGod::Core
 				  "reticle. When your own hull takes fire, arcs round the reticle point the way it came from, blue on the shield "
 				  "and red on the hull, fading as they go; the screen's edge pulses blue as your shields fail and red as the hull "
 				  "goes critical, glowing faintly for as long as it stays so."),
+				T("Missile and lock warning",
+				  "Every missile, torpedo or EMP round homing on the hull you hold puts a red chevron on a ring round the reticle, "
+				  "pointing in from the way it comes and brightening as it closes; while the round is on screen it is ringed, with "
+				  "its seconds to impact beside it. A flashing banner over the reticle names the heaviest coming, how many and the "
+				  "soonest impact (MISSILE x2  3.4s); with nothing in flight it reads LOCK, amber, while a hostile holds its nose on "
+				  "you. Boarding pods and Breacher rounds are not counted, as the warning tones do not count them. Under Reduce "
+				  "flashes the banner holds steady."),
 				T("Difficulty",
 				  "Story, Normal, Hard or Custom: chosen on the New Game setup page, changeable at any time under Settings > "
 				  "Gameplay, and kept in each save. It touches only the unit you embody: the damage your hull takes, how well hostile "

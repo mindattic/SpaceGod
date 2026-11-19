@@ -14,6 +14,8 @@
 #include "Embodiment/MountedTurret.h"
 #include "PlayerOptions.h" // US-T252
 
+#include <cmath>
+
 using namespace SpaceGod::Core;
 
 namespace SpaceGod::UI
@@ -44,6 +46,40 @@ namespace SpaceGod::UI
 			auto c = u->Combat;
 			if (c == nullptr || c->Spec == nullptr || c->Spec->Hull <= 0) return 1;
 			return c->Hull / c->Spec->Hull;
+		}
+
+		// US-T300: the threat warning.
+		constexpr Color MissileWarnColor{1.0f, 0.3f, 0.22f, 1.0f};
+		constexpr Color LockWarnColor{1.0f, 0.64f, 0.26f, 1.0f};
+
+		/// A round that blows rather than boards (a boarding pod or a Breacher drills in), as the warning tone counts them.
+		bool Warhead(MissileKind k) { return k != MissileKind::Pod && k != MissileKind::Breacher; }
+
+		/// The weight of a warhead's warning: the banner names the heaviest coming.
+		int ThreatRank(MissileKind k)
+		{
+			return k == MissileKind::Antimatter ? 3 : k == MissileKind::Torpedo ? 2 : k == MissileKind::Emp ? 1 : 0;
+		}
+
+		const char* ThreatName(MissileKind k)
+		{
+			return k == MissileKind::Antimatter || k == MissileKind::Torpedo ? "TORPEDO" : k == MissileKind::Emp ? "EMP" : "MISSILE";
+		}
+
+		/// Whether a hostile hull that has <paramref name="me"/> as its target holds its nose within 8 degrees of it (the
+		/// lock tone's test, Audio/FlightSounds).
+		bool NoseOn(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& me)
+		{
+			if (b->Over) return false;
+			const double cosLock = std::cos(8.0 * 3.141592653589793 / 180.0);
+			for (const auto& u : b->Units)
+			{
+				if (u == nullptr || u == me || u->Dead || u->Fled || u->Target != me || !b->Hostile(u, me)) continue;
+				auto to = me->Pos - u->Pos;
+				double d = to.Length();
+				if (d > 1e-9 && DVec3::Dot(u->Forward, to / d) > cosLock) return true;
+			}
+			return false;
 		}
 	}
 
@@ -315,6 +351,8 @@ namespace SpaceGod::UI
 			DrawRing(at, Mathf::Lerp(16.0f, 40.0f, t), tint);
 		}
 
+		if (me->Present()) DrawThreatWarning(battle, me, at, now);
+
 		// The combat feed, right of the middle of the screen, newest last.
 		hitFeed.RemoveAll([&](const HitFeedLine& l) { return now - l.Born > HitFeedSeconds; });
 		float y = Screen::height * 0.5f + 34.0f, x = Screen::width * 0.5f + 90.0f;
@@ -324,5 +362,69 @@ namespace SpaceGod::UI
 			DrawLabel(l.Text, Vector2(x, y), WithAlpha(l.Tint, Mathf::Min(1.0f, left)), true);
 			y += 18.0f;
 		}
+	}
+
+	void Hud::DrawThreatWarning(const cs::Ref<Battle>& battle, const cs::Ref<BattleUnit>& me, Vector2 at, float now)
+	{
+		constexpr float ringRadius = 92.0f;
+		int count = 0, rank = -1;
+		auto worst = MissileKind::Missile;
+		double soonest = -1;
+		for (const auto& m : battle->Missiles)
+		{
+			if (m == nullptr || m->Gone || m->Target != me || m->Side == me->Side || !Warhead(m->Kind)) continue;
+			count++;
+			int r = ThreatRank(m->Kind);
+			if (r > rank) { rank = r; worst = m->Kind; }
+
+			auto rel = m->Pos - me->Pos;
+			double dist = rel.Length();
+			auto from = dist > 1e-12 ? rel / dist : -me->Forward;
+			double closing = dist > 1e-12 ? -DVec3::Dot(m->Vel - me->Vel, from) : 0;
+			double impact = closing > 1e-9 ? dist / closing : -1;
+			if (impact >= 0 && (soonest < 0 || impact < soonest)) soonest = impact;
+
+			// Brighter as the impact nears: full under a couple of seconds out.
+			float urgency = impact >= 0 ? Mathf::Clamp01(1.0f - static_cast<float>(impact) / 10.0f) : 0.25f;
+			auto tint = WithAlpha(MissileWarnColor, 0.5f + 0.5f * urgency);
+
+			// A chevron on the ring, pointing in at the reticle from the way the round comes.
+			auto bearing = HitBearing(from);
+			auto across = Vector2(-bearing.y, bearing.x);
+			float size = r >= 2 ? 12.0f : 8.0f;
+			auto tip = at + bearing * ringRadius;
+			auto back = tip + bearing * size;
+			DrawLine(tip, back + across * (size * 0.8f), tint, 2.5f);
+			DrawLine(tip, back - across * (size * 0.8f), tint, 2.5f);
+
+			// The round itself, while it is on screen.
+			Vector2 p;
+			float depth = 0;
+			if (app->ToGui(app->BattleScene(battle, m->Pos), p, depth))
+			{
+				DrawRing(p, r >= 2 ? 11.0f : 8.0f, tint);
+				WorldLabels wl(worldLabelPass);
+				DrawLabel(impact >= 0 ? cs::Cat(cs::Fmt(impact, "0.0"), "s") : cs::String(ThreatName(m->Kind)), p + Vector2(13, -8), tint, true);
+			}
+		}
+
+		cs::String banner;
+		Color tint;
+		if (count > 0)
+		{
+			banner = cs::Cat(ThreatName(worst), count > 1 ? cs::Cat("  x", count) : cs::String(""), soonest >= 0 ? cs::Cat("  ", cs::Fmt(soonest, "0.0"), "s") : cs::String(""));
+			tint = MissileWarnColor;
+		}
+		else if (NoseOn(battle, me))
+		{
+			banner = "LOCK";
+			tint = LockWarnColor;
+		}
+		if (banner.empty()) return;
+
+		// Flashing, or steady and dimmer under Reduce flashes (US-T252).
+		float alpha = PlayerOptions::Calm() ? 0.8f : 0.55f + 0.45f * Mathf::Sin(now * (count > 0 ? 14.0f : 7.0f));
+		auto size = label->CalcSize(GUIContent(banner));
+		DrawLabel(banner, Vector2(at.x - size.x * 0.5f, at.y - ringRadius - 22.0f - size.y), WithAlpha(tint, alpha), false);
 	}
 }
