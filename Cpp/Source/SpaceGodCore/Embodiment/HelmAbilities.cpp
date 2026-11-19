@@ -280,6 +280,22 @@ namespace SpaceGod::Core
 			e.Ready = u->PlayerLockTarget != nullptr;
 			bar.Add(e);
 		}
+		// US-T356: with ships of its side in reach still fighting, it can call them to withdraw, and the same slot calls them back.
+		if (fight)
+		{
+			int running = b->WithdrawingFor(u);
+			int able = running > 0 ? 0 : b->WithdrawersInReach(u);
+			if (running > 0 || able > 0)
+			{
+				HelmAbilityEntry e;
+				e.Ability = HelmAbility::Withdraw;
+				e.Label = running > 0 ? "Call them back" : "Withdraw";
+				e.State = running > 0 ? cs::Cat(running, running == 1 ? " ship withdrawing" : " ships withdrawing")
+					: cs::Cat(able, able == 1 ? " ship in reach" : " ships in reach");
+				e.Ready = true;
+				bar.Add(e);
+			}
+		}
 		// US-T140: a hull with a squad of its band about it orders it through its captain, before any fight (last, so the
 		// slots above keep their keys).
 		if (world != nullptr && SquadOrders::SquadOf(world, ship).Count() > 0)
@@ -477,6 +493,16 @@ namespace SpaceGod::Core
 				auto why = b->OrderCrippleCall(u, target, answering);
 				return why.empty() ? cs::Cat("Cripple the ", target->Name(), ": ", answering, answering == 1 ? " ship aims" : " ships aim",
 					" at its drives for ", cs::Fmt(Battle::CrippleCallSeconds, "0"), " s") : cs::Cat("No call: ", why);
+			}
+			case HelmAbility::Withdraw:
+			{
+				int answering = 0;
+				bool recalled = false;
+				auto why = b->OrderWithdrawCall(u, answering, recalled);
+				if (!why.empty()) return cs::Cat("No withdrawal: ", why);
+				if (recalled) return cs::Cat("Back to the fight: ", answering, answering == 1 ? " ship turns" : " ships turn", " to fight again");
+				return cs::Cat("Withdraw: ", answering, answering == 1 ? " ship breaks off" : " ships break off",
+					" and run for the edge of the fight (again: call them back)");
 			}
 			default:
 				return "";

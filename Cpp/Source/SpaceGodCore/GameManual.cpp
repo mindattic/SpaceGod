@@ -904,6 +904,8 @@ namespace SpaceGod::Core
 				  "then Weapons free, lifts it at once. "
 				  "Cripple the locked hull has your side's ships within reach go for it and aim at its drives for 30 seconds, "
 				  "so it can neither run nor turn. "
+				  "Withdraw has your side's ships within reach that are still fighting break off and run for the edge of the fight, "
+				  "jumping out as a crew that has broken off does; the same slot, then Call them back, turns those still running to the fight again. "
 				  "Out of a fight a hull with none of these has no bar. The orders are for a fight: out of one they are refused, "
 				  "saying why, and a carrier you fly into a fight holds its wing aboard for you to launch. Shift+/ then jumps you "
 				  "straight into the craft launched last, again into the next, and past the last back to the carrier's helm; "

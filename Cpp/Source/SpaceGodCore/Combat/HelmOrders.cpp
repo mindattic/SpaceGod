@@ -436,6 +436,69 @@ namespace SpaceGod::Core
 		return best;
 	}
 
+	// US-T356: whether o, of u's side and within reach, would answer a call to withdraw (an AI ship still fighting).
+	static bool AnswersWithdraw(const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& o, double reach)
+	{
+		if (o == u || o->Side != u->Side || o->Kind != UnitKind::Ship || !o->Present() || o->PlayerControlled()) return false;
+		if (o->Captured || o->Surrendering || o->Fleeing || o->Combat == nullptr || o->Combat->Disabled()) return false;
+		return (o->Pos - u->Pos).Length() <= reach;
+	}
+
+	int Battle::WithdrawersInReach(const cs::Ref<BattleUnit>& u)
+	{
+		if (u == nullptr) return 0;
+		double reach = FleetCoordination::ReachKm()->Value;
+		int n = 0;
+		for (const auto& o : Units)
+			if (AnswersWithdraw(u, o, reach)) n++;
+		return n;
+	}
+
+	int Battle::WithdrawingFor(const cs::Ref<BattleUnit>& u)
+	{
+		if (u == nullptr) return 0;
+		int n = 0;
+		for (const auto& o : Units)
+			if (o->WithdrawCalledBy == u && o->Present() && o->Fleeing) n++;
+		return n;
+	}
+
+	cs::String Battle::OrderWithdrawCall(const cs::Ref<BattleUnit>& u, int& answering, bool& recalled)
+	{
+		answering = 0;
+		recalled = false;
+		if (u == nullptr || u->Combat == nullptr) return "no hull at the helm";
+		if (WithdrawingFor(u) > 0)
+		{
+			// Called back: those still running turn to the fight again (their own crews may still choose to run, as ever).
+			for (const auto& o : Units)
+			{
+				if (o->WithdrawCalledBy != u) continue;
+				if (o->Present() && o->Fleeing)
+				{
+					o->Fleeing = false;
+					o->RetargetIn = 0;
+					answering++;
+				}
+				o->WithdrawCalledBy = nullptr;
+			}
+			recalled = true;
+			return cs::String();
+		}
+		if (!u->Present() || u->Captured || u->Surrendering) return "the hull is out of the fight";
+		double reach = FleetCoordination::ReachKm()->Value;
+		for (const auto& o : Units)
+		{
+			if (!AnswersWithdraw(u, o, reach)) continue;
+			o->Fleeing = true;
+			o->BoardTarget = nullptr;
+			o->WithdrawCalledBy = u;
+			answering++;
+		}
+		if (answering == 0) return cs::Cat("no ship of ours still fighting within ", Km(reach));
+		return cs::String();
+	}
+
 	void Battle::HelmOrdersLapse(const cs::Ref<BattleUnit>& u)
 	{
 		if (!(u->WingHeld || u->WingRecalled || u->WingCall != 0) || u->PlayerControlled()) return;

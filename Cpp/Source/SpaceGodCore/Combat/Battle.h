@@ -282,6 +282,10 @@ namespace SpaceGod::Core
 		cs::Ref<BattleUnit> CrippleCallTarget;
 		double CrippleCallUntil = 0;
 
+		/// <summary>US-T356: the helm whose call to withdraw this hull answered (<see cref="Battle.OrderWithdrawCall"/>): it broke
+		/// off and runs (<see cref="Fleeing"/>) until that helm calls it back or it is clear of the fight. Never set by the AI.</summary>
+		cs::Ref<BattleUnit> WithdrawCalledBy;
+
 		/// <summary>Taken by boarders: it has changed sides and carries a prize crew, so it no longer fights.</summary>
 		bool Captured = false;
 
@@ -1533,6 +1537,22 @@ namespace SpaceGod::Core
 
 		/// <summary>US-T352: whether <paramref name="target"/> still has a drive left to shoot at.</summary>
 		static bool HasDrives(const cs::Ref<BattleUnit>& target);
+
+		/// <summary>
+		/// US-T356: the helm calls its side to withdraw: every AI ship of its side (not craft) within
+		/// <see cref="FleetCoordination.ReachKm"/> that is still fighting breaks off and runs for the edge of the fight as a
+		/// hull its crew has broken off does (<see cref="BattleUnit.Fleeing"/>, its escape jump included), its craft called home
+		/// with it. Given again while any of them are still running, it calls them back to the fight instead
+		/// (<paramref name="recalled"/> true). <paramref name="answering"/> is how many heard it. Empty when given, else why not.
+		/// The call is a one-off change to those hulls, so nothing is worked out each step and a fight nobody holds is unchanged.
+		/// </summary>
+		cs::String OrderWithdrawCall(const cs::Ref<BattleUnit>& u, int& answering, bool& recalled);
+
+		/// <summary>US-T356: how many hulls of <paramref name="u"/>'s side a call to withdraw would send (the bar's count).</summary>
+		int WithdrawersInReach(const cs::Ref<BattleUnit>& u);
+
+		/// <summary>US-T356: how many hulls <paramref name="u"/>'s call to withdraw sent are still running in the fight.</summary>
+		int WithdrawingFor(const cs::Ref<BattleUnit>& u);
 
 		/// <summary>A carrier's helm orders (<see cref="BattleUnit.WingHeld"/>) lapse once nobody holds its helm or flies one of
 		/// its craft: the recall and the call are lifted and its captain launches the wing held aboard, as at the start of a fight.</summary>

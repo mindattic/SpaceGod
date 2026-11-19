@@ -67,6 +67,10 @@ namespace SpaceGod::Core
 		/// <summary>US-T352: call the side's hulls within reach to cripple the locked hull, aiming at its drives
 		/// (<see cref="Battle.OrderCrippleCall"/>), on every hull's bar in a fight, after the call to hold fire.</summary>
 		Cripple = 20,
+
+		/// <summary>US-T356: call the side's ships within reach to withdraw from the fight, or back to it while any still run
+		/// (<see cref="Battle.OrderWithdrawCall"/>), on the bar in a fight while one is in reach or running, after the call to cripple.</summary>
+		Withdraw = 21,
 	};
 
 	/// <summary>One entry of a helm's ability bar: what it does, and how it stands now (craft aboard, reloading, ready).</summary>
