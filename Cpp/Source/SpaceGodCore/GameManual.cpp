@@ -727,7 +727,8 @@ namespace SpaceGod::Core
 				  "The Sort button by a list's heading, or S, steps the Houses, People, Organisations and Worlds lists through their "
 				  "orders: by name, age, wealth or size, reputation or strength, as each has. A person's Tree button draws their "
 				  "house two generations up and down from them, each spouse beside the one they wed and the dead greyed; click a "
-				  "box to go to them.")), // US-T298, US-T299, US-T304, US-T308, US-T315, US-T323, US-T325, US-T327, US-T330, US-T334, US-T337, US-T344, US-T348, US-T351, US-T354, US-T358
+				  "box to go to them. A person's page opens with one sentence that sums them up: their traits, their place in their "
+				  "house, their marriage, what they lead or belong to, their faith and what they want.")), // US-T298, US-T299, US-T304, US-T308, US-T315, US-T323, US-T325, US-T327, US-T330, US-T334, US-T337, US-T344, US-T348, US-T351, US-T354, US-T358, US-T365
 
 			cs::New<ManualChapter>("Comms and pilots", "Hailing ships and stations, piracy by radio, and the people you meet", Keys("COMMS AND PILOTS"),
 				T("Hailing",

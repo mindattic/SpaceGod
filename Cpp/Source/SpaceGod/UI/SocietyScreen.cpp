@@ -63,6 +63,97 @@ namespace SpaceGod::UI
 		cs::String SocietyPct(double v) { return cs::Cat(cs::Fmt(v * 100, "0"), "%"); }
 		cs::String SocietySigned(double v) { return cs::Cat(v >= 0 ? "+" : "", cs::Fmt(v, "0.00")); }
 		cs::String SocietyDate(double jd) { return jd <= 0 ? cs::String("?") : Astro::ToDateTime(jd).ToString("yyyy-MM-dd"); }
+
+		/// US-T365: ASCII lower case (the enum names are plain ASCII words).
+		cs::String SocietyLower(cs::String s)
+		{
+			for (auto& ch : s)
+				if (ch >= 'A' && ch <= 'Z') ch = static_cast<char>(ch - 'A' + 'a');
+			return s;
+		}
+
+		/// US-T365: one sentence that sums a person up from what Society and the Civilization layer keep (their traits, place in
+		/// their house, marriage, the organisation they lead or belong to, their faith, what they want and their name), e.g.
+		/// "A greedy, charming head of House Vance on Kepler Station, 54 years old, married to Ida Vance, who leads the Free
+		/// Traders' Union, keeps the Church of the Long Night and wants wealth; widely admired." Read only and deterministic.
+		cs::String CharacterLine(const Citizen& c, Civilization& civ, double jd)
+		{
+			// Up to two traits, in the enum's order.
+			cs::String adjectives;
+			int shownTraits = 0;
+			if (c.Persona)
+				for (int bit = 1; bit <= (1 << 11) && shownTraits < 2; bit <<= 1)
+					if (c.Traits & bit)
+					{
+						adjectives = cs::Cat(adjectives, shownTraits > 0 ? ", " : "", SocietyLower(Core::ToString(static_cast<Trait>(bit))));
+						shownTraits++;
+					}
+
+			cs::String houseName = c.House != nullptr ? cs::Cat("House ", c.House->Surname) : cs::String();
+			cs::String where = c.House != nullptr && c.House->Home != nullptr ? cs::Cat(" on ", c.House->Home->Name) : cs::String();
+			cs::String noun;
+			switch (c.Role)
+			{
+			case CitizenRole::Head: noun = houseName.empty() ? cs::String("head of a house") : cs::Cat("head of ", houseName); break;
+			case CitizenRole::Spouse: noun = houseName.empty() ? cs::String("spouse") : cs::Cat("spouse in ", houseName); break;
+			case CitizenRole::Heir: noun = houseName.empty() ? cs::String("heir") : cs::Cat("heir of ", houseName); break;
+			case CitizenRole::Governor:
+				noun = c.House != nullptr && c.House->Home != nullptr ? cs::Cat("governor of ", c.House->Home->Name) : cs::String("governor");
+				if (!houseName.empty()) noun = cs::Cat(noun, ", of ", houseName);
+				where = cs::String();
+				break;
+			default: noun = houseName.empty() ? cs::String("child") : cs::Cat("child of ", houseName); break;
+			}
+			cs::String head = adjectives.empty() ? noun : cs::Cat(adjectives, " ", noun);
+			char first = head.empty() ? 'x' : head[0];
+			bool vowel = first == 'a' || first == 'e' || first == 'i' || first == 'o' || first == 'u';
+			cs::String line = cs::Cat(vowel ? "An " : "A ", head, where);
+
+			// Age, and their marriage.
+			line = c.Alive() ? cs::Cat(line, ", ", static_cast<int>(c.AgeYears(jd)), " years old")
+				: cs::Cat(line, ", dead at ", static_cast<int>(c.AgeYears(c.DiedJd)), " (", SocietyDate(c.DiedJd), ")");
+			if (c.Spouse != nullptr)
+				line = c.Spouse->Alive() || !c.Alive() ? cs::Cat(line, ", married to ", c.Spouse->FullName())
+					: cs::Cat(line, ", widowed by ", c.Spouse->FullName());
+
+			// Deeds: what they run, lead or belong to, the faith they keep and what they want.
+			cs::List<cs::String> deeds;
+			bool living = c.Alive();
+			auto verb = [living](const char* now, const char* then) { return cs::String(living ? now : then); };
+			if (living && c.Role == CitizenRole::Head && c.House != nullptr && c.House->Business != nullptr && c.House->Business->Trading())
+				deeds.Add(cs::Cat("runs ", c.House->Business->Name));
+			cs::String led;
+			for (const auto& o : civ.Orgs)
+				if (o != nullptr && o->Active() && o->Leader != nullptr && o->Leader.get() == &c)
+				{
+					led = Narrator::OrgName(*o);
+					break;
+				}
+			if (!led.empty()) deeds.Add(cs::Cat("leads ", led));
+			else
+				for (const auto& o : c.Orgs)
+					if (o != nullptr && o->Active())
+					{
+						deeds.Add(cs::Cat(verb("belongs to ", "belonged to "), Narrator::OrgName(*o)));
+						break;
+					}
+			if (c.Faith != nullptr) deeds.Add(cs::Cat(verb("keeps ", "kept "), Narrator::OrgName(*c.Faith)));
+			if (c.Persona) deeds.Add(cs::Cat(verb("wants ", "wanted "), SocietyLower(Core::ToString(c.Goal))));
+			if (c.Bribes > 0) deeds.Add(cs::Cat(verb("has taken ", "took "), Narrator::Money(c.Bribes), " in bribes"));
+			if (deeds.Count() > 0)
+			{
+				line = cs::Cat(line, ", who ");
+				for (int i = 0; i < deeds.Count(); i++)
+					line = cs::Cat(line, i == 0 ? "" : (i == deeds.Count() - 1 ? " and " : ", "), deeds[i]);
+			}
+
+			// What people think of them.
+			if (c.Reputation >= 0.5) line = cs::Cat(line, "; widely admired");
+			else if (c.Reputation >= 0.2) line = cs::Cat(line, "; well thought of");
+			else if (c.Reputation <= -0.5) line = cs::Cat(line, "; widely despised");
+			else if (c.Reputation <= -0.2) line = cs::Cat(line, "; poorly thought of");
+			return cs::Cat(line, ".");
+		}
 	}
 
 	int SocietyScreen::GroupOf(int k)
@@ -1132,6 +1223,7 @@ namespace SpaceGod::UI
 		{
 			auto c = society != nullptr ? society->CitizenById(p.Id) : nullptr;
 			if (c == nullptr) break;
+			lines.Add(CharacterLine(*c, civ, jd)); // US-T365: who they are, in one sentence
 			cs::String traits;
 			for (int bit = 1; bit <= (1 << 11); bit <<= 1)
 				if (c->Traits & bit) traits = cs::Cat(traits, traits.empty() ? "" : ", ", Core::ToString(static_cast<Trait>(bit)));
