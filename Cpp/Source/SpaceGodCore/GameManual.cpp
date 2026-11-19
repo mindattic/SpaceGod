@@ -698,7 +698,9 @@ namespace SpaceGod::Core
 				  "moved, one bar for every 30 days you have played (up to two years; not kept in saves), today's brightest, with "
 				  "the change since the first. A house picked shows its Family: its people by generation (born within the same 25 "
 				  "years), each with their role and age, who they wed (named with their own house when they married across houses), "
-				  "and the dead greyed with their years; click one to open them.")), // US-T298, US-T299, US-T304, US-T308, US-T315
+				  "and the dead greyed with their years; click one to open them. An organisation picked lists who is in it (how many "
+				  "living and dead, the best known by name with their role and house), what split from it and who is set against "
+				  "it.")), // US-T298, US-T299, US-T304, US-T308, US-T315, US-T323
 
 			cs::New<ManualChapter>("Comms and pilots", "Hailing ships and stations, piracy by radio, and the people you meet", Keys("COMMS AND PILOTS"),
 				T("Hailing",

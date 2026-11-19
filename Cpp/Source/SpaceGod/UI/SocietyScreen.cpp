@@ -688,6 +688,36 @@ namespace SpaceGod::UI
 			if (o->Faction != nullptr) links.emplace_back(o->Faction->Name, CivPick::Faction(o->Faction->Name));
 			if (o->Rival != nullptr) links.emplace_back(cs::Cat("Rival: ", Narrator::OrgName(*o->Rival)), CivPick::Org(o->Rival->Id));
 			if (o->Parent != nullptr) links.emplace_back(cs::Cat("Split from ", Narrator::OrgName(*o->Parent)), CivPick::Org(o->Parent->Id));
+			// US-T323: who is in it (the leader, then the best known), what split from it and who is set against it.
+			{
+				std::vector<cs::Ref<Citizen>> members;
+				int dead = 0;
+				for (const auto& m : o->Members)
+				{
+					if (m == nullptr) continue;
+					if (!m->Alive()) { dead++; continue; }
+					if (m != o->Leader) members.push_back(m);
+				}
+				std::stable_sort(members.begin(), members.end(), [](const cs::Ref<Citizen>& a, const cs::Ref<Citizen>& b) { return a->Reputation > b->Reputation; });
+				constexpr int MaxShown = 12;
+				int living = static_cast<int>(members.size()) + (o->Leader != nullptr && o->Leader->Alive() ? 1 : 0);
+				lines.Add(cs::Cat("Members: ", living, " living", dead > 0 ? cs::Cat(", ", dead, " dead") : cs::String()));
+				int shown = 0;
+				for (const auto& m : members)
+				{
+					if (shown++ >= MaxShown) break;
+					links.emplace_back(cs::Cat(m->FullName(), ", ", Core::ToString(m->Role), m->House != nullptr ? cs::Cat(" of House ", m->House->Surname) : cs::String()),
+						CivPick::Person(m->Id));
+				}
+				if (static_cast<int>(members.size()) > MaxShown) lines.Add(cs::Cat("  and ", static_cast<int>(members.size()) - MaxShown, " more"));
+				for (const auto& other : civ.Orgs)
+				{
+					if (other == nullptr || other == o) continue;
+					if (other->Parent == o) links.emplace_back(cs::Cat("Offshoot: ", Narrator::OrgName(*other), other->Active() ? "" : " (ended)"), CivPick::Org(other->Id));
+					else if (other->Rival == o && o->Rival != other && other->Active())
+						links.emplace_back(cs::Cat("Set against it: ", Narrator::OrgName(*other)), CivPick::Org(other->Id));
+				}
+			}
 			switch (o->Kind)
 			{
 			case OrgKind::Party: one("elect", "Swing the next election to them"); break;
