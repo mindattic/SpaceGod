@@ -408,6 +408,14 @@ namespace SpaceGod::Core
 				CrippleStanding = true;
 				break;
 			}
+		// US-T360: and whether any ship is running under a call to withdraw (likewise never in a fight nobody holds).
+		WithdrawStanding = false;
+		for (const auto& c : Units)
+			if (c->WithdrawCalledBy != nullptr && c->Fleeing && c->Present())
+			{
+				WithdrawStanding = true;
+				break;
+			}
 		for (int i = 0; i < Units.Count(); i++)
 		{
 			auto u = Units[i];
@@ -713,7 +721,11 @@ namespace SpaceGod::Core
 		DVec3 desired;
 		cs::Nullable<DVec3> strikeFace;
 		double burn = 1;
-		if (u->Fleeing)
+		if (u->Fleeing && WithdrawStanding && WithdrawSteer(u, maxSpeed, desired))
+		{
+			// US-T360: running under a helm's call to withdraw, it goes with the rest that answered (never in a fight nobody holds).
+		}
+		else if (u->Fleeing)
 		{
 			auto away = u->Pos - HostileCentroid(u);
 			if (away.LengthSquared() < 1e-6) away = u->Pos.LengthSquared() > 0 ? u->Pos : DVec3::UnitX;

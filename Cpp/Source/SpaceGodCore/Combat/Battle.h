@@ -1544,9 +1544,27 @@ namespace SpaceGod::Core
 		/// hull its crew has broken off does (<see cref="BattleUnit.Fleeing"/>, its escape jump included), its craft called home
 		/// with it. Given again while any of them are still running, it calls them back to the fight instead
 		/// (<paramref name="recalled"/> true). <paramref name="answering"/> is how many heard it. Empty when given, else why not.
-		/// The call is a one-off change to those hulls, so nothing is worked out each step and a fight nobody holds is unchanged.
+		/// The call is a one-off change to those hulls; they then run together (<see cref="WithdrawSteer"/>, US-T360), worked out
+		/// only while <see cref="WithdrawStanding"/>, so a fight nobody holds is unchanged.
 		/// </summary>
 		cs::String OrderWithdrawCall(const cs::Ref<BattleUnit>& u, int& answering, bool& recalled);
+
+		/// <summary>US-T360: whether any ship is running under a call to withdraw this step (worked out each <see cref="Step"/>, so
+		/// not saved; false in any fight nobody holds, where <see cref="WithdrawSteer"/> is then never asked).</summary>
+		bool WithdrawStanding = false;
+		/// <summary>US-T360: how far, km, the most and the least damaged of a withdrawing group spread along its way out (the
+		/// healthiest hanging back toward the enemy, the worst hurt leading).</summary>
+		static constexpr double WithdrawCoverKm = 8;
+		/// <summary>US-T360: the group's pace, as a share of its slowest ship's top speed, so none is left behind.</summary>
+		static constexpr double WithdrawPace = 0.9;
+
+		/// <summary>
+		/// US-T360: the way <paramref name="u"/>, running under a call to withdraw, steers with the rest that answered the same
+		/// helm: all make for one exit (away from the enemy as seen from the group's middle) at the slowest one's pace, the most
+		/// damaged leading and the healthiest hanging back between them and the enemy. False (and <paramref name="desired"/>
+		/// untouched) when it runs alone, which leaves it to the plain flight of a broken crew.
+		/// </summary>
+		bool WithdrawSteer(const cs::Ref<BattleUnit>& u, double maxSpeed, DVec3& desired);
 
 		/// <summary>US-T356: how many hulls of <paramref name="u"/>'s side a call to withdraw would send (the bar's count).</summary>
 		int WithdrawersInReach(const cs::Ref<BattleUnit>& u);

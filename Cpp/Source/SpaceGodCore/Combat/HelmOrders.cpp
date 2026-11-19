@@ -496,7 +496,38 @@ namespace SpaceGod::Core
 			answering++;
 		}
 		if (answering == 0) return cs::Cat("no ship of ours still fighting within ", Km(reach));
+		WithdrawStanding = true; // US-T360: they go together from the next move
 		return cs::String();
+	}
+
+	bool Battle::WithdrawSteer(const cs::Ref<BattleUnit>& u, double maxSpeed, DVec3& desired)
+	{
+		if (!WithdrawStanding || u == nullptr || u->WithdrawCalledBy == nullptr || u->Combat == nullptr) return false;
+		auto caller = u->WithdrawCalledBy;
+		auto middle = DVec3::Zero;
+		double harm = 0;
+		double slowest = maxSpeed;
+		int n = 0;
+		for (const auto& o : Units)
+		{
+			if (o->WithdrawCalledBy != caller || !o->Present() || !o->Fleeing || o->Combat == nullptr) continue;
+			middle = middle + o->Pos;
+			harm += 1 - o->Combat->HullFraction();
+			if (!o->Combat->Disabled())
+				slowest = cs::Math::Min(slowest, o->Combat->Spec->MaxSpeed * (0.25 + 0.75 * o->Combat->EngineFactor()));
+			n++;
+		}
+		if (n < 2) return false;
+		middle = middle / n;
+		harm /= n;
+		auto away = middle - HostileCentroid(u);
+		if (away.LengthSquared() < 1e-6) away = middle.LengthSquared() > 0 ? middle : DVec3::UnitX;
+		auto way = away.Normalized();
+		// The worse hurt than the group's middle lead toward the exit; the healthier hang back, between them and the enemy.
+		double lead = ((1 - u->Combat->HullFraction()) - harm) * WithdrawCoverKm;
+		auto slot = middle + way * lead;
+		desired = way * (slowest * WithdrawPace) + (slot - u->Pos) * 0.05;
+		return true;
 	}
 
 	void Battle::HelmOrdersLapse(const cs::Ref<BattleUnit>& u)
