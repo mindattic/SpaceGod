@@ -38,7 +38,8 @@ namespace SpaceGod::UI
 	/// goes to every peer. A verb that takes two (a feud, an affair, a summit) takes the second from the one marked.
 	/// US-T298: a search over whatever list is shown (Ctrl+F; the feed's events by their words too), and Back / Forward
 	/// through what was picked (Alt+Left / Alt+Right, or the arrows by the detail's title). US-T299: the thing picked lists
-	/// the latest events about it, each one a link to the event.
+	/// the latest events about it, each one a link to the event. US-T304: anything with events can be watched; the Watched page
+	/// lists what is, the feed narrows to it (Watched only), and while playing a toast tells the newest event about it.
 	/// </summary>
 	class SocietyScreen final
 	{
@@ -55,14 +56,21 @@ namespace SpaceGod::UI
 		/// Whether the search has the keys (the owner hands the game's input over meanwhile; US-T298).
 		bool Typing() const { return typing; }
 
+		/// US-T299: whether <paramref name="e"/> is about <paramref name="p"/> (a house's people's doings are the house's).
+		/// Public for the watch list's news (US-T304, UnitySpaceApp::UpdateSocietyWatch).
+		static bool About(const Core::SocialEvent& e, const CivPick& p);
+
 	private:
 		static constexpr float Margin = 40, Gutter = 24, HeadingH = 24, TabRowH = 30, RowH = 46, LineH = 20, SectionGap = 12;
 		static constexpr const char* SearchControl = "SocietySearch";
 		/// The most events the detail lists about the thing picked (US-T299), and the most picks Back remembers (US-T298).
 		static constexpr int RecentMax = 12, HistoryMax = 64;
 
-		/// The pages down the left: the five lists, then the module views (CivHands::Views()).
-		enum Page : int { Feed, Houses, People, Orgs, Worlds, FirstView };
+		/// The pages down the left: the lists (Watched: what the player watches, US-T304), then the module views (CivHands::Views()).
+		enum Page : int { Feed, Houses, People, Orgs, Worlds, Watched, FirstView };
+
+		/// The feed's doings filter (US-T304; was the Steered toggle): every event, the SpaceGod's doings, or those about what is watched.
+		enum Doings : int { AllDoings, SteeredDoings, WatchedDoings, DoingsCount };
 
 		struct Row
 		{
@@ -111,9 +119,9 @@ namespace SpaceGod::UI
 		Vector2 listScroll, detailScroll, pageScroll;
 
 		int page = Feed;
-		/// The feed's filters: a module group (-1 all), a kind (0 all), the world picked only, the SpaceGod's doings only.
-		int group = -1, kind = 0;
-		bool worldOnly = false, steeredOnly = false;
+		/// The feed's filters: a module group (-1 all), a kind (0 all), the world picked only, whose doings (Doings).
+		int group = -1, kind = 0, doings = AllDoings;
+		bool worldOnly = false;
 		/// The organisations' kind (-1 all).
 		int orgKind = -1;
 
@@ -154,8 +162,7 @@ namespace SpaceGod::UI
 		bool Matches(const cs::String& a, const cs::String& b = cs::String()) const;
 		const cs::String& WordsOf(const Core::SocialEvent& e);
 
-		/// US-T299: whether <paramref name="e"/> is about <paramref name="p"/>, and the latest such events.
-		static bool About(const Core::SocialEvent& e, const CivPick& p);
+		/// US-T299: the latest events about <paramref name="p"/>.
 		void BuildRecent(const CivPick& p, Core::Civilization& civ);
 
 		/// The module group of a kind (an index into the group names), and the names.

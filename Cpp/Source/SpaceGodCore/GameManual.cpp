@@ -660,8 +660,8 @@ namespace SpaceGod::Core
 				  "agencies and cells), stepped through by kind; Worlds, each one's mood (approval of its flag, politics, crime, "
 				  "sickness, war weariness, faith, fashion, quarantine, its landmark and monument); and the modules' own views: "
 				  "feuds, regimes, trials, admirals and strikes, crime, money and the chronicle. The feed filters by module, by "
-				  "kind (each kind that has happened, with how often), to the world picked, and to Steered only, the things your "
-				  "own hand brought about. Pick anything and the right shows what it is, with links to the people, houses, "
+				  "kind (each kind that has happened, with how often), to the world picked, and by doings: Steered only, the things your "
+				  "own hand brought about, or Watched only. Pick anything and the right shows what it is, with links to the people, houses, "
 				  "worlds and organisations about it, and below, the SpaceGod's hand: every verb that applies to it (a person can "
 				  "be made famous, back a coup, have a price put on their head, preach or be rumoured about; a world can riot, "
 				  "arm, fall to a syndicate, be swept by the police, hold a festival, find a landmark, catch a plague or be cured, "
@@ -672,7 +672,11 @@ namespace SpaceGod::Core
 				  "the list shown (every word you type must appear: \"mars riot\"; the feed's events by their words too, and People "
 				  "beyond the 400 best known). Alt+Left and Alt+Right, or the arrows by the title, step back and forward through "
 				  "what you picked. Under the links, Recent events lists the latest things that happened about the one picked "
-				  "(a house's include its people's); click one to read it.")), // US-T298, US-T299
+				  "(a house's include its people's); click one to read it. Watch its news, by the title, watches a house, a person, "
+				  "an organisation, a business, a world or a state: the Watched page lists what you watch with its latest event, "
+				  "the feed's doings filter steps on to Watched only, and while you play the newest thing to happen about it is "
+				  "told as a notice on screen (with how many more came with it). The watch list is yours, on this machine, for "
+				  "this galaxy.")), // US-T298, US-T299, US-T304
 
 			cs::New<ManualChapter>("Comms and pilots", "Hailing ships and stations, piracy by radio, and the people you meet", Keys("COMMS AND PILOTS"),
 				T("Hailing",

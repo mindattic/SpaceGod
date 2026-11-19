@@ -26,11 +26,25 @@ public:
 	/// <summary>The screen's own textures go with the Hud's (U.SPC-T366).</summary>
 	void DestroySocietyTextures();
 
-	/// <summary>Before the commands each frame: while the screen's search is being typed in it has the keys (true: the owner
-	/// hands the input over; US-T298).</summary>
+	/// <summary>Before the commands each frame: tells the news about what is watched (<see cref="UpdateSocietyWatch"/>), and
+	/// while the screen's search is being typed in it has the keys (true: the owner hands the input over; US-T298).</summary>
 	bool UpdateSocietyKeys();
+
+	/// <summary>US-T304: the houses, people, organisations, businesses, worlds and states the player watches, local to this
+	/// machine and this galaxy (forgotten when another galaxy's people take over, as on a load or a new game).</summary>
+	std::vector<CivPick> SocietyWatched;
+	bool IsWatched(const CivPick& p) const;
+	void ToggleWatch(const CivPick& p);
 
 private:
 	cs::Ref<UI::SocietyScreen> societyScreen;
+	/// <summary>US-T304: the civilization the watch list is about, the last event looked at, and the toast held back meanwhile
+	/// (the newest watched event, and how many more came with it) so a fast warp does not flicker one over another.</summary>
+	const void* watchCiv = nullptr;
+	int watchSeenId = 0, watchHeld = 0;
+	cs::String watchToast;
+	double watchToastAt = -1e9;
+	/// <summary>US-T304: once a frame, any new event about something watched becomes a toast (at most one every few seconds).</summary>
+	void UpdateSocietyWatch();
 	/// <summary>A "civ" entry carried out on this peer (UnitySpaceApp.Coop.cpp): the asker's line, applied here.</summary>
 	void CoopCivHand(Coop::CoopPeer& peer, int seat, const cs::String& line);

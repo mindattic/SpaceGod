@@ -29,7 +29,8 @@ namespace SpaceGod::UI
 {
 	namespace
 	{
-		const char* const SocietyPageNames[] = { "Feed", "Houses", "People", "Organisations", "Worlds" };
+		const char* const SocietyPageNames[] = { "Feed", "Houses", "People", "Organisations", "Worlds", "Watched" };
+		const char* const SocietyDoingsNames[] = { "All doings", "Steered only", "Watched only" };
 
 		/// The module views' names on the screen (CivHands::Views(), in its order).
 		const char* SocietyViewName(const cs::String& v)
@@ -85,8 +86,8 @@ namespace SpaceGod::UI
 
 	cs::String SocietyScreen::RowsKey() const
 	{
-		return cs::Cat(page, "|", group, "|", kind, "|", worldOnly ? 1 : 0, "|", steeredOnly ? 1 : 0, "|", orgKind, "|",
-			worldOnly && selected.Kind == CivPickKind::World ? selected.Name : cs::String(), "|", search);
+		return cs::Cat(page, "|", group, "|", kind, "|", worldOnly ? 1 : 0, "|", doings, "|", orgKind, "|",
+			worldOnly && selected.Kind == CivPickKind::World ? selected.Name : cs::String(), "|", search, "|", static_cast<int>(app->SocietyWatched.size()));
 	}
 
 	bool SocietyScreen::Matches(const cs::String& a, const cs::String& b) const
@@ -141,7 +142,8 @@ namespace SpaceGod::UI
 				int k = static_cast<int>(e->Kind);
 				if (kind != 0 && k != kind) continue;
 				if (kind == 0 && group >= 0 && GroupOf(k) != group) continue;
-				if (steeredOnly && !e->Steered) continue;
+				if (doings == SteeredDoings && !e->Steered) continue;
+				if (doings == WatchedDoings && std::none_of(app->SocietyWatched.begin(), app->SocietyWatched.end(), [&](const CivPick& p) { return About(*e, p); })) continue;
 				if (!world.empty() && (e->Where == nullptr || e->Where->Name != world)) continue;
 				cs::String head = cs::Cat(SocietyDate(e->Jd), "  \xC2\xB7  ", Core::ToString(e->Kind), e->Where != nullptr ? cs::Cat("  \xC2\xB7  ", e->Where->Name) : cs::String(),
 					e->Steered ? cs::String("  \xC2\xB7  STEERED") : cs::String(), e->Unverified ? cs::String("  \xC2\xB7  unverified") : cs::String());
@@ -199,6 +201,26 @@ namespace SpaceGod::UI
 					cs::Cat("approval ", SocietySigned(c->Approval), "  \xC2\xB7  crime ", SocietyPct(c->Crime), "  \xC2\xB7  sick ", SocietyPct(c->Infected), "  \xC2\xB7  weary ", SocietyPct(c->Weariness),
 						c->Faith != nullptr ? cs::Cat("  \xC2\xB7  ", Narrator::OrgName(*c->Faith)) : cs::String()),
 					CivPick::World(c->Where->Name), nullptr };
+				if (Matches(r.Title, r.Line)) rows.push_back(r);
+			}
+			return;
+		}
+		if (page == Watched)
+		{
+			// What is watched, in the order it was taken up, each with its latest event.
+			for (const auto& p : app->SocietyWatched)
+			{
+				cs::Ref<SocialEvent> latest;
+				int count = 0;
+				for (int i = civ->Events.Count() - 1; i >= 0; i--)
+				{
+					const auto& e = civ->Events[i];
+					if (e == nullptr || !About(*e, p)) continue;
+					if (count++ == 0) latest = e;
+				}
+				static const char* const WatchKinds[] = { "", "house", "person", "organisation", "world", "trial", "business", "state" };
+				Row r{ NameOf(p, galaxy, *civ), cs::Cat(WatchKinds[static_cast<int>(p.Kind)], "  \xC2\xB7  ", count, count == 1 ? " event kept" : " events kept",
+					latest != nullptr ? cs::Cat("  \xC2\xB7  latest ", SocietyDate(latest->Jd), ": ", Core::ToString(latest->Kind)) : cs::String()), p, nullptr };
 				if (Matches(r.Title, r.Line)) rows.push_back(r);
 			}
 			return;
@@ -479,7 +501,8 @@ namespace SpaceGod::UI
 		x += 208;
 		float rest = r.xMax() - x;
 		float half = Mathf::Max(60.0f, (rest - 6) / 2);
-		if (GUI::Button(Rect(x, r.y, half, r.height), steeredOnly ? "Steered only" : "All doings", steeredOnly ? entrySelected : entry)) steeredOnly = !steeredOnly;
+		// US-T304: All doings -> Steered only -> Watched only -> All doings.
+		if (GUI::Button(Rect(x, r.y, half, r.height), SocietyDoingsNames[doings], doings != AllDoings ? entrySelected : entry)) doings = (doings + 1) % DoingsCount;
 		bool canWorld = selected.Kind == CivPickKind::World;
 		bool enabled = GUI::enabled;
 		GUI::enabled = enabled && (canWorld || worldOnly);
@@ -498,7 +521,10 @@ namespace SpaceGod::UI
 		int n = static_cast<int>(rows.size());
 		if (n == 0)
 		{
-			GUI::Label(Rect(list.x, list.y + 4, list.width, 80), page == Feed ? "Nothing of that kind has happened yet." : "Nobody here yet: that part of the civilization wakes as the days pass.", text);
+			GUI::Label(Rect(list.x, list.y + 4, list.width, 80),
+				page == Feed ? (doings == WatchedDoings && app->SocietyWatched.empty() ? "Nothing is watched yet: pick a house, a person, a world... and Watch it." : "Nothing of that kind has happened yet.")
+				: page == Watched ? "Nothing is watched yet. Pick a house, a person, an organisation, a business, a world or a state and Watch it: its news is told here and, while you play, as it happens."
+				: "Nobody here yet: that part of the civilization wakes as the days pass.", text);
 			return;
 		}
 		float w = list.width - 16;
@@ -520,6 +546,9 @@ namespace SpaceGod::UI
 				GUI::Label(Rect(row.x + 8, row.y + 3, row.width - 14, 20), r.Event != nullptr ? r.Line : r.Title, rowTitle);
 				GUI::Label(Rect(row.x + 8, row.y + 22, row.width - 14, 18), r.Event != nullptr ? r.Title : r.Line, rowLine);
 			}
+			// US-T304: what is watched says so (the Watched page is nothing else).
+			if (page != Watched && r.Event == nullptr && !r.Pick.IsNone() && app->IsWatched(r.Pick))
+				GUI::Label(Rect(row.xMax() - 84, row.y + 3, 78, 18), "WATCHED", rowLine);
 		}
 		GUI::EndScrollView();
 	}
@@ -769,7 +798,7 @@ namespace SpaceGod::UI
 			GUI::Label(Rect(area.x, area.y + HeadingH, area.width, 120),
 				"Pick an event, a house, a person, an organisation or a world on the left. What it is shows here, with the people and "
 				"places about it to follow, and the SpaceGod's hand in it: the same verbs as the console's sg.Civ, so in co-op every "
-				"player's galaxy feels it on the same day.", text);
+				"player's galaxy feels it on the same day. Watch one to be told its news as it happens.", text);
 			return;
 		}
 
@@ -809,6 +838,16 @@ namespace SpaceGod::UI
 		y += 30;
 		static const char* const KindNames[] = { "", "House", "Person", "Organisation", "World", "Trial", "Business", "State" };
 		GUI::Label(Rect(0, y, w, 20), event != nullptr ? cs::String("Event") : cs::String(KindNames[static_cast<int>(selected.Kind)]), small);
+		// US-T304: watch it, to be told its news while playing.
+		if (showRecent)
+		{
+			bool watching = app->IsWatched(selected);
+			if (GUI::Button(Rect(Mathf::Max(0.0f, w - 170), y - 2, 166, 22), watching ? "Watching (click to stop)" : "Watch its news", watching ? entrySelected : entry))
+			{
+				app->ToggleWatch(selected);
+				rowsAt = -1;
+			}
+		}
 		y += 22;
 		GUI::DrawTexture(Rect(0, y + 4, w, 1), buttonActiveTexture);
 		y += 12;
