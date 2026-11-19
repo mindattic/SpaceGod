@@ -14,8 +14,8 @@ command, flight keys (flight assist, lock, flip, drift, power, self-destruct, pi
 **Modifier convention.** Shift makes the "bigger / other" sibling of a key (Shift+F1 dev menu next to F1 help, Shift+V practice
 fighter, Shift+K next sky, Shift+P EVA, Shift+T tractor, Shift+J cruise drive, Shift+F3 go dark, Shift+H comms, Shift+U drawer,
 Shift+Insert run hot, Shift+Del roll patches, Shift+Backspace self-destruct, Shift+/ launched craft, Shift+Tab backwards).
-Ctrl is "fine / slow" (and mine / docking mode at the controls). Alt is the manoeuvre key (flip, broadside stance); Alt+K reverses
-the sky cycle. A plain key never changes meaning with Shift unless the table says so.
+Ctrl is "fine / slow" (and mine / docking mode at the controls). Alt is the manoeuvre key (flip, broadside stance); Shift+Alt+K
+reverses the sky cycle. A plain key never changes meaning with Shift unless the table says so.
 
 ## Camera and god view
 
@@ -28,10 +28,10 @@ the sky cycle. A plain key never changes meaning with Shift unless the table say
 | Look / orbit | Right-drag | command | - |
 | Select, focus | Left-click, double-click | command | - |
 | Focus selection | F | command | - |
-| System view | Home | command | - |
+| System view | Home, Backspace | command | - |
 | Planets (twice to focus) | 1-9, 0 | command | - |
 | Cycle ships (back) | Tab (Shift+Tab) | command | - |
-| Watch a battle | B | command | dev menu > Combat |
+| Watch a battle | B (command only; at the controls B is the boarding panel and Shift+B locks an attacker) | command | dev menu > Combat |
 | Pause | Space, Pause | anywhere | - |
 | Time warp slower / faster | `,` `.`; also `-` `=` and numpad - + | anywhere | dev menu > Time and scale |
 | Back to now | T | command | dev menu > Time and scale |
@@ -66,6 +66,7 @@ the sky cycle. A plain key never changes meaning with Shift unless the table say
 | Lane: steer in the tube | A D Q E | riding a lane | - |
 | Interdiction: surge / drop out | Shift / Ctrl | riding a lane | - |
 | Back into the lane | Y | helm | - |
+| Eject in a pressure suit | Shift+Y | launched craft's cockpit | - |
 | FTL spool | Enter, numpad Enter | helm, beyond the rim | - |
 | Plot a course / clear | PgDn, PgUp / Del | helm, command | galaxy map |
 | FTL autopilot | End | helm | Settings > FTL |
@@ -82,7 +83,7 @@ the sky cycle. A plain key never changes meaning with Shift unless the table say
 |---|---|---|---|
 | Guns | Left mouse | controls | - |
 | Lock hull | T | controls | - |
-| Lock attacker (again: the next one engaging you) | Shift+B (US-T307) | controls | - |
+| Lock attacker (again: the next one engaging you) | Shift+B (US-T307; controls only, B in command watches a battle) | controls | - |
 | Missiles / rockets | Right mouse | controls | - |
 | EMP | Middle mouse | controls | - |
 | Mine | Ctrl (press) | controls, fight | - |
@@ -94,6 +95,9 @@ the sky cycle. A plain key never changes meaning with Shift unless the table say
 | Boarding panel (picks; 4 sends boarders over the hull, US-T82) | B (1 2 3 4 0) | controls | - |
 | Abilities (carrier launch, shuttle, pods) | Shift+1 ... Shift+0 (a bar of more than 10 orders is paged nine at a time: Shift+1 ... Shift+9 the page shown, Shift+0 the next page; US-T359) | helm, in a fight | - |
 | Squad stand-down | Shift + the bar's last number | band captain's helm | sg.StandDown |
+| Pirates demand your cargo: hand it over / refuse | 1 / 2 | while the demand stands | - |
+| Pirate haven's defences down: board and take it / destroy it | 1 (marines aboard) / 2 (guns or marines) | at the haven | - |
+| Mech out of the bay | Shift+N | in a fight, capital or station held | - |
 | Weapon systems (US-T189) | no key of their own (the hardpoint fit, F2 outfitting) | - | F2 |
 
 ## Trade, law, comms, fleet
@@ -107,8 +111,7 @@ the sky cycle. A plain key never changes meaning with Shift unless the table say
 | Contracts / bounties / outfitting | F7 / F4 / F2 | port in view | market > Outfit |
 | News feed | X | command | - |
 | Hail polity | F12 | anywhere | galaxy map > Diplomacy |
-| Comms: hail any ship | Shift+H (Up/Down, Enter, 1-9, Esc/Left) | any controls | bottom drawer > Ships in area |
-| Hail the locked ship | Shift+H (US-T201) | any controls | - |
+| Comms: hail the locked ship, or any ship (US-T201) | Shift+H (Up/Down, Enter, 1-9, Esc/Left) | any controls | bottom drawer > Ships in area |
 | Fleet | F10 | anywhere | - |
 | Next / previous seat | `'` / `;` | held unit | - |
 | Man a gun | / | held unit | - |
@@ -140,10 +143,17 @@ the sky cycle. A plain key never changes meaning with Shift unless the table say
 | HUD on / off | U | anywhere | - |
 | Clear the screen | F11 | anywhere | - |
 | Galaxy map | [ | anywhere | - |
+| System map | Shift+[ | anywhere | - |
+| Dock / port screen | Shift+M | alongside a port | - |
+| Recovered logs | Shift+L | anywhere | - |
+| Discoveries | Shift+O | anywhere | - |
+| Encyclopedia | Shift+I | anywhere | - |
+| Society screen | Shift+G | anywhere | - |
 | Galaxy map: find a system or star | Ctrl+F, then Up / Down / Enter (US-T306) | galaxy map | the field at the map's top left |
 | Galaxy map: pin the system picked (again: unpin) / go to a pin | Ctrl+1..9 / 1..9 (US-T377; not while typing in the find; Ctrl held over the map drops no mine) | galaxy map | the PINS panel at the map's bottom left |
 | System map: find a world, station, gate, ship or field | Ctrl+F, then Up / Down / Enter (US-T310) | system map | the field at the map's top left |
 | Quicksave / quickload / slots | F5 / F8 / F6 | anywhere | pause menu > Save / Load |
+| Rewind (again within a few seconds: further back) | Shift+F8 (US-T99) | anywhere | sg.Rewind |
 | Pause menu | Esc (last in the Esc chain) | anywhere | Resume, Help, Save / Load, Settings > Display, Main Menu, Quit |
 | Pause menu: pick / press a button | Up / Down or W / S, then Enter or Space; Left / Right on the leave question, Stay first (US-T311) | pause menu | - |
 | Mechlab: pick a hardpoint or socket, pick what to fit, fit it | Up / Down, Left / Right, Enter (US-T331) | Mechlab view of the outfitting panel (F2) | the mouse |
@@ -152,7 +162,7 @@ the sky cycle. A plain key never changes meaning with Shift unless the table say
 | Main menu: pick / press a button | Up / Down or W / S, then Enter or Space (US-T314) | main menu, its Co-op and Extras pages | - |
 | New Game page: starting situation, start | Left / Right (Up / Down a row) while no field is typed in, Enter to start or host (US-T317) | New Game setup page | - |
 | Showcase tour | - | - | main menu, dev menu > Showcase, sg.Tour; then Right/N, Left/B, S, Space, 1-9, O, Esc |
-| Capture: screenshot, recording, replay | Alt+F9 / F10 / F11 | only while capture runs | - |
+| Capture: screenshot, recording, replay | Alt+F9 / Alt+F10 / Alt+F11 (in place of the picker, fleet and clear screen) | only while capture runs | - |
 
 ## Console
 
