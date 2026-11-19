@@ -48,7 +48,13 @@ namespace SpaceGod
 				break;
 			case 5: OrderLine(battle, unit, FleetFormation::LineAhead); break;
 			case 6: OrderLine(battle, unit, FleetFormation::LineAbreast); break;
-			case 7: OrderLine(battle, unit, FleetFormation::Echelon); break;
+			case 7:
+			{
+				// US-T372: 7 again while the line holds echelon closes it up into a wedge (and back).
+				auto cmd = Core::Broadsides::Of(unit);
+				OrderLine(battle, unit, cmd != nullptr && cmd->Formation == FleetFormation::Echelon ? FleetFormation::Wedge : FleetFormation::Echelon);
+				break;
+			}
 			case 8: OrderLine(battle, unit, FleetFormation::Screen); break;
 			case 9: OrderLine(battle, unit, FleetFormation::EngageAtWill); break;
 			case 0:

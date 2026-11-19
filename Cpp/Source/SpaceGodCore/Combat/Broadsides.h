@@ -83,6 +83,10 @@ namespace SpaceGod::Core
 
 		/// <summary>The line breaks up and each ship fights its own fight.</summary>
 		EngageAtWill,
+
+		/// <summary>US-T372: an arrowhead with the flagship at the point, the others stepped back to starboard and to port
+		/// alternately. Appended last (saved as its number); only a player's helm orders it.</summary>
+		Wedge,
 	};
 
 	SPACEGODCORE_API const char* ToString(FleetFormation v);

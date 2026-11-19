@@ -455,7 +455,9 @@ namespace SpaceGod::Core
 				  "volley, chain fire and back: a volley holds every gun until the whole battery is loaded and fires them "
 				  "together, a harder alpha strike; chain fire (MechWarrior style) strings the same guns' shots out one at a "
 				  "time instead, so the battery keeps firing while the rest stay loaded and ready. Shift+Delete has the helm "
-				  "roll weak shield patches away from the heaviest fire."),
+				  "roll weak shield patches away from the heaviest fire. The formations are line ahead, line abreast, echelon "
+				  "(press it again for a wedge, your hull at the point and the rest stepped back on both sides), screen, and "
+				  "engage at will to break the line."), // US-T372
 				T("Weapon groups",
 				  "Every capital ship also carries nine standing weapon groups (MechWarrior style), assigned from its own "
 				  "layout: 1-6 are its battery guns nearest the bow, stern, starboard, port, dorsal and ventral, 7 its spinal "

@@ -90,7 +90,7 @@ the sky cycle. A plain key never changes meaning with Shift unless the table say
 | Run hot | Shift+Insert | big ships | - |
 | Roll weak patches | Shift+Del | capital ships | - |
 | Broadside | hold Left mouse | capital ships | - |
-| Captain's orders | 1-9, 0 | capital ships | - |
+| Captain's orders | 1-9, 0 (5 line ahead, 6 line abreast, 7 echelon and 7 again a wedge, 8 screen, 9 engage at will; US-T372) | capital ships | - |
 | Boarding panel (picks; 4 sends boarders over the hull, US-T82) | B (1 2 3 4 0) | controls | - |
 | Abilities (carrier launch, shuttle, pods) | Shift+1 ... Shift+0 (a bar of more than 10 orders is paged nine at a time: Shift+1 ... Shift+9 the page shown, Shift+0 the next page; US-T359) | helm, in a fight | - |
 | Squad stand-down | Shift + the bar's last number | band captain's helm | sg.StandDown |

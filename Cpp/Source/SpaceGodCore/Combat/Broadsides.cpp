@@ -49,6 +49,7 @@ namespace SpaceGod::Core
 			case FleetFormation::Echelon: return "Echelon";
 			case FleetFormation::Screen: return "Screen";
 			case FleetFormation::EngageAtWill: return "EngageAtWill";
+			case FleetFormation::Wedge: return "Wedge";
 		}
 		return "";
 	}
@@ -600,6 +601,12 @@ namespace SpaceGod::Core
 				return DVec3((i % 2 == 0 ? 1 : -1) * rank * spacing, 0, 0);
 			}
 			case FleetFormation::Echelon: return DVec3(k * spacing * 0.7, 0, -k * spacing * 0.7);
+			case FleetFormation::Wedge:
+			{
+				// US-T372: the arrowhead's arms, starboard then port, each rank a step further back and out.
+				int rank = (i / 2) + 1;
+				return DVec3((i % 2 == 0 ? 1 : -1) * rank * spacing * 0.7, 0, -rank * spacing * 0.7);
+			}
 			case FleetFormation::Screen:
 			{
 				double a = 2 * cs::Math::PI * i / cs::Math::Max(1, n);
@@ -650,6 +657,7 @@ namespace SpaceGod::Core
 			case FleetFormation::Echelon: return "echelon";
 			case FleetFormation::Screen: return "screen";
 			case FleetFormation::EngageAtWill: return "engage at will";
+			case FleetFormation::Wedge: return "wedge";
 			default: return "no formation";
 		}
 	}
