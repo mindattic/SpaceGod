@@ -684,7 +684,11 @@ namespace SpaceGod
 	int UnitySpaceApp::OpenScreens() const
 	{
 		return (ShowSpawn ? 1 : 0) | (ShowSaves ? 2 : 0) | (ShowGalaxyMap ? 4 : 0) | (ShowMarket ? 8 : 0) | (ShowCargo ? 16 : 0) | (ShowNews ? 32 : 0) |
-			(ShowOutfit ? 64 : 0) | (ShowBounties ? 128 : 0) | (ShowContracts ? 256 : 0) | (ShowFleet ? 512 : 0) | (ShowTrade ? 1024 : 0) | (ShowHelp ? 2048 : 0) | (ShowPicker ? 4096 : 0) | (ShowPort ? 8192 : 0); // US-T266
+			(ShowOutfit ? 64 : 0) | (ShowBounties ? 128 : 0) | (ShowContracts ? 256 : 0) | (ShowFleet ? 512 : 0) | (ShowTrade ? 1024 : 0) | (ShowHelp ? 2048 : 0) | (ShowPicker ? 4096 : 0) | (ShowPort ? 8192 : 0) | // US-T266
+			// US-T389: the full screens too, on the same bits OpenPanels gives them, so one opened while the screen is cleared
+			// (F11) brings the UI back instead of taking keys unseen.
+			(ShowSystemMap ? 1 << 14 : 0) | (ShowLogs ? 1 << 15 : 0) | (ShowDiscoveries ? 1 << 16 : 0) | (ShowEncyclopedia ? 1 << 22 : 0) |
+			(ShowSociety ? 1 << 23 : 0);
 	}
 
 	void UnitySpaceApp::HandleCommands()
