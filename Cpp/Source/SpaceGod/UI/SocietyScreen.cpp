@@ -926,8 +926,45 @@ namespace SpaceGod::UI
 			auto b = society != nullptr ? society->BusinessById(p.Id) : nullptr;
 			if (b == nullptr) break;
 			lines.Add(Society::Describe(b));
+			// US-T334: its history, its standing among the firms, and whom it deals with.
+			if (b->Trading())
+			{
+				int rank = 1, trading = 0;
+				for (const auto& o : society->Businesses)
+					if (o != nullptr && o->Trading())
+					{
+						trading++;
+						if (o != b && o->Capital > b->Capital) rank++;
+					}
+				lines.Add(cs::Cat("Founded ", SocietyDate(b->FoundedJd), " (", static_cast<int>((jd - b->FoundedJd) / 365.25), " years ago)  \xC2\xB7  ",
+					rank, cs::String(rank == 1 ? "st" : rank == 2 ? "nd" : rank == 3 ? "rd" : "th"), " richest of ", trading, " trading firms"));
+			}
+			else
+				lines.Add(cs::Cat("Founded ", SocietyDate(b->FoundedJd), "; ", cs::String(b->Status == BusinessStatus::Acquired ? "bought out" : "went bankrupt"),
+					cs::Double::IsNaN(b->EndedJd) ? cs::String() : cs::Cat(" ", SocietyDate(b->EndedJd)),
+					b->Buyer != nullptr ? cs::Cat(" by ", b->Buyer->Name) : cs::String()));
 			if (b->Owner != nullptr) links.emplace_back(cs::Cat("House ", b->Owner->Surname), CivPick::House(b->Owner->Id));
 			if (b->Home != nullptr) links.emplace_back(b->Home->Name, CivPick::World(b->Home->Name));
+			if (b->Buyer != nullptr) links.emplace_back(cs::Cat("Bought by ", b->Buyer->Name), CivPick::Business(b->Buyer->Id));
+			for (const auto& w : b->Branches)
+				if (w != nullptr) links.emplace_back(cs::Cat("Branch on ", w->Name), CivPick::World(w->Name));
+			for (const auto& o : society->Businesses)
+			{
+				if (o == nullptr || o == b) continue;
+				if (o->Buyer == b) links.emplace_back(cs::Cat("Bought ", o->Name), CivPick::Business(o->Id));
+				else if (b->Trading() && o->Trading() && o->Kind == b->Kind && o->System != nullptr && o->System == b->System)
+					links.emplace_back(cs::Cat("Rival: ", o->Name, " (", Narrator::Money(o->Capital), ")"), CivPick::Business(o->Id));
+			}
+			int bribes = 0, exposed = 0;
+			double paid = 0;
+			for (const auto& r : society->Bribes)
+				if (r != nullptr && r->Briber == b)
+				{
+					bribes++;
+					paid += r->Amount;
+					if (r->Exposed) exposed++;
+				}
+			if (bribes > 0) lines.Add(cs::Cat("Bribes paid: ", bribes, " (", Narrator::Money(paid), "), ", exposed, " exposed"));
 			if (marked.Kind == CivPickKind::House)
 				hands.push_back(Hand{ cs::Cat("Have it taken over by ", NameOf(marked, galaxy, civ)), cs::Cat("takeover ", marked.Arg(), " ", arg) });
 			else hands.push_back(Hand{ "Have it taken over by...  (mark a house)", cs::String() });

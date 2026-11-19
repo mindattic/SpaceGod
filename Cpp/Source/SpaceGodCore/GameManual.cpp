@@ -711,7 +711,9 @@ namespace SpaceGod::Core
 				  "those later events in order, each a click away. A person picked shows their Life in order: born into their house "
 				  "and on what world, then everything kept about them, oldest first, each a click away, and their death. A world "
 				  "picked names who matters there: its governor, its houses by wealth, its best-known residents and the firms "
-				  "trading there, at their head office or a branch.")), // US-T298, US-T299, US-T304, US-T308, US-T315, US-T323, US-T325, US-T327, US-T330
+				  "trading there, at their head office or a branch. A business picked shows when it was founded and where it ranks "
+				  "by capital among the firms still trading (or how it ended, and who bought it), its branches, the firms it bought "
+				  "out, its rivals in the same line in its system and the bribes it has paid.")), // US-T298, US-T299, US-T304, US-T308, US-T315, US-T323, US-T325, US-T327, US-T330, US-T334
 
 			cs::New<ManualChapter>("Comms and pilots", "Hailing ships and stations, piracy by radio, and the people you meet", Keys("COMMS AND PILOTS"),
 				T("Hailing",
