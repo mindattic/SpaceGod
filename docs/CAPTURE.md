@@ -28,6 +28,11 @@ digests stay identical, and the co-op smoke stays 15/15.
 
 Anything after `-capture` that is not a capture word is left for the game, as MindAttic.Capture does.
 
+**The 1920x1080 tour video (US-T291).** `tools/play.ps1 -Offscreen -Capture 'video hq' -ResX 1920 -ResY 1080 -Seconds 1100
+-ExecCmds 'sg.Tour auto quit'` records the whole showcase tour (about 18 minutes; hardware HEVC, ~1% of frames dropped).
+Run it on a quiet machine: lossless `-capture video` at 1080p falls over a minute behind and the capture valve stops the
+tape, and so does free RAM under 2 GB (parallel Unreal builds); the valve's reason is in the session's `.log`.
+
 ## 2. Output
 
 - Root: `R:\MindAttic\Capture\{RepoName}\`. If `R:` is missing: `%USERPROFILE%\Videos\MindAttic\Capture\{RepoName}\`.
