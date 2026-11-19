@@ -263,6 +263,10 @@ namespace SpaceGod::Core
 		cs::Ref<BattleUnit> PaintCallTarget;
 		double PaintCallUntil = 0;
 
+		/// <summary>US-T342: the battle second the player at this helm's call to fall back on it lapses (<see cref="Battle.OrderFallBackCall"/>):
+		/// until then its side's badly damaged hulls within reach break off and close on this hull. Never set by the AI.</summary>
+		double FallBackCallUntil = 0;
+
 		/// <summary>Taken by boarders: it has changed sides and carries a prize crew, so it no longer fights.</summary>
 		bool Captured = false;
 
@@ -1418,6 +1422,30 @@ namespace SpaceGod::Core
 
 		/// <summary>US-T338: how many working recon craft of <paramref name="u"/>'s side are aloft (the bar's count).</summary>
 		int ReconAloftFor(const cs::Ref<BattleUnit>& u);
+
+		/// <summary>US-T342: how long a call to fall back stands, battle seconds.</summary>
+		static constexpr double FallBackCallSeconds = 30;
+
+		/// <summary>US-T342: below this share of its hull a ship counts as badly damaged and answers a call to fall back.</summary>
+		static constexpr double FallBackHullFraction = 0.5;
+
+		/// <summary>US-T342: how far behind the caller (away from the enemy) the hulls falling back take station, km.</summary>
+		static constexpr double FallBackStandKm = 3;
+
+		/// <summary>
+		/// US-T342: the helm calls its side's badly damaged ships (below <see cref="FallBackHullFraction"/> of their hull, still
+		/// fighting, not flown by a player) within <see cref="FleetCoordination.ReachKm"/> to break off and close on its hull for
+		/// <see cref="FallBackCallSeconds"/>. <paramref name="answering"/> is how many heard it. Empty when given, else why not.
+		/// </summary>
+		cs::String OrderFallBackCall(const cs::Ref<BattleUnit>& u, int& answering);
+
+		/// <summary>US-T342: the caller a standing call to fall back sends <paramref name="u"/> to (the nearest of its side within
+		/// reach), or null: always null for a hull that is not a badly damaged AI ship. Only a player's helm ever makes a call, so
+		/// a fight nobody holds never sees one.</summary>
+		cs::Ref<BattleUnit> CalledFallBackFor(const cs::Ref<BattleUnit>& u);
+
+		/// <summary>US-T342: how many badly damaged ships of <paramref name="u"/>'s side within reach would answer (the bar's count).</summary>
+		int DamagedInReach(const cs::Ref<BattleUnit>& u);
 
 		/// <summary>A carrier's helm orders (<see cref="BattleUnit.WingHeld"/>) lapse once nobody holds its helm or flies one of
 		/// its craft: the recall and the call are lifted and its captain launches the wing held aboard, as at the start of a fight.</summary>

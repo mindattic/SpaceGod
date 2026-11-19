@@ -235,6 +235,59 @@ namespace SpaceGod::Core
 		return best;
 	}
 
+	namespace
+	{
+		/// <summary>US-T342: whether <paramref name="o"/> is a badly damaged ship still fighting that a call to fall back moves.</summary>
+		bool FallsBack(const cs::Ref<BattleUnit>& o)
+		{
+			return o->Kind == UnitKind::Ship && o->Combat != nullptr && !o->PlayerControlled() && o->Present() && !o->Captured
+				&& !o->Surrendering && !o->Fleeing && !o->Combat->Disabled() && o->Combat->HullFraction() < Battle::FallBackHullFraction;
+		}
+	}
+
+	int Battle::DamagedInReach(const cs::Ref<BattleUnit>& u)
+	{
+		if (u == nullptr) return 0;
+		double reach = FleetCoordination::ReachKm()->Value;
+		int n = 0;
+		for (const auto& o : Units)
+		{
+			if (o == u || o->Side != u->Side || !FallsBack(o)) continue;
+			if ((o->Pos - u->Pos).Length() > reach) continue;
+			n++;
+		}
+		return n;
+	}
+
+	cs::String Battle::OrderFallBackCall(const cs::Ref<BattleUnit>& u, int& answering)
+	{
+		answering = 0;
+		if (u == nullptr || u->Combat == nullptr) return "no hull at the helm";
+		if (!u->Present() || u->Captured || u->Surrendering) return "the hull is out of the fight";
+		answering = DamagedInReach(u);
+		if (answering == 0) return cs::Cat("no badly damaged ship of ours within ", Km(FleetCoordination::ReachKm()->Value));
+		u->FallBackCallUntil = Seconds + FallBackCallSeconds;
+		return cs::String();
+	}
+
+	cs::Ref<BattleUnit> Battle::CalledFallBackFor(const cs::Ref<BattleUnit>& u)
+	{
+		if (u == nullptr || !FallsBack(u)) return nullptr;
+		cs::Ref<BattleUnit> best = nullptr;
+		double bestKm = FleetCoordination::ReachKm()->Value;
+		for (const auto& c : Units)
+		{
+			if (c == u || Seconds >= c->FallBackCallUntil || c->Side != u->Side || !c->Present() || c->Captured || c->Surrendering) continue;
+			double d = (c->Pos - u->Pos).Length();
+			if (d <= bestKm)
+			{
+				bestKm = d;
+				best = c;
+			}
+		}
+		return best;
+	}
+
 	void Battle::HelmOrdersLapse(const cs::Ref<BattleUnit>& u)
 	{
 		if (!(u->WingHeld || u->WingRecalled || u->WingCall != 0) || u->PlayerControlled()) return;

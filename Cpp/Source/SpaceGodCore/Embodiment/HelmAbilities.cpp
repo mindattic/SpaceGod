@@ -219,6 +219,22 @@ namespace SpaceGod::Core
 				bar.Add(e);
 			}
 		}
+		// US-T342: with badly damaged ships of its side in reach, it can call them to break off and close on it.
+		if (fight)
+		{
+			int damaged = b->DamagedInReach(u);
+			bool standing = b->Seconds < u->FallBackCallUntil;
+			if (damaged > 0 || standing)
+			{
+				HelmAbilityEntry e;
+				e.Ability = HelmAbility::FallBackOnMe;
+				e.Label = "Fall back on me";
+				e.State = standing ? cs::Cat("falling back, ", cs::Fmt(u->FallBackCallUntil - b->Seconds, "0"), " s")
+					: cs::Cat(damaged, damaged == 1 ? " damaged ship in reach" : " damaged ships in reach");
+				e.Ready = damaged > 0;
+				bar.Add(e);
+			}
+		}
 		// US-T140: a hull with a squad of its band about it orders it through its captain, before any fight (last, so the
 		// slots above keep their keys).
 		if (world != nullptr && SquadOrders::SquadOf(world, ship).Count() > 0)
@@ -384,6 +400,13 @@ namespace SpaceGod::Core
 				auto why = b->OrderPaintCall(u, target, answering);
 				return why.empty() ? cs::Cat("Paint the ", target->Name(), ": ", answering, answering == 1 ? " recon craft turns" : " recon craft turn",
 					" onto it for ", cs::Fmt(Battle::PaintCallSeconds, "0"), " s; our bombers' torpedoes ride the paint") : cs::Cat("No paint: ", why);
+			}
+			case HelmAbility::FallBackOnMe:
+			{
+				int answering = 0;
+				auto why = b->OrderFallBackCall(u, answering);
+				return why.empty() ? cs::Cat("Fall back on us: ", answering, answering == 1 ? " damaged ship breaks off" : " damaged ships break off",
+					" for ", cs::Fmt(Battle::FallBackCallSeconds, "0"), " s") : cs::Cat("No fall back: ", why);
 			}
 			default:
 				return "";

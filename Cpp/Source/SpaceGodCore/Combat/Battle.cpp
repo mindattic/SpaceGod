@@ -669,12 +669,15 @@ namespace SpaceGod::Core
 			u->Pos = u->Pos + u->Vel * dt;
 			return;
 		}
-		if (u->BoardTarget != nullptr && !u->Fleeing)
+		// US-T342: a badly damaged ship a player's helm has called to fall back breaks off and closes on that helm (null in any
+		// fight nobody holds, so the AI's own steering below is unchanged there).
+		auto fallBack = CalledFallBackFor(u);
+		if (u->BoardTarget != nullptr && !u->Fleeing && fallBack == nullptr)
 		{
 			Approach(u, dt);
 			return;
 		}
-		if (!u->Fleeing && Dogfights(u))
+		if (!u->Fleeing && fallBack == nullptr && Dogfights(u))
 		{
 			Dogfight(u, dt);
 			return;
@@ -696,6 +699,14 @@ namespace SpaceGod::Core
 			auto away = u->Pos - HostileCentroid(u);
 			if (away.LengthSquared() < 1e-6) away = u->Pos.LengthSquared() > 0 ? u->Pos : DVec3::UnitX;
 			desired = away.Normalized() * maxSpeed;
+		}
+		else if (fallBack != nullptr)
+		{
+			// US-T342: station just behind the caller, on its far side from the enemy, matching its way.
+			auto behind = fallBack->Pos - HostileCentroid(fallBack);
+			if (behind.LengthSquared() < 1e-6) behind = -fallBack->Forward;
+			auto post = fallBack->Pos + behind.Normalized() * FallBackStandKm;
+			desired = (post - u->Pos) * 0.05 + fallBack->Vel;
 		}
 		else if (u->Target != nullptr && AlphaStrike::Flies(u) && !Broadsides::HoldsFormation(u))
 		{
@@ -748,7 +759,7 @@ namespace SpaceGod::Core
 			desired = -u->Pos * 0.01;
 		}
 		// In a formation its flagship ordered (U.SPC-T425) it keeps its station tightly, fighting from there.
-		bool held = !u->Fleeing && Broadsides::HoldsFormation(u);
+		bool held = !u->Fleeing && fallBack == nullptr && Broadsides::HoldsFormation(u);
 		if (held) desired = (StationOf(u) - u->Pos) * 0.05 + u->Leader->Vel;
 		if (desired.Length() > maxSpeed) desired = desired.Normalized() * maxSpeed;
 

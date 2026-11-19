@@ -51,6 +51,10 @@ namespace SpaceGod::Core
 		/// <summary>US-T338: call the side's recon craft aloft to paint the locked hull (<see cref="Battle.OrderPaintCall"/>), on
 		/// the bar in a fight while the side has recon up, after the call for a screen.</summary>
 		PaintTarget = 16,
+
+		/// <summary>US-T342: call the side's badly damaged ships within reach to break off and close on this hull
+		/// (<see cref="Battle.OrderFallBackCall"/>), on the bar in a fight while one is in reach, after the call to paint.</summary>
+		FallBackOnMe = 17,
 	};
 
 	/// <summary>One entry of a helm's ability bar: what it does, and how it stands now (craft aboard, reloading, ready).</summary>
