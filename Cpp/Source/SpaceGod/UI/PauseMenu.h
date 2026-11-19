@@ -83,6 +83,15 @@ namespace SpaceGod::UI
 		int mainPick = -1, leavePick = 1;
 		bool leaveKeyed = false;
 
+		/// US-T322: the Settings page's setting the keys have picked (an index into what was last shown, -1 until Up / Down),
+		/// and what the page last drew for the keys to act on: the settings shown, the nav's groups in order, whether the
+		/// Display row led the list, and the list's height.
+		int settingsPick = -1;
+		cs::List<cs::Ref<Core::GameSetting>> shownSettings;
+		cs::List<cs::String> navGroups;
+		bool displayRowShown = false;
+		float settingsViewH = 0;
+
 		/// The words that find the Display page in a search, as the registry's settings are found by theirs.
 		static constexpr const char* DisplaySearchWords = "display graphics resolution screen window mode borderless fullscreen exclusive vsync aspect ratio ultrawide";
 
@@ -167,6 +176,12 @@ namespace SpaceGod::UI
 		/// under "Advanced (simulation)" (US-T252), the chosen group's settings (or, while something is typed in Search,
 		/// every setting it finds, folded or not) on the right.
 		void DrawSettings();
+
+		/// US-T322: the Settings page's keys: Up / Down pick a setting, Left / Right change it, Enter or Space flips, steps or
+		/// listens, Delete resets it, Page Up / Page Down step the groups, Ctrl+F types in Search (Enter or Down leaves it).
+		void SettingsKeys();
+		/// US-T322: the group <paramref name="g"/> shown, the search cleared and the list back at its top.
+		void ShowGroup(const cs::String& g);
 
 		/// One setting's row: its name and what it does on the left, its control and Reset on the right.
 		void DrawSetting(const cs::Ref<Core::GameSetting>& setting, Rect r, bool showGroup);

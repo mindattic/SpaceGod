@@ -62,6 +62,7 @@ namespace SpaceGod::UI
 		if (!escape)
 		{
 			if (page == Page::Main) MainKeys(); // US-T311
+			else if (page == Page::Settings) SettingsKeys(); // US-T322
 			return;
 		}
 		if (leaving != Leave::None)
@@ -290,11 +291,13 @@ namespace SpaceGod::UI
 
 		// Search, across every group.
 		GUI::Label(Rect(r.xMax() - 320, r.y + 16, 60, 24), "Search", text);
+		GUI::SetNextControlName("SettingsSearch"); // US-T322: the keys leave it alone while it is typed in
 		cs::String typed = GUI::TextField(Rect(r.xMax() - 260, r.y + 14, 240, 26), search, 48, field);
 		if (typed != search)
 		{
 			search = typed;
 			settingsScroll = Vector2::zero();
+			settingsPick = -1;
 		}
 		bool searching = !cs::Strings::IsNullOrWhiteSpace(search);
 
@@ -367,6 +370,13 @@ namespace SpaceGod::UI
 
 		auto view = Rect(px, top + 28, pw, bottom - top - 28);
 		auto content = Rect(0, 0, pw - 18, Mathf::Max(rows * SettingRowH, 1.0f));
+		// US-T322: what the keys act on next frame.
+		shownSettings = shown;
+		displayRowShown = displayFound;
+		settingsViewH = view.height;
+		navGroups = playerGroups;
+		if (advancedOpen) navGroups.AddRange(advancedGroups);
+		if (settingsPick >= shown.Count()) settingsPick = shown.Count() - 1;
 		settingsScroll = GUI::BeginScrollView(view, settingsScroll, content);
 		float y = 0;
 		if (displayFound)
@@ -376,9 +386,10 @@ namespace SpaceGod::UI
 			if (GUI::Button(Rect(content.width - 266, y + 10, 200, 28), "Open Display", button)) OpenDisplay();
 			y += SettingRowH;
 		}
-		for (const auto& setting : shown)
+		for (int i = 0; i < shown.Count(); i++)
 		{
-			DrawSetting(setting, Rect(0, y, content.width, SettingRowH), searching);
+			if (i == settingsPick) GUI::DrawTexture(Rect(0, y, content.width, SettingRowH - 2), rowSelectedTexture); // US-T322
+			DrawSetting(shown[i], Rect(0, y, content.width, SettingRowH), searching);
 			y += SettingRowH;
 		}
 		if (rows == 0)
@@ -396,6 +407,9 @@ namespace SpaceGod::UI
 		if (GUI::Button(Rect(px, by, 220, 30), resetLabel, button))
 			for (const auto& s : resettable) s->Reset();
 		GUI::enabled = enabled;
+		// US-T322: the keys' hint, between Reset and Back.
+		GUI::Label(Rect(px + 230, by + 6, r.xMax() - 20 - 110 - 10 - (px + 230), 18),
+			"Up / Down pick  ·  Left / Right change  ·  Enter flips  ·  Del resets  ·  PgUp / PgDn group  ·  Ctrl+F search", small);
 		if (GUI::Button(Rect(r.xMax() - 20 - 110, by, 110, 30), "Back", button))
 		{
 			search = ""; // the button leaves the page outright; only Esc stops at clearing a search first
@@ -405,13 +419,96 @@ namespace SpaceGod::UI
 
 	void PauseMenu::NavGroup(const cs::String& g, Rect r, bool searching)
 	{
-		if (GUI::Button(r, g, !searching && g == group ? buttonActive : button))
-		{
-			group = g;
-			search = "";
-			settingsScroll = Vector2::zero();
-			captureAction = captureSlot = -1; // US-T249: a slot listening on the page left behind stops
+		if (GUI::Button(r, g, !searching && g == group ? buttonActive : button)) ShowGroup(g);
+	}
 
+	void PauseMenu::ShowGroup(const cs::String& g)
+	{
+		group = g;
+		search = "";
+		settingsScroll = Vector2::zero();
+		settingsPick = -1; // US-T322
+		captureAction = captureSlot = -1; // US-T249: a slot listening on the page left behind stops
+	}
+
+	void PauseMenu::SettingsKeys()
+	{
+		if (!UiInput::present()) return;
+		auto pressed = [](KeyCode k) { return UiInput::WasPressedThisFrame(k); };
+		bool ctrl = UiInput::IsPressed(KeyCode::LeftControl) || UiInput::IsPressed(KeyCode::RightControl);
+		if (GUI::GetNameOfFocusedControl() == "SettingsSearch")
+		{
+			// The caret's keys while Search is typed in; Enter or Down leaves it for the list.
+			if (pressed(KeyCode::Return) || pressed(KeyCode::KeypadEnter) || pressed(KeyCode::DownArrow))
+			{
+				GUIUtility::keyboardControl = 0;
+				if (shownSettings.Count() > 0) settingsPick = 0;
+			}
+			return;
+		}
+		if (ctrl && pressed(KeyCode::F))
+		{
+			GUI::FocusControl("SettingsSearch");
+			return;
+		}
+
+		if (pressed(KeyCode::PageUp) || pressed(KeyCode::PageDown))
+		{
+			if (navGroups.Count() == 0) return;
+			int at = navGroups.IndexOf(group);
+			int step = pressed(KeyCode::PageDown) ? 1 : -1;
+			int next = at < 0 ? 0 : (at + step + navGroups.Count()) % navGroups.Count();
+			ShowGroup(navGroups[next]);
+			return;
+		}
+
+		int count = shownSettings.Count();
+		if (count == 0) return;
+		int move = pressed(KeyCode::UpArrow) || pressed(KeyCode::W) ? -1 : pressed(KeyCode::DownArrow) || pressed(KeyCode::S) ? 1 : 0;
+		if (move != 0)
+		{
+			settingsPick = settingsPick < 0 ? (move > 0 ? 0 : count - 1) : (settingsPick + move + count) % count;
+			// The list follows the pick (the Display row, when a search found it, sits above the settings).
+			float rowTop = (settingsPick + (displayRowShown ? 1 : 0)) * SettingRowH;
+			if (rowTop < settingsScroll.y) settingsScroll.y = rowTop;
+			else if (rowTop + SettingRowH > settingsScroll.y + settingsViewH) settingsScroll.y = rowTop + SettingRowH - settingsViewH;
+			return;
+		}
+		if (settingsPick < 0 || settingsPick >= count) return;
+
+		const auto& setting = shownSettings[settingsPick];
+		if (pressed(KeyCode::Delete))
+		{
+			setting->Reset();
+			return;
+		}
+		int change = pressed(KeyCode::RightArrow) || pressed(KeyCode::D) ? 1 : pressed(KeyCode::LeftArrow) || pressed(KeyCode::A) ? -1 : 0;
+		bool enter = pressed(KeyCode::Return) || pressed(KeyCode::KeypadEnter) || pressed(KeyCode::Space);
+		if (change == 0 && !enter) return;
+
+		if (auto binding = cs::As<Input::KeyBindingSetting>(setting))
+		{
+			if (!enter) return;
+			// Listening on the first empty slot, else the first: as a click on an empty slot would.
+			int slot = 0;
+			for (int i = Input::KeyBindingSetting::Slots - 1; i >= 0; i--)
+				if (binding->Value[i].Empty()) slot = i;
+			captureAction = static_cast<int>(Input::KeyBindings::ActionOf(*setting));
+			captureSlot = slot;
+		}
+		else if (auto toggle = cs::As<ToggleSetting>(setting))
+		{
+			toggle->Set(change > 0 ? true : change < 0 ? false : !toggle->Value);
+		}
+		else if (auto range = cs::As<RangeSetting>(setting))
+		{
+			// A step, or a twentieth of the range for a setting that takes any value.
+			double step = range->Step > 0 ? range->Step : (range->Max - range->Min) / 20.0;
+			range->Set(range->Value + (change != 0 ? change : 1) * step);
+		}
+		else if (auto choice = cs::As<ChoiceSetting>(setting))
+		{
+			choice->Cycle(change != 0 ? change : 1);
 		}
 	}
 
