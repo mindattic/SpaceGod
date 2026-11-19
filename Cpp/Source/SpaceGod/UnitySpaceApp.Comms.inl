@@ -36,6 +36,10 @@ public:
 	/// <summary>Who is speaking now and from where: the unit held, its hull, faction and pose, the scale's ruler.</summary>
 	Core::CommsContext CommsHere();
 
+	/// <summary>US-T305: what the active system's people have been saying lately (CommsContext.Gossip), for any way rumours
+	/// are asked: the plain verb and an encounter's choice alike.</summary>
+	cs::List<cs::String> CommsGossip();
+
 	/// <summary>Says <paramref name="verb"/> to the panel's target, as the unit held, and logs the answer (the smoke's way in too).</summary>
 	void CommsSay(Core::CommsVerb verb);
 

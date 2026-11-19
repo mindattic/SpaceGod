@@ -185,6 +185,7 @@ namespace SpaceGod
 		if (ch.HasAction)
 		{
 			// The game does it: the same command the verb's button sends (Core::CommsCommand's two numbers), the same answer.
+			if (ch.Action == CommsVerb::AskRumours) c.Gossip = CommsGossip(); // US-T305: the people's talk, as the plain verb hears it
 			auto r = Comms::Apply(c, encounterParty.Key(), static_cast<int>(ch.Action));
 			outcome = r.Outcome;
 			bool replaced = false;

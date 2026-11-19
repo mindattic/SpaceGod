@@ -81,6 +81,11 @@ namespace SpaceGod
 
 	// ---------------------------------------------------------------- who speaks, from where
 
+	cs::List<cs::String> UnitySpaceApp::CommsGossip()
+	{
+		return SocietyGossip(Galaxy, ActiveSystem, Clock != nullptr ? Clock->Jd : 0.0);
+	}
+
 	CommsContext UnitySpaceApp::CommsHere()
 	{
 		CommsContext c;
@@ -193,7 +198,7 @@ namespace SpaceGod
 		// Solo, the panel says it straight away; the command (Core::CommsCommand, "comms <player> <target> <verb>") carries the
 		// same two numbers for a co-op peer or a replay, and Comms::Apply gives the same answer there.
 		// US-T274: asked for rumours, a voice may pass on what the system's people are saying (words only, nothing it does).
-		if (verb == CommsVerb::AskRumours) c.Gossip = SocietyGossip(Galaxy, ActiveSystem, Clock->Jd);
+		if (verb == CommsVerb::AskRumours) c.Gossip = CommsGossip();
 		auto r = Comms::Apply(c, commsTarget.Key(), static_cast<int>(verb));
 		// US-T237: the answer to a hail is the speaker's approved Prose bark when there is one; else the generated greeting.
 		// US-T238: the bark replaces only the flavour; the line's gameplay rider (a cargo offer, a raider's demand) follows it.
