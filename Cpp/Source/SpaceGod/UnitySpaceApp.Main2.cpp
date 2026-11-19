@@ -515,6 +515,37 @@ namespace SpaceGod
 		return eph->HelioAt(s->Orbit->Body, jd) + s->Orbit->OffsetAt(jd);
 	}
 
+	bool UnitySpaceApp::NearestHulk(double maxKm, cs::String& name, Core::DVec3& toKm)
+	{
+		if (!IsPiloting() || Piloted.Ship == nullptr) return false;
+		double jd = Clock->Jd;
+		auto frame = Ephemeris()->HelioAt(pilotFrameBody, jd) + pilotOffsetKm();
+		double best = maxKm;
+		bool found = false;
+		for (const auto& s : Fleet()->Ships())
+		{
+			if (!s->Derelict || s->Destroyed || s == Piloted.Ship || s->Orbit == nullptr) continue;
+			auto to = DerelictHelio(Ephemeris(), s, jd) - frame;
+			double d = to.Length();
+			if (d >= best) continue;
+			best = d;
+			toKm = to;
+			name = cs::Cat("DERELICT ", s->Name);
+			found = true;
+		}
+		for (const auto& w : World()->War->Wrecks->Items)
+		{
+			auto to = World()->WreckHelio(w, jd) - frame;
+			double d = to.Length();
+			if (d >= best) continue;
+			best = d;
+			toKm = to;
+			name = cs::Cat("WRECK ", w->Name);
+			found = true;
+		}
+		return found;
+	}
+
 	cs::String UnitySpaceApp::Num(double v, const char* format) { return cs::Fmt(v, format); }
 
 	bool UnitySpaceApp::UpdateSalvage(const cs::Ref<Core::Ship>& ship, float dt)

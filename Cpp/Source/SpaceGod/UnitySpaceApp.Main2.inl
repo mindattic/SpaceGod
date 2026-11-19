@@ -98,6 +98,10 @@ public:
 	/// <summary>The number-key choices open on the latched hulk right now, for the HUD.</summary>
 	cs::String SalvageChoices();
 
+	/// <summary>US-T316: the nearest derelict or wreck within <paramref name="maxKm"/> of the piloted ship (its name, as
+	/// the approach readout names it, and the way to it from the ship in true km, ecliptic axes); false when none.</summary>
+	bool NearestHulk(double maxKm, cs::String& name, Core::DVec3& toKm);
+
 private:
 	/// <summary>Lets go of the latched hulk: the session ends, is logged, and pays out any adventure on it.</summary>
 	/// C++: an empty toast stands for C#'s null (no toast).

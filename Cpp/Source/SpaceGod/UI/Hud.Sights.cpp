@@ -235,6 +235,31 @@ namespace SpaceGod::UI
 			drawn++;
 		}
 
+		// US-T316: salvage. Out of a fight at the helm and not latched on, the nearest wreck or derelict in scanner range: an
+		// arrow off the screen, a tag on it, so a fight's hulks can be found again (the approach readout takes over at 60 km).
+		if (battle == nullptr && app->IsPiloting() && app->Salvage == nullptr && app->Piloted.Ship != nullptr && app->Piloted.Ship->Battle == nullptr)
+		{
+			cs::String hulk;
+			DVec3 to;
+			if (app->NearestHulk(War::ScanRangeKm, hulk, to))
+			{
+				double hkm = to.Length();
+				if (hkm > 1e-9)
+				{
+					auto rel = ToUnity(to / hkm) * 1e6f;
+					auto tag = cs::Cat(hulk, "  ", RangeText(hkm));
+					Vector2 p;
+					if (!onScreen(rel)) DrawEdgeArrow(rel, ArrowSize(hkm, War::ScanRangeKm), SalvageColor, tag, false);
+					else if (app->RelativeToGui(rel, p))
+					{
+						WorldLabels wl(worldLabelPass);
+						DrawRing(p, 9, SalvageColor);
+						DrawLabel(tag, Vector2(p.x + 14, p.y - 8), SalvageColor, true);
+					}
+				}
+			}
+		}
+
 		// The objective: a plotted course's next star or beacon, light-years off as often as not, so sized against the scanners' reach.
 		DVec3 dir;
 		double km = 0;

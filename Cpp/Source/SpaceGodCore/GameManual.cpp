@@ -295,10 +295,12 @@ namespace SpaceGod::Core
 				T("Off-screen arrows",
 				  "At any controls, whatever is worth turning to and off the screen gets an arrow on the screen's edge, pointing "
 				  "the way to turn: every hostile in the fight (the nearest named by its range), the hull you have locked, ringed "
-				  "and named, what you have selected, the hunters running you down, and a plotted course's next star. An arrow "
+				  "and named, what you have selected, the hunters running you down, a plotted course's next star, and, at the helm out "
+				  "of a fight, the nearest wreck or derelict in scanner range (amber, named with its range; a tag on it when it is on "
+				  "the screen), so a fight's hulks can be found to salvage. An arrow "
 				  "grows as its target closes, measured against four times your longest gun's reach (the scanners' reach for the "
 				  "selection out of a fight and for the course) in true kilometres, so it reads the same at the realistic and the "
-				  "game scale. Red is hostile, green your own side, grey anyone else, blue the course."),
+				  "game scale. Red is hostile, green your own side, grey anyone else, blue the course, amber salvage."), // US-T316
 				T("Hit and damage feedback",
 				  "In every seat that fires -- a helm, a launched craft, a gun (only its own rounds count) or a station -- a hit "
 				  "marker flicks round the reticle when your round, beam or missile lands: blue on a shield, white on the hull, "

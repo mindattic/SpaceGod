@@ -264,6 +264,8 @@ private:
 	// US-T252: the stance colours are the Accessibility palette's (PlayerOptions repaints them: red / green, or orange / blue).
 	static inline Color ArrowFriendlyColor{0.45f, 0.95f, 0.6f, 0.95f};
 	static inline Color ArrowNeutralColor{0.85f, 0.85f, 0.8f, 0.9f};
+	/// <summary>US-T316: the nearest hulk's arrow and tag (salvage amber, apart from every stance colour).</summary>
+	static constexpr Color SalvageColor{1.0f, 0.78f, 0.35f, 0.95f};
 
 	/// <summary>
 	/// At any controls (US-T128): an arrow on the screen's edge for each target off it, pointing the way to turn: every hostile
