@@ -725,7 +725,9 @@ namespace SpaceGod::Core
 				  "that year's events. What happened about something watched since you last picked it is counted as NEW on its "
 				  "Watched row, and the Watched page's name says how many are new in all; picking it marks them seen. "
 				  "The Sort button by a list's heading, or S, steps the Houses, People, Organisations and Worlds lists through their "
-				  "orders: by name, age, wealth or size, reputation or strength, as each has.")), // US-T298, US-T299, US-T304, US-T308, US-T315, US-T323, US-T325, US-T327, US-T330, US-T334, US-T337, US-T344, US-T348, US-T351, US-T354
+				  "orders: by name, age, wealth or size, reputation or strength, as each has. A person's Tree button draws their "
+				  "house two generations up and down from them, each spouse beside the one they wed and the dead greyed; click a "
+				  "box to go to them.")), // US-T298, US-T299, US-T304, US-T308, US-T315, US-T323, US-T325, US-T327, US-T330, US-T334, US-T337, US-T344, US-T348, US-T351, US-T354, US-T358
 
 			cs::New<ManualChapter>("Comms and pilots", "Hailing ships and stations, piracy by radio, and the people you meet", Keys("COMMS AND PILOTS"),
 				T("Hailing",

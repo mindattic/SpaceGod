@@ -141,6 +141,8 @@ namespace SpaceGod::UI
 		std::vector<Recent> life;
 		int lifeMore = 0;
 		cs::String lifeKey;
+		/// US-T358: whether a person's FAMILY TREE section is drawn open (UI-side, kept from person to person).
+		bool familyTreeOpen = false;
 		/// US-T348: one year of the TIMELINE strip: how many events about the thing picked, and how many the hand steered.
 		struct TimelineYear
 		{
@@ -230,6 +232,11 @@ namespace SpaceGod::UI
 		/// generation, who each married, the dead greyed); returns its height, draws only when <paramref name="draw"/>, and sets
 		/// <paramref name="follow"/> to the person a row was clicked for.</summary>
 		float DrawFamily(float y, float w, int houseId, Core::Galaxy& galaxy, double jd, bool draw, CivPick& follow);
+		/// <summary>US-T358: the FAMILY TREE section of the person <paramref name="personId"/> at <paramref name="y"/>: a Tree button
+		/// that opens a drawn tree of their house's people two generations up and down (citizens keep no parents, so a generation
+		/// is a 25-year band of births, as in FAMILY), the spouse beside each and the dead greyed; returns its height, draws only
+		/// when <paramref name="draw"/>, and sets <paramref name="follow"/> to the person a box was clicked for.</summary>
+		float DrawFamilyTree(float y, float w, int personId, Core::Galaxy& galaxy, double jd, bool draw, CivPick& follow);
 
 		/// US-T344: one row of the side-by-side compare: what it is, the picked one's value and the marked one's, and which is
 		/// better (0 neither or no better way, 1 the picked, 2 the marked).

@@ -1441,6 +1441,9 @@ namespace SpaceGod::UI
 		bool showFamily = event == nullptr && selected.Kind == CivPickKind::House; // US-T315
 		CivPick familyFollow;
 		float familyH = showFamily ? DrawFamily(0, w, selected.Id, galaxy, jd, false, familyFollow) : 0.0f;
+		bool showTree = event == nullptr && selected.Kind == CivPickKind::Person; // US-T358
+		CivPick treeFollow;
+		familyH += showTree ? DrawFamilyTree(0, w, selected.Id, galaxy, jd, false, treeFollow) : 0.0f;
 		bool showCompare = event == nullptr && Comparable(); // US-T344
 		CivPick compareFollow;
 		float compareH = showCompare ? DrawCompare(0, w, galaxy, civ, jd, false, compareFollow) : 0.0f;
@@ -1484,8 +1487,9 @@ namespace SpaceGod::UI
 		y += SectionGap;
 		if (showTrends) y += DrawTrends(y, w, selected.Name, civ, jd, true);
 		if (showFamily) y += DrawFamily(y, w, selected.Id, galaxy, jd, true, familyFollow);
+		if (showTree) y += DrawFamilyTree(y, w, selected.Id, galaxy, jd, true, treeFollow);
 		if (showCompare) y += DrawCompare(y, w, galaxy, civ, jd, true, compareFollow);
-		CivPick follow = !compareFollow.IsNone() ? compareFollow : familyFollow;
+		CivPick follow = !compareFollow.IsNone() ? compareFollow : !treeFollow.IsNone() ? treeFollow : familyFollow;
 		if (!links.empty())
 		{
 			GUI::Label(Rect(0, y, w, HeadingH - 4), "SEE ALSO", heading);
@@ -1911,6 +1915,116 @@ namespace SpaceGod::UI
 			if (GUI::Button(row, GUIContent::none(), entry)) follow = CivPick::Person(c->Id);
 			GUI::Label(Rect(row.x + 8, row.y + 3, row.width - 14, 20), line, c->Alive() ? rowLine : small);
 			y += FamilyRowH;
+		}
+		return h;
+	}
+
+	float SocietyScreen::DrawFamilyTree(float y, float w, int personId, Galaxy& galaxy, double jd, bool draw, CivPick& follow)
+	{
+		static constexpr float TierLabelH = 18, BusH = 12, BoxH = 52, TierGap = 8, BoxGap = 10, MinBoxW = 150, MaxBoxW = 220, NoteH = 22;
+		static constexpr float SpouseH = 18;
+		static constexpr double GenerationDays = 25 * 365.25;
+		static constexpr int Reach = 2;
+		static const char* const TierNames[] = { "Two generations up", "A generation up", "Their generation", "A generation down", "Two generations down" };
+		auto society = Society::Find(galaxy);
+		auto who = society != nullptr ? society->CitizenById(personId) : nullptr;
+		if (who == nullptr) return 0;
+		bool open = familyTreeOpen;
+
+		// Citizens keep no parents, so as in FAMILY a generation is a 25-year band of births, here counted from the person.
+		std::vector<cs::Ref<Citizen>> tiers[2 * Reach + 1];
+		if (open)
+		{
+			auto home = who->House;
+			if (home != nullptr)
+				for (const auto& m : home->Members)
+				{
+					if (m == nullptr || m == who || m == who->Spouse) continue;
+					// One married in sits beside the one they wed, not in a box of their own.
+					if (m->Role == CitizenRole::Spouse && m->Spouse != nullptr && m->Spouse->House == home) continue;
+					int g = static_cast<int>(std::floor((m->BornJd - who->BornJd) / GenerationDays + 0.5));
+					if (g < -Reach || g > Reach) continue;
+					tiers[g + Reach].push_back(m);
+				}
+			for (auto& t : tiers)
+				std::stable_sort(t.begin(), t.end(), [](const cs::Ref<Citizen>& a, const cs::Ref<Citizen>& b) { return a->BornJd < b->BornJd; });
+			tiers[Reach].insert(tiers[Reach].begin(), who);
+		}
+		int perRow = Mathf::Max(1, static_cast<int>((w + BoxGap) / (MinBoxW + BoxGap)));
+
+		float h = HeadingH + SectionGap;
+		if (open)
+		{
+			h += NoteH;
+			for (const auto& t : tiers)
+				if (!t.empty()) h += TierLabelH + BusH + BoxH + TierGap;
+		}
+		if (!draw) return h;
+
+		GUI::Label(Rect(0, y, Mathf::Max(0.0f, w - 130), HeadingH - 4), "FAMILY TREE", heading);
+		if (GUI::Button(Rect(Mathf::Max(0.0f, w - 120), y, 116, 22), open ? "Hide tree" : "Tree", button)) familyTreeOpen = !familyTreeOpen;
+		y += HeadingH;
+		if (!open) return h;
+		GUI::Label(Rect(0, y, w, NoteH - 2), cs::Cat("House ", who->House != nullptr ? who->House->Surname : cs::String("?"),
+			" by birth, a generation every 25 years (citizens keep no parents, so a band holds cousins too); the dead are greyed."), small);
+		y += NoteH;
+
+		auto year = [](double d) { return d <= 0 ? cs::String("?") : Astro::ToDateTime(d).ToString("yyyy"); };
+		float prevBottom = -1;
+		for (int i = 0; i < 2 * Reach + 1; i++)
+		{
+			const auto& t = tiers[i];
+			if (t.empty()) continue;
+			int count = static_cast<int>(t.size());
+			int shown = count > perRow ? Mathf::Max(1, perRow - 1) : count;
+			int slots = shown + (count > shown ? 1 : 0);
+			float bw = Mathf::Min(MaxBoxW, (w - static_cast<float>(slots - 1) * BoxGap) / static_cast<float>(slots));
+			float x0 = (w - (static_cast<float>(slots) * bw + static_cast<float>(slots - 1) * BoxGap)) / 2;
+
+			GUI::Label(Rect(0, y, w, TierLabelH), count > shown ? cs::Cat(TierNames[i], "  (", count, ", ", shown, " shown)") : cs::Cat(TierNames[i], "  (", count, ")"), small);
+			y += TierLabelH;
+			float busY = y + BusH / 2;
+			y += BusH;
+			float rowY = y;
+			// The lines: down from the band above to this one's bus, and a stub from the bus to each box.
+			if (prevBottom >= 0)
+			{
+				GUI::DrawTexture(Rect(w / 2, prevBottom, 1, Mathf::Max(0.0f, busY - prevBottom)), buttonActiveTexture);
+				float first = x0 + bw / 2, lastCx = x0 + static_cast<float>(slots - 1) * (bw + BoxGap) + bw / 2;
+				GUI::DrawTexture(Rect(Mathf::Min(first, w / 2), busY, Mathf::Max(lastCx, w / 2) - Mathf::Min(first, w / 2) + 1, 1), buttonActiveTexture);
+				for (int s = 0; s < slots; s++)
+					GUI::DrawTexture(Rect(x0 + static_cast<float>(s) * (bw + BoxGap) + bw / 2, busY, 1, rowY - busY), buttonActiveTexture);
+			}
+			for (int s = 0; s < shown; s++)
+			{
+				const auto& m = t[s];
+				float x = x0 + static_cast<float>(s) * (bw + BoxGap);
+				bool self = m == who;
+				auto keep = GUI::color;
+				if (!m->Alive()) GUI::color = Color(keep.r, keep.g, keep.b, keep.a * 0.55f);
+				float personH = m->Spouse != nullptr ? BoxH - SpouseH : BoxH;
+				if (GUI::Button(Rect(x, rowY, bw, personH), GUIContent::none(), self ? entrySelected : entry) && !self) follow = CivPick::Person(m->Id);
+				GUI::Label(Rect(x + 6, rowY + 2, bw - 10, 18), m->FullName(), rowTitle);
+				GUI::Label(Rect(x + 6, rowY + 18, bw - 10, 16), m->Alive()
+					? cs::Cat(Core::ToString(m->Role), ", ", static_cast<int>(m->AgeYears(jd)))
+					: cs::Cat(year(m->BornJd), "-", year(m->DiedJd)), rowLine);
+				if (m->Spouse != nullptr)
+				{
+					auto wed = m->Spouse;
+					bool across = wed->House != nullptr && wed->House != m->House;
+					if (GUI::Button(Rect(x, rowY + personH, bw, SpouseH), GUIContent::none(), entry)) follow = CivPick::Person(wed->Id);
+					GUI::Label(Rect(x + 6, rowY + personH + 1, bw - 10, SpouseH - 2), cs::Cat("= ", across ? wed->FullName() : wed->Given,
+						wed->Alive() ? cs::String() : cs::String(" (dead)")), rowLine);
+				}
+				GUI::color = keep;
+			}
+			if (count > shown)
+			{
+				float x = x0 + static_cast<float>(shown) * (bw + BoxGap);
+				GUI::Label(Rect(x + 6, rowY + 16, bw - 10, 20), cs::Cat("+", count - shown, " more (the house's FAMILY)"), small);
+			}
+			y += BoxH + TierGap;
+			prevBottom = rowY + BoxH;
 		}
 		return h;
 	}
