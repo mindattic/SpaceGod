@@ -130,6 +130,8 @@ namespace SpaceGod::Core
 
 	cs::Ref<BattleUnit> ElectronicWarfare::ChooseMark(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& u)
 	{
+		// US-T338: a player's helm that called for a hull to be painted comes first (null in any fight nobody holds).
+		if (auto called = b->CalledPaintFor(u)) return called;
 		cs::Ref<BattleUnit> bomberMark = nullptr;
 		double nearestBomber = cs::Double::MaxValue;
 		for (const auto& f : b->Units)

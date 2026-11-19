@@ -258,6 +258,11 @@ namespace SpaceGod::Core
 		/// until then its side's screening hulls within reach guard this hull. Never set by the AI.</summary>
 		double ScreenCallUntil = 0;
 
+		/// <summary>US-T338: the hull the player at this helm called its side's recon craft to paint, and the battle second the
+		/// call lapses (<see cref="Battle.OrderPaintCall"/>). Never set by the AI.</summary>
+		cs::Ref<BattleUnit> PaintCallTarget;
+		double PaintCallUntil = 0;
+
 		/// <summary>Taken by boarders: it has changed sides and carries a prize crew, so it no longer fights.</summary>
 		bool Captured = false;
 
@@ -1395,6 +1400,24 @@ namespace SpaceGod::Core
 
 		/// <summary>US-T333: how many hulls of <paramref name="u"/>'s side within reach carry a working screen (the bar's count).</summary>
 		int ScreensInReach(const cs::Ref<BattleUnit>& u);
+
+		/// <summary>US-T338: how long a call to paint stands, battle seconds.</summary>
+		static constexpr double PaintCallSeconds = 45;
+
+		/// <summary>
+		/// US-T338: the helm calls its side's recon craft to paint <paramref name="target"/> (the hull locked): every working recon
+		/// craft of its side aloft takes it as its mark now and keeps it for <see cref="PaintCallSeconds"/>
+		/// (<see cref="ElectronicWarfare.ChooseMark"/>), painting it for the side's bombers once within range.
+		/// <paramref name="answering"/> is how many recon craft heard it. Empty when given, else why not.
+		/// </summary>
+		cs::String OrderPaintCall(const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& target, int& answering);
+
+		/// <summary>US-T338: the hull a standing call to paint puts before recon craft <paramref name="r"/> (the nearest caller of
+		/// its side), or null. Only a player's helm ever makes a call, so a fight nobody holds never sees one.</summary>
+		cs::Ref<BattleUnit> CalledPaintFor(const cs::Ref<BattleUnit>& r);
+
+		/// <summary>US-T338: how many working recon craft of <paramref name="u"/>'s side are aloft (the bar's count).</summary>
+		int ReconAloftFor(const cs::Ref<BattleUnit>& u);
 
 		/// <summary>A carrier's helm orders (<see cref="BattleUnit.WingHeld"/>) lapse once nobody holds its helm or flies one of
 		/// its craft: the recall and the call are lifted and its captain launches the wing held aboard, as at the start of a fight.</summary>

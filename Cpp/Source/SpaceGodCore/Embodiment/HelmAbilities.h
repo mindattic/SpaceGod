@@ -47,6 +47,10 @@ namespace SpaceGod::Core
 		/// <summary>US-T333: call the side's screening hulls to guard this hull (<see cref="Battle.OrderScreenCall"/>), on every
 		/// hull's bar in a fight, after the call for fire.</summary>
 		ScreenMe = 15,
+
+		/// <summary>US-T338: call the side's recon craft aloft to paint the locked hull (<see cref="Battle.OrderPaintCall"/>), on
+		/// the bar in a fight while the side has recon up, after the call for a screen.</summary>
+		PaintTarget = 16,
 	};
 
 	/// <summary>One entry of a helm's ability bar: what it does, and how it stands now (craft aboard, reloading, ready).</summary>

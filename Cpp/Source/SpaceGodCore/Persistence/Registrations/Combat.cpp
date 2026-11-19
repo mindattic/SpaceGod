@@ -215,7 +215,8 @@ namespace SpaceGod::Core
 		SG_OPT(Broadcast), // US-T96: its broadcast array, absent from older saves
 		SG_OPT(PlayerFireGroup), // U.SPC-T277: a weapon group fired this step, absent from older saves
 		SG_OPT(FireCallTarget), SG_OPT(FireCallUntil), // US-T332: a helm's call for fire, absent from older saves
-		SG_OPT(ScreenCallUntil)) // US-T333: a helm's call for a screen, absent from older saves
+		SG_OPT(ScreenCallUntil), // US-T333: a helm's call for a screen, absent from older saves
+		SG_OPT(PaintCallTarget), SG_OPT(PaintCallUntil)) // US-T338: a helm's call to paint, absent from older saves
 
 	SG_SERIALIZE(BoardingParty, "Unity.SpaceGod.Core.BoardingParty",
 		SG_F(Faction), SG_F(Landed), SG_F(Order), SG_F(Strength))

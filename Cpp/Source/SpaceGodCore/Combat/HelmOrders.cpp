@@ -15,6 +15,7 @@
 #include "Combat/Fighters.h"
 #include "Combat/FleetCoordination.h" // US-T332
 #include "Combat/ScreenWeapons.h" // US-T333
+#include "Combat/ElectronicWarfare.h" // US-T338
 #include "Settings/GameSetting.h"
 #include "Ships.h"
 
@@ -178,6 +179,57 @@ namespace SpaceGod::Core
 			{
 				bestKm = d;
 				best = c;
+			}
+		}
+		return best;
+	}
+
+	int Battle::ReconAloftFor(const cs::Ref<BattleUnit>& u)
+	{
+		if (u == nullptr) return 0;
+		int n = 0;
+		for (const auto& r : ReconAloft)
+			if (r->Side == u->Side && r->Kind == UnitKind::Fighter && !r->PlayerControlled() && ElectronicWarfare::Working(r)) n++;
+		return n;
+	}
+
+	cs::String Battle::OrderPaintCall(const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& target, int& answering)
+	{
+		answering = 0;
+		if (u == nullptr || u->Combat == nullptr) return "no hull at the helm";
+		if (target == nullptr) return "lock a hull first (T)";
+		if (!target->Present()) return cs::Cat("the ", target->Name(), " is gone");
+		if (!Hostile(u, target)) return cs::Cat("the ", target->Name(), " is not hostile");
+		if (target->Kind == UnitKind::Fighter) return "recon paints ships, not craft";
+		if (target->Captured || target->Surrendering) return cs::Cat("the ", target->Name(), " has struck");
+		if (ElectronicWarfare::PaintRangeKm()->Value <= 0) return "painting is off (Recon painting range is 0)";
+		for (const auto& r : ReconAloft)
+		{
+			if (r->Side != u->Side || r->Kind != UnitKind::Fighter || r->PlayerControlled() || !ElectronicWarfare::Working(r)) continue;
+			r->Target = target; // onto the mark now; ChooseMark keeps it there while the call stands
+			answering++;
+		}
+		if (answering == 0) return "no recon craft of ours aloft (launch recon first)";
+		u->PaintCallTarget = target;
+		u->PaintCallUntil = Seconds + PaintCallSeconds;
+		return cs::String();
+	}
+
+	cs::Ref<BattleUnit> Battle::CalledPaintFor(const cs::Ref<BattleUnit>& r)
+	{
+		if (r == nullptr) return nullptr;
+		cs::Ref<BattleUnit> best = nullptr;
+		double bestKm = cs::Double::MaxValue;
+		for (const auto& c : Units)
+		{
+			if (c == r || c->PaintCallTarget == nullptr || Seconds >= c->PaintCallUntil || c->Side != r->Side || !c->Present()) continue;
+			auto t = c->PaintCallTarget;
+			if (!t->Present() || t->Captured || t->Surrendering || !Hostile(r, t)) continue;
+			double d = (c->Pos - r->Pos).Length();
+			if (d < bestKm)
+			{
+				bestKm = d;
+				best = t;
 			}
 		}
 		return best;

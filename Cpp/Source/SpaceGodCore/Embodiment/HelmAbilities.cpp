@@ -203,6 +203,22 @@ namespace SpaceGod::Core
 			e.Ready = screens > 0;
 			bar.Add(e);
 		}
+		// US-T338: with recon of its side aloft, it can call them to paint the hull it has locked for the side's bombers.
+		if (fight)
+		{
+			int recon = b->ReconAloftFor(u);
+			bool standing = u->PaintCallTarget != nullptr && b->Seconds < u->PaintCallUntil && u->PaintCallTarget->Present();
+			if (recon > 0 || standing)
+			{
+				HelmAbilityEntry e;
+				e.Ability = HelmAbility::PaintTarget;
+				e.Label = "Paint the locked hull";
+				e.State = standing ? cs::Cat("painting the ", u->PaintCallTarget->Name(), ", ", cs::Fmt(u->PaintCallUntil - b->Seconds, "0"), " s")
+					: cs::Cat(recon, " recon aloft", u->PlayerLockTarget != nullptr ? cs::String() : cs::String(", lock a hull (T)"));
+				e.Ready = recon > 0 && u->PlayerLockTarget != nullptr;
+				bar.Add(e);
+			}
+		}
 		// US-T140: a hull with a squad of its band about it orders it through its captain, before any fight (last, so the
 		// slots above keep their keys).
 		if (world != nullptr && SquadOrders::SquadOf(world, ship).Count() > 0)
@@ -360,6 +376,14 @@ namespace SpaceGod::Core
 				auto why = b->OrderScreenCall(u, answering);
 				return why.empty() ? cs::Cat("Screen on us: ", answering, answering == 1 ? " hull closes in" : " hulls close in",
 					" for ", cs::Fmt(Battle::ScreenCallSeconds, "0"), " s") : cs::Cat("No screen: ", why);
+			}
+			case HelmAbility::PaintTarget:
+			{
+				auto target = u->PlayerLockTarget;
+				int answering = 0;
+				auto why = b->OrderPaintCall(u, target, answering);
+				return why.empty() ? cs::Cat("Paint the ", target->Name(), ": ", answering, answering == 1 ? " recon craft turns" : " recon craft turn",
+					" onto it for ", cs::Fmt(Battle::PaintCallSeconds, "0"), " s; our bombers' torpedoes ride the paint") : cs::Cat("No paint: ", why);
 			}
 			default:
 				return "";
