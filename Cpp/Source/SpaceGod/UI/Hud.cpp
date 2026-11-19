@@ -1382,19 +1382,19 @@ namespace SpaceGod::UI
 	void Hud::DrawBroadside(const cs::Ref<Battle>& battle, const cs::Ref<BattleUnit>& me, float x, float y)
 	{
 		auto look = app->PilotLookDirection();
+		auto broadsideGun = [](const cs::Ref<Subsystem>& s)
+		{
+			auto w = s->Def->Weapon;
+			return !s->Destroyed() && w != nullptr && !w->Missile && !w->AntiSmall && !w->Supporting();
+		};
 		int loaded = 0, bearing = 0;
 		for (const auto& s : me->Combat->Subsystems)
 		{
-			auto w = s->Def->Weapon;
-			if (s->Destroyed() || w == nullptr || w->Missile || w->AntiSmall || w->Supporting() || !me->BearsAlong(s->Def, look)) continue;
+			if (!broadsideGun(s) || !me->BearsAlong(s->Def, look)) continue;
 			bearing++;
 			if (s->Cooldown <= 0) loaded++;
 		}
 		float built = static_cast<float>(me->VolleyCharge / Battle::VolleyBuildSeconds);
-		// C# `string text` (renamed: it would hide the `text` style member).
-		cs::String text_ = cs::Cat(bearing == 0 ? cs::String("NO GUN BEARS HERE") : cs::Cat("BATTERY BEARING  ", loaded, "/", bearing, " loaded"),
-			me->PlayerFireHeld ? cs::Cat("  ·  VOLLEY ", Mathf::RoundToInt(built * 100), "%  (let go to fire)") : cs::String("  ·  hold left mouse to build a volley"));
-		DrawLabel(text_, Vector2(x, y), me->PlayerFireHeld ? LockColor : Dim, true);
 
 		// The hull the volley will go at: the locked one near the line, else the hostile nearest it.
 		cs::Ref<BattleUnit> target = nullptr;
@@ -1408,10 +1408,63 @@ namespace SpaceGod::UI
 			if (o == me->PlayerLockTarget && cos > cs::Math::Cos(Battle::VolleyConeDeg * cs::Math::PI / 180)) { target = o; break; }
 			if (cos > best) { best = cos; target = o; }
 		}
+
+		// US-T326: with no gun bearing along the look, the side whose battery has the most guns loaded (where to come about to).
+		cs::String sideHint;
+		if (bearing == 0)
+		{
+			static const char* sideNames[] = { "FORE", "STBD", "AFT", "PORT" };
+			const DVec3 sideDirs[] = { DVec3(0, 0, 1), DVec3(1, 0, 0), DVec3(0, 0, -1), DVec3(-1, 0, 0) };
+			int bestSide = -1, bestLoaded = 0, bestBearing = 0;
+			for (int i = 0; i < 4; i++)
+			{
+				auto along = me->LocalDirToWorld(sideDirs[i]);
+				int sideLoaded = 0, sideBearing = 0;
+				for (const auto& s : me->Combat->Subsystems)
+				{
+					if (!broadsideGun(s) || !me->BearsAlong(s->Def, along)) continue;
+					sideBearing++;
+					if (s->Cooldown <= 0) sideLoaded++;
+				}
+				if (sideLoaded > bestLoaded || (sideLoaded == bestLoaded && sideBearing > bestBearing))
+				{
+					bestSide = i; bestLoaded = sideLoaded; bestBearing = sideBearing;
+				}
+			}
+			if (bestSide >= 0 && bestBearing > 0) sideHint = cs::Cat(" (", sideNames[bestSide], " battery ", bestLoaded, "/", bestBearing, " loaded)");
+		}
+
+		// US-T326: how many guns bear on the volley's hull itself, and where it lies off the bow.
+		cs::String onTarget;
+		int onTargetBearing = 0;
+		if (target != nullptr)
+		{
+			int onTargetLoaded = 0;
+			for (const auto& s : me->Combat->Subsystems)
+			{
+				if (!broadsideGun(s) || !me->Bears(s->Def, target->Pos)) continue;
+				onTargetBearing++;
+				if (s->Cooldown <= 0) onTargetLoaded++;
+			}
+			double yaw = me->YawDegOf(target->Pos);
+			int off = Mathf::RoundToInt(static_cast<float>(yaw <= 180 ? yaw : 360 - yaw));
+			cs::String lies = off <= 10 ? cs::String("dead ahead") : off >= 170 ? cs::String("astern")
+				: cs::Cat(off, "° to ", yaw <= 180 ? "stbd" : "port");
+			cs::String hullName = target->Ship != nullptr ? cs::Strings::ToUpperInvariant(target->Ship->Name) : cs::String("TARGET");
+			onTarget = cs::Cat("  ·  ON ", hullName, " (", lies, "): ",
+				onTargetBearing == 0 ? cs::String("no gun bears") : cs::Cat(onTargetLoaded, "/", onTargetBearing, " guns"));
+		}
+
+		// C# `string text` (renamed: it would hide the `text` style member).
+		cs::String text_ = cs::Cat(bearing == 0 ? cs::Cat("NO GUN BEARS HERE", sideHint) : cs::Cat("BATTERY BEARING  ", loaded, "/", bearing, " loaded"),
+			onTarget,
+			me->PlayerFireHeld ? cs::Cat("  ·  VOLLEY ", Mathf::RoundToInt(built * 100), "%  (let go to fire)") : cs::String("  ·  hold left mouse to build a volley"));
+		DrawLabel(text_, Vector2(x, y), me->PlayerFireHeld ? LockColor : Dim, true);
+
 		Vector2 tp;
 		float td = 0;
 		if (target != nullptr && app->ToGui(app->BattleScene(battle, target->Pos), tp, td))
-			DrawRing(tp, 14 + 6 * built, me->PlayerFireHeld ? LockColor : HostileColor);
+			DrawRing(tp, 14 + 6 * built, me->PlayerFireHeld ? LockColor : onTargetBearing == 0 ? Dim : HostileColor);
 		DrawCaptain(battle, me, x, y);
 	}
 
