@@ -1869,6 +1869,11 @@ namespace SpaceGod::UI
 		return systemMap->Typing();
 	}
 
+	bool Hud::UpdateHelpKeys()
+	{
+		return app->ShowHelp && helpScreen != nullptr && helpScreen->KeysDown();
+	}
+
 	void Hud::DestroyOwnedTextures()
 	{
 		// UnityEngine.Object.Destroy(tex) -> dropping the reference (the last one releases the Unreal texture).

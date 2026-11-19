@@ -77,6 +77,8 @@ public:
 	bool UpdateGalaxyMapKeys();
 	/// US-T310: the same for the system map's find field.
 	bool UpdateSystemMapKeys();
+	/// US-T346: while the Help screen (or its ship catalog) is up, the keys it steps with are its own, not the flight's.
+	bool UpdateHelpKeys();
 
 private:
 

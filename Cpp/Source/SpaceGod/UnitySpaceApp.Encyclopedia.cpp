@@ -6,6 +6,7 @@
 #include "GameLore.h"
 #include "SimClock.h"
 #include "Input/Gamepad.h"
+#include "Input/InputDevice.h" // US-T346
 #include "Input/KeyBindings.h"
 #include "Lore/Encyclopedia.h"
 #include "Systems/DiscoveryLog.h"
@@ -160,7 +161,14 @@ namespace SpaceGod
 			encyclopediaWasShown = false;
 			return false;
 		}
-		return encyclopediaScreen != nullptr && encyclopediaScreen->Typing();
+		if (encyclopediaScreen == nullptr) return false;
+		if (encyclopediaScreen->Typing()) return true;
+		// US-T346: the arrows and Page Up / Page Down / Home / End step its list and its links while held, not the flight under it.
+		using ::SpaceGod::Input::Key;
+		const ::SpaceGod::Input::InputDevice& kb = ::SpaceGod::Input::InputDevice::current();
+		auto down = [&](Key k) { return kb[k].isPressed || kb[k].wasPressedThisFrame; };
+		return down(Key::UpArrow) || down(Key::DownArrow) || down(Key::LeftArrow) || down(Key::RightArrow)
+			|| down(Key::PageUp) || down(Key::PageDown) || down(Key::Home) || down(Key::End);
 	}
 
 	void UnitySpaceApp::DrawEncyclopedia()

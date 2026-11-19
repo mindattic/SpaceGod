@@ -8,6 +8,7 @@
 #include "CivHand.h"
 #include "Coop/CoopPeer.h"
 #include "Economy/Settlement.h"
+#include "Input/InputDevice.h" // US-T346
 #include "Input/KeyBindings.h"
 #include "SimClock.h"
 #include "Systems/Civilization/Civilization.h"
@@ -82,7 +83,18 @@ namespace SpaceGod
 	{
 		UpdateSocietyWatch();
 		UpdateSocietyTrends();
-		return ShowSociety && societyScreen != nullptr && societyScreen->Typing();
+		if (!ShowSociety || societyScreen == nullptr) return false;
+		if (societyScreen->Typing()) return true;
+		// US-T346: the keys the screen steps and marks with (Up / Down, a plain C, Alt+Left / Right) are its own while held,
+		// not the flight's under it (C is also "down" at the controls).
+		using ::SpaceGod::Input::Key;
+		const ::SpaceGod::Input::InputDevice& kb = ::SpaceGod::Input::InputDevice::current();
+		auto down = [&](Key k) { return kb[k].isPressed || kb[k].wasPressedThisFrame; };
+		bool shift = down(Key::LeftShift) || down(Key::RightShift), ctrl = down(Key::LeftCtrl) || down(Key::RightCtrl);
+		bool alt = down(Key::LeftAlt) || down(Key::RightAlt);
+		if (down(Key::UpArrow) || down(Key::DownArrow)) return true;
+		if (alt && (down(Key::LeftArrow) || down(Key::RightArrow))) return true;
+		return down(Key::C) && !shift && !ctrl && !alt;
 	}
 
 	const std::vector<UnitySpaceApp::SocietyTrendSample>* UnitySpaceApp::SocietyTrendOf(const cs::String& world) const

@@ -4,6 +4,7 @@
 #include "ControlsHelp.h"
 #include "GameManual.h"
 #include "Input/Gamepad.h" // US-T250
+#include "Input/InputDevice.h" // US-T346
 #include "Input/KeyBindings.h" // US-T249
 #include "UI/Hud.h"
 #include "UI/ShipCatalogScreen.h"
@@ -40,6 +41,19 @@ namespace SpaceGod::UI
 	HelpScreen::HelpScreen() = default;
 
 	HelpScreen::~HelpScreen() = default;
+
+	bool HelpScreen::KeysDown() const
+	{
+		using ::SpaceGod::Input::Key;
+		const ::SpaceGod::Input::InputDevice& kb = ::SpaceGod::Input::InputDevice::current();
+		auto down = [&](Key k) { return kb[k].isPressed || kb[k].wasPressedThisFrame; };
+		if (down(Key::UpArrow) || down(Key::DownArrow) || down(Key::PageUp) || down(Key::PageDown) || down(Key::Home) || down(Key::End))
+			return true;
+		if (!showCatalog) return false;
+		if (down(Key::LeftArrow) || down(Key::RightArrow)) return true;
+		bool modified = down(Key::LeftShift) || down(Key::RightShift) || down(Key::LeftCtrl) || down(Key::RightCtrl) || down(Key::LeftAlt) || down(Key::RightAlt);
+		return down(Key::C) && !modified;
+	}
 
 	bool HelpScreen::Draw(const cs::String& closeHint)
 	{

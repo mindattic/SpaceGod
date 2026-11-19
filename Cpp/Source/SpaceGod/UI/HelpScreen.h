@@ -42,6 +42,10 @@ namespace SpaceGod::UI
 		/// (in a game, not on the main menu).
 		cs::Action<> OnEncyclopedia;
 
+		/// US-T346: whether a key this screen steps with is down now (Up / Down, Page Up / Page Down, Home / End; on the ship
+		/// catalog also Left / Right and a plain C): the owner hands the frame's input over, so the flight under it never sees them.
+		bool KeysDown() const;
+
 	private:
 		static constexpr float Margin = 40, Gutter = 28, KeyW = 150, LineGap = 3, TopicGap = 14, HeadingH = 24, ContentsRowH = 30;
 
