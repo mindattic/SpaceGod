@@ -90,6 +90,8 @@ namespace SpaceGod::UI
 		static constexpr int ChronicleNamesMax = 12;
 		/// US-T368: the most RIPE rows Your hand opens with (the most urgent first).
 		static constexpr int RipeMax = 8;
+		/// US-T378: the most houses, firms and organisations each the world's POWER section ranks.
+		static constexpr int PowerMax = 8;
 
 		/// The feed's doings filter (US-T304; was the Steered toggle): every event, the SpaceGod's doings, or those about what is watched.
 		enum Doings : int { AllDoings, SteeredDoings, WatchedDoings, DoingsCount };
@@ -250,6 +252,11 @@ namespace SpaceGod::UI
 		/// <summary>US-T308: the TRENDS section of the world called <paramref name="world"/> at <paramref name="y"/> (its mood over the
 		/// samples the game took, a bar chart a row); returns its height, and draws only when <paramref name="draw"/>.</summary>
 		float DrawTrends(float y, float w, const cs::String& world, Core::Civilization& civ, double jd, bool draw);
+		/// <summary>US-T378: the POWER section of the world called <paramref name="world"/> at <paramref name="y"/>: the houses, firms
+		/// and organisations based there, each kind ranked by its wealth, capital or strength with its share of the kind's total as a
+		/// bar (at most PowerMax each); returns its height, draws only when <paramref name="draw"/>, and sets <paramref name="follow"/>
+		/// to the thing a row was clicked for.</summary>
+		float DrawPower(float y, float w, const cs::String& world, Core::Galaxy& galaxy, Core::Civilization& civ, bool draw, CivPick& follow);
 		/// <summary>US-T315: the FAMILY section of the house <paramref name="houseId"/> at <paramref name="y"/> (its members by
 		/// generation, who each married, the dead greyed); returns its height, draws only when <paramref name="draw"/>, and sets
 		/// <paramref name="follow"/> to the person a row was clicked for.</summary>

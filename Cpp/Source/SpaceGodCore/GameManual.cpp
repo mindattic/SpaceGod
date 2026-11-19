@@ -735,7 +735,9 @@ namespace SpaceGod::Core
 				  "governors whose world has turned against them, the most urgent first. Under each of the hand's buttons a line says what it "
 				  "would do if used now, as the galaxy would judge it: what is sure (the hand forces its outcome, and a swung election "
 				  "shows today's share of the vote) or why it would be refused. A house's Chronicle button tells its history as prose, "
-				  "a paragraph a decade from its founding to who heads it now, with the people and houses each names to follow.")), // US-T298, US-T299, US-T304, US-T308, US-T315, US-T323, US-T325, US-T327, US-T330, US-T334, US-T337, US-T344, US-T348, US-T351, US-T354, US-T358, US-T365, US-T368, US-T371, US-T375
+				  "a paragraph a decade from its founding to who heads it now, with the people and houses each names to follow. "
+				  "A world's POWER ranks the houses, firms and organisations based there by wealth, capital or strength, each with its "
+				  "share as a bar.")), // US-T298, US-T299, US-T304, US-T308, US-T315, US-T323, US-T325, US-T327, US-T330, US-T334, US-T337, US-T344, US-T348, US-T351, US-T354, US-T358, US-T365, US-T368, US-T371, US-T375, US-T378
 
 			cs::New<ManualChapter>("Comms and pilots", "Hailing ships and stations, piracy by radio, and the people you meet", Keys("COMMS AND PILOTS"),
 				T("Hailing",

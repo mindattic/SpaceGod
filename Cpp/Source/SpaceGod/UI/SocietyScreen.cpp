@@ -1975,6 +1975,8 @@ namespace SpaceGod::UI
 		recentH += showTimeline ? DrawTimeline(0, w, false, timelineFollow) : 0.0f;
 		bool showTrends = event == nullptr && selected.Kind == CivPickKind::World;
 		float trendsH = showTrends ? DrawTrends(0, w, selected.Name, civ, jd, false) : 0.0f;
+		CivPick powerFollow; // US-T378: who holds the world's wealth and strength
+		trendsH += showTrends ? DrawPower(0, w, selected.Name, galaxy, civ, false, powerFollow) : 0.0f;
 		bool showFamily = event == nullptr && selected.Kind == CivPickKind::House; // US-T315
 		CivPick familyFollow;
 		float familyH = showFamily ? DrawFamily(0, w, selected.Id, galaxy, jd, false, familyFollow) : 0.0f;
@@ -2027,11 +2029,13 @@ namespace SpaceGod::UI
 		}
 		y += SectionGap;
 		if (showTrends) y += DrawTrends(y, w, selected.Name, civ, jd, true);
+		if (showTrends) y += DrawPower(y, w, selected.Name, galaxy, civ, true, powerFollow);
 		if (showFamily) y += DrawFamily(y, w, selected.Id, galaxy, jd, true, familyFollow);
 		if (showChronicle) y += DrawChronicle(y, w, galaxy, civ, true, chronicleFollow);
 		if (showTree) y += DrawFamilyTree(y, w, selected.Id, galaxy, jd, true, treeFollow);
 		if (showCompare) y += DrawCompare(y, w, galaxy, civ, jd, true, compareFollow);
-		CivPick follow = !compareFollow.IsNone() ? compareFollow : !treeFollow.IsNone() ? treeFollow : !chronicleFollow.IsNone() ? chronicleFollow : familyFollow;
+		CivPick follow = !compareFollow.IsNone() ? compareFollow : !treeFollow.IsNone() ? treeFollow : !chronicleFollow.IsNone() ? chronicleFollow
+			: !powerFollow.IsNone() ? powerFollow : familyFollow;
 		if (!links.empty())
 		{
 			GUI::Label(Rect(0, y, w, HeadingH - 4), "SEE ALSO", heading);
@@ -2401,6 +2405,94 @@ namespace SpaceGod::UI
 			y += TrendRowH;
 		}
 		GUI::Label(Rect(0, y, w, 18), "Bars run oldest to newest; the brightest is today.", small);
+		return h;
+	}
+
+	float SocietyScreen::DrawPower(float y, float w, const cs::String& world, Galaxy& galaxy, Civilization& civ, bool draw, CivPick& follow)
+	{
+		static constexpr float PowerRowH = 26, KindH = 20, BarW = 140, ShareW = 52;
+		struct Rank
+		{
+			cs::String Label;
+			double Value = 0;
+			CivPick Pick;
+		};
+		struct Group
+		{
+			const char* Title;
+			const char* Measure;
+			std::vector<Rank> Rows;
+			double Total = 0;
+			int Count = 0;
+		};
+		cs::Ref<Civics> civics;
+		for (const auto& c : civ.Worlds)
+			if (c != nullptr && c->Where != nullptr && c->Where->Name == world) { civics = c; break; }
+		if (civics == nullptr) return 0;
+		auto s = civics->Where;
+		auto society = Society::Find(galaxy);
+
+		// Each kind ranked by its own measure, its share of what every one of that kind based here holds (read only).
+		Group groups[3] = { { "Houses", "of the houses' wealth", {}, 0, 0 }, { "Firms", "of the firms' capital", {}, 0, 0 },
+			{ "Organisations", "of the organisations' strength", {}, 0, 0 } };
+		if (society != nullptr)
+		{
+			for (const auto& hh : society->HousesOf(s))
+				if (hh != nullptr) groups[0].Rows.push_back(Rank{ cs::Cat("House ", hh->Surname, "  \xC2\xB7  worth ", Narrator::Money(hh->Wealth)), (hh->Wealth > 0 ? hh->Wealth : 0.0), CivPick::House(hh->Id) });
+			for (const auto& b : society->Businesses)
+				if (b != nullptr && b->Trading() && (b->Home == s || b->Branches.Contains(s)))
+					groups[1].Rows.push_back(Rank{ cs::Cat(b->Name, b->Home == s ? " (head office)" : " (branch)", "  \xC2\xB7  ", Narrator::Money(b->Capital)),
+						(b->Capital > 0 ? b->Capital : 0.0), CivPick::Business(b->Id) });
+		}
+		for (const auto& o : civ.Orgs)
+			if (o != nullptr && o->Active() && o->Seat == s)
+				groups[2].Rows.push_back(Rank{ cs::Cat(Narrator::OrgName(*o), " (", Core::ToString(o->Kind), ")  \xC2\xB7  strength ", SocietyPct(o->Strength)),
+					(o->Strength > 0 ? o->Strength : 0.0), CivPick::Org(o->Id) });
+		int shown = 0;
+		for (auto& g : groups)
+		{
+			std::stable_sort(g.Rows.begin(), g.Rows.end(), [](const Rank& a, const Rank& b) { return a.Value > b.Value; });
+			g.Count = static_cast<int>(g.Rows.size());
+			for (const auto& r : g.Rows) g.Total += r.Value;
+			if (static_cast<int>(g.Rows.size()) > PowerMax) g.Rows.resize(PowerMax);
+			shown += static_cast<int>(g.Rows.size());
+		}
+		float h = HeadingH + SectionGap;
+		if (shown == 0) h += 24;
+		for (const auto& g : groups)
+			if (!g.Rows.empty()) h += KindH + static_cast<float>(g.Rows.size()) * PowerRowH;
+		if (!draw) return h;
+
+		GUI::Label(Rect(0, y, w, HeadingH - 4), "POWER", heading);
+		y += HeadingH;
+		if (shown == 0)
+		{
+			GUI::Label(Rect(0, y, w, 20), "No house, firm or organisation is based here.", small);
+			return h;
+		}
+		Color keep = GUI::color;
+		for (const auto& g : groups)
+		{
+			if (g.Rows.empty()) continue;
+			GUI::Label(Rect(0, y + 2, w, KindH - 2), g.Count > static_cast<int>(g.Rows.size())
+				? cs::Cat(g.Title, "  \xC2\xB7  share ", g.Measure, "  (the first ", static_cast<int>(g.Rows.size()), " of ", g.Count, ")")
+				: cs::Cat(g.Title, "  \xC2\xB7  share ", g.Measure), small);
+			y += KindH;
+			for (const auto& r : g.Rows)
+			{
+				double share = g.Total > 0 ? r.Value / g.Total : 0;
+				auto row = Rect(0, y, w, PowerRowH - 4);
+				if (GUI::Button(row, GUIContent::none(), entry)) follow = r.Pick;
+				GUI::color = Color(UiStyle::Edge.r, UiStyle::Edge.g, UiStyle::Edge.b, 0.25f);
+				GUI::DrawTexture(Rect(row.x + 6, row.y + 5, BarW, row.height - 10), Texture2D::whiteTexture());
+				GUI::color = UiStyle::Accent;
+				GUI::DrawTexture(Rect(row.x + 6, row.y + 5, Mathf::Max(1.0f, BarW * static_cast<float>(share)), row.height - 10), Texture2D::whiteTexture());
+				GUI::color = keep;
+				GUI::Label(Rect(row.x + BarW + 12, row.y + 2, ShareW, 20), cs::Cat(cs::Fmt(share * 100, "0"), "%"), text);
+				GUI::Label(Rect(row.x + BarW + ShareW + 16, row.y + 2, Mathf::Max(10.0f, row.width - BarW - ShareW - 22), 20), r.Label, rowLine);
+				y += PowerRowH;
+			}
+		}
 		return h;
 	}
 
