@@ -139,6 +139,7 @@ the sky cycle. A plain key never changes meaning with Shift unless the table say
 | Quicksave / quickload / slots | F5 / F8 / F6 | anywhere | pause menu > Save / Load |
 | Pause menu | Esc (last in the Esc chain) | anywhere | Resume, Help, Save / Load, Settings > Display, Main Menu, Quit |
 | Pause menu: pick / press a button | Up / Down or W / S, then Enter or Space; Left / Right on the leave question, Stay first (US-T311) | pause menu | - |
+| Mechlab: pick a hardpoint or socket, pick what to fit, fit it | Up / Down, Left / Right, Enter (US-T331) | Mechlab view of the outfitting panel (F2) | the mouse |
 | Settings: pick / change / reset a setting, step the groups, search | Up / Down pick, Left / Right change, Enter or Space flips (or listens, on a key binding), Delete resets, Page Up / Page Down group, Ctrl+F search (Enter or Down leaves it) (US-T322) | Settings page | the mouse |
 | Main menu: pick / press a button | Up / Down or W / S, then Enter or Space (US-T314) | main menu, its Co-op and Extras pages | - |
 | New Game page: starting situation, start | Left / Right (Up / Down a row) while no field is typed in, Enter to start or host (US-T317) | New Game setup page | - |

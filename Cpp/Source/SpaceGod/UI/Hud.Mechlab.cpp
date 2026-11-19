@@ -9,6 +9,7 @@
 #include "UI/UiMotion.h" // US-T255
 
 #include "UnitySpaceApp.h"
+#include "Input/InputDevice.h" // US-T331
 
 #include "Ships.h"
 #include "World.h"
@@ -90,6 +91,19 @@ namespace SpaceGod::UI
 		}
 	}
 
+	bool Hud::UpdateMechlabKeys(bool keysFree)
+	{
+		if (!keysFree || !app->ShowOutfit || !outfitMechlab || mechlabDrawnFrame < Time::frameCount - 1) return false;
+		const Input::InputDevice& kb = Input::InputDevice::current();
+		auto pressed = [&](Input::Key k) { return kb[k].wasPressedThisFrame; };
+		if (pressed(Input::Key::DownArrow)) { mechlabRowStep++; return true; }
+		if (pressed(Input::Key::UpArrow)) { mechlabRowStep--; return true; }
+		if (pressed(Input::Key::RightArrow)) { mechlabOptionStep++; return true; }
+		if (pressed(Input::Key::LeftArrow)) { mechlabOptionStep--; return true; }
+		if (pressed(Input::Key::Enter) || pressed(Input::Key::NumpadEnter)) { mechlabFitKey = true; return true; }
+		return false;
+	}
+
 	void Hud::DrawMechlab(const cs::Ref<Ship>& ship, const cs::Ref<Settlement>& yard, const cs::Ref<Settlement>& port, const cs::Ref<Loadout>& loadout)
 	{
 		UiMotion::Scope motion("hud.mechlab");
@@ -101,6 +115,31 @@ namespace SpaceGod::UI
 		if (outfitSocket >= sockets) outfitSocket = -1;
 		if (outfitSlot >= 0) outfitSocket = -1;
 
+		// US-T331: the rows in the order the cards show them (each card's hardpoints, then its sockets), for the keys.
+		struct PickRow { int slot, socket, part, line; };
+		cs::List<PickRow> pickRows;
+		for (int i = 0; i < parts.Count(); i++)
+		{
+			int line = 0;
+			for (int s : parts[i].Slots) pickRows.Add(PickRow{ s, -1, i, line++ });
+			for (int k = 0; k < parts[i].Sockets; k++) pickRows.Add(PickRow{ -1, parts[i].FirstSocket + k, i, line++ });
+		}
+		int pickedRow = -1;
+		for (int i = 0; i < pickRows.Count(); i++)
+			if ((outfitSlot >= 0 && pickRows[i].slot == outfitSlot) || (outfitSocket >= 0 && pickRows[i].socket == outfitSocket)) pickedRow = i;
+		bool keyed = mechlabRowStep != 0;
+		if (keyed && pickRows.Count() > 0)
+		{
+			int next = pickedRow < 0 ? (mechlabRowStep > 0 ? 0 : pickRows.Count() - 1)
+				: Mathf::Clamp(pickedRow + mechlabRowStep, 0, pickRows.Count() - 1);
+			if (next != pickedRow) mechlabOption = 0;
+			pickedRow = next;
+			outfitSlot = pickRows[next].slot;
+			outfitSocket = pickRows[next].socket;
+		}
+		mechlabRowStep = 0;
+		mechlabDrawnFrame = Time::frameCount;
+
 		// What the choice offers: the modules a hardpoint takes, or the utility parts a socket takes (and emptying it).
 		cs::List<int> utilityOptions;
 		int chosenPart = outfitSocket >= 0 ? ShipComponents::ComponentOf(parts, outfitSocket) : -1;
@@ -111,6 +150,8 @@ namespace SpaceGod::UI
 			if (ShipComponents::At(loadout, outfitSocket).has_value()) utilityOptions.Add(-1);
 		}
 		int options = yard == nullptr ? 0 : outfitSlot >= 0 ? OutfitOptions(loadout, outfitSlot).Count() : utilityOptions.Count();
+		mechlabOption = options > 0 ? Mathf::Clamp(mechlabOption + mechlabOptionStep, 0, options - 1) : 0;
+		mechlabOptionStep = 0;
 
 		// The cards, laid out in a grid: each as tall as its hardpoints and sockets, each grid row as tall as its tallest.
 		int cols = parts.Count() <= 2 ? 2 : parts.Count() == 4 ? 2 : 3;
@@ -143,11 +184,20 @@ namespace SpaceGod::UI
 				hardpoints, " hardpoints on ", parts.Count(), " components  ·  utility ", ShipComponents::Fitted(loadout),
 				" of ", sockets, " sockets  ·  credits ", Credits(ship->Faction->Treasury)), small);
 		GUI::Label(Rect(r.x + 12, r.y + 64, w - 24, 18), yard != nullptr
-			? "Pick a hardpoint or a utility socket on a component, then what to fit.   E energy · B ballistic · M missile · SP spinal · SH shield · EN engine · U utility.   F2 to close"
+			? "Pick a hardpoint or a utility socket (Up / Down), then what to fit (Left / Right, Enter).   E energy · B ballistic · M missile · SP spinal · SH shield · EN engine · U utility.   F2 to close"
 			: "Bring the ship alongside a shipyard (or a haven) to refit.   F2 to close", small);
 
 		auto view = Rect(r.x + 8, r.y + 86, w - 16, listH);
 		auto content = Rect(0, 0, w - 34, contentH);
+		if (keyed && pickedRow >= 0) // US-T331: the row the keys moved to stays in view
+		{
+			int gridRow = pickRows[pickedRow].part / cols;
+			float top = 0;
+			for (int g = 0; g < gridRow; g++) top += rowHeights[g] + gap;
+			float rowTop = top + 40 + pickRows[pickedRow].line * rowH;
+			if (rowTop < mechlabScroll.y) mechlabScroll.y = Mathf::Max(0.0f, rowTop - 40);
+			else if (rowTop + rowH > mechlabScroll.y + listH) mechlabScroll.y = rowTop + rowH - listH;
+		}
 		mechlabScroll = GUI::BeginScrollView(view, mechlabScroll, content);
 		float y = 0;
 		for (int i = 0; i < parts.Count(); i++)
@@ -203,6 +253,8 @@ namespace SpaceGod::UI
 		}
 		GUI::EndScrollView();
 
+		bool fitKey = mechlabFitKey;
+		mechlabFitKey = false;
 		if (options == 0) { GUI::contentColor = old; return; }
 		float oy = r.y + 94 + listH;
 		GUI::contentColor = Accent;
@@ -211,19 +263,41 @@ namespace SpaceGod::UI
 			: cs::Cat("Utility socket on the ", cs::Strings::ToLowerInvariant(parts[chosenPart].Name), ":");
 		GUI::Label(Rect(r.x + 12, oy, w - 24, 18), into, small);
 		oy += 22;
-		if (outfitSlot >= 0)
-			for (const auto& option : OutfitOptions(loadout, outfitSlot))
+		auto hardpointOptions = outfitSlot >= 0 ? OutfitOptions(loadout, outfitSlot) : cs::List<OutfitChoice>();
+		for (int i = 0; i < options; i++)
+		{
+			if (i == mechlabOption) // US-T331: the option the keys are on
 			{
-				OutfitOption(ship, yard, loadout, option, r.x, oy, w, rowH);
-				oy += rowH;
+				GUI::contentColor = Accent;
+				GUI::Label(Rect(r.x + 8, oy, 12, rowH), ">", small);
 			}
-		else
-			for (int kind : utilityOptions)
-			{
-				MechlabUtilityOption(ship, yard, loadout, kind, r.x, oy, w, rowH);
-				oy += rowH;
-			}
+			if (outfitSlot >= 0) OutfitOption(ship, yard, loadout, hardpointOptions[i], r.x, oy, w, rowH);
+			else MechlabUtilityOption(ship, yard, loadout, utilityOptions[i], r.x, oy, w, rowH);
+			oy += rowH;
+		}
+		if (fitKey) MechlabFitKeyed(ship, yard, loadout, outfitSlot >= 0 ? &hardpointOptions[mechlabOption] : nullptr,
+			outfitSlot >= 0 ? -2 : utilityOptions[mechlabOption]);
 		GUI::contentColor = old;
+	}
+
+	void Hud::MechlabFitKeyed(const cs::Ref<Ship>& ship, const cs::Ref<Settlement>& yard, const cs::Ref<Loadout>& loadout, const OutfitChoice* option, int kind)
+	{
+		// US-T331: Enter on the option under the cursor does what its Fit button does, refusing what the button would not offer.
+		if (option != nullptr)
+		{
+			if (loadout->Fitted[outfitSlot] == option->module) { app->ShowToast("Already fitted"); return; }
+			if (option->module.has_value() && !ModuleSpec::YardBuilds(*option->module, yard)) { app->ShowToast("This yard cannot build it"); return; }
+			if (!Outfitting::Quote(ship, yard, outfitSlot, option->module).InStock) { app->ShowToast(cs::Cat(yard->Name, " is short of the materials")); return; }
+			if (CoopSendsOutfit(yard, *option)) return;
+			OutfitApply(ship, yard, loadout, *option);
+			return;
+		}
+		cs::Nullable<UtilityKind> k = kind >= 0 ? cs::Nullable<UtilityKind>(static_cast<UtilityKind>(kind)) : std::nullopt;
+		if (k.has_value() && ShipComponents::At(loadout, outfitSocket) == k) { app->ShowToast("Already fitted"); return; }
+		if (!ShipComponents::CanFit(loadout, outfitSocket, k)) { app->ShowToast("Too heavy for the component"); return; }
+		if (!ShipComponents::Quote(ship, yard, outfitSocket, k).InStock) { app->ShowToast(cs::Cat(yard->Name, " is short of the materials")); return; }
+		if (CoopSends("utility", K(yard), outfitSocket, kind)) return;
+		UtilityApply(ship, yard, outfitSocket, kind);
 	}
 
 	void Hud::MechlabUtilityOption(const cs::Ref<Ship>& ship, const cs::Ref<Settlement>& yard, const cs::Ref<Loadout>& loadout, int kind, float x, float y, float w, float rowH)

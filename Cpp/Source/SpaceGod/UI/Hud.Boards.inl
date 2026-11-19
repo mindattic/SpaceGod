@@ -98,6 +98,12 @@ private:
 	int outfitSocket = -1;
 	Vector2 mechlabScroll;
 
+	/// <summary>US-T331: the Mechlab's keys, read in <see cref="UpdateMechlabKeys"/> and acted on by the next draw (which has the
+	/// hull): rows to step (Up / Down), options to step (Left / Right), whether Enter fits the option under the cursor; the
+	/// option cursor itself; and the frame the Mechlab last drew (its keys are live only while it is on screen).</summary>
+	int mechlabRowStep = 0, mechlabOptionStep = 0, mechlabOption = 0, mechlabDrawnFrame = -10;
+	bool mechlabFitKey = false;
+
 	/// <summary>
 	/// The Mechlab (US-T89, <see cref="Core::ShipComponents"/>): the piloted hull laid out as its components (bow, midsections,
 	/// engineering, sponsons), each a card with its type limits, the hardpoints on it (type and size, what is fitted and how it
@@ -113,6 +119,20 @@ private:
 
 	/// <summary>A utility socket's Fit/Empty, as its button does it (also a co-op frame's "utility").</summary>
 	void UtilityApply(const cs::Ref<Core::Ship>& ship, const cs::Ref<Core::Settlement>& yard, int socket, int kind);
+
+	/// <summary>US-T331: Enter on the Mechlab's option cursor: a hardpoint's <paramref name="option"/>, or (option null) the
+	/// utility <paramref name="kind"/> for the socket picked, fitted as its button would (or a notice why not).</summary>
+	void MechlabFitKeyed(const cs::Ref<Core::Ship>& ship, const cs::Ref<Core::Settlement>& yard, const cs::Ref<Core::Loadout>& loadout,
+		const OutfitChoice* option, int kind);
+
+public:
+	/// <summary>US-T331: the Mechlab's keys while it is on screen: Up / Down step through the hardpoints and utility sockets
+	/// card by card, Left / Right through what the one picked can take, Enter fits it (as its Fit button does).
+	/// <paramref name="keysFree"/>: no other panel has the keys this frame. True on a frame one was taken (the caller hands
+	/// input over, so the arrows' power routing and the rest under them do not also go off).</summary>
+	bool UpdateMechlabKeys(bool keysFree);
+
+private:
 
 	// ---------------------------------------------------------------- the port screen (US-T266, UI/Hud.Port.cpp)
 
