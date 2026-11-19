@@ -90,8 +90,9 @@ namespace SpaceGod::UI
 		/// tints each system by the best price the player knows there for one good; Exploration shows what is charted,
 		/// visited, heard from and the undiscovered frontier just past the charts; Danger the raiders, the Bio Mass, the Void
 		/// Raiders' strikes and the Watcher's signs. Only what the player could know, as old as the news of it; the view
-		/// alone, so nothing is sent in co-op. Remembered in the profile (galaxyMapMode).
-		enum class MapMode : int { Political, Trade, Exploration, Danger };
+		/// alone, so nothing is sent in co-op. Remembered in the profile (galaxyMapMode). US-T319: Society shows the
+		/// worlds' mood and where notable social news broke lately, as the Society screen knows them.
+		enum class MapMode : int { Political, Trade, Exploration, Danger, Society };
 
 		MapMode Mode() const { return mode; }
 		void SetMode(MapMode m);
@@ -148,7 +149,13 @@ namespace SpaceGod::UI
 			// Danger.
 			int VoidRaids = 0, WatcherSigns = 0;
 			double Danger = 0;
+			// Society (US-T319): its standing worlds with a civic record, their mean approval of their flag, the worst
+			// unrest among them, notable social news there in the last SocietyNewsDays, and whether one is quarantined.
+			int CivWorlds = 0, SocialNews = 0;
+			double Approval = 0, Unrest = 0;
+			bool Quarantine = false;
 		};
+		static constexpr double SocietyNewsDays = 30;
 		std::unordered_map<const Core::StarSystem*, ModeLook> looks;
 
 		/// A Void Raider strike or a Watcher sign out between the stars the player has word of, for the Danger mode.
@@ -190,6 +197,14 @@ namespace SpaceGod::UI
 		static constexpr Color FrontierColor = Color(1.0f, 0.85f, 0.45f);
 		static constexpr Color BioColor = Color(0.55f, 0.95f, 0.3f);
 		static constexpr Color WatcherColor = Color(0.8f, 0.45f, 1.0f);
+		static constexpr Color CalmColor = Color(0.35f, 0.85f, 0.75f);
+		static constexpr Color RestlessColor = Color(1.0f, 0.3f, 0.25f);
+		static constexpr Color SocialNewsColor = Color(1.0f, 0.82f, 0.35f);
+		static constexpr Color QuarantineColor = Color(0.95f, 0.35f, 0.85f);
+		/// US-T319: the Society mode's pieces (GalaxyMapScreen.Modes.cpp).
+		Color SocietyTint(const ModeLook& look) const;
+		void DrawSocietyLegend(float& y, float x, float w, double jd);
+		void DrawSocietyDetail(float& y, float x, float w, const cs::Ref<Core::MapSystem>& m, double jd);
 
 	private:
 		static bool CoopSendsText(UnitySpaceApp* app, const cs::String& verb, const cs::String& args);

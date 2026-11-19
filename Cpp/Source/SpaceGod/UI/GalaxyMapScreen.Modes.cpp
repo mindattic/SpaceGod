@@ -5,6 +5,7 @@
 #include "UI/GalaxyMapScreen.h"
 
 #include "ActiveProfile.h"
+#include "CivHand.h"
 #include "UnitySpaceApp.h"
 #include "UI/Icons.h"
 
@@ -25,6 +26,8 @@
 #include "Systems/SystemSources.h"
 #include "Systems/VoidStations.h"
 #include "Systems/VoidWatcher.h"
+#include "Systems/Civilization/Civilization.h"
+#include "Systems/Civilization/Narrator.h"
 
 #include <algorithm>
 #include <cmath>
@@ -56,6 +59,7 @@ namespace SpaceGod::UI
 		case MapMode::Trade: return "TRADE";
 		case MapMode::Exploration: return "EXPLORATION";
 		case MapMode::Danger: return "DANGER";
+		case MapMode::Society: return "SOCIETY";
 		default: return "POLITICAL";
 		}
 	}
@@ -76,8 +80,8 @@ namespace SpaceGod::UI
 			auto profile = ActiveProfile::Current();
 			if (profile == nullptr) return;
 			cs::String saved = GameSettings::Setting(profile, ModeSetting);
-			for (int i = 0; i <= static_cast<int>(MapMode::Danger); i++)
-				if (saved == cs::Strings::ToLowerInvariant(ModeName(static_cast<MapMode>(i)))) mode = static_cast<MapMode>(i);
+			for (int i = 0; i <= static_cast<int>(MapMode::Society); i++)
+				if (saved ==cs::Strings::ToLowerInvariant(ModeName(static_cast<MapMode>(i)))) mode = static_cast<MapMode>(i);
 			cs::String good = GameSettings::Setting(profile, GoodSetting);
 			for (int g = 0; g < GoodInfo::Count; g++)
 				if (good == GoodInfo::Of(static_cast<Good>(g))->Name) tradeGood = g;
@@ -190,6 +194,35 @@ namespace SpaceGod::UI
 			look.Danger = score;
 		}
 
+		// Society (US-T319): each standing world's civics, by its system, and the notable social news of the last weeks (as
+		// the Society screen has them: the SpaceGod sees the people whole; rumours, untrue, are left out).
+		auto civ = app->Galaxy != nullptr ? Civilization::Find(*app->Galaxy) : nullptr;
+		if (civ != nullptr)
+		{
+			for (const auto& c : civ->Worlds)
+			{
+				if (c == nullptr || c->System == nullptr || c->Where == nullptr) continue;
+				auto it = looks.find(c->System.get());
+				if (it == looks.end()) continue;
+				auto& look = it->second;
+				look.CivWorlds++;
+				look.Approval += c->Approval;
+				look.Unrest = cs::Math::Max(look.Unrest, c->Where->Unrest);
+				if (c->Quarantined(jd)) look.Quarantine = true;
+			}
+			for (auto& entry : looks)
+				if (entry.second.CivWorlds > 0) entry.second.Approval /= entry.second.CivWorlds;
+			for (int i = civ->Events.Count() - 1; i >= 0; i--)
+			{
+				const auto& e = civ->Events[i];
+				if (e == nullptr) continue;
+				if (e->Jd < jd - SocietyNewsDays) break;
+				if (e->System == nullptr || e->Unverified || !Narrator::Notable(e->Kind)) continue;
+				auto it = looks.find(e->System.get());
+				if (it != looks.end()) it->second.SocialNews++;
+			}
+		}
+
 		if (mode == MapMode::Exploration) BuildFrontier();
 	}
 
@@ -249,9 +282,21 @@ namespace SpaceGod::UI
 			draw = true;
 			return Color::Lerp(Color(1.0f, 0.85f, 0.3f), Color(1.0f, 0.22f, 0.2f), Clamp01(look->Danger / 10));
 		}
+		case MapMode::Society:
+			if (look == nullptr || look->CivWorlds == 0) return Unknown;
+			draw = true;
+			return SocietyTint(*look);
 		default:
 			return Dim;
 		}
+	}
+
+	Color GalaxyMapScreen::SocietyTint(const ModeLook& look) const
+	{
+		// Calm and content to restless and sour: the worst unrest among its worlds, pulled by how far they sour on the flag.
+		float t = Clamp01(look.Unrest * 1.5 + (0.2 - look.Approval) * 0.6);
+		auto uneasy = Color(1.0f, 0.85f, 0.3f);
+		return t < 0.5f ? Color::Lerp(CalmColor, uneasy, t * 2) : Color::Lerp(uneasy, RestlessColor, (t - 0.5f) * 2);
 	}
 
 	cs::String GalaxyMapScreen::ModeSub(const cs::Ref<MapSystem>& m) const
@@ -284,6 +329,16 @@ namespace SpaceGod::UI
 			if (m->Contested || m->Threats.Count() > 0) parts.Add("war");
 			return cs::Strings::Join("  ·  ", parts);
 		}
+		case MapMode::Society:
+		{
+			if (look == nullptr || look->CivWorlds == 0) return "no civic record";
+			cs::List<cs::String> parts;
+			parts.Add(cs::Cat("approval ", look->Approval >= 0 ? "+" : "", cs::Fmt(look->Approval, "0.00")));
+			parts.Add(cs::Cat("unrest ", cs::Fmt(look->Unrest * 100, "0"), "%"));
+			if (look->SocialNews > 0) parts.Add(cs::Cat(look->SocialNews, " in the news"));
+			if (look->Quarantine) parts.Add("quarantine");
+			return cs::Strings::Join("  ·  ", parts);
+		}
 		default:
 			return cs::String();
 		}
@@ -294,7 +349,7 @@ namespace SpaceGod::UI
 	void GalaxyMapScreen::DrawModeTabs(Rect r)
 	{
 		float x = r.x + 150;
-		for (int i = 0; i <= static_cast<int>(MapMode::Danger); i++)
+		for (int i = 0; i <= static_cast<int>(MapMode::Society); i++)
 		{
 			auto m = static_cast<MapMode>(i);
 			float w = m == MapMode::Exploration ? 108.0f : 88.0f;
@@ -346,6 +401,23 @@ namespace SpaceGod::UI
 				if (!local.Contains(p)) continue;
 				Ring(p, 6 + 2 * pulse, Color(FrontierColor.r, FrontierColor.g, FrontierColor.b, 0.35f + 0.3f * pulse), 1.2f);
 				Label(p + Vector2(7, -9), "?", Color(FrontierColor.r, FrontierColor.g, FrontierColor.b, 0.8f), true);
+			}
+		}
+
+		if (mode == MapMode::Society)
+		{
+			// A beating ring where notable social news broke lately (wider the more of it), a steady one round a quarantine.
+			float pulse = 0.5f + 0.5f * Mathf::Sin(Time::unscaledTime * 3);
+			for (const auto& m : model->Systems)
+			{
+				auto look = LookOf(m->System);
+				if (look == nullptr) continue;
+				auto p = Project(local, m->System->PositionLy);
+				if (!local.Contains(p)) continue;
+				if (look->SocialNews > 0)
+					Ring(p, 20 + 2.0f * Mathf::Min(static_cast<float>(look->SocialNews), 5.0f) + 2 * pulse,
+						Color(SocialNewsColor.r, SocialNewsColor.g, SocialNewsColor.b, 0.4f + 0.45f * pulse), 1.8f);
+				if (look->Quarantine) Ring(p, 15, QuarantineColor, 2.2f);
 			}
 		}
 
@@ -483,10 +555,64 @@ namespace SpaceGod::UI
 			Line(y, x, w, "Raiders, Bio Mass and war are as the newest news of each system had them; a strike or sign in the void is known once word from its nearest system is as new.", Dim);
 			break;
 		}
+		case MapMode::Society:
+			DrawSocietyLegend(y, x, w, jd);
+			break;
 		default:
 			break;
 		}
 		LegendHelp(r, x, w);
+	}
+
+	void GalaxyMapScreen::DrawSocietyLegend(float& y, float x, float w, double jd)
+	{
+		Heading(y, x, w, "KEY");
+		Swatch(y, x, w, CalmColor, "calm, content with its flag", false);
+		Swatch(y, x, w, Color(1.0f, 0.85f, 0.3f), "uneasy", false);
+		Swatch(y, x, w, RestlessColor, "restless, souring on its flag", false);
+		Swatch(y, x, w, SocialNewsColor, cs::Cat("notable social news, last ", cs::Fmt(SocietyNewsDays, "0"), " days (ring)"), true);
+		Swatch(y, x, w, QuarantineColor, "a world under quarantine (ring)", true);
+		y += 6;
+		auto civ = app->Galaxy != nullptr ? Civilization::Find(*app->Galaxy) : nullptr;
+		if (civ == nullptr)
+		{
+			Line(y, x, w, "The galaxy's people have not woken yet: let a day pass.", Dim);
+			return;
+		}
+		Heading(y, x, w, "MOST RESTLESS WORLDS");
+		std::vector<cs::Ref<Civics>> worlds;
+		for (const auto& c : civ->Worlds)
+			if (c != nullptr && c->Where != nullptr) worlds.push_back(c);
+		std::sort(worlds.begin(), worlds.end(), [](const auto& a, const auto& b) { return a->Where->Unrest > b->Where->Unrest; });
+		if (worlds.empty()) Line(y, x, w, "no civic records yet", Dim);
+		for (size_t i = 0; i < worlds.size() && i < 4; i++)
+		{
+			const auto& c = worlds[i];
+			ModeLook one;
+			one.Unrest = c->Where->Unrest;
+			one.Approval = c->Approval;
+			Line(y, x, w, cs::Cat(c->Where->Name, ": unrest ", cs::Fmt(c->Where->Unrest * 100, "0"), "%, approval ", c->Approval >= 0 ? "+" : "",
+				cs::Fmt(c->Approval, "0.00"), c->Quarantined(jd) ? ", quarantined" : ""), SocietyTint(one));
+		}
+		y += 6;
+		Heading(y, x, w, "LATEST NOTABLE NEWS");
+		int told = 0;
+		for (int i = civ->Events.Count() - 1; i >= 0 && told < 2; i--)
+		{
+			const auto& e = civ->Events[i];
+			if (e == nullptr || e->Unverified || !Narrator::Notable(e->Kind)) continue;
+			if (e->Jd < jd - SocietyNewsDays) break;
+			Line(y, x, w, cs::Cat(Days(cs::Math::Max(0.0, jd - e->Jd)), " ago: ", Narrator::Render(*e)), Color::white());
+			told++;
+		}
+		if (told == 0) Line(y, x, w, cs::Cat("nothing of note in the last ", cs::Fmt(SocietyNewsDays, "0"), " days"), Dim);
+		y += 4;
+		if (GUI::Button(Rect(x, y, w, 22), "SOCIETY SCREEN", button))
+		{
+			app->ShowGalaxyMap = false;
+			app->ShowSociety = true;
+		}
+		y += 26;
 	}
 
 	void GalaxyMapScreen::DrawModeDetail(float& y, float x, float w, const cs::Ref<MapSystem>& m, double jd)
@@ -541,8 +667,47 @@ namespace SpaceGod::UI
 			y += 6;
 			break;
 		}
+		case MapMode::Society:
+			DrawSocietyDetail(y, x, w, m, jd);
+			break;
 		default:
 			break;
 		}
+	}
+
+	void GalaxyMapScreen::DrawSocietyDetail(float& y, float x, float w, const cs::Ref<MapSystem>& m, double jd)
+	{
+		Heading(y, x, w, "ITS PEOPLE");
+		auto civ = app->Galaxy != nullptr ? Civilization::Find(*app->Galaxy) : nullptr;
+		if (civ == nullptr) { Line(y, x, w, "The galaxy's people have not woken yet.", Dim); y += 6; return; }
+		int worlds = 0;
+		for (const auto& c : civ->Worlds)
+		{
+			if (c == nullptr || c->Where == nullptr || c->System != m->System) continue;
+			worlds++;
+			ModeLook one;
+			one.Unrest = c->Where->Unrest;
+			one.Approval = c->Approval;
+			Line(y, x, w, cs::Cat(c->Where->Name, ": approval ", c->Approval >= 0 ? "+" : "", cs::Fmt(c->Approval, "0.00"), ", unrest ",
+				cs::Fmt(c->Where->Unrest * 100, "0"), "%, crime ", cs::Fmt(c->Crime * 100, "0"), "%, sick ", cs::Fmt(c->Infected * 100, "0"), "%"), SocietyTint(one));
+			if (c->Quarantined(jd)) Line(y, x, w, "  under quarantine: sickness is loose here", QuarantineColor);
+			if (GUI::Button(Rect(x, y, w, 20), cs::Cat("SOCIETY SCREEN: ", cs::Strings::ToUpperInvariant(c->Where->Name)), button))
+			{
+				app->ShowGalaxyMap = false;
+				app->OpenSocietyAt(CivPick::World(c->Where->Name));
+			}
+			y += 24;
+		}
+		if (worlds == 0) { Line(y, x, w, "No standing world here keeps a civic record.", Dim); y += 6; return; }
+		int told = 0;
+		for (int i = civ->Events.Count() - 1; i >= 0 && told < 3; i--)
+		{
+			const auto& e = civ->Events[i];
+			if (e == nullptr || e->System != m->System || e->Unverified || !Narrator::Notable(e->Kind)) continue;
+			if (told == 0) Heading(y, x, w, "IN THE NEWS");
+			Line(y, x, w, cs::Cat(Days(cs::Math::Max(0.0, jd - e->Jd)), " ago: ", Narrator::Render(*e)), Color::white());
+			told++;
+		}
+		y += 6;
 	}
 }

@@ -952,7 +952,11 @@ namespace SpaceGod::Core
 				  "close or pinging near it, and its raiders sail out from it."),
 				T("The galaxy map",
 				  "[ opens it: every system at its real place, who holds it, gate traffic, war fronts, blockades and raiders as "
-				  "far as the news goes. Click a star to inspect it, double-click to travel; DIPLOMACY and COMMAND are its panels."),
+				  "far as the news goes. Click a star to inspect it, double-click to travel; DIPLOMACY and COMMAND are its panels. "
+				  "The tabs along the top change what it shows: POLITICAL, TRADE, EXPLORATION, DANGER and SOCIETY, which washes "
+				  "each system by its people's mood (calm and content to restless and souring on their flag), rings the systems "
+				  "where notable social news broke in the last 30 days and the worlds under quarantine, lists the most restless "
+				  "worlds, and for a system picked shows each world's civics and news with a button to open it on the Society screen."), // US-T319
 				T("The system map", // US-T258
 				  "Shift+[ (or the drawer's SYSTEM MAP) opens the system you are in, seen from above: every world on its orbit, "
 				  "the settlements on them, stations, gas works, the lanes with their ramps and the spurs to the gates, the gates, "
