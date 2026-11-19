@@ -148,8 +148,9 @@ namespace SpaceGod::HarvestPlay
 				if (auto w = works->DueWave(c, jd)) SpawnWave(app, works, c, w);
 			}
 			// The keys, at a helm by a giant: Home takes its contract, Shift+Home raids the nearest skimmer.
+			// US-T388: read straight off the device, so not while a screen, a search field, the drawer or comms has the keys.
 			auto menu = app.CheatMenuUi();
-			if (menu == nullptr || !menu->IsOpen)
+			if ((menu == nullptr || !menu->IsOpen) && !app.ScreenHasKeys())
 			{
 				const auto& kb = Input::InputDevice::current();
 				if (kb.present && kb[Input::Key::Home].wasPressedThisFrame)

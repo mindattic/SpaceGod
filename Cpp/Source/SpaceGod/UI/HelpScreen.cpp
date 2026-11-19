@@ -49,9 +49,13 @@ namespace SpaceGod::UI
 		auto down = [&](Key k) { return kb[k].isPressed || kb[k].wasPressedThisFrame; };
 		if (down(Key::UpArrow) || down(Key::DownArrow) || down(Key::PageUp) || down(Key::PageDown) || down(Key::Home) || down(Key::End))
 			return true;
+		bool modified = down(Key::LeftShift) || down(Key::RightShift) || down(Key::LeftCtrl) || down(Key::RightCtrl) || down(Key::LeftAlt) || down(Key::RightAlt);
+		// US-T388: a plain digit too (no captain's order or prompt answered from under it; Shift/Ctrl/Alt digits go on).
+		if (!modified)
+			for (Key d : { Key::Digit0, Key::Digit1, Key::Digit2, Key::Digit3, Key::Digit4, Key::Digit5, Key::Digit6, Key::Digit7, Key::Digit8, Key::Digit9 })
+				if (down(d)) return true;
 		if (!showCatalog) return false;
 		if (down(Key::LeftArrow) || down(Key::RightArrow)) return true;
-		bool modified = down(Key::LeftShift) || down(Key::RightShift) || down(Key::LeftCtrl) || down(Key::RightCtrl) || down(Key::LeftAlt) || down(Key::RightAlt);
 		return down(Key::C) && !modified;
 	}
 

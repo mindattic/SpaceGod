@@ -691,6 +691,13 @@ namespace SpaceGod
 			(ShowSociety ? 1 << 23 : 0);
 	}
 
+	bool UnitySpaceApp::ScreenHasKeys() const
+	{
+		// US-T388: every panel and full screen (named here too, whatever OpenScreens' mask holds), the drawer, comms, the dev menu, the pause menu.
+		return OpenScreens() != 0 || ShowSystemMap || ShowLogs || ShowDiscoveries || ShowEncyclopedia || ShowSociety || commsOpen ||
+			(hud != nullptr && hud->DrawerOpen()) || (cheatMenu != nullptr && cheatMenu->IsOpen) || (pauseMenu != nullptr && pauseMenu->IsOpen);
+	}
+
 	void UnitySpaceApp::HandleCommands()
 	{
 		auto& i = Input;

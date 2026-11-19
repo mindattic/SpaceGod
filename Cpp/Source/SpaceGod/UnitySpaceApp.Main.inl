@@ -584,6 +584,10 @@ private:
 	void HandleCommands();
 
 public:
+	/// <summary>US-T388: whether a panel, full screen, text field, the drawer, comms, the dev menu or the pause menu has the
+	/// keys now, for the few flight keys read straight off the device (Home at a giant) rather than through the bindings.</summary>
+	bool ScreenHasKeys() const;
+
 	/// <summary>Speeds time up a step (the key and the top bar's button alike), unless the ship at the helm is being
 	/// run down: then time stays at the pace the chase is flown (U.SPC-T273).</summary>
 	void TimeFaster();

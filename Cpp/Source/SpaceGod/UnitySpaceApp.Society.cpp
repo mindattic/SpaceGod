@@ -94,6 +94,7 @@ namespace SpaceGod
 		bool alt = down(Key::LeftAlt) || down(Key::RightAlt);
 		if (down(Key::UpArrow) || down(Key::DownArrow)) return true;
 		if (alt && (down(Key::LeftArrow) || down(Key::RightArrow))) return true;
+		if (ctrl) return true; // US-T388: Ctrl held is the screen's (Ctrl+F finds), not a mine dropped or F's flight assist
 		// US-T354: and a plain S, which steps the list's sort (S is also "back" at the controls).
 		return (down(Key::C) || down(Key::S)) && !shift && !ctrl && !alt;
 	}
