@@ -75,6 +75,8 @@ namespace SpaceGod::UI
 		/// US-T325: how long after a steered event its aftermath is looked for, days, and the most it lists.
 		static constexpr double AftermathDays = 365;
 		static constexpr int AftermathMax = 12;
+		/// US-T327: the most lines a person's LIFE lists (born, the events about them oldest first, died).
+		static constexpr int LifeMax = 30;
 
 		/// The feed's doings filter (US-T304; was the Steered toggle): every event, the SpaceGod's doings, or those about what is watched.
 		enum Doings : int { AllDoings, SteeredDoings, WatchedDoings, DoingsCount };
@@ -127,6 +129,10 @@ namespace SpaceGod::UI
 		std::vector<Recent> aftermath;
 		int aftermathTotal = 0;
 		cs::String aftermathKey;
+		/// US-T327: the person picked's life in order (a birth or death line has no event), the events left out, and its key.
+		std::vector<Recent> life;
+		int lifeMore = 0;
+		cs::String lifeKey;
 		Vector2 listScroll, detailScroll, pageScroll;
 
 		int page = Feed;
@@ -181,6 +187,8 @@ namespace SpaceGod::UI
 		static bool Follows(const Core::SocialEvent& later, const Core::SocialEvent& steered, const std::vector<CivPick>& subjects);
 		/// US-T325: what came of the steered event <paramref name="e"/>.
 		void BuildAftermath(const Core::SocialEvent& e, Core::Civilization& civ);
+		/// US-T327: the life of the person <paramref name="personId"/>, in order.
+		void BuildLife(int personId, Core::Galaxy& galaxy, Core::Civilization& civ);
 		/// <summary>US-T308: the TRENDS section of the world called <paramref name="world"/> at <paramref name="y"/> (its mood over the
 		/// samples the game took, a bar chart a row); returns its height, and draws only when <paramref name="draw"/>.</summary>
 		float DrawTrends(float y, float w, const cs::String& world, Core::Civilization& civ, double jd, bool draw);

@@ -406,6 +406,37 @@ namespace SpaceGod::UI
 		}
 	}
 
+	// ---------------------------------------------------------------- a person's life (US-T327)
+
+	void SocietyScreen::BuildLife(int personId, Galaxy& galaxy, Civilization& civ)
+	{
+		auto society = Society::Find(galaxy);
+		auto c = society != nullptr ? society->CitizenById(personId) : nullptr;
+		int n = civ.Events.Count();
+		int lastId = n > 0 && civ.Events[n - 1] != nullptr ? civ.Events[n - 1]->Id : 0;
+		cs::String key = cs::Cat(personId, "|", n, "|", lastId, "|", c != nullptr && !c->Alive() ? 1 : 0);
+		if (key == lifeKey) return;
+		lifeKey = key;
+		life.clear();
+		lifeMore = 0;
+		if (c == nullptr) return;
+
+		cs::String where = c->House != nullptr && c->House->Home != nullptr ? cs::Cat(" on ", c->House->Home->Name) : cs::String();
+		life.push_back(Recent{ 0, cs::Cat(SocietyDate(c->BornJd), "   Born", c->House != nullptr ? cs::Cat(" into House ", c->House->Surname) : cs::String(), where) });
+		// The events about them, oldest first; room is kept for the death line.
+		const int room = LifeMax - (c->Alive() ? 1 : 2);
+		CivPick p = CivPick::Person(personId);
+		for (int i = 0; i < n; i++)
+		{
+			const auto& e = civ.Events[i];
+			if (e == nullptr || !About(*e, p)) continue;
+			if (static_cast<int>(life.size()) <= room) life.push_back(Recent{ e->Id, cs::Cat(SocietyDate(e->Jd), "   ", Narrator::Render(*e)) });
+			else lifeMore++;
+		}
+		if (!c->Alive())
+			life.push_back(Recent{ 0, cs::Cat(SocietyDate(c->DiedJd), "   Died, aged ", static_cast<int>((c->DiedJd - c->BornJd) / 365.25)) });
+	}
+
 	// ---------------------------------------------------------------- what came of the SpaceGod's hand (US-T325)
 
 	std::vector<CivPick> SocietyScreen::SubjectsOf(const SocialEvent& e)
@@ -937,6 +968,11 @@ namespace SpaceGod::UI
 		if (showAftermath) BuildAftermath(*event, civ);
 		float aftermathH = showAftermath ? HeadingH + (aftermath.empty() ? 24.0f : static_cast<float>(aftermath.size()) * 28.0f) + SectionGap : 0.0f;
 		recentH += aftermathH;
+		// US-T327: a person's life, in order.
+		bool showLife = event == nullptr && selected.Kind == CivPickKind::Person;
+		if (showLife) BuildLife(selected.Id, galaxy, civ);
+		float lifeH = showLife && !life.empty() ? HeadingH + static_cast<float>(life.size()) * 28.0f + (lifeMore > 0 ? 20.0f : 0.0f) + SectionGap : 0.0f;
+		recentH += lifeH;
 		bool showTrends = event == nullptr && selected.Kind == CivPickKind::World;
 		float trendsH = showTrends ? DrawTrends(0, w, selected.Name, civ, jd, false) : 0.0f;
 		bool showFamily = event == nullptr && selected.Kind == CivPickKind::House; // US-T315
@@ -1013,6 +1049,28 @@ namespace SpaceGod::UI
 				if (GUI::Button(row, GUIContent::none(), entry)) followEvent = r.Event;
 				GUI::Label(Rect(row.x + 8, row.y + 3, row.width - 14, 20), r.Line, rowLine);
 				y += 28;
+			}
+			y += SectionGap;
+		}
+		if (lifeH > 0)
+		{
+			GUI::Label(Rect(0, y, w, HeadingH - 4), "LIFE", heading);
+			y += HeadingH;
+			for (const auto& r : life)
+			{
+				auto row = Rect(0, y, w, 24);
+				if (r.Event != 0)
+				{
+					if (GUI::Button(row, GUIContent::none(), entry)) followEvent = r.Event;
+					GUI::Label(Rect(row.x + 8, row.y + 3, row.width - 14, 20), r.Line, rowLine);
+				}
+				else GUI::Label(Rect(row.x + 8, row.y + 3, row.width - 14, 20), r.Line, rowTitle);
+				y += 28;
+			}
+			if (lifeMore > 0)
+			{
+				GUI::Label(Rect(8, y, w - 8, 18), cs::Cat("and ", lifeMore, " more (the latest are under Recent events)"), small);
+				y += 20;
 			}
 			y += SectionGap;
 		}

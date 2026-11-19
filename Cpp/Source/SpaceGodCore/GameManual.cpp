@@ -708,7 +708,8 @@ namespace SpaceGod::Core
 				  "living and dead, the best known by name with their role and house), what split from it and who is set against "
 				  "it. Your hand lists everything the SpaceGod's hand brought about, newest first, with how many events followed "
 				  "about the same people, houses, organisations and businesses within a year; pick one to read What came of it, "
-				  "those later events in order, each a click away.")), // US-T298, US-T299, US-T304, US-T308, US-T315, US-T323, US-T325
+				  "those later events in order, each a click away. A person picked shows their Life in order: born into their house "
+				  "and on what world, then everything kept about them, oldest first, each a click away, and their death.")), // US-T298, US-T299, US-T304, US-T308, US-T315, US-T323, US-T325, US-T327
 
 			cs::New<ManualChapter>("Comms and pilots", "Hailing ships and stations, piracy by radio, and the people you meet", Keys("COMMS AND PILOTS"),
 				T("Hailing",
