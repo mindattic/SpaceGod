@@ -94,6 +94,10 @@ namespace SpaceGod::Core
 		/// </summary>
 		cs::Ref<BattleUnit> CycleLock(DVec3 aim);
 
+		/// <summary>US-T307: locks the hostile engaging this craft, nearest first, the next of them when one is already locked;
+		/// with nobody engaging it, the nearest hostile (<see cref="Attackers.Next"/>). Returns the lock, or null.</summary>
+		cs::Ref<BattleUnit> LockAttacker(bool& engaging);
+
 		/// <summary>Locks <paramref name="target"/> (null drops the lock); a capital ship gets its most telling weak point picked.</summary>
 		void Lock(const cs::Ref<BattleUnit>& target);
 

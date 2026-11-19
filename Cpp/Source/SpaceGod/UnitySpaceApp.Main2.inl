@@ -116,6 +116,10 @@ private:
 	/// camera itself leans toward the lock in <see cref="Cameras.SpaceCamera"/>'s focus update).</summary>
 	void ToggleLockTarget();
 
+	/// <summary>US-T307: the helm's lock onto the hostile engaging the flown hull (again: the next one engaging it), else the
+	/// nearest hostile (<see cref="Core::Attackers"/>), told in a toast.</summary>
+	void LockHelmAttacker();
+
 	/// <summary>Whether the helm's trigger was held last frame, so letting go of it fires the volley.</summary>
 	bool helmTriggerWas = false;
 

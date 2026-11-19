@@ -258,6 +258,7 @@ namespace SpaceGod::Input
 				{ KeyAction::JumpJets, "jumpJets", "Flight: jump jets (mech)", Controls, HeldKind, { Key::Space }, "Held in a mech: the jump jets lift it off the plating and fly it in open space (the pause's Space is theirs while you pilot one)." },
 
 				{ KeyAction::LockTarget, "lockTarget", "Combat: lock target", Controls, EdgeKind, { Key::T }, "Lock (or clear) the hull under the mouse or selected." },
+				{ KeyAction::LockAttacker, "lockAttacker", "Combat: lock attacker", Controls, EdgeKind, { KeyChord(Key::B, S) }, "Lock the hostile engaging you, nearest first; again for the next one engaging you. With nobody on you, the nearest hostile." }, // US-T307
 				{ KeyAction::Tractor, "tractor", "Combat: tractor beam", Controls, EdgeKind, { KeyChord(Key::T, S) }, "The tractor beam on the nearest cargo pod in reach, or off." },
 				{ KeyAction::DropMine, "dropMine", "Combat: drop mine", Controls, EdgeKind, { Key::LeftCtrl, Key::RightCtrl }, "In a fight: a mine dropped astern." },
 				{ KeyAction::TunePhasers, "tunePhasers", "Combat: tune phasers", Controls, EdgeKind, { Key::Insert }, "Retune the phaser arrays: a narrow lance or a wide sweep." },

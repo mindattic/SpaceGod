@@ -3,6 +3,7 @@
 #include "Embodiment/FighterSeat.h"
 #include "Astro.h"
 #include "Combat/Arsenal.h"
+#include "Combat/Attackers.h"
 #include "Combat/Battle.h"
 #include "Combat/BroadcastArrays.h"
 #include "Combat/CombatSpecs.h"
@@ -210,6 +211,15 @@ namespace SpaceGod::Core
 			pick = candidates[i < 0 ? 0 : (i + 1) % candidates.Count()].unit;
 		}
 		Lock(pick);
+		return pick;
+	}
+
+	cs::Ref<BattleUnit> FighterSeat::LockAttacker(bool& engaging)
+	{
+		engaging = false;
+		if (Stick() == nullptr) return nullptr;
+		auto pick = Attackers::Next(*Battle, Unit, Unit->PlayerLockTarget, engaging);
+		if (pick != nullptr) Lock(pick);
 		return pick;
 	}
 

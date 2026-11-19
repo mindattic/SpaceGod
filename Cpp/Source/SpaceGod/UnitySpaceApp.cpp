@@ -1304,6 +1304,7 @@ namespace SpaceGod
 		}
 
 		if (Input.LockTarget) ToggleLockTarget();
+		else if (Input.LockAttacker) LockHelmAttacker(); // US-T307
 		if (!pilotLockTarget.IsNone() && (!pilotLockTarget.IsShip() || pilotLockTarget.Ship->Destroyed)) pilotLockTarget = Target::None();
 		if (ship->Battle == nullptr) pilotLockUnit = nullptr;
 		SpaceCamera->PilotLockTarget = pilotLockTarget;

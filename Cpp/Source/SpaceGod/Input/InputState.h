@@ -241,6 +241,9 @@ namespace SpaceGod::Input
 		/// two never fire together.</summary>
 		bool LockTarget = false;
 
+		/// <summary>US-T307: Shift+B at the controls, a lock on the hostile engaging the hull (again: the next one engaging it).</summary>
+		bool LockAttacker = false;
+
 		/// <summary>US-T95: Shift+T at the controls, the tractor beam on the nearest cargo pod in reach (or off). T alone locks.</summary>
 		bool ToggleTractor = false;
 

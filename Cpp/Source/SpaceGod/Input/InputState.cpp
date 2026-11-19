@@ -101,6 +101,7 @@ namespace SpaceGod::Input
 		TogglePause = hit(A::TogglePause);
 		ResetTime = hit(A::ResetTime);
 		LockTarget = hit(A::LockTarget);
+		LockAttacker = hit(A::LockAttacker); // US-T307
 		ToggleTractor = hit(A::Tractor); // US-T95
 		ToggleOrbits = hit(A::Orbits);
 		ToggleDiscoveries = hit(A::Discoveries); // US-T259
@@ -303,7 +304,7 @@ namespace SpaceGod::Input
 		else if (padDpad == 0) CycleShips = CycleBackward = true;
 		if (padBack) Escape = true;
 		// In command nothing is flown: F focuses, T resets time, Backspace goes home, B watches a battle.
-		ToggleFlightAssist = LockTarget = MoveToHost = ToggleBoarding = Manoeuvre = JumpToCraft = false; // US-T106: no craft to jump from
+		ToggleFlightAssist = LockTarget = LockAttacker = MoveToHost = ToggleBoarding = Manoeuvre = JumpToCraft = false; // US-T106: no craft to jump from
 		Drift = false; // US-T165: R toggles auto-reorient
 		DriftKey::Drop(); // US-T165: a toggled drift ends with the controls
 		PowerKey = -1; // US-T94: nothing to share a reactor of in command
@@ -382,7 +383,7 @@ namespace SpaceGod::Input
 		Boost = Slow = Fire = Cruise = FireEmp = DropMine = false;
 		SelectClicked = SelectDoubleClicked = RightClicked = false;
 		Focus = Escape = ToggleScale = TimeFaster = TimeSlower = TogglePause = ResetTime = false;
-		ToggleOrbits = ToggleLabels = ToggleHelp = ToggleHud = ClearScreen = ToggleMarket = DockPort = ToggleCargo = ToggleOutfit = ToggleSilent = ToggleBounties = ToggleContracts = ToggleFleet = ToggleTrade = ToggleGalaxyMap = ToggleNews = ToggleSpawn = WatchBattle = ToggleLanes = ToggleSatellites = ToggleReorient = CycleShips = CycleBackward = Home = Pilot = LockTarget = ActivateGate = EngageFtl = false;
+		ToggleOrbits = ToggleLabels = ToggleHelp = ToggleHud = ClearScreen = ToggleMarket = DockPort = ToggleCargo = ToggleOutfit = ToggleSilent = ToggleBounties = ToggleContracts = ToggleFleet = ToggleTrade = ToggleGalaxyMap = ToggleNews = ToggleSpawn = WatchBattle = ToggleLanes = ToggleSatellites = ToggleReorient = CycleShips = CycleBackward = Home = Pilot = LockTarget = LockAttacker = ActivateGate = EngageFtl = false;
 		QuickSave = QuickLoad = ToggleSaves = Rewind = false;
 		ToggleSystemMap = false; // US-T258
 		SpawnPractice = false;

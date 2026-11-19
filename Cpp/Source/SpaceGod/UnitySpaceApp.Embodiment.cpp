@@ -729,6 +729,14 @@ namespace SpaceGod
 			ShowToast(locked == nullptr ? cs::String("Nothing hostile near the crosshair to lock")
 				: cs::Cat("Locking ", locked->Name(), (f->Unit->PlayerSubTarget != nullptr ? cs::Cat(" @ ", WeakPoints::Label(f->Unit->PlayerSubTarget)) : cs::String()), ": hold the crosshair on it"));
 		}
+		else if (Input.LockAttacker) // US-T307
+		{
+			bool engaging = false;
+			auto locked = f->LockAttacker(engaging);
+			ShowToast(locked == nullptr ? cs::String("Nothing hostile in this fight to lock")
+				: cs::Cat("Locking ", locked->Name(), engaging ? cs::String(": engaging you") : cs::String(": nearest hostile, nobody is engaging you"),
+					"  (hold the crosshair on it)"));
+		}
 		if (Input.DropMine) f->DropCountermeasures();
 		switch (Input.NumberKey)
 		{

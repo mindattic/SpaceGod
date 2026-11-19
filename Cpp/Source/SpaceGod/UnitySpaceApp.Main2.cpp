@@ -19,6 +19,7 @@
 #include "Ships.h"
 #include "SimClock.h"
 #include "World.h"
+#include "Combat/Attackers.h" // US-T307
 #include "Combat/Battle.h"
 #include "Combat/Broadsides.h"
 #include "Combat/CombatSpecs.h"
@@ -733,6 +734,32 @@ namespace SpaceGod
 		if (u == nullptr) return;
 		if (u->Ship != nullptr) pilotLockTarget = Target::OfShip(u->Ship);
 		else pilotLockUnit = u;
+	}
+
+	void UnitySpaceApp::LockHelmAttacker()
+	{
+		auto battle = Piloted.Ship ? Piloted.Ship->Battle : nullptr;
+		auto me = battle ? battle->UnitOf(Piloted.Ship) : nullptr;
+		if (me == nullptr)
+		{
+			ShowToast("No fight here: nobody to lock");
+			return;
+		}
+		auto current = pilotLockUnit != nullptr ? pilotLockUnit : pilotLockTarget.IsShip() ? battle->UnitOf(pilotLockTarget.Ship) : nullptr;
+		bool engaging = false;
+		auto pick = Core::Attackers::Next(*battle, me, current, engaging);
+		if (pick == nullptr)
+		{
+			ShowToast("Nothing hostile in this fight to lock");
+			return;
+		}
+		pilotLockTarget = Target::None();
+		pilotLockUnit = nullptr;
+		if (pick->Ship != nullptr) pilotLockTarget = Target::OfShip(pick->Ship);
+		else pilotLockUnit = pick;
+		int count = engaging ? Core::Attackers::Of(*battle, me).Count() : 0;
+		ShowToast(engaging ? cs::Cat("Locked ", pick->Name(), ": engaging you", count > 1 ? cs::Cat("  (", count, " on you, Shift+B for the next)") : cs::String())
+			: cs::Cat("Locked ", pick->Name(), ": nearest hostile, nobody is engaging you"));
 	}
 
 	Core::DVec3 UnitySpaceApp::PilotLookDirection()

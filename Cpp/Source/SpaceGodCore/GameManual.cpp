@@ -282,7 +282,8 @@ namespace SpaceGod::Core
 				T("Dogfighting keys",
 				  "Left mouse guns, right mouse the second trigger's weapon group -- homing missiles, hive missiles, dumb-fire "
 				  "rockets or torpedoes (1 cycles them; the readout names the group and its rounds) -- T locks the hostile "
-				  "nearest the crosshair, Ctrl throws flares and chaff, 7 / 8 / 9 move reactor power to weapons, shields or "
+				  "nearest the crosshair (Shift+B locks whoever is engaging you, nearest first, again for the next of them; with "
+				  "nobody on you, the nearest hostile), Ctrl throws flares and chaff, 7 / 8 / 9 move reactor power to weapons, shields or "
 				  "engines and 0 evens it (the arrows too, as at any controls), 2-5 order your wingmen, and 6 picks a capital's next weak point "
 				  "or the locked ship's broadcast array."), // US-T96
 				T("Off-screen arrows",

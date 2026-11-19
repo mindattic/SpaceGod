@@ -39,7 +39,7 @@ namespace SpaceGod::Input
 		// Flight
 		RollLeft, RollRight, Manoeuvre, Cruise, SystemCruise, Drift, FlightAssist, JumpJets,
 		// Combat and sensors
-		LockTarget, Tractor, DropMine, TunePhasers, RunHot, SensorPing, SilentRunning, PowerToggle, SelfDestruct,
+		LockTarget, LockAttacker /* US-T307 */, Tractor, DropMine, TunePhasers, RunHot, SensorPing, SilentRunning, PowerToggle, SelfDestruct,
 		// Reactor
 		PowerWeapons, PowerShields, PowerEngines, PowerBalance, PowerAllWeapons, PowerAllShields, PowerAllEngines,
 		// Travel

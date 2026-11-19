@@ -82,6 +82,7 @@ the sky cycle. A plain key never changes meaning with Shift unless the table say
 |---|---|---|---|
 | Guns | Left mouse | controls | - |
 | Lock hull | T | controls | - |
+| Lock attacker (again: the next one engaging you) | Shift+B (US-T307) | controls | - |
 | Missiles / rockets | Right mouse | controls | - |
 | EMP | Middle mouse | controls | - |
 | Mine | Ctrl (press) | controls, fight | - |

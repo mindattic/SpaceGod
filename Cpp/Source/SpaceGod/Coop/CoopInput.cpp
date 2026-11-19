@@ -58,6 +58,7 @@ namespace SpaceGod::Coop
 				SG_FIELD(DropMine), SG_FIELD(EngageFtl), SG_FIELD(Escape), SG_FIELD(Fire), SG_FIELD(FireEmp), SG_FIELD(FireGroupKey), // U.SPC-T277
 				SG_FIELD(Focus), SG_FIELD(GroupModeKey), // U.SPC-T277
 				SG_FIELD(HailPolity), SG_FIELD(Home), SG_FIELD(JumpToCraft), // US-T106: Shift+/
+				SG_FIELD(LockAttacker), // US-T307: Shift+B at the controls, an edge
 				SG_FIELD(LockTarget), SG_FIELD(LookDelta), SG_FIELD(LookHeld), SG_FIELD(ManGun),
 				SG_FIELD(Manoeuvre), SG_FIELD(MouseDelta), SG_FIELD(MousePosition), SG_FIELD(Move), SG_FIELD(MoveToHost), SG_FIELD(NumberKey), SG_FIELD(Pilot),
 				SG_FIELD(PowerKey), // US-T94: the reactor split's arrow keys, an edge

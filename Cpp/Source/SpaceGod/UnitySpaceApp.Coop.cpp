@@ -318,6 +318,7 @@ namespace SpaceGod
 				cs::String me = Wire::I(peer->LocalSeat());
 				if (Input.ToggleFlightAssist) peer->Submit(cs::Cat("k ", me, " fa"));
 				if (Input.LockTarget) peer->Submit(cs::Cat("k ", me, " lock ", Wire::D(input.Aim.X), " ", Wire::D(input.Aim.Y), " ", Wire::D(input.Aim.Z)));
+				if (Input.LockAttacker) peer->Submit(cs::Cat("k ", me, " attacker")); // US-T307
 				if (Input.DropMine) peer->Submit(cs::Cat("k ", me, " mine"));
 				if (Input.NumberKey >= 0) peer->Submit(cs::Cat("k ", me, " n ", Wire::I(Input.NumberKey)));
 			}
@@ -1151,6 +1152,7 @@ namespace SpaceGod
 			Input.LockTarget = true;
 			aim = DVec3(Wire::ParseD(f.at(3)), Wire::ParseD(f.at(4)), Wire::ParseD(f.at(5)));
 		}
+		else if (f[2] == "attacker") Input.LockAttacker = true; // US-T307
 		else if (f[2] == "mine") Input.DropMine = true;
 		else if (f[2] == "n") Input.NumberKey = Wire::ParseI(f.at(3));
 		{
