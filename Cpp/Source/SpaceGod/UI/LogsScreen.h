@@ -16,7 +16,8 @@ namespace SpaceGod::UI
 {
 	/// The logs screen (Shift+L), in the Help screen's look (UiStyle): the ship logs and station records recovered from
 	/// derelicts, wrecks, prizes and ports (Core::LoreBooks), listed down the left by title and author, newest first; the one
-	/// picked is read on the right a page at a time. Up / Down pick a log, Left / Right turn its pages. Only books Prose wrote
+	/// picked is read on the right a page at a time. Up / Down pick a log (Page Up / Page Down / Home / End jump, the list
+	/// following the pick), Left / Right turn its pages. Only books Prose wrote
 	/// are ever listed: with none recovered it says how logs are found.
 	class LogsScreen final
 	{
@@ -39,6 +40,10 @@ namespace SpaceGod::UI
 		cs::Ref<Texture2D> panelTexture, buttonTexture, buttonActiveTexture;
 		Vector2 scroll, listScroll;
 		int selected = 0, page = 0;
+		/// The list scrolls to the pick on the next draw (a key moved it, not a click). US-T301.
+		bool follow = false;
+		/// Rows the list showed last draw: how far Page Up / Page Down go.
+		int pageRows = 8;
 		/// The key last read, so a new find (listed first) does not move the reader off the book open.
 		cs::String openKey;
 

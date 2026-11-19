@@ -38,7 +38,7 @@ namespace SpaceGod::UI
 		GUI::Box(screen, GUIContent::none(), panel);
 		GUI::Label(Rect(Margin, 22, screen.width - 2 * Margin, 30), "RECOVERED LOGS", title);
 		GUI::Label(Rect(Margin, 54, screen.width - 2 * Margin, 18),
-			cs::Cat("Ship logs and station records you have found  \xC2\xB7  Up / Down for the next log, Left / Right to turn the page  \xC2\xB7  ", closeHint), small);
+			cs::Cat("Ship logs and station records you have found  \xC2\xB7  Up / Down for the next log, Page Up / Page Down / Home / End to jump, Left / Right to turn the page  \xC2\xB7  ", closeHint), small);
 
 		float top = 86, bottom = screen.height - 64;
 		if (books.Count() == 0)
@@ -68,8 +68,13 @@ namespace SpaceGod::UI
 	{
 		Event& e = Event::current();
 		if (e.type != EventType::KeyDown) return;
-		if (e.keyCode == KeyCode::DownArrow && selected < count - 1) { Select(selected + 1); e.Use(); }
-		else if (e.keyCode == KeyCode::UpArrow && selected > 0) { Select(selected - 1); e.Use(); }
+		auto keySelect = [&](int index) { Select(Mathf::Clamp(index, 0, Mathf::Max(0, count - 1))); follow = true; e.Use(); };
+		if (e.keyCode == KeyCode::DownArrow && selected < count - 1) keySelect(selected + 1);
+		else if (e.keyCode == KeyCode::UpArrow && selected > 0) keySelect(selected - 1);
+		else if (e.keyCode == KeyCode::PageDown && count > 0) keySelect(selected + pageRows);
+		else if (e.keyCode == KeyCode::PageUp && count > 0) keySelect(selected - pageRows);
+		else if (e.keyCode == KeyCode::End && count > 0) keySelect(count - 1);
+		else if (e.keyCode == KeyCode::Home && count > 0) keySelect(0);
 		else if (e.keyCode == KeyCode::RightArrow && page < pages - 1) { Turn(page + 1); e.Use(); }
 		else if (e.keyCode == KeyCode::LeftArrow && page > 0) { Turn(page - 1); e.Use(); }
 	}
@@ -96,6 +101,15 @@ namespace SpaceGod::UI
 		GUI::DrawTexture(Rect(area.x, area.y + HeadingH - 5, area.width, 1), buttonActiveTexture);
 		auto list = Rect(area.x, area.y + HeadingH, area.width, area.height - HeadingH);
 		float contentH = books.Count() * RowH;
+		pageRows = Mathf::Max(1, static_cast<int>(list.height / RowH) - 1);
+		if (follow)
+		{
+			// A key moved the pick: scroll just enough to bring its row into view.
+			follow = false;
+			float rowTop = selected * RowH;
+			if (rowTop < listScroll.y) listScroll.y = rowTop;
+			else if (rowTop + RowH > listScroll.y + list.height) listScroll.y = rowTop + RowH - list.height;
+		}
 		listScroll = GUI::BeginScrollView(list, listScroll, Rect(0, 0, list.width - 16, contentH));
 		for (int i = 0; i < books.Count(); i++)
 		{

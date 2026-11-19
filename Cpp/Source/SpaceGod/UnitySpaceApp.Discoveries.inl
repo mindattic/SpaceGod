@@ -38,6 +38,10 @@ public:
 	/// closes it on Back or once a button went to a find.</summary>
 	void DrawDiscoveries();
 
+	/// <summary>Before the commands each frame: while the screen's search is typed in it has the keys (true: the owner
+	/// hands the input over). US-T301.</summary>
+	bool UpdateDiscoveriesKeys();
+
 	/// <summary>The screen's own textures go with the Hud's (U.SPC-T366).</summary>
 	void DestroyDiscoveriesTextures();
 

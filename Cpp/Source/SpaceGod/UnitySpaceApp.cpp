@@ -492,6 +492,7 @@ namespace SpaceGod
 		UpdateInfluence(); // US-T140: the embody gate's world, this frame
 		if (Tour::ShowcaseTour::Update(*this, !cheatMenu->IsOpen)) Input.Handover(); // US-T147: the showcase tour has the keys while it runs
 		if (UpdateEncyclopediaKeys()) Input.Handover(); // US-T271: the Encyclopedia's search has the keys while typed in
+		if (UpdateDiscoveriesKeys()) Input.Handover(); // US-T301: so does the discoveries screen's
 		TutorialKeys(); // US-T254: Shift+Enter / Shift+Esc on the tutorial's card (it never takes the other keys)
 		ArbitrateInput(true); // US-T90: one owner per input this frame (the craft held, else the command view)
 		int screensOpen = OpenScreens();

@@ -38,14 +38,49 @@ namespace SpaceGod::UI
 		return "";
 	}
 
+	bool DiscoveriesScreen::Matches(const DiscoveryEntry& e, const cs::List<cs::String>& words)
+	{
+		cs::String hay = cs::Strings::ToLowerInvariant(cs::Cat(e.Name, "\n", e.System, "\n", e.By, "\n", e.Note));
+		for (const auto& w : words)
+			if (!cs::Strings::Contains(hay, w)) return false;
+		return true;
+	}
+
+	void DiscoveriesScreen::Closed()
+	{
+		if (typing) GUIUtility::keyboardControl = 0;
+		typing = false;
+		focusFilter = false;
+	}
+
 	void DiscoveriesScreen::Refresh(const DiscoveryLog& log)
 	{
-		if (shownLog == &log && shownVersion == log.Version && shownKind == kind) return;
+		if (shownLog == &log && shownVersion == log.Version && shownKind == kind && shownFilter == filter) return;
 		const DiscoveryEntry* was = selected >= 0 && selected < shown.Count() && shownKind == kind ? shown[selected].get() : nullptr;
-		shown = log.Of(static_cast<DiscoveryKind>(kind));
+		if (shownFilter != filter) listScroll = Vector2::zero();
+		cs::List<cs::String> words;
+		for (const auto& w : cs::Strings::Split(cs::Strings::ToLowerInvariant(filter), " \t"))
+			if (!w.empty()) words.Add(w);
+		counts.assign(DiscoveryLog::KindCount, 0);
+		shown.Clear();
+		for (int k = 0; k < DiscoveryLog::KindCount; k++)
+		{
+			if (words.Count() == 0 && k != kind)
+			{
+				counts[k] = log.CountOf(static_cast<DiscoveryKind>(k));
+				continue;
+			}
+			for (const auto& e : log.Of(static_cast<DiscoveryKind>(k)))
+				if (words.Count() == 0 || Matches(*e, words))
+				{
+					counts[k]++;
+					if (k == kind) shown.Add(e);
+				}
+		}
 		shownLog = &log;
 		shownVersion = log.Version;
 		shownKind = kind;
+		shownFilter = filter;
 		// A new find (listed first) does not move the card off the find being read.
 		if (was != nullptr)
 			for (int i = 0; i < shown.Count(); i++)
@@ -63,9 +98,12 @@ namespace SpaceGod::UI
 
 		auto screen = Rect(0, 0, static_cast<float>(Screen::width), static_cast<float>(Screen::height));
 		GUI::Box(screen, GUIContent::none(), panel);
-		GUI::Label(Rect(Margin, 22, screen.width - 2 * Margin, 30), "DISCOVERIES", title);
-		GUI::Label(Rect(Margin, 54, screen.width - 2 * Margin, 18),
-			cs::Cat("What you have found, by kind and the day it was found  \xC2\xB7  Up / Down for the next find, Left / Right for the next kind  \xC2\xB7  ", closeHint), small);
+		GUI::Label(Rect(Margin, 22, 300, 30), "DISCOVERIES", title);
+		float fieldW = Mathf::Clamp(screen.width * 0.3f, 240.0f, 420.0f);
+		DrawFilter(Rect(screen.width - Margin - fieldW, 22, fieldW, 30));
+		GUI::Label(Rect(Margin, 56, screen.width - 2 * Margin, 18),
+			cs::Cat("What you have found, by kind and the day it was found  \xC2\xB7  Up / Down for the next find, Page Up / Page Down / Home / End to jump, "
+				"Left / Right for the next kind  \xC2\xB7  ", closeHint), small);
 
 		float top = 86, bottom = screen.height - 64;
 		float kindsW = Mathf::Clamp(screen.width * 0.16f, 170.0f, 230.0f);
@@ -78,7 +116,13 @@ namespace SpaceGod::UI
 		float x = listX + listW + Gutter;
 		auto card = Rect(x, top, screen.width - Margin - x, bottom - top);
 		bool went = false;
-		if (shown.Count() == 0)
+		if (shown.Count() == 0 && !shownFilter.empty() && log.CountOf(static_cast<DiscoveryKind>(kind)) > 0)
+		{
+			GUI::Label(Rect(card.x, card.y, card.width, HeadingH - 4), "NO MATCH", heading);
+			GUI::Label(Rect(card.x, card.y + HeadingH, card.width, 60),
+				"None of this kind's finds hold every word searched for. The counts on the left are each kind's matches.", text);
+		}
+		else if (shown.Count() == 0)
 		{
 			GUI::Label(Rect(card.x, card.y, card.width, HeadingH - 4), "NOTHING YET", heading);
 			GUI::Label(Rect(card.x, card.y + HeadingH, card.width, 80), HowFound(kind), text);
@@ -92,10 +136,22 @@ namespace SpaceGod::UI
 	{
 		Event& e = Event::current();
 		if (e.type != EventType::KeyDown) return;
-		if (e.keyCode == KeyCode::DownArrow && selected < count - 1) { Pick(selected + 1); e.Use(); }
-		else if (e.keyCode == KeyCode::UpArrow && selected > 0) { Pick(selected - 1); e.Use(); }
-		else if (e.keyCode == KeyCode::RightArrow && kind < DiscoveryLog::KindCount - 1) { PickKind(kind + 1); e.Use(); }
-		else if (e.keyCode == KeyCode::LeftArrow && kind > 0) { PickKind(kind - 1); e.Use(); }
+		auto keyPick = [&](int index) { Pick(Mathf::Clamp(index, 0, Mathf::Max(0, count - 1))); follow = true; e.Use(); };
+		if ((e.keyCode == KeyCode::Escape || e.keyCode == KeyCode::Return || e.keyCode == KeyCode::KeypadEnter) && typing)
+		{
+			GUIUtility::keyboardControl = 0;
+			typing = false;
+			e.Use();
+		}
+		else if (e.keyCode == KeyCode::DownArrow && selected < count - 1) keyPick(selected + 1);
+		else if (e.keyCode == KeyCode::UpArrow && selected > 0) keyPick(selected - 1);
+		else if (e.keyCode == KeyCode::PageDown && count > 0) keyPick(selected + pageRows);
+		else if (e.keyCode == KeyCode::PageUp && count > 0) keyPick(selected - pageRows);
+		// The field's own caret takes Left / Right / Home / End while typed in.
+		else if (!typing && e.keyCode == KeyCode::End && count > 0) keyPick(count - 1);
+		else if (!typing && e.keyCode == KeyCode::Home && count > 0) keyPick(0);
+		else if (!typing && e.keyCode == KeyCode::RightArrow && kind < DiscoveryLog::KindCount - 1) { PickKind(kind + 1); e.Use(); }
+		else if (!typing && e.keyCode == KeyCode::LeftArrow && kind > 0) { PickKind(kind - 1); e.Use(); }
 	}
 
 	void DiscoveriesScreen::Pick(int index)
@@ -103,6 +159,25 @@ namespace SpaceGod::UI
 		if (index == selected) return;
 		selected = index;
 		scroll = Vector2::zero();
+	}
+
+	void DiscoveriesScreen::DrawFilter(Rect r)
+	{
+		GUI::SetNextControlName(FilterControl);
+		filter = GUI::TextField(r, filter, 60, field);
+		if (focusFilter)
+		{
+			GUI::FocusControl(FilterControl);
+			focusFilter = GUI::GetNameOfFocusedControl() != FilterControl;
+		}
+		typing = GUI::GetNameOfFocusedControl() == FilterControl;
+		if (filter.empty())
+			GUI::Label(Rect(r.x + 10, r.y + 6, r.width - 20, 18), typing ? "a name, a system, who found it..." : "click to search what you have found", small);
+		else if (GUI::Button(Rect(r.x + r.width - 28, r.y + 3, 24, 24), "X", button))
+		{
+			filter.clear();
+			focusFilter = true;
+		}
 	}
 
 	void DiscoveriesScreen::PickKind(int k)
@@ -116,12 +191,16 @@ namespace SpaceGod::UI
 
 	void DiscoveriesScreen::DrawKinds(Rect area, const DiscoveryLog& log)
 	{
-		GUI::Label(Rect(area.x, area.y, area.width, HeadingH - 4), cs::Cat("FOUND  (", log.Entries.Count(), ")"), heading);
+		int total = 0;
+		for (int c : counts) total += c;
+		GUI::Label(Rect(area.x, area.y, area.width, HeadingH - 4),
+			shownFilter.empty() ? cs::Cat("FOUND  (", log.Entries.Count(), ")") : cs::Cat("MATCHES  (", total, ")"), heading);
 		GUI::DrawTexture(Rect(area.x, area.y + HeadingH - 5, area.width, 1), buttonActiveTexture);
 		for (int k = 0; k < DiscoveryLog::KindCount; k++)
 		{
 			auto row = Rect(area.x, area.y + HeadingH + k * KindRowH, area.width, KindRowH - 4);
-			cs::String label = cs::Cat(DiscoveryLog::Heading(static_cast<DiscoveryKind>(k)), "  (", log.CountOf(static_cast<DiscoveryKind>(k)), ")");
+			int n = k < static_cast<int>(counts.size()) ? counts[k] : log.CountOf(static_cast<DiscoveryKind>(k));
+			cs::String label = cs::Cat(DiscoveryLog::Heading(static_cast<DiscoveryKind>(k)), "  (", n, ")");
 			if (GUI::Button(row, label, k == kind ? entrySelected : entry)) PickKind(k);
 		}
 	}
@@ -133,6 +212,15 @@ namespace SpaceGod::UI
 		GUI::DrawTexture(Rect(area.x, area.y + HeadingH - 5, area.width, 1), buttonActiveTexture);
 		auto list = Rect(area.x, area.y + HeadingH, area.width, area.height - HeadingH);
 		float contentH = shown.Count() * RowH;
+		pageRows = Mathf::Max(1, static_cast<int>(list.height / RowH) - 1);
+		if (follow)
+		{
+			// A key moved the pick: scroll just enough to bring its row into view.
+			follow = false;
+			float rowTop = selected * RowH;
+			if (rowTop < listScroll.y) listScroll.y = rowTop;
+			else if (rowTop + RowH > listScroll.y + list.height) listScroll.y = rowTop + RowH - list.height;
+		}
 		listScroll = GUI::BeginScrollView(list, listScroll, Rect(0, 0, list.width - 16, contentH));
 		// Only the rows in view are drawn: a long career meets hundreds of pilots.
 		int first = Mathf::Max(0, static_cast<int>(listScroll.y / RowH) - 1);
@@ -238,6 +326,8 @@ namespace SpaceGod::UI
 		panelTexture = S::PanelFrame(S::Depth::Screen);
 		buttonTexture = S::ControlTexture();
 		buttonActiveTexture = S::ControlOnTexture();
+		fieldTexture = S::FieldTexture();
+		field = S::FieldStyle(T::Body, fieldTexture);
 		panel = S::PanelStyle(panelTexture);
 		title = S::TitleStyle(T::Screen);
 		entryTitle = S::TitleStyle(T::Chapter);
@@ -257,6 +347,7 @@ namespace SpaceGod::UI
 		panelTexture = nullptr;
 		buttonTexture = nullptr;
 		buttonActiveTexture = nullptr;
+		fieldTexture = nullptr;
 		stylesReady = false;
 	}
 }

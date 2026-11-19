@@ -137,6 +137,18 @@ namespace SpaceGod
 		if (discoveriesScreen->Draw("Esc or Shift+O to close")) ShowDiscoveries = false;
 	}
 
+	bool UnitySpaceApp::UpdateDiscoveriesKeys()
+	{
+		if (!discoveriesScreen) return false;
+		if (!ShowDiscoveries)
+		{
+			// Closed some other way (the pause menu, a find gone to): the search lets the keys go.
+			if (discoveriesScreen->Typing()) discoveriesScreen->Closed();
+			return false;
+		}
+		return discoveriesScreen->Typing();
+	}
+
 	void UnitySpaceApp::DestroyDiscoveriesTextures()
 	{
 		if (discoveriesScreen) discoveriesScreen->DestroyOwnedTextures();
