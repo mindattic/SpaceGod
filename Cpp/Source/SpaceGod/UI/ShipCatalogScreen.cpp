@@ -1,5 +1,8 @@
 #include "UI/ShipCatalogScreen.h"
 
+#include <algorithm>
+#include <cmath>
+
 #include "Combat/Construction.h"
 #include "Combat/FlightModels.h"
 #include "Combat/Outfitting.h"
@@ -63,7 +66,27 @@ namespace SpaceGod::UI
 		float listW = Mathf::Clamp(area.width * 0.24f, 180.0f, 300.0f);
 		DrawList(Rect(area.x, top, listW, area.height - tabsH), shown);
 		float x = area.x + listW + Gutter;
-		DrawEntry(shown[selected], Rect(x, top, area.x + area.width - x, area.height - tabsH));
+		// US-T340: the compare bar over the hull: mark it, unmark it, or say what the two shown are.
+		const auto& current = shown[selected];
+		float viewW = area.x + area.width - x;
+		const float barH = 26;
+		cs::String buttonText = marked == nullptr ? cs::String("Compare (C)") : marked == current ? cs::String("Unmark (C)") : cs::String("Stop comparing");
+		float buttonW = entry->CalcSize(GUIContent(buttonText)).x + 24;
+		if (GUI::Button(Rect(x, top, buttonW, barH), buttonText, marked != nullptr ? entrySelected : entry))
+			ToggleMark(marked == nullptr ? current : marked);
+		cs::String hint = marked == nullptr ? cs::String("mark this hull, then pick another to see the two side by side")
+			: marked == current ? cs::String("marked: pick another hull to compare it with")
+			: cs::Cat("comparing with the marked ", marked->Name, "; C on it unmarks");
+		GUI::Label(Rect(x + buttonW + 10, top, Mathf::Max(0.0f, viewW - buttonW - 10), barH), hint, small);
+		auto view = Rect(x, top + barH + 8, viewW, area.height - tabsH - barH - 8);
+		if (marked != nullptr && marked != current) DrawCompare(marked, current, view);
+		else DrawEntry(current, view);
+	}
+
+	void ShipCatalogScreen::ToggleMark(const cs::Ref<ShipCatalogEntry>& e)
+	{
+		marked = marked == e ? nullptr : e;
+		scroll = Vector2::zero();
 	}
 
 	cs::List<int> ShipCatalogScreen::Tabs(const cs::List<cs::Ref<ShipCatalogEntry>>& entries)
@@ -103,6 +126,8 @@ namespace SpaceGod::UI
 		else if (e.keyCode == KeyCode::Home && count > 0) keySelect(0);
 		else if (e.keyCode == KeyCode::RightArrow && tab < tabs.Count() - 1) { PickTab(tab + 1, tabs, entries, shown[selected]); e.Use(); }
 		else if (e.keyCode == KeyCode::LeftArrow && tab > 0) { PickTab(tab - 1, tabs, entries, shown[selected]); e.Use(); }
+		// US-T340: C marks the hull picked to compare (on the marked one, unmarks it).
+		else if (e.keyCode == KeyCode::C && !e.shift && !e.control && !e.alt && !e.command && count > 0) { ToggleMark(shown[selected]); e.Use(); }
 	}
 
 	void ShipCatalogScreen::Select(int index)
@@ -161,7 +186,9 @@ namespace SpaceGod::UI
 			auto row = Rect(0, i * ListRowH, list.width - 16, ListRowH - 4);
 			if (GUI::Button(row, entries[i]->Name, i == selected ? entrySelected : entry)) Select(i);
 			// Under All, each row says its category on the right (a tab lists one, so it would only repeat it).
-			if (all) GUI::Label(Rect(row.x, row.y, row.width - 8, row.height), ToString(entries[i]->Category), rowCategory);
+			// US-T340: the marked hull's row says so instead.
+			if (entries[i] == marked) GUI::Label(Rect(row.x, row.y, row.width - 8, row.height), "marked", rowCategory);
+			else if (all) GUI::Label(Rect(row.x, row.y, row.width - 8, row.height), ToString(entries[i]->Category), rowCategory);
 		}
 		GUI::EndScrollView();
 	}
@@ -252,6 +279,109 @@ namespace SpaceGod::UI
 		GUI::EndScrollView();
 	}
 
+	void ShipCatalogScreen::DrawCompare(const cs::Ref<ShipCatalogEntry>& a, const cs::Ref<ShipCatalogEntry>& b, Rect view)
+	{
+		// One row: its name, the two hulls' values, how to show one, and which way is better (+1 more, -1 less, 0 neither).
+		struct Row
+		{
+			cs::String Name;
+			double A, B;
+			cs::String (*Show)(double);
+			int Better;
+		};
+		auto speed = [](double kmS) -> cs::String { return cs::Cat(cs::Fmt(kmS * 1000, "0"), " m/s"); };
+		auto degS = [](double d) -> cs::String { return cs::Cat(cs::Fmt(d, "0.#"), " deg/s"); };
+		auto accel = [](double kmS2) -> cs::String { return Accel(kmS2); };
+		auto times = [](double m) -> cs::String { return cs::Cat("x", cs::Fmt(m, "0.##")); };
+		auto secs = [](double s) -> cs::String { return cs::Cat(cs::Fmt(s, "0.#"), " s"); };
+		auto metres = [](double km) -> cs::String { return cs::Cat(cs::Fmt(km * 1000, "0"), " m"); };
+		auto tonnesKt = [](double kt) -> cs::String { return cs::Cat(cs::Fmt(kt * 1000, "N0"), " t"); };
+		auto tonnes = [](double t) -> cs::String { return cs::Cat(cs::Fmt(t, "N0"), " t"); };
+		auto whole = [](double n) -> cs::String { return cs::String(cs::Fmt(n, "N0")); };
+		auto tenth = [](double n) -> cs::String { return cs::String(cs::Fmt(n, "0.#")); };
+		auto mw = [](double n) -> cs::String { return cs::Cat(cs::Fmt(n, "N0"), " MW"); };
+		auto sections = [](double n) -> cs::String { return cs::Cat(cs::Fmt(n, "0.#"), " sections"); };
+
+		const auto& ha = a->Handling;
+		const auto& hb = b->Handling;
+		const auto& la = a->Lead();
+		const auto& lb = b->Lead();
+		auto slots = [](const cs::Ref<ShipCatalogEntry>& e, SlotCategory c) { return static_cast<double>(e->SlotCount(c)); };
+		cs::List<std::pair<cs::String, cs::List<Row>>> groups;
+		groups.Add({ cs::String("HANDLING"), cs::List<Row>{
+			{ "Top speed", ha.TopSpeedKmS, hb.TopSpeedKmS, speed, 1 },
+			{ "Turn rate (pitch / yaw)", ha.TurnRateDegS, hb.TurnRateDegS, degS, 1 },
+			{ "Roll rate", ha.RollRateDegS, hb.RollRateDegS, degS, 1 },
+			{ "Acceleration", la.AccelKmS2, lb.AccelKmS2, accel, 1 },
+			{ "Braking", la.BrakeKmS2, lb.BrakeKmS2, accel, 1 },
+			{ "Strafe", la.StrafeKmS2, lb.StrafeKmS2, accel, 1 },
+			{ "Boost", ha.BoostSpeedMultiplier, hb.BoostSpeedMultiplier, times, 1 },
+			{ "Boost lasts", ha.BoostDurationS, hb.BoostDurationS, secs, 1 },
+			{ "Cruise drive", ha.CruiseSpeedMultiplier, hb.CruiseSpeedMultiplier, times, 1 },
+			{ "Cruise spools in", ha.CruiseRampS, hb.CruiseRampS, secs, -1 } } });
+		groups.Add({ cs::String("HULL"), cs::List<Row>{
+			{ "Length", la.LengthKm, lb.LengthKm, metres, 0 },
+			{ "Mass", la.MassKt, lb.MassKt, tonnesKt, 0 },
+			{ "Hull", la.Hull, lb.Hull, whole, 1 },
+			{ "Shield", la.Shield, lb.Shield, whole, 1 },
+			{ "Armour", la.Armor, lb.Armor, tenth, 1 } } });
+		groups.Add({ cs::String("EQUIPMENT SLOTS"), cs::List<Row>{
+			{ "Weapon", slots(a, SlotCategory::Weapon), slots(b, SlotCategory::Weapon), whole, 1 },
+			{ "Shield", slots(a, SlotCategory::Shield), slots(b, SlotCategory::Shield), whole, 1 },
+			{ "Engine", slots(a, SlotCategory::Engine), slots(b, SlotCategory::Engine), whole, 1 },
+			{ "Utility", slots(a, SlotCategory::Utility), slots(b, SlotCategory::Utility), whole, 1 } } });
+		groups.Add({ cs::String("COMPARTMENTS"), cs::List<Row>{
+			{ "Cargo", a->CargoTonnes, b->CargoTonnes, tonnes, 1 },
+			{ "Hangar (craft)", static_cast<double>(a->HangarCraft), static_cast<double>(b->HangarCraft), whole, 1 },
+			{ "Crew", a->Crew, b->Crew, whole, 0 },
+			{ "Marines", a->Marines, b->Marines, whole, 1 },
+			{ "Reactor reserve", a->ReactorMw, b->ReactorMw, mw, 1 },
+			{ "Internal space", a->InternalSpace, b->InternalSpace, sections, 1 },
+			{ "Free space", a->SpareSpace, b->SpareSpace, sections, 1 },
+			{ "Designs", static_cast<double>(a->Designs.Count()), static_cast<double>(b->Designs.Count()), whole, 0 } } });
+
+		float w = view.width - 16;
+		float labelW = Mathf::Clamp(w * 0.34f, 150.0f, 300.0f);
+		float colW = (w - labelW) / 2;
+		float h = 28 + RowH + SectionGap;
+		for (const auto& g : groups) h += HeadingH + g.second.Count() * RowH + SectionGap;
+		h += RowH * 3;
+
+		scroll = GUI::BeginScrollView(view, scroll, Rect(0, 0, w, h));
+		float y = 0;
+		GUI::Label(Rect(labelW, y, colW - 8, 28), cs::Strings::ToUpperInvariant(a->Name), compareHead);
+		GUI::Label(Rect(labelW + colW, y, colW - 8, 28), cs::Strings::ToUpperInvariant(b->Name), compareHead);
+		y += 28;
+		GUI::Label(Rect(0, y, labelW - 8, RowH), "Category", label);
+		GUI::Label(Rect(labelW, y, colW - 8, RowH), cs::Cat("marked  ·  ", ToString(a->Category)), small);
+		GUI::Label(Rect(labelW + colW, y, colW - 8, RowH), cs::Cat("picked  ·  ", ToString(b->Category)), small);
+		y += RowH + SectionGap;
+		int aWins = 0, bWins = 0;
+		for (const auto& g : groups)
+		{
+			GUI::Label(Rect(0, y, w, HeadingH - 4), g.first, heading);
+			GUI::DrawTexture(Rect(0, y + HeadingH - 5, w, 1), ruleTexture);
+			y += HeadingH;
+			for (const auto& r : g.second)
+			{
+				// The better one only where the row has a better way and the two differ (beyond rounding).
+				bool differ = std::abs(r.A - r.B) > 1e-6 * std::max(1.0, std::max(std::abs(r.A), std::abs(r.B)));
+				bool aBetter = differ && r.Better != 0 && (r.Better > 0 ? r.A > r.B : r.A < r.B);
+				bool bBetter = differ && r.Better != 0 && !aBetter;
+				if (aBetter) aWins++;
+				if (bBetter) bWins++;
+				GUI::Label(Rect(0, y, labelW - 8, RowH), r.Name, label);
+				GUI::Label(Rect(labelW, y, colW - 8, RowH), r.Show(r.A), aBetter ? better : value);
+				GUI::Label(Rect(labelW + colW, y, colW - 8, RowH), r.Show(r.B), bBetter ? better : value);
+				y += RowH;
+			}
+			y += SectionGap;
+		}
+		GUI::Label(Rect(0, y, w, RowH), cs::Cat("Better in ", aWins, " row", aWins == 1 ? "" : "s", " the ", a->Name, ", in ", bWins, " the ", b->Name,
+			" (length, mass, crew and designs are neither)"), small);
+		GUI::EndScrollView();
+	}
+
 	void ShipCatalogScreen::EnsureStyles()
 	{
 		if (stylesReady) return;
@@ -276,6 +406,11 @@ namespace SpaceGod::UI
 		rowCategory = S::TextStyle(T::Body, S::Dim, FontStyle::Italic);
 		rowCategory->alignment = TextAnchor::MiddleRight;
 		rowCategory->clipping = TextClipping::Clip;
+		// US-T340: the better value of a compared row, and the two hulls' names over their columns.
+		better = S::TextStyle(T::Body, S::Accent, FontStyle::Bold);
+		better->clipping = TextClipping::Clip;
+		compareHead = S::TextStyle(T::Heading, S::Accent, FontStyle::Bold);
+		compareHead->clipping = TextClipping::Clip;
 	}
 
 	void ShipCatalogScreen::DestroyOwnedTextures()

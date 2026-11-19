@@ -18,7 +18,8 @@ namespace SpaceGod::UI
 	/// equipment slots (weapons, shields, engines, utility) and its compartments (cargo, hangar, crew, reactor), and each
 	/// of its designs' drives. Read straight from Core::ShipCatalog, the table flight itself reads. Up / Down step through
 	/// the hulls (Page Up / Page Down / Home / End jump, the list following the pick); tabs along the top narrow the list to
-	/// one category, each with its count, Left / Right stepping through them (US-T302). The Help screen opens it from its
+	/// one category, each with its count, Left / Right stepping through them (US-T302). C (or the Compare button) marks the
+	/// hull picked; any other hull picked then shows beside it, row by row, the better value highlighted (US-T340). The Help screen opens it from its
 	/// Ship catalog button.
 	class ShipCatalogScreen final
 	{
@@ -44,6 +45,9 @@ namespace SpaceGod::UI
 		bool follow = false;
 		/// Rows the list showed last draw: how far Page Up / Page Down go.
 		int pageRows = 8;
+		/// US-T340: the hull marked to compare (C or the Compare button); with another hull picked, the two show side by side.
+		cs::Ref<Core::ShipCatalogEntry> marked;
+		cs::Ref<GUIStyle> better, compareHead;
 
 		/// The tabs: All, then each hull category the catalog has a hull of, in the category's order (-1 for All).
 		static cs::List<int> Tabs(const cs::List<cs::Ref<Core::ShipCatalogEntry>>& entries);
@@ -60,6 +64,10 @@ namespace SpaceGod::UI
 			const cs::Ref<Core::ShipCatalogEntry>& current);
 		void DrawList(Rect area, const cs::List<cs::Ref<Core::ShipCatalogEntry>>& entries);
 		void DrawEntry(const cs::Ref<Core::ShipCatalogEntry>& e, Rect view);
+		/// US-T340: marks <paramref name="e"/> to compare, or unmarks it if it is the one marked.
+		void ToggleMark(const cs::Ref<Core::ShipCatalogEntry>& e);
+		/// US-T340: the marked hull and <paramref name="e"/> side by side, the better value of each row highlighted.
+		void DrawCompare(const cs::Ref<Core::ShipCatalogEntry>& a, const cs::Ref<Core::ShipCatalogEntry>& b, Rect view);
 		cs::List<std::pair<cs::String, cs::List<std::pair<cs::String, cs::String>>>> Sections(const cs::Ref<Core::ShipCatalogEntry>& e) const;
 		void EnsureStyles();
 	};
