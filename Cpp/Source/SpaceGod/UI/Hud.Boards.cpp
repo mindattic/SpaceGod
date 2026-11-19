@@ -1615,12 +1615,19 @@ namespace SpaceGod::UI
 		if (bar.Count() == 0) return;
 		constexpr float pad = 10, rowH = 20, gap = 18;
 		float maxW = Mathf::Min(static_cast<float>(Screen::width) - 40, 1100.0f);
-		// Lay the entries out in rows, each "Shift+n  what  (how it stands)".
+		// Lay the entries out in rows, each "Shift+n  what  (how it stands)". US-T359: every entry, not just the first 10; a bar
+		// of more than 10 is paged nine at a time, the shown page's entries keyed Shift+1..9 and the rest drawn keyless and dim.
+		bool paged = bar.Count() > 10;
+		int page = app->HelmBarPage(bar.Count());
+		int pageFirst = page * UnitySpaceApp::HelmBarPageSize;
 		cs::List<cs::String> texts;
 		cs::List<float> widths;
-		for (int i = 0; i < bar.Count() && i < 10; i++)
+		cs::List<bool> keyed;
+		for (int i = 0; i < bar.Count(); i++)
 		{
-			cs::String key = cs::Cat("Shift+", i == 9 ? 0 : i + 1);
+			bool onPage = !paged || (i >= pageFirst && i < pageFirst + UnitySpaceApp::HelmBarPageSize);
+			cs::String key = !onPage ? cs::String("     ") : paged ? cs::Cat("Shift+", i - pageFirst + 1) : cs::Cat("Shift+", i == 9 ? 0 : i + 1);
+			keyed.Add(onPage);
 			cs::String t = cs::Cat(key, "  ", bar[i].Label, "  (", bar[i].State, ")");
 			texts.Add(t);
 			widths.Add(small->CalcSize(GUIContent(t)).x);
@@ -1640,6 +1647,11 @@ namespace SpaceGod::UI
 			widest = Mathf::Max(widest, x - gap);
 		}
 		cs::String heading = cs::Cat(HelmAbilities::Heading(helm->Ship), "  \xC2\xB7  Shift+/ jump into a launched craft (again: the next, then back here)");
+		if (paged) // US-T359
+		{
+			int pages = (bar.Count() + UnitySpaceApp::HelmBarPageSize - 1) / UnitySpaceApp::HelmBarPageSize;
+			heading = cs::Cat(heading, "  \xC2\xB7  Shift+0 next page (", page + 1, "/", pages, ")");
+		}
 		widest = Mathf::Max(widest, small->CalcSize(GUIContent(heading)).x);
 		float w = widest + 2 * pad, h = pad * 2 + rowH * (rows + 1);
 		auto r = Rect((Screen::width - w) * 0.5f, Screen::height - 104 - h, w, h);
@@ -1657,7 +1669,7 @@ namespace SpaceGod::UI
 				onRow = rowOf[i];
 				x = 0;
 			}
-			GUI::contentColor = bar[i].Ready ? Color(0.55f, 1.0f, 0.65f, 1.0f) : Dim;
+			GUI::contentColor = bar[i].Ready ? Color(0.55f, 1.0f, 0.65f, keyed[i] ? 1.0f : 0.45f) : keyed[i] ? Dim : Color(Dim.r, Dim.g, Dim.b, Dim.a * 0.5f);
 			GUI::Label(Rect(r.x + pad + x, r.y + pad - 2 + rowH * (onRow + 1), widths[i] + 4, rowH), texts[i], small);
 			x += widths[i] + gap;
 		}

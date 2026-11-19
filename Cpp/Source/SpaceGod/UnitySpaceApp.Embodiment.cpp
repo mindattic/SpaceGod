@@ -365,6 +365,25 @@ namespace SpaceGod
 	{
 		if (!Input.Boost || Input.NumberKey < 0 || ClickPanelOpen() || ship == nullptr || ship->Phase == ShipPhase::Lane) return 0;
 		int slot = Input.NumberKey == 0 ? 10 : Input.NumberKey;
+		// US-T359: a bar of more than 10 orders is paged nine at a time; Shift+0 turns the page instead of using slot 10.
+		int count = HelmAbilities::Of(ship, World()).Count();
+		if (count > 10)
+		{
+			int pages = (count + HelmBarPageSize - 1) / HelmBarPageSize;
+			int page = HelmBarPage(count);
+			if (Input.NumberKey == 0)
+			{
+				helmBarPage = (page + 1) % pages;
+				Input.NumberKey = -1; // spent: the page turned, never also the captain's order on 0
+				return 0;
+			}
+			slot = page * HelmBarPageSize + Input.NumberKey;
+			if (slot > count)
+			{
+				Input.NumberKey = -1; // an empty slot on the last page: spent all the same, as a Shift+digit always is here
+				return 0;
+			}
+		}
 		auto ability = HelmAbilities::AtSlot(ship, slot, World()); // US-T140: the bar as the HUD shows it (a band captain's squad order last)
 		if (ability == HelmAbility::None) return 0;
 		Input.NumberKey = -1; // spent: Shift+digit is the ability, never also the captain's order on the digit

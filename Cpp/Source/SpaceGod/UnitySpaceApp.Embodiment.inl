@@ -149,6 +149,8 @@ private:
 	/// <summary>The craft the local player's helm orders launched, newest first, for <see cref="JumpToCraft"/>.</summary>
 	cs::List<cs::Ref<Core::BattleUnit>> launchedCraft;
 	int helmAbilitySeq = 0;
+	/// <summary>US-T359: the page of the helm bar Shift+1..9 reach when it holds more than 10 orders (Shift+0 turns it).</summary>
+	int helmBarPage = 0;
 
 	/// <summary>The carrier whose craft Shift+/ jumps between: the hull flown at the helm, or the carrier of the craft held;
 	/// null when neither is in a fight.</summary>
@@ -166,6 +168,17 @@ public:
 	/// <summary>Shift+1..0 at the helm (US-T106): the ability in that slot of the hull's bar, the number key spent so it is not
 	/// also a captain's order; 0 when the key is no ability.</summary>
 	int HelmAbilityKey(const cs::Ref<Core::Ship>& ship);
+
+	/// <summary>US-T359: up to 10 orders, Shift+1..0 are slots 1..10 as before. More than 10, the bar is paged nine at a
+	/// time: Shift+1..9 are the shown page's slots and Shift+0 turns the page.</summary>
+	static constexpr int HelmBarPageSize = 9;
+	/// <summary>US-T359: the helm bar page in use for a bar of <paramref name="count"/> orders (0 when it is not paged).</summary>
+	int HelmBarPage(int count) const
+	{
+		if (count <= 10) return 0;
+		int pages = (count + HelmBarPageSize - 1) / HelmBarPageSize;
+		return helmBarPage < 0 || helmBarPage >= pages ? 0 : helmBarPage;
+	}
 
 	/// <summary>After the helm has flown a frame: what the last ability order came to, toasted, and its craft remembered.</summary>
 	void NoteHelmAbility();
