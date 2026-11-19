@@ -111,6 +111,12 @@ private:
 	cs::Dictionary<cs::Ref<Core::BattleUnit>, float> hitClaimed;
 	double hitCallsSeen[7] = {};
 	int hitWithdrawSeen = 0;
+	/// US-T370: the ships running under the held hull's Withdraw call at the last look (one turned back to the fight, still
+	/// present, was called back), when it could next demand a surrender at the last look (a later time is a hail just made),
+	/// and the last helm order's sequence number seen (HelmAbilities::Last, for Board it).
+	cs::List<cs::Ref<Core::BattleUnit>> hitWithdrawers;
+	double hitDemandSeen = 0;
+	int hitOrderSeqSeen = 0;
 
 	/// US-T312: the wingmen of the craft held, and whether each was away (flying home to its deck or down on one) at the
 	/// last look; the one its order had it on (the lock it attacks, the threat it covers against), the last one called,
@@ -150,8 +156,9 @@ private:
 	void AddMoment(const cs::String& what, Color tint);
 
 	/// US-T364: the fight's key moments as the held unit <paramref name="me"/> sees them: ships of either side destroyed,
-	/// breaking off, getting away or striking their colours, and each helm call it makes. Read only; the first look after a
-	/// new fight or seat only takes stock.
+	/// breaking off, getting away or striking their colours, and each helm call it makes (US-T370: and its lifting with Weapons
+	/// free, calling a withdrawal back, the answer to each demand to strike, and each Board it call). Read only; the first look
+	/// after a new fight or seat only takes stock.
 	void TrackMoments(const cs::Ref<Core::Battle>& battle, const cs::Ref<Core::BattleUnit>& me, bool takeStock);
 
 	/// US-T303: ends the tally of <paramref name="me"/>'s fight in <paramref name="battle"/> (over, or left), making the

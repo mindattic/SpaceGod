@@ -15,6 +15,7 @@
 #include "Combat/EscapeJumps.h" // US-T328
 #include "Combat/Fighters.h"
 #include "Combat/FlightDecks.h"
+#include "Embodiment/HelmAbilities.h" // US-T370
 #include "Embodiment/MountedTurret.h"
 #include "PlayerOptions.h" // US-T252
 
@@ -174,22 +175,36 @@ namespace SpaceGod::UI
 	void Hud::TrackMoments(const cs::Ref<Battle>& battle, const cs::Ref<BattleUnit>& me, bool takeStock)
 	{
 		// The held hull's helm calls, by when each ends: a later end than last seen is a call just made.
+		constexpr int deadBit = 1, fledBit = 2, fleeingBit = 4, struckBit = 8;
 		const double ends[7] = { me->FireCallUntil, me->ScreenCallUntil, me->PaintCallUntil, me->FallBackCallUntil, me->RushRepairUntil,
 			me->HoldFireCallUntil, me->CrippleCallUntil };
 		int withdrawing = 0;
+		cs::List<cs::Ref<BattleUnit>> nowWithdrawing; // US-T370
 		for (const auto& u : battle->Units)
-			if (u != nullptr && u->WithdrawCalledBy == me && u->Present()) withdrawing++;
+			if (u != nullptr && u->WithdrawCalledBy == me && u->Present())
+			{
+				withdrawing++;
+				nowWithdrawing.Add(u);
+			}
+		const auto& lastOrder = HelmAbilities::Last(); // US-T370
 		if (takeStock)
 		{
 			for (int i = 0; i < 7; i++) hitCallsSeen[i] = ends[i];
 			hitWithdrawSeen = withdrawing;
+			hitWithdrawers = nowWithdrawing;
+			hitDemandSeen = me->DemandSurrenderNext;
+			hitOrderSeqSeen = lastOrder.Seq;
 			hitFates.Clear();
 		}
 		else
 		{
+			Color callTint(0.62f, 0.86f, 1.0f, 1.0f);
 			for (int i = 0; i < 7; i++)
 			{
-				if (ends[i] > hitCallsSeen[i] + 1e-6 && ends[i] > battle->Seconds)
+				// US-T370: a hold-fire call that was standing ended early: lifted with Weapons free.
+				if (i == 5 && hitCallsSeen[i] > battle->Seconds && ends[i] < hitCallsSeen[i] - 1e-6 && ends[i] <= battle->Seconds)
+					AddMoment("You called weapons free", callTint);
+				else if (ends[i] > hitCallsSeen[i] + 1e-6 && ends[i] > battle->Seconds)
 				{
 					auto mark = [](const cs::Ref<BattleUnit>& t) { return t != nullptr ? cs::Cat(" the ", t->Name()) : cs::String(" the locked hull"); };
 					cs::String call;
@@ -203,17 +218,52 @@ namespace SpaceGod::UI
 						case 5: call = "You ordered hold fire"; break;
 						default: call = cs::Cat("You called to cripple", mark(me->CrippleCallTarget)); break;
 					}
-					AddMoment(call, Color(0.62f, 0.86f, 1.0f, 1.0f));
+					AddMoment(call, callTint);
 				}
 				hitCallsSeen[i] = ends[i];
 			}
 			if (withdrawing > 0 && hitWithdrawSeen == 0)
 				AddMoment(cs::Cat("You called a withdrawal: ", withdrawing, withdrawing == 1 ? " ship runs" : " ships run"), Color(1.0f, 0.64f, 0.26f, 1.0f));
+			// US-T370: ships that ran under the call and, still here, turned back to the fight were called back.
+			int turnedBack = 0;
+			for (const auto& u : hitWithdrawers)
+				if (u != nullptr && u->WithdrawCalledBy != me && u->Present() && !u->Fleeing) turnedBack++;
+			if (turnedBack > 0)
+				AddMoment(cs::Cat("You called the withdrawal back: ", turnedBack, turnedBack == 1 ? " ship turns" : " ships turn", " to fight again"), callTint);
 			hitWithdrawSeen = withdrawing;
+			hitWithdrawers = nowWithdrawing;
+
+			// US-T370: a later next-hail time is a demand to strike just made, at the hull locked; its crew's answer is
+			// already in its state (struck, broke off, or neither: refused). The fate scan below is told, so it doesn't
+			// name the same strike or break-off again.
+			if (me->DemandSurrenderNext > hitDemandSeen + 1e-6)
+			{
+				auto t = me->PlayerLockTarget;
+				cs::String who = t != nullptr ? cs::Cat("the ", t->Name()) : cs::String("the locked hull");
+				int was = 0;
+				bool known = t != nullptr && hitFates.TryGetValue(t, was);
+				if (t != nullptr && t->Surrendering && !(was & struckBit))
+				{
+					AddMoment(cs::Cat("You demanded ", who, " strike: it struck its colours"), LockColor);
+					if (known) hitFates[t] = was | struckBit;
+				}
+				else if (t != nullptr && t->Fleeing && !(was & fleeingBit))
+				{
+					AddMoment(cs::Cat("You demanded ", who, " strike: it broke off and ran"), Color(0.75f, 0.75f, 0.8f, 1.0f));
+					if (known) hitFates[t] = was | fleeingBit;
+				}
+				else AddMoment(cs::Cat("You demanded ", who, " strike: refused"), callTint);
+			}
+			hitDemandSeen = me->DemandSurrenderNext;
+
+			// US-T370: a Board it call this helm made, as its order's result tells it (no state of its own to watch).
+			if (lastOrder.Seq != hitOrderSeqSeen && lastOrder.Carrier != nullptr && lastOrder.Carrier == me->Ship &&
+				cs::Strings::StartsWith(lastOrder.Toast, "Board the "))
+				AddMoment(cs::Cat("You called: ", lastOrder.Toast), callTint);
 		}
+		hitOrderSeqSeen = lastOrder.Seq;
 
 		// Ships of either side (not craft): destroyed, breaking off, getting away, striking their colours.
-		constexpr int deadBit = 1, fledBit = 2, fleeingBit = 4, struckBit = 8;
 		for (const auto& u : battle->Units)
 		{
 			if (u == nullptr || u->Kind == UnitKind::Fighter) continue;
