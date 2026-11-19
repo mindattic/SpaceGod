@@ -299,6 +299,10 @@ public:
 	/// <summary>Every frame: undocks once the hull has left the port (or the helm), or the port no longer lets it in.</summary>
 	void UpdateDocking();
 
+	/// <summary>US-T335: the port screen's number keys while it is open: 1-9 and 0 open its tabs as the strip shows them, from
+	/// the left. True on a frame one was taken (the caller hands input over, so the helm's digit orders do not also go off).</summary>
+	bool UpdatePortKeys(bool keysFree);
+
 	// ---------------------------------------------------------------- recovered logs (US-T261)
 
 	/// <summary>US-T261: the logs screen (Shift+L): every Prose book recovered (ship logs, station records), to read.

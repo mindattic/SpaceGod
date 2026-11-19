@@ -3,6 +3,7 @@
 // is not saved and goes through no co-op frame; what is bought docked goes through the panels' own co-op entries.
 
 #include "UnitySpaceApp.h"
+#include "Input/InputDevice.h" // US-T335
 
 #include "World.h"
 #include "Combat/Outfitting.h"
@@ -109,6 +110,36 @@ namespace SpaceGod
 		if (DockedAt != nullptr && (tab == PortTab::Market || tab == PortTab::Contracts || tab == PortTab::Bounties || tab == PortTab::Fleet))
 			Select(Target::OfBody(DockedAt->Body));
 		if (bool* panel = PortTabPanel(tab)) *panel = true;
+	}
+
+	bool UnitySpaceApp::UpdatePortKeys(bool keysFree)
+	{
+		if (!keysFree || !ShowPort || DockedAt == nullptr) return false;
+		// A full screen over the port has the keys (its search fields take digits).
+		if (ShowSociety || ShowEncyclopedia || ShowHelp || ShowSaves || ShowGalaxyMap) return false;
+		using Key = ::SpaceGod::Input::Key;
+		const ::SpaceGod::Input::InputDevice& kb = ::SpaceGod::Input::InputDevice::current();
+		auto held = [&](Key a, Key b) { return kb[a].isPressed || kb[b].isPressed; };
+		// Shift+digit is a helm ability (US-T332), Ctrl and Alt digits are the player's own bindings.
+		if (held(Key::LeftShift, Key::RightShift) || held(Key::LeftCtrl, Key::RightCtrl) || held(Key::LeftAlt, Key::RightAlt))
+			return false;
+		static constexpr Key digits[] = { Key::Digit1, Key::Digit2, Key::Digit3, Key::Digit4, Key::Digit5,
+			Key::Digit6, Key::Digit7, Key::Digit8, Key::Digit9, Key::Digit0 };
+		// The tabs as the strip shows them (Outfitting only at a yard), numbered from the left.
+		bool yard = Outfitting::IsYard(DockedAt);
+		int n = 0;
+		for (int t = 0; t <= static_cast<int>(PortTab::News); t++)
+		{
+			auto tab = static_cast<PortTab>(t);
+			if (tab == PortTab::Outfitting && !yard) continue;
+			if (n < 10 && kb[digits[n]].wasPressedThisFrame)
+			{
+				OpenPortTab(tab);
+				return true;
+			}
+			n++;
+		}
+		return false;
 	}
 
 	void UnitySpaceApp::UpdateDocking()

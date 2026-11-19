@@ -492,6 +492,7 @@ namespace SpaceGod
 		if (hud != nullptr && hud->UpdateDrawer(!cheatMenu->IsOpen && !commsOpen)) Input.Handover(); // US-T200: the bottom drawer (Shift+U) has the keys while open
 		if (hud != nullptr && hud->UpdateTradeKeys(!cheatMenu->IsOpen && !commsOpen)) Input.Handover(); // US-T329: the trade desk's Tab / PgUp / PgDn, on the frame pressed
 		if (hud != nullptr && hud->UpdateMechlabKeys(!cheatMenu->IsOpen && !commsOpen)) Input.Handover(); // US-T331: the Mechlab's arrows and Enter, on the frame pressed
+		if (UpdatePortKeys(!cheatMenu->IsOpen && !commsOpen)) Input.Handover(); // US-T335: the port screen's 1-9 / 0 tabs, on the frame pressed
 		UpdateInfluence(); // US-T140: the embody gate's world, this frame
 		if (Tour::ShowcaseTour::Update(*this, !cheatMenu->IsOpen)) Input.Handover(); // US-T147: the showcase tour has the keys while it runs
 		if (UpdateEncyclopediaKeys()) Input.Handover(); // US-T271: the Encyclopedia's search has the keys while typed in

@@ -133,7 +133,7 @@ namespace SpaceGod::UI
 		auto old = GUI::contentColor;
 		GUI::contentColor = Dim;
 		GUI::Label(Rect(r.x + 12, r.y + 58, w - 24, 18), cs::Cat("Credits ", Credits(ship->Faction->Treasury), standing,
-			"   ·   Shift+M closes, Esc too; flying off undocks"), small);
+			"   ·   1-9, 0 pick a tab   ·   Shift+M closes, Esc too; flying off undocks"), small); // US-T335
 		float y = r.y + 80;
 		switch (app->PortTabOpen)
 		{
