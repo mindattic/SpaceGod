@@ -12,7 +12,8 @@
 //   - US-T300: a threat warning for warheads homing on it and hostiles locking it (DrawThreatWarning);
 //   - US-T303: an after-action report when its fight ends or it leaves the fight (DrawAfterAction);
 //   - US-T309: a LOST / RESTORED line in the feed for each of its own subsystems shot away or repaired (TrackOwnDamage);
-//   - US-T312: leading a squadron, its wingmen's radio calls in the feed (TrackWing).
+//   - US-T312: leading a squadron, its wingmen's radio calls in the feed (TrackWing);
+//   - US-T318: a SPOOFED line for each round homing on it that flares and chaff draw off (TrackSpoofed).
 
 private:
 	enum class HitMark : int { Shield, Hull, WeakPoint };
@@ -40,6 +41,8 @@ private:
 		int Shield = 0, Hull = 0, Weak = 0, Destroyed = 0, Disabled = 0, Struck = 0, TakenShield = 0, TakenHull = 0;
 		/// US-T309: the held hull's own subsystems shot away, and brought back by damage control, in the fight.
 		int SystemsLost = 0, SystemsRestored = 0;
+		/// US-T318: hostile rounds homing on the held hull that its flares and chaff drew off.
+		int Spoofed = 0;
 		double SecondsFrom = 0, SecondsTo = 0, HullFrom = 1, HullTo = 1;
 		cs::String Where, Outcome;
 		Color Tint;
@@ -80,6 +83,8 @@ private:
 	float hitReportAt = -100.0f;
 	/// US-T309: which of the held hull's subsystems were down at the last look, by index.
 	cs::List<bool> hitSubDown;
+	/// US-T318: the rounds homing on the held hull already known to be drawn off by a decoy (each called once).
+	cs::List<cs::Ref<Core::Missile>> hitSpoofed;
 
 	/// US-T312: the wingmen of the craft held, and whether each was away (flying home to its deck or down on one) at the
 	/// last look; the one its order had it on (the lock it attacks, the threat it covers against), the last one called,
@@ -101,6 +106,11 @@ private:
 	/// (and each that damage control has brought back), counted for the after-action card. The first look after a new
 	/// fight or seat only takes stock, so what was down before is not reported as new.
 	void TrackOwnDamage(const cs::Ref<Core::BattleUnit>& me, float now, bool takeStock);
+
+	/// US-T318: a feed line (MISSILE / TORPEDO / EMP SPOOFED) for each hostile round homing on <paramref name="me"/> that a
+	/// flare-and-chaff cloud has drawn off since the last look, counted for the after-action card. The first look after a new
+	/// fight or seat only takes stock.
+	void TrackSpoofed(const cs::Ref<Core::Battle>& battle, const cs::Ref<Core::BattleUnit>& me, float now, bool takeStock);
 
 	/// US-T303: ends the tally of <paramref name="me"/>'s fight in <paramref name="battle"/> (over, or left), making the
 	/// report if the unit fired or was fired on.
@@ -131,5 +141,6 @@ private:
 	/// US-T300: the threat warning for the held hull, round the reticle at <paramref name="at"/>: a chevron the way each
 	/// hostile warhead homing on it comes from (the nearer its impact, the brighter), a ring and time to impact on the
 	/// round itself when it is on screen, and a banner over the reticle (MISSILE / TORPEDO / EMP with the count and the
-	/// soonest impact, else LOCK while a hostile holds its nose on the hull). Read only, as the warning tones are.
+	/// soonest impact, else LOCK while a hostile holds its nose on the hull). Read only, as the warning tones are. US-T318: a
+	/// round drawn off by a decoy is no longer counted or given a chevron; on screen its ring is grey and reads DECOYED.
 	void DrawThreatWarning(const cs::Ref<Core::Battle>& battle, const cs::Ref<Core::BattleUnit>& me, Vector2 at, float now);

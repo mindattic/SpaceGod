@@ -317,7 +317,9 @@ namespace SpaceGod::Core
 				  "its seconds to impact beside it. A flashing banner over the reticle names the heaviest coming, how many and the "
 				  "soonest impact (MISSILE x2  3.4s); with nothing in flight it reads LOCK, amber, while a hostile holds its nose on "
 				  "you. Boarding pods and Breacher rounds are not counted, as the warning tones do not count them. Under Reduce "
-				  "flashes the banner holds steady."),
+				  "flashes the banner holds steady. A round your flares and chaff draw off drops out of the warning: the feed calls "
+				  "it (MISSILE SPOOFED), its ring turns grey and reads DECOYED while it chases the cloud, and the after-action card "
+				  "counts the rounds spoofed."), // US-T318
 				T("Difficulty",
 				  "Story, Normal, Hard or Custom: chosen on the New Game setup page, changeable at any time under Settings > "
 				  "Gameplay, and kept in each save. It touches only the unit you embody: the damage your hull takes, how well hostile "

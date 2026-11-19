@@ -74,6 +74,9 @@ namespace SpaceGod::UI
 		// US-T300: the threat warning.
 		constexpr Color MissileWarnColor{1.0f, 0.3f, 0.22f, 1.0f};
 		constexpr Color LockWarnColor{1.0f, 0.64f, 0.26f, 1.0f};
+		// US-T318: a round drawn off by the hull's flares and chaff.
+		constexpr Color SpoofedColor{0.5f, 0.9f, 0.55f, 1.0f};
+		constexpr Color DecoyedRingColor{0.6f, 0.62f, 0.66f, 0.7f};
 
 		/// A round that blows rather than boards (a boarding pod or a Breacher drills in), as the warning tone counts them.
 		bool Warhead(MissileKind k) { return k != MissileKind::Pod && k != MissileKind::Breacher; }
@@ -248,6 +251,22 @@ namespace SpaceGod::UI
 		}
 	}
 
+	void Hud::TrackSpoofed(const cs::Ref<Battle>& battle, const cs::Ref<BattleUnit>& me, float now, bool takeStock)
+	{
+		// The rounds that have gone (burnt out in the cloud, or struck) need no more remembering.
+		hitSpoofed.RemoveAll([](const cs::Ref<Missile>& m) { return m == nullptr || m->Gone; });
+		if (takeStock) hitSpoofed.Clear();
+		for (const auto& m : battle->Missiles)
+		{
+			if (m == nullptr || m->Gone || m->Decoy == nullptr || m->Target != me || m->Side == me->Side || !Warhead(m->Kind)) continue;
+			if (hitSpoofed.Contains(m)) continue;
+			hitSpoofed.Add(m);
+			if (takeStock) continue;
+			hitTally.Spoofed++;
+			AddHitFeed(cs::Cat(ThreatName(m->Kind), " SPOOFED"), SpoofedColor, now);
+		}
+	}
+
 	void Hud::TakeHitFx(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& me, const cs::Ref<Subsystem>& mount, float now)
 	{
 		// Only what is new since the last read, and not a backlog left while the HUD was hidden or the game paused.
@@ -400,6 +419,7 @@ namespace SpaceGod::UI
 			hitDisabled.Clear();
 			hitWing.Clear();
 			hitWingCalled = nullptr;
+			hitSpoofed.Clear();
 			return;
 		}
 		bool freshSeat = battle != hitBattle || me != hitUnit;
@@ -432,6 +452,7 @@ namespace SpaceGod::UI
 		TakeHitFx(battle, me, mount, now);
 		TrackOwnDamage(me, now, freshSeat || stale);
 		TrackWing(battle, me, now, freshSeat || stale);
+		TrackSpoofed(battle, me, now, freshSeat || stale);
 		if (battle->Over || me->Dead || me->Fled) CloseHitTally(battle, me, now);
 
 		// The held hull's own state: its shields going down, its hull going critical.
@@ -529,8 +550,21 @@ namespace SpaceGod::UI
 		for (const auto& m : battle->Missiles)
 		{
 			if (m == nullptr || m->Gone || m->Target != me || m->Side == me->Side || !Warhead(m->Kind)) continue;
-			count++;
 			int r = ThreatRank(m->Kind);
+			// US-T318: drawn off by a decoy, it is no threat now: a grey ring on it while it is on screen, and nothing else.
+			if (m->Decoy != nullptr)
+			{
+				Vector2 dp;
+				float dz = 0;
+				if (app->ToGui(app->BattleScene(battle, m->Pos), dp, dz))
+				{
+					DrawRing(dp, r >= 2 ? 11.0f : 8.0f, DecoyedRingColor);
+					WorldLabels wl(worldLabelPass);
+					DrawLabel("DECOYED", dp + Vector2(13, -8), DecoyedRingColor, true);
+				}
+				continue;
+			}
+			count++;
 			if (r > rank) { rank = r; worst = m->Kind; }
 
 			auto rel = m->Pos - me->Pos;
@@ -590,7 +624,7 @@ namespace SpaceGod::UI
 		hitTallyDone = true;
 		auto& t = hitTally;
 		// A fight the unit neither fired in nor took fire in (a seat taken for a look) is not worth a report.
-		if (t.Shield + t.Hull + t.Weak + t.TakenShield + t.TakenHull + t.Destroyed + t.Disabled + t.Struck + t.SystemsLost == 0) return;
+		if (t.Shield + t.Hull + t.Weak + t.TakenShield + t.TakenHull + t.Destroyed + t.Disabled + t.Struck + t.SystemsLost + t.Spoofed == 0) return;
 		t.SecondsTo = battle->Seconds;
 		t.HullTo = me->Dead ? 0.0 : HullShare(me);
 		if (me->Dead) { t.Outcome = "HULL LOST"; t.Tint = HostileColor; }
@@ -625,6 +659,8 @@ namespace SpaceGod::UI
 		lines.Add(cs::Cat("Taken  shield ", t.TakenShield, "  hull ", t.TakenHull, "  \xC2\xB7  hull ", pct(t.HullFrom), " \xE2\x86\x92 ", pct(t.HullTo)));
 		if (t.SystemsLost > 0 || t.SystemsRestored > 0) // US-T309
 			lines.Add(cs::Cat("Systems lost ", t.SystemsLost, t.SystemsRestored > 0 ? cs::Cat("  \xC2\xB7  ", t.SystemsRestored, " brought back") : cs::String()));
+		if (t.Spoofed > 0) // US-T318
+			lines.Add(cs::Cat(t.Spoofed, t.Spoofed == 1 ? " round" : " rounds", " spoofed by flares and chaff"));
 
 		constexpr float w = 340, pad = 12, rowH = 18;
 		float h = pad * 2 + rowH * (1 + lines.Count());

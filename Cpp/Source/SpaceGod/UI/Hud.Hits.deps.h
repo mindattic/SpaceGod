@@ -10,6 +10,7 @@ namespace SpaceGod::Core
 {
 	class Battle;
 	class BattleUnit;
+	class Missile;
 	class Subsystem;
 	struct CombatFx;
 }
