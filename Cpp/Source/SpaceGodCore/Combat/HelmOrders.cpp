@@ -39,6 +39,17 @@ namespace SpaceGod::Core
 			if (!target->Combat->Interior->Admits(u->Faction, u->Side)) return cs::Cat("another side is boarding the ", target->Name());
 			return cs::String();
 		}
+
+		/// <summary>US-T379: whether the helm's own hull can still give an order to its side (present, neither taken nor struck).</summary>
+		bool InTheFight(const cs::Ref<BattleUnit>& u) { return u->Present() && !u->Captured && !u->Surrendering; }
+
+		/// <summary>US-T379: whether <paramref name="o"/> is a hull that answers a call to fire or cripple by picking its target
+		/// again: an AI hull (not a craft, not another player's) still fighting.</summary>
+		bool AnswersTargetCall(const cs::Ref<BattleUnit>& o)
+		{
+			return o->Kind != UnitKind::Fighter && o->Combat != nullptr && !o->PlayerControlled() && o->Present() && !o->Captured
+				&& !o->Surrendering && !o->Combat->Disabled();
+		}
 	}
 
 	cs::String Battle::OrderBreacher(const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& target)
@@ -60,6 +71,7 @@ namespace SpaceGod::Core
 	cs::String Battle::OrderPods(const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& target)
 	{
 		if (u == nullptr || u->Combat == nullptr) return "no boarding pods aboard";
+		if (u->Combat->Disabled()) return "the hull is disabled"; // US-T379: as the Breacher and shuttle orders
 		cs::Ref<Subsystem> ready = nullptr, any = nullptr;
 		for (const auto& s : u->Combat->Subsystems)
 		{
@@ -94,7 +106,14 @@ namespace SpaceGod::Core
 		if (hull == nullptr) return c->Shuttles() > 0 ? cs::String("no shuttle aboard fit to fly") : cs::String("every shuttle is out");
 		double team = BoardingShuttles::TeamSize()->Value;
 		if (c->MarinesAvailable() < team + BoardingShuttles::Reserve) return "not marines enough aboard for a team and the ship's own reserve";
-		if (!ShuttleMayBoard(u, target)) return cs::Cat("the ", target->Name(), " is still fighting: disable it, or have it strike, first");
+		if (!ShuttleMayBoard(u, target))
+		{
+			// US-T379: say which of ShuttleMayBoard's tests failed, not always the last.
+			if (!MayBoard(u, target)) return cs::Cat("the ", target->Name(), " is not ours to board");
+			if (target->Ship != nullptr && Spares(u, target) && target->Ship->HasCargo && !target->SurrenderOpenToBoarding)
+				return cs::Cat("the ", target->Name(), " is spared for its hold: ask for its cargo first");
+			return cs::Cat("the ", target->Name(), " is still fighting: disable it, or have it strike, first");
+		}
 		double d = (target->Pos - u->Pos).Length();
 		if (d > BoardingShuttles::RangeKm()->Value) return cs::Cat("out of reach: ", Km(d), " (", Km(BoardingShuttles::RangeKm()->Value), " at most)");
 		sent = FighterAI::LaunchShuttle(shared_from_this(), u, target, c->Interior->TakeMarines(team), hull);
@@ -106,6 +125,7 @@ namespace SpaceGod::Core
 	{
 		answering = 0;
 		if (u == nullptr || u->Combat == nullptr) return "no hull at the helm";
+		if (!InTheFight(u)) return "the hull is out of the fight";
 		if (target == nullptr) return "lock a hull first (T)";
 		if (!target->Present()) return cs::Cat("the ", target->Name(), " is gone");
 		if (!Hostile(u, target)) return cs::Cat("the ", target->Name(), " is not hostile");
@@ -113,7 +133,7 @@ namespace SpaceGod::Core
 		double reach = FleetCoordination::ReachKm()->Value;
 		for (const auto& o : Units)
 		{
-			if (o == u || o->Side != u->Side || !o->Present() || o->Captured || o->Kind == UnitKind::Fighter) continue;
+			if (o == u || o->Side != u->Side || !AnswersTargetCall(o)) continue;
 			if ((o->Pos - u->Pos).Length() > reach) continue;
 			o->RetargetIn = 0; // they pick again on their next thought, the call weighing in (PickTarget)
 			answering++;
@@ -132,6 +152,7 @@ namespace SpaceGod::Core
 		for (const auto& c : Units)
 		{
 			if (c == u || c->FireCallTarget == nullptr || Seconds >= c->FireCallUntil || c->Side != u->Side || !c->Present()) continue;
+			if (c->Captured || c->Surrendering) continue; // US-T379: a struck caller's call no longer steers its side
 			if (!c->FireCallTarget->Present() || c->FireCallTarget->Captured || c->FireCallTarget->Surrendering) continue;
 			double d = (c->Pos - u->Pos).Length();
 			if (d <= bestKm)
@@ -161,6 +182,7 @@ namespace SpaceGod::Core
 	{
 		answering = 0;
 		if (u == nullptr || u->Combat == nullptr) return "no hull at the helm";
+		if (!InTheFight(u)) return "the hull is out of the fight";
 		if (ScreenWeapons::ScreenStation()->Value <= 0) return "screens roam free (Screen station-keeping is 0)";
 		answering = ScreensInReach(u);
 		if (answering == 0) return cs::Cat("no hull of ours with flak or interceptors within ", Km(FleetCoordination::ReachKm()->Value));
@@ -199,6 +221,7 @@ namespace SpaceGod::Core
 	{
 		answering = 0;
 		if (u == nullptr || u->Combat == nullptr) return "no hull at the helm";
+		if (!InTheFight(u)) return "the hull is out of the fight";
 		if (target == nullptr) return "lock a hull first (T)";
 		if (!target->Present()) return cs::Cat("the ", target->Name(), " is gone");
 		if (!Hostile(u, target)) return cs::Cat("the ", target->Name(), " is not hostile");
@@ -396,6 +419,7 @@ namespace SpaceGod::Core
 	{
 		answering = 0;
 		if (u == nullptr || u->Combat == nullptr) return "no hull at the helm";
+		if (!InTheFight(u)) return "the hull is out of the fight";
 		if (target == nullptr) return "lock a hull first (T)";
 		if (!target->Present()) return cs::Cat("the ", target->Name(), " is gone");
 		if (!Hostile(u, target)) return cs::Cat("the ", target->Name(), " is not hostile");
@@ -405,7 +429,7 @@ namespace SpaceGod::Core
 		double reach = FleetCoordination::ReachKm()->Value;
 		for (const auto& o : Units)
 		{
-			if (o == u || o->Side != u->Side || !o->Present() || o->Captured || o->Kind == UnitKind::Fighter) continue;
+			if (o == u || o->Side != u->Side || !AnswersTargetCall(o)) continue;
 			if ((o->Pos - u->Pos).Length() > reach) continue;
 			o->RetargetIn = 0; // they pick again on their next thought, the call weighing in (PickTarget)
 			answering++;
@@ -425,6 +449,7 @@ namespace SpaceGod::Core
 		for (const auto& c : Units)
 		{
 			if (c->CrippleCallTarget == nullptr || Seconds >= c->CrippleCallUntil || c->Side != u->Side || !c->Present()) continue;
+			if (c->Captured || c->Surrendering) continue; // US-T379: a struck caller's call no longer steers its side
 			auto t = c->CrippleCallTarget;
 			if (!t->Present() || t->Captured || t->Surrendering) continue;
 			double d = (c->Pos - u->Pos).Length();
@@ -467,6 +492,7 @@ namespace SpaceGod::Core
 	cs::String Battle::DemandSurrenderBlocked(const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& target)
 	{
 		if (u == nullptr || u->Combat == nullptr) return "no hull at the helm";
+		if (!InTheFight(u)) return "the hull is out of the fight";
 		if (target == nullptr) return "lock a hull first (T)";
 		if (!target->Present()) return cs::Cat("the ", target->Name(), " is gone");
 		if (!Hostile(u, target)) return cs::Cat("the ", target->Name(), " is not hostile");

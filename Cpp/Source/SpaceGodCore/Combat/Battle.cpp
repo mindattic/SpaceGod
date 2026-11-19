@@ -569,6 +569,9 @@ namespace SpaceGod::Core
 			if (c->Disabled() || u->PlayerControlled()) u->Fleeing = false;
 			else if (!u->Fleeing && (merchant || c->HullFraction() < 0.25 || (!c->Armed() && !CanBoard(u)) || Routed(u->Side)))
 				u->Fleeing = true;
+			// US-T379: a ship no longer running is out of any Withdraw call (only a player's helm sets it), so a later run of
+			// its own crew's choosing is not pulled back into the caller's group.
+			if (!u->Fleeing && u->WithdrawCalledBy != nullptr) u->WithdrawCalledBy = nullptr;
 			// Only the AI flies a boarding approach (Move leaves a player-flown hull alone), so a
 			// player-flown hull never holds a boarding target it would never close on.
 			// Nor does a ship its flagship has ordered into line break off to board (U.SPC-T425).
