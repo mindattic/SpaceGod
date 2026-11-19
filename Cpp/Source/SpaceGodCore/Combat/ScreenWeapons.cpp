@@ -148,6 +148,8 @@ namespace SpaceGod::Core
 
 	cs::Ref<BattleUnit> ScreenWeapons::WardOf(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& u)
 	{
+		// US-T333: a player's helm that called for a screen comes first, whatever its size (null in any fight nobody holds).
+		if (auto called = b->CalledScreenFor(u)) return called;
 		auto leader = u->Leader;
 		if (leader != nullptr && leader->Present() && !leader->Fleeing && leader->Combat->Spec->Hull > u->Combat->Spec->Hull) return leader;
 		cs::Ref<BattleUnit> best = nullptr;

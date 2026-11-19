@@ -254,6 +254,10 @@ namespace SpaceGod::Core
 		cs::Ref<BattleUnit> FireCallTarget;
 		double FireCallUntil = 0;
 
+		/// <summary>US-T333: the battle second the player at this helm's call for a screen lapses (<see cref="Battle.OrderScreenCall"/>):
+		/// until then its side's screening hulls within reach guard this hull. Never set by the AI.</summary>
+		double ScreenCallUntil = 0;
+
 		/// <summary>Taken by boarders: it has changed sides and carries a prize crew, so it no longer fights.</summary>
 		bool Captured = false;
 
@@ -1374,6 +1378,23 @@ namespace SpaceGod::Core
 		/// <summary>US-T332: the hull a standing call for fire puts before <paramref name="u"/>'s gunners (the nearest caller of its
 		/// side within reach), or null. Only a player's helm ever makes a call, so a fight nobody holds never sees one.</summary>
 		cs::Ref<BattleUnit> CalledFireFor(const cs::Ref<BattleUnit>& u);
+
+		/// <summary>US-T333: how long a call for a screen stands, battle seconds.</summary>
+		static constexpr double ScreenCallSeconds = 60;
+
+		/// <summary>
+		/// US-T333: the helm calls its side's screen onto its own hull: every hull of its side within <see cref="FleetCoordination.ReachKm"/>
+		/// carrying a working screen (<see cref="ScreenWeapons.Screens"/>) takes it as its ward for <see cref="ScreenCallSeconds"/>.
+		/// <paramref name="answering"/> is how many screening hulls heard it. Empty when given, else why not.
+		/// </summary>
+		cs::String OrderScreenCall(const cs::Ref<BattleUnit>& u, int& answering);
+
+		/// <summary>US-T333: the hull a standing call for a screen puts <paramref name="u"/> to guard (the nearest caller of its side
+		/// within reach), or null. Only a player's helm ever makes a call, so a fight nobody holds never sees one.</summary>
+		cs::Ref<BattleUnit> CalledScreenFor(const cs::Ref<BattleUnit>& u);
+
+		/// <summary>US-T333: how many hulls of <paramref name="u"/>'s side within reach carry a working screen (the bar's count).</summary>
+		int ScreensInReach(const cs::Ref<BattleUnit>& u);
 
 		/// <summary>A carrier's helm orders (<see cref="BattleUnit.WingHeld"/>) lapse once nobody holds its helm or flies one of
 		/// its craft: the recall and the call are lifted and its captain launches the wing held aboard, as at the start of a fight.</summary>

@@ -43,6 +43,10 @@ namespace SpaceGod::Core
 		/// <summary>US-T332: call the side's fire onto the locked hull (<see cref="Battle.OrderFireCall"/>), on every hull's bar
 		/// in a fight, before the squad's order.</summary>
 		CallFire = 14,
+
+		/// <summary>US-T333: call the side's screening hulls to guard this hull (<see cref="Battle.OrderScreenCall"/>), on every
+		/// hull's bar in a fight, after the call for fire.</summary>
+		ScreenMe = 15,
 	};
 
 	/// <summary>One entry of a helm's ability bar: what it does, and how it stands now (craft aboard, reloading, ready).</summary>

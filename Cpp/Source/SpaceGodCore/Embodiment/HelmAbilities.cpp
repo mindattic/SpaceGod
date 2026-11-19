@@ -190,6 +190,19 @@ namespace SpaceGod::Core
 			e.Ready = u->PlayerLockTarget != nullptr;
 			bar.Add(e);
 		}
+		// US-T333: and call its side's screening hulls (flak, interceptors) to guard it.
+		if (fight)
+		{
+			HelmAbilityEntry e;
+			e.Ability = HelmAbility::ScreenMe;
+			e.Label = "Screen me";
+			int screens = b->ScreensInReach(u);
+			bool standing = b->Seconds < u->ScreenCallUntil;
+			e.State = standing ? cs::Cat("screened, ", cs::Fmt(u->ScreenCallUntil - b->Seconds, "0"), " s")
+				: screens > 0 ? cs::Cat(screens, screens == 1 ? " screen in reach" : " screens in reach") : cs::String("no screen in reach");
+			e.Ready = screens > 0;
+			bar.Add(e);
+		}
 		// US-T140: a hull with a squad of its band about it orders it through its captain, before any fight (last, so the
 		// slots above keep their keys).
 		if (world != nullptr && SquadOrders::SquadOf(world, ship).Count() > 0)
@@ -340,6 +353,13 @@ namespace SpaceGod::Core
 				auto why = b->OrderFireCall(u, target, answering);
 				return why.empty() ? cs::Cat("Fire on the ", target->Name(), ": ", answering, answering == 1 ? " ship answers" : " ships answer",
 					" for ", cs::Fmt(Battle::FireCallSeconds, "0"), " s") : cs::Cat("No call: ", why);
+			}
+			case HelmAbility::ScreenMe:
+			{
+				int answering = 0;
+				auto why = b->OrderScreenCall(u, answering);
+				return why.empty() ? cs::Cat("Screen on us: ", answering, answering == 1 ? " hull closes in" : " hulls close in",
+					" for ", cs::Fmt(Battle::ScreenCallSeconds, "0"), " s") : cs::Cat("No screen: ", why);
 			}
 			default:
 				return "";
