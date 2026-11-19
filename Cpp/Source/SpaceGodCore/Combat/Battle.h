@@ -1599,6 +1599,12 @@ namespace SpaceGod::Core
 		static constexpr double DemandRunToll = 0.45;
 		/// <summary>US-T363: a hull at least this outgunned (<see cref="Morale.Outgunned"/>) that won't strike runs instead.</summary>
 		static constexpr double DemandRunOutgunned = 0.35;
+		/// <summary>
+		/// US-T382: how <paramref name="target"/>'s crew would answer a demand to strike now (<see cref="OrderDemandSurrender"/>'s
+		/// own weighing, which uses it): Struck past their breaking point, Ran when badly hurt or outgunned short of it, else
+		/// Refused. Pure (no dice, no writes), so the HUD may read it every frame. The target must be a ship with a Combat.
+		/// </summary>
+		DemandAnswer DemandOutcome(const cs::Ref<BattleUnit>& target) const;
 
 		/// <summary>
 		/// US-T366: the helm calls its side's boarders within command reach (<see cref="FleetCoordination.ReachKm"/>) onto the hull
@@ -1687,7 +1693,7 @@ namespace SpaceGod::Core
 
 		void TallySideStrength();
 
-		double OutgunnedOf(const cs::Ref<BattleUnit>& u);
+		double OutgunnedOf(const cs::Ref<BattleUnit>& u) const;
 
 		static double DamageTollOf(const cs::Ref<BattleUnit>& u);
 

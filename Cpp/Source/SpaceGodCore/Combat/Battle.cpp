@@ -3258,7 +3258,7 @@ namespace SpaceGod::Core
 				sideStrength[u->Side] += u->Combat->Strength();
 	}
 
-	double Battle::OutgunnedOf(const cs::Ref<BattleUnit>& u)
+	double Battle::OutgunnedOf(const cs::Ref<BattleUnit>& u) const
 	{
 		return u->Side < 0 || u->Side > 1 ? 0 : Morale::Outgunned(sideStrength[u->Side], sideStrength[1 - u->Side]);
 	}

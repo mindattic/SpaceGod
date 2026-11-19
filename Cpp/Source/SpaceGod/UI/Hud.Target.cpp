@@ -235,6 +235,9 @@ namespace SpaceGod::UI
 		// Heading, name, class line, range line, (the focus line,) (the stun line,) hull, heat, the shields' caption and rows, the subsystems' caption, the
 		// weak point and its key; then as many subsystem kinds as the column has room for.
 		float fixedH = 6 + RowH * 4 + (focusLine ? RowH : 0) + (stunLine ? RowH : 0) + (threatLine ? RowH : 0) + RowH * 2 + RowH + patchRows * RowH + RowH + (weakLine ? RowH * 2 : 0) + 8;
+		// US-T382: its crew's nerve, as a hail to strike would find it (Battle::DemandOutcome).
+		bool crewLine = focusLine && t->Kind == UnitKind::Ship && !t->Captured && !t->PlayerControlled();
+		if (crewLine) fixedH += RowH;
 		float room = layout.FreeRight() - HudLayout::Gap;
 		int kindRows = static_cast<int>(kinds.size());
 		if (fixedH + kindRows * RowH > room) kindRows = std::max(0, static_cast<int>((room - fixedH) / RowH));
@@ -316,6 +319,23 @@ namespace SpaceGod::UI
 				threat = cs::Cat("THREAT  \xC2\xB7  ", sides[top].first, " battery bears on you, ", bearOnMe, "/", guns, " guns");
 			}
 			DrawLabel(FitText(threat, minorLabel, w), Vector2(x, y), bearOnMe > 0 ? HostileColor : Dim, true);
+			y += RowH;
+		}
+		// US-T382: the crew's nerve in bands, from the same weighing a demand to strike uses (no numbers: the breaking
+		// point is the crew's own). Read only, pure.
+		if (crewLine)
+		{
+			cs::String nerve;
+			Color nerveTint = Dim;
+			if (t->Surrendering) { nerve = "CREW  \xC2\xB7  struck"; nerveTint = LockColor; }
+			else
+			{
+				auto outcome = battle->DemandOutcome(t);
+				if (outcome == Battle::DemandAnswer::Struck) { nerve = "CREW  \xC2\xB7  breaking: a hail to strike would take"; nerveTint = LockColor; }
+				else if (outcome == Battle::DemandAnswer::Ran) { nerve = "CREW  \xC2\xB7  shaken: hailed, they would run"; nerveTint = Color(1.0f, 0.62f, 0.32f, 1.0f); }
+				else nerve = "CREW  \xC2\xB7  steady";
+			}
+			DrawLabel(FitText(nerve, minorLabel, w), Vector2(x, y), nerveTint, true);
 			y += RowH;
 		}
 

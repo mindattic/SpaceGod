@@ -339,6 +339,8 @@ private:
 	/// line in, U.SPC-T533) and how many of them are loaded, the volley building while the trigger is held, and the hull
 	/// it will be fired at.
 	void DrawBroadside(const cs::Ref<Core::Battle>& battle, const cs::Ref<Core::BattleUnit>& me, float x, float y);
+	/// US-T382: under the broadside readout, how the hull's armour lies to the locked hull's fire and what a slant would cut.
+	void DrawArmourAdvice(const cs::Ref<Core::Battle>& battle, const cs::Ref<Core::BattleUnit>& me, float x, float y);
 
 	/// The captain's orders at a capital ship's helm (U.SPC-T425), above the gauges: the order of the guns bearing where the
 	/// player is looking (U.SPC-T533), whether the gunners focus a weakened shield patch

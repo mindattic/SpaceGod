@@ -28,6 +28,7 @@
 #include "SimClock.h"
 #include "World.h"
 #include "Combat/Arsenal.h"
+#include "Combat/ArmourAngling.h" // US-T382
 #include "Combat/Battle.h"
 #include "Combat/Broadsides.h"
 #include "Combat/CombatSpecs.h"
@@ -1505,12 +1506,54 @@ namespace SpaceGod::UI
 			onTarget,
 			me->PlayerFireHeld ? cs::Cat("  ·  VOLLEY ", Mathf::RoundToInt(built * 100), "%  (let go to fire)") : cs::String("  ·  hold left mouse to build a volley"));
 		DrawLabel(text_, Vector2(x, y), me->PlayerFireHeld ? LockColor : Dim, true);
+		DrawArmourAdvice(battle, me, x, y + 18); // US-T382
 
 		Vector2 tp;
 		float td = 0;
 		if (target != nullptr && app->ToGui(app->BattleScene(battle, target->Pos), tp, td))
 			DrawRing(tp, 14 + 6 * built, me->PlayerFireHeld ? LockColor : onTargetBearing == 0 ? Dim : HostileColor);
 		DrawCaptain(battle, me, x, y);
+	}
+
+	void Hud::DrawArmourAdvice(const cs::Ref<Battle>& battle, const cs::Ref<BattleUnit>& me, float x, float y)
+	{
+		// US-T382: how the hull's armour lies to the locked hull's fire (ArmourAngling, U.SPC-T534) and what a slant of
+		// ArmourAngling::SlantDeg either way would let home instead. Pure geometry from its cached table: no dice, no writes.
+		auto foe = me->PlayerLockTarget;
+		if (foe == nullptr || !foe->Present() || !battle->Hostile(me, foe) || me->Combat == nullptr) return;
+		if (ArmourAngling::Strength()->Value <= 0) return;
+		auto toFoe = foe->Pos - me->Pos;
+		if (toFoe.LengthSquared() < 1e-12) return;
+		auto dir = toFoe.Normalized();
+		auto right = me->LocalDirToWorld(DVec3(1, 0, 0));
+		auto upAxis = me->LocalDirToWorld(DVec3(0, 1, 0));
+		auto bow = me->LocalDirToWorld(DVec3(0, 0, 1));
+		DVec3 local(DVec3::Dot(dir, right), DVec3::Dot(dir, upAxis), DVec3::Dot(dir, bow));
+		auto spec = me->Combat->Spec;
+		double harmNow = ArmourAngling::Harm(spec, local);
+		// The hull turned a degrees to starboard: the foe's bearing swings the other way in the hull's own frame.
+		auto turned = [&](double deg)
+		{
+			double a = deg * cs::Math::PI / 180, c = cs::Math::Cos(a), s = cs::Math::Sin(a);
+			return DVec3(local.X * c - local.Z * s, local.Y, local.X * s + local.Z * c);
+		};
+		double harmStbd = ArmourAngling::Harm(spec, turned(ArmourAngling::SlantDeg));
+		double harmPort = ArmourAngling::Harm(spec, turned(-ArmourAngling::SlantDeg));
+		double offBow = cs::Math::Acos(cs::Math::Max(-1.0, cs::Math::Min(1.0, local.Z))) * 180 / cs::Math::PI;
+		cs::String lies = offBow <= 30 ? cs::String("bow-on") : offBow >= 150 ? cs::String("stern-on")
+			: offBow >= 60 && offBow <= 120 ? cs::String("beam-on") : cs::String("quartering");
+		cs::String foeName = foe->Ship != nullptr ? foe->Ship->Name : foe->Name();
+		cs::String advice;
+		double bestSlant = cs::Math::Min(harmStbd, harmPort);
+		if (harmNow > 0 && bestSlant < harmNow * 0.97)
+		{
+			int cut = Mathf::RoundToInt(static_cast<float>((1 - bestSlant / harmNow) * 100));
+			advice = cs::Cat("slant ", Mathf::RoundToInt(static_cast<float>(ArmourAngling::SlantDeg)), "° to ",
+				harmStbd <= harmPort ? "stbd" : "port", ": -", cut, "% harm");
+		}
+		else advice = "laid as well as a slant would lay it";
+		DrawLabel(cs::Cat("ARMOUR  ", lies, " to the ", foeName, "  ·  lets home ", Mathf::RoundToInt(static_cast<float>(harmNow * 100)),
+			"% of a hit  ·  ", advice), Vector2(x, y), Dim, true);
 	}
 
 	void Hud::DrawCaptain(const cs::Ref<Battle>& battle, const cs::Ref<BattleUnit>& me, float x, float y)

@@ -509,19 +509,14 @@ namespace SpaceGod::Core
 		auto why = DemandSurrenderBlocked(u, target);
 		if (!why.empty()) return why;
 		u->DemandSurrenderNext = Seconds + DemandSurrenderCooldownSeconds;
-		// The crew weigh it as they weigh striking on their own (StrikesColours), the hail pressing a little harder.
-		double toll = DamageTollOf(target);
-		double outgunned = OutgunnedOf(target);
-		double resolve = Morale::Resolve(target->Faction, target->Ship != nullptr && target->Ship->Spec->IsMilitary)
-			* (target->Side >= 0 && target->Side < 2 ? Dread[target->Side] : 1) * Morale::SupplyResolve(target->Combat->Readiness);
-		double pressure = Morale::Pressure(toll, outgunned, resolve) + DemandSurrenderPressure;
-		if (toll >= Morale::MinDamageToStrike && Morale::ShouldSurrender(pressure, target->MoraleThreshold))
+		auto outcome = DemandOutcome(target); // US-T382: the same weighing the target card previews
+		if (outcome == DemandAnswer::Struck)
 		{
 			Surrender(target);
 			answer = DemandAnswer::Struck;
 			return cs::String();
 		}
-		if (!target->Fleeing && !target->Combat->Disabled() && (toll >= DemandRunToll || outgunned >= DemandRunOutgunned))
+		if (outcome == DemandAnswer::Ran)
 		{
 			// Not beaten enough to strike, but enough to see the way the fight is going: they break off as a broken crew does.
 			target->Fleeing = true;
@@ -531,6 +526,19 @@ namespace SpaceGod::Core
 		}
 		answer = DemandAnswer::Refused;
 		return cs::String();
+	}
+
+	Battle::DemandAnswer Battle::DemandOutcome(const cs::Ref<BattleUnit>& target) const
+	{
+		// The crew weigh it as they weigh striking on their own (StrikesColours), the hail pressing a little harder.
+		double toll = DamageTollOf(target);
+		double outgunned = OutgunnedOf(target);
+		double resolve = Morale::Resolve(target->Faction, target->Ship != nullptr && target->Ship->Spec->IsMilitary)
+			* (target->Side >= 0 && target->Side < 2 ? Dread[target->Side] : 1) * Morale::SupplyResolve(target->Combat->Readiness);
+		double pressure = Morale::Pressure(toll, outgunned, resolve) + DemandSurrenderPressure;
+		if (toll >= Morale::MinDamageToStrike && Morale::ShouldSurrender(pressure, target->MoraleThreshold)) return DemandAnswer::Struck;
+		if (!target->Fleeing && !target->Combat->Disabled() && (toll >= DemandRunToll || outgunned >= DemandRunOutgunned)) return DemandAnswer::Ran;
+		return DemandAnswer::Refused;
 	}
 
 	bool Battle::OpenPrize(const cs::Ref<BattleUnit>& target)
