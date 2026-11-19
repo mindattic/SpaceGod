@@ -48,6 +48,20 @@ namespace SpaceGod::UI
 			return c->Hull / c->Spec->Hull;
 		}
 
+		// US-T309: the held hull's own damage report.
+		constexpr Color LostSystemColor{1.0f, 0.36f, 0.26f, 1.0f};
+		constexpr Color RestoredSystemColor{0.5f, 0.9f, 0.55f, 1.0f};
+
+		/// The side of the hull a hardpoint sits on (hull frame: right, up, forward), by its largest offset.
+		const char* SideOf(const cs::Ref<SubsystemDef>& d)
+		{
+			double ax = std::abs(d->X), ay = std::abs(d->Y), az = std::abs(d->Z);
+			if (ax < 1e-6 && ay < 1e-6 && az < 1e-6) return "CORE";
+			if (az >= ax && az >= ay) return d->Z > 0 ? "FORE" : "AFT";
+			if (ax >= ay) return d->X > 0 ? "STBD" : "PORT";
+			return d->Y > 0 ? "DORSAL" : "VENTRAL";
+		}
+
 		// US-T300: the threat warning.
 		constexpr Color MissileWarnColor{1.0f, 0.3f, 0.22f, 1.0f};
 		constexpr Color LockWarnColor{1.0f, 0.64f, 0.26f, 1.0f};
@@ -114,6 +128,36 @@ namespace SpaceGod::UI
 		line.Born = now;
 		hitFeed.Add(line);
 		if (hitFeed.Count() > HitFeedMax) hitFeed.RemoveRange(0, hitFeed.Count() - HitFeedMax);
+	}
+
+	void Hud::TrackOwnDamage(const cs::Ref<BattleUnit>& me, float now, bool takeStock)
+	{
+		const auto& subs = me->Combat->Subsystems;
+		// A refit or a new hull under the same seat changes the list: take stock again rather than report it all.
+		if (hitSubDown.Count() != subs.Count()) takeStock = true;
+		if (takeStock)
+		{
+			hitSubDown.Clear();
+			for (const auto& s : subs) hitSubDown.Add(s->Destroyed());
+			return;
+		}
+		int i = 0;
+		for (const auto& s : subs)
+		{
+			bool down = s->Destroyed();
+			if (down != hitSubDown[i])
+			{
+				hitSubDown[i] = down;
+				(down ? hitTally.SystemsLost : hitTally.SystemsRestored)++;
+				HitFeedLine line;
+				line.Text = cs::Cat(down ? "LOST  " : "RESTORED  ", SideOf(s->Def), " ", cs::Strings::ToUpperInvariant(SubsystemDef::Name(s->Kind())));
+				line.Tint = down ? LostSystemColor : RestoredSystemColor;
+				line.Born = now;
+				hitFeed.Add(line);
+				if (hitFeed.Count() > HitFeedMax) hitFeed.RemoveRange(0, hitFeed.Count() - HitFeedMax);
+			}
+			i++;
+		}
 	}
 
 	void Hud::TakeHitFx(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& me, const cs::Ref<Subsystem>& mount, float now)
@@ -268,7 +312,8 @@ namespace SpaceGod::UI
 			hitDisabled.Clear();
 			return;
 		}
-		if (battle != hitBattle || me != hitUnit)
+		bool freshSeat = battle != hitBattle || me != hitUnit;
+		if (freshSeat)
 		{
 			// A new fight or a new seat: what came before is not this unit's. Leaving a fight reports it; a new seat in the
 			// same fight starts its own tally.
@@ -292,7 +337,10 @@ namespace SpaceGod::UI
 		// A gun mount held fires only itself; every other seat fires all the hull's (or the craft's) weapons.
 		cs::Ref<Subsystem> mount;
 		if (auto m = cs::As<MountedTurret>(app->HeldSeat())) mount = m->Mount;
+		// Damage taken while the HUD was hidden or the game paused is not news: take stock instead.
+		bool stale = now - hitSeenAt > 0.5f;
 		TakeHitFx(battle, me, mount, now);
+		TrackOwnDamage(me, now, freshSeat || stale);
 		if (battle->Over || me->Dead || me->Fled) CloseHitTally(battle, me, now);
 
 		// The held hull's own state: its shields going down, its hull going critical.
@@ -451,7 +499,7 @@ namespace SpaceGod::UI
 		hitTallyDone = true;
 		auto& t = hitTally;
 		// A fight the unit neither fired in nor took fire in (a seat taken for a look) is not worth a report.
-		if (t.Shield + t.Hull + t.Weak + t.TakenShield + t.TakenHull + t.Destroyed + t.Disabled + t.Struck == 0) return;
+		if (t.Shield + t.Hull + t.Weak + t.TakenShield + t.TakenHull + t.Destroyed + t.Disabled + t.Struck + t.SystemsLost == 0) return;
 		t.SecondsTo = battle->Seconds;
 		t.HullTo = me->Dead ? 0.0 : HullShare(me);
 		if (me->Dead) { t.Outcome = "HULL LOST"; t.Tint = HostileColor; }
@@ -484,6 +532,8 @@ namespace SpaceGod::UI
 		lines.Add(downed == 0 ? cs::String("No hulls downed")
 			: cs::Cat(t.Destroyed, " destroyed  \xC2\xB7  ", t.Disabled, " disabled  \xC2\xB7  ", t.Struck, " struck colours"));
 		lines.Add(cs::Cat("Taken  shield ", t.TakenShield, "  hull ", t.TakenHull, "  \xC2\xB7  hull ", pct(t.HullFrom), " \xE2\x86\x92 ", pct(t.HullTo)));
+		if (t.SystemsLost > 0 || t.SystemsRestored > 0) // US-T309
+			lines.Add(cs::Cat("Systems lost ", t.SystemsLost, t.SystemsRestored > 0 ? cs::Cat("  \xC2\xB7  ", t.SystemsRestored, " brought back") : cs::String()));
 
 		constexpr float w = 340, pad = 12, rowH = 18;
 		float h = pad * 2 + rowH * (1 + lines.Count());

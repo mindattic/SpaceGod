@@ -10,7 +10,8 @@
 //   - arcs round the reticle pointing where the held hull is taking fire from, blue on the shield and red on the hull,
 //     fading out; and a pulse round the screen's edge when its shields go down and when its hull goes critical;
 //   - US-T300: a threat warning for warheads homing on it and hostiles locking it (DrawThreatWarning);
-//   - US-T303: an after-action report when its fight ends or it leaves the fight (DrawAfterAction).
+//   - US-T303: an after-action report when its fight ends or it leaves the fight (DrawAfterAction);
+//   - US-T309: a LOST / RESTORED line in the feed for each of its own subsystems shot away or repaired (TrackOwnDamage).
 
 private:
 	enum class HitMark : int { Shield, Hull, WeakPoint };
@@ -36,6 +37,8 @@ private:
 	struct HitTally
 	{
 		int Shield = 0, Hull = 0, Weak = 0, Destroyed = 0, Disabled = 0, Struck = 0, TakenShield = 0, TakenHull = 0;
+		/// US-T309: the held hull's own subsystems shot away, and brought back by damage control, in the fight.
+		int SystemsLost = 0, SystemsRestored = 0;
 		double SecondsFrom = 0, SecondsTo = 0, HullFrom = 1, HullTo = 1;
 		cs::String Where, Outcome;
 		Color Tint;
@@ -74,6 +77,13 @@ private:
 	HitTally hitTally, hitReport;
 	bool hitTallyDone = true;
 	float hitReportAt = -100.0f;
+	/// US-T309: which of the held hull's subsystems were down at the last look, by index.
+	cs::List<bool> hitSubDown;
+
+	/// US-T309: the held hull's own damage report: a feed line naming each of its subsystems shot away since the last look
+	/// (and each that damage control has brought back), counted for the after-action card. The first look after a new
+	/// fight or seat only takes stock, so what was down before is not reported as new.
+	void TrackOwnDamage(const cs::Ref<Core::BattleUnit>& me, float now, bool takeStock);
 
 	/// US-T303: ends the tally of <paramref name="me"/>'s fight in <paramref name="battle"/> (over, or left), making the
 	/// report if the unit fired or was fired on.

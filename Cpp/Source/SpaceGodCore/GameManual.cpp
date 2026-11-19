@@ -300,7 +300,9 @@ namespace SpaceGod::Core
 				  "destroyed, disabled or strikes its colours earns a kill marker and a line in the small combat feed beside the "
 				  "reticle. When your own hull takes fire, arcs round the reticle point the way it came from, blue on the shield "
 				  "and red on the hull, fading as they go; the screen's edge pulses blue as your shields fail and red as the hull "
-				  "goes critical, glowing faintly for as long as it stays so."),
+				  "goes critical, glowing faintly for as long as it stays so. When one of your own hull's systems is shot away the "
+				  "feed says so in red, with where it sat (LOST  FORE TURRET), and in green when damage control brings it back "
+				  "(RESTORED); the after-action card counts the systems lost."), // US-T309
 				T("Missile and lock warning",
 				  "Every missile, torpedo or EMP round homing on the hull you hold puts a red chevron on a ring round the reticle, "
 				  "pointing in from the way it comes and brightening as it closes; while the round is on screen it is ringed, with "
