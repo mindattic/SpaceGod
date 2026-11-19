@@ -86,7 +86,36 @@ namespace SpaceGod::UI
 	cs::String SocietyScreen::RowsKey() const
 	{
 		return cs::Cat(page, "|", group, "|", kind, "|", worldOnly ? 1 : 0, "|", steeredOnly ? 1 : 0, "|", orgKind, "|",
-			worldOnly && selected.Kind == CivPickKind::World ? selected.Name : cs::String());
+			worldOnly && selected.Kind == CivPickKind::World ? selected.Name : cs::String(), "|", search);
+	}
+
+	bool SocietyScreen::Matches(const cs::String& a, const cs::String& b) const
+	{
+		if (search.empty()) return true;
+		// Every word of the search, anywhere in either (case aside): "sol riot" finds Sol's riots.
+		cs::String la = cs::Strings::ToLowerInvariant(a), lb = cs::Strings::ToLowerInvariant(b);
+		cs::String words = cs::Strings::ToLowerInvariant(search);
+		size_t at = 0;
+		while (at < words.size())
+		{
+			size_t end = words.find(' ', at);
+			if (end == cs::String::npos) end = words.size();
+			if (end > at)
+			{
+				cs::String w = words.substr(at, end - at);
+				if (la.find(w) == cs::String::npos && lb.find(w) == cs::String::npos) return false;
+			}
+			at = end + 1;
+		}
+		return true;
+	}
+
+	const cs::String& SocietyScreen::WordsOf(const SocialEvent& e)
+	{
+		auto at = eventWords.find(e.Id);
+		if (at != eventWords.end()) return at->second;
+		if (eventWords.size() > 50000) eventWords.clear();
+		return eventWords.emplace(e.Id, Narrator::Render(e)).first->second;
 	}
 
 	void SocietyScreen::Rebuild(Galaxy& galaxy, Civilization* civ, double jd)
@@ -116,6 +145,7 @@ namespace SpaceGod::UI
 				if (!world.empty() && (e->Where == nullptr || e->Where->Name != world)) continue;
 				cs::String head = cs::Cat(SocietyDate(e->Jd), "  \xC2\xB7  ", Core::ToString(e->Kind), e->Where != nullptr ? cs::Cat("  \xC2\xB7  ", e->Where->Name) : cs::String(),
 					e->Steered ? cs::String("  \xC2\xB7  STEERED") : cs::String(), e->Unverified ? cs::String("  \xC2\xB7  unverified") : cs::String());
+				if (!search.empty() && !Matches(head, WordsOf(*e))) continue;
 				rows.push_back(Row{ head, cs::String(), CivPick(), e });
 			}
 			return;
@@ -125,8 +155,9 @@ namespace SpaceGod::UI
 			for (const auto& h : society->Houses)
 			{
 				if (h == nullptr || h->Scattered) continue;
-				rows.push_back(Row{ cs::Cat("House ", h->Surname), cs::Cat(h->Home != nullptr ? h->Home->Name : cs::String("?"), "  \xC2\xB7  ", h->Living(), " living  \xC2\xB7  ",
-					Narrator::Money(h->Wealth), h->Business != nullptr ? cs::Cat("  \xC2\xB7  ", h->Business->Name) : cs::String()), CivPick::House(h->Id), nullptr });
+				Row r{ cs::Cat("House ", h->Surname), cs::Cat(h->Home != nullptr ? h->Home->Name : cs::String("?"), "  \xC2\xB7  ", h->Living(), " living  \xC2\xB7  ",
+					Narrator::Money(h->Wealth), h->Business != nullptr ? cs::Cat("  \xC2\xB7  ", h->Business->Name) : cs::String()), CivPick::House(h->Id), nullptr };
+				if (Matches(r.Title, r.Line)) rows.push_back(r);
 			}
 			return;
 		}
@@ -136,10 +167,14 @@ namespace SpaceGod::UI
 			std::vector<cs::Ref<Citizen>> people(adults.begin(), adults.end());
 			// The best and worst known first: renown either way.
 			std::stable_sort(people.begin(), people.end(), [](const cs::Ref<Citizen>& a, const cs::Ref<Citizen>& b) { return std::abs(a->Reputation) > std::abs(b->Reputation); });
-			if (people.size() > 400) people.resize(400);
+			// The 400 best known that the search lets through (so a search reaches past the 400 shown without one).
 			for (const auto& c : people)
-				rows.push_back(Row{ c->FullName(), cs::Cat(static_cast<int>(c->AgeYears(jd)), ", ", Core::ToString(c->Role), c->House != nullptr && c->House->Home != nullptr ? cs::Cat(" of ", c->House->Home->Name) : cs::String(),
-					"  \xC2\xB7  reputation ", SocietySigned(c->Reputation)), CivPick::Person(c->Id), nullptr });
+			{
+				if (rows.size() >= 400) break;
+				Row r{ c->FullName(), cs::Cat(static_cast<int>(c->AgeYears(jd)), ", ", Core::ToString(c->Role), c->House != nullptr && c->House->Home != nullptr ? cs::Cat(" of ", c->House->Home->Name) : cs::String(),
+					"  \xC2\xB7  reputation ", SocietySigned(c->Reputation)), CivPick::Person(c->Id), nullptr };
+				if (Matches(r.Title, r.Line)) rows.push_back(r);
+			}
 			return;
 		}
 		if (page == Orgs)
@@ -148,9 +183,10 @@ namespace SpaceGod::UI
 			{
 				if (o == nullptr || !o->Active()) continue;
 				if (orgKind >= 0 && static_cast<int>(o->Kind) != orgKind) continue;
-				rows.push_back(Row{ cs::Cat(Narrator::OrgName(*o), "   ", Core::ToString(o->Kind)),
+				Row r{ cs::Cat(Narrator::OrgName(*o), "   ", Core::ToString(o->Kind)),
 					cs::Cat(o->Seat != nullptr ? o->Seat->Name : cs::String("?"), "  \xC2\xB7  strength ", SocietyPct(o->Strength), "  \xC2\xB7  ", Narrator::Money(o->Funds), "  \xC2\xB7  ", o->Members.Count(), " members"),
-					CivPick::Org(o->Id), nullptr });
+					CivPick::Org(o->Id), nullptr };
+				if (Matches(r.Title, r.Line)) rows.push_back(r);
 			}
 			return;
 		}
@@ -159,10 +195,11 @@ namespace SpaceGod::UI
 			for (const auto& c : civ->Worlds)
 			{
 				if (c == nullptr || c->Where == nullptr) continue;
-				rows.push_back(Row{ cs::Cat(c->Where->Name, c->Where->Owner != nullptr ? cs::Cat("   ", c->Where->Owner->Name) : cs::String(), c->Quarantined(jd) ? cs::String("   QUARANTINED") : cs::String()),
+				Row r{ cs::Cat(c->Where->Name, c->Where->Owner != nullptr ? cs::Cat("   ", c->Where->Owner->Name) : cs::String(), c->Quarantined(jd) ? cs::String("   QUARANTINED") : cs::String()),
 					cs::Cat("approval ", SocietySigned(c->Approval), "  \xC2\xB7  crime ", SocietyPct(c->Crime), "  \xC2\xB7  sick ", SocietyPct(c->Infected), "  \xC2\xB7  weary ", SocietyPct(c->Weariness),
 						c->Faith != nullptr ? cs::Cat("  \xC2\xB7  ", Narrator::OrgName(*c->Faith)) : cs::String()),
-					CivPick::World(c->Where->Name), nullptr });
+					CivPick::World(c->Where->Name), nullptr };
+				if (Matches(r.Title, r.Line)) rows.push_back(r);
 			}
 			return;
 		}
@@ -172,22 +209,62 @@ namespace SpaceGod::UI
 		{
 			cs::List<CivRow> lines;
 			CivHands::View(views[view], galaxy, *civ, jd, lines);
-			for (const auto& l : lines) rows.push_back(Row{ l.Text, cs::String(), l.Pick, nullptr });
+			for (const auto& l : lines)
+				if (Matches(l.Text)) rows.push_back(Row{ l.Text, cs::String(), l.Pick, nullptr });
 		}
 	}
 
-	void SocietyScreen::Select(const Row& r)
+	void SocietyScreen::Select(const Row& r, bool remember)
 	{
-		if (r.Event != nullptr)
+		Visit to;
+		if (r.Event != nullptr) to.Event = r.Event->Id;
+		else if (!r.Pick.IsNone()) to.Pick = r.Pick;
+		else return;
+		if (remember) Go(to);
+		else
 		{
-			selectedEvent = r.Event->Id;
-			selected = CivPick();
+			selected = to.Pick;
+			selectedEvent = to.Event;
+			detailScroll = Vector2::zero();
+			result.clear();
 		}
-		else if (!r.Pick.IsNone())
+	}
+
+	void SocietyScreen::Go(const Visit& to)
+	{
+		if (to.Pick == selected && to.Event == selectedEvent) return;
+		if (!selected.IsNone() || selectedEvent != 0)
 		{
-			selected = r.Pick;
-			selectedEvent = 0;
+			back.push_back(Here());
+			if (static_cast<int>(back.size()) > HistoryMax) back.erase(back.begin());
 		}
+		forward.clear();
+		selected = to.Pick;
+		selectedEvent = to.Event;
+		detailScroll = Vector2::zero();
+		result.clear();
+	}
+
+	void SocietyScreen::StepBack()
+	{
+		if (back.empty()) return;
+		forward.push_back(Here());
+		Visit to = back.back();
+		back.pop_back();
+		selected = to.Pick;
+		selectedEvent = to.Event;
+		detailScroll = Vector2::zero();
+		result.clear();
+	}
+
+	void SocietyScreen::StepForward()
+	{
+		if (forward.empty()) return;
+		back.push_back(Here());
+		Visit to = forward.back();
+		forward.pop_back();
+		selected = to.Pick;
+		selectedEvent = to.Event;
 		detailScroll = Vector2::zero();
 		result.clear();
 	}
@@ -195,13 +272,77 @@ namespace SpaceGod::UI
 	void SocietyScreen::HandleKeys()
 	{
 		Event& e = Event::current();
-		if (e.type != EventType::KeyDown || rows.empty()) return;
+		if (e.type != EventType::KeyDown) return;
+		if (e.keyCode == KeyCode::F && (e.control || e.command)) { focusSearch = true; e.Use(); return; }
+		if (e.keyCode == KeyCode::Escape && typing) { closeAsked = true; e.Use(); return; }
+		if ((e.keyCode == KeyCode::Return || e.keyCode == KeyCode::KeypadEnter) && typing) { GUIUtility::keyboardControl = 0; typing = false; e.Use(); return; }
+		if (e.keyCode == KeyCode::LeftArrow && e.alt) { StepBack(); e.Use(); return; }
+		if (e.keyCode == KeyCode::RightArrow && e.alt) { StepForward(); e.Use(); return; }
+		if (rows.empty()) return;
 		int at = -1;
 		for (int i = 0; i < static_cast<int>(rows.size()); i++)
 			if ((rows[i].Event != nullptr && rows[i].Event->Id == selectedEvent) || (rows[i].Event == nullptr && !rows[i].Pick.IsNone() && rows[i].Pick == selected)) { at = i; break; }
 		int n = static_cast<int>(rows.size());
-		if (e.keyCode == KeyCode::DownArrow) { Select(rows[at < 0 ? 0 : Mathf::Min(at + 1, n - 1)]); e.Use(); }
-		else if (e.keyCode == KeyCode::UpArrow) { Select(rows[at < 0 ? 0 : Mathf::Max(at - 1, 0)]); e.Use(); }
+		if (e.keyCode == KeyCode::DownArrow) { Select(rows[at < 0 ? 0 : Mathf::Min(at + 1, n - 1)], false); e.Use(); }
+		else if (e.keyCode == KeyCode::UpArrow) { Select(rows[at < 0 ? 0 : Mathf::Max(at - 1, 0)], false); e.Use(); }
+	}
+
+	void SocietyScreen::DrawSearch(Rect r)
+	{
+		GUI::SetNextControlName(SearchControl);
+		cs::String typed = GUI::TextField(r, search, 60, field);
+		if (typed != search) search = typed;
+		if (focusSearch)
+		{
+			GUI::FocusControl(SearchControl);
+			focusSearch = GUI::GetNameOfFocusedControl() != SearchControl;
+		}
+		typing = GUI::GetNameOfFocusedControl() == SearchControl;
+		if (search.empty())
+			GUI::Label(Rect(r.x + 10, r.y + 6, r.width - 20, 18), typing ? "type a name, a world, a kind: vance, mars, riot..." : "Ctrl+F to search this list", small);
+		else if (GUI::Button(Rect(r.x + r.width - 28, r.y + 3, 24, 22), "X", button))
+		{
+			search.clear();
+			focusSearch = true;
+		}
+	}
+
+	// ---------------------------------------------------------------- what happened about a thing (US-T299)
+
+	bool SocietyScreen::About(const SocialEvent& e, const CivPick& p)
+	{
+		auto person = [&](const cs::Ref<Citizen>& c) { return c != nullptr && c->Id == p.Id; };
+		auto house = [&](const cs::Ref<Household>& h) { return h != nullptr && h->Id == p.Id; };
+		auto org = [&](const cs::Ref<Org>& o) { return o != nullptr && o->Id == p.Id; };
+		auto state = [&](const cs::Ref<Faction>& f) { return f != nullptr && f->Name == p.Name; };
+		switch (p.Kind)
+		{
+		case CivPickKind::Person: return person(e.Who) || person(e.Whom);
+		// A house's doings are its own and its people's.
+		case CivPickKind::House: return house(e.House) || house(e.OtherHouse) || (e.Who != nullptr && house(e.Who->House)) || (e.Whom != nullptr && house(e.Whom->House));
+		case CivPickKind::Org: return org(e.Org) || org(e.OtherOrg) || org(e.RunBy);
+		case CivPickKind::Business: return e.Business != nullptr && e.Business->Id == p.Id;
+		case CivPickKind::World: return e.Where != nullptr && e.Where->Name == p.Name;
+		case CivPickKind::Faction: return state(e.Faction) || state(e.Rival);
+		default: return false;
+		}
+	}
+
+	void SocietyScreen::BuildRecent(const CivPick& p, Civilization& civ)
+	{
+		int n = civ.Events.Count();
+		int lastId = n > 0 && civ.Events[n - 1] != nullptr ? civ.Events[n - 1]->Id : 0;
+		cs::String key = cs::Cat(static_cast<int>(p.Kind), "|", p.Id, "|", p.Name, "|", n, "|", lastId);
+		if (key == recentKey) return;
+		recentKey = key;
+		recent.clear();
+		recentTotal = 0;
+		for (int i = n - 1; i >= 0; i--)
+		{
+			const auto& e = civ.Events[i];
+			if (e == nullptr || !About(*e, p)) continue;
+			if (recentTotal++ < RecentMax) recent.push_back(Recent{ e->Id, cs::Cat(SocietyDate(e->Jd), "   ", Narrator::Render(*e)) });
+		}
 	}
 
 	void SocietyScreen::Ask(const cs::String& line)
@@ -233,7 +374,7 @@ namespace SpaceGod::UI
 			: cs::Cat(civ->Worlds.Count(), " worlds watched  \xC2\xB7  ", civ->OrgsOf(OrgKind::Party).Count() + civ->OrgsOf(OrgKind::Faith).Count(), " parties and faiths  \xC2\xB7  ",
 				civ->Events.Count(), " events kept  \xC2\xB7  Prose narration ", Narrator::HasSource() ? "on" : "off");
 		GUI::Label(Rect(Margin, 56, screen.width - 2 * Margin, 18),
-			cs::Cat(tallies, "  \xC2\xB7  Up / Down to pick  \xC2\xB7  ", closeHint), small);
+			cs::Cat(tallies, "  \xC2\xB7  Up / Down to pick  \xC2\xB7  Ctrl+F to search  \xC2\xB7  Alt+Left / Right for back and forward  \xC2\xB7  ", closeHint), small);
 
 		Rebuild(galaxy, civ.get(), jd);
 		HandleKeys();
@@ -250,9 +391,11 @@ namespace SpaceGod::UI
 			return GUI::Button(Rect(screen.width - Margin - 120, by, 120, 32), "Close", button);
 		}
 		float listTop = top;
+		DrawSearch(Rect(listX, listTop, listW, 28));
+		listTop += 34;
 		if (page == Feed || page == Orgs)
 		{
-			DrawFilters(Rect(listX, top, listW, 26), *civ);
+			DrawFilters(Rect(listX, listTop, listW, 26), *civ);
 			listTop += 32;
 		}
 		DrawList(Rect(listX, listTop, listW, bottom - listTop), civ.get());
@@ -261,7 +404,15 @@ namespace SpaceGod::UI
 
 		if (!result.empty())
 			GUI::Label(Rect(x, by + 6, screen.width - Margin - 132 - x, 22), result, resultBad ? bad : good);
-		return GUI::Button(Rect(screen.width - Margin - 120, by, 120, 32), "Close", button);
+		bool close = GUI::Button(Rect(screen.width - Margin - 120, by, 120, 32), "Close", button) || closeAsked;
+		closeAsked = false;
+		if (close)
+		{
+			// The game's keys come back with the screen gone.
+			if (typing) GUIUtility::keyboardControl = 0;
+			typing = false;
+		}
+		return close;
 	}
 
 	void SocietyScreen::DrawPages(Rect area)
@@ -613,6 +764,7 @@ namespace SpaceGod::UI
 		else if (!selected.IsNone()) Describe(selected, galaxy, civ, jd, name, lines, links, hands);
 		if (name.empty())
 		{
+			if (!back.empty() && GUI::Button(Rect(area.xMax() - 30, area.y, 26, 24), "<", button)) StepBack();
 			GUI::Label(Rect(area.x, area.y, area.width, HeadingH - 4), "NOTHING PICKED", heading);
 			GUI::Label(Rect(area.x, area.y + HeadingH, area.width, 120),
 				"Pick an event, a house, a person, an organisation or a world on the left. What it is shows here, with the people and "
@@ -635,11 +787,25 @@ namespace SpaceGod::UI
 		}
 		float textH = 0;
 		for (const auto& l : lines) textH += text->CalcHeight(GUIContent(l), w) + 2;
-		float contentH = 30 + 22 + 12 + textH + SectionGap + (links.empty() ? 0.0f : HeadingH + linkH + SectionGap)
+		// US-T299: what has happened about the thing picked (a trial's is its accused's).
+		bool showRecent = event == nullptr && !selected.IsNone() && selected.Kind != CivPickKind::Trial;
+		if (showRecent) BuildRecent(selected, civ);
+		float recentH = showRecent ? HeadingH + (recent.empty() ? 24.0f : static_cast<float>(recent.size()) * 28.0f) + SectionGap : 0.0f;
+		float contentH = 30 + 22 + 12 + textH + SectionGap + (links.empty() ? 0.0f : HeadingH + linkH + SectionGap) + recentH
 			+ (selected.IsNone() || event != nullptr ? 0.0f : HeadingH + 30 + static_cast<float>(hands.size()) * 30.0f + SectionGap);
+		// US-T298: back and forward through what was picked, beside the title.
+		bool stepBack = false, stepForward = false;
+		{
+			bool enabled = GUI::enabled;
+			GUI::enabled = enabled && !back.empty();
+			stepBack = GUI::Button(Rect(area.xMax() - 60, area.y + 2, 26, 24), "<", button);
+			GUI::enabled = enabled && !forward.empty();
+			stepForward = GUI::Button(Rect(area.xMax() - 30, area.y + 2, 26, 24), ">", button);
+			GUI::enabled = enabled;
+		}
 		detailScroll = GUI::BeginScrollView(area, detailScroll, Rect(0, 0, w, contentH));
 		float y = 0;
-		GUI::Label(Rect(0, y, w, 30), cs::Strings::ToUpperInvariant(name), entryTitle);
+		GUI::Label(Rect(0, y, w - 50, 30), cs::Strings::ToUpperInvariant(name), entryTitle);
 		y += 30;
 		static const char* const KindNames[] = { "", "House", "Person", "Organisation", "World", "Trial", "Business", "State" };
 		GUI::Label(Rect(0, y, w, 20), event != nullptr ? cs::String("Event") : cs::String(KindNames[static_cast<int>(selected.Kind)]), small);
@@ -668,6 +834,25 @@ namespace SpaceGod::UI
 			}
 			y += 28 + SectionGap;
 		}
+		int followEvent = 0;
+		if (showRecent)
+		{
+			GUI::Label(Rect(0, y, w, HeadingH - 4), recentTotal > RecentMax ? cs::Cat("RECENT EVENTS  (latest ", RecentMax, " of ", recentTotal, ")") : cs::Cat("RECENT EVENTS  (", recentTotal, ")"), heading);
+			y += HeadingH;
+			if (recent.empty())
+			{
+				GUI::Label(Rect(0, y, w, 20), "Nothing kept about it yet.", small);
+				y += 24;
+			}
+			for (const auto& r : recent)
+			{
+				auto row = Rect(0, y, w, 24);
+				if (GUI::Button(row, GUIContent::none(), entry)) followEvent = r.Event;
+				GUI::Label(Rect(row.x + 8, row.y + 3, row.width - 14, 20), r.Line, rowLine);
+				y += 28;
+			}
+			y += SectionGap;
+		}
 		if (event == nullptr && !selected.IsNone())
 		{
 			GUI::Label(Rect(0, y, w, HeadingH - 4), "THE SPACEGOD'S HAND", heading);
@@ -690,13 +875,10 @@ namespace SpaceGod::UI
 			if (hands.empty()) GUI::Label(Rect(0, y, w, 20), "No hand of the SpaceGod's reaches this.", small);
 		}
 		GUI::EndScrollView();
-		if (!follow.IsNone())
-		{
-			selected = follow;
-			selectedEvent = 0;
-			detailScroll = Vector2::zero();
-			result.clear();
-		}
+		if (!follow.IsNone()) Go(Visit{ follow, 0 });
+		else if (followEvent != 0) Go(Visit{ CivPick(), followEvent });
+		else if (stepBack) StepBack();
+		else if (stepForward) StepForward();
 	}
 
 	void SocietyScreen::EnsureStyles()
@@ -709,6 +891,7 @@ namespace SpaceGod::UI
 		panelTexture = S::PanelFrame(S::Depth::Screen);
 		buttonTexture = S::ControlTexture();
 		buttonActiveTexture = S::ControlOnTexture();
+		fieldTexture = S::FieldTexture();
 		panel = S::PanelStyle(panelTexture);
 		title = S::TitleStyle(T::Screen);
 		entryTitle = S::TitleStyle(T::Chapter);
@@ -730,6 +913,7 @@ namespace SpaceGod::UI
 		good->clipping = TextClipping::Clip;
 		bad = S::TextStyle(T::Body, S::Warning);
 		bad->clipping = TextClipping::Clip;
+		field = S::FieldStyle(T::Body, fieldTexture);
 	}
 
 	void SocietyScreen::DestroyOwnedTextures()
@@ -737,6 +921,7 @@ namespace SpaceGod::UI
 		panelTexture = nullptr;
 		buttonTexture = nullptr;
 		buttonActiveTexture = nullptr;
+		fieldTexture = nullptr;
 		stylesReady = false;
 	}
 }

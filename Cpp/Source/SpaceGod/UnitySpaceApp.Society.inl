@@ -26,6 +26,10 @@ public:
 	/// <summary>The screen's own textures go with the Hud's (U.SPC-T366).</summary>
 	void DestroySocietyTextures();
 
+	/// <summary>Before the commands each frame: while the screen's search is being typed in it has the keys (true: the owner
+	/// hands the input over; US-T298).</summary>
+	bool UpdateSocietyKeys();
+
 private:
 	cs::Ref<UI::SocietyScreen> societyScreen;
 	/// <summary>A "civ" entry carried out on this peer (UnitySpaceApp.Coop.cpp): the asker's line, applied here.</summary>

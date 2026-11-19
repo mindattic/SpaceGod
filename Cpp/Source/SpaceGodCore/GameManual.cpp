@@ -668,7 +668,11 @@ namespace SpaceGod::Core
 				  "be struck by disaster). A hand that takes two (a feud, an affair, a takeover, a summit, spies, relief, hiring "
 				  "a free company) takes its second from the one you mark: pick it, Mark as the second, then pick the first. Each "
 				  "button runs the very sg.Civ line shown beside it, and the outcome (or why not) shows at the foot. In co-op the "
-				  "hand goes to the whole party and every player's galaxy feels it on the same day, the same way.")),
+				  "hand goes to the whole party and every player's galaxy feels it on the same day, the same way. Ctrl+F searches "
+				  "the list shown (every word you type must appear: \"mars riot\"; the feed's events by their words too, and People "
+				  "beyond the 400 best known). Alt+Left and Alt+Right, or the arrows by the title, step back and forward through "
+				  "what you picked. Under the links, Recent events lists the latest things that happened about the one picked "
+				  "(a house's include its people's); click one to read it.")), // US-T298, US-T299
 
 			cs::New<ManualChapter>("Comms and pilots", "Hailing ships and stations, piracy by radio, and the people you meet", Keys("COMMS AND PILOTS"),
 				T("Hailing",

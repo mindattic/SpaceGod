@@ -64,4 +64,9 @@ namespace SpaceGod
 	{
 		if (societyScreen) societyScreen->DestroyOwnedTextures();
 	}
+
+	bool UnitySpaceApp::UpdateSocietyKeys()
+	{
+		return ShowSociety && societyScreen != nullptr && societyScreen->Typing();
+	}
 }
