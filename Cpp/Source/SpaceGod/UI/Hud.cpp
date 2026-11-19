@@ -255,6 +255,7 @@ namespace SpaceGod::UI
 		DrawFtl();
 		DrawSeat();
 		DrawHelmAbilities(); // US-T106
+		DrawBattlePlot(); // US-T367
 		DrawCourseMarker();
 		DrawInterdiction();
 		if (app->ShowCargo) DrawCargo();

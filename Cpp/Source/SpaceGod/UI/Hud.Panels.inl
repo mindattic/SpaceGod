@@ -254,6 +254,11 @@ private:
 	/// card sizes itself to the rest.
 	void DrawTargetCard();
 
+	/// US-T367 (Hud.Plot.cpp): in a fight, a small top-down plot at the left edge of every hull around the one held, by
+	/// side, its lock ringed and its standing fire, paint and cripple calls marked. Read only; on until Shift+F10 turns it off.
+	void DrawBattlePlot();
+	bool battlePlotShown = true;
+
 	/// <summary>The tanks: how full, how many tonnes, and the delta-v that leaves at the ship's present mass.</summary>
 	static cs::String PropellantText(const cs::Ref<Core::Ship>& ship);
 

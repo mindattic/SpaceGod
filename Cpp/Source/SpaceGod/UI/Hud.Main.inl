@@ -81,6 +81,8 @@ public:
 	bool UpdateHelpKeys();
 	/// US-T349: the same for the recovered logs screen's list and page keys.
 	bool UpdateLogsKeys();
+	/// US-T367 (Hud.Plot.cpp): Shift+F10 (unless rebound) turns the battle plot on or off. True when the key was spent.
+	bool UpdateBattlePlotKey(bool keysFree);
 
 private:
 

@@ -136,6 +136,7 @@ the sky cycle. A plain key never changes meaning with Shift unless the table say
 | Spawn menu (dev menu on Spawn) | Shift+F2 (US-T186, landing) | anywhere (local) | dev menu > Spawn |
 | Bottom drawer | Shift+U (US-T200, landing) | anywhere | handle, bottom left |
 | Notice history: the last 100 notices with their game time; F (Shift+F back) steps the kind shown | Shift+X (US-T345) | anywhere the drawer shows | the drawer's Notices tab |
+| Battle plot on / off: a top-down plot at the left edge of every hull around you by side, your lock ringed and your fire, paint and cripple calls marked | Shift+F10 (US-T367) | in a fight | the plot (on by default) |
 | HUD on / off | U | anywhere | - |
 | Clear the screen | F11 | anywhere | - |
 | Galaxy map | [ | anywhere | - |
