@@ -22,10 +22,17 @@ namespace SpaceGod
 			return cs::Func<cs::String, double>([](double v) { return cs::Cat(cs::Fmt(v, "0"), "%"); });
 		}
 
-		/// The stance palette into the HUD's own colours (its markers, edge arrows, target card and roster read them).
-		void PaintHud()
+		// Colour-blind safe: orange against sky blue (Okabe-Ito's, lifted for a dark screen), told apart under every common
+		// form of colour blindness; neutral stays grey.
+		Color Hostile(bool colourBlind, float alpha) { return colourBlind ? Color(1.0f, 0.55f, 0.1f, alpha) : Color(1.0f, 0.4f, 0.35f, alpha); }
+		Color Friendly(bool colourBlind, float alpha) { return colourBlind ? Color(0.35f, 0.72f, 1.0f, alpha) : Color(0.45f, 0.95f, 0.6f, alpha); }
+		Color Neutral(bool colourBlind, float alpha) { return colourBlind ? Color(0.86f, 0.86f, 0.86f, alpha) : Color(0.85f, 0.85f, 0.8f, alpha); }
+
+		/// The stance palette into the HUD's own colours (its markers, edge arrows, target card and roster read them). Takes the
+		/// palette rather than reading StancePalette(): it runs from inside that setting's own first construction (US-T320).
+		void PaintHud(bool colourBlind)
 		{
-			UI::Hud::SetStanceColours(PlayerOptions::HostileColor(0.95f), PlayerOptions::FriendlyColor(0.95f), PlayerOptions::NeutralColor(0.9f));
+			UI::Hud::SetStanceColours(Hostile(colourBlind, 0.95f), Friendly(colourBlind, 0.95f), Neutral(colourBlind, 0.9f));
 		}
 	}
 
@@ -108,7 +115,7 @@ namespace SpaceGod
 			cs::List<cs::String>{ "Red, grey, green", "Colour-blind safe" }, 0,
 			"Hostile, neutral and friendly in comms, markers, edge arrows and the roster: red, grey and green, or orange, grey and blue.",
 			"colourblind colorblind color colour deuteranopia protanopia palette hostile friendly")
-			->Applying([](int) { PaintHud(); });
+			->Applying([](int palette) { PaintHud(palette == 1); });
 		return value;
 	}
 
@@ -160,13 +167,11 @@ namespace SpaceGod
 
 	bool PlayerOptions::ColourBlindStances() { return StancePalette()->Index == 1; }
 
-	// Colour-blind safe: orange against sky blue (Okabe-Ito's, lifted for a dark screen), told apart under every common
-	// form of colour blindness; neutral stays grey.
-	Color PlayerOptions::HostileColor(float alpha) { return ColourBlindStances() ? Color(1.0f, 0.55f, 0.1f, alpha) : Color(1.0f, 0.4f, 0.35f, alpha); }
+	Color PlayerOptions::HostileColor(float alpha) { return Hostile(ColourBlindStances(), alpha); }
 
-	Color PlayerOptions::FriendlyColor(float alpha) { return ColourBlindStances() ? Color(0.35f, 0.72f, 1.0f, alpha) : Color(0.45f, 0.95f, 0.6f, alpha); }
+	Color PlayerOptions::FriendlyColor(float alpha) { return Friendly(ColourBlindStances(), alpha); }
 
-	Color PlayerOptions::NeutralColor(float alpha) { return ColourBlindStances() ? Color(0.86f, 0.86f, 0.86f, alpha) : Color(0.85f, 0.85f, 0.8f, alpha); }
+	Color PlayerOptions::NeutralColor(float alpha) { return Neutral(ColourBlindStances(), alpha); }
 
 	Color PlayerOptions::WaryColor(float alpha) { return ColourBlindStances() ? Color(0.95f, 0.9f, 0.35f, alpha) : Color(1.0f, 0.78f, 0.35f, alpha); }
 
