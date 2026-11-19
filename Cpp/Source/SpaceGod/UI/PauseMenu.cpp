@@ -11,6 +11,7 @@
 #include "UI/CreditsScreen.h" // US-T246
 #include "UI/DisplayOptions.h"
 #include "UI/Hud.h"
+#include "UI/UiInput.h" // US-T311
 
 using namespace SpaceGod::Core;
 
@@ -23,6 +24,7 @@ namespace SpaceGod::UI
 		settingsOnly = false;
 		page = Page::Main;
 		notice.clear();
+		mainPick = -1; // US-T311
 		timeScaleBefore = Time::timeScale;
 		Time::timeScale = 0;
 	}
@@ -57,7 +59,11 @@ namespace SpaceGod::UI
 			UpdateCapture(escape); // US-T249: Esc cancels the listening slot, not the page
 			return;
 		}
-		if (!escape) return;
+		if (!escape)
+		{
+			if (page == Page::Main) MainKeys(); // US-T311
+			return;
+		}
 		if (leaving != Leave::None)
 		{
 			leaving = Leave::None; // US-T252: Esc answers the question with Stay
@@ -179,54 +185,87 @@ namespace SpaceGod::UI
 
 	void PauseMenu::DrawMain()
 	{
-		const float w = 320, h = 478; // US-T271: one more button, the Encyclopedia; US-T293: and Society
+		// US-T271: one more button, the Encyclopedia; US-T293: and Society; US-T311: and the keys' hint under them.
+		static const char* const labels[MainCount] = { "Resume", "Help", "Encyclopedia", "Society", "Save / Load", "Settings", "Credits", "Main Menu", "Quit" };
+		const float w = 320, h = 498;
 		auto r = Centred(w, h);
 		GUI::Box(r, GUIContent::none(), panel);
 		GUI::Label(Rect(r.x + 20, r.y + 14, w - 40, 22), "PAUSED", title);
 		GUI::Label(Rect(r.x + 20, r.y + 38, w - 40, 18), "Every system stands still  ·  Esc to resume", small);
-		float y = r.y + 70;
-		if (GUI::Button(Rect(r.x + 20, y, w - 40, 34), "Resume", button)) Close();
-		if (GUI::Button(Rect(r.x + 20, y + 44, w - 40, 34), "Help", button))
+		const float y = r.y + 70;
+		for (int i = 0; i < MainCount; i++)
+			if (GUI::Button(Rect(r.x + 20, y + i * 44, w - 40, 34), labels[i], i == mainPick ? buttonActive : button)) PressMain(i, false);
+		GUI::Label(Rect(r.x + 20, y + MainCount * 44, w - 40, 18), "Up / Down to pick  ·  Enter to press", small);
+	}
+
+	void PauseMenu::PressMain(int i, bool keyed)
+	{
+		switch (i)
 		{
-			Close();
-			if (ShowHelp) ShowHelp();
+			case 0: Close(); break;
+			case 1:
+				Close();
+				if (ShowHelp) ShowHelp();
+				break;
+			case 2: // US-T271
+				Close();
+				if (ShowEncyclopedia) ShowEncyclopedia();
+				break;
+			case 3: // US-T293
+				Close();
+				if (ShowSociety) ShowSociety();
+				break;
+			case 4:
+				Close();
+				if (ShowSaves) ShowSaves();
+				break;
+			case 5: page = Page::Settings; break;
+			case 6: // US-T246
+				if (!credits) credits = cs::New<CreditsScreen>();
+				credits->Restart();
+				page = Page::Credits;
+				break;
+			case 7: AskLeave(Leave::MainMenu, keyed); break;
+			case 8: AskLeave(Leave::Quit, keyed); break;
+			default: break;
 		}
-		if (GUI::Button(Rect(r.x + 20, y + 88, w - 40, 34), "Encyclopedia", button)) // US-T271
+	}
+
+	void PauseMenu::AskLeave(Leave what, bool keyed)
+	{
+		// US-T252: Confirm before quitting (Settings > Gameplay) asks first; a driven run leaves in one click.
+		if (!PlayerOptions::ConfirmQuit()->Value || PlayerOptions::ScriptedRun())
 		{
-			Close();
-			if (ShowEncyclopedia) ShowEncyclopedia();
+			LeaveNow(what);
+			return;
 		}
-		y += 44;
-		if (GUI::Button(Rect(r.x + 20, y + 88, w - 40, 34), "Society", button)) // US-T293
+		leaving = what;
+		leavePick = 1; // US-T311: Stay first, so a second Enter never leaves by accident
+		leaveKeyed = keyed;
+	}
+
+	void PauseMenu::MainKeys()
+	{
+		if (!UiInput::present()) return;
+		auto pressed = [](KeyCode k) { return UiInput::WasPressedThisFrame(k); };
+		bool enter = pressed(KeyCode::Return) || pressed(KeyCode::KeypadEnter) || pressed(KeyCode::Space);
+		if (leaving != Leave::None)
 		{
-			Close();
-			if (ShowSociety) ShowSociety();
+			if (pressed(KeyCode::LeftArrow) || pressed(KeyCode::RightArrow) || pressed(KeyCode::A) || pressed(KeyCode::D) || pressed(KeyCode::Tab))
+			{
+				leavePick = 1 - leavePick;
+				leaveKeyed = true;
+			}
+			else if (enter)
+			{
+				if (leavePick == 0) LeaveNow(leaving);
+				else leaving = Leave::None;
+			}
+			return;
 		}
-		y += 44;
-		if (GUI::Button(Rect(r.x + 20, y + 88, w - 40, 34), "Save / Load", button))
-		{
-			Close();
-			if (ShowSaves) ShowSaves();
-		}
-		if (GUI::Button(Rect(r.x + 20, y + 132, w - 40, 34), "Settings", button)) page = Page::Settings;
-		if (GUI::Button(Rect(r.x + 20, y + 176, w - 40, 34), "Credits", button)) // US-T246
-		{
-			if (!credits) credits = cs::New<CreditsScreen>();
-			credits->Restart();
-			page = Page::Credits;
-		}
-		// US-T252: Confirm before quitting (Settings > Gameplay) asks first.
-		bool ask = PlayerOptions::ConfirmQuit()->Value && !PlayerOptions::ScriptedRun(); // a driven run leaves in one click
-		if (GUI::Button(Rect(r.x + 20, y + 220, w - 40, 34), "Main Menu", button))
-		{
-			if (ask) leaving = Leave::MainMenu;
-			else LeaveNow(Leave::MainMenu);
-		}
-		if (GUI::Button(Rect(r.x + 20, y + 264, w - 40, 34), "Quit", button))
-		{
-			if (ask) leaving = Leave::Quit;
-			else LeaveNow(Leave::Quit);
-		}
+		int step = pressed(KeyCode::UpArrow) || pressed(KeyCode::W) ? -1 : pressed(KeyCode::DownArrow) || pressed(KeyCode::S) ? 1 : 0;
+		if (step != 0) mainPick = mainPick < 0 ? (step > 0 ? 0 : MainCount - 1) : (mainPick + step + MainCount) % MainCount;
+		else if (enter && mainPick >= 0) PressMain(mainPick, true);
 	}
 
 	void PauseMenu::DrawSettings()
@@ -387,8 +426,10 @@ namespace SpaceGod::UI
 		GUI::Label(Rect(r.x + 20, r.y + 40, w - 40, 36),
 			quit ? "The game autosaves on the way out." : "The game autosaves on the way.  (Settings > Gameplay stops this question.)", small);
 		float bw = (w - 50) * 0.5f;
-		if (GUI::Button(Rect(r.x + 20, r.yMax() - 46, bw, 30), quit ? "Quit" : "Main Menu", buttonActive)) LeaveNow(leaving);
-		else if (GUI::Button(Rect(r.x + 30 + bw, r.yMax() - 46, bw, 30), "Stay", button)) leaving = Leave::None;
+		// US-T311: once the keys are used here, the one they pick is the one lit.
+		bool leaveLit = !leaveKeyed || leavePick == 0;
+		if (GUI::Button(Rect(r.x + 20, r.yMax() - 46, bw, 30), quit ? "Quit" : "Main Menu", leaveLit ? buttonActive : button)) LeaveNow(leaving);
+		else if (GUI::Button(Rect(r.x + 30 + bw, r.yMax() - 46, bw, 30), "Stay", leaveKeyed && leavePick == 1 ? buttonActive : button)) leaving = Leave::None;
 	}
 
 	void PauseMenu::LeaveNow(Leave what)

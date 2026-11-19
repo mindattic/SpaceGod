@@ -77,6 +77,12 @@ namespace SpaceGod::UI
 		enum class Leave : int { None, MainMenu, Quit };
 		Leave leaving = Leave::None;
 
+		/// US-T311: the first page's button the keys have picked (-1 until Up / Down is pressed), and the leave question's
+		/// (0 leave, 1 stay; Stay first), shown only once the keys have been used on it.
+		static constexpr int MainCount = 9;
+		int mainPick = -1, leavePick = 1;
+		bool leaveKeyed = false;
+
 		/// The words that find the Display page in a search, as the registry's settings are found by theirs.
 		static constexpr const char* DisplaySearchWords = "display graphics resolution screen window mode borderless fullscreen exclusive vsync aspect ratio ultrawide";
 
@@ -146,6 +152,14 @@ namespace SpaceGod::UI
 		Rect Centred(float w, float h) const;
 
 		void DrawMain();
+
+		/// US-T311: the first page's keys: Up / Down (or W / S) pick a button, Enter or Space presses it; over the leave
+		/// question, Left / Right (or Tab) pick Leave or Stay and Enter or Space answers.
+		void MainKeys();
+		/// The first page's button <paramref name="i"/> pressed (by the mouse, or the keys with <paramref name="keyed"/>).
+		void PressMain(int i, bool keyed);
+		/// Main Menu or Quit picked: asks first when Confirm before quitting is on, else leaves now.
+		void AskLeave(Leave what, bool keyed);
 
 		static constexpr float SettingRowH = 58;
 
