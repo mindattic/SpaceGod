@@ -476,7 +476,9 @@ namespace SpaceGod::Core
 				  "through the airlock, by boarding pods, by a carrier's shuttles or by a Breacher round fired from a Breacher "
 				  "bay. The fight goes compartment by compartment; holding the bridge and engineering takes the ship. While "
 				  "your hull is being boarded, or your marines are boarding, B opens the boarding panel: pick a compartment "
-				  "and push for it or muster on it, hold, or auto-resolve."),
+				  "and push for it or muster on it, hold, or auto-resolve. A notice tells you when such a fight begins, and the "
+				  "panel's strength line shows who is ahead: your side's numbers against theirs, the spaces the boarders hold "
+				  "and what each side has lost."), // US-T321
 				T("Boarding with allies",
 				  "Marines of allied factions on the same side of a battle can board one hull together. They fight its "
 				  "defenders as one party, as well as the mix of them who landed, and your orders from the boarding panel "

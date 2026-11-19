@@ -1533,7 +1533,7 @@ namespace SpaceGod::UI
 		constexpr float rowH = 16;
 		// US-T82: a row for each party out on the hull, with how far across it is.
 		int rows = inside->Compartments.Count() + inside->HullParties.Count();
-		float w = 560, h = 82 + rows * rowH;
+		float w = 560, h = 82 + (rows + 1) * rowH; // US-T321: and the strength line
 		auto r = Panel(Rect((Screen::width - w) * 0.5f, Screen::height - h - 48, w, h));
 		GUI::Label(Rect(r.x + 12, r.y + 6, w - 24, 20), cs::Cat("BOARDING  ·  ", cs::Strings::ToUpperInvariant(hull->Name()), "  ·  ",
 			role == BoardingRole::Boarders ? cs::String("OUR MARINES ABOARD") : cs::Cat("REPELLING ", cs::Strings::ToUpperInvariant(inside->BoarderNames()))), title);
@@ -1554,8 +1554,22 @@ namespace SpaceGod::UI
 				cs::Cat("   On the hull:  ", cs::Fmt(p->Marines, "0"), " marines, ", inside->Compartments[p->From]->Name, " to ",
 					inside->Compartments[p->To]->Name, "  ", bar, " ", cs::Fmt(p->Progress(), "P0")), small);
 		}
-		GUI::contentColor = Color::white();
 		float y = r.y + 34 + rows * rowH;
+		// US-T321: who is ahead, from the player's side: the boarders against the ship's crew and marines, the spaces the
+		// boarders hold and what each side has lost so far.
+		double boarders = inside->Boarders(), defenders = inside->Crew() + inside->Marines();
+		int held = 0;
+		for (const auto& c : inside->Compartments)
+			if (c->Taken) held++;
+		double ours = role == BoardingRole::Boarders ? boarders : defenders, theirs = role == BoardingRole::Boarders ? defenders : boarders;
+		double ourLost = role == BoardingRole::Boarders ? inside->BoardersLost : inside->CrewLost + inside->MarinesLost;
+		double theirLost = role == BoardingRole::Boarders ? inside->CrewLost + inside->MarinesLost : inside->BoardersLost;
+		GUI::contentColor = ours > theirs * 1.25 ? Color(0.45f, 0.95f, 0.6f) : theirs > ours * 1.25 ? UiStyle::Danger : Color(1.0f, 0.85f, 0.4f);
+		GUI::Label(Rect(r.x + 12, y, w - 24, rowH), cs::Cat("Strength:  ", cs::Fmt(ours, "0"), " ours against ", cs::Fmt(theirs, "0"),
+			"   ·   boarders hold ", held, " of ", inside->Compartments.Count(), " spaces   ·   lost ", cs::Fmt(ourLost, "0"), " to their ",
+			cs::Fmt(theirLost, "0")), small);
+		y += rowH;
+		GUI::contentColor = Color::white();
 		GUI::Label(Rect(r.x + 12, y, w - 24, rowH), cs::Cat("Orders:  ", BoardingCommand::Label(inside, role),
 			inside->Log.Count() > 0 ? cs::Cat("   ·   ", inside->Log[inside->Log.Count() - 1].Text) : cs::String()), small);
 		GUI::contentColor = Accent;

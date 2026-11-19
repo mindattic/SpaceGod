@@ -24,6 +24,14 @@ namespace SpaceGod
 		cs::Ref<BattleUnit> fightHull = fight.has_value() ? std::get<0>(*fight) : nullptr;
 		cs::Ref<BattleUnit> heldHull = BoardingFight.has_value() ? std::get<0>(*BoardingFight) : nullptr;
 		if (fightHull != heldHull) BoardingPick = -1;
+		// US-T321: a fight aboard that has just begun is told even with the panel shut, with the key that commands it.
+		if (fightHull != nullptr && fightHull != heldHull && !ShowBoarding)
+		{
+			auto role = std::get<1>(*fight);
+			ShowToast(role == BoardingRole::Defenders
+				? cs::Cat("BOARDERS ABOARD: ", fightHull->Combat->Interior->BoarderNames(), " are cutting in  ·  B to command the defence")
+				: cs::Cat("OUR MARINES ARE ABOARD ", cs::Strings::ToUpperInvariant(fightHull->Name()), "  ·  B to command the boarding"));
+		}
 		BoardingFight = fight;
 		if (Input.ToggleBoarding)
 		{
