@@ -221,7 +221,8 @@ namespace SpaceGod::Core
 		SG_OPT(RushRepairUntil), // US-T347: a helm's damage control rush, absent from older saves
 		SG_OPT(HoldFireCallUntil), // US-T350: a helm's call to hold fire, absent from older saves
 		SG_OPT(CrippleCallTarget), SG_OPT(CrippleCallUntil), // US-T352: a helm's call to cripple, absent from older saves
-		SG_OPT(WithdrawCalledBy)) // US-T356: the helm a withdrawing hull answered, absent from older saves
+		SG_OPT(WithdrawCalledBy), // US-T356: the helm a withdrawing hull answered, absent from older saves
+		SG_OPT(DemandSurrenderNext)) // US-T363: when a helm may next demand a surrender, absent from older saves
 
 	SG_SERIALIZE(BoardingParty, "Unity.SpaceGod.Core.BoardingParty",
 		SG_F(Faction), SG_F(Landed), SG_F(Order), SG_F(Strength))

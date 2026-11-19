@@ -296,6 +296,17 @@ namespace SpaceGod::Core
 				bar.Add(e);
 			}
 		}
+		// US-T363: any hull in a fight can hail the hostile hull it has locked to strike its colours.
+		if (fight)
+		{
+			HelmAbilityEntry e;
+			e.Ability = HelmAbility::DemandSurrender;
+			e.Label = "Demand surrender";
+			auto blocked = b->DemandSurrenderBlocked(u, u->PlayerLockTarget);
+			e.State = blocked.empty() ? cs::Cat("hail the ", u->PlayerLockTarget->Name()) : blocked;
+			e.Ready = blocked.empty();
+			bar.Add(e);
+		}
 		// US-T140: a hull with a squad of its band about it orders it through its captain, before any fight (last, so the
 		// slots above keep their keys).
 		if (world != nullptr && SquadOrders::SquadOf(world, ship).Count() > 0)
@@ -503,6 +514,19 @@ namespace SpaceGod::Core
 				if (recalled) return cs::Cat("Back to the fight: ", answering, answering == 1 ? " ship turns" : " ships turn", " to fight again");
 				return cs::Cat("Withdraw: ", answering, answering == 1 ? " ship breaks off" : " ships break off",
 					" and run for the edge of the fight (again: call them back)");
+			}
+			case HelmAbility::DemandSurrender:
+			{
+				auto target = u->PlayerLockTarget;
+				auto answer = Battle::DemandAnswer::Refused;
+				auto why = b->OrderDemandSurrender(u, target, answer);
+				if (!why.empty()) return cs::Cat("No hail: ", why);
+				switch (answer)
+				{
+					case Battle::DemandAnswer::Struck: return cs::Cat("The ", target->Name(), " strikes its colours");
+					case Battle::DemandAnswer::Ran: return cs::Cat("The ", target->Name(), " won't strike, but breaks off and runs");
+					default: return cs::Cat("The ", target->Name(), " refuses: \"Come and take us\"");
+				}
 			}
 			default:
 				return "";

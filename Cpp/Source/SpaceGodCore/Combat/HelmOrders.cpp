@@ -17,6 +17,7 @@
 #include "Combat/ScreenWeapons.h" // US-T333
 #include "Combat/ElectronicWarfare.h" // US-T338
 #include "Combat/Broadsides.h" // US-T347
+#include "Combat/Morale.h" // US-T363
 #include "Settings/GameSetting.h"
 #include "Ships.h"
 
@@ -461,6 +462,49 @@ namespace SpaceGod::Core
 		for (const auto& o : Units)
 			if (o->WithdrawCalledBy == u && o->Present() && o->Fleeing) n++;
 		return n;
+	}
+
+	cs::String Battle::DemandSurrenderBlocked(const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& target)
+	{
+		if (u == nullptr || u->Combat == nullptr) return "no hull at the helm";
+		if (target == nullptr) return "lock a hull first (T)";
+		if (!target->Present()) return cs::Cat("the ", target->Name(), " is gone");
+		if (!Hostile(u, target)) return cs::Cat("the ", target->Name(), " is not hostile");
+		if (target->Kind != UnitKind::Ship || target->Combat == nullptr) return "only a ship's crew can strike";
+		if (target->Captured || target->Surrendering) return cs::Cat("the ", target->Name(), " has already struck");
+		if (target->PlayerControlled()) return cs::Cat("the ", target->Name(), " is a player's to strike");
+		if (Seconds < u->DemandSurrenderNext) return cs::Cat("hail again in ", cs::Fmt(u->DemandSurrenderNext - Seconds, "0"), " s");
+		return cs::String();
+	}
+
+	cs::String Battle::OrderDemandSurrender(const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& target, DemandAnswer& answer)
+	{
+		answer = DemandAnswer::Refused;
+		auto why = DemandSurrenderBlocked(u, target);
+		if (!why.empty()) return why;
+		u->DemandSurrenderNext = Seconds + DemandSurrenderCooldownSeconds;
+		// The crew weigh it as they weigh striking on their own (StrikesColours), the hail pressing a little harder.
+		double toll = DamageTollOf(target);
+		double outgunned = OutgunnedOf(target);
+		double resolve = Morale::Resolve(target->Faction, target->Ship != nullptr && target->Ship->Spec->IsMilitary)
+			* (target->Side >= 0 && target->Side < 2 ? Dread[target->Side] : 1) * Morale::SupplyResolve(target->Combat->Readiness);
+		double pressure = Morale::Pressure(toll, outgunned, resolve) + DemandSurrenderPressure;
+		if (toll >= Morale::MinDamageToStrike && Morale::ShouldSurrender(pressure, target->MoraleThreshold))
+		{
+			Surrender(target);
+			answer = DemandAnswer::Struck;
+			return cs::String();
+		}
+		if (!target->Fleeing && !target->Combat->Disabled() && (toll >= DemandRunToll || outgunned >= DemandRunOutgunned))
+		{
+			// Not beaten enough to strike, but enough to see the way the fight is going: they break off as a broken crew does.
+			target->Fleeing = true;
+			target->BoardTarget = nullptr;
+			answer = DemandAnswer::Ran;
+			return cs::String();
+		}
+		answer = DemandAnswer::Refused;
+		return cs::String();
 	}
 
 	cs::String Battle::OrderWithdrawCall(const cs::Ref<BattleUnit>& u, int& answering, bool& recalled)

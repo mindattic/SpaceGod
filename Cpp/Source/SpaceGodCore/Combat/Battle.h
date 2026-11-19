@@ -286,6 +286,10 @@ namespace SpaceGod::Core
 		/// off and runs (<see cref="Fleeing"/>) until that helm calls it back or it is clear of the fight. Never set by the AI.</summary>
 		cs::Ref<BattleUnit> WithdrawCalledBy;
 
+		/// <summary>US-T363: the battle second this helm may next demand a hull's surrender (<see cref="Battle.OrderDemandSurrender"/>).
+		/// Never set by the AI.</summary>
+		double DemandSurrenderNext = 0;
+
 		/// <summary>Taken by boarders: it has changed sides and carries a prize crew, so it no longer fights.</summary>
 		bool Captured = false;
 
@@ -1571,6 +1575,30 @@ namespace SpaceGod::Core
 
 		/// <summary>US-T356: how many hulls <paramref name="u"/>'s call to withdraw sent are still running in the fight.</summary>
 		int WithdrawingFor(const cs::Ref<BattleUnit>& u);
+
+		/// <summary>US-T363: how the crew of a hull hailed to surrender answered.</summary>
+		enum class DemandAnswer : int { Struck, Ran, Refused };
+
+		/// <summary>
+		/// US-T363: the helm hails the hostile hull it has locked to strike its colours. Its crew weigh it as they weigh striking on
+		/// their own (<see cref="Morale.Pressure"/>: their hull's toll, their side's odds, their resolve), the demand adding
+		/// <see cref="DemandSurrenderPressure"/>: past their breaking point they strike (<see cref="Surrender"/>); short of it but
+		/// badly hurt or outgunned they break off and run (<see cref="BattleUnit.Fleeing"/>); else they refuse. No dice, so it is
+		/// the same on every peer; only a player's helm demands, and the helm may hail again only after
+		/// <see cref="DemandSurrenderCooldownSeconds"/>. Empty when the hail went out (<paramref name="answer"/> says how they
+		/// answered), else why not.
+		/// </summary>
+		cs::String OrderDemandSurrender(const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& target, DemandAnswer& answer);
+		/// <summary>US-T363: why a demand for <paramref name="target"/>'s surrender can't go out now, or empty when it can.</summary>
+		cs::String DemandSurrenderBlocked(const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& target);
+		/// <summary>US-T363: how much a demand adds to the pressure on a hailed crew.</summary>
+		static constexpr double DemandSurrenderPressure = 0.15;
+		/// <summary>US-T363: seconds before the same helm may demand a surrender again.</summary>
+		static constexpr double DemandSurrenderCooldownSeconds = 20;
+		/// <summary>US-T363: a hull at least this hurt (<see cref="Morale.DamageToll"/>) that won't strike runs instead.</summary>
+		static constexpr double DemandRunToll = 0.45;
+		/// <summary>US-T363: a hull at least this outgunned (<see cref="Morale.Outgunned"/>) that won't strike runs instead.</summary>
+		static constexpr double DemandRunOutgunned = 0.35;
 
 		/// <summary>A carrier's helm orders (<see cref="BattleUnit.WingHeld"/>) lapse once nobody holds its helm or flies one of
 		/// its craft: the recall and the call are lifted and its captain launches the wing held aboard, as at the start of a fight.</summary>

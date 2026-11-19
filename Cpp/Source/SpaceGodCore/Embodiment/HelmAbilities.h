@@ -71,6 +71,10 @@ namespace SpaceGod::Core
 		/// <summary>US-T356: call the side's ships within reach to withdraw from the fight, or back to it while any still run
 		/// (<see cref="Battle.OrderWithdrawCall"/>), on the bar in a fight while one is in reach or running, after the call to cripple.</summary>
 		Withdraw = 21,
+
+		/// <summary>US-T363: hail the locked hostile hull to strike its colours (<see cref="Battle.OrderDemandSurrender"/>); its crew
+		/// strike, run or refuse. On every hull's bar in a fight, after the call to withdraw.</summary>
+		DemandSurrender = 22,
 	};
 
 	/// <summary>One entry of a helm's ability bar: what it does, and how it stands now (craft aboard, reloading, ready).</summary>
