@@ -87,7 +87,70 @@ namespace SpaceGod::UI
 	cs::String SocietyScreen::RowsKey() const
 	{
 		return cs::Cat(page, "|", group, "|", kind, "|", worldOnly ? 1 : 0, "|", doings, "|", orgKind, "|",
-			worldOnly && selected.Kind == CivPickKind::World ? selected.Name : cs::String(), "|", search, "|", static_cast<int>(app->SocietyWatched.size()));
+			worldOnly && selected.Kind == CivPickKind::World ? selected.Name : cs::String(), "|", search, "|", static_cast<int>(app->SocietyWatched.size()),
+			"|", page >= 0 && page < FirstView ? sortBy[page] : 0); // US-T354: a new sort shows at once
+	}
+
+	// ---------------------------------------------------------------- the lists' sorts (US-T354)
+
+	int SocietyScreen::SortCount(int p)
+	{
+		switch (p)
+		{
+		case Houses: return 5;
+		case People: return 4;
+		case Orgs: return 5;
+		case Worlds: return 4;
+		default: return 1;
+		}
+	}
+
+	const char* SocietyScreen::SortName(int p, int s)
+	{
+		static const char* const HouseSorts[] = { "founding", "name", "wealth", "size", "oldest" };
+		static const char* const PeopleSorts[] = { "renown", "name", "age", "reputation" };
+		static const char* const OrgSorts[] = { "founding", "name", "strength", "funds", "members" };
+		static const char* const WorldSorts[] = { "kept order", "name", "approval", "crime" };
+		if (s < 0 || s >= SortCount(p)) return "";
+		switch (p)
+		{
+		case Houses: return HouseSorts[s];
+		case People: return PeopleSorts[s];
+		case Orgs: return OrgSorts[s];
+		case Worlds: return WorldSorts[s];
+		default: return "";
+		}
+	}
+
+	void SocietyScreen::StepSort()
+	{
+		if (page < 0 || page >= FirstView || SortCount(page) <= 1) return;
+		sortBy[page] = (sortBy[page] + 1) % SortCount(page);
+	}
+
+	namespace
+	{
+		/// US-T354: puts <paramref name="rows"/> in order by <paramref name="keys"/> (one a row, the greatest first) or, with
+		/// <paramref name="byName"/>, by their titles A to Z; ties keep the order they were built in.
+		template <typename RowT>
+		void SortRows(std::vector<RowT>& rows, const std::vector<double>& keys, bool byName)
+		{
+			std::vector<size_t> order(rows.size());
+			for (size_t i = 0; i < order.size(); i++) order[i] = i;
+			std::vector<cs::String> names;
+			if (byName)
+			{
+				names.reserve(rows.size());
+				for (const auto& r : rows) names.push_back(cs::Strings::ToLowerInvariant(r.Title));
+				std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) { return names[a] < names[b]; });
+			}
+			else
+				std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) { return keys[a] > keys[b]; });
+			std::vector<RowT> sorted;
+			sorted.reserve(rows.size());
+			for (size_t i : order) sorted.push_back(rows[i]);
+			rows.swap(sorted);
+		}
 	}
 
 	bool SocietyScreen::Matches(const cs::String& a, const cs::String& b) const
@@ -154,13 +217,19 @@ namespace SpaceGod::UI
 		}
 		if (page == Houses && society != nullptr)
 		{
+			// US-T354: founding (the order they were met), name, wealth, size (the living) or oldest first.
+			int sort = sortBy[Houses];
+			std::vector<double> keys;
 			for (const auto& h : society->Houses)
 			{
 				if (h == nullptr || h->Scattered) continue;
 				Row r{ cs::Cat("House ", h->Surname), cs::Cat(h->Home != nullptr ? h->Home->Name : cs::String("?"), "  \xC2\xB7  ", h->Living(), " living  \xC2\xB7  ",
 					Narrator::Money(h->Wealth), h->Business != nullptr ? cs::Cat("  \xC2\xB7  ", h->Business->Name) : cs::String()), CivPick::House(h->Id), nullptr };
-				if (Matches(r.Title, r.Line)) rows.push_back(r);
+				if (!Matches(r.Title, r.Line)) continue;
+				rows.push_back(r);
+				keys.push_back(sort == 2 ? h->Wealth : sort == 3 ? static_cast<double>(h->Living()) : sort == 4 ? -h->FoundedJd : 0.0);
 			}
+			if (sort != 0) SortRows(rows, keys, sort == 1);
 			return;
 		}
 		if (page == People && society != nullptr)
@@ -170,17 +239,26 @@ namespace SpaceGod::UI
 			// The best and worst known first: renown either way.
 			std::stable_sort(people.begin(), people.end(), [](const cs::Ref<Citizen>& a, const cs::Ref<Citizen>& b) { return std::abs(a->Reputation) > std::abs(b->Reputation); });
 			// The 400 best known that the search lets through (so a search reaches past the 400 shown without one).
+			// US-T354: those 400 then by renown, name, age (the oldest first) or reputation (the best thought of first).
+			int sort = sortBy[People];
+			std::vector<double> keys;
 			for (const auto& c : people)
 			{
 				if (rows.size() >= 400) break;
 				Row r{ c->FullName(), cs::Cat(static_cast<int>(c->AgeYears(jd)), ", ", Core::ToString(c->Role), c->House != nullptr && c->House->Home != nullptr ? cs::Cat(" of ", c->House->Home->Name) : cs::String(),
 					"  \xC2\xB7  reputation ", SocietySigned(c->Reputation)), CivPick::Person(c->Id), nullptr };
-				if (Matches(r.Title, r.Line)) rows.push_back(r);
+				if (!Matches(r.Title, r.Line)) continue;
+				rows.push_back(r);
+				keys.push_back(sort == 2 ? c->AgeYears(jd) : sort == 3 ? c->Reputation : 0.0);
 			}
+			if (sort != 0) SortRows(rows, keys, sort == 1);
 			return;
 		}
 		if (page == Orgs)
 		{
+			// US-T354: founding (the order they were founded in), name, strength, funds or members.
+			int sort = sortBy[Orgs];
+			std::vector<double> keys;
 			for (const auto& o : civ->Orgs)
 			{
 				if (o == nullptr || !o->Active()) continue;
@@ -188,12 +266,18 @@ namespace SpaceGod::UI
 				Row r{ cs::Cat(Narrator::OrgName(*o), "   ", Core::ToString(o->Kind)),
 					cs::Cat(o->Seat != nullptr ? o->Seat->Name : cs::String("?"), "  \xC2\xB7  strength ", SocietyPct(o->Strength), "  \xC2\xB7  ", Narrator::Money(o->Funds), "  \xC2\xB7  ", o->Members.Count(), " members"),
 					CivPick::Org(o->Id), nullptr };
-				if (Matches(r.Title, r.Line)) rows.push_back(r);
+				if (!Matches(r.Title, r.Line)) continue;
+				rows.push_back(r);
+				keys.push_back(sort == 2 ? o->Strength : sort == 3 ? o->Funds : sort == 4 ? static_cast<double>(o->Members.Count()) : 0.0);
 			}
+			if (sort != 0) SortRows(rows, keys, sort == 1);
 			return;
 		}
 		if (page == Worlds)
 		{
+			// US-T354: the order they are kept in, name, approval (the happiest first) or crime (the worst first).
+			int sort = sortBy[Worlds];
+			std::vector<double> keys;
 			for (const auto& c : civ->Worlds)
 			{
 				if (c == nullptr || c->Where == nullptr) continue;
@@ -201,8 +285,11 @@ namespace SpaceGod::UI
 					cs::Cat("approval ", SocietySigned(c->Approval), "  \xC2\xB7  crime ", SocietyPct(c->Crime), "  \xC2\xB7  sick ", SocietyPct(c->Infected), "  \xC2\xB7  weary ", SocietyPct(c->Weariness),
 						c->Faith != nullptr ? cs::Cat("  \xC2\xB7  ", Narrator::OrgName(*c->Faith)) : cs::String()),
 					CivPick::World(c->Where->Name), nullptr };
-				if (Matches(r.Title, r.Line)) rows.push_back(r);
+				if (!Matches(r.Title, r.Line)) continue;
+				rows.push_back(r);
+				keys.push_back(sort == 2 ? static_cast<double>(c->Approval) : sort == 3 ? static_cast<double>(c->Crime) : 0.0);
 			}
+			if (sort != 0) SortRows(rows, keys, sort == 1);
 			return;
 		}
 		if (page == Watched)
@@ -387,6 +474,8 @@ namespace SpaceGod::UI
 		if (e.keyCode == KeyCode::RightArrow && e.alt) { StepForward(); e.Use(); return; }
 		// US-T344: C marks the thing picked (again: clears it), as the ship catalog's compare does; not while typing in the search.
 		if (e.keyCode == KeyCode::C && !typing && !e.shift && !e.control && !e.alt && !e.command && selectedEvent == 0 && !selected.IsNone()) { ToggleMark(); e.Use(); return; }
+		// US-T354: S steps the list's sort (Houses, People, Organisations, Worlds); not while typing in the search.
+		if (e.keyCode == KeyCode::S && !typing && !e.shift && !e.control && !e.alt && !e.command && page < FirstView && SortCount(page) > 1) { StepSort(); e.Use(); return; }
 		if (rows.empty()) return;
 		int at = -1;
 		for (int i = 0; i < static_cast<int>(rows.size()); i++)
@@ -844,6 +933,13 @@ namespace SpaceGod::UI
 		(void)civ;
 		cs::String head = page < FirstView ? cs::Strings::ToUpperInvariant(cs::String(SocietyPageNames[page])) : cs::Strings::ToUpperInvariant(cs::String(SocietyViewName(CivHands::Views()[page - FirstView])));
 		GUI::Label(Rect(area.x, area.y, area.width, HeadingH - 4), cs::Cat(head, "  (", static_cast<int>(rows.size()), ")"), heading);
+		// US-T354: the list's sort, at the heading's right end; a click (or S) steps it.
+		if (page < FirstView && SortCount(page) > 1)
+		{
+			const float sortW = 170;
+			if (GUI::Button(Rect(area.xMax() - sortW, area.y - 2, sortW, HeadingH - 4), cs::Cat("Sort: ", SortName(page, sortBy[page]), " (S)"), sortBy[page] != 0 ? entrySelected : entry))
+				StepSort();
+		}
 		GUI::DrawTexture(Rect(area.x, area.y + HeadingH - 5, area.width, 1), buttonActiveTexture);
 		auto list = Rect(area.x, area.y + HeadingH, area.width, area.height - HeadingH);
 		int n = static_cast<int>(rows.size());

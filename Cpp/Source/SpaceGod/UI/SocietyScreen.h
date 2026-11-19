@@ -164,6 +164,8 @@ namespace SpaceGod::UI
 		bool worldOnly = false;
 		/// The organisations' kind (-1 all).
 		int orgKind = -1;
+		/// US-T354: each list page's sort (0 its own order: founding, renown...; SortName names each), kept per page.
+		int sortBy[FirstView] = {};
 
 		CivPick selected, marked;
 		int selectedEvent = 0;
@@ -246,6 +248,12 @@ namespace SpaceGod::UI
 		float DrawCompare(float y, float w, Core::Galaxy& galaxy, Core::Civilization& civ, double jd, bool draw, CivPick& follow);
 		/// US-T344: marks the thing picked (C or the Mark button), or clears the mark when it is the one marked.
 		void ToggleMark();
+
+		/// US-T354: how many sorts the page <paramref name="p"/> offers (1: none to choose), and the name of sort <paramref name="s"/> there.
+		static int SortCount(int p);
+		static const char* SortName(int p, int s);
+		/// US-T354: the next sort of the page shown (S, or the Sort button by the list's heading).
+		void StepSort();
 
 		/// The module group of a kind (an index into the group names), and the names.
 		static int GroupOf(int kind);
