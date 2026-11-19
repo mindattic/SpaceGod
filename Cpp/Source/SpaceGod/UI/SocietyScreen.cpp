@@ -400,6 +400,67 @@ namespace SpaceGod::UI
 				if (!standing(h)) return no("no such house standing");
 				return sure(cs::Cat("they give ", Narrator::Money(h->Wealth * 0.2), " (a fifth of their wealth); their world's care and approval rise and their head's standing with it"));
 			}
+			// US-T385: Society's own hands, mirroring Society::Fund/BribeFor/Ruin/Send/Expose (Society.cpp's own Stands: no
+			// fallen, ruined or haven world, and an owner).
+			auto societyStands = [](const cs::Ref<Settlement>& s)
+			{
+				return s != nullptr && !s->Fallen && s->Stage != ColonyStage::Ruin && s->Kind != SettlementKind::Haven && s->Owner != nullptr;
+			};
+			if (verb == "fund")
+			{
+				auto b = society->BusinessById(num(1));
+				if (b == nullptr) return no("no such business");
+				if (!b->Trading()) return no("that business is not trading");
+				double credits = args.size() > 2 ? std::atof(args[2].c_str()) : 0.0;
+				if (!(credits > 0)) return no("the sum must be positive");
+				return sure(cs::Cat("an anonymous backer pays in ", Narrator::Money(credits), "; its capital goes from ", Narrator::Money(b->Capital), " to ",
+					Narrator::Money(b->Capital + credits)));
+			}
+			if (verb == "bribe")
+			{
+				auto b = society->BusinessById(num(1));
+				if (b == nullptr) return no("no such business");
+				if (!b->Trading() || !societyStands(b->Home)) return no("that business is not trading");
+				// The sitting governor, as Society::GovernorOf finds one first (it would appoint one from the richest house
+				// there when none sits, which this reading does not do).
+				cs::Ref<Citizen> gov;
+				for (const auto& h : society->Houses)
+					if (h != nullptr && h->Home == b->Home && gov == nullptr)
+						for (const auto& m : h->Members)
+							if (m != nullptr && m->Alive() && m->Role == CitizenRole::Governor) { gov = m; break; }
+				if (gov == nullptr && society->HousesOf(b->Home).Count() == 0) return no("there is no governor there to buy");
+				if (gov != nullptr && gov->House == b->Owner) return no("the governor is of its own house");
+				double amount = cs::Math::Clamp(b->Capital * 0.03, 5e4, 5e6);
+				return sure(cs::Cat("it pays ", gov != nullptr ? cs::Cat("Governor ", gov->FullName()) : cs::String("a governor named from the richest house there"),
+					" ", Narrator::Money(amount), " and the favour brings back ", Narrator::Money(amount * 2.5)));
+			}
+			if (verb == "ruin")
+			{
+				auto b = society->BusinessById(num(1));
+				if (b == nullptr) return no("no such business");
+				if (!b->Trading()) return no("that business is not trading");
+				return sure(cs::Cat("its creditors call in everything overnight: its ", Narrator::Money(b->Capital), " is gone and it closes at once"));
+			}
+			if (verb == "send")
+			{
+				auto c = person(1);
+				auto to = world(2);
+				if (c == nullptr) return no("no such person");
+				if (!c->Alive()) return no("they are dead");
+				if (c->TripId != 0) return no("they are already travelling");
+				if (!societyStands(to)) return no("no standing settlement by that name");
+				if (c->House != nullptr && c->House->Home == to) return no("they live there");
+				if (c->House == nullptr) return no("they will not go");
+				return sure(cs::Cat("they write that they are off to ", to->Name, " on business, leaving within 4 to 24 days"));
+			}
+			if (verb == "expose")
+			{
+				auto r = society->BribeById(num(1));
+				if (r == nullptr) return no("no such bribe");
+				if (r->Exposed) return no("that bribe is already public");
+				return sure(cs::Cat(Narrator::Money(r->Amount), " paid to ", r->Official != nullptr ? cs::Cat("Governor ", r->Official->FullName()) : cs::String("a governor"),
+					" comes out, and the scandal follows"));
+			}
 			return cs::String();
 		}
 	}
@@ -1757,6 +1818,13 @@ namespace SpaceGod::UI
 			one("preach", "Have them preach a new faith");
 			one("rumour", "Spread a rumour about them");
 			pair(CivPickKind::Person, "seduce", "Begin an affair with", "mark another person");
+			pair(CivPickKind::World, "send", "Send them on business to", "mark a world"); // US-T385
+			{
+				cs::Ref<Bribe> taken; // US-T385: the latest bribe they took that is still hidden
+				for (const auto& r : society->Bribes)
+					if (r != nullptr && r->Official == c && !r->Exposed) taken = r;
+				if (taken != nullptr) hands.push_back(Hand{ cs::Cat("Expose the bribe they took from ", taken->Briber != nullptr ? taken->Briber->Name : cs::String("a firm")), cs::Cat("expose ", taken->Id) });
+			}
 			break;
 		}
 		case CivPickKind::Org:
@@ -1981,6 +2049,21 @@ namespace SpaceGod::UI
 			if (marked.Kind == CivPickKind::House)
 				hands.push_back(Hand{ cs::Cat("Have it taken over by ", NameOf(marked, galaxy, civ)), cs::Cat("takeover ", marked.Arg(), " ", arg) });
 			else hands.push_back(Hand{ "Have it taken over by...  (mark a house)", cs::String() });
+			// US-T385: Society's own hands on a firm. The backer's sum is a quarter of its capital (100k to 50M), named in the line
+			// so every peer pays in the same.
+			if (b->Trading())
+			{
+				double sum = cs::Math::Floor(cs::Math::Clamp(b->Capital * 0.25, 1e5, 5e7) / 1000) * 1000;
+				hands.push_back(Hand{ cs::Cat("Fund it (", Narrator::Money(sum), " from an anonymous backer)"), cs::Cat("fund ", arg, " ", cs::Fmt(sum, "0")) });
+				one("bribe", "Have it buy its governor");
+				one("ruin", "Start a run on it");
+			}
+			{
+				cs::Ref<Bribe> open;
+				for (const auto& r : society->Bribes)
+					if (r != nullptr && r->Briber == b && !r->Exposed) open = r; // the latest still hidden
+				if (open != nullptr) hands.push_back(Hand{ cs::Cat("Expose its bribe to ", open->Official != nullptr ? open->Official->FullName() : cs::String("a governor")), cs::Cat("expose ", open->Id) });
+			}
 			break;
 		}
 		case CivPickKind::Faction:

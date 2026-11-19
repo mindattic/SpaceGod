@@ -53,7 +53,8 @@ namespace SpaceGod
 			static const std::vector<const char*> verbs = { "feud", "reconcile", "fame", "seduce", "elect", "coup", "acquit", "summit",
 				"riot", "arm", "spy", "hire", "hit", "racket", "crackdown",
 				"takeover", "bankrun", "landmark", "preach", "festival", "rig", "rumour",
-				"plague", "cure", "disaster", "aid", "slant", "investigate", "donate" };
+				"plague", "cure", "disaster", "aid", "slant", "investigate", "donate",
+				"fund", "bribe", "ruin", "send", "expose" }; // US-T385: Society's own hands (sg.Society's), on the screen and in co-op
 			return verbs;
 		}
 
@@ -188,6 +189,14 @@ namespace SpaceGod
 				return galaxy.Polities->Find(spaced);
 			};
 			auto said = [&done](const cs::String& why, const char* what) -> cs::String { if (why.empty()) done = what; return why; };
+
+			// US-T385: Society's own hands (sg.Society's, which refuses co-op; here they go through CivHandAsk like the rest and
+			// roll nothing but the day's hashes, so every peer does the same). "fund <business> <credits>", "send <person> <world>".
+			if (verb == "fund") return said(society->Fund(galaxy, society->BusinessById(num(1)), args.size() > 2 ? std::atof(args[2].c_str()) : 0.0, jd), "An anonymous backer pays in");
+			if (verb == "bribe") return said(society->BribeFor(galaxy, society->BusinessById(num(1)), jd), "A governor is bought");
+			if (verb == "ruin") return said(society->Ruin(galaxy, society->BusinessById(num(1)), jd), "A run on the firm");
+			if (verb == "send") return said(society->Send(galaxy, person(1), world(2), jd), "A business trip is booked");
+			if (verb == "expose") return said(society->Expose(galaxy, society->BribeById(num(1)), jd), "A bribe comes to light");
 
 			// US-T277 Kinship.
 			if (civ.Kinship != nullptr)
