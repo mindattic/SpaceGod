@@ -4,7 +4,8 @@ US-T99 proposes rewinding the session to any earlier moment from **deterministic
 keyframes are denser during battles, older ones are thinned under a fixed budget, and the session start is always
 kept. The first version has one timeline, stored so that it can branch later. Before a horizon is picked ("how far
 back can you go"), this phase measures what keyframes cost, how fast the simulation re-simulates, and whether a
-restored keyframe re-simulates bit-exactly. Nothing here builds the rewind feature.
+restored keyframe re-simulates bit-exactly. Phase 1 built nothing in the game. Phase 2, the in-game keyframe ring
+and rewind to a keyframe, is in [Build phases](#build-phases) below.
 
 All numbers come from the headless Bench (the C++ Core, `Bench/`) on this workstation (2026-11-05). The machine was
 shared with other builds and agents, so treat differences under about 20% as noise. MB means MiB.
@@ -234,6 +235,59 @@ session, defaulting to whole session. The numbers show no need to cap it.
    per-battle snapshot) before the dense battle tier can ship.
 3. **The intervention log must record each frame's dt**, or the game must step a fixed dt, or replays will not be
    bit-exact.
+
+## Build phases
+
+The owner approved the build on 2026-11-19. The phases below each land on their own.
+
+**Phase 1: measurement. Done** (8eecc20; see above).
+
+**Phase 2: the keyframe ring in the game, and rewinding to a keyframe. Done** (US-T99).
+
+- *Store.* `Core::RewindRing` (`Cpp/Source/SpaceGodCore/Persistence/RewindRing.h`). A keyframe is the `SaveData`
+  object graph, the same bytes a save holds. Capturing walks the world on the simulation thread, as a save does, and
+  then compresses on a worker (`std::async`) with the save file's raw DEFLATE. Each keyframe is keyed by **session game
+  seconds**, which is the game time the clock has moved forward since the session or its loaded save began. It is not
+  keyed by date, so a clock set back by hand does not reorder the ring. Each keyframe also carries a branch id (always
+  0 for now) and a parent link to the retained keyframe before it, so the store can grow into a tree for US-T104
+  without a rewrite.
+- *Schedule and budget.* The tiers in the Recommendation are 10 s while a battle runs in the watched system or a craft
+  is held (last 15 min), 1 min (1 h), 10 min (1 day), 1 h (7 days), 1 day (90 days), then 1 week. Thinning runs from
+  oldest to newest, so decisions about old keyframes do not churn as new ones arrive. The budget is 512 MB of RAM.
+  While the ring is over budget, every spacing doubles. The session start is pinned, so the horizon is always the whole
+  session.
+- *Cadence.* A keyframe is due when the newest one is at least one tier spacing of game time old (10 s in battle, else
+  1 min) **and** at least `MinWallGapS` = 20 real seconds old. Capture is not yet off the simulation thread (open
+  problem 2), so the 20 s floor stands in for the recommended 2 s. It keeps the 110-490 ms walk to one hitch every
+  20 s or more. The dense 10 s battle tier therefore fills only at real time or slower. Keyframes are taken only when a
+  save could be made (`SaveBlocker`: not between the stars, under FTL or latched to a hulk), and never with
+  `-norewind`, `-demo` or `-capture`.
+- *Rewind.* **Shift+F8** (key action `rewind`, rebindable) loads the newest keyframe before now in place, through the
+  same path a load takes (`ApplyLoaded`). Pressed again within 6 real seconds, it steps back from the moment it just
+  rewound to. `sg.Rewind [list | back <game s> | to <id>]` lists the ring or rewinds by game time or keyframe id.
+  Keyframes after the moment rewound to stay until the next keyframe is taken, so stepping back further works. Once
+  play goes on, that capture drops them: **one timeline, and the old future is replaced** (the owner's call, 2026-11-05).
+  Loading a save starts a new ring rooted at it.
+- *Co-op.* The host's rewind goes through `CoopLoadingHere`, so every client follows through the existing resync. A
+  client's Shift+F8 is refused for now; see phase 4.
+- *The live simulation is unchanged.* A keyframe is the same read-only walk an autosave makes (the probe showed taking
+  keyframes leaves every digest as it was). Nothing in Core's simulation calls the ring, so the Bench digests cannot
+  move.
+- *What it is not yet.* A rewind lands **exactly on a keyframe**, not on any tick between them, and keyframes are whole
+  DEFLATE graphs (3-11 MB), not Oodle deltas. At 512 MB the ring holds about 50-150 keyframes, which the thinning
+  spreads over the whole session.
+
+**Phase 3: the intervention log and seeking to any tick. Next.** Record every input frame (per `EmbodiableKey`, with
+its tick and the frame's dt; US-T169's requirement 1), every order and every clock change, keyed by (branch, session
+game seconds). A seek restores the keyframe before T and replays headless to T. This needs either a fixed simulation
+step or the logged dt (open problem 3). Then a timeline bar with an analytic preview. The fork for US-T104 happens at
+the first intervention after a seek.
+
+**Phase 4: cheaper storage and capture.** Use Oodle Kraken deltas against the parent keyframe, with every 16th
+keyframe whole. That needs the engine's Oodle SDK linked into the game module, not only into Bench.Rewind. Add the
+4 GB disk spill under the save folder, and an incremental or off-thread capture, which lets the 20 s floor drop to the
+recommended 2 s and lets the dense battle ring ship. Then a client's rewind becomes a command in the co-op lockstep
+stream, ordered by the host: any player may rewind, and the later request wins.
 
 ## Parked: checkpoint loops with ghost replays (US-T169)
 

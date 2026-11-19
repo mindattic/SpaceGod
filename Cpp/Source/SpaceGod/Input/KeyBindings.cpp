@@ -340,6 +340,7 @@ namespace SpaceGod::Input
 				{ KeyAction::SpawnPractice, "spawnPractice", "Screen: practice fighter", Both, EdgeKind, { KeyChord(Key::V, S) }, "The practice fighter at the camera, you at its helm." },
 				{ KeyAction::QuickSave, "quickSave", "Game: quicksave", Both, EdgeKind, { Key::F5 }, "Save to the quicksave slot." },
 				{ KeyAction::QuickLoad, "quickLoad", "Game: quickload", Both, EdgeKind, { Key::F8 }, "Load the quicksave slot." },
+				{ KeyAction::Rewind, "rewind", "Game: rewind", Both, EdgeKind, { KeyChord(Key::F8, S) }, "Rewind to the last moment kept; again within a few seconds to go further back. Play on and the old future is replaced." }, // US-T99
 				{ KeyAction::Saves, "saves", "Game: save slots", Both, EdgeKind, { Key::F6 }, "The save slots." },
 				{ KeyAction::CheatMenu, "devMenu", "Game: dev menu", Both, EdgeKind, { KeyChord(Key::F1, S) }, "The dev menu." },
 				{ KeyAction::SpawnMenu, "spawnMenu", "Game: dev spawn menu", Both, EdgeKind, { KeyChord(Key::F2, S) }, "The dev menu on its Spawn tab." },

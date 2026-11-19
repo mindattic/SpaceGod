@@ -47,6 +47,7 @@
 #include "UnitySpaceApp.Encyclopedia.deps.h" // US-T271
 #include "UnitySpaceApp.Society.deps.h" // US-T293
 #include "UnitySpaceApp.Tutorial.deps.h" // US-T254
+#include "UnitySpaceApp.Rewind.deps.h" // US-T99
 #include "NewGameSetup.h" // US-T247: the New Game setup page's choices
 
 namespace SpaceGod
@@ -116,5 +117,6 @@ namespace SpaceGod
 #include "UnitySpaceApp.Society.inl" // US-T293: the Society screen and the SpaceGod's hand in the galaxy's people
 #include "UnitySpaceApp.Tutorial.inl" // US-T254: the guided tutorial and the first-time hints
 #include "UnitySpaceApp.NewGame.inl" // US-T247: the New Game setup page's starting situations
+#include "UnitySpaceApp.Rewind.inl" // US-T99: time reversal's keyframe ring (docs/REWIND.md)
 	};
 }

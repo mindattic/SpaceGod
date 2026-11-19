@@ -268,6 +268,10 @@ namespace SpaceGod::Input
 		/// <summary>F5 saves to the quicksave slot, F8 loads it, F6 opens the save slots.</summary>
 		bool QuickSave = false, QuickLoad = false, ToggleSaves = false;
 
+		/// <summary>US-T99: Shift+F8 rewinds to the last keyframe kept (docs/REWIND.md). Not a co-op PilotFrame field: a
+		/// rewind is the host's load in place, not a helm input.</summary>
+		bool Rewind = false;
+
 		/// <summary>While capture runs (US-T72, docs/CAPTURE.md section 5): Alt+F9 a screenshot, Alt+F10 toggles an
 		/// on-demand recording, Alt+F11 saves the replay. Local to this machine: never sent to co-op peers (they are
 		/// read-only properties, which PilotFrame's field list leaves out, as Unity's PilotFrame skips properties).</summary>

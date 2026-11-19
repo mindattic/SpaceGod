@@ -96,6 +96,7 @@ namespace SpaceGod
 			ReturnToMainMenu();
 			return;
 		}
+		UpdateRewind(); // US-T99: a keyframe when one is due (at the frame's start, as a save is taken), and Shift+F8
 		if (!pendingSave.empty())
 		{
 			SaveTo(pendingSave, pendingSaveLabel);
@@ -265,6 +266,7 @@ namespace SpaceGod
 			FocusSystemOverview();
 		}
 		autosaveDueS = PlayerOptions::AutosaveSeconds() > 0 ? PlayerOptions::AutosaveSeconds() : AutosaveIntervalS; // US-T252
+		RewindAfterLoad(); // US-T99: a save loaded starts a new timeline (a keyframe rewound to keeps the old one)
 		CoopLoaded(); // US-T44
 	}
 

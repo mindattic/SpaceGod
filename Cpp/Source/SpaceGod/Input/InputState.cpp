@@ -194,6 +194,7 @@ namespace SpaceGod::Input
 		QuickSave = hit(A::QuickSave);
 		QuickLoad = hit(A::QuickLoad);
 		ToggleSaves = hit(A::Saves);
+		Rewind = hit(A::Rewind); // US-T99
 
 		const Key digits[] = { Key::Digit0, Key::Digit1, Key::Digit2, Key::Digit3, Key::Digit4, Key::Digit5, Key::Digit6, Key::Digit7, Key::Digit8, Key::Digit9 };
 		// U.SPC-T277/US-T284: Alt+digit is a weapon group fired, Alt+Shift+digit toggles its fire mode, each exclusive of
@@ -382,7 +383,7 @@ namespace SpaceGod::Input
 		SelectClicked = SelectDoubleClicked = RightClicked = false;
 		Focus = Escape = ToggleScale = TimeFaster = TimeSlower = TogglePause = ResetTime = false;
 		ToggleOrbits = ToggleLabels = ToggleHelp = ToggleHud = ClearScreen = ToggleMarket = DockPort = ToggleCargo = ToggleOutfit = ToggleSilent = ToggleBounties = ToggleContracts = ToggleFleet = ToggleTrade = ToggleGalaxyMap = ToggleNews = ToggleSpawn = WatchBattle = ToggleLanes = ToggleSatellites = ToggleReorient = CycleShips = CycleBackward = Home = Pilot = LockTarget = ActivateGate = EngageFtl = false;
-		QuickSave = QuickLoad = ToggleSaves = false;
+		QuickSave = QuickLoad = ToggleSaves = Rewind = false;
 		ToggleSystemMap = false; // US-T258
 		SpawnPractice = false;
 		ToggleCheatMenu = false; // US-T126
