@@ -1674,6 +1674,45 @@ namespace SpaceGod::UI
 			x += widths[i] + gap;
 		}
 		GUI::contentColor = old;
+		// US-T361: the calls this helm has standing in the fight, each with its mark and the time left, in one strip just above
+		// the bar. Read only: it looks at the helm's call fields and draws nothing out of a fight or with nothing standing.
+		auto soBattle = helm->Ship->Battle;
+		if (soBattle == nullptr || soBattle->Over) return;
+		auto soUnit = soBattle->UnitOf(helm->Ship);
+		if (soUnit == nullptr || !soUnit->Present()) return;
+		double soNow = soBattle->Seconds;
+		auto soLeft = [soNow](double until) { return cs::Cat(cs::Fmt(until - soNow, "0"), " s"); };
+		auto soMark = [](const cs::Ref<BattleUnit>& t)
+		{
+			cs::String n = "a hull gone";
+			if (t != nullptr && t->Present()) n = t->Name();
+			return n;
+		};
+		cs::List<cs::String> soCalls;
+		if (soUnit->FireCallTarget != nullptr && soNow < soUnit->FireCallUntil)
+			soCalls.Add(cs::Cat("Fire on ", soMark(soUnit->FireCallTarget), " ", soLeft(soUnit->FireCallUntil)));
+		if (soNow < soUnit->ScreenCallUntil) soCalls.Add(cs::Cat("Screen on us ", soLeft(soUnit->ScreenCallUntil)));
+		if (soUnit->PaintCallTarget != nullptr && soNow < soUnit->PaintCallUntil)
+			soCalls.Add(cs::Cat("Paint ", soMark(soUnit->PaintCallTarget), " ", soLeft(soUnit->PaintCallUntil)));
+		if (soUnit->CrippleCallTarget != nullptr && soNow < soUnit->CrippleCallUntil)
+			soCalls.Add(cs::Cat("Cripple ", soMark(soUnit->CrippleCallTarget), " ", soLeft(soUnit->CrippleCallUntil)));
+		if (soNow < soUnit->FallBackCallUntil) soCalls.Add(cs::Cat("Fall back on us ", soLeft(soUnit->FallBackCallUntil)));
+		if (soNow < soUnit->RushRepairUntil) soCalls.Add(cs::Cat("Damage control ", soLeft(soUnit->RushRepairUntil)));
+		if (soNow < soUnit->HoldFireCallUntil) soCalls.Add(cs::Cat("Hold fire ", soLeft(soUnit->HoldFireCallUntil)));
+		int soRunning = 0;
+		for (const auto& o : soBattle->Units)
+			if (o != soUnit && o->WithdrawCalledBy == soUnit && o->Fleeing && o->Present()) soRunning++;
+		if (soRunning > 0) soCalls.Add(cs::Cat("Withdrawing: ", soRunning, soRunning == 1 ? " ship" : " ships"));
+		if (soCalls.Count() == 0) return;
+		cs::String soLine = "STANDING";
+		for (const auto& c : soCalls) soLine = cs::Cat(soLine, "  \xC2\xB7  ", c);
+		float soW = Mathf::Min(small->CalcSize(GUIContent(soLine)).x + 2 * pad, maxW);
+		auto soRect = Rect((Screen::width - soW) * 0.5f, r.y - 4 - (rowH + pad), soW, rowH + pad);
+		RegisterUi(soRect); // US-T212
+		GUI::Box(soRect, GUIContent::none(), panel);
+		GUI::contentColor = Color(1.0f, 0.82f, 0.4f, 1.0f);
+		GUI::Label(Rect(soRect.x + pad, soRect.y + pad * 0.5f - 2, soW - 2 * pad, rowH), soLine, small);
+		GUI::contentColor = old;
 	}
 
 	// ---------------------------------------------------------------- the take-charge picker (U.SPC-T446)
