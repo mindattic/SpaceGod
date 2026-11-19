@@ -48,6 +48,11 @@ namespace SpaceGod::UI
 		/// The map's own textures go with the HUD that owns it (U.SPC-T366).
 		void DestroyOwnedTextures();
 
+		/// US-T310: whether the find field has the keys (the owner hands the game's input over meanwhile).
+		bool Typing() const { return finding; }
+		/// US-T310: the map has been closed: the find field lets the keys go.
+		void Closed();
+
 	private:
 		enum class ItemKind : int { Star, Body, Site, Station, Gas, Gate, Ramp, Ship, Belt, IceField, Nebula, Graveyard, You };
 
@@ -93,8 +98,29 @@ namespace SpaceGod::UI
 
 		bool showOrbits = true, showLanes = true, showContacts = true, showFields = true, showLabels = true;
 
-		cs::Ref<GUIStyle> panel, title, text, small, label, labelDim, button, buttonOn, tip;
-		cs::Ref<Texture2D> panelTex, buttonTex, buttonOnTex, glow, tipTex;
+		cs::Ref<GUIStyle> panel, title, text, small, label, labelDim, button, buttonOn, tip, field;
+		cs::Ref<Texture2D> panelTex, buttonTex, buttonOnTex, glow, tipTex, fieldTex;
+
+		// ---------------------------------------------------------------- US-T310: find (SystemMapScreen.Find.cpp)
+
+		static constexpr const char* FindControl = "SystemMapFind";
+		static constexpr int MaxFindHits = 8;
+		static constexpr float FindRowH = 24;
+		cs::String findText, findFor;
+		bool finding = false, focusFind = false;
+		int findPick = 0;
+		/// The keys of the items found, best first (looked up again each draw: the items are rebuilt).
+		std::vector<cs::String> findHits;
+		float findBuiltAt = -1;
+		/// Where the find field and its list of results sit this draw (the map takes no clicks under them).
+		Rect findRect, findListRect;
+
+		void RefreshFind();
+		void FindKeys();
+		void DrawFind();
+		void DrawFindMarks(Rect local);
+		void GoTo(const cs::String& key);
+		Core::DVec3 YouKm() const;
 
 		void Build(double jd);
 		void Fit(Rect canvas);

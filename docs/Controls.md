@@ -133,6 +133,7 @@ the sky cycle. A plain key never changes meaning with Shift unless the table say
 | Clear the screen | F11 | anywhere | - |
 | Galaxy map | [ | anywhere | - |
 | Galaxy map: find a system or star | Ctrl+F, then Up / Down / Enter (US-T306) | galaxy map | the field at the map's top left |
+| System map: find a world, station, gate, ship or field | Ctrl+F, then Up / Down / Enter (US-T310) | system map | the field at the map's top left |
 | Quicksave / quickload / slots | F5 / F8 / F6 | anywhere | pause menu > Save / Load |
 | Pause menu | Esc (last in the Esc chain) | anywhere | Resume, Help, Save / Load, Settings > Display, Main Menu, Quit |
 | Showcase tour | - | - | main menu, dev menu > Showcase, sg.Tour; then Right/N, Left/B, S, Space, 1-9, O, Esc |

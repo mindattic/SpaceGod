@@ -202,6 +202,7 @@ namespace SpaceGod::UI
 			return;
 		}
 		systemMapOpen = false;
+		if (systemMap) systemMap->Closed(); // US-T310: the find field lets the keys go
 
 		LayoutNews(); // TopCentre's first slot, so every alert and banner stacks under the news
 
@@ -1802,6 +1803,17 @@ namespace SpaceGod::UI
 			return false;
 		}
 		return galaxyMap->Typing();
+	}
+
+	bool Hud::UpdateSystemMapKeys()
+	{
+		if (!systemMap) return false;
+		if (!app->ShowSystemMap || app->Travel->Active || app->InFtlCruise())
+		{
+			systemMap->Closed();
+			return false;
+		}
+		return systemMap->Typing();
 	}
 
 	void Hud::DestroyOwnedTextures()

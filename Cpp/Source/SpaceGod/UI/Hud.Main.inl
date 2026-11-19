@@ -75,6 +75,8 @@ public:
 	/// US-T306: before the commands each frame: while the galaxy map's find field is typed in it has the keys (true: the
 	/// owner hands the input over); the map closed some other way, the field lets them go.
 	bool UpdateGalaxyMapKeys();
+	/// US-T310: the same for the system map's find field.
+	bool UpdateSystemMapKeys();
 
 private:
 

@@ -427,7 +427,10 @@ namespace SpaceGod::UI
 	void SystemMapScreen::HandleInput(Rect canvas)
 	{
 		Event& e = Event::current();
-		bool over = canvas.Contains(e.mousePosition);
+		// US-T310: the find field and its results take their own clicks; a click on the map leaves the field.
+		bool overFind = findRect.Contains(e.mousePosition) || (!findHits.empty() && findListRect.Contains(e.mousePosition));
+		if (e.type == EventType::MouseDown && finding && !overFind) Closed();
+		bool over = canvas.Contains(e.mousePosition) && !overFind;
 		if (e.type == EventType::MouseUp) dragging = false;
 		if (!over && !dragging)
 		{
@@ -521,6 +524,11 @@ namespace SpaceGod::UI
 		auto canvas = Rect(legend.xMax() + 8, header.yMax() + 8, detail.xMin() - legend.xMax() - 16, screen.height - header.yMax() - 18);
 
 		if (!fitted) Fit(canvas);
+		// US-T310: the find field over the map's top left, its results under it; both before the map takes its clicks.
+		findRect = Rect(canvas.x + 8, canvas.y + 8, Mathf::Min(320.0f, canvas.width - 16), 28);
+		FindKeys();
+		RefreshFind();
+		findListRect = findHits.empty() ? Rect() : Rect(findRect.x, findRect.yMax() + 2, findRect.width, FindRowH * static_cast<float>(findHits.size()) + 4);
 		HandleInput(canvas);
 		if (Event::current().type == EventType::Repaint) DrawMap(canvas, jd);
 		DrawHeader(header);
@@ -528,6 +536,7 @@ namespace SpaceGod::UI
 		if (GUI::Button(Rect(legend.x + 10, legend.yMax() - 62, (legend.width - 26) / 2, 22), "FIT", button)) Fit(canvas);
 		if (GUI::Button(Rect(legend.x + 16 + (legend.width - 26) / 2, legend.yMax() - 62, (legend.width - 26) / 2, 22), "HERE", button)) CentreOnYou(canvas);
 		DrawDetail(detail, jd);
+		DrawFind(); // US-T310
 	}
 
 	void SystemMapScreen::DrawMap(Rect canvas, double jd)
@@ -682,6 +691,7 @@ namespace SpaceGod::UI
 			Label(Vector2(14, local.height - 34), Km(nice), UiStyle::Dim, true);
 		}
 
+		DrawFindMarks(local); // US-T310
 		if (hovered != nullptr) DrawTip(local, *hovered);
 		GUI::EndClip();
 	}
@@ -765,8 +775,8 @@ namespace SpaceGod::UI
 		auto old = GUI::contentColor;
 		GUI::contentColor = UiStyle::Dim;
 		GUI::Label(Rect(r.x + 12, r.y + 26, r.width - 200, 16),
-			app->IsPiloting() ? "Click to select  \xC2\xB7  double-click cruises there  \xC2\xB7  drag pans, wheel zooms  \xC2\xB7  Esc or Shift+[ closes"
-				: "Click to select  \xC2\xB7  double-click flies the view there  \xC2\xB7  drag pans, wheel zooms  \xC2\xB7  Esc or Shift+[ closes", small);
+			app->IsPiloting() ? "Click to select  \xC2\xB7  double-click cruises there  \xC2\xB7  drag pans, wheel zooms  \xC2\xB7  Ctrl+F finds  \xC2\xB7  Esc or Shift+[ closes"
+				: "Click to select  \xC2\xB7  double-click flies the view there  \xC2\xB7  drag pans, wheel zooms  \xC2\xB7  Ctrl+F finds  \xC2\xB7  Esc or Shift+[ closes", small); // US-T310
 		GUI::contentColor = old;
 		if (GUI::Button(Rect(r.xMax() - 180, r.y + 12, 80, 22), "GALAXY", button))
 		{
@@ -1049,6 +1059,8 @@ namespace SpaceGod::UI
 		tip->alignment = TextAnchor::UpperLeft;
 		tip->fontSize = text->fontSize;
 		tip->normal.textColor = S::Text;
+		fieldTex = S::FieldTexture(); // US-T310
+		field = S::FieldStyle(T::Label, fieldTex);
 	}
 
 	cs::Ref<Texture2D> SystemMapScreen::SoftDisc()
@@ -1077,6 +1089,7 @@ namespace SpaceGod::UI
 		buttonOnTex = nullptr;
 		tipTex = nullptr;
 		glow = nullptr;
+		fieldTex = nullptr;
 		title = nullptr; // the styles are made again, with fresh textures, next time it is drawn
 	}
 }

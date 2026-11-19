@@ -495,6 +495,7 @@ namespace SpaceGod
 		if (UpdateSocietyKeys()) Input.Handover(); // US-T298: so does the Society screen's
 		if (UpdateDiscoveriesKeys()) Input.Handover(); // US-T301: so does the discoveries screen's
 		if (hud != nullptr && hud->UpdateGalaxyMapKeys()) Input.Handover(); // US-T306: and the galaxy map's find
+		if (hud != nullptr && hud->UpdateSystemMapKeys()) Input.Handover(); // US-T310: and the system map's
 		TutorialKeys(); // US-T254: Shift+Enter / Shift+Esc on the tutorial's card (it never takes the other keys)
 		ArbitrateInput(true); // US-T90: one owner per input this frame (the craft held, else the command view)
 		int screensOpen = OpenScreens();
