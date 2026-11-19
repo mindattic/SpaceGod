@@ -178,6 +178,18 @@ namespace SpaceGod::Core
 			e.Ready = fight && loaded;
 			bar.Add(e);
 		}
+		// US-T332: any hull in a fight can call its side's fire onto the hull it has locked.
+		if (fight)
+		{
+			HelmAbilityEntry e;
+			e.Ability = HelmAbility::CallFire;
+			e.Label = "Call fire on the locked hull";
+			bool standing = u->FireCallTarget != nullptr && b->Seconds < u->FireCallUntil && u->FireCallTarget->Present();
+			e.State = standing ? cs::Cat("on the ", u->FireCallTarget->Name(), ", ", cs::Fmt(u->FireCallUntil - b->Seconds, "0"), " s")
+				: u->PlayerLockTarget != nullptr ? cs::Cat("at the ", u->PlayerLockTarget->Name()) : cs::String("lock a hull (T)");
+			e.Ready = u->PlayerLockTarget != nullptr;
+			bar.Add(e);
+		}
 		// US-T140: a hull with a squad of its band about it orders it through its captain, before any fight (last, so the
 		// slots above keep their keys).
 		if (world != nullptr && SquadOrders::SquadOf(world, ship).Count() > 0)
@@ -320,6 +332,14 @@ namespace SpaceGod::Core
 				auto target = u->PlayerLockTarget;
 				auto why = b->OrderPods(u, target);
 				return why.empty() ? cs::Cat("Boarding pods away for the ", target->Name()) : cs::Cat("No pods: ", why);
+			}
+			case HelmAbility::CallFire:
+			{
+				auto target = u->PlayerLockTarget;
+				int answering = 0;
+				auto why = b->OrderFireCall(u, target, answering);
+				return why.empty() ? cs::Cat("Fire on the ", target->Name(), ": ", answering, answering == 1 ? " ship answers" : " ships answer",
+					" for ", cs::Fmt(Battle::FireCallSeconds, "0"), " s") : cs::Cat("No call: ", why);
 			}
 			default:
 				return "";

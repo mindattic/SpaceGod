@@ -39,6 +39,10 @@ namespace SpaceGod::Core
 		/// <summary>US-T140: a band's captain orders the squad to stand down (out of a fight, <see cref="SquadOrders.StandDown"/>).
 		/// Last on the bar, so the slots before it keep their keys.</summary>
 		StandDown = 13,
+
+		/// <summary>US-T332: call the side's fire onto the locked hull (<see cref="Battle.OrderFireCall"/>), on every hull's bar
+		/// in a fight, before the squad's order.</summary>
+		CallFire = 14,
 	};
 
 	/// <summary>One entry of a helm's ability bar: what it does, and how it stands now (craft aboard, reloading, ready).</summary>

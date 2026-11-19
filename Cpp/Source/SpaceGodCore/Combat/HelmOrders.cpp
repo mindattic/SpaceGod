@@ -13,6 +13,7 @@
 #include "Combat/CombatState.h"
 #include "Combat/Dogfighting.h"
 #include "Combat/Fighters.h"
+#include "Combat/FleetCoordination.h" // US-T332
 #include "Settings/GameSetting.h"
 #include "Ships.h"
 
@@ -95,6 +96,47 @@ namespace SpaceGod::Core
 		sent = FighterAI::LaunchShuttle(shared_from_this(), u, target, c->Interior->TakeMarines(team), hull);
 		u->ShuttleLaunchIn = BoardingShuttles::LaunchSeconds;
 		return cs::String();
+	}
+
+	cs::String Battle::OrderFireCall(const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& target, int& answering)
+	{
+		answering = 0;
+		if (u == nullptr || u->Combat == nullptr) return "no hull at the helm";
+		if (target == nullptr) return "lock a hull first (T)";
+		if (!target->Present()) return cs::Cat("the ", target->Name(), " is gone");
+		if (!Hostile(u, target)) return cs::Cat("the ", target->Name(), " is not hostile");
+		if (target->Captured || target->Surrendering) return cs::Cat("the ", target->Name(), " has struck");
+		double reach = FleetCoordination::ReachKm()->Value;
+		for (const auto& o : Units)
+		{
+			if (o == u || o->Side != u->Side || !o->Present() || o->Captured || o->Kind == UnitKind::Fighter) continue;
+			if ((o->Pos - u->Pos).Length() > reach) continue;
+			o->RetargetIn = 0; // they pick again on their next thought, the call weighing in (PickTarget)
+			answering++;
+		}
+		if (answering == 0) return cs::Cat("no ship of ours within ", Km(reach), " to answer");
+		u->FireCallTarget = target;
+		u->FireCallUntil = Seconds + FireCallSeconds;
+		return cs::String();
+	}
+
+	cs::Ref<BattleUnit> Battle::CalledFireFor(const cs::Ref<BattleUnit>& u)
+	{
+		if (u == nullptr) return nullptr;
+		cs::Ref<BattleUnit> best = nullptr;
+		double bestKm = FleetCoordination::ReachKm()->Value;
+		for (const auto& c : Units)
+		{
+			if (c == u || c->FireCallTarget == nullptr || Seconds >= c->FireCallUntil || c->Side != u->Side || !c->Present()) continue;
+			if (!c->FireCallTarget->Present() || c->FireCallTarget->Captured || c->FireCallTarget->Surrendering) continue;
+			double d = (c->Pos - u->Pos).Length();
+			if (d <= bestKm)
+			{
+				bestKm = d;
+				best = c->FireCallTarget;
+			}
+		}
+		return best;
 	}
 
 	void Battle::HelmOrdersLapse(const cs::Ref<BattleUnit>& u)

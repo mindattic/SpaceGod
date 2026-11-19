@@ -213,7 +213,8 @@ namespace SpaceGod::Core
 		SG_OPT(WingCall), SG_OPT(WingHeld), SG_OPT(WingRecalled), // US-T106: a carrier's wing orders from the helm, absent from older saves
 		SG_OPT(JumpChargeS), SG_OPT(JumpDriveAt), SG_OPT(JumpHullAt), SG_OPT(JumpNeedS), SG_OPT(JumpRestartS), // US-T98: an escape jump's charge, absent from older saves
 		SG_OPT(Broadcast), // US-T96: its broadcast array, absent from older saves
-		SG_OPT(PlayerFireGroup)) // U.SPC-T277: a weapon group fired this step, absent from older saves
+		SG_OPT(PlayerFireGroup), // U.SPC-T277: a weapon group fired this step, absent from older saves
+		SG_OPT(FireCallTarget), SG_OPT(FireCallUntil)) // US-T332: a helm's call for fire, absent from older saves
 
 	SG_SERIALIZE(BoardingParty, "Unity.SpaceGod.Core.BoardingParty",
 		SG_F(Faction), SG_F(Landed), SG_F(Order), SG_F(Strength))

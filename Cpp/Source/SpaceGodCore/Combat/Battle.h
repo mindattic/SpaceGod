@@ -249,6 +249,11 @@ namespace SpaceGod::Core
 		bool WingHeld = false, WingRecalled = false;
 		int WingCall = 0;
 
+		/// <summary>US-T332: the hull the player at this helm called its side's fire onto, and the battle second the call
+		/// lapses (<see cref="Battle.OrderFireCall"/>). Never set by the AI.</summary>
+		cs::Ref<BattleUnit> FireCallTarget;
+		double FireCallUntil = 0;
+
 		/// <summary>Taken by boarders: it has changed sides and carries a prize crew, so it no longer fights.</summary>
 		bool Captured = false;
 
@@ -1353,6 +1358,22 @@ namespace SpaceGod::Core
 		/// <summary>The helm sends a boarding shuttle at <paramref name="target"/> with a team (the carrier keeping its reserve);
 		/// <paramref name="sent"/> is the shuttle. Empty when it went, else why not.</summary>
 		cs::String OrderShuttle(const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& target, cs::Ref<BattleUnit>& sent);
+
+		/// <summary>US-T332: how long a call for fire stands, battle seconds, and how much it weighs in a ship's choice of target
+		/// (as km nearer; a command ship's own focus is <see cref="FleetCoordination.Focus"/>).</summary>
+		static constexpr double FireCallSeconds = 30;
+		static constexpr double FireCallWeightKm = 40;
+
+		/// <summary>
+		/// US-T332: the helm calls its side's fire onto <paramref name="target"/> (the hull locked): every ship of its side
+		/// within <see cref="FleetCoordination.ReachKm"/> picks its target again now and, for <see cref="FireCallSeconds"/>,
+		/// favours that hull. <paramref name="answering"/> is how many ships heard it. Empty when given, else why not.
+		/// </summary>
+		cs::String OrderFireCall(const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& target, int& answering);
+
+		/// <summary>US-T332: the hull a standing call for fire puts before <paramref name="u"/>'s gunners (the nearest caller of its
+		/// side within reach), or null. Only a player's helm ever makes a call, so a fight nobody holds never sees one.</summary>
+		cs::Ref<BattleUnit> CalledFireFor(const cs::Ref<BattleUnit>& u);
 
 		/// <summary>A carrier's helm orders (<see cref="BattleUnit.WingHeld"/>) lapse once nobody holds its helm or flies one of
 		/// its craft: the recall and the call are lifted and its captain launches the wing held aboard, as at the start of a fight.</summary>

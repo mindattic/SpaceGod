@@ -585,6 +585,8 @@ namespace SpaceGod::Core
 		cs::Ref<BattleUnit> flagship = SideFlagship(u->Side);
 		// The hull its command ship is fighting, to concentrate on (U.SPC-T477).
 		auto focus = FleetCoordination::FocusTarget(u);
+		// US-T332: the hull a player's helm has called its side's fire onto (null in any fight nobody holds).
+		auto called = CalledFireFor(u);
 		for (const auto& o : Units)
 		{
 			if (!Hostile(u, o) || o->Captured || o->Surrendering) continue;
@@ -617,6 +619,7 @@ namespace SpaceGod::Core
 			score -= Choreography::TargetBias(u, o);
 			if (flagship != nullptr && flagship != u && flagship->Target == o) score -= 6;
 			if (focus != nullptr && focus == o) score -= FleetCoordination::Focus()->Value;
+			if (called != nullptr && called == o) score -= FireCallWeightKm;
 			score *= 0.85 + rng.NextDouble() * 0.3;
 			// Stickiness (U.SPC-T560): the current mark keeps the gun unless a rival is clearly better, so heading settles.
 			if (o == u->Target) score *= TargetStickiness;
