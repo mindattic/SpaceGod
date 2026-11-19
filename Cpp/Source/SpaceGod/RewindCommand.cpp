@@ -1,7 +1,8 @@
 // US-T99: sg.Rewind, time reversal's keyframe ring from the console (docs/REWIND.md, phase 2). sg.Rewind (or sg.Rewind
 // list) logs every keyframe kept, its age, size and capture time; sg.Rewind back <game seconds> loads the newest keyframe
 // at least that far back (else the session start); sg.Rewind to <id> loads that keyframe. Both act at the start of the
-// next frame, as Shift+F8 does.
+// next frame, as Shift+F8 does. Phase 3: sg.Rewind seek <game seconds back> and sg.Rewind at <session game seconds> go
+// to any moment (the keyframe before it, then the frame log replayed up to it); sg.Rewind bar shows the timeline bar.
 
 #include "UnitySpaceApp.h"
 
@@ -57,11 +58,31 @@ namespace
 			UE_LOG(LogSpaceGod, Display, TEXT("sg.Rewind: rewinding to keyframe #%d"), id);
 			return;
 		}
-		UE_LOG(LogSpaceGod, Warning, TEXT("sg.Rewind: usage: sg.Rewind [list | back <game seconds> | to <keyframe id>]"));
+		// Phase 3: to any moment, by the keyframe before it and the frame log replayed up to it.
+		if (args.Num() >= 2 && args[0].Equals(TEXT("seek"), ESearchCase::IgnoreCase))
+		{
+			double backS = FMath::Max(0.0, FCString::Atod(*args[1]));
+			app->RequestRewindSeek(FMath::Max(0.0, app->RewindSessionS() - backS));
+			UE_LOG(LogSpaceGod, Display, TEXT("sg.Rewind: seeking %.1f game seconds back"), backS);
+			return;
+		}
+		if (args.Num() >= 2 && args[0].Equals(TEXT("at"), ESearchCase::IgnoreCase))
+		{
+			double atS = FMath::Max(0.0, FCString::Atod(*args[1]));
+			app->RequestRewindSeek(atS);
+			UE_LOG(LogSpaceGod, Display, TEXT("sg.Rewind: seeking to %.1f game seconds into the session"), atS);
+			return;
+		}
+		if (args[0].Equals(TEXT("bar"), ESearchCase::IgnoreCase))
+		{
+			app->ShowRewindBar(30);
+			return;
+		}
+		UE_LOG(LogSpaceGod, Warning, TEXT("sg.Rewind: usage: sg.Rewind [list | back <game seconds> | to <keyframe id> | seek <game seconds back> | at <session game seconds> | bar]"));
 	}
 
 	FAutoConsoleCommand GRewindCommand(
 		TEXT("sg.Rewind"),
-		TEXT("US-T99: time reversal's keyframe ring: sg.Rewind [list | back <game seconds> | to <keyframe id>]."),
+		TEXT("US-T99: time reversal: sg.Rewind [list | back <game seconds> | to <keyframe id> | seek <game seconds back> | at <session game seconds> | bar]."),
 		FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& args) { RewindCommand(args); }));
 }

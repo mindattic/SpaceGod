@@ -273,15 +273,36 @@ The owner approved the build on 2026-11-19. The phases below each land on their 
 - *The live simulation is unchanged.* A keyframe is the same read-only walk an autosave makes (the probe showed taking
   keyframes leaves every digest as it was). Nothing in Core's simulation calls the ring, so the Bench digests cannot
   move.
-- *What it is not yet.* A rewind lands **exactly on a keyframe**, not on any tick between them, and keyframes are whole
+- *What it is not yet.* A rewind lands **exactly on a keyframe**, not on any tick between them (phase 3's seek adds
+  that), and keyframes are whole
   DEFLATE graphs (3-11 MB), not Oodle deltas. At 512 MB the ring holds about 50-150 keyframes, which the thinning
   spreads over the whole session.
 
-**Phase 3: the intervention log and seeking to any tick. Next.** Record every input frame (per `EmbodiableKey`, with
-its tick and the frame's dt; US-T169's requirement 1), every order and every clock change, keyed by (branch, session
-game seconds). A seek restores the keyframe before T and replays headless to T. This needs either a fixed simulation
-step or the logged dt (open problem 3). Then a timeline bar with an analytic preview. The fork for US-T104 happens at
-the first intervention after a seek.
+**Phase 3: the frame log, seeking by replay and the timeline bar. Part done** (US-T99).
+
+- *Frame log.* Each frame of single-player play is logged in the game layer (`UnitySpaceApp.Rewind.cpp`,
+  `RewindFrame`): its start on the timeline (session game seconds), the real seconds it stepped (open problem 3: the
+  logged dt), the clock's whole state just before it advanced (co-op's `ClockState`) and the date after, and whether the
+  player touched a key, a mouse button, the wheel or the pad that frame. Frames carry consecutive serials, and each
+  keyframe records the serial of the frame its world steps into next. The log holds about 10 minutes of frames (40,000,
+  under 64 bytes each). Play going on after a rewind drops the old future from the log as it goes.
+- *Seek.* `RewindSeek(T)` (`sg.Rewind seek <s back>`, `sg.Rewind at <session s>`, a click on the timeline bar) restores
+  the keyframe at or before T, then replays the logged frames through the game's own frame: each replayed frame gets
+  its logged dt and has its clock put in the logged state first (as a co-op client does with the host's frame), and the
+  player's input is handed over (idle). It stops at the frame that reaches T, or short of it at the first frame the
+  player acted on (that input is not replayed yet), at a gap in the log, or after 90 s of play replayed (replay runs at
+  the speed it was played). Esc stops a replay where it is. A replayed frame whose date differs from the log's is
+  counted and logged as a warning.
+- *Timeline bar.* Under the top of the screen after Shift+F8, after any rewind and while a seek replays (`sg.Rewind bar`
+  shows it for 30 s): the session from its start to now, a tick per keyframe (the session start wider), the replayable
+  stretch shaded blue, now in amber. Hovering a moment says how far back it is and whether it replays exactly; a click
+  seeks there (when the cursor is free, not at the controls).
+- *Not yet.* The player's own input in the log is only marked, not replayed, so a seek past an action lands just before
+  it; replaying it is the input recorder (per `EmbodiableKey` frames, orders, clock keys; US-T169's requirement 1). The
+  game frame's replay is not yet shown bit-exact: the world's adventures spawn round the camera's point
+  (`PlayerHelioKm`), which a restored view need not share, and console commands (`sg.*`) are not marked as input. In
+  co-op the log is off and a seek lands on the keyframe. The analytic preview on the bar, and the US-T104 fork at the
+  first intervention after a seek, are still to come.
 
 **Phase 4: cheaper storage and capture.** Use Oodle Kraken deltas against the parent keyframe, with every 16th
 keyframe whole. That needs the engine's Oodle SDK linked into the game module, not only into Bench.Rewind. Add the

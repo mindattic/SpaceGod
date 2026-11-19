@@ -475,6 +475,7 @@ namespace SpaceGod
 		bool overUi = IsPointerOverUi();
 		Input.Poll(overUi, ModelViewer::CapturesInput());
 		CaptureEvents::Hotkeys(Input); // US-T72: Alt+F9/F10/F11 while capture runs, on this machine only
+		if (RewindFrameStart(dt)) Input.Handover(); // US-T99: the frame for the rewind log; while a seek replays, the logged frame has it
 		// The galaxy map turns with its own drag: the camera behind it does not look about meanwhile.
 		if ((ShowGalaxyMap || ShowSystemMap /* US-T258 */ || ShowHelp || ShowLogs || ShowDiscoveries || ShowEncyclopedia || ShowSociety /* US-T293 */) && !ScreenCleared) Input.ReleaseLook(); // US-T261: the logs screen too; US-T259: the discoveries; US-T271: the Encyclopedia
 		// The pause menu has the frame: nothing else moves, and the stick and trigger do nothing, until it closes.
@@ -650,6 +651,7 @@ namespace SpaceGod
 		DrawInfluence(); // US-T140: the Influence meter, the embody gate's refusals, the squad's line
 		Tour::ShowcaseTour::Draw(*this); // US-T147: the showcase tour's strip
 		DrawTutorial(); // US-T254: the tutorial's card, or a first-time hint
+		DrawRewindBar(); // US-T99: the timeline bar (after Shift+F8, while a seek replays)
 		cheatMenu->Draw(*this); // US-T126: the dev menu, or the HUD's hint for its key
 		GUI::enabled = true;
 		if (menu) pauseMenu->Draw();
