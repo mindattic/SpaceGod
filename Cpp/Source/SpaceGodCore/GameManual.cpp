@@ -737,7 +737,8 @@ namespace SpaceGod::Core
 				  "shows today's share of the vote) or why it would be refused. A house's Chronicle button tells its history as prose, "
 				  "a paragraph a decade from its founding to who heads it now, with the people and houses each names to follow. "
 				  "A world's POWER ranks the houses, firms and organisations based there by wealth, capital or strength, each with its "
-				  "share as a bar.")), // US-T298, US-T299, US-T304, US-T308, US-T315, US-T323, US-T325, US-T327, US-T330, US-T334, US-T337, US-T344, US-T348, US-T351, US-T354, US-T358, US-T365, US-T368, US-T371, US-T375, US-T378
+				  "share as a bar. A person away says where they are bound, why, when they arrive and whom they meet; a world names "
+				  "its visitors and the conferences it hosts, and a business the conferences it sent people to.")), // US-T298, US-T299, US-T304, US-T308, US-T315, US-T323, US-T325, US-T327, US-T330, US-T334, US-T337, US-T344, US-T348, US-T351, US-T354, US-T358, US-T365, US-T368, US-T371, US-T375, US-T378, US-T384
 
 			cs::New<ManualChapter>("Comms and pilots", "Hailing ships and stations, piracy by radio, and the people you meet", Keys("COMMS AND PILOTS"),
 				T("Hailing",

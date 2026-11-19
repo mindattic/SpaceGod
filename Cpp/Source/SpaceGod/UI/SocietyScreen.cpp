@@ -1555,6 +1555,51 @@ namespace SpaceGod::UI
 		if (e.Rival != nullptr) links.emplace_back(e.Rival->Name, CivPick::Faction(e.Rival->Name));
 	}
 
+	namespace
+	{
+		// US-T384: a trip's purpose in plain words.
+		cs::String TripWhy(TripPurpose why)
+		{
+			switch (why)
+			{
+			case TripPurpose::Business: return "On business";
+			case TripPurpose::Conference: return "To a conference";
+			case TripPurpose::FamilyVisit: return "Visiting family";
+			case TripPurpose::Holiday: return "On holiday";
+			case TripPurpose::Honeymoon: return "On honeymoon";
+			case TripPurpose::Pilgrimage: return "On pilgrimage";
+			case TripPurpose::Study: return "Away to study";
+			case TripPurpose::Festival: return "To a festival";
+			case TripPurpose::Match: return "To a match";
+			}
+			return "Travelling";
+		}
+
+		// US-T384: where a trip stands, by its dates.
+		cs::String TripWhen(const Trip& t)
+		{
+			switch (t.Stage)
+			{
+			case TripStage::Planned: return cs::Cat("leaves ", SocietyDate(t.DepartJd));
+			case TripStage::Outbound: return cs::Cat("arrives ", SocietyDate(t.ArriveJd));
+			case TripStage::There: return cs::Cat("there until ", SocietyDate(t.LeaveJd));
+			case TripStage::Homeward: return cs::Cat("on the way home, back ", SocietyDate(t.HomeJd));
+			default: return cs::String();
+			}
+		}
+
+		// US-T384: a conference in one line: its trade, where, when, and how it went or stands.
+		cs::String ConferenceLine(const Conference& k, double jd)
+		{
+			cs::String when = k.Closed ? cs::Cat("held ", SocietyDate(k.OpensJd), " to ", SocietyDate(k.ClosesJd))
+				: jd < k.OpensJd ? cs::Cat("opens ", SocietyDate(k.OpensJd), " (in ", static_cast<int>(k.OpensJd - jd), " days)")
+				: cs::Cat("open now, until ", SocietyDate(k.ClosesJd));
+			return cs::Cat(k.Name, " on ", Core::ToString(k.Trade), k.Host != nullptr ? cs::Cat(" at ", k.Host->Name) : cs::String(), ", ", when, "  \xC2\xB7  ",
+				k.Delegates, k.Delegates == 1 ? " delegate" : " delegates", ", ", k.Attending.Count(), k.Attending.Count() == 1 ? " firm" : " firms",
+				k.Deals > 0 ? cs::Cat(", ", k.Deals, k.Deals == 1 ? " deal" : " deals") : cs::String());
+		}
+	}
+
 	void SocietyScreen::Describe(const CivPick& p, Galaxy& galaxy, Civilization& civ, double jd, cs::String& name, cs::List<cs::String>& lines,
 		std::vector<std::pair<cs::String, CivPick>>& links, std::vector<Hand>& hands)
 	{
@@ -1678,6 +1723,24 @@ namespace SpaceGod::UI
 			lines.Add(cs::Cat(c->Alive() ? cs::Cat(static_cast<int>(c->AgeYears(jd)), " years old") : cs::Cat("died ", SocietyDate(c->DiedJd)), ", ", Core::ToString(c->Role)));
 			lines.Add(cs::Cat("Traits: ", traits.empty() ? cs::String("none yet") : traits, "  \xC2\xB7  wants ", Core::ToString(c->Goal)));
 			lines.Add(cs::Cat("Reputation ", SocietySigned(c->Reputation), "  \xC2\xB7  skill ", cs::Fmt(c->Skill, "0.00"), c->Faith != nullptr ? cs::Cat("  \xC2\xB7  keeps ", Narrator::OrgName(*c->Faith)) : cs::String()));
+			// US-T384: where they are bound, why, when they get there and whom they go to see.
+			if (c->Alive() && c->TripId != 0)
+			{
+				cs::Ref<Trip> trip;
+				for (const auto& t : society->Trips)
+					if (t != nullptr && t->Id == c->TripId && t->Active()) { trip = t; break; }
+				if (trip != nullptr)
+				{
+					auto to = trip->To;
+					lines.Add(cs::Cat(TripWhy(trip->Purpose), to != nullptr ? cs::Cat(" to ", to->Name) : cs::String(), ", ", TripWhen(*trip),
+						trip->Meeting != nullptr ? cs::Cat(", meeting ", trip->Meeting->FullName()) : cs::String(),
+						trip->Conference != nullptr ? cs::Cat(" at ", trip->Conference->Name) : cs::String(), trip->Steered ? " (your hand sent them)" : ""));
+					if (to != nullptr) links.emplace_back(cs::Cat("Bound for ", to->Name), CivPick::World(to->Name));
+					if (trip->Meeting != nullptr) links.emplace_back(cs::Cat("Meeting ", trip->Meeting->FullName()), CivPick::Person(trip->Meeting->Id));
+					if (trip->Conference != nullptr && trip->Conference->Host != nullptr)
+						links.emplace_back(cs::Cat(trip->Conference->Name, " (", trip->Conference->Host->Name, ")"), CivPick::World(trip->Conference->Host->Name));
+				}
+			}
 			for (const auto& t : c->Ties)
 				if (t != nullptr && t->Other != nullptr)
 					lines.Add(cs::Cat("  ", Core::ToString(t->Kind), " of ", t->Other->FullName(), ", ", cs::Fmt(t->Strength, "0.00"), t->Other->Alive() ? "" : ", dead"));
@@ -1816,6 +1879,27 @@ namespace SpaceGod::UI
 				for (const auto& b : firms)
 					links.emplace_back(cs::Cat(b->Name, " (", Core::ToString(b->Kind), b->Home == s ? ", head office)" : ", branch)"), CivPick::Business(b->Id));
 			}
+			// US-T384: who is visiting now, and the conferences it hosts (open, coming or held).
+			if (society != nullptr)
+			{
+				constexpr int MaxVisitors = 6;
+				int visitors = 0;
+				for (const auto& t : society->Trips)
+				{
+					if (t == nullptr || t->Stage != TripStage::There || t->To != s || t->Traveller == nullptr) continue;
+					if (visitors++ < MaxVisitors)
+						links.emplace_back(cs::Cat("Visiting: ", t->Traveller->FullName(), " (", cs::Strings::ToLowerInvariant(TripWhy(t->Purpose)), ")"), CivPick::Person(t->Traveller->Id));
+				}
+				if (visitors > 0)
+					lines.Add(cs::Cat("Visitors here now: ", visitors, visitors > MaxVisitors ? cs::Cat(" (the first ", MaxVisitors, " linked)") : cs::String()));
+				for (const auto& k : society->Conferences)
+				{
+					if (k == nullptr || k->Host != s) continue;
+					lines.Add(cs::Cat("Hosts ", ConferenceLine(*k, jd)));
+					for (const auto& b : k->Attending)
+						if (b != nullptr) links.emplace_back(cs::Cat("At ", k->Name, ": ", b->Name), CivPick::Business(b->Id));
+				}
+			}
 			for (const auto& o : civ.Orgs)
 				if (o != nullptr && o->Active() && o->Seat == s) links.emplace_back(cs::Cat(Narrator::OrgName(*o), " (", Core::ToString(o->Kind), ")"), CivPick::Org(o->Id));
 			one("riot", "Stir a riot");
@@ -1876,6 +1960,13 @@ namespace SpaceGod::UI
 				if (o->Buyer == b) links.emplace_back(cs::Cat("Bought ", o->Name), CivPick::Business(o->Id));
 				else if (b->Trading() && o->Trading() && o->Kind == b->Kind && o->System != nullptr && o->System == b->System)
 					links.emplace_back(cs::Cat("Rival: ", o->Name, " (", Narrator::Money(o->Capital), ")"), CivPick::Business(o->Id));
+			}
+			// US-T384: the conferences it has sent people to.
+			for (const auto& k : society->Conferences)
+			{
+				if (k == nullptr || !k->Attending.Contains(b)) continue;
+				lines.Add(cs::Cat("Sent people to ", ConferenceLine(*k, jd)));
+				if (k->Host != nullptr) links.emplace_back(cs::Cat(k->Name, " (", k->Host->Name, ")"), CivPick::World(k->Host->Name));
 			}
 			int bribes = 0, exposed = 0;
 			double paid = 0;
