@@ -9,6 +9,7 @@
 #include "Astro.h"
 #include "Difficulty.h"
 #include "Settings/GameSetting.h"
+#include "UI/UiInput.h"
 
 using namespace SpaceGod::Core;
 
@@ -37,6 +38,25 @@ namespace SpaceGod::UI
 		dateText = NewGameSetup::FormatDate(Astro::JulianDate(cs::DateTime::UtcNow()));
 		seedText = cs::Cat(NewGameSetup::RandomSeed());
 		situation = StartSituation::GodView;
+		keyStart = false;
+	}
+
+	void NewGamePage::Keys()
+	{
+		if (!UiInput::present()) return;
+		auto pressed = [](KeyCode k) { return UiInput::WasPressedThisFrame(k); };
+		if (pressed(KeyCode::Return) || pressed(KeyCode::KeypadEnter))
+		{
+			keyStart = true;
+			return;
+		}
+		// The caret's keys while the date or the seed is typed in.
+		if (!GUI::GetNameOfFocusedControl().empty()) return;
+		int step = pressed(KeyCode::RightArrow) ? 1 : pressed(KeyCode::LeftArrow) ? -1
+			: pressed(KeyCode::DownArrow) ? 2 : pressed(KeyCode::UpArrow) ? -2 : 0;
+		if (step == 0) return;
+		const int count = NewGameSetup::SituationCount;
+		situation = static_cast<StartSituation>(((static_cast<int>(situation) + step) % count + count) % count);
 	}
 
 	double NewGamePage::PickedJd() const
@@ -69,6 +89,9 @@ namespace SpaceGod::UI
 		GUI::Label(Rect(r.x + 20, r.y + 38, w - 40, 32),
 			hosting ? cs::String("How the game you host starts; the players who join take it as you set it  \xC2\xB7  Esc to go back")
 				: cs::String("How the game starts  \xC2\xB7  Quick Start on the main menu skips this  \xC2\xB7  Esc to go back"), s.small);
+		// US-T317: the keys.
+		GUI::Label(Rect(r.x + 20, r.yMax() - 76, w - 40, 18),
+			hosting ? cs::String("Arrows pick how it starts  \xC2\xB7  Enter to host") : cs::String("Arrows pick how it starts  \xC2\xB7  Enter to start"), s.small);
 		const float lx = r.x + 20, cx = r.x + 160, cw = w - 180;
 		float y = r.y + 78;
 
@@ -127,6 +150,8 @@ namespace SpaceGod::UI
 		GUI::enabled = enabled && dateOk;
 		if (GUI::Button(Rect(r.xMax() - 250, r.yMax() - 50, 230, 34), hosting ? "Host Game" : "Start Game", s.buttonActive)) action = Action::Start;
 		GUI::enabled = enabled;
+		if (keyStart && dateOk) action = Action::Start; // US-T317
+		keyStart = false;
 		if (GUI::Button(Rect(r.x + 20, r.yMax() - 50, 110, 34), "Back", s.button)) action = Action::Back;
 		return action;
 	}

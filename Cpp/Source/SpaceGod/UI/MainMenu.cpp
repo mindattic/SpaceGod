@@ -191,6 +191,7 @@ namespace SpaceGod::UI
 		// US-T247: back to Host Co-op from its setup page; US-T245: Host and Join back to the Co-op page.
 		if (escape && page != Page::Main)
 			Open(page == Page::NewGame && newGame.Hosting() ? Page::Host : page == Page::Host || page == Page::Join ? Page::Coop : Page::Main);
+		else if (!escape && page == Page::NewGame) newGame.Keys(); // US-T317
 		else if (!escape) MenuKeys(); // US-T314
 	}
 

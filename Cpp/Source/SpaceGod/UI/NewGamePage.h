@@ -46,6 +46,10 @@ namespace SpaceGod::UI
 		/// Once a frame while the page is up, centred on the screen: what the player asked for.
 		Action Draw(const Styles& s);
 
+		/// US-T317: the page's keys, once a frame from the menu's Update (Esc is the menu's): Left / Right step the starting
+		/// situation and Up / Down a row of them while no field is typed in; Enter starts the game (Draw says Start, if the day is one).
+		void Keys();
+
 		/// The choices as they stand (valid once Draw has said Start).
 		Core::NewGameSetup Setup() const;
 
@@ -55,6 +59,8 @@ namespace SpaceGod::UI
 		cs::String dateText;
 		cs::String seedText;
 		Core::StartSituation situation = Core::StartSituation::GodView;
+		/// US-T317: Enter was pressed; the next Draw starts the game if the day is valid.
+		bool keyStart = false;
 
 		/// The typed day, or NaN while it is not one (pickDate only).
 		double PickedJd() const;

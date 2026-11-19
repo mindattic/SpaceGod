@@ -138,6 +138,7 @@ the sky cycle. A plain key never changes meaning with Shift unless the table say
 | Pause menu | Esc (last in the Esc chain) | anywhere | Resume, Help, Save / Load, Settings > Display, Main Menu, Quit |
 | Pause menu: pick / press a button | Up / Down or W / S, then Enter or Space; Left / Right on the leave question, Stay first (US-T311) | pause menu | - |
 | Main menu: pick / press a button | Up / Down or W / S, then Enter or Space (US-T314) | main menu, its Co-op and Extras pages | - |
+| New Game page: starting situation, start | Left / Right (Up / Down a row) while no field is typed in, Enter to start or host (US-T317) | New Game setup page | - |
 | Showcase tour | - | - | main menu, dev menu > Showcase, sg.Tour; then Right/N, Left/B, S, Space, 1-9, O, Esc |
 | Capture: screenshot, recording, replay | Alt+F9 / F10 / F11 | only while capture runs | - |
 
