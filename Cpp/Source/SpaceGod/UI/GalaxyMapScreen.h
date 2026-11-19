@@ -32,6 +32,7 @@ namespace SpaceGod::Core
 	class StrategicCommand;
 	class World;
 	class FtlTarget;
+	class JumpGate; // US-T355
 	struct Rgb;
 	class PolityDirectives; // US-T47
 	class ProductionFocus;
@@ -378,6 +379,12 @@ namespace SpaceGod::UI
 		/// course out (shown here once plotted: the run out, the jump, any wells on the way, the ETA and the fuel) and ENGAGE
 		/// AUTOPILOT flies it.
 		void DrawFtlSection(float& y, float x, float w, const cs::Ref<Core::FtlTarget>& target);
+
+		/// US-T355: THE WAY THERE: the gate route to a picked system leg by leg (each gate's far system, its light years and
+		/// days in the gate), what lies on the way (shut gates, war fronts, contested systems, raiders, raids on a lane) and
+		/// a last line summing up the dangers. Read only: the map model as the news has it. Stops at <paramref name="yMax"/>.
+		void DrawRouteLegs(float& y, float x, float w, float yMax, const cs::Ref<Core::StarSystem>& from,
+			const cs::Ref<cs::List<cs::Ref<Core::JumpGate>>>& route);
 
 		static cs::String Days(double d);
 

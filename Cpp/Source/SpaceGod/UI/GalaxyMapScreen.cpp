@@ -610,6 +610,7 @@ namespace SpaceGod::UI
 			auto pilotFaction = app->Piloted.Ship != nullptr ? app->Piloted.Ship->Faction : nullptr;
 			auto openRoute = app->Galaxy->Network->Route(app->ActiveSystem, s, pilotFaction != nullptr ? pilotFaction : app->ActiveSystem->Holder(), jd);
 			if (route != nullptr && openRoute == nullptr) Line(y, x, w, "Every way there is shut to you just now", FrontColor);
+			DrawRouteLegs(y, x, w, r.yMax(), app->ActiveSystem, openRoute != nullptr ? openRoute : route); // US-T355
 			cs::String news = app->Galaxy->Traffic != nullptr ? app->Galaxy->Traffic->News->Describe(app->ActiveSystem, s, jd) : cs::String();
 			Line(y, x, w, !news.empty() ? news : cs::String("no news"), Dim);
 			if (GUI::Button(Rect(x, y + 2, w, 28), app->IsPiloting() ? "PLOT A COURSE HERE THROUGH THE GATES" : "TRAVEL HERE THROUGH THE GATES", buttonOn)) Travel(s);
@@ -1108,6 +1109,71 @@ namespace SpaceGod::UI
 	cs::String GalaxyMapScreen::Days(double d)
 	{
 		return d < 1 ? cs::Cat(cs::Fmt(d * 24, "0"), " h") : cs::Cat(cs::Fmt(d, "0.0"), " days");
+	}
+
+	void GalaxyMapScreen::DrawRouteLegs(float& y, float x, float w, float yMax, const cs::Ref<StarSystem>& from,
+		const cs::Ref<cs::List<cs::Ref<JumpGate>>>& route)
+	{
+		if (route == nullptr || route->Count() == 0 || from == nullptr) return;
+		Heading(y, x, w, "THE WAY THERE");
+		constexpr int LegsShown = 8;
+		int shutLegs = 0, frontLegs = 0, contestedStops = 0, raiderLegs = 0, legNo = 0, unshown = 0;
+		auto at = from;
+		for (const auto& g : *route)
+		{
+			auto to = g != nullptr ? g->Destination() : nullptr;
+			if (to == nullptr) break;
+			legNo++;
+			cs::Ref<MapLink> lane = nullptr;
+			if (g->Link != nullptr)
+				for (const auto& l : model->Links)
+					if (l->Link == g->Link)
+					{
+						lane = l;
+						break;
+					}
+			auto stop = model->Of(to);
+			cs::String flags;
+			bool raiders = false, danger = false; // danger: shut, a front or contested (raiders alone tint it the raiders' colour)
+			if (lane != nullptr)
+			{
+				if (lane->Shut()) { flags += "  SHUT"; shutLegs++; danger = true; }
+				if (lane->WarFront) { flags += "  FRONT"; frontLegs++; danger = true; }
+				if (lane->Raids > 0) { flags += cs::Cat("  ", lane->Raids, lane->Raids == 1 ? " raid" : " raids"); raiders = true; }
+			}
+			if (stop != nullptr)
+			{
+				if (stop->Contested) { flags += "  contested"; contestedStops++; danger = true; }
+				if (stop->Pirates != PirateActivity::None)
+				{
+					flags += stop->Pirates == PirateActivity::High ? "  raiders, heavy" : "  raiders";
+					raiders = true;
+				}
+			}
+			if (raiders) raiderLegs++;
+			if (legNo > LegsShown || y > yMax - 40) unshown++;
+			else
+			{
+				cs::String ly = g->Link != nullptr ? cs::Cat(cs::Fmt(g->Link->Ly, "0.00"), " ly, ", Days(g->Link->TransitDays())) : cs::String();
+				Line(y, x, w, cs::Cat(legNo, ". ", at->Name, " \xE2\x86\x92 ", to->Name, "   ", ly, flags),
+					danger ? FrontColor : raiders ? PirateColor : Color::white());
+			}
+			at = to;
+		}
+		if (unshown > 0) Line(y, x, w, cs::Cat("... and ", unshown, unshown == 1 ? " more leg" : " more legs"), Dim);
+		if (shutLegs + frontLegs + contestedStops + raiderLegs == 0)
+		{
+			Line(y, x, w, "Nothing known in the way, as the news has it", Dim);
+			return;
+		}
+		cs::List<cs::String> parts;
+		if (shutLegs > 0) parts.Add(cs::Cat(shutLegs, shutLegs == 1 ? " shut gate" : " shut gates"));
+		if (frontLegs > 0) parts.Add(cs::Cat(frontLegs, frontLegs == 1 ? " war front" : " war fronts"));
+		if (contestedStops > 0) parts.Add(cs::Cat(contestedStops, contestedStops == 1 ? " contested system" : " contested systems"));
+		if (raiderLegs > 0) parts.Add(cs::Cat(raiderLegs, raiderLegs == 1 ? " leg with raiders" : " legs with raiders"));
+		cs::String sum;
+		for (int i = 0; i < parts.Count(); i++) sum += (i == 0 ? cs::String() : cs::String(", ")) + parts[i];
+		Line(y, x, w, cs::Cat("On the way: ", sum), shutLegs + frontLegs + contestedStops > 0 ? FrontColor : PirateColor);
 	}
 
 	cs::String GalaxyMapScreen::People(double n)
