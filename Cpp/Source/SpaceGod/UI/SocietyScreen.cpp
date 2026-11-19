@@ -820,7 +820,9 @@ namespace SpaceGod::UI
 		bool showRecent = event == nullptr && !selected.IsNone() && selected.Kind != CivPickKind::Trial;
 		if (showRecent) BuildRecent(selected, civ);
 		float recentH = showRecent ? HeadingH + (recent.empty() ? 24.0f : static_cast<float>(recent.size()) * 28.0f) + SectionGap : 0.0f;
-		float contentH = 30 + 22 + 12 + textH + SectionGap + (links.empty() ? 0.0f : HeadingH + linkH + SectionGap) + recentH
+		bool showTrends = event == nullptr && selected.Kind == CivPickKind::World;
+		float trendsH = showTrends ? DrawTrends(0, w, selected.Name, civ, jd, false) : 0.0f;
+		float contentH = 30 + 22 + 12 + textH + SectionGap + trendsH + (links.empty() ? 0.0f : HeadingH + linkH + SectionGap) + recentH
 			+ (selected.IsNone() || event != nullptr ? 0.0f : HeadingH + 30 + static_cast<float>(hands.size()) * 30.0f + SectionGap);
 		// US-T298: back and forward through what was picked, beside the title.
 		bool stepBack = false, stepForward = false;
@@ -858,6 +860,7 @@ namespace SpaceGod::UI
 			y += h + 2;
 		}
 		y += SectionGap;
+		if (showTrends) y += DrawTrends(y, w, selected.Name, civ, jd, true);
 		CivPick follow;
 		if (!links.empty())
 		{
@@ -918,6 +921,95 @@ namespace SpaceGod::UI
 		else if (followEvent != 0) Go(Visit{ CivPick(), followEvent });
 		else if (stepBack) StepBack();
 		else if (stepForward) StepForward();
+	}
+
+	float SocietyScreen::DrawTrends(float y, float w, const cs::String& world, Civilization& civ, double jd, bool draw)
+	{
+		static constexpr float TrendRowH = 26, BarH = 20, LabelW = 120, DeltaW = 150;
+		struct Measure
+		{
+			const char* Name;
+			double UnitySpaceApp::SocietyTrendSample::* Field;
+			/// Approval runs -1..1 from a middle line; the rest 0..1 from the floor. Rising is good only for approval.
+			bool Signed;
+		};
+		static const Measure Measures[] = {
+			{ "Approval", &UnitySpaceApp::SocietyTrendSample::Approval, true },
+			{ "Unrest", &UnitySpaceApp::SocietyTrendSample::Unrest, false },
+			{ "Crime", &UnitySpaceApp::SocietyTrendSample::Crime, false },
+			{ "Sickness", &UnitySpaceApp::SocietyTrendSample::Infected, false },
+			{ "War weariness", &UnitySpaceApp::SocietyTrendSample::Weariness, false },
+		};
+		const int rowsN = static_cast<int>(sizeof(Measures) / sizeof(Measures[0]));
+		const auto* sampled = app->SocietyTrendOf(world);
+		float h = HeadingH + (sampled == nullptr ? 24.0f : rowsN * TrendRowH + 20) + SectionGap;
+		if (!draw) return h;
+
+		// The samples the game took, then today's mood as the last bar (when the newest sample is older than a day).
+		std::vector<UnitySpaceApp::SocietyTrendSample> bars;
+		if (sampled != nullptr) bars = *sampled;
+		cs::Ref<Civics> now;
+		for (const auto& c : civ.Worlds)
+			if (c != nullptr && c->Where != nullptr && c->Where->Name == world) { now = c; break; }
+		if (now != nullptr && (bars.empty() || jd - bars.back().Jd > 1))
+			bars.push_back(UnitySpaceApp::SocietyTrendSample{ jd, now->Approval, now->Where->Unrest, now->Crime, now->Infected, now->Weariness });
+
+		GUI::Label(Rect(0, y, w, HeadingH - 4), sampled == nullptr ? cs::String("TRENDS")
+			: cs::Cat("TRENDS  (every ", static_cast<int>(UnitySpaceApp::SocietyTrendDays), " days since ", SocietyDate(sampled->front().Jd), ")"), heading);
+		y += HeadingH;
+		if (sampled == nullptr)
+		{
+			GUI::Label(Rect(0, y, w, 20), cs::Cat("Its mood is sampled every ", static_cast<int>(UnitySpaceApp::SocietyTrendDays),
+				" days while you play (not kept in saves); the first sample comes with the next."), small);
+			return h;
+		}
+		float chartW = Mathf::Max(60.0f, w - LabelW - DeltaW - 16);
+		float slot = chartW / static_cast<float>(UnitySpaceApp::SocietyTrendMax + 1);
+		float barW = Mathf::Max(2.0f, slot - 2);
+		Color keep = GUI::color;
+		for (const auto& m : Measures)
+		{
+			GUI::Label(Rect(0, y + 2, LabelW, 20), m.Name, text);
+			float x0 = LabelW;
+			GUI::color = Color(UiStyle::Edge.r, UiStyle::Edge.g, UiStyle::Edge.b, 0.25f);
+			GUI::DrawTexture(Rect(x0, y + 2, chartW, BarH), Texture2D::whiteTexture());
+			float mid = y + 2 + BarH * 0.5f, baseY = y + 2 + BarH;
+			if (m.Signed)
+			{
+				GUI::color = UiStyle::Edge;
+				GUI::DrawTexture(Rect(x0, mid, chartW, 1), Texture2D::whiteTexture());
+			}
+			for (size_t i = 0; i < bars.size(); i++)
+			{
+				double v = bars[i].*m.Field;
+				bool last = i + 1 == bars.size();
+				Color c = m.Signed ? (v >= 0 ? UiStyle::Good : UiStyle::Danger) : UiStyle::Accent;
+				GUI::color = Color(c.r, c.g, c.b, last ? 1.0f : 0.6f);
+				float x = x0 + static_cast<float>(i) * slot + 1;
+				if (m.Signed)
+				{
+					float bh = Mathf::Clamp(static_cast<float>(std::fabs(v)), 0.0f, 1.0f) * BarH * 0.5f;
+					GUI::DrawTexture(Rect(x, v >= 0 ? mid - bh : mid, barW, Mathf::Max(1.0f, bh)), Texture2D::whiteTexture());
+				}
+				else
+				{
+					float bh = Mathf::Clamp(static_cast<float>(v), 0.0f, 1.0f) * BarH;
+					GUI::DrawTexture(Rect(x, baseY - Mathf::Max(1.0f, bh), barW, Mathf::Max(1.0f, bh)), Texture2D::whiteTexture());
+				}
+			}
+			GUI::color = keep;
+			double first = bars.front().*m.Field, latest = bars.back().*m.Field;
+			double d = latest - first;
+			cs::String value = m.Signed ? SocietySigned(latest) : SocietyPct(latest);
+			cs::String change = bars.size() < 2 || std::fabs(d) < 0.005 ? cs::String("steady")
+				: m.Signed ? cs::Cat(d > 0 ? "up " : "down ", cs::Fmt(std::fabs(d), "0.00")) : cs::Cat(d > 0 ? "up " : "down ", cs::Fmt(std::fabs(d) * 100, "0"), " pts");
+			bool better = m.Signed ? d > 0 : d < 0;
+			GUI::Label(Rect(LabelW + chartW + 12, y + 2, DeltaW, 20), cs::Cat(value, "  ", change),
+				bars.size() < 2 || std::fabs(d) < 0.005 ? text : better ? good : bad);
+			y += TrendRowH;
+		}
+		GUI::Label(Rect(0, y, w, 18), "Bars run oldest to newest; the brightest is today.", small);
+		return h;
 	}
 
 	void SocietyScreen::EnsureStyles()

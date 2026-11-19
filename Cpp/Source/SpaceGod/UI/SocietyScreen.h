@@ -164,6 +164,9 @@ namespace SpaceGod::UI
 
 		/// US-T299: the latest events about <paramref name="p"/>.
 		void BuildRecent(const CivPick& p, Core::Civilization& civ);
+		/// <summary>US-T308: the TRENDS section of the world called <paramref name="world"/> at <paramref name="y"/> (its mood over the
+		/// samples the game took, a bar chart a row); returns its height, and draws only when <paramref name="draw"/>.</summary>
+		float DrawTrends(float y, float w, const cs::String& world, Core::Civilization& civ, double jd, bool draw);
 
 		/// The module group of a kind (an index into the group names), and the names.
 		static int GroupOf(int kind);

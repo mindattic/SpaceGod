@@ -679,7 +679,9 @@ namespace SpaceGod::Core
 				  "an organisation, a business, a world or a state: the Watched page lists what you watch with its latest event, "
 				  "the feed's doings filter steps on to Watched only, and while you play the newest thing to happen about it is "
 				  "told as a notice on screen (with how many more came with it). The watch list is yours, on this machine, for "
-				  "this galaxy.")), // US-T298, US-T299, US-T304
+				  "this galaxy. A world picked shows its Trends: how its approval, unrest, crime, sickness and war weariness have "
+				  "moved, one bar for every 30 days you have played (up to two years; not kept in saves), today's brightest, with "
+				  "the change since the first.")), // US-T298, US-T299, US-T304, US-T308
 
 			cs::New<ManualChapter>("Comms and pilots", "Hailing ships and stations, piracy by radio, and the people you meet", Keys("COMMS AND PILOTS"),
 				T("Hailing",

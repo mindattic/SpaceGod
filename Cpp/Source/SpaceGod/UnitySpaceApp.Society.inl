@@ -36,6 +36,17 @@ public:
 	bool IsWatched(const CivPick& p) const;
 	void ToggleWatch(const CivPick& p);
 
+	/// <summary>US-T308: one world's mood on one day, sampled every <see cref="SocietyTrendDays"/> game days while the game runs
+	/// (local to this machine and this galaxy, never saved: a load or a new game starts the trends over).</summary>
+	struct SocietyTrendSample
+	{
+		double Jd = 0, Approval = 0, Unrest = 0, Crime = 0, Infected = 0, Weariness = 0;
+	};
+	static constexpr double SocietyTrendDays = 30;
+	static constexpr int SocietyTrendMax = 24;
+	/// <summary>The samples of the world called <paramref name="world"/>, oldest first (null: none taken yet).</summary>
+	const std::vector<SocietyTrendSample>* SocietyTrendOf(const cs::String& world) const;
+
 private:
 	cs::Ref<UI::SocietyScreen> societyScreen;
 	/// <summary>US-T304: the civilization the watch list is about, the last event looked at, and the toast held back meanwhile
@@ -46,5 +57,11 @@ private:
 	double watchToastAt = -1e9;
 	/// <summary>US-T304: once a frame, any new event about something watched becomes a toast (at most one every few seconds).</summary>
 	void UpdateSocietyWatch();
+	/// <summary>US-T308: the worlds' trends, the civilization they are about, and the day the next sample is due.</summary>
+	std::map<cs::String, std::vector<SocietyTrendSample>> societyTrends;
+	const void* trendCiv = nullptr;
+	double trendNextJd = -1e18;
+	/// <summary>US-T308: once a frame, every world's mood is sampled when a sample is due (and the future dropped after a rewind).</summary>
+	void UpdateSocietyTrends();
 	/// <summary>A "civ" entry carried out on this peer (UnitySpaceApp.Coop.cpp): the asker's line, applied here.</summary>
 	void CoopCivHand(Coop::CoopPeer& peer, int seat, const cs::String& line);

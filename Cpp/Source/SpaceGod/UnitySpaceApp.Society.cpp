@@ -7,6 +7,7 @@
 
 #include "CivHand.h"
 #include "Coop/CoopPeer.h"
+#include "Economy/Settlement.h"
 #include "Input/KeyBindings.h"
 #include "SimClock.h"
 #include "Systems/Civilization/Civilization.h"
@@ -73,7 +74,44 @@ namespace SpaceGod
 	bool UnitySpaceApp::UpdateSocietyKeys()
 	{
 		UpdateSocietyWatch();
+		UpdateSocietyTrends();
 		return ShowSociety && societyScreen != nullptr && societyScreen->Typing();
+	}
+
+	const std::vector<UnitySpaceApp::SocietyTrendSample>* UnitySpaceApp::SocietyTrendOf(const cs::String& world) const
+	{
+		auto at = societyTrends.find(world);
+		return at == societyTrends.end() || at->second.empty() ? nullptr : &at->second;
+	}
+
+	void UnitySpaceApp::UpdateSocietyTrends()
+	{
+		auto civ = Galaxy != nullptr && Clock != nullptr ? Civilization::Find(*Galaxy) : nullptr;
+		if (civ == nullptr) return;
+		double jd = Clock->Jd;
+		// Another galaxy's people (a load, a new game): their worlds' past is not this one's.
+		if (civ.get() != trendCiv)
+		{
+			trendCiv = civ.get();
+			societyTrends.clear();
+			trendNextJd = -1e18;
+		}
+		// A rewind: what was sampled after the day rewound to has not happened (yet).
+		if (jd < trendNextJd - SocietyTrendDays)
+		{
+			for (auto& [name, samples] : societyTrends)
+				samples.erase(std::remove_if(samples.begin(), samples.end(), [jd](const SocietyTrendSample& s) { return s.Jd > jd; }), samples.end());
+			trendNextJd = jd;
+		}
+		if (jd < trendNextJd) return;
+		trendNextJd = jd + SocietyTrendDays;
+		for (const auto& c : civ->Worlds)
+		{
+			if (c == nullptr || c->Where == nullptr) continue;
+			auto& samples = societyTrends[c->Where->Name];
+			samples.push_back(SocietyTrendSample{ jd, c->Approval, c->Where->Unrest, c->Crime, c->Infected, c->Weariness });
+			if (static_cast<int>(samples.size()) > SocietyTrendMax) samples.erase(samples.begin());
+		}
 	}
 
 	bool UnitySpaceApp::IsWatched(const CivPick& p) const
