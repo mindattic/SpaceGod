@@ -82,6 +82,9 @@ namespace SpaceGod::UI
 		};
 
 		Page page = Page::Main;
+		/// US-T314: the button the keys have picked on the Main, Co-op or Extras page (-1 until Up / Down is pressed), and
+		/// the one Enter pressed, which the page's next draw presses as a click would.
+		int pick = -1, keyPress = -1;
 		NewGamePage newGame; // US-T247
 		const cs::Ref<PauseMenu> settings;
 		const cs::Ref<HelpScreen> help;
@@ -173,6 +176,17 @@ namespace SpaceGod::UI
 
 		void DrawCoop(); // US-T245
 		void DrawExtras(); // US-T245
+
+		/// US-T314: the Main, Co-op and Extras pages' keys: Up / Down (or W / S) pick a button (skipping those that can't be
+		/// pressed), Enter or Space presses it.
+		void MenuKeys();
+		/// US-T314: how many buttons the page has for the keys (0: the page takes no keys), and whether button i can be pressed.
+		int KeyButtons() const;
+		bool KeyButtonEnabled(int i) const;
+		/// US-T314: a page's button <paramref name="index"/> for the keys: lit while picked, pressed by a click or by Enter.
+		bool KeyButton(const Rect& r, const cs::String& label, const cs::Ref<GUIStyle>& style, int index);
+		/// US-T314: the keys' hint under a page's buttons.
+		void DrawKeyHint(const Rect& r);
 		void EnsureStyles();
 	};
 }

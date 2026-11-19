@@ -191,6 +191,63 @@ namespace SpaceGod::UI
 		// US-T247: back to Host Co-op from its setup page; US-T245: Host and Join back to the Co-op page.
 		if (escape && page != Page::Main)
 			Open(page == Page::NewGame && newGame.Hosting() ? Page::Host : page == Page::Host || page == Page::Join ? Page::Coop : Page::Main);
+		else if (!escape) MenuKeys(); // US-T314
+	}
+
+	// ---------------------------------------------------------------- the keys (US-T314)
+
+	int MainMenu::KeyButtons() const
+	{
+		switch (page)
+		{
+			case Page::Main: return 10; // Continue, New Game, Quick Start, Load Game, Co-op, Settings, Help, Credits, Extras, Quit
+			case Page::Coop: return 3; // Host Co-op, Join Co-op, Back
+			case Page::Extras: return 5; // Tutorial, Dogfight Demo, Dogfight (Heavy), Showcase Tour, Back
+			default: return 0;
+		}
+	}
+
+	bool MainMenu::KeyButtonEnabled(int i) const
+	{
+		if (page != Page::Main) return true;
+		if (i == 0) return latest != nullptr;
+		if (i == 3) return saveNames.Count() > 0;
+		return true;
+	}
+
+	void MainMenu::MenuKeys()
+	{
+		int count = KeyButtons();
+		if (count == 0 || !UiInput::present()) return;
+		auto pressed = [](KeyCode k) { return UiInput::WasPressedThisFrame(k); };
+		int step = pressed(KeyCode::UpArrow) || pressed(KeyCode::W) ? -1 : pressed(KeyCode::DownArrow) || pressed(KeyCode::S) ? 1 : 0;
+		if (step != 0)
+		{
+			int at = pick < 0 ? (step > 0 ? -1 : count) : pick;
+			for (int tries = 0; tries < count; tries++)
+			{
+				at = (at + step + count) % count;
+				if (KeyButtonEnabled(at)) break;
+			}
+			pick = at;
+		}
+		else if (pick >= 0 && KeyButtonEnabled(pick) && (pressed(KeyCode::Return) || pressed(KeyCode::KeypadEnter) || pressed(KeyCode::Space)))
+			keyPress = pick;
+	}
+
+	bool MainMenu::KeyButton(const Rect& r, const cs::String& label, const cs::Ref<GUIStyle>& style, int index)
+	{
+		// Once the keys pick, only the picked button is lit (Continue's and New Game's own light gives way).
+		const auto& lit = pick < 0 ? style : index == pick ? buttonActive : button;
+		bool clicked = GUI::Button(r, label, lit);
+		if (keyPress != index) return clicked;
+		keyPress = -1;
+		return GUI::enabled || clicked;
+	}
+
+	void MainMenu::DrawKeyHint(const Rect& r)
+	{
+		GUI::Label(r, "Up / Down to pick  ·  Enter to press", small);
 	}
 
 	void MainMenu::OnDestroy()
@@ -224,6 +281,7 @@ namespace SpaceGod::UI
 	void MainMenu::Open(Page p)
 	{
 		page = p;
+		pick = keyPress = -1; // US-T314
 		notice.clear();
 		deleteArmed.clear();
 		ReadProfile();
@@ -407,7 +465,7 @@ namespace SpaceGod::UI
 
 	void MainMenu::DrawMain()
 	{
-		const float w = 380, h = 474;
+		const float w = 380, h = 494; // US-T314: and the keys' hint
 		auto r = UnderHeading(w, h);
 		DrawHeading(r);
 		GUI::Box(r, GUIContent::none(), panel);
@@ -420,34 +478,35 @@ namespace SpaceGod::UI
 		float y = r.y + 80, bw = w - 40;
 		bool enabled = GUI::enabled;
 		GUI::enabled = enabled && latest != nullptr;
-		if (GUI::Button(Rect(r.x + 20, y, bw, 38), "Continue", latest != nullptr ? buttonActive : button)) GameLaunch::Load(latest->Slot);
+		if (KeyButton(Rect(r.x + 20, y, bw, 38), "Continue", latest != nullptr ? buttonActive : button, 0)) GameLaunch::Load(latest->Slot);
 		GUI::enabled = enabled;
 		// US-T247: New Game opens the setup page (date, seed, situation, difficulty); Quick Start keeps the one-click start (today,
 		// the usual galaxy, the god view, at the difficulty set, offering the tutorial once a profile, US-T254).
 		const float dw = 150;
-		if (GUI::Button(Rect(r.x + 20, y + 48, bw - dw - 10, 38), "New Game...", latest == nullptr ? buttonActive : button))
+		if (KeyButton(Rect(r.x + 20, y + 48, bw - dw - 10, 38), "New Game...", latest == nullptr ? buttonActive : button, 1))
 		{
 			newGame.Open(false);
 			Open(Page::NewGame);
 		}
-		if (GUI::Button(Rect(r.x + 20 + bw - dw, y + 48, dw, 38), "Quick Start", button)) GameLaunch::MenuNewGame();
+		if (KeyButton(Rect(r.x + 20 + bw - dw, y + 48, dw, 38), "Quick Start", button, 2)) GameLaunch::MenuNewGame();
 		GUI::enabled = enabled && saveNames.Count() > 0;
-		if (GUI::Button(Rect(r.x + 20, y + 96, bw, 38), "Load Game", button)) Open(Page::Load);
+		if (KeyButton(Rect(r.x + 20, y + 96, bw, 38), "Load Game", button, 3)) Open(Page::Load);
 		GUI::enabled = enabled;
 		// US-T245: one Co-op entry, leading to US-T248's Host Co-op and Join Co-op pages.
-		if (GUI::Button(Rect(r.x + 20, y + 144, bw, 38), "Co-op", button)) Open(Page::Coop);
-		if (GUI::Button(Rect(r.x + 20, y + 192, bw, 38), "Settings", button)) settings->OpenSettings();
+		if (KeyButton(Rect(r.x + 20, y + 144, bw, 38), "Co-op", button, 4)) Open(Page::Coop);
+		if (KeyButton(Rect(r.x + 20, y + 192, bw, 38), "Settings", button, 5)) settings->OpenSettings();
 		// US-T246: Credits beside Help.
 		const float half = (bw - 10) * 0.5f;
-		if (GUI::Button(Rect(r.x + 20, y + 240, half, 38), "Help", button)) Open(Page::Help);
-		if (GUI::Button(Rect(r.x + 30 + half, y + 240, half, 38), "Credits", button))
+		if (KeyButton(Rect(r.x + 20, y + 240, half, 38), "Help", button, 6)) Open(Page::Help);
+		if (KeyButton(Rect(r.x + 30 + half, y + 240, half, 38), "Credits", button, 7))
 		{
 			credits->Restart();
 			Open(Page::Credits);
 		}
 		// US-T245: the demos and the tour on a page of their own, out of the player's list.
-		if (GUI::Button(Rect(r.x + 20, y + 288, bw, 38), "Extras", button)) Open(Page::Extras);
-		if (GUI::Button(Rect(r.x + 20, y + 336, bw, 38), "Quit", button)) Quit();
+		if (KeyButton(Rect(r.x + 20, y + 288, bw, 38), "Extras", button, 8)) Open(Page::Extras);
+		if (KeyButton(Rect(r.x + 20, y + 336, bw, 38), "Quit", button, 9)) Quit();
+		DrawKeyHint(Rect(r.x + 20, y + 384, bw, 18)); // US-T314
 	}
 
 	void MainMenu::DrawCoop()
@@ -460,11 +519,12 @@ namespace SpaceGod::UI
 		GUI::Label(Rect(r.x + 20, r.y + 14, w - 40, 22), "CO-OP", title);
 		GUI::Label(Rect(r.x + 20, r.y + 38, w - 40, 18), "Play the same galaxy with friends  ·  Esc to go back", small);
 		float y = r.y + 70, bw = w - 40;
-		if (GUI::Button(Rect(r.x + 20, y, bw, 38), "Host Co-op", buttonActive)) Open(Page::Host);
+		if (KeyButton(Rect(r.x + 20, y, bw, 38), "Host Co-op", buttonActive, 0)) Open(Page::Host);
 		GUI::Label(Rect(r.x + 24, y + 40, bw - 8, 18), "Start a new game, Continue or any save, and let others join it", small);
-		if (GUI::Button(Rect(r.x + 20, y + 66, bw, 38), "Join Co-op", button)) Open(Page::Join);
+		if (KeyButton(Rect(r.x + 20, y + 66, bw, 38), "Join Co-op", button, 1)) Open(Page::Join);
 		GUI::Label(Rect(r.x + 24, y + 106, bw - 8, 18), "Join a game someone is hosting, by address or from your recent hosts", small);
-		if (GUI::Button(Rect(r.xMax() - 130, r.yMax() - 46, 110, 30), "Back", button)) Open(Page::Main);
+		DrawKeyHint(Rect(r.x + 20, y + 134, bw, 18)); // US-T314
+		if (KeyButton(Rect(r.xMax() - 130, r.yMax() - 46, 110, 30), "Back", button, 2)) Open(Page::Main);
 	}
 
 	void MainMenu::DrawExtras()
@@ -478,17 +538,18 @@ namespace SpaceGod::UI
 		GUI::Label(Rect(r.x + 20, r.y + 38, w - 40, 18), "Each starts a new game of its own  ·  Esc to go back", small);
 		float y = r.y + 70, bw = w - 40;
 		// US-T254: the guided tutorial, played by doing, any time (a new game with it running; Help has it too).
-		if (GUI::Button(Rect(r.x + 20, y, bw, 38), "Tutorial", button)) GameLaunch::Tutorial();
+		if (KeyButton(Rect(r.x + 20, y, bw, 38), "Tutorial", button, 0)) GameLaunch::Tutorial();
 		GUI::Label(Rect(r.x + 24, y + 40, bw - 8, 18), "The guided tutorial: the basics, played by doing", small);
 		// US-T88: a new game straight into the dogfight demo, at a light or a heavy fighter's helm (-dogfight / -dogfight-heavy).
 		const float half = (bw - 10) * 0.5f;
-		if (GUI::Button(Rect(r.x + 20, y + 66, half, 38), "Dogfight Demo", button)) GameLaunch::DogfightDemo(false);
-		if (GUI::Button(Rect(r.x + 30 + half, y + 66, half, 38), "Dogfight (Heavy)", button)) GameLaunch::DogfightDemo(true);
+		if (KeyButton(Rect(r.x + 20, y + 66, half, 38), "Dogfight Demo", button, 1)) GameLaunch::DogfightDemo(false);
+		if (KeyButton(Rect(r.x + 30 + half, y + 66, half, 38), "Dogfight (Heavy)", button, 2)) GameLaunch::DogfightDemo(true);
 		GUI::Label(Rect(r.x + 24, y + 106, bw - 8, 18), "Straight into a fight at a light or a heavy fighter's helm", small);
 		// US-T147: a new game straight into the showcase tour, every feature in turn (sg.Tour waits for the game it starts).
-		if (GUI::Button(Rect(r.x + 20, y + 132, bw, 38), "Showcase Tour", button) && GEngine) GEngine->Exec(nullptr, TEXT("sg.Tour"));
+		if (KeyButton(Rect(r.x + 20, y + 132, bw, 38), "Showcase Tour", button, 3) && GEngine) GEngine->Exec(nullptr, TEXT("sg.Tour"));
 		GUI::Label(Rect(r.x + 24, y + 172, bw - 8, 18), "Every feature in turn, played for you (Esc ends it)", small);
-		if (GUI::Button(Rect(r.xMax() - 130, r.yMax() - 46, 110, 30), "Back", button)) Open(Page::Main);
+		DrawKeyHint(Rect(r.x + 20, y + 200, bw, 18)); // US-T314
+		if (KeyButton(Rect(r.xMax() - 130, r.yMax() - 46, 110, 30), "Back", button, 4)) Open(Page::Main);
 	}
 
 	void MainMenu::DrawLoad()
