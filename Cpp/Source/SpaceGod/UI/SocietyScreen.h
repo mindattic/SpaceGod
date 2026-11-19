@@ -173,6 +173,9 @@ namespace SpaceGod::UI
 		std::vector<Row> rows;
 		cs::String rowsKey;
 		double rowsAt = -1;
+		/// US-T351: how many events about what is watched came since each was last looked at (the Watched page's button), and when counted.
+		int watchedNew = 0;
+		double watchedNewAt = -1e9;
 
 		void Rebuild(Core::Galaxy& galaxy, Core::Civilization* civ, double jd);
 		cs::String RowsKey() const;

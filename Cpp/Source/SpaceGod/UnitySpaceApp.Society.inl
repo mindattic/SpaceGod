@@ -38,6 +38,11 @@ public:
 	std::vector<CivPick> SocietyWatched;
 	bool IsWatched(const CivPick& p) const;
 	void ToggleWatch(const CivPick& p);
+	/// <summary>US-T351: the newest event id there was when <paramref name="p"/> was last looked at (taken up, or picked on the
+	/// Society screen): its events past it are new since. Not watched: the newest there is (nothing new).</summary>
+	int WatchSeenId(const CivPick& p) const;
+	/// <summary>US-T351: <paramref name="p"/> is being looked at now: everything about it so far is seen.</summary>
+	void MarkWatchSeen(const CivPick& p);
 
 	/// <summary>US-T308: one world's mood on one day, sampled every <see cref="SocietyTrendDays"/> game days while the game runs
 	/// (local to this machine and this galaxy, never saved: a load or a new game starts the trends over).</summary>
@@ -58,6 +63,11 @@ private:
 	int watchSeenId = 0, watchHeld = 0;
 	cs::String watchToast;
 	double watchToastAt = -1e9;
+	/// <summary>US-T351: for each watched thing, the newest event id when it was last looked at (local, never saved, like the
+	/// watch list).</summary>
+	std::vector<std::pair<CivPick, int>> watchLastSeen;
+	/// <summary>US-T351: the newest event's id in the galaxy's people's feed now (0: none, or no people yet).</summary>
+	int LatestSocialEventId() const;
 	/// <summary>US-T304: once a frame, any new event about something watched becomes a toast (at most one every few seconds).</summary>
 	void UpdateSocietyWatch();
 	/// <summary>US-T308: the worlds' trends, the civilization they are about, and the day the next sample is due.</summary>

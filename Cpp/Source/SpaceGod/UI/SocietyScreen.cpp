@@ -207,20 +207,25 @@ namespace SpaceGod::UI
 		}
 		if (page == Watched)
 		{
-			// What is watched, in the order it was taken up, each with its latest event.
+			// What is watched, in the order it was taken up, each with its latest event (US-T351: and how many came since it was
+			// last looked at, those first in the line).
 			for (const auto& p : app->SocietyWatched)
 			{
 				cs::Ref<SocialEvent> latest;
-				int count = 0;
+				int count = 0, fresh = 0;
+				int seenId = app->WatchSeenId(p);
 				for (int i = civ->Events.Count() - 1; i >= 0; i--)
 				{
 					const auto& e = civ->Events[i];
 					if (e == nullptr || !About(*e, p)) continue;
 					if (count++ == 0) latest = e;
+					if (e->Id > seenId) fresh++;
 				}
 				static const char* const WatchKinds[] = { "", "house", "person", "organisation", "world", "trial", "business", "state" };
-				Row r{ NameOf(p, galaxy, *civ), cs::Cat(WatchKinds[static_cast<int>(p.Kind)], "  \xC2\xB7  ", count, count == 1 ? " event kept" : " events kept",
-					latest != nullptr ? cs::Cat("  \xC2\xB7  latest ", SocietyDate(latest->Jd), ": ", Core::ToString(latest->Kind)) : cs::String()), p, nullptr };
+				Row r{ cs::Cat(NameOf(p, galaxy, *civ), fresh > 0 ? cs::Cat("   ", fresh, " NEW") : cs::String()),
+					cs::Cat(WatchKinds[static_cast<int>(p.Kind)], "  \xC2\xB7  ", count, count == 1 ? " event kept" : " events kept",
+					latest != nullptr ? cs::Cat("  \xC2\xB7  latest ", SocietyDate(latest->Jd), ": ", Core::ToString(latest->Kind)) : cs::String(),
+					fresh > 0 ? cs::Cat("  \xC2\xB7  ", fresh, fresh == 1 ? " event" : " events", " since you last looked") : cs::String()), p, nullptr };
 				if (Matches(r.Title, r.Line)) rows.push_back(r);
 			}
 			return;
@@ -702,6 +707,26 @@ namespace SpaceGod::UI
 
 		Rebuild(galaxy, civ.get(), jd);
 		HandleKeys();
+		// US-T351: what is picked is being looked at, so its news so far is seen; and the Watched page's button counts what is
+		// new across the watch list (twice a second: the feed only grows at its end, so each look stops at the first seen).
+		if (!selected.IsNone()) app->MarkWatchSeen(selected);
+		double nowS = FPlatformTime::Seconds();
+		if (civ != nullptr && nowS - watchedNewAt >= 0.5)
+		{
+			watchedNewAt = nowS;
+			watchedNew = 0;
+			for (const auto& p : app->SocietyWatched)
+			{
+				int seenId = app->WatchSeenId(p);
+				for (int i = civ->Events.Count() - 1; i >= 0; i--)
+				{
+					const auto& e = civ->Events[i];
+					if (e == nullptr) continue;
+					if (e->Id <= seenId) break;
+					if (About(*e, p)) watchedNew++;
+				}
+			}
+		}
 
 		float top = 88, bottom = screen.height - 64;
 		float pagesW = Mathf::Clamp(screen.width * 0.13f, 160.0f, 210.0f);
@@ -756,6 +781,7 @@ namespace SpaceGod::UI
 				y += HeadingH;
 			}
 			cs::String name = p < FirstView ? cs::String(SocietyPageNames[p]) : cs::String(SocietyViewName(views[p - FirstView]));
+			if (p == Watched && watchedNew > 0) name = cs::Cat(name, "  (", watchedNew, " new)"); // US-T351
 			if (GUI::Button(Rect(0, y, w, TabRowH - 4), name, p == page ? entrySelected : entry) && p != page)
 			{
 				page = p;

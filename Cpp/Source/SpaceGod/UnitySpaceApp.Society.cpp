@@ -142,8 +142,43 @@ namespace SpaceGod
 	{
 		if (p.IsNone() || p.Kind == CivPickKind::Trial) return;
 		auto at = std::find(SocietyWatched.begin(), SocietyWatched.end(), p);
+		auto seen = std::find_if(watchLastSeen.begin(), watchLastSeen.end(), [&](const std::pair<CivPick, int>& s) { return s.first == p; });
+		if (seen != watchLastSeen.end()) watchLastSeen.erase(seen);
 		if (at != SocietyWatched.end()) SocietyWatched.erase(at);
-		else SocietyWatched.push_back(p);
+		else
+		{
+			SocietyWatched.push_back(p);
+			watchLastSeen.emplace_back(p, LatestSocialEventId()); // US-T351: taken up now, so nothing about it is new yet
+		}
+	}
+
+	int UnitySpaceApp::LatestSocialEventId() const
+	{
+		auto civ = Galaxy != nullptr ? Civilization::Find(*Galaxy) : nullptr;
+		if (civ == nullptr) return 0;
+		for (int i = civ->Events.Count() - 1; i >= 0; i--)
+			if (civ->Events[i] != nullptr) return civ->Events[i]->Id;
+		return 0;
+	}
+
+	int UnitySpaceApp::WatchSeenId(const CivPick& p) const
+	{
+		for (const auto& s : watchLastSeen)
+			if (s.first == p) return s.second;
+		return LatestSocialEventId();
+	}
+
+	void UnitySpaceApp::MarkWatchSeen(const CivPick& p)
+	{
+		if (!IsWatched(p)) return;
+		int latestId = LatestSocialEventId();
+		for (auto& s : watchLastSeen)
+			if (s.first == p)
+			{
+				s.second = latestId;
+				return;
+			}
+		watchLastSeen.emplace_back(p, latestId);
 	}
 
 	void UnitySpaceApp::UpdateSocietyWatch()
@@ -156,14 +191,23 @@ namespace SpaceGod
 		// Another galaxy's people (a load, a new game): their ids name other people, so the list starts over.
 		if (civ.get() != watchCiv)
 		{
-			if (watchCiv != nullptr) SocietyWatched.clear();
+			if (watchCiv != nullptr)
+			{
+				SocietyWatched.clear();
+				watchLastSeen.clear(); // US-T351
+			}
 			watchCiv = civ.get();
 			watchSeenId = lastId;
 			watchHeld = 0;
 			watchToast.clear();
 			return;
 		}
-		if (lastId < watchSeenId) watchSeenId = lastId; // the feed went back (a rewind): look on from there
+		if (lastId < watchSeenId)
+		{
+			watchSeenId = lastId; // the feed went back (a rewind): look on from there
+			for (auto& s : watchLastSeen)
+				if (s.second > lastId) s.second = lastId; // US-T351: and so did what was seen
+		}
 		if (!SocietyWatched.empty() && lastId > watchSeenId)
 		{
 			bool newest = true;
