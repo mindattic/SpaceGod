@@ -105,7 +105,29 @@ namespace SpaceGod::UI
 		/// The map has been closed: the find field lets the keys go.
 		void Closed();
 
+		// ---------------------------------------------------------------- US-T377: pins (GalaxyMapScreen.Pins.cpp)
+
+		/// The map's pin keys, in the frame's Update while the map is up (not travelling, not typing in the find): Ctrl+1..9
+		/// pins the system picked to that slot (again on the same one: unpins it), a plain 1..9 picks the pinned system and
+		/// centres the map on it. True when the game's input is the map's this frame: a pin key used, or Ctrl held (so the
+		/// flight under the map neither drops a mine nor slows on a Ctrl+digit).
+		bool PinKeys();
+
 	private:
+		/// US-T377: the pinned systems by slot (1..9 at 0..8), by name; empty for a free slot. Saved in the profile
+		/// (galaxyMapPins), not the game save: the view's, so nothing is sent in co-op and the Bench is unchanged.
+		static constexpr int PinSlots = 9;
+		static constexpr const char* PinsSetting = "galaxyMapPins";
+		static constexpr float PinRowH = 20;
+		cs::String pins[PinSlots];
+		bool pinsLoaded = false;
+		/// Where the pins panel sits this draw (the map takes no clicks under it).
+		Rect pinsRect;
+		void LoadPins();
+		void SavePins();
+		void Pin(int slot);
+		void JumpToPin(int slot);
+		void DrawPins(Rect canvas);
 		/// One find result: a simulated system or a plain star on the charts, its name, a note (holder or distance), where.
 		struct FindHit
 		{

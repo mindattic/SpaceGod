@@ -105,6 +105,7 @@ namespace SpaceGod::UI
 		if (diplomacyMode) DrawDiplomacy(detail, jd);
 		else if (commandMode) DrawCommand(detail, jd);
 		else DrawDetail(detail, jd);
+		DrawPins(canvas); // US-T377
 		DrawFind(canvas); // US-T306
 	}
 
@@ -200,7 +201,7 @@ namespace SpaceGod::UI
 		// US-T306: the find field and its results take their own clicks; a click on the map leaves the field.
 		bool overFind = findRect.Contains(e.mousePosition) || (!findHits.empty() && findListRect.Contains(e.mousePosition));
 		if (e.type == EventType::MouseDown && finding && !overFind) Closed();
-		if (!canvas.Contains(e.mousePosition) || overFind)
+		if (!canvas.Contains(e.mousePosition) || overFind || pinsRect.Contains(e.mousePosition)) // US-T377: the pins panel takes its own clicks
 		{
 			if (e.type == EventType::Repaint)
 			{

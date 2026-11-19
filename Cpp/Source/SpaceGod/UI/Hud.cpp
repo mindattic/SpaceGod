@@ -1857,7 +1857,7 @@ namespace SpaceGod::UI
 			galaxyMap->Closed();
 			return false;
 		}
-		return galaxyMap->Typing();
+		return galaxyMap->Typing() || galaxyMap->PinKeys(); // US-T377: and its pin keys
 	}
 
 	bool Hud::UpdateSystemMapKeys()
