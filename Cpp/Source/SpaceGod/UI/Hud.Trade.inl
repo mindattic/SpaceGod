@@ -1,6 +1,12 @@
 // Hud.Trade.inl -- included INSIDE class Hud (see UI/Hud.h).
 // Port of Unity.SpaceGod's Runtime/UI/Hud.Trade.cs (the trade desk); bodies in UI/Hud.Trade.cpp.
 
+public:
+	/// <summary>US-T329: the trade desk's keys while it is open (Tab / Shift+Tab the pages, Page Up / Page Down the runs list).
+	/// <paramref name="keysFree"/>: no other panel has the keys this frame. True on a frame one of them was taken (the caller
+	/// hands input over, so the sensor ping and FTL plotting under them do not also go off).</summary>
+	bool UpdateTradeKeys(bool keysFree);
+
 private:
 	// ---------------------------------------------------------------- the trade desk (U.SPC-T426)
 

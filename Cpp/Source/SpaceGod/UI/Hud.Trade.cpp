@@ -6,6 +6,7 @@
 #include <tuple>
 
 #include "UnitySpaceApp.h"
+#include "Input/InputDevice.h" // US-T329
 
 #include "Astro.h"
 #include "Ships.h"
@@ -29,6 +30,26 @@ using namespace SpaceGod::Core;
 namespace SpaceGod::UI
 {
 	// ---------------------------------------------------------------- the trade desk (U.SPC-T426)
+
+	bool Hud::UpdateTradeKeys(bool keysFree)
+	{
+		if (!keysFree || !app->ShowTrade || !DrawerAvailable() || drawerOpen) return false;
+		const Input::InputDevice& kb = Input::InputDevice::current();
+		auto pressed = [&](Input::Key k) { return kb[k].wasPressedThisFrame; };
+		bool shift = kb[Input::Key::LeftShift].isPressed || kb[Input::Key::RightShift].isPressed;
+		constexpr int pages = static_cast<int>(TradeTab::Warehouses) + 1;
+		if (pressed(Input::Key::Tab))
+		{
+			tradeTab = static_cast<TradeTab>((static_cast<int>(tradeTab) + (shift ? pages - 1 : 1)) % pages);
+			tradeScroll = Vector2::zero();
+			return true;
+		}
+		if (tradeTab != TradeTab::Runs) return false;
+		constexpr float page = 280; // the runs list's view less a row
+		if (pressed(Input::Key::PageDown)) { tradeScroll.y += page; return true; }
+		if (pressed(Input::Key::PageUp)) { tradeScroll.y = Mathf::Max(0.0f, tradeScroll.y - page); return true; }
+		return false;
+	}
 
 	cs::Ref<Settlement> Hud::TradePortInView()
 	{
@@ -77,7 +98,7 @@ namespace SpaceGod::UI
 		}
 		GUI::contentColor = Dim;
 		GUI::Label(Rect(x + 8, y + 2, r.xMax() - x - 20, 18),
-			cs::Cat("account ", Credits(h->Balance()), purse != h->House ? cs::Cat("  ·  purse ", Credits(purse->Treasury)) : cs::String(), "   F12 to close"), small);
+			cs::Cat("account ", Credits(h->Balance()), purse != h->House ? cs::Cat("  ·  purse ", Credits(purse->Treasury)) : cs::String(), "   Tab pages  ·  F12 to close"), small);
 
 		y += 28;
 		auto view = Rect(r.x + 8, y, w - 16, listH);

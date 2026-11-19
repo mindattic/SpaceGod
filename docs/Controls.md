@@ -103,6 +103,7 @@ the sky cycle. A plain key never changes meaning with Shift unless the table say
 | Market | M | piloting near a settlement | - |
 | Cargo hold | I | piloting | - |
 | Trade desk | \ | anywhere | - |
+| Trade desk: next / previous page, scroll the runs | Tab / Shift+Tab, Page Up / Page Down on Runs (US-T329) | trade desk open | the page buttons |
 | Contracts / bounties / outfitting | F7 / F4 / F2 | port in view | market > Outfit |
 | News feed | X | command | - |
 | Hail polity | F12 | anywhere | galaxy map > Diplomacy |

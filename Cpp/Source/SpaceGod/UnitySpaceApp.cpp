@@ -490,6 +490,7 @@ namespace SpaceGod
 		if (UpdateCheatMenu()) Input.Handover();
 		if (UpdateComms()) Input.Handover(); // US-T137: the comms panel (Shift+H) has the keys while open; US-T138: the held pilot
 		if (hud != nullptr && hud->UpdateDrawer(!cheatMenu->IsOpen && !commsOpen)) Input.Handover(); // US-T200: the bottom drawer (Shift+U) has the keys while open
+		if (hud != nullptr && hud->UpdateTradeKeys(!cheatMenu->IsOpen && !commsOpen)) Input.Handover(); // US-T329: the trade desk's Tab / PgUp / PgDn, on the frame pressed
 		UpdateInfluence(); // US-T140: the embody gate's world, this frame
 		if (Tour::ShowcaseTour::Update(*this, !cheatMenu->IsOpen)) Input.Handover(); // US-T147: the showcase tour has the keys while it runs
 		if (UpdateEncyclopediaKeys()) Input.Handover(); // US-T271: the Encyclopedia's search has the keys while typed in
