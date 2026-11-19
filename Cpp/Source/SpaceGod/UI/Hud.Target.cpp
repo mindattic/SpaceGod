@@ -23,6 +23,9 @@
 #include "Ships.h"
 
 #include <algorithm>
+#include <deque> // US-T339
+#include <limits>
+#include <utility>
 #include <vector>
 
 using namespace SpaceGod::Core;
@@ -136,6 +139,56 @@ namespace SpaceGod::UI
 			GUI::color = old;
 		}
 
+		/// US-T339: the locked hull's hull + shield over the last few seconds of battle time, kept here (UI side only, never
+		/// saved, nothing read back into the fight) to estimate the rate it is being worn down at. Reset when the lock,
+		/// the battle or the clock (a rewind) changes.
+		struct FocusTrack
+		{
+			const BattleUnit* Unit = nullptr;
+			const Battle* Fight = nullptr;
+			std::deque<std::pair<double, double>> Samples; // (battle seconds, hull + shield)
+		};
+
+		FocusTrack& Focus()
+		{
+			static FocusTrack track;
+			return track;
+		}
+
+		constexpr double FocusWindowS = 12;
+		constexpr double FocusMinSpanS = 2;
+
+		/// Records the target's hull + shield now and returns the seconds to kill it at the rate seen over the window (< 0
+		/// when no rate is known yet, infinity when nothing is landing).
+		double TimeToKill(const Battle& fight, const BattleUnit& target, double hp)
+		{
+			auto& track = Focus();
+			double now = fight.Seconds;
+			if (track.Unit != &target || track.Fight != &fight || (!track.Samples.empty() && now < track.Samples.back().first))
+			{
+				track.Unit = &target;
+				track.Fight = &fight;
+				track.Samples.clear();
+			}
+			if (track.Samples.empty() || now > track.Samples.back().first) track.Samples.emplace_back(now, hp);
+			while (track.Samples.size() > 2 && now - track.Samples[1].first >= FocusWindowS) track.Samples.pop_front();
+			const auto& oldest = track.Samples.front();
+			double span = now - oldest.first;
+			if (span < FocusMinSpanS) return -1;
+			double rate = (oldest.second - hp) / span;
+			if (rate <= 1e-9) return std::numeric_limits<double>::infinity();
+			return hp / rate;
+		}
+
+		cs::String KillText(double seconds)
+		{
+			if (seconds < 0) return "reading the damage...";
+			if (seconds > 1800) return "no real damage landing";
+			int s = Mathf::RoundToInt(static_cast<float>(seconds));
+			if (s < 60) return cs::Cat("~", std::max(1, s), " s to kill");
+			return cs::Cat("~", s / 60, " m ", s % 60 < 10 ? "0" : "", s % 60, " s to kill");
+		}
+
 		Color HealthTint(double h)
 		{
 			if (h <= 0) return Color(0.55f, 0.55f, 0.55f, 0.9f);
@@ -174,10 +227,11 @@ namespace SpaceGod::UI
 		}
 		int patchRows = static_cast<int>((patches.size() + 1) / 2);
 		bool weakLine = fighterSeat || weak != nullptr;
+		bool focusLine = battle->Hostile(me, t); // US-T339: how many of ours are on it, and how long it has left
 
-		// Heading, name, class line, range line, hull, heat, the shields' caption and rows, the subsystems' caption, the
+		// Heading, name, class line, range line, (the focus line,) hull, heat, the shields' caption and rows, the subsystems' caption, the
 		// weak point and its key; then as many subsystem kinds as the column has room for.
-		float fixedH = 6 + RowH * 4 + RowH * 2 + RowH + patchRows * RowH + RowH + (weakLine ? RowH * 2 : 0) + 8;
+		float fixedH = 6 + RowH * 4 + (focusLine ? RowH : 0) + RowH * 2 + RowH + patchRows * RowH + RowH + (weakLine ? RowH * 2 : 0) + 8;
 		float room = layout.FreeRight() - HudLayout::Gap;
 		int kindRows = static_cast<int>(kinds.size());
 		if (fixedH + kindRows * RowH > room) kindRows = std::max(0, static_cast<int>((room - fixedH) / RowH));
@@ -207,6 +261,19 @@ namespace SpaceGod::UI
 		double closing = km > 1e-9 ? -DVec3::Dot(t->Vel - me->Vel, rel / km) : 0;
 		DrawLabel(cs::Cat(RangeText(km), "   ", closing >= 0 ? "closing " : "opening ", cs::Fmt(cs::Math::Abs(closing), "0.00"), " km/s"), Vector2(x, y), Dim, true);
 		y += RowH;
+
+		// US-T339: the focus on it -- you and the hulls and craft of your side whose target it is -- and a rough time to
+		// kill at the rate its hull and shield have fallen over the last FocusWindowS seconds. Read only.
+		if (focusLine)
+		{
+			int ours = 0;
+			for (const auto& o : battle->Units)
+				if (o != me && o != nullptr && o->Side == me->Side && o->Present() && !o->Captured && o->Target == t) ours++;
+			double eta = TimeToKill(*battle, *t, c->Hull + c->Shield());
+			cs::String who = ours == 0 ? cs::String("you alone") : cs::Cat("you + ", ours, " of ours");
+			DrawLabel(FitText(cs::Cat("FOCUS  ", who, "  \xC2\xB7  ", KillText(eta)), minorLabel, w), Vector2(x, y), ours > 0 ? Accent : Dim, true);
+			y += RowH;
+		}
 
 		// Hull and gun heat, each a caption and a bar.
 		constexpr float capW = 74;
