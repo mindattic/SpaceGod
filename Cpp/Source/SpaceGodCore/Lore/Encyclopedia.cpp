@@ -276,7 +276,7 @@ namespace SpaceGod::Core
 			case EncyclopediaCategory::Settlements: return "The colonies, outposts and pirate havens of each system are written in as you find them.";
 			case EncyclopediaCategory::Systems: return "A system is written in when a lookout charts its star or you visit it.";
 			case EncyclopediaCategory::Pilots: return "A pilot is written in when you hail them, fly their hull, fight them or pull them out of a wreck.";
-			case EncyclopediaCategory::Society: return "The galaxy's houses and organisations appear here once its people have lived a while.";
+			case EncyclopediaCategory::Society: return "The galaxy's houses, organisations, wonders and monuments appear here once its people have lived a while.";
 		}
 		return "";
 	}
@@ -855,6 +855,49 @@ namespace SpaceGod::Core
 			for (const auto& e : civ->Culture->Chronicle)
 				text = cs::Cat(text, text.empty() ? "" : "\n", static_cast<int>(2000 + (e->Jd - 2451544.5) / 365.25), ": ", e->ToString());
 			a->AddSection("", text);
+			Add(a);
+		}
+		// US-T274: the wonders travellers come to see (Commerce's tourism), each its own article, and the worlds' monuments.
+		cs::String monuments;
+		for (const auto& c : civ->Worlds)
+		{
+			if (c == nullptr || c->Where == nullptr) continue;
+			if (!c->Monument.empty())
+			{
+				// The monument keeps the kind of event it remembers (PeaceSummit): read as words (peace summit).
+				cs::String words;
+				for (char ch : c->Monument)
+				{
+					if (ch >= 'A' && ch <= 'Z' && !words.empty()) words += ' ';
+					words += static_cast<char>(ch >= 'A' && ch <= 'Z' ? ch - 'A' + 'a' : ch);
+				}
+				monuments = cs::Cat(monuments, monuments.empty() ? "" : "\n", c->Where->Name, ": a monument to the ", words);
+			}
+			if (c->Landmark.empty()) continue;
+			auto a = cs::New<EncyclopediaArticle>();
+			a->Id = MakeId(EncyclopediaCategory::Society, cs::Cat("landmark-", c->Where->Name));
+			a->Category = EncyclopediaCategory::Society;
+			cs::String title = c->Landmark;
+			if (!title.empty() && title[0] >= 'a' && title[0] <= 'z') title[0] = static_cast<char>(title[0] - 'a' + 'A');
+			a->Title = title;
+			a->Subtitle = cs::Cat("A wonder of ", c->Where->Name, c->System != nullptr ? cs::Cat(", in ", c->System->Name) : cs::String());
+			a->AlwaysKnown = true;
+			a->LoreKey = LoreKeys::Slug(cs::Cat("landmark-", c->Where->Name));
+			a->AddKeywords(cs::Cat("society landmark wonder tourism ", c->Where->Name));
+			cs::String record = lore.Long(a->LoreKey, "");
+			a->AddSection("", record.empty() ? cs::Cat("Travellers cross the galaxy to see ", c->Landmark, " on ", c->Where->Name, ", and its hotels prosper for it.") : record);
+			Add(a);
+		}
+		if (!monuments.empty())
+		{
+			auto a = cs::New<EncyclopediaArticle>();
+			a->Id = MakeId(EncyclopediaCategory::Society, "monuments");
+			a->Category = EncyclopediaCategory::Society;
+			a->Title = "Monuments";
+			a->Subtitle = "What the galaxy's worlds have carved in stone";
+			a->AlwaysKnown = true;
+			a->AddKeywords("monuments memorials history society");
+			a->AddSection("", monuments);
 			Add(a);
 		}
 	}

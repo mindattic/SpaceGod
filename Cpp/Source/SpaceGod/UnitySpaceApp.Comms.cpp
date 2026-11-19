@@ -19,6 +19,8 @@
 #include "Lore/LoreKeys.h"
 #include "PlayerOptions.h" // US-T252
 #include "Systems/Galaxy.h"
+#include "Systems/Civilization/Civilization.h" // US-T274: the people's talk, for rumours
+#include "Systems/Civilization/Narrator.h"
 #include "ScaleModel.h"
 #include "Sensors/Sensors.h"
 #include "Ships.h"
@@ -48,6 +50,32 @@ namespace SpaceGod
 			case CommsStance::Wary: return PlayerOptions::WaryColor();
 			default: return PlayerOptions::HostileColor();
 			}
+		}
+
+		/// <summary>
+		/// US-T274: what the people of <paramref name="sys"/> have been saying this past month, for a voice asked about rumours
+		/// (CommsContext.Gossip): the Civilization layer's rumours and propaganda first, else its news, in the Narrator's words
+		/// (Prose's when approved). Newest first, a handful at most; empty when there is no Civilization or nothing was said.
+		/// </summary>
+		cs::List<cs::String> SocietyGossip(const cs::Ref<Core::Galaxy>& galaxy, const cs::Ref<Core::StarSystem>& sys, double jd)
+		{
+			cs::List<cs::String> talk;
+			if (galaxy == nullptr || sys == nullptr) return talk;
+			auto civ = Civilization::Find(*galaxy);
+			if (civ == nullptr) return talk;
+			constexpr int Kept = 6;
+			constexpr double MonthDays = 30;
+			cs::List<cs::String> news;
+			for (int i = civ->Events.Count() - 1; i >= 0 && talk.Count() < Kept; i--)
+			{
+				const auto& e = civ->Events[i];
+				if (e == nullptr || e->Jd > jd) continue;
+				if (jd - e->Jd > MonthDays) break;
+				if (e->System != sys) continue;
+				if (e->Unverified) talk.Add(Narrator::Render(*e));
+				else if (news.Count() < Kept && Narrator::Notable(e->Kind)) news.Add(Narrator::Render(*e));
+			}
+			return talk.Count() > 0 ? talk : news;
 		}
 	}
 
@@ -164,6 +192,8 @@ namespace SpaceGod
 		}
 		// Solo, the panel says it straight away; the command (Core::CommsCommand, "comms <player> <target> <verb>") carries the
 		// same two numbers for a co-op peer or a replay, and Comms::Apply gives the same answer there.
+		// US-T274: asked for rumours, a voice may pass on what the system's people are saying (words only, nothing it does).
+		if (verb == CommsVerb::AskRumours) c.Gossip = SocietyGossip(Galaxy, ActiveSystem, Clock->Jd);
 		auto r = Comms::Apply(c, commsTarget.Key(), static_cast<int>(verb));
 		// US-T237: the answer to a hail is the speaker's approved Prose bark when there is one; else the generated greeting.
 		// US-T238: the bark replaces only the flavour; the line's gameplay rider (a cargo offer, a raider's demand) follows it.

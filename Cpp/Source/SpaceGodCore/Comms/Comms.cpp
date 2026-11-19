@@ -605,6 +605,12 @@ namespace SpaceGod::Core
 			}
 			return said;
 		}
+
+		/// US-T274: one of the system's lines of talk (CommsContext.Gossip, never empty here), picked by the seed.
+		cs::String Gossip(const CommsContext& c, uint32_t seed)
+		{
+			return c.Gossip[static_cast<int>(seed % static_cast<uint32_t>(c.Gossip.Count()))];
+		}
 	}
 
 	cs::String Comms::Rumours(const CommsContext& c, const CommsParty& to, CommsStance stance, const cs::Ref<NamedPilot>& p)
@@ -691,6 +697,8 @@ namespace SpaceGod::Core
 		case RumourVoice::Merchant:
 		case RumourVoice::Station:
 			said = PriceTip(c, them, false, stance == CommsStance::Friendly || voice == RumourVoice::Station);
+			// US-T274: a station with no tip passes on what its people are saying.
+			if (said.empty() && voice == RumourVoice::Station && c.Gossip.Count() > 0) said = cs::Cat("Nothing in the markets, but the concourse is talking: ", Gossip(c, seed));
 			if (said.empty()) said = "Prices are flat everywhere. Nobody's making money.";
 			break;
 		case RumourVoice::Miner:
@@ -699,8 +707,10 @@ namespace SpaceGod::Core
 			break;
 		default:
 		{
-			// An independent hears the gossip: something older than the news, still talked about.
-			for (int i = c.World->Events.Count() - 1; i >= 0; i--)
+			// An independent hears the gossip: the talk of the system's people first (US-T274), else something older than the
+			// news, still talked about.
+			if (c.Gossip.Count() > 0) said = cs::Cat("Word on the lanes: ", Gossip(c, seed));
+			for (int i = c.World->Events.Count() - 1; i >= 0 && said.empty(); i--)
 			{
 				const auto& ev = c.World->Events[i];
 				double age = c.Jd - ev.Jd;
@@ -721,6 +731,7 @@ namespace SpaceGod::Core
 		{
 			auto tip = voice == RumourVoice::Merchant || voice == RumourVoice::Miner ? cs::String() : PriceTip(c, them, false, false);
 			if (!tip.empty()) said = cs::Cat(said, " ", tip);
+			else if (c.Gossip.Count() > 0) said = cs::Cat(said, " And the talk is: ", Gossip(c, seed >> 3), " You didn't hear it from me."); // US-T274
 			else said = cs::Cat(said, " You didn't hear it from me.");
 		}
 		return said;

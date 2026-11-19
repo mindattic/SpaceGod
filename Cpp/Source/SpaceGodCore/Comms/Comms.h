@@ -141,6 +141,11 @@ namespace SpaceGod::Core
 		DVec3 HelioKm;
 		double Jd = 0;
 		CommsRuler Ruler;
+
+		/// <summary>US-T274: what the people of this system are saying lately (the Civilization layer's talk, its rumours first),
+		/// already in words (Narrator, Prose's when approved). Filled by the game only when rumours are asked for; empty in a
+		/// Core-only run or a test, where a voice falls back to the world's own news.</summary>
+		cs::List<cs::String> Gossip = cs::List<cs::String>();
 	};
 
 	/// <summary>One line on the comms log.</summary>
