@@ -79,6 +79,8 @@ public:
 	bool UpdateSystemMapKeys();
 	/// US-T346: while the Help screen (or its ship catalog) is up, the keys it steps with are its own, not the flight's.
 	bool UpdateHelpKeys();
+	/// US-T349: the same for the recovered logs screen's list and page keys.
+	bool UpdateLogsKeys();
 
 private:
 

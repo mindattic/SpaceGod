@@ -10,6 +10,7 @@
 #include "UI/SystemMapScreen.h" // US-T258
 #include "UI/HelpScreen.h"
 #include "UI/LogsScreen.h"
+#include "Input/InputDevice.h" // US-T349
 #include "GameLore.h"
 #include "UI/Icons.h"
 #include "Camera/SpaceCamera.h"
@@ -1872,6 +1873,17 @@ namespace SpaceGod::UI
 	bool Hud::UpdateHelpKeys()
 	{
 		return app->ShowHelp && helpScreen != nullptr && helpScreen->KeysDown();
+	}
+
+	bool Hud::UpdateLogsKeys()
+	{
+		if (!app->ShowLogs || logsScreen == nullptr) return false;
+		// US-T349: the arrows and Page Up / Page Down / Home / End pick a log and turn its pages while held, not the flight under it.
+		using ::SpaceGod::Input::Key;
+		const ::SpaceGod::Input::InputDevice& kb = ::SpaceGod::Input::InputDevice::current();
+		auto down = [&](Key k) { return kb[k].isPressed || kb[k].wasPressedThisFrame; };
+		return down(Key::UpArrow) || down(Key::DownArrow) || down(Key::LeftArrow) || down(Key::RightArrow)
+			|| down(Key::PageUp) || down(Key::PageDown) || down(Key::Home) || down(Key::End);
 	}
 
 	void Hud::DestroyOwnedTextures()

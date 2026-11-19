@@ -10,6 +10,7 @@
 #include "SimClock.h"
 #include "World.h"
 #include "Comms/Pilots.h"
+#include "Input/InputDevice.h" // US-T349
 #include "Law/Law.h"
 #include "Systems/DiscoveryLog.h"
 #include "Systems/Galaxy.h"
@@ -146,7 +147,13 @@ namespace SpaceGod
 			if (discoveriesScreen->Typing()) discoveriesScreen->Closed();
 			return false;
 		}
-		return discoveriesScreen->Typing();
+		if (discoveriesScreen->Typing()) return true;
+		// US-T349: the arrows and Page Up / Page Down / Home / End step its finds and kinds while held, not the flight under it.
+		using ::SpaceGod::Input::Key;
+		const ::SpaceGod::Input::InputDevice& kb = ::SpaceGod::Input::InputDevice::current();
+		auto down = [&](Key k) { return kb[k].isPressed || kb[k].wasPressedThisFrame; };
+		return down(Key::UpArrow) || down(Key::DownArrow) || down(Key::LeftArrow) || down(Key::RightArrow)
+			|| down(Key::PageUp) || down(Key::PageDown) || down(Key::Home) || down(Key::End);
 	}
 
 	void UnitySpaceApp::DestroyDiscoveriesTextures()
