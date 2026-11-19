@@ -1606,6 +1606,78 @@ namespace SpaceGod::UI
 
 	// ---------------------------------------------------------------- the helm's abilities (US-T106)
 
+	namespace
+	{
+		/// <summary>US-T374: what a helm bar entry does, who answers it and how long it lasts, for its hover card. UI-side words
+		/// only (from the manual and Combat/HelmOrders.cpp); an ability not listed here gets the label-and-state card alone.</summary>
+		struct HelmHelpText
+		{
+			const char* What = nullptr;
+			const char* Who = nullptr;
+			const char* Lasts = nullptr;
+		};
+
+		HelmHelpText HelmHelpFor(HelmAbility a)
+		{
+			switch (a)
+			{
+				case HelmAbility::LaunchInterceptors:
+				case HelmAbility::LaunchFighters:
+				case HelmAbility::LaunchBombers:
+				case HelmAbility::LaunchHeavyFighters:
+				case HelmAbility::LaunchRecon:
+					return { "Launches this class of craft from your hangar into the fight.", "The craft of that class aboard, as the deck sends them out.",
+						"Until they are recalled, lost or out of fuel and ammunition." };
+				case HelmAbility::RecallWing:
+					return { "Calls every craft of your wing back aboard to rearm and repair.", "Your own wing.", "Until they are aboard." };
+				case HelmAbility::WingAttack:
+					return { "Sends your wing onto the hull you have locked.", "Your own wing.", "Until you give the wing another call." };
+				case HelmAbility::WingGuard:
+					return { "Calls your wing back to guard the carrier.", "Your own wing.", "Until you give the wing another call." };
+				case HelmAbility::WingFree:
+					return { "Lets your wing pick its own fights again.", "Your own wing.", "Until you give the wing another call." };
+				case HelmAbility::SendShuttle:
+					return { "Sends a boarding shuttle with a marine team at the locked hull.", "Your shuttle bay.", "One shuttle per use, while teams and shuttles last." };
+				case HelmAbility::FireBreacher:
+					return { "Fires a Breacher round at the locked hull; it latches on and puts a boarding team aboard.", "Your Breacher bay.", "One round per use, then the bay cycles." };
+				case HelmAbility::FirePods:
+					return { "Fires boarding pods at the locked hull.", "Your pod launchers.", "One volley per use." };
+				case HelmAbility::StandDown:
+					return { "Orders your band's squad to stand down.", "Your squad, through its captain.", "Until you give it another order." };
+				case HelmAbility::CallFire:
+					return { "Your side's ships pick again and favour the hull you have locked.", "Ships of your side within command reach.", "30 seconds." };
+				case HelmAbility::ScreenMe:
+					return { "Your side's flak and interceptor hulls keep between you and the enemy.", "Screening hulls of your side within command reach.", "60 seconds." };
+				case HelmAbility::PaintTarget:
+					return { "Your recon craft paint the locked hull: your bombers go for it first and their torpedoes home harder.",
+						"Recon craft of your side aloft.", "45 seconds." };
+				case HelmAbility::FallBackOnMe:
+					return { "Your badly damaged ships break off and take station just behind you, away from the enemy.",
+						"Ships of your side under half their hull, within command reach.", "30 seconds." };
+				case HelmAbility::RushRepairs:
+					return { "Every damage control team rushes the worst-hurt system, three times as fast; your guns reload at half pace meanwhile.",
+						"Your own damage control teams.", "20 seconds." };
+				case HelmAbility::HoldFire:
+					return { "Your side's ships hold every gun but point defence; used again, it calls weapons free at once.",
+						"Ships of your side within command reach.", "60 seconds, or until weapons free." };
+				case HelmAbility::Cripple:
+					return { "Your side's ships go for the locked hull and aim at its drives, so it can neither run nor turn.",
+						"Ships of your side within command reach.", "30 seconds." };
+				case HelmAbility::Withdraw:
+					return { "Your side's ships break off and leave the fight together, the healthiest covering the most hurt; used again, it calls them back.",
+						"Ships of your side within command reach still fighting.", "Until they are clear or you call them back." };
+				case HelmAbility::DemandSurrender:
+					return { "Hails the locked hull to strike; its crew weigh damage, odds and nerve, and strike, run or refuse.",
+						"The locked hostile hull's crew.", "Answered at once; 20 seconds before you can hail again." };
+				case HelmAbility::BoardIt:
+					return { "Your boarders go for the locked hull once it is disabled or has struck: carriers send shuttle teams, marine hulls close to board.",
+						"Boarders of your side within command reach.", "Until the prize is taken or no longer open to boarding." };
+				default:
+					return {};
+			}
+		}
+	}
+
 	void Hud::DrawHelmAbilities()
 	{
 		if (!app->IsPiloting() || app->Travel->Active || app->ShowPicker) return;
@@ -1662,6 +1734,9 @@ namespace SpaceGod::UI
 		GUI::Label(Rect(r.x + pad, r.y + pad - 2, w - 2 * pad, rowH), heading, small);
 		x = 0;
 		int onRow = 0;
+		int hovered = -1; // US-T374
+		float hoveredX = 0;
+		auto mouseAt = Event::current().mousePosition;
 		for (int i = 0; i < texts.Count(); i++)
 		{
 			if (rowOf[i] != onRow)
@@ -1670,10 +1745,45 @@ namespace SpaceGod::UI
 				x = 0;
 			}
 			GUI::contentColor = bar[i].Ready ? Color(0.55f, 1.0f, 0.65f, keyed[i] ? 1.0f : 0.45f) : keyed[i] ? Dim : Color(Dim.r, Dim.g, Dim.b, Dim.a * 0.5f);
-			GUI::Label(Rect(r.x + pad + x, r.y + pad - 2 + rowH * (onRow + 1), widths[i] + 4, rowH), texts[i], small);
+			auto entryRect = Rect(r.x + pad + x, r.y + pad - 2 + rowH * (onRow + 1), widths[i] + 4, rowH);
+			GUI::Label(entryRect, texts[i], small);
+			if (entryRect.Contains(mouseAt))
+			{
+				hovered = i;
+				hoveredX = entryRect.x;
+			}
 			x += widths[i] + gap;
 		}
 		GUI::contentColor = old;
+		// US-T374: the entry under the mouse gets a card above the bar (clear of the standing strip): what it does, who answers,
+		// how long it lasts, and why it is greyed out when it is. Read only.
+		if (hovered >= 0)
+		{
+			const auto& entry = bar[hovered];
+			auto helpText = HelmHelpFor(entry.Ability);
+			cs::List<cs::String> cardLines;
+			if (helpText.What != nullptr) cardLines.Add(helpText.What);
+			if (helpText.Who != nullptr) cardLines.Add(cs::Cat("Who answers: ", helpText.Who));
+			if (helpText.Lasts != nullptr) cardLines.Add(cs::Cat("Lasts: ", helpText.Lasts));
+			if (!entry.State.empty()) cardLines.Add(cs::Cat(entry.Ready ? "Now: " : "Not now: ", entry.State));
+			float cardW = small->CalcSize(GUIContent(entry.Label)).x;
+			for (const auto& l : cardLines) cardW = Mathf::Max(cardW, small->CalcSize(GUIContent(l)).x);
+			cardW = Mathf::Min(cardW + 2 * pad + 4, static_cast<float>(Screen::width) - 20);
+			float cardH = pad * 2 + rowH * (cardLines.Count() + 1);
+			float cardX = Mathf::Clamp(hoveredX, 10.0f, static_cast<float>(Screen::width) - cardW - 10);
+			auto cardRect = Rect(cardX, r.y - 8 - (rowH + pad) - 4 - cardH, cardW, cardH);
+			RegisterUi(cardRect); // US-T212
+			GUI::Box(cardRect, GUIContent::none(), panel);
+			GUI::contentColor = entry.Ready ? Color(0.55f, 1.0f, 0.65f, 1.0f) : Color::white();
+			GUI::Label(Rect(cardRect.x + pad, cardRect.y + pad - 2, cardW - 2 * pad, rowH), entry.Label, small);
+			for (int li = 0; li < cardLines.Count(); li++)
+			{
+				bool why = !entry.Ready && li == cardLines.Count() - 1 && !entry.State.empty();
+				GUI::contentColor = why ? Color(1.0f, 0.82f, 0.4f, 1.0f) : Dim;
+				GUI::Label(Rect(cardRect.x + pad, cardRect.y + pad - 2 + rowH * (li + 1), cardW - 2 * pad, rowH), cardLines[li], small);
+			}
+			GUI::contentColor = old;
+		}
 		// US-T361: the calls this helm has standing in the fight, each with its mark and the time left, in one strip just above
 		// the bar. Read only: it looks at the helm's call fields and draws nothing out of a fight or with nothing standing.
 		auto soBattle = helm->Ship->Battle;
