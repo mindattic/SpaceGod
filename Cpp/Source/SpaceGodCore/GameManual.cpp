@@ -709,7 +709,9 @@ namespace SpaceGod::Core
 				  "it. Your hand lists everything the SpaceGod's hand brought about, newest first, with how many events followed "
 				  "about the same people, houses, organisations and businesses within a year; pick one to read What came of it, "
 				  "those later events in order, each a click away. A person picked shows their Life in order: born into their house "
-				  "and on what world, then everything kept about them, oldest first, each a click away, and their death.")), // US-T298, US-T299, US-T304, US-T308, US-T315, US-T323, US-T325, US-T327
+				  "and on what world, then everything kept about them, oldest first, each a click away, and their death. A world "
+				  "picked names who matters there: its governor, its houses by wealth, its best-known residents and the firms "
+				  "trading there, at their head office or a branch.")), // US-T298, US-T299, US-T304, US-T308, US-T315, US-T323, US-T325, US-T327, US-T330
 
 			cs::New<ManualChapter>("Comms and pilots", "Hailing ships and stations, piracy by radio, and the people you meet", Keys("COMMS AND PILOTS"),
 				T("Hailing",

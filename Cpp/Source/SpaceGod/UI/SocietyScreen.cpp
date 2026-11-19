@@ -853,11 +853,50 @@ namespace SpaceGod::UI
 			if (!c->Monument.empty()) lines.Add(cs::Cat("Monument: ", c->Monument));
 			if (s->Owner != nullptr) links.emplace_back(s->Owner->Name, CivPick::Faction(s->Owner->Name));
 			if (c->Faith != nullptr) links.emplace_back(Narrator::OrgName(*c->Faith), CivPick::Org(c->Faith->Id));
+			// US-T330: who matters here: the governor, the houses by wealth, the best known who live here and the firms that trade here.
 			if (society != nullptr)
-				for (const auto& h : society->HousesOf(s))
-					if (h != nullptr) links.emplace_back(cs::Cat("House ", h->Surname), CivPick::House(h->Id));
+			{
+				auto houses = society->HousesOf(s);
+				std::vector<cs::Ref<Household>> byWealth;
+				std::vector<cs::Ref<Citizen>> residents;
+				cs::Ref<Citizen> governor;
+				for (const auto& h : houses)
+				{
+					if (h == nullptr) continue;
+					byWealth.push_back(h);
+					for (const auto& m : h->Members)
+					{
+						if (m == nullptr || !m->Alive()) continue;
+						if (m->Role == CitizenRole::Governor) governor = m;
+						else residents.push_back(m);
+					}
+				}
+				std::stable_sort(byWealth.begin(), byWealth.end(), [](const cs::Ref<Household>& a, const cs::Ref<Household>& b) { return a->Wealth > b->Wealth; });
+				std::stable_sort(residents.begin(), residents.end(), [](const cs::Ref<Citizen>& a, const cs::Ref<Citizen>& b) { return a->Reputation > b->Reputation; });
+				std::vector<cs::Ref<Business>> firms;
+				for (const auto& b : society->Businesses)
+					if (b != nullptr && b->Trading() && (b->Home == s || b->Branches.Contains(s))) firms.push_back(b);
+				lines.Add(cs::Cat("Here: ", static_cast<int>(byWealth.size()), " houses, ", static_cast<int>(residents.size()) + (governor != nullptr ? 1 : 0), " living people, ",
+					static_cast<int>(firms.size()), " firms trading"));
+				if (governor != nullptr)
+				{
+					lines.Add(cs::Cat("Governor: ", governor->FullName(), governor->House != nullptr ? cs::Cat(" of House ", governor->House->Surname) : cs::String()));
+					links.emplace_back(cs::Cat("Governor ", governor->FullName()), CivPick::Person(governor->Id));
+				}
+				for (const auto& h : byWealth)
+					links.emplace_back(cs::Cat("House ", h->Surname, ", worth ", Narrator::Money(h->Wealth)), CivPick::House(h->Id));
+				constexpr int MaxPeople = 6;
+				for (int i = 0; i < static_cast<int>(residents.size()) && i < MaxPeople; i++)
+				{
+					const auto& m = residents[i];
+					links.emplace_back(cs::Cat(m->FullName(), ", ", Core::ToString(m->Role), m->House != nullptr ? cs::Cat(" of House ", m->House->Surname) : cs::String()),
+						CivPick::Person(m->Id));
+				}
+				for (const auto& b : firms)
+					links.emplace_back(cs::Cat(b->Name, " (", Core::ToString(b->Kind), b->Home == s ? ", head office)" : ", branch)"), CivPick::Business(b->Id));
+			}
 			for (const auto& o : civ.Orgs)
-				if (o != nullptr && o->Active() && o->Seat == s) links.emplace_back(Narrator::OrgName(*o), CivPick::Org(o->Id));
+				if (o != nullptr && o->Active() && o->Seat == s) links.emplace_back(cs::Cat(Narrator::OrgName(*o), " (", Core::ToString(o->Kind), ")"), CivPick::Org(o->Id));
 			one("riot", "Stir a riot");
 			one("arm", "Arm the rebels");
 			one("racket", "Let a syndicate take the streets");
