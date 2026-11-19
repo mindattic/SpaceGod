@@ -190,7 +190,7 @@ namespace SpaceGod::UI
 		float fieldW = Mathf::Clamp(screen.width * 0.34f, 260.0f, 460.0f);
 		DrawFilter(Rect(screen.width - Margin - fieldW, 22, fieldW, 30));
 		GUI::Label(Rect(Margin, 56, screen.width - 2 * Margin, 18),
-			cs::Cat("Everything written down, gathered as you go  \xC2\xB7  type to search titles, text and keywords  \xC2\xB7  Up / Down an article, Left / Right a category, Alt+Left / Alt+Right back and forward  \xC2\xB7  ", closeHint), small);
+			cs::Cat("Everything written down, gathered as you go  \xC2\xB7  type to search titles, text and keywords  \xC2\xB7  Up / Down an article, Page Up / Page Down / Home / End to jump, Left / Right a category, Alt+Left / Alt+Right back and forward  \xC2\xB7  ", closeHint), small);
 
 		float top = 88, bottom = screen.height - 64;
 		float catW = Mathf::Clamp(screen.width * 0.15f, 170.0f, 220.0f);
@@ -229,8 +229,21 @@ namespace SpaceGod::UI
 		int n = static_cast<int>(rows.size());
 		if (e.keyCode == KeyCode::Escape && typing) { closeAsked = true; e.Use(); }
 		else if ((e.keyCode == KeyCode::Return || e.keyCode == KeyCode::KeypadEnter) && typing) { GUIUtility::keyboardControl = 0; typing = false; e.Use(); }
-		else if (e.keyCode == KeyCode::DownArrow && n > 0) { Go(rows[sel < 0 ? 0 : Mathf::Min(sel + 1, n - 1)].Article->Id, false); e.Use(); }
-		else if (e.keyCode == KeyCode::UpArrow && n > 0) { Go(rows[sel < 0 ? 0 : Mathf::Max(sel - 1, 0)].Article->Id, false); e.Use(); }
+		else if (e.keyCode == KeyCode::DownArrow && n > 0) { Go(rows[sel < 0 ? 0 : Mathf::Min(sel + 1, n - 1)].Article->Id, false); followPick = true; e.Use(); }
+		else if (e.keyCode == KeyCode::UpArrow && n > 0) { Go(rows[sel < 0 ? 0 : Mathf::Max(sel - 1, 0)].Article->Id, false); followPick = true; e.Use(); }
+		else if (!typing && n > 0 && (e.keyCode == KeyCode::PageDown || e.keyCode == KeyCode::PageUp || e.keyCode == KeyCode::Home || e.keyCode == KeyCode::End))
+		{
+			// US-T336: a page of articles at a time, or the first and last (Home / End move the caret while typing).
+			int page = Mathf::Max(1, static_cast<int>(listViewH / RowH) - 1);
+			int to = sel < 0 ? 0 : sel;
+			if (e.keyCode == KeyCode::PageDown) to = Mathf::Min(to + page, n - 1);
+			else if (e.keyCode == KeyCode::PageUp) to = Mathf::Max(to - page, 0);
+			else if (e.keyCode == KeyCode::Home) to = 0;
+			else to = n - 1;
+			Go(rows[to].Article->Id, false);
+			followPick = true;
+			e.Use();
+		}
 		else if (e.keyCode == KeyCode::LeftArrow && e.alt) { StepBack(); e.Use(); }
 		else if (e.keyCode == KeyCode::RightArrow && e.alt) { StepForward(); e.Use(); }
 		else if (!typing && e.keyCode == KeyCode::RightArrow)
@@ -311,8 +324,20 @@ namespace SpaceGod::UI
 			return;
 		}
 		float w = list.width - 16;
-		listScroll = GUI::BeginScrollView(list, listScroll, Rect(0, 0, w, n * RowH));
 		int sel = SelectedRow();
+		listViewH = list.height;
+		// US-T336: an article picked by a key is scrolled into view, the list moving no more than it must.
+		if (followPick)
+		{
+			followPick = false;
+			if (sel >= 0)
+			{
+				float rowTop = sel * RowH;
+				if (rowTop < listScroll.y) listScroll.y = rowTop;
+				else if (rowTop + RowH > listScroll.y + list.height) listScroll.y = rowTop + RowH - list.height;
+			}
+		}
+		listScroll = GUI::BeginScrollView(list, listScroll, Rect(0, 0, w, n * RowH));
 		// Only the rows in view are drawn: a long career meets hundreds of pilots.
 		int first = Mathf::Max(0, static_cast<int>(listScroll.y / RowH) - 1);
 		int last = Mathf::Min(n - 1, static_cast<int>((listScroll.y + list.height) / RowH) + 1);

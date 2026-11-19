@@ -69,6 +69,9 @@ namespace SpaceGod::UI
 		cs::Ref<GUIStyle> panel, title, entryTitle, heading, keys, text, small, button, entry, entrySelected, field, rowTitle, rowLine, link;
 		cs::Ref<Texture2D> panelTexture, buttonTexture, buttonActiveTexture, fieldTexture;
 		Vector2 scroll, listScroll;
+		/// US-T336: the list scrolls to the article picked by a key on its next draw; the height it last had, for a page.
+		bool followPick = false;
+		float listViewH = 0;
 
 		cs::String filter;
 		bool focusFilter = true, typing = false, closeAsked = false;
