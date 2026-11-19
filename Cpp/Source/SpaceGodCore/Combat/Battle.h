@@ -276,6 +276,12 @@ namespace SpaceGod::Core
 		/// until then its side's hulls within reach hold every gun but their point defence. Never set by the AI.</summary>
 		double HoldFireCallUntil = 0;
 
+		/// <summary>US-T352: the hull the player at this helm called its side to cripple, and the battle second the call lapses
+		/// (<see cref="Battle.OrderCrippleCall"/>): until then its side's hulls within reach go for it and aim at its drives.
+		/// Never set by the AI.</summary>
+		cs::Ref<BattleUnit> CrippleCallTarget;
+		double CrippleCallUntil = 0;
+
 		/// <summary>Taken by boarders: it has changed sides and carries a prize crew, so it no longer fights.</summary>
 		bool Captured = false;
 
@@ -1501,6 +1507,32 @@ namespace SpaceGod::Core
 
 		/// <summary>US-T350: how many hulls of <paramref name="u"/>'s side within reach a call to hold fire would hold (the bar's count).</summary>
 		int HoldersInReach(const cs::Ref<BattleUnit>& u);
+
+		/// <summary>US-T352: how long a call to cripple a hull stands, battle seconds.</summary>
+		static constexpr double CrippleCallSeconds = 30;
+		/// <summary>US-T352: how much nearer, km, the called hull scores in a gunner's choice of target (as a call for fire's).</summary>
+		static constexpr double CrippleCallWeightKm = 40;
+		/// <summary>US-T352: the weight a called hull's drives get in a gunner's choice of system (a weapon's is 3).</summary>
+		static constexpr double CrippleDriveWeight = 30;
+
+		/// <summary>US-T352: whether any call to cripple stands this step (worked out at the top of each <see cref="Step"/>, so not
+		/// saved; false in any fight nobody holds, where <see cref="CalledCrippleFor"/> is then never asked).</summary>
+		bool CrippleStanding = false;
+
+		/// <summary>
+		/// US-T352: the helm calls its side to cripple the hull it has locked: every hull of its side (not craft) within
+		/// <see cref="FleetCoordination.ReachKm"/> picks its target again, favouring that hull, and for
+		/// <see cref="CrippleCallSeconds"/> its gunners aim at its drives so it can neither run nor turn. <paramref name="answering"/>
+		/// is how many heard it. Empty when given, else why not.
+		/// </summary>
+		cs::String OrderCrippleCall(const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& target, int& answering);
+
+		/// <summary>US-T352: the hull a standing call to cripple from a hull of <paramref name="u"/>'s side within reach names
+		/// (the nearest caller's), or null.</summary>
+		cs::Ref<BattleUnit> CalledCrippleFor(const cs::Ref<BattleUnit>& u);
+
+		/// <summary>US-T352: whether <paramref name="target"/> still has a drive left to shoot at.</summary>
+		static bool HasDrives(const cs::Ref<BattleUnit>& target);
 
 		/// <summary>A carrier's helm orders (<see cref="BattleUnit.WingHeld"/>) lapse once nobody holds its helm or flies one of
 		/// its craft: the recall and the call are lifted and its captain launches the wing held aboard, as at the start of a fight.</summary>

@@ -383,6 +383,59 @@ namespace SpaceGod::Core
 		return false;
 	}
 
+	bool Battle::HasDrives(const cs::Ref<BattleUnit>& target)
+	{
+		if (target == nullptr || target->Combat == nullptr) return false;
+		for (const auto& s : target->Combat->Subsystems)
+			if (s->Kind() == SubsystemKind::Engine && !s->Destroyed()) return true;
+		return false;
+	}
+
+	cs::String Battle::OrderCrippleCall(const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& target, int& answering)
+	{
+		answering = 0;
+		if (u == nullptr || u->Combat == nullptr) return "no hull at the helm";
+		if (target == nullptr) return "lock a hull first (T)";
+		if (!target->Present()) return cs::Cat("the ", target->Name(), " is gone");
+		if (!Hostile(u, target)) return cs::Cat("the ", target->Name(), " is not hostile");
+		if (target->Kind == UnitKind::Fighter) return "craft have no drives to aim at";
+		if (target->Captured || target->Surrendering) return cs::Cat("the ", target->Name(), " has struck");
+		if (!HasDrives(target)) return cs::Cat("the ", target->Name(), "'s drives are already shot away");
+		double reach = FleetCoordination::ReachKm()->Value;
+		for (const auto& o : Units)
+		{
+			if (o == u || o->Side != u->Side || !o->Present() || o->Captured || o->Kind == UnitKind::Fighter) continue;
+			if ((o->Pos - u->Pos).Length() > reach) continue;
+			o->RetargetIn = 0; // they pick again on their next thought, the call weighing in (PickTarget)
+			answering++;
+		}
+		if (answering == 0) return cs::Cat("no ship of ours within ", Km(reach), " to answer");
+		u->CrippleCallTarget = target;
+		u->CrippleCallUntil = Seconds + CrippleCallSeconds;
+		CrippleStanding = true;
+		return cs::String();
+	}
+
+	cs::Ref<BattleUnit> Battle::CalledCrippleFor(const cs::Ref<BattleUnit>& u)
+	{
+		if (!CrippleStanding || u == nullptr) return nullptr;
+		cs::Ref<BattleUnit> best = nullptr;
+		double bestKm = FleetCoordination::ReachKm()->Value;
+		for (const auto& c : Units)
+		{
+			if (c->CrippleCallTarget == nullptr || Seconds >= c->CrippleCallUntil || c->Side != u->Side || !c->Present()) continue;
+			auto t = c->CrippleCallTarget;
+			if (!t->Present() || t->Captured || t->Surrendering) continue;
+			double d = (c->Pos - u->Pos).Length();
+			if (d <= bestKm)
+			{
+				bestKm = d;
+				best = t;
+			}
+		}
+		return best;
+	}
+
 	void Battle::HelmOrdersLapse(const cs::Ref<BattleUnit>& u)
 	{
 		if (!(u->WingHeld || u->WingRecalled || u->WingCall != 0) || u->PlayerControlled()) return;

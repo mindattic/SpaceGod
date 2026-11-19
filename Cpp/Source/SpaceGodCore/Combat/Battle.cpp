@@ -400,6 +400,14 @@ namespace SpaceGod::Core
 				HoldFireStanding = true;
 				break;
 			}
+		// US-T352: and whether one has a call to cripple a hull standing (likewise never in a fight nobody holds).
+		CrippleStanding = false;
+		for (const auto& c : Units)
+			if (c->CrippleCallTarget != nullptr && Seconds < c->CrippleCallUntil)
+			{
+				CrippleStanding = true;
+				break;
+			}
 		for (int i = 0; i < Units.Count(); i++)
 		{
 			auto u = Units[i];
@@ -595,6 +603,8 @@ namespace SpaceGod::Core
 		auto focus = FleetCoordination::FocusTarget(u);
 		// US-T332: the hull a player's helm has called its side's fire onto (null in any fight nobody holds).
 		auto called = CalledFireFor(u);
+		// US-T352: the hull a player's helm has called its side to cripple (null in any fight nobody holds).
+		auto crippling = CalledCrippleFor(u);
 		for (const auto& o : Units)
 		{
 			if (!Hostile(u, o) || o->Captured || o->Surrendering) continue;
@@ -628,6 +638,7 @@ namespace SpaceGod::Core
 			if (flagship != nullptr && flagship != u && flagship->Target == o) score -= 6;
 			if (focus != nullptr && focus == o) score -= FleetCoordination::Focus()->Value;
 			if (called != nullptr && called == o) score -= FireCallWeightKm;
+			if (crippling != nullptr && crippling == o) score -= CrippleCallWeightKm;
 			score *= 0.85 + rng.NextDouble() * 0.3;
 			// Stickiness (U.SPC-T560): the current mark keeps the gun unless a rival is clearly better, so heading settles.
 			if (o == u->Target) score *= TargetStickiness;
@@ -2346,6 +2357,8 @@ namespace SpaceGod::Core
 		bool robbing = shooter != nullptr && !shooter->PlayerControlled() && RaidDoctrine::Robs(shooter->Faction, target->Ship);
 		if (target->Kind == UnitKind::Fighter) return nullptr;
 		bool focus = Broadsides::FocusesFire(shooter);
+		// US-T352: a hull a player's helm has called its side to cripple is shot at its drives (never, with no call standing).
+		bool crippling = CrippleStanding && shooter != nullptr && CalledCrippleFor(shooter) == target;
 		double total = 0;
 		const auto& subs = target->Combat->Subsystems;
 		auto weights = cs::NewArray<double>(subs.Count());
@@ -2377,7 +2390,7 @@ namespace SpaceGod::Core
 				case SubsystemKind::Coilgun: w = 4; break;
 				case SubsystemKind::ShieldGenerator: w = s->Shield > 0 ? 2.5 : 0.5; break;
 				// A hull spooling to jump out is stopped at its drive (US-T98).
-				case SubsystemKind::Engine: w = EscapeJumps::Spooling(target) ? EscapeJumps::DriveAimWeight : 1.4; break;
+				case SubsystemKind::Engine: w = crippling ? CrippleDriveWeight : EscapeJumps::Spooling(target) ? EscapeJumps::DriveAimWeight : 1.4; break;
 				case SubsystemKind::Hangar: w = target->Combat->Fighters() > 0 ? 1.8 : 0.4; break;
 				case SubsystemKind::Bridge: w = 1.1; break;
 				case SubsystemKind::PointDefense: w = 0.8; break;

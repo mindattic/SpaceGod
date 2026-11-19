@@ -268,6 +268,18 @@ namespace SpaceGod::Core
 				bar.Add(e);
 			}
 		}
+		// US-T352: any hull in a fight can call its side to cripple the hull it has locked, at its drives.
+		if (fight)
+		{
+			HelmAbilityEntry e;
+			e.Ability = HelmAbility::Cripple;
+			e.Label = "Cripple the locked hull";
+			bool standing = u->CrippleCallTarget != nullptr && b->Seconds < u->CrippleCallUntil && u->CrippleCallTarget->Present();
+			e.State = standing ? cs::Cat("at the ", u->CrippleCallTarget->Name(), "'s drives, ", cs::Fmt(u->CrippleCallUntil - b->Seconds, "0"), " s")
+				: u->PlayerLockTarget != nullptr ? cs::Cat("the ", u->PlayerLockTarget->Name(), "'s drives") : cs::String("lock a hull (T)");
+			e.Ready = u->PlayerLockTarget != nullptr;
+			bar.Add(e);
+		}
 		// US-T140: a hull with a squad of its band about it orders it through its captain, before any fight (last, so the
 		// slots above keep their keys).
 		if (world != nullptr && SquadOrders::SquadOf(world, ship).Count() > 0)
@@ -457,6 +469,14 @@ namespace SpaceGod::Core
 				if (lifted) return "Weapons free: our hulls open fire again";
 				return cs::Cat("Hold fire: ", answering, answering == 1 ? " hull holds its guns" : " hulls hold their guns", " for ",
 					cs::Fmt(Battle::HoldFireCallSeconds, "0"), " s, point defence still up (again: weapons free)");
+			}
+			case HelmAbility::Cripple:
+			{
+				auto target = u->PlayerLockTarget;
+				int answering = 0;
+				auto why = b->OrderCrippleCall(u, target, answering);
+				return why.empty() ? cs::Cat("Cripple the ", target->Name(), ": ", answering, answering == 1 ? " ship aims" : " ships aim",
+					" at its drives for ", cs::Fmt(Battle::CrippleCallSeconds, "0"), " s") : cs::Cat("No call: ", why);
 			}
 			default:
 				return "";

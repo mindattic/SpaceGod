@@ -63,6 +63,10 @@ namespace SpaceGod::Core
 		/// <summary>US-T350: call the side's hulls within reach to hold fire, or weapons free while the call stands
 		/// (<see cref="Battle.OrderHoldFireCall"/>), on the bar in a fight while one is in reach, after damage control.</summary>
 		HoldFire = 19,
+
+		/// <summary>US-T352: call the side's hulls within reach to cripple the locked hull, aiming at its drives
+		/// (<see cref="Battle.OrderCrippleCall"/>), on every hull's bar in a fight, after the call to hold fire.</summary>
+		Cripple = 20,
 	};
 
 	/// <summary>One entry of a helm's ability bar: what it does, and how it stands now (craft aboard, reloading, ready).</summary>

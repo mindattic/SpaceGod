@@ -900,6 +900,8 @@ namespace SpaceGod::Core
 				  "they work three times as fast, the worst-hurt system first, while your guns reload at half pace. "
 				  "Hold fire has your side's hulls within reach hold every gun but their point defence for 60 seconds; the same slot, "
 				  "then Weapons free, lifts it at once. "
+				  "Cripple the locked hull has your side's ships within reach go for it and aim at its drives for 30 seconds, "
+				  "so it can neither run nor turn. "
 				  "Out of a fight a hull with none of these has no bar. The orders are for a fight: out of one they are refused, "
 				  "saying why, and a carrier you fly into a fight holds its wing aboard for you to launch. Shift+/ then jumps you "
 				  "straight into the craft launched last, again into the next, and past the last back to the carrier's helm; "
