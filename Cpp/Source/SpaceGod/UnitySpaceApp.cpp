@@ -494,6 +494,7 @@ namespace SpaceGod
 		if (UpdateEncyclopediaKeys()) Input.Handover(); // US-T271: the Encyclopedia's search has the keys while typed in
 		if (UpdateSocietyKeys()) Input.Handover(); // US-T298: so does the Society screen's
 		if (UpdateDiscoveriesKeys()) Input.Handover(); // US-T301: so does the discoveries screen's
+		if (hud != nullptr && hud->UpdateGalaxyMapKeys()) Input.Handover(); // US-T306: and the galaxy map's find
 		TutorialKeys(); // US-T254: Shift+Enter / Shift+Esc on the tutorial's card (it never takes the other keys)
 		ArbitrateInput(true); // US-T90: one owner per input this frame (the craft held, else the command view)
 		int screensOpen = OpenScreens();

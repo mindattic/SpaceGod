@@ -96,7 +96,39 @@ namespace SpaceGod::UI
 		MapMode Mode() const { return mode; }
 		void SetMode(MapMode m);
 
+		// ---------------------------------------------------------------- US-T306: find (GalaxyMapScreen.Find.cpp)
+
+		/// Whether the find field has the keys (the owner hands the game's input over meanwhile).
+		bool Typing() const { return finding; }
+		/// The map has been closed: the find field lets the keys go.
+		void Closed();
+
 	private:
+		/// One find result: a simulated system or a plain star on the charts, its name, a note (holder or distance), where.
+		struct FindHit
+		{
+			cs::Ref<Core::StarSystem> System;
+			cs::Nullable<Core::NearbyStar> Star;
+			cs::String Name, Note;
+			Core::DVec3 Ly;
+		};
+		static constexpr const char* FindControl = "GalaxyMapFind";
+		static constexpr int MaxFindHits = 8;
+		static constexpr float FindRowH = 24;
+		cs::String findText, findFor;
+		bool finding = false, focusFind = false;
+		int findPick = 0;
+		std::vector<FindHit> findHits;
+		const Core::GalaxyMapModel* findModel = nullptr;
+		/// Where the find field and its list of results sit this draw (the map takes no clicks under the list).
+		Rect findRect, findListRect;
+		cs::Ref<GUIStyle> field;
+		cs::Ref<Texture2D> fieldTex;
+		void RefreshFind();
+		void FindKeys();
+		void DrawFind(Rect canvas);
+		void DrawFindMarks(Rect local);
+		void GoTo(const FindHit& h);
 		MapMode mode = MapMode::Political;
 		bool modeLoaded = false;
 		/// The good the Trade mode prices (a Core::Good), and whether it shows where to sell it rather than buy it.

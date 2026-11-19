@@ -84,6 +84,11 @@ namespace SpaceGod::UI
 		auto canvas = Rect(legend.xMax() + 8, header.yMax() + 8, detail.xMin() - legend.xMax() - 16, Screen::height - header.yMax() - 18);
 
 		if (!fitted) Fit(canvas);
+		// US-T306: the find field over the map's top left, its results under it; both before the map takes its clicks.
+		findRect = Rect(canvas.x + 8, canvas.y + 8, Mathf::Min(320.0f, canvas.width - 16), 28);
+		FindKeys();
+		RefreshFind();
+		findListRect = findHits.empty() ? Rect() : Rect(findRect.x, findRect.yMax() + 2, findRect.width, FindRowH * static_cast<float>(findHits.size()) + 4);
 		HandleInput(canvas);
 		if (Event::current().type == EventType::Repaint) DrawMap(canvas, jd);
 		DrawHeader(header, jd);
@@ -100,6 +105,7 @@ namespace SpaceGod::UI
 		if (diplomacyMode) DrawDiplomacy(detail, jd);
 		else if (commandMode) DrawCommand(detail, jd);
 		else DrawDetail(detail, jd);
+		DrawFind(canvas); // US-T306
 	}
 
 	// ---------------------------------------------------------------- projection
@@ -191,7 +197,10 @@ namespace SpaceGod::UI
 	void GalaxyMapScreen::HandleInput(Rect canvas)
 	{
 		Event& e = Event::current();
-		if (!canvas.Contains(e.mousePosition))
+		// US-T306: the find field and its results take their own clicks; a click on the map leaves the field.
+		bool overFind = findRect.Contains(e.mousePosition) || (!findHits.empty() && findListRect.Contains(e.mousePosition));
+		if (e.type == EventType::MouseDown && finding && !overFind) Closed();
+		if (!canvas.Contains(e.mousePosition) || overFind)
 		{
 			if (e.type == EventType::Repaint)
 			{
@@ -400,6 +409,7 @@ namespace SpaceGod::UI
 				: (m->Holder != nullptr ? cs::Cat(m->Holder->Name, "  ·  ") : cs::String("unclaimed  ·  ")) + Age(m->AgeDays);
 			Label(p + Vector2(12, -5), sub, m->Holder != nullptr && showTerritory ? Tint(m->Holder->Color, 0.95f) : Dim, true);
 		}
+		DrawFindMarks(local); // US-T306
 		GUI::EndClip();
 	}
 
@@ -1265,6 +1275,8 @@ namespace SpaceGod::UI
 		button->alignment = TextAnchor::MiddleLeft;
 		button->padding = RectOffset(static_cast<int>(S::Space::Pad), S::Space::TextPad, 0, 0);
 		buttonOn = S::ButtonOnStyle(button, buttonOnTex);
+		fieldTex = S::FieldTexture(); // US-T306
+		field = S::FieldStyle(T::Label, fieldTex);
 	}
 
 	cs::Ref<Texture2D> GalaxyMapScreen::SoftDisc()
@@ -1294,5 +1306,6 @@ namespace SpaceGod::UI
 		buttonTex = nullptr;
 		buttonOnTex = nullptr;
 		glow = nullptr;
+		fieldTex = nullptr;
 	}
 }

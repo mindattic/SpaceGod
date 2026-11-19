@@ -189,6 +189,7 @@ namespace SpaceGod::UI
 			return;
 		}
 		galaxyMapOpen = false;
+		if (galaxyMap) galaxyMap->Closed(); // US-T306: the find field lets the keys go
 
 		// So is the system map (US-T258): the system the player is in, top-down; a trip under way has the screen.
 		if (app->ShowSystemMap && !app->Travel->Active && !app->InFtlCruise())
@@ -1790,6 +1791,17 @@ namespace SpaceGod::UI
 	cs::Ref<Texture2D> Hud::Solid(Color fill, Color edge)
 	{
 		return UiStyle::Flat(fill, edge);
+	}
+
+	bool Hud::UpdateGalaxyMapKeys()
+	{
+		if (!galaxyMap) return false;
+		if (!app->ShowGalaxyMap || app->Travel->Active)
+		{
+			galaxyMap->Closed();
+			return false;
+		}
+		return galaxyMap->Typing();
 	}
 
 	void Hud::DestroyOwnedTextures()

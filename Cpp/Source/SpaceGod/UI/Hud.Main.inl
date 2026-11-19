@@ -71,6 +71,13 @@ private:
 	cs::Ref<SystemMapScreen> systemMap; // US-T258
 	bool systemMapOpen = false;
 
+public:
+	/// US-T306: before the commands each frame: while the galaxy map's find field is typed in it has the keys (true: the
+	/// owner hands the input over); the map closed some other way, the field lets them go.
+	bool UpdateGalaxyMapKeys();
+
+private:
+
 	/// The Help screen (H / F1, or Help in the Esc menu), made the first time it is opened.
 	cs::Ref<HelpScreen> helpScreen;
 

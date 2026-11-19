@@ -377,7 +377,7 @@ namespace SpaceGod::UI
 		auto old = GUI::contentColor;
 		GUI::contentColor = Dim;
 		GUI::Label(Rect(x, r.yMax() - 92, w, 84),
-			"Click a star to inspect it, double-click to travel.\nAt the helm: plot an FTL course to any star.\nDrag to turn, shift-drag to pan, wheel to zoom.\n[ or Esc closes the map.", small);
+			"Click a star to inspect it, double-click to travel.\nAt the helm: plot an FTL course to any star.\nDrag to turn, shift-drag to pan, wheel to zoom.\nCtrl+F finds a star  \xC2\xB7  [ or Esc closes the map.", small);
 		GUI::contentColor = old;
 	}
 
