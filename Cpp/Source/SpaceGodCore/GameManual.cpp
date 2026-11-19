@@ -912,6 +912,8 @@ namespace SpaceGod::Core
 				  "jumping out as a crew that has broken off does;the same slot, then Call them back, turns those still running to the fight again. "
 				  "Demand surrender hails the hostile hull you have locked: its crew weigh their damage, the odds and their nerve and "
 				  "strike their colours, break off and run, or refuse; you may hail again after 20 seconds. "
+				  "Once the hull you have locked is disabled or has struck open to boarding, Board it sends your side's boarders within "
+				  "reach at it: carriers launch a shuttle team each and marine-carrying hulls close in to board it themselves. "
 				  "Out of a fight a hull with none of these has no bar. The orders are for a fight: out of one they are refused, "
 				  "saying why, and a carrier you fly into a fight holds its wing aboard for you to launch. Shift+/ then jumps you "
 				  "straight into the craft launched last, again into the next, and past the last back to the carrier's helm; "

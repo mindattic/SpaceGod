@@ -507,6 +507,76 @@ namespace SpaceGod::Core
 		return cs::String();
 	}
 
+	bool Battle::OpenPrize(const cs::Ref<BattleUnit>& target)
+	{
+		return target != nullptr && target->Combat != nullptr && !target->Captured &&
+			(target->Combat->Disabled() || target->SurrenderOpenToBoarding || target->Stunned > 10);
+	}
+
+	int Battle::BoardCallAnswer(const cs::Ref<BattleUnit>& o, const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& target)
+	{
+		if (o == u || o->Side != u->Side || o->Kind != UnitKind::Ship || o->Combat == nullptr || !o->Present()) return 0;
+		if (o->PlayerControlled() || o->Captured || o->Surrendering || o->Fleeing || o->Combat->Disabled()) return 0;
+		if ((o->Pos - u->Pos).Length() > FleetCoordination::ReachKm()->Value) return 0;
+		if (!target->Combat->Interior->Admits(o->Faction, o->Side)) return 0;
+		if (BoardsByShuttle(o))
+		{
+			// As the helm's own shuttle order (OrderShuttle) would have it: a working deck clear to launch, a shuttle fit to
+			// fly, a team to spare and the prize within the shuttles' reach.
+			if (!HangarWorks(o) || o->ShuttleLaunchIn > 0 || CarrierWings::ReadyShuttle(o->Combat) == nullptr) return 0;
+			if (o->Combat->MarinesAvailable() < BoardingShuttles::TeamSize()->Value + BoardingShuttles::Reserve) return 0;
+			if (!ShuttleMayBoard(o, target)) return 0;
+			if ((target->Pos - o->Pos).Length() > BoardingShuttles::RangeKm()->Value) return 0;
+			return 2;
+		}
+		// A hull that boards with its own (ChooseBoarding): a boarder with marines to send, not held in a flagship's formation
+		// (which drops a boarding target), already on its way to this prize or free to take it.
+		bool boarder = o->Faction->IsPirate || o->Faction->IsMilitary || (Boards != nullptr && Boards(o));
+		if (!boarder || o->Combat->MarinesAvailable() < 15 || Broadsides::HoldsFormation(o)) return 0;
+		if (o->Latched != nullptr || !MayBoard(o, target)) return 0;
+		return 1;
+	}
+
+	cs::String Battle::BoardCallBlocked(const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& target, int& able)
+	{
+		able = 0;
+		if (u == nullptr || u->Combat == nullptr) return "no hull at the helm";
+		cs::String why = LockedPrize(*this, u, target);
+		if (!why.empty()) return why;
+		if (target->Kind != UnitKind::Ship || target->Combat == nullptr) return "only a ship can be boarded";
+		if (!OpenPrize(target)) return cs::Cat("the ", target->Name(), " is still fighting: disable it, or have it strike, first");
+		for (const auto& o : Units)
+			if (BoardCallAnswer(o, u, target) != 0) able++;
+		if (able == 0) return "no boarders of ours in reach (marines, a shuttle deck or boarding craft)";
+		return cs::String();
+	}
+
+	cs::String Battle::OrderBoardCall(const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& target, int& answering)
+	{
+		answering = 0;
+		int able = 0;
+		auto why = BoardCallBlocked(u, target, able);
+		if (!why.empty()) return why;
+		auto all = Units.ToArray(); // a shuttle launched below joins Units
+		for (const auto& o : all)
+		{
+			int how = BoardCallAnswer(o, u, target);
+			if (how == 2)
+			{
+				auto hull = CarrierWings::ReadyShuttle(o->Combat);
+				FighterAI::LaunchShuttle(shared_from_this(), o, target, o->Combat->Interior->TakeMarines(BoardingShuttles::TeamSize()->Value), hull);
+				o->ShuttleLaunchIn = BoardingShuttles::LaunchSeconds;
+				answering++;
+			}
+			else if (how == 1)
+			{
+				o->BoardTarget = target; // ChooseBoarding keeps it while the prize stays open; Move flies the approach
+				answering++;
+			}
+		}
+		return answering > 0 ? cs::String() : cs::String("no boarders of ours in reach");
+	}
+
 	cs::String Battle::OrderWithdrawCall(const cs::Ref<BattleUnit>& u, int& answering, bool& recalled)
 	{
 		answering = 0;

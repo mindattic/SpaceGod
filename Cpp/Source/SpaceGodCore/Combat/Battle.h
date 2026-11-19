@@ -1600,6 +1600,24 @@ namespace SpaceGod::Core
 		/// <summary>US-T363: a hull at least this outgunned (<see cref="Morale.Outgunned"/>) that won't strike runs instead.</summary>
 		static constexpr double DemandRunOutgunned = 0.35;
 
+		/// <summary>
+		/// US-T366: the helm calls its side's boarders within command reach (<see cref="FleetCoordination.ReachKm"/>) onto the hull
+		/// it has locked, once that hull is open to boarding (disabled, struck and open to it, or stunned): each AI hull that boards
+		/// by shuttle sends a team in one now (as <see cref="OrderShuttle"/> does for the helm's own), each that boards with its own
+		/// hull (<see cref="ChooseBoarding"/>) takes it as its <see cref="BattleUnit.BoardTarget"/>, which it keeps while the prize
+		/// stays open. Only a player's helm calls, so AI fights are unchanged. Empty when at least one answered
+		/// (<paramref name="answering"/> how many), else why not.
+		/// </summary>
+		cs::String OrderBoardCall(const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& target, int& answering);
+		/// <summary>US-T366: why the side's boarders can't be called onto <paramref name="target"/> now, or empty;
+		/// <paramref name="able"/> is how many would answer.</summary>
+		cs::String BoardCallBlocked(const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& target, int& able);
+		/// <summary>US-T366: whether <paramref name="target"/> is open to boarding now (disabled, struck and open to it, or stunned).</summary>
+		static bool OpenPrize(const cs::Ref<BattleUnit>& target);
+		/// <summary>US-T366: how <paramref name="o"/> would answer a boarding call onto <paramref name="target"/> made by
+		/// <paramref name="u"/>'s helm: 0 not at all, 1 with its own hull, 2 by shuttle.</summary>
+		int BoardCallAnswer(const cs::Ref<BattleUnit>& o, const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& target);
+
 		/// <summary>A carrier's helm orders (<see cref="BattleUnit.WingHeld"/>) lapse once nobody holds its helm or flies one of
 		/// its craft: the recall and the call are lifted and its captain launches the wing held aboard, as at the start of a fight.</summary>
 		void HelmOrdersLapse(const cs::Ref<BattleUnit>& u);

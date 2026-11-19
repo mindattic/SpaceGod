@@ -307,6 +307,19 @@ namespace SpaceGod::Core
 			e.Ready = blocked.empty();
 			bar.Add(e);
 		}
+		// US-T366: with a hostile hull locked that is open to boarding, it can call the side's boarders onto it.
+		auto prize = u->PlayerLockTarget;
+		if (fight && prize != nullptr && prize->Present() && prize->Kind == UnitKind::Ship && b->Hostile(u, prize) && Battle::OpenPrize(prize))
+		{
+			int able = 0;
+			auto blocked = b->BoardCallBlocked(u, prize, able);
+			HelmAbilityEntry e;
+			e.Ability = HelmAbility::BoardIt;
+			e.Label = "Board it";
+			e.State = blocked.empty() ? cs::Cat(able, able == 1 ? " boarder in reach" : " boarders in reach") : blocked;
+			e.Ready = blocked.empty();
+			bar.Add(e);
+		}
 		// US-T140: a hull with a squad of its band about it orders it through its captain, before any fight (last, so the
 		// slots above keep their keys).
 		if (world != nullptr && SquadOrders::SquadOf(world, ship).Count() > 0)
@@ -527,6 +540,14 @@ namespace SpaceGod::Core
 					case Battle::DemandAnswer::Ran: return cs::Cat("The ", target->Name(), " won't strike, but breaks off and runs");
 					default: return cs::Cat("The ", target->Name(), " refuses: \"Come and take us\"");
 				}
+			}
+			case HelmAbility::BoardIt:
+			{
+				auto target = u->PlayerLockTarget;
+				int answering = 0;
+				auto why = b->OrderBoardCall(u, target, answering);
+				return why.empty() ? cs::Cat("Board the ", target->Name(), ": ", answering, answering == 1 ? " boarder goes" : " boarders go",
+					" for it") : cs::Cat("No boarding: ", why);
 			}
 			default:
 				return "";

@@ -75,6 +75,10 @@ namespace SpaceGod::Core
 		/// <summary>US-T363: hail the locked hostile hull to strike its colours (<see cref="Battle.OrderDemandSurrender"/>); its crew
 		/// strike, run or refuse. On every hull's bar in a fight, after the call to withdraw.</summary>
 		DemandSurrender = 22,
+
+		/// <summary>US-T366: call the side's boarders within reach onto the locked hull once it is open to boarding
+		/// (<see cref="Battle.OrderBoardCall"/>), on the bar in a fight while the hull locked is such a prize, after the demand.</summary>
+		BoardIt = 23,
 	};
 
 	/// <summary>One entry of a helm's ability bar: what it does, and how it stands now (craft aboard, reloading, ready).</summary>
