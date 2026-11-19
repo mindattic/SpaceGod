@@ -55,7 +55,7 @@ namespace SpaceGod::UI
 			GUI::Box(whole, GUIContent::none(), panel);
 			GUI::Label(Rect(Margin, 22, whole.width - 2 * Margin, 30), "SHIP CATALOG", title);
 			GUI::Label(Rect(Margin, 54, whole.width - 2 * Margin, 18),
-				cs::Cat("Every hull in the game: handling, equipment slots and compartments  ·  Up / Down for the next hull  ·  ", closeHint), small);
+				cs::Cat("Every hull in the game: handling, equipment slots and compartments  ·  Up / Down for the next hull, Page Up / Page Down / Home / End to jump, Left / Right for the category  ·  ", closeHint), small);
 			catalog->Draw(Rect(Margin, 86, whole.width - 2 * Margin, whole.height - 64 - 86));
 			if (GUI::Button(Rect(Margin, whole.height - 50, 150, 32), "Manual", button)) showCatalog = false;
 			return GUI::Button(Rect(whole.width - Margin - 120, whole.height - 50, 120, 32), "Back", button);

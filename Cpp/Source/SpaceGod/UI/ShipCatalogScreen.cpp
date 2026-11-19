@@ -46,21 +46,63 @@ namespace SpaceGod::UI
 		EnsureStyles();
 		const auto& entries = ShipCatalog::Entries();
 		if (entries.Count() == 0) return;
-		selected = Mathf::Clamp(selected, 0, entries.Count() - 1);
-		HandleKeys(entries.Count());
+		auto tabs = Tabs(entries);
+		tab = Mathf::Clamp(tab, 0, tabs.Count() - 1);
+		auto shown = Shown(entries, tabs[tab]);
+		selected = Mathf::Clamp(selected, 0, shown.Count() - 1);
+		HandleKeys(shown.Count(), tabs, entries, shown);
+		// A key may have changed the tab: list what it picks now.
+		shown = Shown(entries, tabs[tab]);
+		selected = Mathf::Clamp(selected, 0, shown.Count() - 1);
 
+		float tabsH = DrawTabs(Rect(area.x, area.y, area.width, area.height), tabs, entries, shown[selected]);
+		// A click on a tab changes it while drawing the row.
+		shown = Shown(entries, tabs[tab]);
+		selected = Mathf::Clamp(selected, 0, shown.Count() - 1);
+		float top = area.y + tabsH;
 		float listW = Mathf::Clamp(area.width * 0.24f, 180.0f, 300.0f);
-		DrawList(Rect(area.x, area.y, listW, area.height), entries);
+		DrawList(Rect(area.x, top, listW, area.height - tabsH), shown);
 		float x = area.x + listW + Gutter;
-		DrawEntry(entries[selected], Rect(x, area.y, area.x + area.width - x, area.height));
+		DrawEntry(shown[selected], Rect(x, top, area.x + area.width - x, area.height - tabsH));
 	}
 
-	void ShipCatalogScreen::HandleKeys(int count)
+	cs::List<int> ShipCatalogScreen::Tabs(const cs::List<cs::Ref<ShipCatalogEntry>>& entries)
+	{
+		cs::List<int> tabs;
+		tabs.Add(-1);
+		int last = -1;
+		for (const auto& e : entries) last = Mathf::Max(last, static_cast<int>(e->Category));
+		for (int c = 0; c <= last; c++)
+		{
+			for (const auto& e : entries)
+				if (static_cast<int>(e->Category) == c) { tabs.Add(c); break; }
+		}
+		return tabs;
+	}
+
+	cs::List<cs::Ref<ShipCatalogEntry>> ShipCatalogScreen::Shown(const cs::List<cs::Ref<ShipCatalogEntry>>& entries, int category) const
+	{
+		if (category < 0) return entries;
+		cs::List<cs::Ref<ShipCatalogEntry>> shown;
+		for (const auto& e : entries)
+			if (static_cast<int>(e->Category) == category) shown.Add(e);
+		return shown;
+	}
+
+	void ShipCatalogScreen::HandleKeys(int count, const cs::List<int>& tabs, const cs::List<cs::Ref<ShipCatalogEntry>>& entries,
+		const cs::List<cs::Ref<ShipCatalogEntry>>& shown)
 	{
 		Event& e = Event::current();
 		if (e.type != EventType::KeyDown) return;
-		if (e.keyCode == KeyCode::DownArrow && selected < count - 1) { Select(selected + 1); e.Use(); }
-		else if (e.keyCode == KeyCode::UpArrow && selected > 0) { Select(selected - 1); e.Use(); }
+		auto keySelect = [&](int index) { Select(Mathf::Clamp(index, 0, Mathf::Max(0, count - 1))); follow = true; e.Use(); };
+		if (e.keyCode == KeyCode::DownArrow && selected < count - 1) keySelect(selected + 1);
+		else if (e.keyCode == KeyCode::UpArrow && selected > 0) keySelect(selected - 1);
+		else if (e.keyCode == KeyCode::PageDown && count > 0) keySelect(selected + pageRows);
+		else if (e.keyCode == KeyCode::PageUp && count > 0) keySelect(selected - pageRows);
+		else if (e.keyCode == KeyCode::End && count > 0) keySelect(count - 1);
+		else if (e.keyCode == KeyCode::Home && count > 0) keySelect(0);
+		else if (e.keyCode == KeyCode::RightArrow && tab < tabs.Count() - 1) { PickTab(tab + 1, tabs, entries, shown[selected]); e.Use(); }
+		else if (e.keyCode == KeyCode::LeftArrow && tab > 0) { PickTab(tab - 1, tabs, entries, shown[selected]); e.Use(); }
 	}
 
 	void ShipCatalogScreen::Select(int index)
@@ -70,16 +112,56 @@ namespace SpaceGod::UI
 		scroll = Vector2::zero();
 	}
 
+	void ShipCatalogScreen::PickTab(int index, const cs::List<int>& tabs, const cs::List<cs::Ref<ShipCatalogEntry>>& entries,
+		const cs::Ref<ShipCatalogEntry>& current)
+	{
+		if (index == tab) return;
+		tab = index;
+		int keep = Shown(entries, tabs[tab]).IndexOf(current);
+		selected = -1;
+		Select(Mathf::Max(0, keep));
+		follow = true;
+	}
+
+	float ShipCatalogScreen::DrawTabs(Rect area, const cs::List<int>& tabs, const cs::List<cs::Ref<ShipCatalogEntry>>& entries,
+		const cs::Ref<ShipCatalogEntry>& current)
+	{
+		float x = 0, y = 0;
+		for (int i = 0; i < tabs.Count(); i++)
+		{
+			int category = tabs[i];
+			cs::String name = category < 0 ? cs::String("All") : cs::String(ToString(static_cast<HullCategory>(category)));
+			cs::String text = cs::Cat(name, " (", Shown(entries, category).Count(), ")");
+			float w = entry->CalcSize(GUIContent(text)).x + 20;
+			if (x > 0 && x + w > area.width) { x = 0; y += TabH + TabGap; }
+			if (GUI::Button(Rect(area.x + x, area.y + y, w, TabH), text, i == tab ? entrySelected : entry)) PickTab(i, tabs, entries, current);
+			x += w + TabGap;
+		}
+		return y + TabH + SectionGap;
+	}
+
 	void ShipCatalogScreen::DrawList(Rect area, const cs::List<cs::Ref<ShipCatalogEntry>>& entries)
 	{
 		GUI::Label(Rect(area.x, area.y, area.width, HeadingH - 4), cs::Cat("HULLS (", entries.Count(), ")"), heading);
 		GUI::DrawTexture(Rect(area.x, area.y + HeadingH - 5, area.width, 1), ruleTexture);
 		auto list = Rect(area.x, area.y + HeadingH, area.width, area.height - HeadingH);
+		pageRows = Mathf::Max(1, static_cast<int>(list.height / ListRowH) - 1);
+		if (follow)
+		{
+			// A key moved the pick: scroll just enough to bring its row into view.
+			follow = false;
+			float rowTop = selected * ListRowH;
+			if (rowTop < listScroll.y) listScroll.y = rowTop;
+			else if (rowTop + ListRowH > listScroll.y + list.height) listScroll.y = rowTop + ListRowH - list.height;
+		}
+		bool all = tab == 0;
 		listScroll = GUI::BeginScrollView(list, listScroll, Rect(0, 0, list.width - 16, entries.Count() * ListRowH));
 		for (int i = 0; i < entries.Count(); i++)
 		{
 			auto row = Rect(0, i * ListRowH, list.width - 16, ListRowH - 4);
 			if (GUI::Button(row, entries[i]->Name, i == selected ? entrySelected : entry)) Select(i);
+			// Under All, each row says its category on the right (a tab lists one, so it would only repeat it).
+			if (all) GUI::Label(Rect(row.x, row.y, row.width - 8, row.height), ToString(entries[i]->Category), rowCategory);
 		}
 		GUI::EndScrollView();
 	}
@@ -191,6 +273,9 @@ namespace SpaceGod::UI
 		small->clipping = TextClipping::Clip;
 		entry = S::EntryStyle(T::Body, rowTexture, rowActiveTexture);
 		entrySelected = S::EntrySelectedStyle(entry, rowActiveTexture);
+		rowCategory = S::TextStyle(T::Body, S::Dim, FontStyle::Italic);
+		rowCategory->alignment = TextAnchor::MiddleRight;
+		rowCategory->clipping = TextClipping::Clip;
 	}
 
 	void ShipCatalogScreen::DestroyOwnedTextures()

@@ -123,6 +123,8 @@ the sky cycle. A plain key never changes meaning with Shift unless the table say
 |---|---|---|---|
 | Help | H, F1 | anywhere | pause menu > Help |
 | Ship catalog | - | - | Help > ship catalog (US-T193) |
+| Ship catalog: next / previous hull, jump | Up / Down, Page Up / Page Down / Home / End (US-T302) | ship catalog | - |
+| Ship catalog: next / previous category tab | Right / Left (US-T302) | ship catalog | - |
 | Dev menu | Shift+F1 | anywhere (local) | sg.CheatMenu |
 | Spawn menu (dev menu on Spawn) | Shift+F2 (US-T186, landing) | anywhere (local) | dev menu > Spawn |
 | Bottom drawer | Shift+U (US-T200, landing) | anywhere | handle, bottom left |
