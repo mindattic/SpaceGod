@@ -316,6 +316,13 @@ namespace SpaceGod::Core
 		static constexpr int MaxFeed = 400;
 		static constexpr int KeepEndedTrips = 120;
 
+		/// <summary>
+		/// Years the dead stay on their house's roll before they leave it (US-T273: the galaxy runs with no player for as long
+		/// as it is left, so a house keeps its living and its recent dead, not every generation it ever had). Whatever still
+		/// holds one of them (a widow, a tie, a feed item, a trip on record) keeps them; only the roll forgets.
+		/// </summary>
+		static constexpr double RememberYears = 40;
+
 		/// <summary>A year's share of capital a business earns on a world at full wellbeing and no unrest (assumed).</summary>
 		static constexpr double YieldPerYear = 0.08;
 
@@ -409,6 +416,7 @@ namespace SpaceGod::Core
 		void Post(FeedKind kind, double jd, const cs::Ref<StarSystem>& sys, cs::String from, cs::String to, cs::String text);
 		void Notable(Galaxy& galaxy, const cs::Ref<StarSystem>& sys, double jd, const cs::String& text, WorldEventKind kind);
 		void Prune();
+		void Forget(double jd);
 
 		SG_SERIALIZABLE(Society); // ObjectGraph registration (Society.cpp)
 	};

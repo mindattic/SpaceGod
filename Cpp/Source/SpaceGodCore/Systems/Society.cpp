@@ -399,6 +399,28 @@ namespace SpaceGod::Core
 			if (b->Trading()) Branches(galaxy, b, jd);
 		Conferences_(galaxy, jd);
 		Bribery(galaxy, jd);
+		Forget(jd);
+	}
+
+	/// <summary>
+	/// US-T273: the long dead leave their house's roll (<see cref="RememberYears"/>), so a galaxy left to run for centuries
+	/// keeps every roll, and every walk over the rolls (weddings, governors, the Civilization layer's personas), to the living
+	/// and the recently dead. Objects that still hold one of them keep them; the walk is in house and member order, so every
+	/// lockstep peer forgets the same people on the same day.
+	/// </summary>
+	void Society::Forget(double jd)
+	{
+		double cutoff = jd - RememberYears * 365.25;
+		for (const auto& h : Houses)
+		{
+			auto& roll = h->Members;
+			for (int i = 0; i < roll.Count();)
+			{
+				const auto& c = roll[i];
+				if (c != nullptr && !c->Alive() && c->DiedJd < cutoff) roll.RemoveAt(i);
+				else i++;
+			}
+		}
 	}
 
 	// ---------------------------------------------------------------- census: houses founded, houses driven off
