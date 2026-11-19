@@ -939,6 +939,26 @@ namespace SpaceGod
 		if (coopMuteToasts > 0) return; // US-T44 (US-T43): another player's action, replayed here
 		Toast = message;
 		ToastAge = 0;
+		// US-T345: kept for the notice history (Shift+X); the same words again in a row count up on one line.
+		if (message.empty()) return;
+		double jd = Clock != nullptr ? Clock->Jd : 0;
+		NoticeKind kind = cs::Strings::StartsWith(message, "Watched: ") || ShowSociety ? NoticeKind::Society
+			: battleTimeFor != nullptr ? NoticeKind::Combat
+			: DockedAt != nullptr || ShowPort ? NoticeKind::Trade
+			: NoticeKind::System;
+		if (noticeHistory.Count() > 0 && noticeHistory[noticeHistory.Count() - 1].Text == message)
+		{
+			auto& last = noticeHistory[noticeHistory.Count() - 1];
+			last.Repeats++;
+			last.Jd = jd;
+			return;
+		}
+		NoticeRecord record;
+		record.Text = message;
+		record.Jd = jd;
+		record.Kind = kind;
+		noticeHistory.Add(record);
+		while (noticeHistory.Count() > NoticesKept) noticeHistory.RemoveAt(0);
 	}
 
 	void UnitySpaceApp::ResetToNow()

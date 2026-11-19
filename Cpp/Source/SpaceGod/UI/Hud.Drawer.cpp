@@ -10,6 +10,7 @@
 #include "Input/InputDevice.h"
 #include "Input/KeyBindings.h" // US-T249
 
+#include "Astro.h" // US-T345
 #include "BodyCatalog.h"
 #include "BodyDefinition.h"
 #include "Ephemeris.h"
@@ -60,6 +61,18 @@ namespace SpaceGod::UI
 		const Input::InputDevice& kb = Input::InputDevice::current();
 		auto pressed = [&](Input::Key k) { return kb[k].wasPressedThisFrame; };
 		bool shift = kb[Input::Key::LeftShift].isPressed || kb[Input::Key::RightShift].isPressed;
+		// US-T345: Shift+X (unless rebound) opens the drawer on the notice history, and closes it from there.
+		if (Input::KeyBindings::Pressed(Input::KeyAction::Notices, kb))
+		{
+			if (drawerOpen && drawerTab == DrawerTab::Notices) drawerOpen = false;
+			else
+			{
+				drawerOpen = true;
+				if (drawerTab != DrawerTab::Notices) SetDrawerTab(DrawerTab::Notices);
+				drawerFollowRow = true;
+			}
+			return true; // the key is spent (X alone is the news feed's: it does not go off under it)
+		}
 		if (Input::KeyBindings::Pressed(Input::KeyAction::Drawer, kb)) // US-T249: Shift+U unless rebound
 		{
 			drawerOpen = !drawerOpen;
@@ -75,9 +88,12 @@ namespace SpaceGod::UI
 		}
 		bool back = (pressed(Input::Key::Tab) && shift) || pressed(Input::Key::LeftArrow);
 		bool next = (pressed(Input::Key::Tab) && !shift) || pressed(Input::Key::RightArrow);
-		if (back || next)
+		if (back || next) // US-T345: three tabs now, round in either direction
+			SetDrawerTab(static_cast<DrawerTab>((static_cast<int>(drawerTab) + (next ? 1 : DrawerTabCount - 1)) % DrawerTabCount));
+		// US-T345: F (Shift+F back) steps the notice history's filter.
+		if (drawerTab == DrawerTab::Notices && pressed(Input::Key::F))
 		{
-			drawerTab = drawerTab == DrawerTab::Navigation ? DrawerTab::Ships : DrawerTab::Navigation;
+			noticeFilter = (noticeFilter + (shift ? NoticeFilterCount - 1 : 1)) % NoticeFilterCount;
 			drawerRow = 0;
 			drawerScroll = Vector2::zero();
 			drawerItems.clear();
@@ -111,6 +127,7 @@ namespace SpaceGod::UI
 	{
 		drawerItems.clear();
 		if (drawerTab == DrawerTab::Navigation) AddDrawerNavigation();
+		else if (drawerTab == DrawerTab::Notices) AddDrawerNotices(); // US-T345
 		else AddDrawerShips();
 		// The keyboard's row on a row that can take it.
 		int n = static_cast<int>(drawerItems.size());
@@ -285,6 +302,87 @@ namespace SpaceGod::UI
 		}
 	}
 
+	// US-T345: the notice history.
+	const char* Hud::NoticeFilterName(int filter)
+	{
+		switch (filter)
+		{
+			case 1: return "SYSTEM";
+			case 2: return "COMBAT";
+			case 3: return "TRADE";
+			case 4: return "SOCIETY";
+			default: return "ALL";
+		}
+	}
+
+	void Hud::SetDrawerTab(DrawerTab tab)
+	{
+		drawerTab = tab;
+		drawerRow = 0;
+		drawerScroll = Vector2::zero();
+		drawerItems.clear();
+		drawerRefreshAt = -10.0f;
+	}
+
+	void Hud::AddDrawerNotices()
+	{
+		using NoticeKind = UnitySpaceApp::NoticeKind;
+		const auto& all = app->Notices();
+		auto kindName = [](NoticeKind k)
+		{
+			switch (k)
+			{
+				case NoticeKind::Combat: return "combat";
+				case NoticeKind::Trade: return "trade";
+				case NoticeKind::Society: return "society";
+				default: return "system";
+			}
+		};
+		auto kindColor = [](NoticeKind k)
+		{
+			switch (k)
+			{
+				case NoticeKind::Combat: return UiStyle::Danger;
+				case NoticeKind::Trade: return UiStyle::Warning;
+				case NoticeKind::Society: return UiStyle::Good;
+				default: return UiStyle::Text;
+			}
+		};
+		int shown = 0;
+		for (int i = 0; i < all.Count(); i++)
+			if (noticeFilter == 0 || static_cast<int>(all[i].Kind) + 1 == noticeFilter) shown++;
+
+		DrawerItem head;
+		head.heading = true;
+		head.color = UiStyle::Accent;
+		head.name = cs::Cat("LAST ", UnitySpaceApp::NoticesKept, " NOTICES  ·  ", NoticeFilterName(noticeFilter), " (", shown, " of ", all.Count(),
+			")  ·  F or the filter button steps the kind  ·  newest first");
+		drawerItems.push_back(head);
+		if (shown == 0)
+		{
+			DrawerItem none;
+			none.heading = true;
+			none.color = UiStyle::Dim;
+			none.name = all.Count() == 0 ? cs::String("No notices yet this session.") : cs::String("No notices of this kind yet.");
+			drawerItems.push_back(none);
+			return;
+		}
+		int year = app->Clock != nullptr ? app->Clock->Utc().Year() : 0;
+		for (int i = all.Count() - 1; i >= 0; i--)
+		{
+			const auto& n = all[i];
+			if (noticeFilter != 0 && static_cast<int>(n.Kind) + 1 != noticeFilter) continue;
+			DrawerItem it;
+			it.name = n.Text;
+			it.indent = 1;
+			it.color = kindColor(n.Kind);
+			cs::String when = n.Jd <= 0 ? cs::String("?")
+				: Astro::ToDateTime(n.Jd).ToString(Astro::ToDateTime(n.Jd).Year() == year ? "MMM dd HH:mm" : "yyyy MMM dd HH:mm");
+			it.details = n.Repeats > 1 ? cs::Cat("x", n.Repeats, "  ·  ", kindName(n.Kind), "  ·  ", when) : cs::Cat(kindName(n.Kind), "  ·  ", when);
+			drawerItems.push_back(it);
+		}
+	}
+
 	void Hud::ActDrawerItem(int index)
 	{
 		if (index < 0 || index >= static_cast<int>(drawerItems.size())) return;
@@ -359,20 +457,28 @@ namespace SpaceGod::UI
 		// The grip and the tabs.
 		float pad = UiStyle::Space::Pad;
 		float x = r.x + pad, y = r.y + pad;
-		const DrawerTab tabs[] = { DrawerTab::Navigation, DrawerTab::Ships };
+		const DrawerTab tabs[] = { DrawerTab::Navigation, DrawerTab::Ships, DrawerTab::Notices };
 		for (auto tab : tabs)
 		{
 			cs::String name = tab == DrawerTab::Navigation ? cs::String("NAVIGATION")
+				: tab == DrawerTab::Notices ? cs::Cat("NOTICES  ", Input::KeyBindings::Keys(Input::KeyAction::Notices)) // US-T345
 				: drawerTab == DrawerTab::Ships ? cs::Cat("SHIPS IN AREA  (", drawerShipCount, ")") : cs::String("SHIPS IN AREA");
 			if (GUI::Button(Rect(x, y, 160, 22), name, tab == drawerTab ? buttonActive : button) && tab != drawerTab)
+				SetDrawerTab(tab);
+			x += 164;
+		}
+		// US-T345: on the Notices tab, its filter (a click steps it, as F does).
+		if (drawerTab == DrawerTab::Notices)
+		{
+			if (GUI::Button(Rect(x, y, 140, 22), cs::Cat("KIND: ", NoticeFilterName(noticeFilter), "  F"), noticeFilter != 0 ? buttonActive : button))
 			{
-				drawerTab = tab;
+				noticeFilter = (noticeFilter + 1) % NoticeFilterCount;
 				drawerRow = 0;
 				drawerScroll = Vector2::zero();
 				drawerItems.clear();
 				drawerRefreshAt = -10.0f;
 			}
-			x += 164;
+			x += 144;
 		}
 		// US-T258: the system map, this system drawn top-down (Shift+[).
 		if (GUI::Button(Rect(x, y, 150, 22), "SYSTEM MAP  Shift+[", button)) app->ShowSystemMap = true;
@@ -397,7 +503,9 @@ namespace SpaceGod::UI
 		float hintX = x + 8;
 		if (right - 88 - hintX > 60)
 			GUI::Label(Rect(hintX, y + 2, right - 88 - hintX, 18),
-				FitText("Tab tabs  ·  Up/Down rows  ·  Enter acts  ·  PgUp/PgDn height  ·  Esc or Shift+U closes", small, right - 88 - hintX), small);
+				FitText(drawerTab == DrawerTab::Notices // US-T345
+					? cs::String("Tab tabs  ·  Up/Down rows  ·  F kind  ·  PgUp/PgDn height  ·  Esc or Shift+U closes")
+					: cs::String("Tab tabs  ·  Up/Down rows  ·  Enter acts  ·  PgUp/PgDn height  ·  Esc or Shift+U closes"), small, right - 88 - hintX), small);
 		GUI::contentColor = old;
 
 		// The rows, scrolled.

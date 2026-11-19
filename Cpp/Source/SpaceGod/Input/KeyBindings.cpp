@@ -337,6 +337,7 @@ namespace SpaceGod::Input
 				{ KeyAction::Discoveries, "discoveries", "Screen: discoveries", Both, EdgeKind, { KeyChord(Key::O, S) }, "Everything found, by kind and day." },
 				{ KeyAction::Encyclopedia, "encyclopedia", "Screen: encyclopedia", Both, EdgeKind, { KeyChord(Key::I, S) }, "Every article in one place: controls, guides, lore and all you have learned, with a search." }, // US-T271
 				{ KeyAction::Society, "society", "Screen: society", Both, EdgeKind, { KeyChord(Key::G, S) }, "The galaxy's people: the feed of their doings, houses, people, organisations and each world's mood, and the SpaceGod's hand in them." }, // US-T293
+				{ KeyAction::Notices, "notices", "Screen: notice history", Both, EdgeKind, { KeyChord(Key::X, S) }, "The bottom drawer on its Notices tab: the last 100 notices with their game time, filtered by kind." }, // US-T345
 				{ KeyAction::SpawnPilot, "spawnPilot", "Screen: spawn & pilot", Both, EdgeKind, { Key::V }, "Pick a hull to spawn and pilot at the camera." },
 				{ KeyAction::SpawnPractice, "spawnPractice", "Screen: practice fighter", Both, EdgeKind, { KeyChord(Key::V, S) }, "The practice fighter at the camera, you at its helm." },
 				{ KeyAction::QuickSave, "quickSave", "Game: quicksave", Both, EdgeKind, { Key::F5 }, "Save to the quicksave slot." },

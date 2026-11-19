@@ -386,6 +386,28 @@ public:
 	cs::String Toast;
 	float ToastAge = 99.0f;
 
+	/// <summary>US-T345: where the player was when a notice showed, for the notice history's filter: on the Society screen
+	/// (or a watched event's notice), in a fight (battle time), docked at a port, else anywhere else.</summary>
+	enum class NoticeKind : int { System, Combat, Trade, Society };
+	/// <summary>US-T345: one notice shown: its words, the game time it last showed, its kind, and how many times in a row.</summary>
+	struct NoticeRecord
+	{
+		cs::String Text;
+		double Jd = 0;
+		NoticeKind Kind = NoticeKind::System;
+		int Repeats = 1;
+	};
+	/// <summary>US-T345: how many past notices the history keeps.</summary>
+	static constexpr int NoticesKept = 100;
+	/// <summary>US-T345: the last <see cref="NoticesKept"/> notices shown here, oldest first. UI state only: not saved, and
+	/// nothing in the simulation reads it.</summary>
+	const cs::List<NoticeRecord>& Notices() const { return noticeHistory; }
+
+private:
+	cs::List<NoticeRecord> noticeHistory;
+
+public:
+
 	/// <summary>GUI-space rects drawn by the HUD last frame; clicks inside them do not reach the world.</summary>
 	cs::List<Rect> UiRects;
 

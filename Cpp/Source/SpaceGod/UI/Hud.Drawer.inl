@@ -9,6 +9,9 @@
 //   - Ships in area: every hull the unit held makes out near here, nearest first, with its range, faction, class and
 //     role as far as the sensors tell them. A hull in hailing range is hailed by a click (UnitySpaceApp::HailShip,
 //     US-T201); one that cannot be (Comms::CanHail) is greyed with why, and a click only selects it.
+//   - Notices (US-T345): the last 100 notices shown here (UnitySpaceApp::Notices), newest first, each with its game time
+//     and how many times in a row it showed, filtered by kind (all, combat, trade, society, system) with F or the
+//     filter button. Shift+X opens the drawer straight on it (and closes it from there).
 // Shift+U opens and closes it. While open it has the keys (the comms panel's pattern): Tab / Shift+Tab or Left / Right
 // the tabs, Up / Down the rows, Enter acts on the row, PgUp / PgDn the height, Esc closes. The cursor is free meanwhile.
 
@@ -21,7 +24,8 @@ public:
 	bool DrawerOpen() const { return drawerOpen; }
 
 private:
-	enum class DrawerTab : int { Navigation, Ships };
+	enum class DrawerTab : int { Navigation, Ships, Notices /* US-T345 */ };
+	static constexpr int DrawerTabCount = 3;
 
 	/// One row of the drawer: a heading (no action), a star system, a place in this system, or a hull.
 	struct DrawerItem
@@ -51,6 +55,9 @@ private:
 	std::vector<DrawerItem> drawerItems;
 	float drawerRefreshAt = -10.0f;
 	int drawerShipCount = 0;
+	/// US-T345: the Notices tab's filter: 0 every kind, else 1 + UnitySpaceApp::NoticeKind's value (NoticeFilterCount in all).
+	int noticeFilter = 0;
+	static constexpr int NoticeFilterCount = 5;
 
 	static constexpr int DrawerSteps = 3;
 	static constexpr float DrawerHandleW = 150, DrawerRowH = 19;
@@ -70,6 +77,14 @@ private:
 	void RebuildDrawerItems();
 	void AddDrawerNavigation();
 	void AddDrawerShips();
+	/// US-T345: the Notices tab's rows, newest first, under the filter.
+	void AddDrawerNotices();
+
+	/// US-T345: the drawer on <paramref name="tab"/>, its rows and scroll back to the top.
+	void SetDrawerTab(DrawerTab tab);
+
+	/// US-T345: the filter's name (ALL, COMBAT, TRADE, SOCIETY, SYSTEM).
+	static const char* NoticeFilterName(int filter);
 
 	/// Acts on a row: travel, cruise, focus, or hail.
 	void ActDrawerItem(int index);
