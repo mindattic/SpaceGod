@@ -103,6 +103,8 @@ namespace SpaceGod::UI
 		struct Hand
 		{
 			cs::String Label, Line;
+			/// US-T371: what it will do if used now (sure, or refused and why), shown under its button.
+			cs::String Outlook;
 		};
 
 		/// One place Back and Forward return to: a thing, or an event (US-T298).

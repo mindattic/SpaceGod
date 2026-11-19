@@ -8,6 +8,7 @@
 #include "SimClock.h"
 #include "Ships.h"
 #include "Economy/Settlement.h"
+#include "Systems/Civilization/CivHash.h" // US-T371
 #include "Systems/Civilization/Civilization.h"
 #include "Systems/Civilization/Culture.h"
 #include "Systems/Civilization/Kinship.h"
@@ -22,6 +23,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 
 using namespace SpaceGod::Core;
 
@@ -153,6 +155,246 @@ namespace SpaceGod::UI
 			else if (c.Reputation <= -0.5) line = cs::Cat(line, "; widely despised");
 			else if (c.Reputation <= -0.2) line = cs::Cat(line, "; poorly thought of");
 			return cs::Cat(line, ".");
+		}
+
+		/// US-T371: what a hand (a sg.Civ line) will do if used now, judged as the simulation would judge it: the refusals its
+		/// resolver checks first (Kinship::Declare, Politics::Overthrow and the rest), else what it brings about. The SpaceGod's
+		/// hand forces its outcome (a steered hit always kills, steered spies are never caught, a swung election is won), so
+		/// most are sure; an election's share is the day's hash. Read only: no RNG drawn and nothing written, Bench unchanged.
+		cs::String HandOutlook(const cs::String& handLine, Galaxy& galaxy, Civilization& civ, double jd)
+		{
+			if (handLine.empty()) return cs::String();
+			auto args = CivHands::Words(handLine);
+			if (args.empty()) return cs::String();
+			const cs::String& verb = args[0];
+			auto society = Society::Find(galaxy);
+			if (society == nullptr) return "Refused now: the galaxy's people have not woken yet.";
+			auto num = [&](size_t i) { return args.size() > i ? std::atoi(args[i].c_str()) : 0; };
+			auto house = [&](size_t i) { return society->HouseById(num(i)); };
+			auto person = [&](size_t i) { return society->CitizenById(num(i)); };
+			auto world = [&](size_t i) -> cs::Ref<Settlement>
+			{
+				if (galaxy.Polities == nullptr) return nullptr;
+				cs::String rest;
+				for (size_t j = i; j < args.size(); j++) rest = cs::Cat(rest, j > i ? " " : "", args[j]);
+				cs::String want = cs::Strings::ToUpperInvariant(rest);
+				for (const auto& s : galaxy.Polities->Settlements())
+					if (cs::Strings::ToUpperInvariant(s->Name) == want) return s;
+				return nullptr;
+			};
+			auto faction = [&](size_t i) -> cs::Ref<Faction>
+			{
+				if (galaxy.Polities == nullptr || args.size() <= i) return nullptr;
+				if (auto f = galaxy.Polities->Find(args[i])) return f;
+				cs::String spaced = args[i];
+				for (auto& ch : spaced)
+					if (ch == '_') ch = ' ';
+				return galaxy.Polities->Find(spaced);
+			};
+			auto standing = [](const cs::Ref<Household>& h) { return h != nullptr && !h->Scattered && h->Living() > 0; };
+			auto no = [](const char* why) { return cs::Cat("Refused now: ", why, "."); };
+			auto sure = [](const cs::String& what) { return cs::Cat("Sure: ", what, "."); };
+
+			if (verb == "feud")
+			{
+				auto a = house(1), b = house(2);
+				if (!standing(a) || !standing(b)) return no("no such house standing");
+				if (a == b) return no("a house cannot feud with itself");
+				if (civ.Kinship != nullptr)
+					if (auto f = civ.Kinship->FeudBetween(a, b))
+						return sure(cs::Cat("their feud grows hotter, heat ", cs::Fmt(f->Heat, "0.00"), " to ", cs::Fmt(cs::Math::Min(1.0, f->Heat + 0.35), "0.00")));
+				return sure("a feud is sworn at heat 0.70, the heads made enemies and their states cooled");
+			}
+			if (verb == "reconcile")
+			{
+				if (civ.Kinship == nullptr || civ.Kinship->FeudBetween(house(1), house(2)) == nullptr) return no("those houses are not feuding");
+				return sure("the feud ends");
+			}
+			if (verb == "fame")
+			{
+				auto c = person(1);
+				if (c == nullptr || !c->Alive()) return no("no such person living");
+				if (c->Reputation >= Kinship::FameThreshold) return no("they are famous already");
+				return sure(cs::Cat("their standing leaps from ", cs::Fmt(c->Reputation, "0.00"), " to 0.85"));
+			}
+			if (verb == "seduce")
+			{
+				auto a = person(1), b = person(2);
+				if (a == nullptr || b == nullptr || !a->Alive() || !b->Alive() || a == b) return no("no such pair living");
+				if (a->AgeYears(jd) < 18 || b->AgeYears(jd) < 18) return no("only grown people");
+				if (a->Spouse == b) return no("they are married to each other");
+				return sure("they become lovers");
+			}
+			if (verb == "elect")
+			{
+				auto party = civ.OrgById(num(1));
+				if (party == nullptr || party->Kind != OrgKind::Party || !party->Active()) return no("no such party");
+				if (civ.Politics == nullptr || civ.Politics->RegimeOf(party->Faction) == nullptr) return no("its state has no government to win");
+				double share = 0.5 + 0.2 * Civ::Unit(Civ::H(static_cast<std::uint32_t>(party->Id), Civ::DayOf(jd))); // Politics::Elect's own share
+				return sure(cs::Cat("they win today with ", cs::Fmt(share * 100, "0"), "% of the vote and take the government"));
+			}
+			if (verb == "coup")
+			{
+				auto c = person(1);
+				if (c == nullptr || !c->Alive() || c->House == nullptr || c->House->Home == nullptr) return no("no such person living");
+				auto r = civ.Politics != nullptr ? civ.Politics->RegimeOf(c->House->Home->Owner) : nullptr;
+				if (r == nullptr) return no("their state has no government to seize");
+				if (r->Ruler == c) return no("they rule already");
+				return sure(r->Ruler != nullptr ? cs::Cat("they overthrow ", r->Ruler->FullName(), " and rule without elections") : cs::String("they seize the government and rule without elections"));
+			}
+			if (verb == "acquit")
+			{
+				auto t = civ.Politics != nullptr ? civ.Politics->TrialById(num(1)) : nullptr;
+				if (t == nullptr) return no("no such trial");
+				if (t->Decided) return no("the verdict is in already");
+				return sure("the court acquits, bought");
+			}
+			if (verb == "summit")
+			{
+				auto a = faction(1), b = faction(2);
+				if (a == nullptr || b == nullptr || a == b) return no("name two states");
+				if (!Civilization::Hostile(galaxy, a, b)) return "Refused unless they are at war: they are not hostile.";
+				return sure("their leaders meet to talk peace");
+			}
+			if (verb == "riot")
+			{
+				auto s = world(1);
+				if (!Civilization::Stands(s)) return no("no such world standing");
+				return sure("riots and a 10-day strike; unrest up, approval down");
+			}
+			if (verb == "arm")
+			{
+				auto s = world(1);
+				if (!Civilization::Stands(s)) return no("no such world standing");
+				return sure("its rebels grow stronger (+0.4) and richer, a cell founded if it has none");
+			}
+			if (verb == "spy")
+			{
+				auto by = faction(1), on = faction(2);
+				if (by == nullptr || on == nullptr || by == on) return no("name two states");
+				if (galaxy.Polities == nullptr || galaxy.Polities->CapitalOf(by) == nullptr) return no("that state has no capital to run spies from");
+				return "Sure not to be caught; the operation may still find nothing to take.";
+			}
+			if (verb == "hire")
+			{
+				auto company = civ.OrgById(num(1));
+				if (company == nullptr || company->Kind != OrgKind::Mercenaries || !company->Active()) return no("no such free company");
+				if (faction(2) == nullptr) return no("no such state");
+				return sure(company->Faction != nullptr ? "they turn their coats and fight for the new paymaster" : "they sign on and fight for it");
+			}
+			if (verb == "hit")
+			{
+				auto c = person(1);
+				if (c == nullptr || !c->Alive()) return no("no such person living");
+				return sure("the hand's killers do not miss: they die within a day, or when a contract already out on them falls due");
+			}
+			if (verb == "racket")
+			{
+				auto s = world(1);
+				if (!Civilization::Stands(s)) return no("no such world standing");
+				auto c = civ.CivicsOf(s);
+				return sure(c != nullptr ? cs::Cat("a syndicate grows (+0.4) and crime rises from ", cs::Fmt(c->Crime, "0.00"), " to ", cs::Fmt(cs::Math::Min(1.0, c->Crime + 0.2), "0.00")) : cs::String("a syndicate takes the streets"));
+			}
+			if (verb == "crackdown")
+			{
+				auto s = world(1);
+				if (!Civilization::Stands(s)) return no("no such world standing");
+				auto c = civ.CivicsOf(s);
+				if (c == nullptr) return no("nobody watches that world yet");
+				return sure(cs::Cat("crime falls from ", cs::Fmt(c->Crime, "0.00"), " to ", cs::Fmt(cs::Math::Max(0.0, c->Crime - 0.2), "0.00"), ", its syndicate weakened"));
+			}
+			if (verb == "takeover")
+			{
+				auto raider = house(1);
+				auto b = society->BusinessById(num(2));
+				if (!standing(raider)) return no("no such house standing");
+				if (b == nullptr || !b->Trading()) return no("no such business trading");
+				if (b->Owner == raider) return no("they own it already");
+				return sure(cs::Cat("House ", raider->Surname, " seizes it (capital ", Narrator::Money(b->Capital), ")"));
+			}
+			if (verb == "bankrun")
+			{
+				auto bank = civ.OrgById(num(1));
+				if (bank == nullptr || bank->Kind != OrgKind::Bank || !bank->Active()) return no("no such bank");
+				return sure("the bank fails");
+			}
+			if (verb == "landmark")
+			{
+				auto c = civ.CivicsOf(world(1));
+				if (c == nullptr) return no("nobody watches that world yet");
+				if (!c->Landmark.empty()) return no("it is famous already");
+				return sure("a wonder is found there and draws visitors");
+			}
+			if (verb == "preach")
+			{
+				auto c = person(1);
+				if (c == nullptr || !c->Alive() || c->House == nullptr || c->House->Home == nullptr) return no("no such person living");
+				return sure("a new faith is founded at their home with a tenth of its people, and they grow in standing");
+			}
+			if (verb == "festival")
+			{
+				if (civ.CivicsOf(world(1)) == nullptr) return no("nobody watches that world yet");
+				return sure("a festival is held");
+			}
+			if (verb == "rig")
+			{
+				auto team = civ.OrgById(num(1));
+				if (team == nullptr || team->Kind != OrgKind::Team || !team->Active()) return no("no such team");
+				int top = 0;
+				for (const auto& t : civ.OrgsOf(OrgKind::Team)) top = cs::Math::Max(top, t->Score);
+				return sure(cs::Cat("they top the table, ", team->Score, " to ", top + 3, " points"));
+			}
+			if (verb == "rumour")
+			{
+				auto c = person(1);
+				if (c == nullptr || !c->Alive()) return no("no such person living");
+				return sure(cs::Cat("a false tale spreads; their standing slips from ", cs::Fmt(c->Reputation, "0.00"), " to ", cs::Fmt(cs::Math::Max(-1.0, c->Reputation - 0.05), "0.00")));
+			}
+			if (verb == "plague")
+			{
+				auto c = civ.CivicsOf(world(1));
+				if (c == nullptr) return no("nobody watches that world yet");
+				return sure(cs::Cat("the sick rise from ", cs::Fmt(c->Infected * 100, "0"), "% to ", cs::Fmt(cs::Math::Min(1.0, c->Infected + 0.08) * 100, "0"), "%"));
+			}
+			if (verb == "cure")
+			{
+				auto c = civ.CivicsOf(world(1));
+				if (c == nullptr) return no("nobody watches that world yet");
+				if (c->Infected <= 0) return no("it is not sick");
+				return sure(cs::Cat("its ", cs::Fmt(c->Infected * 100, "0"), "% sick recover and are immune"));
+			}
+			if (verb == "disaster")
+			{
+				if (civ.CivicsOf(world(1)) == nullptr) return no("nobody watches that world yet");
+				return sure("catastrophe strikes it");
+			}
+			if (verb == "aid")
+			{
+				if (faction(1) == nullptr) return no("no such state");
+				if (civ.CivicsOf(world(2)) == nullptr) return no("nobody watches that world yet");
+				return sure("relief ships are sent");
+			}
+			if (verb == "slant")
+			{
+				auto outlet = civ.OrgById(num(1));
+				if (outlet == nullptr || outlet->Kind != OrgKind::Outlet || !outlet->Active()) return no("no such outlet");
+				cs::String to = args.size() > 2 ? args[2] : cs::String();
+				double stance = to == "for" ? 0.9 : to == "against" ? -0.9 : 0.0;
+				return sure(cs::Cat("its line goes from ", cs::Fmt(outlet->Stance, "0.00"), " to ", cs::Fmt(stance, "0.00")));
+			}
+			if (verb == "investigate")
+			{
+				auto outlet = civ.OrgById(num(1));
+				if (outlet == nullptr || outlet->Kind != OrgKind::Outlet || !outlet->Active()) return no("no such outlet");
+				return "Sure if there is anything in its system to dig up; refused if not.";
+			}
+			if (verb == "donate")
+			{
+				auto h = house(1);
+				if (!standing(h)) return no("no such house standing");
+				return sure(cs::Cat("they give ", Narrator::Money(h->Wealth * 0.2), " (a fifth of their wealth); their world's care and approval rise and their head's standing with it"));
+			}
+			return cs::String();
 		}
 	}
 
@@ -1550,6 +1792,13 @@ namespace SpaceGod::UI
 				if (civ.Events[i] != nullptr && civ.Events[i]->Id == selectedEvent) { event = civ.Events[i]; break; }
 		if (event != nullptr) DescribeEvent(*event, name, lines, links);
 		else if (!selected.IsNone()) Describe(selected, galaxy, civ, jd, name, lines, links, hands);
+		// US-T371: each hand's outlook, judged now (read only).
+		float handsH = 0;
+		for (auto& h : hands)
+		{
+			h.Outlook = HandOutlook(h.Line, galaxy, civ, jd);
+			handsH += h.Outlook.empty() ? 30.0f : 48.0f;
+		}
 		if (name.empty())
 		{
 			if (!back.empty() && GUI::Button(Rect(area.xMax() - 30, area.y, 26, 24), "<", button)) StepBack();
@@ -1607,7 +1856,7 @@ namespace SpaceGod::UI
 		CivPick compareFollow;
 		float compareH = showCompare ? DrawCompare(0, w, galaxy, civ, jd, false, compareFollow) : 0.0f;
 		float contentH = 30 + 22 + 12 + textH + SectionGap + trendsH + familyH + compareH +(links.empty() ? 0.0f : HeadingH + linkH + SectionGap) + recentH
-			+ (selected.IsNone() || event != nullptr ? 0.0f : HeadingH + 30 + static_cast<float>(hands.size()) * 30.0f + SectionGap);
+			+ (selected.IsNone() || event != nullptr ? 0.0f : HeadingH + 30 + handsH + SectionGap);
 		// US-T298: back and forward through what was picked, beside the title.
 		bool stepBack = false, stepForward = false;
 		{
@@ -1745,6 +1994,11 @@ namespace SpaceGod::UI
 				if (GUI::Button(Rect(0, y, Mathf::Min(w, 420.0f), 26), h.Label, button)) Ask(h.Line);
 				if (!h.Line.empty()) GUI::Label(Rect(Mathf::Min(w, 420.0f) + 10, y + 4, Mathf::Max(0.0f, w - 430), 20), cs::Cat("sg.Civ ", h.Line), small);
 				y += 30;
+				if (!h.Outlook.empty()) // US-T371
+				{
+					GUI::Label(Rect(12, y - 3, Mathf::Max(0.0f, w - 12), 18), h.Outlook, small);
+					y += 18;
+				}
 			}
 			GUI::enabled = enabled;
 			if (hands.empty()) GUI::Label(Rect(0, y, w, 20), "No hand of the SpaceGod's reaches this.", small);

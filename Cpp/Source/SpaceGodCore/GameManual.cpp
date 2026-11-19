@@ -730,7 +730,9 @@ namespace SpaceGod::Core
 				  "box to go to them. A person's page opens with one sentence that sums them up: their traits, their place in their "
 				  "house, their marriage, what they lead or belong to, their faith and what they want. Your hand opens with what is "
 				  "ripe for it: feuds near open war, firms whose losses will close them within months, ageing heads with no heir and "
-				  "governors whose world has turned against them, the most urgent first.")), // US-T298, US-T299, US-T304, US-T308, US-T315, US-T323, US-T325, US-T327, US-T330, US-T334, US-T337, US-T344, US-T348, US-T351, US-T354, US-T358, US-T365, US-T368
+				  "governors whose world has turned against them, the most urgent first. Under each of the hand's buttons a line says what it "
+				  "would do if used now, as the galaxy would judge it: what is sure (the hand forces its outcome, and a swung election "
+				  "shows today's share of the vote) or why it would be refused.")), // US-T298, US-T299, US-T304, US-T308, US-T315, US-T323, US-T325, US-T327, US-T330, US-T334, US-T337, US-T344, US-T348, US-T351, US-T354, US-T358, US-T365, US-T368, US-T371
 
 			cs::New<ManualChapter>("Comms and pilots", "Hailing ships and stations, piracy by radio, and the people you meet", Keys("COMMS AND PILOTS"),
 				T("Hailing",
