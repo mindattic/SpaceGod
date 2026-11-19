@@ -16,6 +16,7 @@
 #include "Combat/FleetCoordination.h" // US-T332
 #include "Combat/ScreenWeapons.h" // US-T333
 #include "Combat/ElectronicWarfare.h" // US-T338
+#include "Combat/Broadsides.h" // US-T347
 #include "Settings/GameSetting.h"
 #include "Ships.h"
 
@@ -286,6 +287,43 @@ namespace SpaceGod::Core
 			}
 		}
 		return best;
+	}
+
+	int Battle::MendableSystems(const cs::Ref<BattleUnit>& u, cs::String& worst) const
+	{
+		worst = cs::String();
+		if (u == nullptr || u->Combat == nullptr) return 0;
+		int n = 0;
+		double worstHealth = cs::Double::MaxValue;
+		for (const auto& s : u->Combat->Subsystems)
+		{
+			if (s->Destroyed() || s->Hp >= s->Def->MaxHp * Broadsides::FieldRepairCap) continue;
+			n++;
+			double health = s->Health();
+			if (health < worstHealth)
+			{
+				worstHealth = health;
+				worst = SubsystemDef::Name(s->Kind());
+			}
+		}
+		return n;
+	}
+
+	cs::String Battle::OrderRushRepair(const cs::Ref<BattleUnit>& u, cs::String& worst)
+	{
+		worst = cs::String();
+		if (u == nullptr || u->Combat == nullptr) return "no hull at the helm";
+		if (!u->Present() || u->Captured || u->Surrendering) return "the hull is out of the fight";
+		if (u->Broadside == nullptr) return "no damage control teams aboard";
+		if (Broadsides::DamageControlRate()->Value <= 0) return "damage control is off (Damage control rate is 0)";
+		if (u->Stunned > 0) return "the systems are knocked out";
+		int teams = Broadsides::Teams(u);
+		for (int bits = u->EvaHeldTeams; bits != 0; bits &= bits - 1) teams--;
+		if (teams <= 0) return "no damage control team free (too few crew, or all out on the plating)";
+		if (RushingRepairs(u)) return cs::Cat("the teams are already at it, ", cs::Fmt(u->RushRepairUntil - Seconds, "0"), " s left");
+		if (MendableSystems(u, worst) == 0) return "nothing the teams can mend in the field";
+		u->RushRepairUntil = Seconds + RushRepairSeconds;
+		return cs::String();
 	}
 
 	void Battle::HelmOrdersLapse(const cs::Ref<BattleUnit>& u)

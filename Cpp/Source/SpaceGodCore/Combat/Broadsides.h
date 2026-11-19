@@ -388,8 +388,10 @@ namespace SpaceGod::Core
 		/// <see cref="ShieldEmitters.EmergencyRepairRate"/>, restores it to <see cref="ShieldEmitters.RestoredHealth"/> (an
 		/// emitter's field then regrows from nothing); anything else shot away, and the hull itself, wait for a yard.
 		/// With the focus on shields, emitters under fire keep their fields charging at half their rate.
+		/// US-T347: <paramref name="surge"/> multiplies the teams' work (a player's damage control rush, <see cref="Battle.OrderRushRepair"/>);
+		/// 1 otherwise, which leaves every figure as it was.
 		/// </summary>
-		static void StepDamageControl(const cs::Ref<BattleUnit>& u, double dt);
+		static void StepDamageControl(const cs::Ref<BattleUnit>& u, double dt, double surge = 1);
 
 	private:
 		/// <summary>

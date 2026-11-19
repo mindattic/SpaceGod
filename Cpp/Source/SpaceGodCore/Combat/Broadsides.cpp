@@ -438,7 +438,7 @@ namespace SpaceGod::Core
 		}
 	}
 
-	void Broadsides::StepDamageControl(const cs::Ref<BattleUnit>& u, double dt)
+	void Broadsides::StepDamageControl(const cs::Ref<BattleUnit>& u, double dt, double surge)
 	{
 		auto cmd = u->Broadside;
 		// Nor with the hull's systems knocked out: the teams are working in the dark.
@@ -450,6 +450,9 @@ namespace SpaceGod::Core
 		if (rate <= 0 || teams <= 0) return;
 		auto c = u->Combat;
 		double budget = teams * RepairHpPerTeamS * rate * c->Readiness * dt;
+		// US-T347: a rush puts every hand at the repairs, the worst-hurt system first whatever the focus.
+		bool rush = surge != 1;
+		if (rush) budget *= surge;
 		for (int pass = 0; pass < 8 && budget > 1e-9; pass++)
 		{
 			cs::Ref<Subsystem> worst = nullptr;
@@ -457,7 +460,7 @@ namespace SpaceGod::Core
 			for (const auto& s : c->Subsystems)
 			{
 				if (s->Destroyed() || s->Hp >= s->Def->MaxHp * FieldRepairCap) continue;
-				double score = s->Health() - (InFocus(s, cmd->Focus) ? 2 : 0);
+				double score = s->Health() - (!rush && InFocus(s, cmd->Focus) ? 2 : 0);
 				if (score < worstScore)
 				{
 					worstScore = score;
@@ -470,7 +473,7 @@ namespace SpaceGod::Core
 			cmd->Repaired += fix;
 			budget -= fix;
 		}
-		StepEmergencyRepair(c, cmd, teams, dt);
+		StepEmergencyRepair(c, cmd, teams, rush ? dt * surge : dt); // its dt only scales the work
 		if (cmd->Focus == DamageControlFocus::Shields)
 		{
 			double ratings = 0, room = 0;
@@ -535,7 +538,7 @@ namespace SpaceGod::Core
 		cmd->BraceLeft = cs::Math::Max(0.0, cmd->BraceLeft - dt);
 		cmd->BraceCooldown = cs::Math::Max(0.0, cmd->BraceCooldown - dt);
 		if (!u->PlayerControlled() && !u->Captured && !u->Surrendering && !u->Combat->Disabled()) Doctrine(b, u, cmd);
-		StepDamageControl(u, dt);
+		StepDamageControl(u, dt, b->RushingRepairs(u) ? Battle::RushRepairRate : 1); // US-T347
 	}
 
 	void Broadsides::Doctrine(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& u, const cs::Ref<BroadsideCommand>& cmd)

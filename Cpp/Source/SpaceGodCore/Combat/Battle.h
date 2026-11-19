@@ -267,6 +267,11 @@ namespace SpaceGod::Core
 		/// until then its side's badly damaged hulls within reach break off and close on this hull. Never set by the AI.</summary>
 		double FallBackCallUntil = 0;
 
+		/// <summary>US-T347: the battle second the player at this helm's damage control rush lapses (<see cref="Battle.OrderRushRepair"/>):
+		/// until then its teams work <see cref="Battle.RushRepairRate"/> times as fast and its guns reload at
+		/// <see cref="Battle.RushRepairFireScale"/> of their pace. Never set by the AI.</summary>
+		double RushRepairUntil = 0;
+
 		/// <summary>Taken by boarders: it has changed sides and carries a prize crew, so it no longer fights.</summary>
 		bool Captured = false;
 
@@ -1446,6 +1451,30 @@ namespace SpaceGod::Core
 
 		/// <summary>US-T342: how many badly damaged ships of <paramref name="u"/>'s side within reach would answer (the bar's count).</summary>
 		int DamagedInReach(const cs::Ref<BattleUnit>& u);
+
+		/// <summary>US-T347: how long a damage control rush lasts, battle seconds.</summary>
+		static constexpr double RushRepairSeconds = 20;
+
+		/// <summary>US-T347: how many times as fast the damage control teams work during a rush.</summary>
+		static constexpr double RushRepairRate = 3;
+
+		/// <summary>US-T347: the share of their pace the hull's guns reload at during a rush (the hands are at the repairs).</summary>
+		static constexpr double RushRepairFireScale = 0.5;
+
+		/// <summary>US-T347: whether <paramref name="u"/>'s damage control rush stands now.</summary>
+		bool RushingRepairs(const cs::Ref<BattleUnit>& u) const { return u != nullptr && Seconds < u->RushRepairUntil; }
+
+		/// <summary>US-T347: how many of <paramref name="u"/>'s systems its damage control teams could still mend in the field
+		/// (damaged, not shot away, below <see cref="Broadsides.FieldRepairCap"/>), and the worst of them in <paramref name="worst"/>.</summary>
+		int MendableSystems(const cs::Ref<BattleUnit>& u, cs::String& worst) const;
+
+		/// <summary>
+		/// US-T347: the helm sends every damage control team aboard to the repairs for <see cref="RushRepairSeconds"/>: they
+		/// work <see cref="RushRepairRate"/> times as fast, the worst-hurt system first, while the guns reload at
+		/// <see cref="RushRepairFireScale"/> of their pace. <paramref name="worst"/> names the system they go to first. Empty
+		/// when given, else why not.
+		/// </summary>
+		cs::String OrderRushRepair(const cs::Ref<BattleUnit>& u, cs::String& worst);
 
 		/// <summary>A carrier's helm orders (<see cref="BattleUnit.WingHeld"/>) lapse once nobody holds its helm or flies one of
 		/// its craft: the recall and the call are lifted and its captain launches the wing held aboard, as at the start of a fight.</summary>

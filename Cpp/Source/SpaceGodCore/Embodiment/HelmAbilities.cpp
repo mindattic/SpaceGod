@@ -235,6 +235,23 @@ namespace SpaceGod::Core
 				bar.Add(e);
 			}
 		}
+		// US-T347: a hull with damage control teams and a system they can mend can rush them to the repairs.
+		if (fight && u->Broadside != nullptr)
+		{
+			cs::String worst;
+			int mendable = b->MendableSystems(u, worst);
+			bool standing = b->RushingRepairs(u);
+			if (mendable > 0 || standing)
+			{
+				HelmAbilityEntry e;
+				e.Ability = HelmAbility::RushRepairs;
+				e.Label = "Damage control";
+				e.State = standing ? cs::Cat("at the repairs, guns slow, ", cs::Fmt(u->RushRepairUntil - b->Seconds, "0"), " s")
+					: cs::Cat(mendable, mendable == 1 ? " system to mend" : " systems to mend", ", worst: ", worst);
+				e.Ready = mendable > 0 && !standing;
+				bar.Add(e);
+			}
+		}
 		// US-T140: a hull with a squad of its band about it orders it through its captain, before any fight (last, so the
 		// slots above keep their keys).
 		if (world != nullptr && SquadOrders::SquadOf(world, ship).Count() > 0)
@@ -407,6 +424,13 @@ namespace SpaceGod::Core
 				auto why = b->OrderFallBackCall(u, answering);
 				return why.empty() ? cs::Cat("Fall back on us: ", answering, answering == 1 ? " damaged ship breaks off" : " damaged ships break off",
 					" for ", cs::Fmt(Battle::FallBackCallSeconds, "0"), " s") : cs::Cat("No fall back: ", why);
+			}
+			case HelmAbility::RushRepairs:
+			{
+				cs::String worst;
+				auto why = b->OrderRushRepair(u, worst);
+				return why.empty() ? cs::Cat("Damage control: every team to the repairs for ", cs::Fmt(Battle::RushRepairSeconds, "0"),
+					" s, the ", worst, " first; the guns reload at half pace") : cs::Cat("No damage control rush: ", why);
 			}
 			default:
 				return "";

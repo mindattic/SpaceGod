@@ -55,6 +55,10 @@ namespace SpaceGod::Core
 		/// <summary>US-T342: call the side's badly damaged ships within reach to break off and close on this hull
 		/// (<see cref="Battle.OrderFallBackCall"/>), on the bar in a fight while one is in reach, after the call to paint.</summary>
 		FallBackOnMe = 17,
+
+		/// <summary>US-T347: send every damage control team to the repairs for a while, the guns slower meanwhile
+		/// (<see cref="Battle.OrderRushRepair"/>), on the bar in a fight while a system can be mended, after the call to fall back.</summary>
+		RushRepairs = 18,
 	};
 
 	/// <summary>One entry of a helm's ability bar: what it does, and how it stands now (craft aboard, reloading, ready).</summary>

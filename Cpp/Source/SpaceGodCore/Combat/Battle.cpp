@@ -1205,6 +1205,8 @@ namespace SpaceGod::Core
 		// A small craft's weapons reload as fast as the power it gives them (U.SPC-T424).
 		// A big ship that cannot shed its heat has its crew throttle the guns' reloading (U.SPC-T491).
 		double weaponPower = PowerFactor(u, PowerSystem::Weapons) * Radiators::Throttle(u); // and a held hull's, US-T94
+		// US-T347: with its hands at the repairs (a player's damage control rush), the guns reload slower.
+		if (RushingRepairs(u)) weaponPower *= RushRepairFireScale;
 		for (const auto& s : c->Subsystems)
 		{
 			// A fleet out of supply reloads slower: short of rounds, of spares for its mounts, of power to spare (U.SPC-T93).
