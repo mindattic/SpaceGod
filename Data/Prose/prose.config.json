@@ -4,7 +4,7 @@
   "universe": "spacegod",
   "displayName": "SpaceGod",
   "root": "../..",
-  "mapper": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/universe-export.ps1 -BuildCore",
+  "mapper": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/universe-export.ps1 -BuildCore -Days 730",
   "applier": "python tools/prose_apply.py Data/Prose/pending --lore Data/Lore --universe Data/Prose/spacegod.universe.json",
   "kinds": [
     "description",

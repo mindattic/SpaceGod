@@ -67,8 +67,9 @@ links the standalone `SpaceGodCore.lib` from `tools/build-core.ps1`, as the Benc
    `Data/Prose/spacegod.universe.json`, and checks it with `tools/prose_manifest.py` (below). The kit's `validate`,
    which `push` runs first, checks the rest of the contract against Prose's own `docs/schemas/universe.schema.json`.
 
-The kit runs it as its mapper with `-BuildCore` (an incremental `tools/build-core.ps1`, so the exporter always links a
-lib built from the Core it compiles against).
+The kit runs it as its mapper with `-BuildCore -Days 730` (an incremental `tools/build-core.ps1`, so the exporter always
+links a lib built from the Core it compiles against; two years so the Society and Civilization cast has lived, US-T294).
+A push of a shorter run would prune the houses, citizens and organisations it lacks, and their texts would orphan.
 
 Same seed and same build give the same file, byte for byte. The build hash (`git rev-parse HEAD`, `+dirty` when Core
 has uncommitted edits), the seed, start date and days are recorded in the file's top-level `source` block and in the
@@ -474,6 +475,14 @@ pass `-Days 730` or more so the people have lived a while). It exports houses (`
 their heads and famous members (`citizen-<name>-<id>`, `character`), every active organisation
 (`org-<kind>-<name>-<id>`, `faction`, with its `nameKey`), and one `concept` per event kind (`social-<slug>`, with its key
 and fallback lines) for Prose to draft from.
+
+**Drafted (US-T294)**: the 730-day galaxy (seed 1977, build `55291b2b0e21`: 146 houses, 153 citizens, 78
+organisations, 134 event concepts) is in Prose 'spacegod', and every pool above is drafted there for the owner to approve:
+all 134 `spacegod/social-<slug>` pools, both slant tails, the twelve `spacegod/names-<kind>` pools, and a description of
+each of the 78 organisations (keyed by its `org-...` id). Agents drafted them (`draftedBy` `claude-US-T294`, batches
+`social-v2-US-T294` and `social-witness-US-T294`); none is approved yet, so the game still words every event from the
+templates. `prose --texts-list spacegod --status draft` shows them; the owner approves with `--texts-approve-all spacegod
+--kind bark --by <name> --dry-run` first.
 
 **What to write first**: the kinds the feed shows most (`birth`, `death`, `wedding`, `friendship`, `falling-out`,
 `board-post`, `protest`, `festival`, `match-played`, `trend-sweeps`, `rumour`, `propaganda`), then the notable ones the
