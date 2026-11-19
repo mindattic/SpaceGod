@@ -320,6 +320,12 @@ namespace SpaceGod::Core
 				  "flashes the banner holds steady. A round your flares and chaff draw off drops out of the warning: the feed calls "
 				  "it (MISSILE SPOOFED), its ring turns grey and reads DECOYED while it chases the cloud, and the after-action card "
 				  "counts the rounds spoofed."), // US-T318
+				T("Stopping an escape",
+				  "A hostile hull that breaks off does not vanish at once: it charges its FTL drive, a few seconds for a fighter and "
+				  "half a minute for a capital. The combat feed calls it (Corsair spooling to jump out), and while it is on screen a "
+				  "ring round it fills with the charge, tagged with how full it is (JUMP 62%) and how near the fire on it has come to "
+				  "breaking the jump. Hit its hull, and above all its drive, to cancel the jump; the feed says when its jump is broken "
+				  "or when it got away."), // US-T328
 				T("Difficulty",
 				  "Story, Normal, Hard or Custom: chosen on the New Game setup page, changeable at any time under Settings > "
 				  "Gameplay, and kept in each save. It touches only the unit you embody: the damage your hull takes, how well hostile "

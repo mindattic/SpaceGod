@@ -85,6 +85,8 @@ private:
 	cs::List<bool> hitSubDown;
 	/// US-T318: the rounds homing on the held hull already known to be drawn off by a decoy (each called once).
 	cs::List<cs::Ref<Core::Missile>> hitSpoofed;
+	/// US-T328: the hostile hulls whose escape jump was charging at the last look.
+	cs::List<cs::Ref<Core::BattleUnit>> hitSpooling;
 
 	/// US-T312: the wingmen of the craft held, and whether each was away (flying home to its deck or down on one) at the
 	/// last look; the one its order had it on (the lock it attacks, the threat it covers against), the last one called,
@@ -111,6 +113,14 @@ private:
 	/// flare-and-chaff cloud has drawn off since the last look, counted for the after-action card. The first look after a new
 	/// fight or seat only takes stock.
 	void TrackSpoofed(const cs::Ref<Core::Battle>& battle, const cs::Ref<Core::BattleUnit>& me, float now, bool takeStock);
+
+	/// US-T328: escapes by the held unit's enemies: a feed line when a hostile hull begins to charge its escape jump, when
+	/// the jump is broken (damage, a stun) and when it gets away. The first look after a new fight or seat only takes stock.
+	void TrackEscapes(const cs::Ref<Core::Battle>& battle, const cs::Ref<Core::BattleUnit>& me, float now, bool takeStock);
+
+	/// US-T328: on each hostile hull charging its escape jump while it is on screen, a ring filling with the charge and a
+	/// tag with how full it is and how near the fire on it has come to breaking it (shoot its drive to stop it).
+	void DrawEscapes(const cs::Ref<Core::Battle>& battle, const cs::Ref<Core::BattleUnit>& me, float now);
 
 	/// US-T303: ends the tally of <paramref name="me"/>'s fight in <paramref name="battle"/> (over, or left), making the
 	/// report if the unit fired or was fired on.

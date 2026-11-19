@@ -12,6 +12,7 @@
 #include "Combat/CombatSpecs.h"
 #include "Combat/CombatState.h"
 #include "Combat/Dogfighting.h"
+#include "Combat/EscapeJumps.h" // US-T328
 #include "Combat/Fighters.h"
 #include "Combat/FlightDecks.h"
 #include "Embodiment/MountedTurret.h"
@@ -64,6 +65,11 @@ namespace SpaceGod::UI
 			if (ax >= ay) return d->X > 0 ? "STBD" : "PORT";
 			return d->Y > 0 ? "DORSAL" : "VENTRAL";
 		}
+
+		// US-T328: hostile escape jumps.
+		constexpr Color EscapeSpoolColor{1.0f, 0.78f, 0.3f, 1.0f};
+		constexpr Color EscapeBrokenColor{0.5f, 0.9f, 0.55f, 1.0f};
+		constexpr Color EscapeGoneColor{0.75f, 0.75f, 0.8f, 1.0f};
 
 		// US-T312: the wing's radio calls.
 		constexpr Color WingCallColor{0.62f, 0.86f, 1.0f, 1.0f};
@@ -267,6 +273,57 @@ namespace SpaceGod::UI
 		}
 	}
 
+	void Hud::TrackEscapes(const cs::Ref<Battle>& battle, const cs::Ref<BattleUnit>& me, float now, bool takeStock)
+	{
+		if (takeStock) hitSpooling.Clear();
+		// Each hull charging at the last look: still charging, gone, or its jump broken.
+		for (int i = hitSpooling.Count() - 1; i >= 0; i--)
+		{
+			auto u = hitSpooling[i];
+			if (u != nullptr && !u->Dead && !u->Fled && EscapeJumps::Spooling(u)) continue;
+			hitSpooling.RemoveAt(i);
+			if (u == nullptr || u->Dead) continue; // its fall is the kill feed's
+			AddHitFeed(u->Fled ? cs::Cat(u->Name(), " jumped out") : cs::Cat(u->Name(), "'s jump broken"),
+				u->Fled ? EscapeGoneColor : EscapeBrokenColor, now);
+		}
+		for (const auto& u : battle->Units)
+		{
+			if (u == nullptr || u == me || u->Side == me->Side || u->Dead || u->Fled) continue;
+			if (!EscapeJumps::Spooling(u) || hitSpooling.Contains(u)) continue;
+			hitSpooling.Add(u);
+			if (!takeStock) AddHitFeed(cs::Cat(u->Name(), " spooling to jump out"), EscapeSpoolColor, now);
+		}
+	}
+
+	void Hud::DrawEscapes(const cs::Ref<Battle>& battle, const cs::Ref<BattleUnit>& me, float now)
+	{
+		for (const auto& u : hitSpooling)
+		{
+			if (u == nullptr || u->Dead || u->Fled || !EscapeJumps::Spooling(u)) continue;
+			Vector2 p;
+			float depth = 0;
+			if (!app->ToGui(app->BattleScene(battle, u->Pos), p, depth)) continue;
+			float charge = Mathf::Clamp01(static_cast<float>(EscapeJumps::Fraction(u)));
+			float broken = Mathf::Clamp01(static_cast<float>(EscapeJumps::Disruption(u)));
+			// A faint full ring, and over it an arc from the top round as far as the charge has come, beating faster as it fills.
+			constexpr float radius = 22.0f;
+			float beat = 0.75f + 0.25f * Mathf::Sin(now * (4.0f + 8.0f * charge));
+			DrawRing(p, radius, WithAlpha(EscapeSpoolColor, 0.25f));
+			constexpr int steps = 32;
+			int lit = static_cast<int>(steps * charge);
+			for (int k = 0; k < lit; k++)
+			{
+				float a0 = -Mathf::PI * 0.5f + 2.0f * Mathf::PI * k / steps, a1 = -Mathf::PI * 0.5f + 2.0f * Mathf::PI * (k + 1) / steps;
+				DrawLine(p + Vector2(Mathf::Cos(a0), Mathf::Sin(a0)) * radius, p + Vector2(Mathf::Cos(a1), Mathf::Sin(a1)) * radius,
+					WithAlpha(EscapeSpoolColor, beat), 3.0f);
+			}
+			WorldLabels wl(worldLabelPass);
+			DrawLabel(cs::Cat("JUMP ", cs::Fmt(charge * 100.0, "0"), "%"), p + Vector2(radius + 6, -16), WithAlpha(EscapeSpoolColor, beat), true);
+			DrawLabel(cs::Cat("hit its drive  ", cs::Fmt(broken * 100.0, "0"), "% to break"), p + Vector2(radius + 6, 0),
+				WithAlpha(EscapeBrokenColor, 0.85f), true);
+		}
+	}
+
 	void Hud::TakeHitFx(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& me, const cs::Ref<Subsystem>& mount, float now)
 	{
 		// Only what is new since the last read, and not a backlog left while the HUD was hidden or the game paused.
@@ -420,6 +477,7 @@ namespace SpaceGod::UI
 			hitWing.Clear();
 			hitWingCalled = nullptr;
 			hitSpoofed.Clear();
+			hitSpooling.Clear();
 			return;
 		}
 		bool freshSeat = battle != hitBattle || me != hitUnit;
@@ -453,6 +511,7 @@ namespace SpaceGod::UI
 		TrackOwnDamage(me, now, freshSeat || stale);
 		TrackWing(battle, me, now, freshSeat || stale);
 		TrackSpoofed(battle, me, now, freshSeat || stale);
+		TrackEscapes(battle, me, now, freshSeat || stale);
 		if (battle->Over || me->Dead || me->Fled) CloseHitTally(battle, me, now);
 
 		// The held hull's own state: its shields going down, its hull going critical.
@@ -526,6 +585,7 @@ namespace SpaceGod::UI
 			DrawRing(at, Mathf::Lerp(16.0f, 40.0f, t), tint);
 		}
 
+		DrawEscapes(battle, me, now);
 		if (me->Present()) DrawThreatWarning(battle, me, at, now);
 
 		DrawAfterAction(now);
