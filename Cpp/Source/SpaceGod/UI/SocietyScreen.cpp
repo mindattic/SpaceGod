@@ -773,16 +773,84 @@ namespace SpaceGod::UI
 				lines.Add(Society::Describe(h->Business));
 				links.emplace_back(h->Business->Name, CivPick::Business(h->Business->Id));
 			}
+			// US-T341: who heads it, the seats its people hold, what it owns, whom it married and every feud it is in.
+			auto head = h->Head();
+			if (head != nullptr)
+			{
+				lines.Add(cs::Cat("Head: ", head->FullName(), head->Alive() ? cs::Cat(", ", static_cast<int>(head->AgeYears(jd))) : cs::String(", dead")));
+				links.emplace_back(cs::Cat("Head: ", head->FullName()), CivPick::Person(head->Id));
+			}
+			if (h->Business != nullptr)
+			{
+				int branches = h->Business->Branches.Count();
+				if (branches > 0) lines.Add(cs::Cat("  branches on ", branches, branches == 1 ? " world" : " worlds"));
+				for (const auto& bought : society->Businesses)
+					if (bought != nullptr && bought->Buyer == h->Business) links.emplace_back(cs::Cat("Bought ", bought->Name), CivPick::Business(bought->Id));
+			}
+			{
+				int seats = 0;
+				for (const auto& m : h->Members)
+					if (m != nullptr && m->Alive() && m->Role == CitizenRole::Governor)
+					{
+						seats++;
+						lines.Add(cs::Cat("Seat: ", m->FullName(), " governs ", h->Home != nullptr ? h->Home->Name : cs::String("their world")));
+					}
+				for (const auto& o : civ.Orgs)
+				{
+					if (o == nullptr || !o->Active()) continue;
+					bool led = o->Leader != nullptr && o->Leader->Alive() && o->Leader->House == h;
+					if (led)
+					{
+						seats++;
+						links.emplace_back(cs::Cat(o->Leader->Given, " leads ", Narrator::OrgName(*o)), CivPick::Org(o->Id));
+					}
+					else if (o->Owner == h) links.emplace_back(cs::Cat("Owns ", Narrator::OrgName(*o)), CivPick::Org(o->Id));
+				}
+				if (seats == 0) lines.Add("Seats: none of its people govern or lead anything");
+			}
+			{
+				// The other houses its members' spouses came from (or went to), with how many matches each.
+				std::vector<std::pair<cs::Ref<Household>, int>> wedded;
+				for (const auto& m : h->Members)
+				{
+					if (m == nullptr || m->Spouse == nullptr) continue;
+					auto other = m->Spouse->House;
+					if (other == nullptr || other == h) continue;
+					auto at = std::find_if(wedded.begin(), wedded.end(), [&](const std::pair<cs::Ref<Household>, int>& e) { return e.first == other; });
+					if (at != wedded.end()) at->second++;
+					else wedded.emplace_back(other, 1);
+				}
+				std::stable_sort(wedded.begin(), wedded.end(), [](const std::pair<cs::Ref<Household>, int>& a, const std::pair<cs::Ref<Household>, int>& b) { return a.second > b.second; });
+				if (wedded.empty()) lines.Add("Married into: no other house yet");
+				else lines.Add(cs::Cat("Married into ", static_cast<int>(wedded.size()), wedded.size() == 1 ? " house" : " houses"));
+				for (const auto& w : wedded)
+					links.emplace_back(cs::Cat("Wed into House ", w.first->Surname, w.second > 1 ? cs::Cat(" (", w.second, " matches)") : cs::String()), CivPick::House(w.first->Id));
+			}
 			if (civ.Kinship != nullptr)
-				if (auto f = civ.Kinship->FeudOf(h); f != nullptr && f->Active())
+			{
+				std::vector<cs::Ref<Feud>> feuds;
+				for (const auto& f : civ.Kinship->Feuds)
+					if (f != nullptr && (f->A == h || f->B == h)) feuds.push_back(f);
+				std::stable_sort(feuds.begin(), feuds.end(), [](const cs::Ref<Feud>& a, const cs::Ref<Feud>& b)
+				{
+					if (a->Active() != b->Active()) return a->Active();
+					return a->Active() ? a->Heat > b->Heat : a->EndedJd > b->EndedJd;
+				});
+				for (const auto& f : feuds)
 				{
 					auto other = f->A == h ? f->B : f->A;
-					lines.Add(cs::Cat("At feud with House ", other->Surname, " over ", f->Cause, ", heat ", cs::Fmt(f->Heat, "0.00")));
-					links.emplace_back(cs::Cat("House ", other->Surname), CivPick::House(other->Id));
+					if (other == nullptr) continue;
+					if (f->Active())
+						lines.Add(cs::Cat("At feud with House ", other->Surname, " over ", f->Cause, " since ", SocietyDate(f->StartedJd), ", heat ", cs::Fmt(f->Heat, "0.00"),
+							f->Incidents > 0 ? cs::Cat(", ", f->Incidents, f->Incidents == 1 ? " incident" : " incidents") : cs::String()));
+					else
+						lines.Add(cs::Cat("Old feud with House ", other->Surname, " over ", f->Cause, ", ", SocietyDate(f->StartedJd), " to ", SocietyDate(f->EndedJd)));
+					links.emplace_back(cs::Cat(f->Active() ? "Feud: House " : "Old feud: House ", other->Surname), CivPick::House(other->Id));
 				}
+			}
 			if (h->Home != nullptr) links.emplace_back(h->Home->Name, CivPick::World(h->Home->Name));
 			for (const auto& m : h->Members)
-				if (m != nullptr && m->Alive()) links.emplace_back(m->FullName(), CivPick::Person(m->Id));
+				if (m != nullptr && m->Alive() && m != head) links.emplace_back(m->FullName(), CivPick::Person(m->Id));
 			one("donate", "Donate (a great gift)");
 			pair(CivPickKind::House, "feud", "Swear a feud with", "mark another house");
 			pair(CivPickKind::House, "reconcile", "Reconcile with", "mark another house");
