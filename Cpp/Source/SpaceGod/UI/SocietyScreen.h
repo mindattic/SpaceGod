@@ -40,6 +40,8 @@ namespace SpaceGod::UI
 	/// through what was picked (Alt+Left / Alt+Right, or the arrows by the detail's title). US-T299: the thing picked lists
 	/// the latest events about it, each one a link to the event. US-T304: anything with events can be watched; the Watched page
 	/// lists what is, the feed narrows to it (Watched only), and while playing a toast tells the newest event about it.
+	/// US-T344: the mark (C, or the Mark button) also compares: with a person, house, organisation or business marked, another of
+	/// the same kind picked shows beside it row by row, the better value of each highlighted.
 	/// </summary>
 	class SocietyScreen final
 	{
@@ -199,6 +201,24 @@ namespace SpaceGod::UI
 		/// generation, who each married, the dead greyed); returns its height, draws only when <paramref name="draw"/>, and sets
 		/// <paramref name="follow"/> to the person a row was clicked for.</summary>
 		float DrawFamily(float y, float w, int houseId, Core::Galaxy& galaxy, double jd, bool draw, CivPick& follow);
+
+		/// US-T344: one row of the side-by-side compare: what it is, the picked one's value and the marked one's, and which is
+		/// better (0 neither or no better way, 1 the picked, 2 the marked).
+		struct CompareRow
+		{
+			cs::String Label, A, B;
+			int Better = 0;
+		};
+		/// US-T344: whether the thing picked and the one marked compare (two different people, houses, organisations or businesses).
+		bool Comparable() const;
+		/// US-T344: the rows comparing the thing picked with the one marked (empty when they don't compare or one is gone).
+		void BuildCompare(Core::Galaxy& galaxy, Core::Civilization& civ, double jd, std::vector<CompareRow>& out) const;
+		/// <summary>US-T344: the COMPARE section at <paramref name="y"/> (the picked and the marked side by side, the better value of
+		/// each row highlighted); returns its height, draws only when <paramref name="draw"/>, and sets <paramref name="follow"/> to
+		/// the marked one when its name is clicked.</summary>
+		float DrawCompare(float y, float w, Core::Galaxy& galaxy, Core::Civilization& civ, double jd, bool draw, CivPick& follow);
+		/// US-T344: marks the thing picked (C or the Mark button), or clears the mark when it is the one marked.
+		void ToggleMark();
 
 		/// The module group of a kind (an index into the group names), and the names.
 		static int GroupOf(int kind);

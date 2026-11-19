@@ -130,9 +130,11 @@ the sky cycle. A plain key never changes meaning with Shift unless the table say
 | Ship catalog: next / previous hull, jump | Up / Down, Page Up / Page Down / Home / End (US-T302) | ship catalog | - |
 | Ship catalog: next / previous category tab | Right / Left (US-T302) | ship catalog | - |
 | Ship catalog: mark the hull picked to compare (again: unmark); any other hull picked then shows beside it | C (US-T340) | ship catalog | the Compare button over the hull |
+| Society screen: mark the thing picked (again: clear); another person, house, organisation or business picked then shows beside it | C (US-T344; not while typing in the search) | Society screen | the Mark button under THE SPACEGOD'S HAND |
 | Dev menu | Shift+F1 | anywhere (local) | sg.CheatMenu |
 | Spawn menu (dev menu on Spawn) | Shift+F2 (US-T186, landing) | anywhere (local) | dev menu > Spawn |
 | Bottom drawer | Shift+U (US-T200, landing) | anywhere | handle, bottom left |
+| Notice history: the last 100 notices with their game time; F (Shift+F back) steps the kind shown | Shift+X (US-T345) | anywhere the drawer shows | the drawer's Notices tab |
 | HUD on / off | U | anywhere | - |
 | Clear the screen | F11 | anywhere | - |
 | Galaxy map | [ | anywhere | - |

@@ -380,6 +380,8 @@ namespace SpaceGod::UI
 		if ((e.keyCode == KeyCode::Return || e.keyCode == KeyCode::KeypadEnter) && typing) { GUIUtility::keyboardControl = 0; typing = false; e.Use(); return; }
 		if (e.keyCode == KeyCode::LeftArrow && e.alt) { StepBack(); e.Use(); return; }
 		if (e.keyCode == KeyCode::RightArrow && e.alt) { StepForward(); e.Use(); return; }
+		// US-T344: C marks the thing picked (again: clears it), as the ship catalog's compare does; not while typing in the search.
+		if (e.keyCode == KeyCode::C && !typing && !e.shift && !e.control && !e.alt && !e.command && selectedEvent == 0 && !selected.IsNone()) { ToggleMark(); e.Use(); return; }
 		if (rows.empty()) return;
 		int at = -1;
 		for (int i = 0; i < static_cast<int>(rows.size()); i++)
@@ -1164,7 +1166,10 @@ namespace SpaceGod::UI
 		bool showFamily = event == nullptr && selected.Kind == CivPickKind::House; // US-T315
 		CivPick familyFollow;
 		float familyH = showFamily ? DrawFamily(0, w, selected.Id, galaxy, jd, false, familyFollow) : 0.0f;
-		float contentH = 30 + 22 + 12 + textH + SectionGap + trendsH + familyH + (links.empty() ? 0.0f : HeadingH + linkH + SectionGap) + recentH
+		bool showCompare = event == nullptr && Comparable(); // US-T344
+		CivPick compareFollow;
+		float compareH = showCompare ? DrawCompare(0, w, galaxy, civ, jd, false, compareFollow) : 0.0f;
+		float contentH = 30 + 22 + 12 + textH + SectionGap + trendsH + familyH + compareH +(links.empty() ? 0.0f : HeadingH + linkH + SectionGap) + recentH
 			+ (selected.IsNone() || event != nullptr ? 0.0f : HeadingH + 30 + static_cast<float>(hands.size()) * 30.0f + SectionGap);
 		// US-T298: back and forward through what was picked, beside the title.
 		bool stepBack = false, stepForward = false;
@@ -1204,7 +1209,8 @@ namespace SpaceGod::UI
 		y += SectionGap;
 		if (showTrends) y += DrawTrends(y, w, selected.Name, civ, jd, true);
 		if (showFamily) y += DrawFamily(y, w, selected.Id, galaxy, jd, true, familyFollow);
-		CivPick follow = familyFollow;
+		if (showCompare) y += DrawCompare(y, w, galaxy, civ, jd, true, compareFollow);
+		CivPick follow = !compareFollow.IsNone() ? compareFollow : familyFollow;
 		if (!links.empty())
 		{
 			GUI::Label(Rect(0, y, w, HeadingH - 4), "SEE ALSO", heading);
@@ -1285,8 +1291,9 @@ namespace SpaceGod::UI
 			y += HeadingH;
 			// The mark: the second thing a two-sided hand (a feud, an affair, a summit) takes.
 			bool isMarked = marked == selected;
-			if (GUI::Button(Rect(0, y, 200, 24), isMarked ? "Marked (click to clear)" : "Mark as the second", isMarked ? entrySelected : entry)) marked = isMarked ? CivPick() : selected;
-			if (!marked.IsNone() && !isMarked) GUI::Label(Rect(208, y + 3, w - 208, 20), cs::Cat("Marked: ", NameOf(marked, galaxy, civ)), small);
+			// US-T344: the same mark compares (C); the button names the key.
+			if (GUI::Button(Rect(0, y, 240, 24), isMarked ? "Marked (C or click: clear)" : "Mark: second / compare (C)", isMarked ? entrySelected : entry)) ToggleMark();
+			if (!marked.IsNone() && !isMarked) GUI::Label(Rect(248, y + 3, Mathf::Max(0.0f, w - 248), 20),cs::Cat("Marked: ", NameOf(marked, galaxy, civ)), small);
 			y += 30;
 			bool enabled = GUI::enabled;
 			for (const auto& h : hands)
@@ -1304,6 +1311,177 @@ namespace SpaceGod::UI
 		else if (followEvent != 0) Go(Visit{ CivPick(), followEvent });
 		else if (stepBack) StepBack();
 		else if (stepForward) StepForward();
+	}
+
+	void SocietyScreen::ToggleMark()
+	{
+		marked = marked == selected ? CivPick() : selected;
+	}
+
+	bool SocietyScreen::Comparable() const
+	{
+		if (selected.IsNone() || marked.IsNone() || selected == marked || selected.Kind != marked.Kind) return false;
+		return selected.Kind == CivPickKind::Person || selected.Kind == CivPickKind::House || selected.Kind == CivPickKind::Org || selected.Kind == CivPickKind::Business;
+	}
+
+	void SocietyScreen::BuildCompare(Galaxy& galaxy, Civilization& civ, double jd, std::vector<CompareRow>& out) const
+	{
+		out.clear();
+		if (!Comparable()) return;
+		auto society = Society::Find(galaxy);
+		// sense: 1 the higher is better, -1 the lower, 0 neither (an age, a date, a count that is no merit either way).
+		auto add = [&](const char* label, double a, double b, const cs::String& as, const cs::String& bs, int sense)
+		{
+			CompareRow r;
+			r.Label = label;
+			r.A = as;
+			r.B = bs;
+			if (sense != 0 && !std::isnan(a) && !std::isnan(b) && a != b) r.Better = (sense > 0) == (a > b) ? 1 : 2;
+			out.push_back(r);
+		};
+		auto words = [&](const char* label, const cs::String& as, const cs::String& bs)
+		{
+			CompareRow r;
+			r.Label = label;
+			r.A = as;
+			r.B = bs;
+			out.push_back(r);
+		};
+		auto count = [&](const char* label, int a, int b, int sense) { add(label, a, b, cs::Cat(a), cs::Cat(b), sense); };
+		auto money = [&](const char* label, double a, double b) { add(label, a, b, Narrator::Money(a), Narrator::Money(b), 1); };
+		auto date = [&](const char* label, double a, double b) { add(label, a, b, SocietyDate(a), SocietyDate(b), 0); };
+		switch (selected.Kind)
+		{
+		case CivPickKind::Person:
+		{
+			auto a = society != nullptr ? society->CitizenById(selected.Id) : nullptr;
+			auto b = society != nullptr ? society->CitizenById(marked.Id) : nullptr;
+			if (a == nullptr || b == nullptr) return;
+			auto years = [&](const Citizen& c) { return c.Alive() ? c.AgeYears(jd) : c.AgeYears(c.DiedJd); };
+			auto orgsOf = [](const Citizen& c)
+			{
+				int n = 0;
+				for (const auto& o : c.Orgs)
+					if (o != nullptr && o->Active()) n++;
+				return n;
+			};
+			words("Status", a->Alive() ? cs::String("living") : cs::Cat("died ", SocietyDate(a->DiedJd)), b->Alive() ? cs::String("living") : cs::Cat("died ", SocietyDate(b->DiedJd)));
+			add("Age", years(*a), years(*b), cs::Cat(static_cast<int>(years(*a))), cs::Cat(static_cast<int>(years(*b))), 0);
+			words("Role", cs::String(Core::ToString(a->Role)), cs::String(Core::ToString(b->Role)));
+			words("House", a->House != nullptr ? a->House->Surname : cs::String("none"), b->House != nullptr ? b->House->Surname : cs::String("none"));
+			add("Reputation", a->Reputation, b->Reputation, SocietySigned(a->Reputation), SocietySigned(b->Reputation), 1);
+			add("Skill", a->Skill, b->Skill, cs::Fmt(a->Skill, "0.00"), cs::Fmt(b->Skill, "0.00"), 1);
+			count("Ties outside the family", a->Ties.Count(), b->Ties.Count(), 0);
+			count("Organisations", orgsOf(*a), orgsOf(*b), 0);
+			words("Faith", a->Faith != nullptr ? Narrator::OrgName(*a->Faith) : cs::String("none"), b->Faith != nullptr ? Narrator::OrgName(*b->Faith) : cs::String("none"));
+			if (a->Bribes > 0 || b->Bribes > 0) add("Bribes taken", a->Bribes, b->Bribes, Narrator::Money(a->Bribes), Narrator::Money(b->Bribes), 0);
+			break;
+		}
+		case CivPickKind::House:
+		{
+			auto a = society != nullptr ? society->HouseById(selected.Id) : nullptr;
+			auto b = society != nullptr ? society->HouseById(marked.Id) : nullptr;
+			if (a == nullptr || b == nullptr) return;
+			auto capital = [](const Household& h) { return h.Business != nullptr && h.Business->Trading() ? h.Business->Capital : 0.0; };
+			auto branches = [](const Household& h) { return h.Business != nullptr && h.Business->Trading() ? h.Business->Branches.Count() : 0; };
+			auto governors = [](const Household& h)
+			{
+				int n = 0;
+				for (const auto& m : h.Members)
+					if (m != nullptr && m->Alive() && m->Role == CitizenRole::Governor) n++;
+				return n;
+			};
+			auto feuds = [&](const cs::Ref<Household>& h)
+			{
+				int n = 0;
+				if (civ.Kinship != nullptr)
+					for (const auto& f : civ.Kinship->Feuds)
+						if (f != nullptr && f->Active() && (f->A == h || f->B == h)) n++;
+				return n;
+			};
+			words("Home", a->Home != nullptr ? a->Home->Name : cs::String("nowhere"), b->Home != nullptr ? b->Home->Name : cs::String("nowhere"));
+			date("Founded", a->FoundedJd, b->FoundedJd);
+			count("Living", a->Living(), b->Living(), 1);
+			count("Members ever", a->Members.Count(), b->Members.Count(), 0);
+			money("Wealth", a->Wealth, b->Wealth);
+			add("Business capital", capital(*a), capital(*b), a->Business != nullptr && a->Business->Trading() ? Narrator::Money(capital(*a)) : cs::String("no business"),
+				b->Business != nullptr && b->Business->Trading() ? Narrator::Money(capital(*b)) : cs::String("no business"), 1);
+			count("Branch worlds", branches(*a), branches(*b), 1);
+			count("Governors", governors(*a), governors(*b), 1);
+			count("Feuds running", feuds(a), feuds(b), -1);
+			break;
+		}
+		case CivPickKind::Org:
+		{
+			auto a = civ.OrgById(selected.Id);
+			auto b = civ.OrgById(marked.Id);
+			if (a == nullptr || b == nullptr) return;
+			words("Kind", cs::String(Core::ToString(a->Kind)), cs::String(Core::ToString(b->Kind)));
+			words("Status", a->Active() ? cs::String("active") : cs::Cat("ended ", SocietyDate(a->EndedJd)), b->Active() ? cs::String("active") : cs::Cat("ended ", SocietyDate(b->EndedJd)));
+			date("Founded", a->FoundedJd, b->FoundedJd);
+			add("Strength", a->Strength, b->Strength, SocietyPct(a->Strength), SocietyPct(b->Strength), 1);
+			money("Funds", a->Funds, b->Funds);
+			count("Members", a->Members.Count(), b->Members.Count(), 1);
+			add("Stance", a->Stance, b->Stance, SocietySigned(a->Stance), SocietySigned(b->Stance), 0);
+			add("Score", static_cast<double>(a->Score), static_cast<double>(b->Score), cs::Cat(a->Score), cs::Cat(b->Score), 1);
+			words("Led by", a->Leader != nullptr ? a->Leader->FullName() : cs::String("nobody"), b->Leader != nullptr ? b->Leader->FullName() : cs::String("nobody"));
+			break;
+		}
+		case CivPickKind::Business:
+		{
+			auto a = society != nullptr ? society->BusinessById(selected.Id) : nullptr;
+			auto b = society != nullptr ? society->BusinessById(marked.Id) : nullptr;
+			if (a == nullptr || b == nullptr) return;
+			auto bought = [&](const cs::Ref<Business>& x)
+			{
+				int n = 0;
+				for (const auto& o : society->Businesses)
+					if (o != nullptr && o->Buyer == x) n++;
+				return n;
+			};
+			words("Line", cs::String(Core::ToString(a->Kind)), cs::String(Core::ToString(b->Kind)));
+			words("Status", cs::String(Core::ToString(a->Status)), cs::String(Core::ToString(b->Status)));
+			words("Owner", a->Owner != nullptr ? cs::Cat("House ", a->Owner->Surname) : cs::String("none"), b->Owner != nullptr ? cs::Cat("House ", b->Owner->Surname) : cs::String("none"));
+			date("Founded", a->FoundedJd, b->FoundedJd);
+			money("Capital", a->Capital, b->Capital);
+			money("Last month", a->LastMonth, b->LastMonth);
+			count("Branch worlds", a->Branches.Count(), b->Branches.Count(), 1);
+			count("Firms bought", bought(a), bought(b), 1);
+			break;
+		}
+		default:
+			break;
+		}
+	}
+
+	float SocietyScreen::DrawCompare(float y, float w, Galaxy& galaxy, Civilization& civ, double jd, bool draw, CivPick& follow)
+	{
+		std::vector<CompareRow> cmp;
+		BuildCompare(galaxy, civ, jd, cmp);
+		if (cmp.empty()) return 0;
+		float height = HeadingH + 28 + static_cast<float>(cmp.size()) * 22.0f + 22 + SectionGap;
+		if (!draw) return height;
+		float labelW = Mathf::Min(170.0f, w * 0.3f);
+		float colW = (w - labelW) / 2;
+		GUI::Label(Rect(0, y, w, HeadingH - 4), "COMPARE", heading);
+		y += HeadingH;
+		cs::String here = NameOf(selected, galaxy, civ), there = NameOf(marked, galaxy, civ);
+		GUI::Label(Rect(labelW, y + 3, colW - 6, 20), here, rowTitle);
+		if (GUI::Button(Rect(labelW + colW, y, Mathf::Min(colW - 6, link->CalcSize(GUIContent(there)).x + 16), 24), there, link)) follow = marked;
+		y += 28;
+		int winsHere = 0, winsThere = 0;
+		for (const auto& r : cmp)
+		{
+			GUI::Label(Rect(0, y, labelW - 6, 20), r.Label, small);
+			GUI::Label(Rect(labelW, y, colW - 6, 20), r.A, r.Better == 1 ? good : text);
+			GUI::Label(Rect(labelW + colW, y, colW - 6, 20), r.B, r.Better == 2 ? good : text);
+			if (r.Better == 1) winsHere++;
+			else if (r.Better == 2) winsThere++;
+			y += 22;
+		}
+		GUI::Label(Rect(0, y, w, 20), cs::Cat(here, " ahead on ", winsHere, winsHere == 1 ? " row" : " rows", ", ", there, " on ", winsThere,
+			"  (the better value of a row is highlighted; an age, a date or a stance has none)"), small);
+		return height;
 	}
 
 	float SocietyScreen::DrawTrends(float y, float w, const cs::String& world, Civilization& civ, double jd, bool draw)

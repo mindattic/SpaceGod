@@ -718,7 +718,9 @@ namespace SpaceGod::Core
 				  "by capital among the firms still trading (or how it ended, and who bought it), its branches, the firms it bought "
 				  "out, its rivals in the same line in its system and the bribes it has paid. This month sums up the last 30 days: "
 				  "each kind of event that happened, the most frequent first, with how many, how many your hand steered, the worlds "
-				  "it touched and the latest one's words; click one to read it.")), // US-T298, US-T299, US-T304, US-T308, US-T315, US-T323, US-T325, US-T327, US-T330, US-T334, US-T337
+				  "it touched and the latest one's words; click one to read it. The mark compares too: mark a person, house, "
+				  "organisation or business (C, or the Mark button) and pick another of the same kind, and the two show side by "
+				  "side, the better value of each row highlighted and the marked one's name a link.")), // US-T298, US-T299, US-T304, US-T308, US-T315, US-T323, US-T325, US-T327, US-T330, US-T334, US-T337, US-T344
 
 			cs::New<ManualChapter>("Comms and pilots", "Hailing ships and stations, piracy by radio, and the people you meet", Keys("COMMS AND PILOTS"),
 				T("Hailing",
