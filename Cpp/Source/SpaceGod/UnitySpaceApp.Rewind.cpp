@@ -75,7 +75,15 @@ namespace SpaceGod
 			// This frame was the logged one: on to the next, until the seek arrives.
 			rewindFrameStarted = false;
 			if (const RewindFrame* f = RewindFrameAt(rewindReplayNext))
+			{
 				if (Clock->Jd != f->JdAfter) rewindReplayDrift++;
+				// The world itself, where the play kept a check: the replay is exact only while every one matches.
+				if (f->Check != 0)
+				{
+					rewindReplayChecks++;
+					if (RewindWorldCheck() != f->Check && rewindReplayMismatches++ == 0) rewindReplayFirstMismatchS = f->SessionS;
+				}
+			}
 			rewindReplayNext++;
 			if (rewindReplayNext >= rewindReplayStop) FinishRewindReplay(false);
 			return;
@@ -258,8 +266,23 @@ namespace SpaceGod
 		f.Before = rewindFrameClock;
 		f.JdAfter = Clock->Jd;
 		f.Intervened = rewindFrameIntervened;
+		if (f.Serial % RewindCheckEvery == 0) f.Check = RewindWorldCheck();
 		rewindFrames.push_back(f);
 		while (rewindFrames.size() > RewindMaxFrames) rewindFrames.pop_front();
+	}
+
+	unsigned long long UnitySpaceApp::RewindWorldCheck()
+	{
+		// FNV-1a over co-op's world digest (clock, every system's counts and treasuries, the watched system's ships and
+		// settlements): what a desync check compares, so a replay that matches it re-lived the play as a client would.
+		cs::String d = CoopDigest();
+		unsigned long long h = 1469598103934665603ULL;
+		for (unsigned char c : d)
+		{
+			h ^= c;
+			h *= 1099511628211ULL;
+		}
+		return h == 0 ? 1 : h;
 	}
 
 	const UnitySpaceApp::RewindFrame* UnitySpaceApp::RewindFrameAt(long long serial) const
@@ -308,6 +331,8 @@ namespace SpaceGod
 		rewindReplayStop = stop;
 		rewindReplayTargetS = targetS;
 		rewindReplayDrift = 0;
+		rewindReplayChecks = rewindReplayMismatches = 0;
+		rewindReplayFirstMismatchS = -1;
 		ShowToast(cs::Cat("Replaying ", RewindSpan(wallS), " of play to the moment picked  (Esc stops here)"));
 		return true;
 	}
@@ -320,10 +345,19 @@ namespace SpaceGod
 		if (rewindReplayDrift > 0)
 			Debug::LogWarning(cs::Cat("[Unity.SpaceGod] Rewind replay: the clock differed from the log on ", rewindReplayDrift, " of ",
 				rewindReplayNext - rewindReplayStart, " frames"));
+		// Whether the replay re-lived the play: its world checks against the ones the play kept.
+		cs::String exact = rewindReplayChecks == 0 ? cs::String("not checked (too short)")
+			: rewindReplayMismatches == 0 ? cs::Cat("exact (", rewindReplayChecks, " checks matched)")
+			: cs::Cat("drifted from the play from ", RewindSpan(rewindReplayFirstMismatchS), " into the session (", rewindReplayMismatches,
+				" of ", rewindReplayChecks, " checks differ)");
+		rewindLastVerdict = cs::Cat(rewindReplayNext - rewindReplayStart, " frames replayed, ", exact);
+		if (rewindReplayMismatches > 0) Debug::LogWarning(cs::Cat("[Unity.SpaceGod] Rewind replay ", rewindLastVerdict));
+		else Debug::Log(cs::Cat("[Unity.SpaceGod] Rewind replay ", rewindLastVerdict));
 		cs::String when = Astro::ToDateTime(Clock->Jd).ToString("yyyy-MM-dd HH:mm:ss");
-		if (stopped) ShowToast(cs::Cat("Replay stopped at ", when, " UTC"));
-		else if (!rewindReplayWhy.empty()) ShowToast(cs::Cat("Replayed to ", when, " UTC, short of the moment picked: ", rewindReplayWhy));
-		else ShowToast(cs::Cat("Arrived at ", when, " UTC  (play on and the old future is replaced)"));
+		cs::String tail = rewindReplayMismatches > 0 ? cs::String("  (the replay drifted from the play: sg.Rewind list)") : cs::String();
+		if (stopped) ShowToast(cs::Cat("Replay stopped at ", when, " UTC", tail));
+		else if (!rewindReplayWhy.empty()) ShowToast(cs::Cat("Replayed to ", when, " UTC, short of the moment picked: ", rewindReplayWhy, tail));
+		else ShowToast(cs::Cat("Arrived at ", when, " UTC  (play on and the old future is replaced)", tail));
 		ShowRewindBar(6);
 	}
 
@@ -414,6 +448,7 @@ namespace SpaceGod
 		text += rewindFrames.empty() ? cs::String("\n  frame log: empty (co-op, or nothing played yet)")
 			: cs::Cat("\n  frame log: ", rewindFrames.size(), " frames, ", RewindSpan(rewindFrames.back().SessionS - rewindFrames.front().SessionS),
 				" of game time (from ", RewindSpan(rewindSessionS - rewindFrames.front().SessionS), " back), ", acted, " with your input");
+		if (!rewindLastVerdict.empty()) text += cs::Cat("\n  last replay: ", rewindLastVerdict);
 		for (const auto& k : frames)
 		{
 			text += cs::Cat("\n  #", k->Id, "  ", Astro::ToDateTime(k->Jd).ToString("yyyy-MM-dd HH:mm:ss"), "  ", RewindSpan(rewindSessionS - k->SessionS),

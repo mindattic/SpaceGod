@@ -62,7 +62,20 @@ private:
 		Coop::ClockState Before;
 		double JdAfter = 0;
 		bool Intervened = false;
+		/// <summary>A hash of the world just after the frame (CoopDigest), on every RewindCheckEvery-th frame (0: none).</summary>
+		unsigned long long Check = 0;
 	};
+
+	/// <summary>Every this many logged frames the world's digest is kept, so a replay can tell whether it is re-living the
+	/// play exactly (about once a second at 60 fps).</summary>
+	static constexpr long long RewindCheckEvery = 60;
+	/// <summary>The hash of CoopDigest() now (never 0).</summary>
+	unsigned long long RewindWorldCheck();
+	/// <summary>The replay's checks: compared, differing, and the session second of the first that differed (-1: none).</summary>
+	int rewindReplayChecks = 0, rewindReplayMismatches = 0;
+	double rewindReplayFirstMismatchS = -1;
+	/// <summary>The last replay's verdict, for sg.Rewind list.</summary>
+	cs::String rewindLastVerdict;
 
 	/// <summary>The frame log, oldest first, serials consecutive (single player only).</summary>
 	std::deque<RewindFrame> rewindFrames;

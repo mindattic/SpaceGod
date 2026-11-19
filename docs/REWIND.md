@@ -297,9 +297,15 @@ The owner approved the build on 2026-11-19. The phases below each land on their 
   shows it for 30 s): the session from its start to now, a tick per keyframe (the session start wider), the replayable
   stretch shaded blue, now in amber. Hovering a moment says how far back it is and whether it replays exactly; a click
   seeks there (when the cursor is free, not at the controls).
+- *Replay checks.* Every 60th logged frame also keeps a hash of the world just after it (FNV-1a over co-op's desync
+  digest, `CoopDigest`: the clock, every system's counts and treasuries, the watched system's ships and settlements).
+  A seek's replay recomputes it at the same frames and counts the ones that differ, so whether a replay re-lived the
+  play exactly is measured in the game, not assumed: the arrival toast says when it drifted, the log gets a line
+  either way, and `sg.Rewind list` shows the last replay's verdict ("exact (N checks matched)", or where it first
+  drifted). The check only reads the world; nothing in the simulation calls it.
 - *Not yet.* The player's own input in the log is only marked, not replayed, so a seek past an action lands just before
   it; replaying it is the input recorder (per `EmbodiableKey` frames, orders, clock keys; US-T169's requirement 1). The
-  game frame's replay is not yet shown bit-exact: the world's adventures spawn round the camera's point
+  replay checks above are how a remaining source of drift shows: the world's adventures spawn round the camera's point
   (`PlayerHelioKm`), which a restored view need not share, and console commands (`sg.*`) are not marked as input. In
   co-op the log is off and a seek lands on the keyframe. The analytic preview on the bar, and the US-T104 fork at the
   first intervention after a seek, are still to come.
