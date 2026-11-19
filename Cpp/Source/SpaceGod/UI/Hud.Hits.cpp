@@ -151,6 +151,98 @@ namespace SpaceGod::UI
 	{
 		killMarkAt = now;
 		AddHitFeed(cs::Cat(unit->Name(), " ", how), tint, now);
+		// US-T364: on the timeline as the unit's own, and not again when the fate scan sees it fall or strike.
+		AddMoment(cs::Cat("You: the ", unit->Name(), " ", how), tint);
+		hitClaimed[unit] = now;
+	}
+
+	void Hud::AddMoment(const cs::String& what, Color tint)
+	{
+		if (hitTallyDone || hitBattle == nullptr) return;
+		if (hitTally.Moments.Count() >= MomentsKept)
+		{
+			hitTally.MomentsLate++;
+			return;
+		}
+		HitMoment m;
+		m.At = hitBattle->Seconds;
+		m.Text = what;
+		m.Tint = tint;
+		hitTally.Moments.Add(m);
+	}
+
+	void Hud::TrackMoments(const cs::Ref<Battle>& battle, const cs::Ref<BattleUnit>& me, bool takeStock)
+	{
+		// The held hull's helm calls, by when each ends: a later end than last seen is a call just made.
+		const double ends[7] = { me->FireCallUntil, me->ScreenCallUntil, me->PaintCallUntil, me->FallBackCallUntil, me->RushRepairUntil,
+			me->HoldFireCallUntil, me->CrippleCallUntil };
+		int withdrawing = 0;
+		for (const auto& u : battle->Units)
+			if (u != nullptr && u->WithdrawCalledBy == me && u->Present()) withdrawing++;
+		if (takeStock)
+		{
+			for (int i = 0; i < 7; i++) hitCallsSeen[i] = ends[i];
+			hitWithdrawSeen = withdrawing;
+			hitFates.Clear();
+		}
+		else
+		{
+			for (int i = 0; i < 7; i++)
+			{
+				if (ends[i] > hitCallsSeen[i] + 1e-6 && ends[i] > battle->Seconds)
+				{
+					auto mark = [](const cs::Ref<BattleUnit>& t) { return t != nullptr ? cs::Cat(" the ", t->Name()) : cs::String(" the locked hull"); };
+					cs::String call;
+					switch (i)
+					{
+						case 0: call = cs::Cat("You called fire on", mark(me->FireCallTarget)); break;
+						case 1: call = "You called the screen on you"; break;
+						case 2: call = cs::Cat("You called recon to paint", mark(me->PaintCallTarget)); break;
+						case 3: call = "You called the damaged to fall back on you"; break;
+						case 4: call = "You rushed damage control"; break;
+						case 5: call = "You ordered hold fire"; break;
+						default: call = cs::Cat("You called to cripple", mark(me->CrippleCallTarget)); break;
+					}
+					AddMoment(call, Color(0.62f, 0.86f, 1.0f, 1.0f));
+				}
+				hitCallsSeen[i] = ends[i];
+			}
+			if (withdrawing > 0 && hitWithdrawSeen == 0)
+				AddMoment(cs::Cat("You called a withdrawal: ", withdrawing, withdrawing == 1 ? " ship runs" : " ships run"), Color(1.0f, 0.64f, 0.26f, 1.0f));
+			hitWithdrawSeen = withdrawing;
+		}
+
+		// Ships of either side (not craft): destroyed, breaking off, getting away, striking their colours.
+		constexpr int deadBit = 1, fledBit = 2, fleeingBit = 4, struckBit = 8;
+		for (const auto& u : battle->Units)
+		{
+			if (u == nullptr || u->Kind == UnitKind::Fighter) continue;
+			bool ours = u->Side == me->Side, theirs = !ours && battle->Hostile(me, u);
+			if (!ours && !theirs) continue;
+			int fate = (u->Dead ? deadBit : 0) | (u->Fled ? fledBit : 0) | (u->Fleeing ? fleeingBit : 0) | (u->Surrendering ? struckBit : 0);
+			int was = 0;
+			bool known = hitFates.TryGetValue(u, was);
+			hitFates[u] = fate;
+			if (takeStock || !known) continue;
+			int fresh = fate & ~was;
+			if (fresh == 0) continue;
+			bool claimed = hitClaimed.ContainsKey(u);
+			auto name = u->Name();
+			Color lossTint(1.0f, 0.42f, 0.3f, 1.0f), goneTint(0.75f, 0.75f, 0.8f, 1.0f);
+			if (fresh & deadBit)
+			{
+				if (u == me) AddMoment("Your hull was lost", lossTint);
+				else if (ours) AddMoment(cs::Cat("Lost: the ", name), lossTint);
+				else if (!claimed) AddMoment(cs::Cat("The ", name, " destroyed"), KillMarkColor);
+				continue;
+			}
+			if ((fresh & struckBit) && !claimed)
+				AddMoment(ours ? cs::Cat("Our ", name, " struck its colours") : cs::Cat("The ", name, " struck its colours"), ours ? lossTint : LockColor);
+			if (fresh & fledBit)
+				AddMoment(u == me ? cs::String("You got away") : ours ? cs::Cat("Our ", name, " got away") : cs::Cat("The ", name, " got away"), goneTint);
+			else if (fresh & fleeingBit)
+				AddMoment(u == me ? cs::String("You broke off") : ours ? cs::Cat("Our ", name, " broke off") : cs::Cat("The ", name, " broke off"), goneTint);
+		}
 	}
 
 	void Hud::TrackWing(const cs::Ref<Battle>& b, const cs::Ref<BattleUnit>& me, float now, bool takeStock)
@@ -350,6 +442,8 @@ namespace SpaceGod::UI
 				if (fx.Kind != FxKind::ShieldHit && !(fx.Kind == FxKind::Impact && fx.Size > 0)) continue;
 				bool shield = fx.Kind == FxKind::ShieldHit;
 				(shield ? hitTally.TakenShield : hitTally.TakenHull)++;
+				if (hitTally.TakenShield + hitTally.TakenHull == 1) // US-T364
+					AddMoment(fx.By != nullptr && fx.By != me ? cs::Cat("First fire taken, from the ", fx.By->Name()) : cs::String("First fire taken"), HullArcColor);
 				auto from = fx.By != nullptr && fx.By != me && (fx.By->Pos - me->Pos).LengthSquared() > 1e-18 ? fx.By->Pos - me->Pos : fx.A - me->Pos;
 				if (from.LengthSquared() < 1e-18) from = -me->Forward;
 				from = from.Normalized();
@@ -385,6 +479,8 @@ namespace SpaceGod::UI
 					auto kind = fx.Kind == FxKind::ShieldHit ? HitMark::Shield
 						: fx.Kind == FxKind::SubsystemDestroyed || fx.WeakPoint ? HitMark::WeakPoint : HitMark::Hull;
 					(kind == HitMark::Shield ? hitTally.Shield : kind == HitMark::WeakPoint ? hitTally.Weak : hitTally.Hull)++;
+					if (hitTally.Shield + hitTally.Hull + hitTally.Weak == 1) // US-T364
+						AddMoment(cs::Cat("First blood: you hit the ", fx.Unit->Name()), WeakMarkColor);
 					// The strongest of the frame's hits is the one marked.
 					if (!marked || static_cast<int>(kind) > static_cast<int>(hitMark)) hitMark = kind;
 					marked = true;
@@ -478,6 +574,8 @@ namespace SpaceGod::UI
 			hitWingCalled = nullptr;
 			hitSpoofed.Clear();
 			hitSpooling.Clear();
+			hitFates.Clear(); // US-T364
+			hitClaimed.Clear();
 			return;
 		}
 		bool freshSeat = battle != hitBattle || me != hitUnit;
@@ -498,6 +596,7 @@ namespace SpaceGod::UI
 			hitArcs.Clear();
 			hitStruck.Clear();
 			hitDisabled.Clear();
+			hitClaimed.Clear(); // US-T364
 			hitMarkAt = killMarkAt = shieldDownAt = hullCriticalAt = -100.0f;
 			hadShield = ShieldShare(me) > 0.1;
 			hullWasCritical = HullShare(me) < HullCritical;
@@ -512,6 +611,7 @@ namespace SpaceGod::UI
 		TrackWing(battle, me, now, freshSeat || stale);
 		TrackSpoofed(battle, me, now, freshSeat || stale);
 		TrackEscapes(battle, me, now, freshSeat || stale);
+		TrackMoments(battle, me, freshSeat || stale); // US-T364
 		if (battle->Over || me->Dead || me->Fled) CloseHitTally(battle, me, now);
 
 		// The held hull's own state: its shields going down, its hull going critical.
@@ -699,10 +799,12 @@ namespace SpaceGod::UI
 
 	void Hud::DrawAfterAction(float now)
 	{
-		float age = now - hitReportAt;
-		if (age < 0 || age > AfterActionSeconds) return;
 		const auto& t = hitReport;
-		float alpha = Mathf::Min(1.0f, (AfterActionSeconds - age) / 1.5f);
+		// US-T364: a card with a timeline stays up longer, to be read.
+		float shownFor = AfterActionSeconds + (t.Moments.Count() > 0 ? TimelineLinger : 0.0f);
+		float age = now - hitReportAt;
+		if (age < 0 || age > shownFor) return;
+		float alpha = Mathf::Min(1.0f, (shownFor - age) / 1.5f);
 
 		int secs = Mathf::Max(0, Mathf::RoundToInt(static_cast<float>(t.SecondsTo - t.SecondsFrom)));
 		cs::String length = cs::Cat(secs / 60, ":", secs % 60 < 10 ? "0" : "", secs % 60);
@@ -722,8 +824,31 @@ namespace SpaceGod::UI
 		if (t.Spoofed > 0) // US-T318
 			lines.Add(cs::Cat(t.Spoofed, t.Spoofed == 1 ? " round" : " rounds", " spoofed by flares and chaff"));
 
+		// US-T364: the timeline, each moment at its time into the fight; past MomentsShown, the first and last halves with
+		// a line for what lies between.
+		cs::List<std::pair<cs::String, Color>> moments;
+		int count = t.Moments.Count();
+		auto stamp = [&](const HitMoment& m)
+		{
+			int s = Mathf::Max(0, Mathf::RoundToInt(static_cast<float>(m.At - t.SecondsFrom)));
+			return cs::Cat(s / 60, ":", s % 60 < 10 ? "0" : "", s % 60, "  ", m.Text);
+		};
+		for (int i = 0; i < count; i++)
+		{
+			if (count > MomentsShown && i == MomentsShown / 2)
+			{
+				int skipped = count - MomentsShown;
+				moments.Add({ cs::Cat("\xE2\x80\xA6 ", skipped, skipped == 1 ? " more moment" : " more moments", " \xE2\x80\xA6"), Dim });
+				i = count - MomentsShown / 2 - 1;
+				continue;
+			}
+			moments.Add({ stamp(t.Moments[i]), t.Moments[i].Tint });
+		}
+		if (t.MomentsLate > 0)
+			moments.Add({ cs::Cat("\xE2\x80\xA6 and ", t.MomentsLate, " later"), Dim });
+
 		constexpr float w = 340, pad = 12, rowH = 18;
-		float h = pad * 2 + rowH * (1 + lines.Count());
+		float h = pad * 2 + rowH * (1 + lines.Count()) + (moments.Count() > 0 ? rowH * (1 + moments.Count()) + 4 : 0);
 		auto r = Rect(Screen::width * 0.5f - w * 0.5f, 96.0f, w, h);
 		auto old = GUI::color;
 		GUI::color = WithAlpha(Color(1, 1, 1, 1), alpha);
@@ -735,6 +860,15 @@ namespace SpaceGod::UI
 		for (const auto& l : lines)
 		{
 			DrawLabel(FitText(l, minorLabel, w - 2 * pad), Vector2(r.x + pad, y), WithAlpha(Dim, alpha), true);
+			y += rowH;
+		}
+		if (moments.Count() == 0) return;
+		y += 4;
+		DrawLabel("TIMELINE", Vector2(r.x + pad, y), WithAlpha(Accent, alpha), true);
+		y += rowH;
+		for (const auto& m : moments)
+		{
+			DrawLabel(FitText(m.first, minorLabel, w - 2 * pad), Vector2(r.x + pad, y), WithAlpha(m.second, alpha), true);
 			y += rowH;
 		}
 	}

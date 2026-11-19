@@ -13,7 +13,8 @@
 //   - US-T303: an after-action report when its fight ends or it leaves the fight (DrawAfterAction);
 //   - US-T309: a LOST / RESTORED line in the feed for each of its own subsystems shot away or repaired (TrackOwnDamage);
 //   - US-T312: leading a squadron, its wingmen's radio calls in the feed (TrackWing);
-//   - US-T318: a SPOOFED line for each round homing on it that flares and chaff draw off (TrackSpoofed).
+//   - US-T318: a SPOOFED line for each round homing on it that flares and chaff draw off (TrackSpoofed);
+//   - US-T364: a timeline of the fight's key moments on the after-action card (TrackMoments).
 
 private:
 	enum class HitMark : int { Shield, Hull, WeakPoint };
@@ -35,9 +36,20 @@ private:
 		float Born = 0;
 	};
 
+	/// US-T364: a key moment of the fight for the after-action timeline: when (battle seconds), what, and its colour.
+	struct HitMoment
+	{
+		double At = 0;
+		cs::String Text;
+		Color Tint;
+	};
+
 	/// US-T303: what the held unit did and took in one fight, for the after-action report.
 	struct HitTally
 	{
+		/// US-T364: the fight's key moments in order (the first MomentsKept), and how many came after those.
+		cs::List<HitMoment> Moments;
+		int MomentsLate = 0;
 		int Shield = 0, Hull = 0, Weak = 0, Destroyed = 0, Disabled = 0, Struck = 0, TakenShield = 0, TakenHull = 0;
 		/// US-T309: the held hull's own subsystems shot away, and brought back by damage control, in the fight.
 		int SystemsLost = 0, SystemsRestored = 0;
@@ -49,6 +61,11 @@ private:
 	};
 
 	static constexpr float AfterActionSeconds = 12.0f;
+	/// US-T364: the most moments a fight's timeline keeps, the most the card lists, and how much longer a card with a
+	/// timeline stays up.
+	static constexpr int MomentsKept = 40;
+	static constexpr int MomentsShown = 16;
+	static constexpr float TimelineLinger = 8.0f;
 	static constexpr float HitMarkSeconds = 0.22f;
 	static constexpr float KillMarkSeconds = 0.75f;
 	static constexpr float HitArcSeconds = 1.4f;
@@ -87,6 +104,13 @@ private:
 	cs::List<cs::Ref<Core::Missile>> hitSpoofed;
 	/// US-T328: the hostile hulls whose escape jump was charging at the last look.
 	cs::List<cs::Ref<Core::BattleUnit>> hitSpooling;
+	/// US-T364: each ship's fate flags at the last look (dead, fled, fleeing, struck), the hulls whose fall the held unit
+	/// already claimed (so the timeline names it once), the held hull's helm calls' ends at the last look, and how many ships
+	/// ran under its Withdraw call.
+	cs::Dictionary<cs::Ref<Core::BattleUnit>, int> hitFates;
+	cs::Dictionary<cs::Ref<Core::BattleUnit>, float> hitClaimed;
+	double hitCallsSeen[7] = {};
+	int hitWithdrawSeen = 0;
 
 	/// US-T312: the wingmen of the craft held, and whether each was away (flying home to its deck or down on one) at the
 	/// last look; the one its order had it on (the lock it attacks, the threat it covers against), the last one called,
@@ -121,6 +145,14 @@ private:
 	/// US-T328: on each hostile hull charging its escape jump while it is on screen, a ring filling with the charge and a
 	/// tag with how full it is and how near the fire on it has come to breaking it (shoot its drive to stop it).
 	void DrawEscapes(const cs::Ref<Core::Battle>& battle, const cs::Ref<Core::BattleUnit>& me, float now);
+
+	/// US-T364: a moment for the running fight's timeline, at the battle's time now (none once the tally is closed).
+	void AddMoment(const cs::String& what, Color tint);
+
+	/// US-T364: the fight's key moments as the held unit <paramref name="me"/> sees them: ships of either side destroyed,
+	/// breaking off, getting away or striking their colours, and each helm call it makes. Read only; the first look after a
+	/// new fight or seat only takes stock.
+	void TrackMoments(const cs::Ref<Core::Battle>& battle, const cs::Ref<Core::BattleUnit>& me, bool takeStock);
 
 	/// US-T303: ends the tally of <paramref name="me"/>'s fight in <paramref name="battle"/> (over, or left), making the
 	/// report if the unit fired or was fired on.
