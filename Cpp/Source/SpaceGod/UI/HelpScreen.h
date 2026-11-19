@@ -50,6 +50,10 @@ namespace SpaceGod::UI
 		cs::Ref<Texture2D> panelTexture, buttonTexture, buttonActiveTexture;
 		Vector2 scroll, contentsScroll;
 		int chapter = 0;
+		/// US-T324: the contents list scrolls to the chapter picked on the next draw; the chapter's view and text heights as
+		/// last drawn (Page Up / Page Down step a page of them).
+		bool followContents = false;
+		float chapterViewH = 0, chapterTextH = 0;
 
 		/// The ship catalog page (US-T193), and whether it has the screen.
 		cs::Ref<ShipCatalogScreen> catalog;

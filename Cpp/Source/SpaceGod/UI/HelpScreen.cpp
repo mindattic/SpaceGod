@@ -69,7 +69,7 @@ namespace SpaceGod::UI
 		GUI::Box(screen, GUIContent::none(), panel);
 		GUI::Label(Rect(Margin, 22, screen.width - 2 * Margin, 30), "MANUAL", title);
 		GUI::Label(Rect(Margin, 54, screen.width - 2 * Margin, 18),
-			cs::Cat("Everything in the game, by chapter  ·  Up / Down for the next chapter  ·  ", closeHint), small);
+			cs::Cat("Everything in the game, by chapter  ·  Up / Down for the next chapter, Page Up / Page Down to scroll it, Home / End to its top and bottom  ·  ", closeHint), small);
 
 		float top = 86, bottom = screen.height - 64;
 		float contentsW = Mathf::Clamp(screen.width * 0.24f, 180.0f, 300.0f);
@@ -98,6 +98,16 @@ namespace SpaceGod::UI
 		if (e.type != EventType::KeyDown) return;
 		if (e.keyCode == KeyCode::DownArrow && chapter < count - 1) { Select(chapter + 1); e.Use(); }
 		else if (e.keyCode == KeyCode::UpArrow && chapter > 0) { Select(chapter - 1); e.Use(); }
+		else
+		{
+			// US-T324: the chapter's text by the page, as last drawn.
+			float bottom = Mathf::Max(0.0f, chapterTextH - chapterViewH);
+			float page = Mathf::Max(40.0f, chapterViewH * 0.9f);
+			if (e.keyCode == KeyCode::PageDown) { scroll.y = Mathf::Min(scroll.y + page, bottom); e.Use(); }
+			else if (e.keyCode == KeyCode::PageUp) { scroll.y = Mathf::Max(scroll.y - page, 0.0f); e.Use(); }
+			else if (e.keyCode == KeyCode::Home) { scroll.y = 0; e.Use(); }
+			else if (e.keyCode == KeyCode::End) { scroll.y = bottom; e.Use(); }
+		}
 	}
 
 	void HelpScreen::Select(int index)
@@ -105,6 +115,7 @@ namespace SpaceGod::UI
 		if (index == chapter) return;
 		chapter = index;
 		scroll = Vector2::zero();
+		followContents = true; // US-T324
 	}
 
 	void HelpScreen::DrawContents(Rect area, const cs::List<cs::Ref<ManualChapter>>& chapters)
@@ -113,6 +124,13 @@ namespace SpaceGod::UI
 		GUI::DrawTexture(Rect(area.x, area.y + HeadingH - 5, area.width, 1), buttonActiveTexture);
 		auto list = Rect(area.x, area.y + HeadingH, area.width, area.height - HeadingH);
 		float contentH = chapters.Count() * ContentsRowH;
+		if (followContents) // US-T324: the chapter picked stays in view
+		{
+			followContents = false;
+			float rowTop = chapter * ContentsRowH;
+			if (rowTop < contentsScroll.y) contentsScroll.y = rowTop;
+			else if (rowTop + ContentsRowH > contentsScroll.y + list.height) contentsScroll.y = rowTop + ContentsRowH - list.height;
+		}
 		contentsScroll = GUI::BeginScrollView(list, contentsScroll, Rect(0, 0, list.width - 16, contentH));
 		for (int i = 0; i < chapters.Count(); i++)
 		{
@@ -126,6 +144,8 @@ namespace SpaceGod::UI
 	{
 		float w = view.width - 16;
 		float contentH = ChapterHeight(c, w);
+		chapterViewH = view.height; // US-T324
+		chapterTextH = contentH;
 		scroll = GUI::BeginScrollView(view, scroll, Rect(0, 0, w, contentH));
 		float y = 0;
 		GUI::Label(Rect(0, y, w, 28), cs::Strings::ToUpperInvariant(c->Title), chapterTitle);
