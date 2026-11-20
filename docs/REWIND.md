@@ -616,10 +616,25 @@ and bounded by barriers**:
 - Projectiles, mines and decoys were already played back from their tracks. Not reversed: the audio bed.
 - **Tested:** the self-test checks the effects' clock sits at the moment reached during a hold (45 checks, all passing).
 
+### US-T422: another body's seat, another body's frame, the hull left
+
+- The census no longer counts the body held (`Ship`) or the helm's frame (`Frame`) as a barrier.
+- **Seat:** `RestoreHoldRewindSeat` takes the helm of the resume point's seat body first when the player is not aboard
+  it (the helm is ungated, as a load takes it), so the embody gate sees the player aboard and lets the seat back, then
+  lets go of the helm if the resume point had none (US-T414's order). Letting go of the helm altogether (to the map)
+  is undone the same way: the resume takes the helm back.
+- **Frame:** each kept pilot pose carries its frame body; the hold plays it back in that frame and a resume puts the
+  frame and the pose back together (`pilotFrameBody`, `helmFlight->FrameBody`), as a save loaded does.
+- **Tested:** the self-test lets go of the helm mid-fight, holds back to before, and checks the player is back at the
+  hull's helm in the fight's frame with no barrier (50 checks, all passing). The frame crossing itself is not driven
+  by the test (a fight's helm never changes frame); it rides the same restore as a load.
+
 ### Not yet (later stages)
 
-- Moving to a seat on another body during the window, and crossing into another body's frame.
-- Another fight coming into view (the rewind follows the new one from then on).
+- A fight that **started** in the window (flying into one, or one coming into view): the rewind cannot go back past
+  its start. A battle's creation is spread over about ten war entry points (`TryStart*`, `Enforce`, `StrikeAt`,
+  gate ambushes...), each drawing on the war's random numbers, numbering the battle, pulling ships in (`Join`) and
+  writing the world's log and news; undoing it means either whole-world snapshots or the US-T99 save-based rewind.
 - A ship that changed phase (left an orbit, joined a lane) in the window is still drawn where its *current* phase
   puts it at the past `jd`, as a ship's analytic state is a snapshot of now, overwritten at every phase change.
 - Reversed effects (an FTL flash collapsing into a hull, an explosion contracting), the hull sections' damage stage,

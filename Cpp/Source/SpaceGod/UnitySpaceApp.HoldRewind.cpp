@@ -103,6 +103,9 @@ namespace SpaceGod
 		{
 			double T = 0;
 			PilotState State;
+			/// <summary>US-T422: the body whose frame the pose is in (it changes when the helm crosses into another body's
+			/// space), so the hold plays it back in its own frame and a resume puts the frame back with it.</summary>
+			int Frame = 0;
 		};
 
 		/// <summary>A resume point: the fight's whole state at one moment, by value, beside the live objects it goes back
@@ -169,8 +172,10 @@ namespace SpaceGod
 			bool operator==(const HrCensus& o) const
 			{
 				return Fight == o.Fight && Over == o.Over && Units == o.Units && Dead == o.Dead && Fled == o.Fled &&
-					Struck == o.Struck && Taken == o.Taken && Lost == o.Lost && Seats == o.Seats && Flags == o.Flags &&
-					Ship == o.Ship && Frame == o.Frame;
+					Struck == o.Struck && Taken == o.Taken && Lost == o.Lost && Seats == o.Seats && Flags == o.Flags;
+				// US-T422: neither the body held (Ship) nor the helm's frame (Frame) is a barrier any more: a resume puts the
+				// seat back on whichever body it was (RestoreHoldRewindSeat takes that body's helm first) and the helm in
+				// the frame it was in (the pose and its frame together, as a load does). Kept for the reasons' wording.
 			}
 		};
 
@@ -581,6 +586,8 @@ namespace SpaceGod
 			double OverWall = -1;
 			/// <summary>US-T419: the wall clock a screenshot was asked for, so the hold waits for it to be taken.</summary>
 			double ShotWall = -1;
+			/// <summary>US-T422: the moment marked before the helm is let go.</summary>
+			double LeaveMarkT = HrNone;
 			// US-T414: the seat-change check (phases 8-13): the hull taken for it, the moment marked while piloting
 			// it (before the switch to a turret), and whether the resume landed there or was blocked by a barrier.
 			cs::Ref<Ship> SeatShip;
@@ -1045,7 +1052,7 @@ namespace SpaceGod
 				HrRecordProjectiles(h.Decoys, fight->Decoys, t, s, h.Samples);
 			}
 		}
-		if (piloting) h.Pilot.push_back(HrPilotPose { t, pilot() });
+		if (piloting) h.Pilot.push_back(HrPilotPose { t, pilot(), pilotFrameBody });
 
 		if (t >= h.NextAnchorAt && (fight != nullptr || piloting))
 		{
@@ -1235,6 +1242,12 @@ namespace SpaceGod
 		{
 			auto it = std::lower_bound(h.Pilot.begin(), h.Pilot.end(), tau, [](const HrPilotPose& p, double t) { return p.T < t; });
 			if (it == h.Pilot.end()) --it;
+			// US-T422: in the frame it was kept in (the helm may have crossed into another body's space since).
+			if (pilotFrameBody != it->Frame)
+			{
+				pilotFrameBody = it->Frame;
+				if (helmFlight != nullptr) helmFlight->FrameBody = it->Frame;
+			}
 			pilot() = it->State;
 			pilotAim = pilot().Forward;
 		}
@@ -1247,14 +1260,29 @@ namespace SpaceGod
 		bool helmNow = IsPiloting() && Piloted.Ship == pilotShip;
 		bool samePilot = piloting ? helmNow : !IsPiloting();
 		if (sameSeat && samePilot) return;
-		// The seat the resume point had, taken while whatever is held now still holds the body (a resume never crosses to
-		// another body: that stays a barrier), so the embody gate sees the player aboard and lets it through.
 		if (!sameSeat)
 		{
 			if (seat == nullptr) ReleaseSeat();
-			else if (!SwitchSeat(seat)) UnityCompat::Debug::LogWarning(cs::Cat("Hold rewind: could not put the player back at ", seat->Name()));
+			else
+			{
+				// US-T422: the seat the resume point had may be on another body than the one held now (a gun or craft taken on
+				// another hull since). The embody gate lets a seat be taken only on a body the player is aboard, so the helm
+				// of that seat's body is taken first (the helm is the player's own to take, ungated, as a load does), which
+				// puts the player aboard; the seat is then a seat on the body held, and the helm is let go below if the resume
+				// point had none (the order US-T414 settled: the seat first, then the helm let go).
+				auto body = HrBodyShip(seat);
+				bool aboard = body != nullptr && IsPiloting() && Piloted.Ship == body;
+				if (!aboard && body != nullptr && !body->Destroyed && HrBodyShip(HeldSeat()) != body)
+				{
+					if (IsPiloting()) ExitPiloting();
+					EnterPiloting(Target::OfShip(body));
+				}
+				if (!SwitchSeat(seat)) UnityCompat::Debug::LogWarning(cs::Cat("Hold rewind: could not put the player back at ", seat->Name()));
+			}
 		}
 		// Then the helm, as it was.
+		helmNow = IsPiloting() && Piloted.Ship == pilotShip;
+		if (piloting && !helmNow && IsPiloting()) ExitPiloting();
 		if (piloting && !helmNow && pilotShip != nullptr && !pilotShip->Destroyed) EnterPiloting(Target::OfShip(pilotShip));
 		else if (!piloting && IsPiloting()) ExitPiloting();
 	}
@@ -1295,8 +1323,12 @@ namespace SpaceGod
 			// then matches the seats it was taken with.
 			RestoreHoldRewindSeat(a.Seat, a.HasPilot, a.PilotShip);
 			HrRestoreFight(a);
-			if (a.HasPilot && IsPiloting() && World()->PilotedShip == a.PilotShip && pilotFrameBody == a.PilotFrame)
+			if (a.HasPilot && IsPiloting() && World()->PilotedShip == a.PilotShip && a.PilotFrame >= 0)
 			{
+				// US-T422: in the frame it was taken in (a crossing into another body's space since is undone with it), as a
+				// save loaded puts the frame and the pose back together (UnitySpaceApp.Saves.cpp).
+				pilotFrameBody = a.PilotFrame;
+				if (helmFlight != nullptr) helmFlight->FrameBody = a.PilotFrame;
 				pilot() = a.Pilot;
 				pilotAim = a.Pilot.Forward;
 			}
@@ -1933,6 +1965,58 @@ namespace SpaceGod
 				selfCheck(enemiesStanding() > 0, "the enemies are back after the hold");
 				selfCheck(!t.Fight->Over && !t.Fight->EndHeld, "and the fight is on again, its end undone");
 				shot("4-fight-on-again");
+				t.PhaseWall = wall;
+				t.Phase = 22;
+				return true;
+			}
+			// US-T422: leaving the hull (the helm let go, nothing held) is no barrier: a hold to before it puts the player back
+			// at the helm, in the frame and pose the resume point had.
+			case 22: // Out of the cooldown, at the helm: mark, then let go of the helm.
+			{
+				if (!HoldRewindRefusal().empty()) return true;
+				if (t.LeaveMarkT == HrNone)
+				{
+					if (!IsPiloting() || World()->PilotedShip != t.SeatShip) return finish("not at the helm for the leave-the-hull check");
+					t.LeaveMarkT = h.LivedS;
+					t.PhaseWall = wall;
+					return true;
+				}
+				if (wall - t.PhaseWall < 0.6) return true;
+				ExitPiloting();
+				t.PhaseWall = wall;
+				t.Phase = 23;
+				return true;
+			}
+			case 23: // Off the hull: hold back to before.
+			{
+				if (wall - t.PhaseWall < 0.6) return true;
+				selfCheck(!IsPiloting() && HeldNonHelm() == nullptr, "the helm let go: the player holds nothing");
+				selfCheck(h.Fight == t.Fight, "and the rewind still keeps the fight watched");
+				t.Target = t.LeaveMarkT;
+				t.ForceDown = true;
+				t.SettleFrames = 0;
+				t.PhaseWall = wall;
+				t.Phase = 24;
+				return true;
+			}
+			case 24:
+			{
+				if (!h.Active) return true;
+				if (h.Tau > std::max(t.LeaveMarkT, h.Oldest) + 1e-6) return true;
+				if (++t.SettleFrames < 3) return true;
+				t.ForceDown = false;
+				t.HaveResume = false;
+				t.PhaseWall = wall;
+				t.Phase = 25;
+				return true;
+			}
+			case 25: // Played on from before: back at the helm.
+			{
+				if (!t.HaveResume) return true;
+				selfCheck(t.ResumedAnchorT <= t.LeaveMarkT + HrTuning::AnchorS + 1e-6 && h.BarrierT < t.LeaveMarkT,
+					"leaving the hull does not block a resume to before it");
+				selfCheck(IsPiloting() && World()->PilotedShip == t.SeatShip, "and the player is back at its helm");
+				selfCheck(t.SeatShip->Battle != nullptr && pilotFrameBody == t.SeatShip->Battle->Body, "in the fight's frame");
 				t.PhaseWall = wall;
 				t.Phase = 17;
 				return true;
