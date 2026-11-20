@@ -56,6 +56,7 @@ namespace SpaceGod::Core
 	{
 		if (u == nullptr || u->Ship == nullptr || BreacherBays::Count(u->Ship) <= 0) return "no Breacher bay aboard";
 		if (u->Combat->Disabled()) return "the hull is disabled";
+		if (!InTheFight(u)) return "the hull is out of the fight"; // US-T400
 		cs::String why = LockedPrize(*this, u, target);
 		if (!why.empty()) return why;
 		if (!MayBreach(u, target)) return cs::Cat("the ", target->Name(), " is not ours to board");
@@ -72,6 +73,7 @@ namespace SpaceGod::Core
 	{
 		if (u == nullptr || u->Combat == nullptr) return "no boarding pods aboard";
 		if (u->Combat->Disabled()) return "the hull is disabled"; // US-T379: as the Breacher and shuttle orders
+		if (!InTheFight(u)) return "the hull is out of the fight"; // US-T400
 		cs::Ref<Subsystem> ready = nullptr, any = nullptr;
 		for (const auto& s : u->Combat->Subsystems)
 		{
@@ -98,6 +100,7 @@ namespace SpaceGod::Core
 		if (u == nullptr || u->Combat == nullptr || u->Combat->Spec->Shuttles <= 0) return "no shuttle bay aboard";
 		auto c = u->Combat;
 		if (c->Disabled()) return "the hull is disabled";
+		if (!InTheFight(u)) return "the hull is out of the fight"; // US-T400
 		if (!HangarWorks(u)) return "the hangars are shot away";
 		cs::String why = LockedPrize(*this, u, target);
 		if (!why.empty()) return why;
@@ -172,6 +175,9 @@ namespace SpaceGod::Core
 		for (const auto& o : Units)
 		{
 			if (o == u || o->Side != u->Side || !o->Present() || o->Captured || o->Kind == UnitKind::Fighter || o->Combat == nullptr) continue;
+			// US-T400: only screens that answer (WardOf steers an AI hull still fighting and not running), not another player's,
+			// a struck, fleeing or disabled one.
+			if (o->PlayerControlled() || o->Surrendering || o->Fleeing || o->Combat->Disabled()) continue;
 			if ((o->Pos - u->Pos).Length() > reach || !ScreenWeapons::Screens(o->Combat)) continue;
 			n++;
 		}
@@ -248,6 +254,7 @@ namespace SpaceGod::Core
 		for (const auto& c : Units)
 		{
 			if (c == r || c->PaintCallTarget == nullptr || Seconds >= c->PaintCallUntil || c->Side != r->Side || !c->Present()) continue;
+			if (c->Captured || c->Surrendering) continue; // US-T400: a struck caller's paint no longer steers its recon
 			auto t = c->PaintCallTarget;
 			if (!t->Present() || t->Captured || t->Surrendering || !Hostile(r, t)) continue;
 			double d = (c->Pos - r->Pos).Length();
@@ -543,7 +550,9 @@ namespace SpaceGod::Core
 
 	bool Battle::OpenPrize(const cs::Ref<BattleUnit>& target)
 	{
+		// US-T400: not a hull struck with its terms undecided (LockedPrize and ChooseBoarding refuse it too).
 		return target != nullptr && target->Combat != nullptr && !target->Captured &&
+			(!target->Surrendering || target->SurrenderOpenToBoarding) &&
 			(target->Combat->Disabled() || target->SurrenderOpenToBoarding || target->Stunned > 10);
 	}
 
