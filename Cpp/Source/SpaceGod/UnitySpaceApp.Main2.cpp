@@ -1486,7 +1486,11 @@ namespace SpaceGod
 			auto ship = Fleet()->Ships()[i];
 			// Not streamed in (U.SPC-T414): out of sight, or drawn as its icon until its model is built.
 			if (shipViews[i] == nullptr) continue;
-			if (ship->Destroyed)
+			// US-T418: a hold playing the past back draws a ship that came in during it as not there yet...
+			if (!HoldRewindShipShown(i, true)) { shipViews[i]->SetVisible(false); continue; }
+			// ...and one that went out through a gate during it as still on its way there (drawn as any live hull below).
+			bool backFromGate = ship->Destroyed && ship->GateDeparted && HoldRewindShipShown(i, false);
+			if (ship->Destroyed && !backFromGate)
 			{
 				// A jump gate retires the origin hull the same way a kill does (so its id stays put
 				// for every ship after it -- see GateTransit) but it flew off, not blew up.

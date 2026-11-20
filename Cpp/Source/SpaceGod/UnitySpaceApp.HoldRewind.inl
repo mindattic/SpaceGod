@@ -63,6 +63,11 @@ public:
 	/// instead of reporting what changed).</summary>
 	bool HoldRewindJustResumed() const;
 
+	/// <summary>US-T418: whether the ship at fleet index <paramref name="index"/> is drawn: while a hold plays the past back,
+	/// a ship that went out through a gate after the moment reached is drawn again, and one that appeared after it is
+	/// hidden; otherwise <paramref name="shownNow"/>.</summary>
+	bool HoldRewindShipShown(int index, bool shownNow) const;
+
 	/// <summary>US-T410: the self-test (sg.HoldRewind selftest): watches <paramref name="fight"/>, then drives the hold by
 	/// itself and checks the resumed state, the floor, the cooldown and the ease. Each frame's <see cref="TickHoldRewindSelfTest"/>
 	/// says whether it is still running; the summary line is "HoldRewind selftest: PASS|FAIL (n checks, m failed)".</summary>
@@ -110,6 +115,10 @@ private:
 
 	/// <summary>US-T409: the fight the hold rewind keeps (the hull flown's, else the one watched), or null.</summary>
 	cs::Ref<Core::Battle> HoldRewindBattle();
+
+	/// <summary>US-T418: notes, per fleet index, when a ship went out through a gate and when it first appeared (lived
+	/// seconds <paramref name="t"/>), for HoldRewindShipShown.</summary>
+	void TrackHoldRewindShips(double t);
 
 	/// <summary>US-T409: why a hold cannot start now (empty: it can).</summary>
 	cs::String HoldRewindRefusal();

@@ -559,29 +559,28 @@ and bounded by barriers**:
   unbooked and at the helm, and a second loss left alone in the cooldown is booked only once the window is out and
   then lets go of the helm. All game layer (no Core file changed), so the Bench is untouched.
 
+### US-T418: ships that came and went in the window
+
+- **Left the system:** `Fleet::LetGo` (`Fleet.cpp:2429`) does not take the hull out of `Fleet->Ships()`: it puts a
+  `Ship::Tombstone()` in its slot (a copy flagged `Destroyed` + `GateDeparted`, keeping the motion it had), so the
+  index, the per-frame arrays and `shipScene` stay put and `Fleet::StateOf` still places it at a past `jd` along the
+  path it was flying to the gate. (The earlier note here said the hull was removed entirely; it is not.) The view
+  loop hid every `GateDeparted` slot; now, while a hold plays back to before the moment the slot went, it is drawn as
+  any live hull (`UnitySpaceApp.Main2.cpp`, the ship views), and its HUD mark comes back with it (`Hud.cpp`).
+- **Arrived in the window:** the fleet only grows, so an index that first appears is a ship that came in. The hold
+  notes the lived second each index first appears and each slot turns `GateDeparted` (`TrackHoldRewindShips`, from
+  `RecordHoldRewind`; game layer, no Core timestamp, so no Bench question), and `HoldRewindShipShown` hides a ship
+  that came after the moment reached.
+- Drawing only, like `ViewSystemBack`: letting go does not bring a departed ship back into the system (it is on its
+  passage), which matches the rest of the system outside the fight, drawn as it was and put back to now on release.
+  Ships present when the recording started (a load, a new system) count as always there.
+- **Tested:** the self-test checks the show/hide rule during a real hold (34 checks, all passing).
+
 ### Not yet (later stages)
 
 - Moving to a seat on another body during the window, and crossing into another body's frame.
-- **Ships that crossed the system's edge in the window are still not redrawn outside a fight** (US-T412 looked for a
-  cheap fix and did not find one safe to land untested): a ship's analytic state (`ShipController`'s phase, orbit,
-  lane) is a snapshot of *now*, overwritten at every phase change, so `Fleet::StateOf(ship, jd)` for a past `jd` is
-  only right while the ship has not changed phase since. Two cases:
-  - **Left the system:** crossing a gate removes the hull from this system's `Fleet->Ships()` entirely
-    (`Fleet::LetGo`, `Fleet.cpp:2429`, called from `InterstellarTraffic::DepartLeader` and the escorts' loop,
-    `Systems/InterstellarTraffic.cpp` ~313-321) and wraps it in a `Passage` (`Systems/InterstellarTraffic.h` ~207-225:
-    `EnterJd`, `ExitJd`, `From`/`To` gates, a pure `Progress(jd)`), kept in `Galaxy::Traffic->InGates()`
-    (`Systems/Galaxy.h:234`). Neither `DepartLeader` nor `LetGo` touches the ship's `Orbit`/`Phase`/`PhaseStartJd`, so
-    for `jd` back to the moment it started burning for the gate, `Fleet::StateOf` on that same (still-alive) `Ship`
-    object would likely still answer right — a real path to drawing it again, but it needs its own rendering lane:
-    the per-frame ship arrays (`shipScene`/`shipRotation`/… in `UpdateShips`) are sized and indexed 1:1 with
-    `Fleet()->Ships()`, which every other system (selection, hover, the HUD, lane geometry) assumes, so a departed
-    hull cannot simply be added to that loop; it needs a separate, additional draw pass, built and tried in the
-    running game, not guessed at in a patch nobody has run.
-  - **Arrived in the window:** there is no stamped arrival time to hide it before (`InterstellarTraffic::Arrive`,
-    `Systems/InterstellarTraffic.cpp:731`, sets no such field); the nearest proxy, `PhaseStartJd`, also moves on an
-    ordinary phase change made well before the window, so keying visibility off it would hide ships that never left.
-  Both need real work (the departure side as above; the arrival side an explicit timestamp at `Arrive`/`Emerge`,
-  which is Core simulation state and so its own Bench question) before this is worth doing at all.
+- A ship that changed phase (left an orbit, joined a lane) in the window is still drawn where its *current* phase
+  puts it at the past `jd`, as a ship's analytic state is a snapshot of now, overwritten at every phase change.
 - Reversed effects (an FTL flash collapsing into a hull, an explosion contracting), the hull sections' damage stage,
   the reversed audio bed, and a hold in co-op.
 

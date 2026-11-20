@@ -53,6 +53,7 @@
 #include "Embodiment/Embodiables.h" // US-T414: HelmOf/TurretsOn, for the self-test's seat-change check
 #include "Embodiment/MountedTurret.h" // US-T414: the full type, so Ref<MountedTurret> converts to Ref<IEmbodiable>
 #include "Embodiment/MechWalker.h" // US-T416: a deployed mech's state, captured by value
+#include "Fleet.h" // US-T418: the fleet's comings and goings through the gates
 #include "Session/ISession.h" // US-T414: the session's refusal events, for the self-test's diagnosis
 #include "Session/SessionEvents.h"
 #include "Embodiment/ShipHelm.h" // US-T414: likewise for Ref<ShipHelm>
@@ -624,12 +625,56 @@ namespace SpaceGod
 		/// <summary>US-T417: lived seconds when the hull flown was first seen lost or taken, for the readout's countdown.</summary>
 		double OwnFateSince = HrNone;
 
+		/// <summary>US-T418: per fleet index, the lived seconds the ship went out through a gate (HrNone: not, or before the
+		/// recording began) and the lived seconds it first appeared (HrNone: there when the recording began), so a hold
+		/// draws the ships that left in the window again and hides the ones that came in it. Drawing only.</summary>
+		std::vector<double> ShipGoneAt, ShipCameAt;
+		std::vector<char> ShipWasGone;
+		bool ShipsSeen = false;
+
 		HrSelfTest Test;
 
 		cs::Ref<GUIStyle> Text;
 	};
 
 	bool UnitySpaceApp::HoldRewindActive() const { return holdRewind != nullptr && holdRewind->Active; }
+
+	void UnitySpaceApp::TrackHoldRewindShips(double t)
+	{
+		auto& h = *holdRewind;
+		auto fleet = Fleet();
+		if (fleet == nullptr) return;
+		{
+			const auto& ships = fleet->Ships();
+			size_t n = static_cast<size_t>(ships.Count());
+			size_t had = h.ShipGoneAt.size();
+			if (n < had) had = n;
+			h.ShipGoneAt.resize(n, HrNone);
+			h.ShipCameAt.resize(n, HrNone);
+			h.ShipWasGone.resize(n, 0);
+			for (size_t i = 0; i < n; i++)
+			{
+				const auto& ship = ships[static_cast<int>(i)];
+				bool gone = ship != nullptr && ship->GateDeparted;
+				if (i >= had) h.ShipCameAt[i] = h.ShipsSeen ? t : HrNone;
+				if (gone && !h.ShipWasGone[i] && h.ShipsSeen && i < had) h.ShipGoneAt[i] = t;
+				h.ShipWasGone[i] = gone ? 1 : 0;
+			}
+			h.ShipsSeen = true;
+		}
+	}
+
+	bool UnitySpaceApp::HoldRewindShipShown(int index, bool shownNow) const
+	{
+		if (holdRewind == nullptr || !holdRewind->Active || index < 0) return shownNow;
+		const auto& h = *holdRewind;
+		size_t i = static_cast<size_t>(index);
+		if (i >= h.ShipGoneAt.size()) return shownNow;
+		// Came in after the moment reached: not there yet. Went out after it: still there.
+		if (h.ShipCameAt[i] != HrNone && h.Tau < h.ShipCameAt[i]) return false;
+		if (h.ShipGoneAt[i] != HrNone && h.Tau < h.ShipGoneAt[i]) return true;
+		return shownNow;
+	}
 
 	bool UnitySpaceApp::HoldRewindJustResumed() const { return holdRewind != nullptr && holdRewind->JustResumed > 0; }
 
@@ -869,6 +914,7 @@ namespace SpaceGod
 
 		h.LivedS += dt;
 		double t = h.LivedS;
+		TrackHoldRewindShips(t);
 		bool piloting = IsPiloting();
 		// US-T414: the hull the player is aboard by ANY seat (the helm, or a turret, through HeldSeat's own
 		// EmbodimentSubject), not only while piloting -- piloting stays its own flag, for the pilot state capture
@@ -1422,6 +1468,21 @@ namespace SpaceGod
 				if (++t.SettleFrames < 3) return true;
 				selfCheck(t.TauMonotonic, "the moment reached only went back while held");
 				selfCheck(h.Tau >= h.Oldest - 1e-9, "the hold never went past the oldest moment");
+				// US-T418: a ship gone through a gate after the moment reached is drawn again, one that came after it
+				// is hidden, and one that came or went before it is drawn as now (fleet index 0's notes, put back after).
+				selfCheck(!h.ShipGoneAt.empty(), "the fleet's comings and goings are noted");
+				if (!h.ShipGoneAt.empty())
+				{
+					double gone = h.ShipGoneAt[0], came = h.ShipCameAt[0];
+					h.ShipGoneAt[0] = h.Tau + 1; h.ShipCameAt[0] = HrNone;
+					bool backAgain = HoldRewindShipShown(0, false);
+					h.ShipGoneAt[0] = HrNone; h.ShipCameAt[0] = h.Tau + 1;
+					bool notYet = !HoldRewindShipShown(0, true);
+					h.ShipGoneAt[0] = h.Tau - 1; h.ShipCameAt[0] = h.Tau - 2;
+					bool asNow = !HoldRewindShipShown(0, false) && HoldRewindShipShown(0, true);
+					h.ShipGoneAt[0] = gone; h.ShipCameAt[0] = came;
+					selfCheck(backAgain && notYet && asNow, "a hold draws ships gone in the window again and hides ones that came in it");
+				}
 				t.HaveResume = false;
 				t.ForceDown = false;
 				t.Phase = 4;

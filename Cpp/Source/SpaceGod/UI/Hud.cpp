@@ -769,7 +769,9 @@ namespace SpaceGod::UI
 		for (int i = 0; i < ships.Count(); i++)
 		{
 			auto ship = ships[i];
-			if (ship->Destroyed || ship->Controller()->Phase == ShipPhase::Landed) continue;
+			// US-T418: a hold playing the past back marks the ships as they were then (gone through a gate since: still
+			// marked; come in since: not yet).
+			if (!app->HoldRewindShipShown(i, !ship->Destroyed) || ship->Controller()->Phase == ShipPhase::Landed) continue;
 			cs::Ref<Contact> contact = picture != nullptr && ship != app->Piloted.Ship ? picture->Of(ship) : nullptr;
 			if (picture != nullptr && ship != app->Piloted.Ship && contact == nullptr) continue;
 			DVec3 scene;
