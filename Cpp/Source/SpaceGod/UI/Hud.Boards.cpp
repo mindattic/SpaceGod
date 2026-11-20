@@ -87,7 +87,7 @@ namespace SpaceGod::UI
 				if (s->Discovered() && app->NearPort(s)) { port = s; break; }
 		constexpr float w = 760, rowH = 18;
 		auto board = port != nullptr ? outlaws->BoardAt(port) : cs::List<cs::Ref<BountyPosting>>();
-		int rows = Mathf::Min(board.Count(), 14);
+		int rows = Mathf::Min(board.Count(), 14); // US-T392: the rows shown at once; the rest scroll
 		// Captains in the player's brig, and kills waiting on a scan of the wreck (U.SPC-T63).
 		cs::Ref<Ship> ship = app->IsPiloting() ? app->World()->PilotedShip : nullptr;
 		auto held = outlaws->HeldAboard(ship);
@@ -96,7 +96,8 @@ namespace SpaceGod::UI
 		float h = 54 + Mathf::Max(1, rows) * rowH + (extra > 0 ? 8 + extra * 22 : 0);
 		auto r = Panel(Rect((Screen::width - w) * 0.5f, 120, w, h));
 		GUI::Label(Rect(r.x + 12, r.y + 6, w - 24, 22),
-			cs::Cat("BOUNTY BOARD  ·  ", port != nullptr ? cs::Cat(port->Name, "  ·  ", port->Owner->Name) : cs::String("no port in view")), title);
+			cs::Cat("BOUNTY BOARD", board.Count() > 0 ? cs::Cat(" (", board.Count(), ")") : cs::String(), "  ·  ", // US-T392: the count
+				port != nullptr ? cs::Cat(port->Name, "  ·  ", port->Owner->Name) : cs::String("no port in view")), title);
 		auto old = GUI::contentColor;
 		GUI::contentColor = Dim;
 		cs::String closeBounties = CloseHint(::SpaceGod::Input::KeyAction::Bounties); // US-T390
@@ -105,11 +106,20 @@ namespace SpaceGod::UI
 			: board.Count() == 0 ? cs::Cat("Nobody is wanted here.   ", closeBounties)
 			: cs::Cat("Bounties posted by ", port->Owner->Name, ", biggest first; the price pays in full alive, half dead on a scanned wreck.   ", closeBounties);
 		GUI::Label(Rect(r.x + 12, r.y + 28, w - 24, 18), note, small);
-		for (int i = 0; i < rows; i++)
+		// US-T392: every posting, in a scroll view that shows `rows` of them at once (DrawSaves' pattern).
+		if (rows > 0)
 		{
-			auto p = board[i];
-			GUI::contentColor = p->IsPlayer() ? UiStyle::Danger : p->Outlaw != nullptr && p->Outlaw->Feared ? UiStyle::Warning : Color::white();
-			GUI::Label(Rect(r.x + 12, r.y + 48 + i * rowH, w - 24, rowH), Outlaws::Describe(p, app->Clock->Jd), small);
+			bool scrolls = board.Count() > rows;
+			auto view = Rect(r.x + 12, r.y + 48, w - 24, rows * rowH);
+			auto content = Rect(0, 0, view.width - (scrolls ? 18 : 0), board.Count() * rowH);
+			bountiesScroll = GUI::BeginScrollView(view, bountiesScroll, content);
+			for (int i = 0; i < board.Count(); i++)
+			{
+				auto p = board[i];
+				GUI::contentColor = p->IsPlayer() ? UiStyle::Danger : p->Outlaw != nullptr && p->Outlaw->Feared ? UiStyle::Warning : Color::white();
+				GUI::Label(Rect(0, i * rowH, content.width, rowH), Outlaws::Describe(p, app->Clock->Jd), small);
+			}
+			GUI::EndScrollView();
 		}
 		float y = r.y + 56 + Mathf::Max(1, rows) * rowH;
 		bool alongside = port != nullptr && app->NearPort(port);
@@ -158,11 +168,12 @@ namespace SpaceGod::UI
 		auto board = port != nullptr ? contracts->BoardAt(port) : cs::List<cs::Ref<Contract>>();
 		auto mine = contracts->PlayerActive();
 		constexpr float w = 860, rowH = 20;
-		int rows = Mathf::Min(board.Count(), 12), ownRows = Mathf::Min(mine.Count(), 6);
+		int rows = Mathf::Min(board.Count(), 12), ownRows = Mathf::Min(mine.Count(), 6); // US-T392: the rows shown at once; the rest scroll
 		float h = 54 + Mathf::Max(1, rows) * rowH + (ownRows > 0 ? 24 + ownRows * rowH : 0);
 		auto r = Panel(Rect((Screen::width - w) * 0.5f, 120, w, h));
 		GUI::Label(Rect(r.x + 12, r.y + 6, w - 24, 22),
-			cs::Cat("CONTRACTS  ·  ", port != nullptr ? cs::Cat(port->Name, "  ·  ", port->Owner->Name) : cs::String("no port in view")), title);
+			cs::Cat("CONTRACTS", board.Count() > 0 ? cs::Cat(" (", board.Count(), ")") : cs::String(), "  ·  ", // US-T392: the count
+				port != nullptr ? cs::Cat(port->Name, "  ·  ", port->Owner->Name) : cs::String("no port in view")), title);
 		auto old = GUI::contentColor;
 		GUI::contentColor = Dim;
 		auto ship = app->World()->PilotedShip;
@@ -175,30 +186,45 @@ namespace SpaceGod::UI
 			: cs::Cat("Fly alongside to take a job (", BoundKeys(::SpaceGod::Input::KeyAction::Pilot), " to pilot a ship).   ", closeContracts);
 		GUI::Label(Rect(r.x + 12, r.y + 28, w - 24, 18), note, small);
 		double jd = app->Clock->Jd;
-		for (int i = 0; i < rows; i++)
+		// US-T392: every posting, in a scroll view showing `rows` at once; i still indexes the whole board, as co-op's ctake expects.
+		if (rows > 0)
 		{
-			auto c = board[i];
-			float y = r.y + 48 + i * rowH;
-			GUI::contentColor = c->Urgency >= 0.6 ? UiStyle::Warning : Color::white();
-			GUI::Label(Rect(r.x + 12, y, w - 110, rowH), Contracts::Describe(c, jd), small);
-			if (alongside && GUI::Button(Rect(r.xMax() - 90, y, 78, rowH - 2), "Take", button) &&
-				!CoopSends("ctake", K(port), i)) // US-T44 (US-T43): an entry in co-op
-				TakeContract(contracts, c, ship, jd); // US-T44 (US-T43): the original's lines, moved into TakeContract (Hud.Coop.cpp)
+			bool scrolls = board.Count() > rows;
+			auto view = Rect(r.x + 12, r.y + 48, w - 24, rows * rowH);
+			auto content = Rect(0, 0, view.width - (scrolls ? 18 : 0), board.Count() * rowH);
+			contractsScroll = GUI::BeginScrollView(view, contractsScroll, content);
+			for (int i = 0; i < board.Count(); i++)
+			{
+				auto c = board[i];
+				float y = i * rowH;
+				GUI::contentColor = c->Urgency >= 0.6 ? UiStyle::Warning : Color::white();
+				GUI::Label(Rect(0, y, content.width - 98, rowH), Contracts::Describe(c, jd), small);
+				if (alongside && GUI::Button(Rect(content.width - 78, y, 78, rowH - 2), "Take", button) &&
+					!CoopSends("ctake", K(port), i)) // US-T44 (US-T43): an entry in co-op
+					TakeContract(contracts, c, ship, jd); // US-T44 (US-T43): the original's lines, moved into TakeContract (Hud.Coop.cpp)
+			}
+			GUI::EndScrollView();
 		}
 		if (ownRows > 0)
 		{
 			float y0 = r.y + 52 + Mathf::Max(1, rows) * rowH;
 			GUI::contentColor = Dim;
-			GUI::Label(Rect(r.x + 12, y0, w - 24, 18), "YOUR CONTRACTS  (giving one up costs standing with whoever posted it)", small);
-			for (int i = 0; i < ownRows; i++)
+			GUI::Label(Rect(r.x + 12, y0, w - 24, 18), cs::Cat("YOUR CONTRACTS (", mine.Count(), ")  (giving one up costs standing with whoever posted it)"), small); // US-T392: the count
+			// US-T392: every contract held, in a scroll view showing `ownRows` at once; i indexes the whole list, as co-op's cabandon expects.
+			bool ownScrolls = mine.Count() > ownRows;
+			auto ownView = Rect(r.x + 12, y0 + 22, w - 24, ownRows * rowH);
+			auto ownContent = Rect(0, 0, ownView.width - (ownScrolls ? 18 : 0), mine.Count() * rowH);
+			ownContractsScroll = GUI::BeginScrollView(ownView, ownContractsScroll, ownContent);
+			for (int i = 0; i < mine.Count(); i++)
 			{
 				auto c = mine[i];
-				float y = y0 + 22 + i * rowH;
+				float y = i * rowH;
 				GUI::contentColor = c->DueJd - jd < 1 ? UiStyle::Danger : Color(0.6f, 0.9f, 1.0f);
-				GUI::Label(Rect(r.x + 12, y, w - 110, rowH), Contracts::Describe(c, jd), small);
-				if (GUI::Button(Rect(r.xMax() - 90, y, 78, rowH - 2), "Abandon", button) && !CoopSends("cabandon", i) && contracts->Abandon(c, jd)) // US-T44 (US-T43): an entry in co-op
+				GUI::Label(Rect(0, y, ownContent.width - 98, rowH), Contracts::Describe(c, jd), small);
+				if (GUI::Button(Rect(ownContent.width - 78, y, 78, rowH - 2), "Abandon", button) && !CoopSends("cabandon", i) && contracts->Abandon(c, jd)) // US-T44 (US-T43): an entry in co-op
 					app->ShowToast(cs::Cat("Contract abandoned: ", c->Title()));
 			}
+			GUI::EndScrollView();
 		}
 		GUI::contentColor = old;
 	}

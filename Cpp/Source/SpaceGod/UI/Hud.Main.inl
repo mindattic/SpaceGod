@@ -122,6 +122,10 @@ private:
 	cs::List<cs::Ref<Core::SaveHeader>> saveHeaders;
 	float savesReadAt = -10.0f;
 	Vector2 savesScroll;
+	/// US-T392: the bounty board's, the contracts board's and YOUR CONTRACTS' scroll positions (UI state only).
+	Vector2 bountiesScroll;
+	Vector2 contractsScroll;
+	Vector2 ownContractsScroll;
 
 	/// The save the player has asked to delete, waiting for the second click that confirms it (empty: none).
 	cs::String deleteArmed;
