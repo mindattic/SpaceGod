@@ -434,10 +434,11 @@ and bounded by barriers**:
 - **The whole system drawn as it was:** while held, the world clock is set back to the moment reached (the marks keep
   the world's date beside the fight's clock) for the drawing only (planets, ships in orbit and on the lanes, gates),
   and put back to now on letting go (`ViewSystemBack`).
-- **Still barriers, and why:** a craft launched or landed and a hull joining (the hangars and the fleet's own lists
-  change outside the copied fight); the player's own hull lost, struck, taken or fled, and a surrender's terms settled
-  (the seat, the session, cargo and prizes must be answered at once: booked then, a barrier); a gun, craft or mech
-  taken or let go, a seat change, crossing into another body's frame; the fight ending or another coming into view.
+- **Still barriers, and why:** a hull joining the fight (a new `BattleUnit`, which the census can only refuse across,
+  not put back); the player's own hull lost, struck, taken or fled, and a surrender's terms settled (the seat, the
+  session, cargo and prizes must be answered at once: booked then, a barrier); a gun, craft or mech taken or let go
+  (the `Seats` census, which covers every unit's stations, not only the player's own), crossing into another body's
+  frame; the fight ending or another coming into view. A craft launched or landed is no longer one: see US-T413.
 - **Tested:** `sg.HoldRewind selftest [quit]` (HoldRewindCommand.cpp) starts a fight off Uranus and, with no hand
   on the keys, marks a resume point and hashes the whole fight there (`HoldRewindFightDigest`: its clock and random
   draws to come, every unit's flags, pose, hull and mounts, every missile, round, decoy and mine), plays on 3 s, holds
@@ -465,10 +466,43 @@ and bounded by barriers**:
   RNG, no writes outside it), and the moment play resumes, the ordinary `Galaxy->Update(Clock->Jd)` call overwrites
   it again, correctly, before anything else reads it, so neither end of a hold needs its own restore.
 
+### US-T413: craft launch and landing put back; seat change investigated
+
+- **Craft launch and landing were a barrier only because their state lives outside the per-unit copies.** A
+  fighter's own progress through a deck (`DeckVisit`: `Stage`, `Along`, `Offset`, `Service`, `Stowing`...) is mutated
+  in place, not recreated, each time it taxis in or out; `FighterState::Deck` only holds a `Ref` to it, so copying
+  `FighterState` by value (already done) carries the pointer, not what it points to. A carrier's own
+  `FlightDeck`s (who is `Aboard`, who is `Final`, `NextLaunch`) live in `FlightDecks::Of`'s weak table
+  (`FlightDecks.cpp:161`), entirely outside the fight's own object graph. `ShipCombat::Hangar`/`ShuttleBay`
+  (`CombatState.h:85,98`) are a `Ref` to a shared `List`, so copying `ShipCombat` by value (already done) also only
+  carries that pointer, not the list's contents. None of these three were captured or restored by anything, which is
+  why the census (`HrWhyChanged`, `Docked`/`Hangars` counts) treated any change in them as unresumable.
+- **Fixed.** `HrAnchor` gained three more by-value copies, keyed the same way as every other one (by the live
+  object's own `Ref`): `Decks` (every carrier's `FlightDeck`s, from `FlightDecks::Of(u)` for each `Ship` unit in the
+  fight), `Visits` (every flown fighter's own `DeckVisit`, from `u->Fighter->Deck`), and `Bays` (the hangar and
+  shuttle bay lists' own contents, restored into the same live `List` object with `Clear()` then `Add()`, so a `Ref`
+  held elsewhere still points at the right one). The census's `Docked` and `Hangars` fields are gone: nothing about
+  a launch or a landing is left unaccounted for. (`b.Units != a.Units`, the one case that really does mean a new
+  hull joined the fight, since fighters stay in `Battle::Units` the whole time launch or landing, is untouched and
+  still a barrier, now worded as just that.)
+- **Seat change, investigated, not changed.** The directive asked whether switching seats on the *same* hull inside
+  the same recorded fight (pilot to a turret) is already covered. The simulated side is: nothing about it needs
+  anything beyond what the per-unit snapshot already restores (no human-vs-AI flag lives in `ShipCombat`/`Subsystem`
+  that the resume would need to touch). But the barrier census's `you changed seat` check compares `Ship` *and*
+  `Piloting` (`a.Ship != b.Ship || a.Piloting != b.Piloting`), so moving from the helm to a turret on the identical
+  hull flips `Piloting` and is flagged exactly like leaving the hull altogether, even though `Ship` never changed.
+  Narrowing that check to `Ship` alone looks right on paper, but `putBack`'s own pilot-state reapply is gated on
+  `IsPiloting()` being true *at the moment of letting go* (`UnitySpaceApp.HoldRewind.cpp`, the `putBack` lambda): if
+  you are at a turret when you let go, the anchor's own `Pilot`/`pilotAim` are silently not reapplied at all, whether
+  or not the barrier is there. Whether that is actually a problem (the turret's own state restores fine regardless;
+  it is only the pilot's helm orientation that would be dropped, and arguably nothing visible depends on it while
+  you are not piloting) is something this pass could not answer without running it. Left as a barrier rather than
+  guessed at.
+
 ### Not yet (later stages)
 
-- Undoing the barriers left (launches and landings, seats, the player's own hull's fate): the hangars and the
-  fleet's lists copied too, and a booking journal for the seat and the session.
+- Undoing the barriers left (a hull joining the fight, the player's own hull's fate, seat change — see US-T413's
+  finding above): a booking journal for the seat and the session, and for a new unit joining mid-fight.
 - **Ships that crossed the system's edge in the window are still not redrawn outside a fight** (US-T412 looked for a
   cheap fix and did not find one safe to land untested): a ship's analytic state (`ShipController`'s phase, orbit,
   lane) is a snapshot of *now*, overwritten at every phase change, so `Fleet::StateOf(ship, jd)` for a past `jd` is

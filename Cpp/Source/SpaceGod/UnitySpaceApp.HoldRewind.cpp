@@ -14,8 +14,10 @@
 //     (what Sands of Time does for its actors), so play goes on from a real state, not from the drawn one.
 // US-T410: the world's bookings from the fight in view (a hull lost, struck or taken: the war's hooks) wait until their
 // moment is older than the window (or the fight ends, or a save is made), so a hold can bring a lost hull back; a resume
-// drops the ones after it. What still cannot be put back (a craft launched or landed, a hull joining, a seat changed,
-// the fight's end, your own hull's fate) is a barrier: a resume never goes back past the last one. A resume never goes
+// drops the ones after it. US-T413: a craft's launch or landing is put back too (a carrier's own FlightDecks, a
+// fighter's DeckVisit and the hangar/shuttle bay lists live outside the per-unit copies, so they are captured and
+// restored the same way, by value). What still cannot be put back (a hull joining the fight, a seat changed, the
+// fight's end, your own hull's fate) is a barrier: a resume never goes back past the last one. A resume never goes
 // back past the previous resume either (the floor: a moment already rewound through is never revisited). While held,
 // the world clock is set back for the drawing (planets, ships in orbit and on the lanes), and put back on letting go:
 // the world outside the fight goes on from now.
@@ -45,6 +47,7 @@
 #include "Combat/CombatState.h"
 #include "Combat/Dogfighting.h"
 #include "Combat/Fighters.h"
+#include "Combat/FlightDecks.h" // US-T413: a carrier's decks and a craft's deck visit, outside the per-unit snapshot
 #include "Combat/PilotFlight.h"
 #include "Persistence/HoldRewindCurve.h"
 #include "Systems/HelmFtl.h"
@@ -108,20 +111,32 @@ namespace SpaceGod
 			std::vector<std::pair<cs::Ref<KineticRound>, KineticRound>> Rounds;
 			std::vector<std::pair<cs::Ref<Mine>, Mine>> Mines;
 			std::vector<std::pair<cs::Ref<Decoy>, Decoy>> Decoys;
+			// US-T413: a carrier's own flight decks (Aboard, Final, NextLaunch) and a craft's own progress along one
+			// (DeckVisit) are not reached by the Units/Fighters copies above: FlightDecks::Of keeps them in its own
+			// weak table outside the fight, and a fighter's DeckVisit is mutated in place, not recreated, while it
+			// taxis or launches. Captured and restored the same way, by value, keyed by their own Ref.
+			std::vector<std::pair<cs::Ref<FlightDeck>, FlightDeck>> Decks;
+			std::vector<std::pair<cs::Ref<DeckVisit>, DeckVisit>> Visits;
+			// US-T413: ShipCombat::Hangar/ShuttleBay are a Ref to a shared List, so copying ShipCombat by value only
+			// copies that pointer, not what is in the list. Captured as the list's own contents and restored into the
+			// same live List object (Clear then Add), so anyone else holding the same Ref still holds the right one.
+			std::vector<std::pair<cs::Ref<cs::List<cs::Ref<Ship>>>, std::vector<cs::Ref<Ship>>>> Bays;
 			bool HasPilot = false;
 			PilotState Pilot;
 			cs::Ref<Ship> PilotShip;
 			int PilotFrame = -1;
 		};
 
-		/// <summary>What a resume cannot put back: who is in the fight and in what state, the hangars, the seats. Any
-		/// change between two frames is a barrier. US-T410: with the bookings held back, a hull lost, struck, taken or
-		/// escaped is put back by the resume point itself, so only the player's own hull's fate counts here.</summary>
+		/// <summary>What a resume cannot put back: who is in the fight and in what state, the seats. Any change between
+		/// two frames is a barrier. US-T410: with the bookings held back, a hull lost, struck, taken or escaped is put
+		/// back by the resume point itself. US-T413: a craft launched or landed is put back too (FlightDecks::Of's
+		/// decks and a fighter's DeckVisit, and the hangar/shuttle bay lists, are captured and restored by value), so
+		/// only an actual new unit (a hull joining) and the player's own hull's fate count here.</summary>
 		struct HrCensus
 		{
 			const void* Fight = nullptr;
 			bool Over = false;
-			int Units = 0, Dead = 0, Fled = 0, Docked = 0, Struck = 0, Taken = 0, Lost = 0, Hangars = 0, Seats = 0;
+			int Units = 0, Dead = 0, Fled = 0, Struck = 0, Taken = 0, Lost = 0, Seats = 0;
 			unsigned long long Flags = 0;
 			const void* Ship = nullptr;
 			int Frame = -1;
@@ -129,8 +144,8 @@ namespace SpaceGod
 
 			bool operator==(const HrCensus& o) const
 			{
-				return Fight == o.Fight && Over == o.Over && Units == o.Units && Dead == o.Dead && Fled == o.Fled && Docked == o.Docked &&
-					Struck == o.Struck && Taken == o.Taken && Lost == o.Lost && Hangars == o.Hangars && Seats == o.Seats && Flags == o.Flags &&
+				return Fight == o.Fight && Over == o.Over && Units == o.Units && Dead == o.Dead && Fled == o.Fled &&
+					Struck == o.Struck && Taken == o.Taken && Lost == o.Lost && Seats == o.Seats && Flags == o.Flags &&
 					Ship == o.Ship && Frame == o.Frame && Piloting == o.Piloting;
 			}
 		};
@@ -158,17 +173,12 @@ namespace SpaceGod
 					c.Struck += u->Surrendering ? 1 : 0;
 					c.Taken += u->Captured ? 1 : 0;
 				}
-				c.Docked += u->Docked ? 1 : 0;
 				// A hull struck off the world's books (its Ship destroyed) by anything but the held-back hooks.
 				c.Lost += u->Ship != nullptr && u->Ship->Destroyed ? 1 : 0;
-				if (u->Combat != nullptr)
-				{
-					c.Hangars += u->Combat->Hangar != nullptr ? u->Combat->Hangar->Count() : 0;
-					c.Hangars += u->Combat->ShuttleBay != nullptr ? u->Combat->ShuttleBay->Count() : 0;
-				}
+				// US-T413: Docked and the hangar/shuttle bay counts are no longer a barrier (they are captured and
+				// restored by value now), so they are not part of the census.
 				unsigned long long bits = (u->PlayerControlled() ? 32u : 0u);
 				if (counted) bits |= (u->Dead ? 1u : 0u) | (u->Fled ? 2u : 0u) | (u->Surrendering ? 8u : 0u) | (u->Captured ? 16u : 0u);
-				bits |= u->Docked ? 4u : 0u;
 				h = (h ^ (static_cast<unsigned long long>(u->Id) * 64 + bits)) * 1099511628211ull;
 			}
 			c.Flags = h;
@@ -185,8 +195,7 @@ namespace SpaceGod
 			if (b.Dead > a.Dead || b.Lost > a.Lost) return "a hull was lost";
 			if (b.Fled > a.Fled) return "a hull escaped the fight";
 			if (b.Taken != a.Taken || b.Struck != a.Struck) return "a hull struck or was taken";
-			if (b.Units != a.Units) return "a craft launched or a hull joined the fight";
-			if (b.Hangars != a.Hangars || b.Docked != a.Docked) return "a craft launched or landed";
+			if (b.Units != a.Units) return "a hull joined the fight";
 			if (b.Seats != a.Seats) return "a gun, a craft or a mech was taken or let go";
 			return "the fight changed in a way not undone yet";
 		}
@@ -343,10 +352,37 @@ namespace SpaceGod
 						for (const auto& s : u->Combat->Subsystems)
 							if (s != nullptr) a->Subsystems.emplace_back(s, *s);
 						if (u->Combat->Reactor != nullptr) a->Powers.emplace_back(u->Combat->Reactor, *u->Combat->Reactor);
+						// US-T413: the hangar and shuttle bay's own contents (a Ref to a shared List; ShipCombat's own
+						// copy above only carries the pointer).
+						if (u->Combat->Hangar != nullptr)
+						{
+							std::vector<cs::Ref<Ship>> items;
+							for (const auto& s : *u->Combat->Hangar) items.push_back(s);
+							a->Bays.emplace_back(u->Combat->Hangar, std::move(items));
+						}
+						if (u->Combat->ShuttleBay != nullptr)
+						{
+							std::vector<cs::Ref<Ship>> items;
+							for (const auto& s : *u->Combat->ShuttleBay) items.push_back(s);
+							a->Bays.emplace_back(u->Combat->ShuttleBay, std::move(items));
+						}
 					}
 					if (u->Power != nullptr) a->Powers.emplace_back(u->Power, *u->Power);
-					if (u->Fighter != nullptr) a->Fighters.emplace_back(u->Fighter, *u->Fighter);
+					if (u->Fighter != nullptr)
+					{
+						a->Fighters.emplace_back(u->Fighter, *u->Fighter);
+						// US-T413: the craft's own progress along the deck it is visiting, mutated in place while it
+						// taxis, lands or launches; not reached by the FighterState copy above, which only carries
+						// the Ref to it.
+						if (u->Fighter->Deck != nullptr) a->Visits.emplace_back(u->Fighter->Deck, *u->Fighter->Deck);
+					}
 					if (u->Broadside != nullptr) a->Broadsides.emplace_back(u->Broadside, *u->Broadside);
+					// US-T413: a carrier's own flight decks (who is aboard, who is cleared to land, the next launch
+					// slot) live in FlightDecks::Of's weak table outside the fight, keyed by the carrier's own
+					// BattleUnit, which stays alive (even if Dead) for as long as the fight is recorded.
+					if (u->Kind == UnitKind::Ship)
+						for (const auto& d : FlightDecks::Of(u))
+							if (d != nullptr) a->Decks.emplace_back(d, *d);
 				}
 				for (const auto& m : fight->Missiles)
 					if (m != nullptr) a->Missiles.emplace_back(m, *m);
@@ -418,6 +454,16 @@ namespace SpaceGod
 			for (const auto& p : a.Rounds) *p.first = p.second;
 			for (const auto& p : a.Mines) *p.first = p.second;
 			for (const auto& p : a.Decoys) *p.first = p.second;
+			// US-T413: a carrier's decks and a craft's own deck visit, outside the per-unit copies above.
+			for (const auto& p : a.Decks) *p.first = p.second;
+			for (const auto& p : a.Visits) *p.first = p.second;
+			// US-T413: the hangar/shuttle bay list is restored into the same live List object (its Ref is shared),
+			// not replaced, so anyone else holding that Ref still holds the one that now has the old contents back.
+			for (const auto& p : a.Bays)
+			{
+				p.first->Clear();
+				for (const auto& s : p.second) p.first->Add(s);
+			}
 		}
 
 		/// <summary>A booking of the world's held back (US-T410): when (lived seconds) and what it does.</summary>
