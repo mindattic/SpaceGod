@@ -24,6 +24,11 @@
 
 #include "Containers/Ticker.h"
 #include "Engine/Engine.h"
+#include "Engine/GameViewportClient.h"
+#include "Framework/Application/SlateApplication.h"
+#include "GameFramework/PlayerController.h"
+#include "GameFramework/PlayerInput.h"
+#include "InputCoreTypes.h"
 #include "HAL/IConsoleManager.h"
 #include "HAL/PlatformMisc.h"
 #include "HAL/PlatformTime.h"
@@ -34,6 +39,18 @@ using namespace SpaceGod::Core;
 
 namespace
 {
+	AUnitySpaceAppActor* HoldRewindActor()
+	{
+		if (!GEngine) return nullptr;
+		for (const FWorldContext& c : GEngine->GetWorldContexts())
+		{
+			if (c.WorldType != EWorldType::Game && c.WorldType != EWorldType::PIE) continue;
+			auto* actor = AUnitySpaceAppActor::Find(c.World());
+			if (actor != nullptr && actor->GetApp() != nullptr) return actor;
+		}
+		return nullptr;
+	}
+
 	SpaceGod::UnitySpaceApp* HoldRewindApp()
 	{
 		if (!GEngine) return nullptr;
@@ -59,6 +76,68 @@ namespace
 		bool Quit = false, AskedNewGame = false, Began = false;
 		double Started = FPlatformTime::Seconds();
 		cs::Ref<Battle> Fight;
+
+		/// <summary>US-T420: the hold key is pressed for real: Shift+R as key events into Slate (the path the OS keyboard
+		/// takes: Slate, the game viewport, the player controller the game reads), or, if Slate does not route them to the
+		/// game here, straight into the player controller.</summary>
+		bool KeyDown = false, ViaController = false, WasScripted = false;
+		int WaitedTicks = 0;
+
+		static APlayerController* Controller()
+		{
+			if (!GEngine || GEngine->GameViewport == nullptr) return nullptr;
+			UWorld* w = GEngine->GameViewport->GetWorld();
+			return w != nullptr ? w->GetFirstPlayerController() : nullptr;
+		}
+
+		void SendKeys(bool down)
+		{
+			if (!ViaController && FSlateApplication::IsInitialized())
+			{
+				FSlateApplication& s = FSlateApplication::Get();
+				FModifierKeysState shift(true, false, false, false, false, false, false, false, false);
+				FModifierKeysState none;
+				if (down)
+				{
+					s.ProcessKeyDownEvent(FKeyEvent(EKeys::LeftShift, shift, 0, false, 0, 0));
+					s.ProcessKeyDownEvent(FKeyEvent(EKeys::R, shift, 0, false, 'R', 'R'));
+				}
+				else
+				{
+					s.ProcessKeyUpEvent(FKeyEvent(EKeys::R, shift, 0, false, 'R', 'R'));
+					s.ProcessKeyUpEvent(FKeyEvent(EKeys::LeftShift, none, 0, false, 0, 0));
+				}
+				return;
+			}
+			if (APlayerController* pc = Controller())
+			{
+				EInputEvent e = down ? IE_Pressed : IE_Released;
+				if (down) pc->InputKey(FInputKeyParams(EKeys::LeftShift, e, 1.0));
+				pc->InputKey(FInputKeyParams(EKeys::R, e, down ? 1.0 : 0.0));
+				if (!down) pc->InputKey(FInputKeyParams(EKeys::LeftShift, e, 0.0));
+			}
+		}
+
+		void DriveKeys(SpaceGod::UnitySpaceApp* app)
+		{
+			bool want = app->HoldRewindSelfTestWantsKey();
+			if (want != KeyDown)
+			{
+				SendKeys(want);
+				KeyDown = want;
+				WaitedTicks = 0;
+				return;
+			}
+			// Held, and the game has not seen it after a while: Slate is not routing to the game in this run.
+			if (want && !ViaController && !app->HoldRewindKeyHeld() && ++WaitedTicks > 30)
+			{
+				UE_LOG(LogSpaceGod, Display, TEXT("sg.HoldRewind selftest: Slate did not route the keys to the game here; pressing them on the player controller"));
+				SendKeys(false);
+				ViaController = true;
+				SendKeys(true);
+				WaitedTicks = 0;
+			}
+		}
 
 		bool Tick()
 		{
@@ -86,11 +165,25 @@ namespace
 				app->Clock->SetWarp(0);
 				app->WatchBattle(Fight);
 				app->BeginHoldRewindSelfTest(Fight);
+				app->SetHoldRewindSelfTestRealKeys(true);
+				// US-T420: a headless run feeds the app scripted input (Bootstrap: no window, no keyboard); for the test
+				// the app reads Unreal's own input again (UnrealInputDevice::Feed from the player controller), so the keys
+				// pressed below go the whole way a player's do. Put back when the test ends.
+				if (auto* actor = HoldRewindActor())
+				{
+					WasScripted = actor->bScriptedInput;
+					actor->bScriptedInput = false;
+				}
 				Began = true;
 				UE_LOG(LogSpaceGod, Display, TEXT("sg.HoldRewind selftest: %s, %d units"), UTF8_TO_TCHAR(Fight->Name.c_str()), Fight->Units.Count());
 				return true;
 			}
-			if (app->TickHoldRewindSelfTest()) return true;
+			bool running = app->TickHoldRewindSelfTest();
+			DriveKeys(app);
+			if (running) return true;
+			if (KeyDown) SendKeys(false);
+			if (auto* actor = HoldRewindActor()) actor->bScriptedInput = WasScripted;
+			UE_LOG(LogSpaceGod, Display, TEXT("sg.HoldRewind selftest: the hold key was pressed through %s"), ViaController ? TEXT("the player controller") : TEXT("Slate (the OS keyboard's path)"));
 			bool passed = app->HoldRewindSelfTestPassed();
 			return Finish(passed, passed ? nullptr : TEXT("see the FAIL lines above"));
 		}

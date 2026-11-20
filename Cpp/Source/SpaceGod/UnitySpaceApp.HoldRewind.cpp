@@ -566,6 +566,10 @@ namespace SpaceGod
 			int FxSeqAtPress = 0, Resumes = 0;
 			std::vector<cs::Ref<BattleUnit>> DiedSinceM;
 			bool ForceDown = false;
+			/// <summary>US-T420: the hold key is pressed for real (by sg.HoldRewind, through Unreal's input) to match
+			/// ForceDown, which then no longer reaches the hold itself.</summary>
+			bool RealKeys = false;
+			bool KeyChecked = false;
 			double Target = HrNone;
 			// US-T417: the hull flown's unit (from the seat check) and the moment marked before it is killed.
 			cs::Ref<BattleUnit> SeatUnit;
@@ -1069,7 +1073,8 @@ namespace SpaceGod
 		// US-T417: set again by UpdatePiloting this frame while the hull flown's fate is still held back.
 		if (h.OwnFateHeld == 0) h.OwnFateSince = HrNone;
 		h.OwnFateHeld = 0;
-		bool down = Input.HoldRewind || h.Test.ForceDown;
+		// US-T420: with real keys the self-test presses Shift+R itself: only the key counts, as for a player.
+		bool down = Input.HoldRewind || (h.Test.ForceDown && !h.Test.RealKeys);
 		bool pressed = down && !h.KeyWasDown;
 		h.KeyWasDown = down;
 		if (!h.Active)
@@ -1428,6 +1433,14 @@ namespace SpaceGod
 
 	bool UnitySpaceApp::HoldRewindSelfTestPassed() const { return holdRewind != nullptr && holdRewind->Test.Done && holdRewind->Test.Passed; }
 
+	bool UnitySpaceApp::HoldRewindSelfTestWantsKey() const { return holdRewind != nullptr && holdRewind->Test.On && holdRewind->Test.ForceDown; }
+
+	void UnitySpaceApp::SetHoldRewindSelfTestRealKeys(bool real)
+	{
+		if (holdRewind == nullptr) holdRewind = std::make_shared<HoldRewindState>();
+		holdRewind->Test.RealKeys = real;
+	}
+
 	bool UnitySpaceApp::TickHoldRewindSelfTest()
 	{
 		if (holdRewind == nullptr) return false;
@@ -1536,6 +1549,11 @@ namespace SpaceGod
 				if (++t.SettleFrames < 3) return true;
 				selfCheck(t.TauMonotonic, "the moment reached only went back while held");
 				selfCheck(h.Tau >= h.Oldest - 1e-9, "the hold never went past the oldest moment");
+				if (t.RealKeys && !t.KeyChecked)
+				{
+					t.KeyChecked = true;
+					selfCheck(Input.HoldRewind, "the hold is Shift+R held down through Unreal's input (the player's own key path)");
+				}
 				shot("1-held");
 				// US-T418: a ship gone through a gate after the moment reached is drawn again, one that came after it
 				// is hidden, and one that came or went before it is drawn as now (fleet index 0's notes, put back after).

@@ -592,6 +592,12 @@ and bounded by barriers**:
 - The HUD follows a resume (`Hud.Hits.cpp`): the after-action timeline drops moments after the fight clock put back,
   a tally a loss closed is reopened (its report taken down) when the loss is undone, and the passing hit/kill lines go,
   with the kill claims of units alive again. A hull lost whose loss is still held back no longer closes the tally.
+- **The real key (US-T420):** `sg.HoldRewind selftest` holds the rewind by pressing and letting go of Shift+R as key
+  events into Slate (`FSlateApplication::ProcessKeyDownEvent`, the path the OS keyboard takes), with the app reading
+  Unreal's own input for the test (a headless run otherwise feeds it scripted input): Slate, the game viewport, the
+  player controller, `UnrealInputDevice::Feed`, the key bindings (`KeyAction::HoldRewind`, Shift+R) and the hold. The
+  test's own "force down" no longer reaches the hold, and a check asserts the game read the key (44 checks, all passing;
+  the run logs which path carried the keys: Slate).
 - **Seen, not only checked:** the self-test saves the screen at four moments (`Cpp/Saved/Screenshots/holdrewind-*.png`:
   mid-hold, YOUR HULL IS LOST, VICTORY held, the fight on again after the resume). Looking at them found the stale
   after-action report and kill label above, both fixed and re-shot.

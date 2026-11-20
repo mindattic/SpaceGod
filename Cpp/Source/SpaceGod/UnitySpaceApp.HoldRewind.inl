@@ -79,6 +79,13 @@ public:
 	bool TickHoldRewindSelfTest();
 	/// <summary>US-T410: the self-test's last verdict (true: every check passed).</summary>
 	bool HoldRewindSelfTestPassed() const;
+	/// <summary>US-T420: whether the self-test wants the hold key held now. With <see cref="SetHoldRewindSelfTestRealKeys"/>
+	/// the caller presses and lets go of the real keys (Shift+R through Unreal's input) to match, and the hold reads only
+	/// the keys, exactly as when a player holds them.</summary>
+	bool HoldRewindSelfTestWantsKey() const;
+	void SetHoldRewindSelfTestRealKeys(bool real);
+	/// <summary>US-T420: the hold key as the game read it this frame (InputState: Shift+R held).</summary>
+	bool HoldRewindKeyHeld() const { return Input.HoldRewind; }
 
 	/// <summary>US-T410: a hash of the fight's whole state (its clock and random draws to come, every unit's flags, pose,
 	/// hull and mounts, every missile, round, mine and decoy), for the self-test.</summary>
