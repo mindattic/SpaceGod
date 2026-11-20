@@ -423,17 +423,32 @@ namespace SpaceGod::UI
 				auto b = society->BusinessById(num(1));
 				if (b == nullptr) return no("no such business");
 				if (!b->Trading() || !societyStands(b->Home)) return no("that business is not trading");
-				// The sitting governor, as Society::GovernorOf finds one first (it would appoint one from the richest house
-				// there when none sits, which this reading does not do).
+				// The sitting governor, as Society::GovernorOf finds one first; failing that, US-T399: whom it would appoint
+				// (the richest house there's first living heir or spouse of 30 or more), read only, without appointing them.
 				cs::Ref<Citizen> gov;
 				for (const auto& h : society->Houses)
 					if (h != nullptr && h->Home == b->Home && gov == nullptr)
 						for (const auto& m : h->Members)
 							if (m != nullptr && m->Alive() && m->Role == CitizenRole::Governor) { gov = m; break; }
-				if (gov == nullptr && society->HousesOf(b->Home).Count() == 0) return no("there is no governor there to buy");
-				if (gov != nullptr && gov->House == b->Owner) return no("the governor is of its own house");
+				bool appointed = false;
+				if (gov == nullptr)
+				{
+					cs::Ref<Household> rich;
+					for (const auto& h : society->HousesOf(b->Home))
+						if (rich == nullptr || h->Wealth > rich->Wealth) rich = h;
+					if (rich != nullptr)
+						for (const auto& m : rich->Members)
+							if (m != nullptr && m->Alive() && (m->Role == CitizenRole::Heir || m->Role == CitizenRole::Spouse) && m->AgeYears(jd) >= 30)
+							{
+								gov = m;
+								appointed = true;
+								break;
+							}
+				}
+				if (gov == nullptr) return no("there is no governor there to buy, and no one in the richest house there to name");
+				if (gov->House == b->Owner) return no(appointed ? "the governor it would be named from is of its own house" : "the governor is of its own house");
 				double amount = cs::Math::Clamp(b->Capital * 0.03, 5e4, 5e6);
-				return sure(cs::Cat("it pays ", gov != nullptr ? cs::Cat("Governor ", gov->FullName()) : cs::String("a governor named from the richest house there"),
+				return sure(cs::Cat("it pays ", appointed ? cs::Cat(gov->FullName(), " (named governor for it)") : cs::Cat("Governor ", gov->FullName()),
 					" ", Narrator::Money(amount), " and the favour brings back ", Narrator::Money(amount * 2.5)));
 			}
 			if (verb == "ruin")
@@ -450,8 +465,10 @@ namespace SpaceGod::UI
 				if (c == nullptr) return no("no such person");
 				if (!c->Alive()) return no("they are dead");
 				if (c->TripId != 0) return no("they are already travelling");
+				if (c->AgeYears(jd) < 14) return no("they are too young to travel"); // US-T399: as Society::Send refuses
 				if (!societyStands(to)) return no("no standing settlement by that name");
 				if (c->House != nullptr && c->House->Home == to) return no("they live there");
+				if (society->ActiveTrips().Count() >= Core::Society::MaxTrips) return no("the lanes are full of travellers"); // US-T399
 				if (c->House == nullptr) return no("they will not go");
 				return sure(cs::Cat("they write that they are off to ", to->Name, " on business, leaving within 4 to 24 days"));
 			}
@@ -749,7 +766,8 @@ namespace SpaceGod::UI
 						double monthsLeft = (b->Capital - 2e5) / -b->LastMonth;
 						if (monthsLeft > 3) continue;
 						ripe.push_back(Ripe{ 1.0 - cs::Math::Max(0.0, monthsLeft) / 4.0, Row{ cs::Cat("RIPE  \xC2\xB7  ", b->Name, " near failing"),
-							cs::Cat(Narrator::Money(b->Capital), " left, ", Narrator::Money(-b->LastMonth), " lost last month", monthsLeft <= 1 ? cs::String(", a month at most") : cs::Cat(", about ", static_cast<int>(monthsLeft), " months")),
+							cs::Cat(Narrator::Money(b->Capital), " left, ", Narrator::Money(-b->LastMonth), " lost last month", monthsLeft <= 1 ? cs::String(", a month at most") : monthsLeft < 2 ? cs::String(", about a month") // US-T399: not "about 1 months"
+								: cs::Cat(", about ", static_cast<int>(monthsLeft), " months")),
 							CivPick::Business(b->Id), nullptr } });
 					}
 					for (const auto& h : society->Houses)
@@ -2114,7 +2132,8 @@ namespace SpaceGod::UI
 				for (const auto& ln : civ.Commerce->Loans)
 					if (ln != nullptr && ln->Business == b && ln->Bank != nullptr)
 					{
-						lines.Add(cs::Cat("Owes ", Narrator::Money(ln->Principal), " to ", Narrator::OrgName(*ln->Bank), ", due ", SocietyDate(ln->DueJd)));
+						lines.Add(cs::Cat("Owes ", Narrator::Money(ln->Principal), " to ", Narrator::OrgName(*ln->Bank),
+							ln->DueJd < jd ? ", overdue since " : ", due ", SocietyDate(ln->DueJd))); // US-T399: an unpaid loan past due says so
 						links.emplace_back(cs::Cat("Lender: ", Narrator::OrgName(*ln->Bank)), CivPick::Org(ln->Bank->Id));
 					}
 			}

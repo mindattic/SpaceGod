@@ -1315,8 +1315,10 @@ namespace SpaceGod::Core
 		if (c == nullptr) return "no such person";
 		if (!c->Alive()) return "they are dead";
 		if (c->TripId != 0) return "they are already travelling";
+		if (c->AgeYears(jd) < 14) return "they are too young to travel"; // US-T399: as Book refuses
 		if (!Stands(to)) return "no standing settlement by that name";
 		if (c->House != nullptr && c->House->Home == to) return "they live there";
+		if (ActiveTrips().Count() >= MaxTrips) return "the lanes are full of travellers"; // US-T399: Book's cap
 		auto t = Plan(galaxy, c, to, TripPurpose::Business, nullptr, jd, H(static_cast<std::uint32_t>(c->Id), DayOf(jd), 0x5E4Du));
 		if (t == nullptr) return "they will not go";
 		t->Steered = true;
