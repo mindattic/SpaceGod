@@ -23,6 +23,7 @@
 #include "Systems/Polities.h"
 #include "Ships.h"
 #include "Systems/Galaxy.h"
+#include "Systems/LastingConsequences.h" // US-T406: the exiles view
 #include "Systems/Society.h"
 
 #include <cstdlib>
@@ -67,7 +68,8 @@ namespace SpaceGod
 
 		const std::vector<const char*>& Views()
 		{
-			static const std::vector<const char*> views = { "feuds", "regimes", "trials", "admirals", "crime", "money", "chronicle" };
+			static const std::vector<const char*> views = { "feuds", "regimes", "trials", "admirals", "crime", "money", "chronicle",
+				"exiles" }; // US-T406: the peoples the wars drove out, and their grudges
 			return views;
 		}
 
@@ -150,6 +152,16 @@ namespace SpaceGod
 			{
 				for (const auto& e : civ.Culture->Chronicle) add(e->ToString());
 				add(cs::Cat("The league is in season ", civ.Culture->Season, ", round ", civ.Culture->Round));
+				return true;
+			}
+			// US-T406: the refugee tribes the wars left (LastingConsequences, US-T105), each in a line; read only.
+			if (view == "exiles")
+			{
+				auto lc = Core::LastingConsequences::Find(galaxy);
+				if (lc != nullptr)
+					for (const auto& t : lc->Tribes)
+						if (t != nullptr)
+							add(Core::LastingConsequences::Describe(t), t->Home != nullptr ? CivPick::World(t->Home->Name) : CivPick());
 				return true;
 			}
 			return false;

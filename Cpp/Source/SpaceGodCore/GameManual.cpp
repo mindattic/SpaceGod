@@ -736,6 +736,7 @@ namespace SpaceGod::Core
 				  "would do if used now, as the galaxy would judge it: what is sure (the hand forces its outcome, and a swung election "
 				  "shows today's share of the vote) or why it would be refused. A house's Chronicle button tells its history as prose, "
 				  "a paragraph a decade from its founding to who heads it now, with the people and houses each names to follow. "
+				  "The Exiles & grudges page lists the peoples the wars drove out: where they fled from and to, their grudges, their plots and their next move, those aimed at you flagged AGAINST YOU. " // US-T406
 				  "A world's POWER ranks the houses, firms and organisations based there by wealth, capital or strength, each with its "
 				  "share as a bar. A person away says where they are bound, why, when they arrive and whom they meet; a world names "
 				  "its visitors and the conferences it hosts, and a business the conferences it sent people to. A trading firm can "

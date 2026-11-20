@@ -19,6 +19,7 @@
 #include "Systems/Civilization/Underworld.h" // US-T386
 #include "Systems/Galaxy.h"
 #include "Systems/InterstellarWars.h" // US-T383: the summit outlook reads the wars as the resolver does
+#include "Systems/LastingConsequences.h" // US-T406: the exiles and their grudges
 #include "Systems/Polities.h"
 #include "Systems/Society.h"
 
@@ -47,6 +48,7 @@ namespace SpaceGod::UI
 			if (v == "crime") return "Crime";
 			if (v == "money") return "Money";
 			if (v == "chronicle") return "Chronicle";
+			if (v == "exiles") return "Exiles & grudges"; // US-T406
 			return "View";
 		}
 
@@ -873,6 +875,81 @@ namespace SpaceGod::UI
 		}
 		int view = page - FirstView;
 		const auto& views = CivHands::Views();
+		// US-T406: the exiles get a page of their own: each tribe, its grudges (those against the SpaceGod flagged), its
+		// plots and its next move. Read only (LastingConsequences::Find never makes one).
+		if (view >= 0 && view < static_cast<int>(views.size()) && cs::String(views[view]) == "exiles")
+		{
+			auto lc = LastingConsequences::Find(galaxy);
+			if (lc == nullptr) return;
+			std::vector<cs::Ref<RefugeeTribe>> tribes;
+			for (const auto& t : lc->Tribes)
+				if (t != nullptr) tribes.push_back(t);
+			// Those still on the road or plotting first, the latest driven out first.
+			std::stable_sort(tribes.begin(), tribes.end(), [](const cs::Ref<RefugeeTribe>& a, const cs::Ref<RefugeeTribe>& b)
+			{
+				if (a->Active() != b->Active()) return a->Active();
+				return a->FledJd > b->FledJd;
+			});
+			auto powerName = [](const cs::Ref<Faction>& f) { return f != nullptr ? f->Name : cs::String("an unknown power"); };
+			auto put = [this](const cs::String& head, const cs::String& sub, const CivPick& pick, bool warn)
+			{
+				if (!Matches(head, sub)) return;
+				Row r{ head, sub, pick, nullptr };
+				r.Warn = warn;
+				rows.push_back(r);
+			};
+			const cs::String dot = "  \xC2\xB7  ";
+			for (const auto& t : tribes)
+			{
+				cs::String stage;
+				switch (t->Stage)
+				{
+				case TribeStage::Fleeing: stage = "on the road"; break;
+				case TribeStage::Resettled: stage = t->Refuge != nullptr ? cs::Cat("settled at ", t->Refuge->Name) : cs::String("settled"); break;
+				case TribeStage::Returned: stage = "home again"; break;
+				case TribeStage::Assimilated: stage = "one with those who took them in"; break;
+				case TribeStage::Scattered: stage = "scattered"; break;
+				}
+				cs::String home = t->Home != nullptr ? t->Home->Name : cs::String("their home");
+				if (t->HomeSystem != nullptr) home = cs::Cat(home, " (", t->HomeSystem->Name, ")");
+				cs::String when = cs::Cat("fled ", SocietyDate(t->FledJd));
+				if (!cs::Double::IsNaN(t->ResettledJd)) when = cs::Cat(when, ", settled ", SocietyDate(t->ResettledJd));
+				if (!cs::Double::IsNaN(t->EndedJd)) when = cs::Cat(when, ", ended ", SocietyDate(t->EndedJd));
+				put(cs::Cat(t->Name, dot, cs::Fmt(t->People, "N0"), " people", dot, stage),
+					cs::Cat(powerName(t->Origin), "'s people driven from ", home, " by ", powerName(t->Victor), "; ", when,
+						t->Plots > 0 ? cs::Cat("; ", t->Plots, t->Plots == 1 ? " plot, " : " plots, ", t->PlotsSucceeded, " came off") : cs::String()),
+					t->Home != nullptr ? CivPick::World(t->Home->Name) : CivPick(), false);
+				for (const auto& g : t->Grudges)
+				{
+					if (g == nullptr) continue;
+					cs::String against = g->SpaceGod ? cs::String("YOU, the SpaceGod, who helped the victor") : powerName(g->Against);
+					put(cs::Cat("    Grudge against ", against, " since ", SocietyDate(g->SinceJd),
+							g->Owed() ? cs::String(", still owed") : cs::Cat(", avenged ", SocietyDate(g->SettledJd))),
+						cs::String(), !g->SpaceGod && g->Against != nullptr ? CivPick::Faction(g->Against->Name) : CivPick(), g->SpaceGod && g->Owed());
+				}
+				for (const auto& p : lc->Plots)
+				{
+					if (p == nullptr || p->Tribe != t) continue;
+					cs::String aim = p->Kind == PlotKind::Revenge ? cs::String("stirred their old home against the garrison")
+						: p->Kind == PlotKind::Assassination ? cs::String("an assassination") : cs::String("a strike at YOU");
+					put(cs::Cat("    Plot ", SocietyDate(p->Jd), ": ", aim, p->Where != nullptr ? cs::Cat(" at ", p->Where->Name) : cs::String(),
+							", odds ", SocietyPct(p->Odds), p->Succeeded ? ", came off" : ", failed"),
+						p->Outcome, p->Where != nullptr ? CivPick::World(p->Where->Name) : p->Target != nullptr ? CivPick::Faction(p->Target->Name) : CivPick(),
+						p->Kind == PlotKind::AssassinateSpaceGod);
+				}
+				if (t->Active() && !cs::Double::IsNaN(t->NextPlotJd))
+				{
+					auto next = t->NextGrudge();
+					int days = static_cast<int>(std::ceil(t->NextPlotJd - jd));
+					cs::String whenNext = days > 0 ? cs::Cat("in about ", days, days == 1 ? " day (" : " days (", SocietyDate(t->NextPlotJd), ")") : cs::String("any day now");
+					cs::String at = next == nullptr ? cs::String() : next->SpaceGod ? cs::String(", against YOU") : cs::Cat(", against ", powerName(next->Against));
+					put(cs::Cat("    Next move ", whenNext, at), cs::String(),
+						next != nullptr && !next->SpaceGod && next->Against != nullptr ? CivPick::Faction(next->Against->Name) : CivPick(),
+						next != nullptr && next->SpaceGod);
+				}
+			}
+			return;
+		}
 		if (view >= 0 && view < static_cast<int>(views.size()))
 		{
 			cs::List<CivRow> lines;
@@ -1570,6 +1647,7 @@ namespace SpaceGod::UI
 				: page == Watched ? "Nothing is watched yet. Pick a house, a person, an organisation, a business, a world or a state and Watch it: its news is told here and, while you play, as it happens."
 				: page == YourHand ? "Your hand has not touched the galaxy's people yet. Pick a house, a person, an organisation or a world and use the SpaceGod's hand on it: what it brings about, and what comes of that, is kept here."
 				: page == Month ? "Nothing has happened among the galaxy's people in the last 30 days."
+				: page >= FirstView && cs::String(CivHands::Views()[page - FirstView]) == "exiles" ? "No people have been driven from their homes yet: a war that takes a settlement sends its people out." // US-T406
 				: "Nobody here yet: that part of the civilization wakes as the days pass.", text);
 			return;
 		}
@@ -1595,6 +1673,8 @@ namespace SpaceGod::UI
 			// US-T304: what is watched says so (the Watched page is nothing else).
 			if (page != Watched && r.Event == nullptr && !r.Pick.IsNone() && app->IsWatched(r.Pick))
 				GUI::Label(Rect(row.xMax() - 84, row.y + 3, 78, 18), "WATCHED", rowLine);
+			// US-T406: a grudge, a plot or a next move aimed at the SpaceGod is flagged (left of WATCHED).
+			if (r.Warn) GUI::Label(Rect(row.xMax() - 190, row.y + 3, 100, 18), "AGAINST YOU", bad);
 		}
 		GUI::EndScrollView();
 	}

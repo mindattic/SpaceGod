@@ -102,6 +102,8 @@ namespace SpaceGod::UI
 			CivPick Pick;
 			/// The feed's event (its words are rendered only while in view).
 			cs::Ref<Core::SocialEvent> Event;
+			/// US-T406: flagged AGAINST YOU (a grudge, a plot or a next move aimed at the SpaceGod).
+			bool Warn = false;
 		};
 
 		/// A button the detail panel offers: a link to another thing, or a hand (an sg.Civ line), or a hint (no line, disabled).
