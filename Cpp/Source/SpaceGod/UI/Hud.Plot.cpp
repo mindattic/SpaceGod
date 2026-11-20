@@ -17,6 +17,7 @@
 
 #include "Camera/StarTravel.h"
 #include "Combat/Battle.h"
+#include "Combat/FleetCoordination.h" // US-T403
 
 #include <algorithm>
 #include <cmath>
@@ -140,6 +141,29 @@ namespace SpaceGod::UI
 			else if (u->Fleeing) c = Faded(c, 0.6f);
 			float size = u->Kind == UnitKind::Fighter ? 3.0f : u->Kind == UnitKind::Platform ? 6.0f : 5.0f;
 			Dot(place(u), size, c);
+		}
+
+		// US-T403: the command nets. Each working command ship's reach as a faint ring in its side's colour (only the dots
+		// inside the plot), and a small amber ring on each hull disrupted by losing its command ship. Read only.
+		for (const auto& u : battle->Units)
+		{
+			if (u == nullptr || !u->Present()) continue;
+			if (FleetCoordination::Coordinates(u))
+			{
+				float reach = static_cast<float>(FleetCoordination::ReachOf(u) / radiusKm * inner);
+				if (reach < 3) continue;
+				Color nc = Faded(battle->Hostile(me, u) ? HostileColor : u->Side == me->Side ? ArrowFriendlyColor : ArrowNeutralColor, 0.3f);
+				auto at = u == me ? centre : place(u);
+				int dots = std::clamp(static_cast<int>(reach * 0.6f), 12, 72);
+				for (int i = 0; i < dots; i++)
+				{
+					float a = i * 2 * Mathf::PI / dots;
+					auto q = Vector2(at.x + Mathf::Cos(a) * reach, at.y + Mathf::Sin(a) * reach);
+					if ((q - centre).magnitude() <= inner) Dot(q, 2, nc);
+				}
+			}
+			else if (u->CommandedBy == nullptr && u->Disrupted > 0 && u != me)
+				Circle(place(u), 5, Color(1.0f, 0.62f, 0.32f, 0.9f), 8);
 		}
 
 		// The marks: the lock ringed, then each standing call's letter beside its hull.

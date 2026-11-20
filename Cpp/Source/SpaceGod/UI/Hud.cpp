@@ -41,6 +41,7 @@
 #include "Embodiment/SelfDestruct.h"
 #include "Combat/EnergyWeapons.h"
 #include "Combat/FireCones.h"
+#include "Combat/FleetCoordination.h" // US-T403
 #include "Combat/FlightModels.h"
 #include "Combat/Gunnery.h"
 #include "Combat/HaulerFlight.h"
@@ -1263,12 +1264,52 @@ namespace SpaceGod::UI
 		for (const auto& s : c->Subsystems) shieldSum += s->Shield;
 		DrawGauge(Rect(x0 + 2 * (w + 14), y, w, 6), static_cast<float>(shieldSum / maxShield), Color(0.45f, 0.7f, 1.0f), "SHIELDS");
 		DrawGauge(Rect(x0 + 3 * (w + 14), y, w, 6), static_cast<float>(c->Hull / cs::Math::Max(1e-9, c->Spec->Hull)), ProgradeColor, "HULL");
+		// US-T403: whether this hull fights in a command ship's net (FleetCoordination: truer, quicker gunnery), alone, or
+		// disrupted after its command ship fell. Read only. One line above the stun warning's place, so the two never meet.
+		{
+			cs::String net;
+			Color netTint = Dim;
+			auto cmdr = me->CommandedBy;
+			if (cmdr != nullptr && cmdr == me)
+			{
+				int under = 0;
+				for (const auto& o : battle->Units)
+					if (o != me && o->Present() && o->CommandedBy == me) under++;
+				net = cs::Cat("YOU COMMAND THE NET  \xC2\xB7  reach ", RangeText(FleetCoordination::ReachOf(me)), "  \xC2\xB7  ", under,
+					under == 1 ? " hull" : " hulls", " in it");
+				netTint = Accent;
+			}
+			else if (cmdr != nullptr)
+			{
+				cs::String cmdName = cmdr->Ship != nullptr ? cmdr->Ship->Name : cmdr->Name();
+				net = cs::Cat("IN COMMAND NET  \xC2\xB7  ", cmdName, ", ", RangeText((cmdr->Pos - me->Pos).Length()));
+				netTint = Accent;
+			}
+			else if (me->Disrupted > 0)
+			{
+				net = cs::Cat("COMMAND LOST  \xC2\xB7  DISRUPTED ", Mathf::CeilToInt(static_cast<float>(me->Disrupted)), " s");
+				netTint = HostileColor;
+			}
+			else net = "FIGHTING ALONE";
+			float netW = Mathf::Max(260.0f, Mathf::Min(static_cast<float>(Screen::width) - x0 - 16, 4 * (w + 14) + 120));
+			DrawLabel(FitText(net, minorLabel, netW), Vector2(x0, app->PilotControlMode == PilotControl::Helm ? y - 104 : y - 52), netTint, true);
+		}
 		// US-T380: an EMP's stun, which silences the guns and drives, said plainly over the gauges while it lasts.
 		if (me->Stunned > 0)
 			// US-T401: at a capital's helm the captain's orders (y - 32) and patches (y - 50) take that space, and the armour
 			// advice sits above them (y - 68), so the warning goes over all three there.
 			DrawLabel(cs::Cat("SYSTEMS KNOCKED OUT ", Mathf::CeilToInt(static_cast<float>(me->Stunned)), " s"),
 				Vector2(x0, app->PilotControlMode == PilotControl::Helm ? y - 86 : y - 34), HostileColor, true);
+		// US-T404: hostile recon jamming this hull, at the right end of the gauge row (ElectronicWarfare::JamFactor, read only).
+		{
+			double jam = ElectronicWarfare::JamFactor(battle, me);
+			if (jam < 1)
+			{
+				float jx = x0 + 4 * (w + 14);
+				DrawLabel(FitText(cs::Cat("JAMMED  \xC2\xB7  gunnery -", Mathf::RoundToInt(static_cast<float>((1 - jam) * 100)), "%"), minorLabel,
+					Mathf::Max(80.0f, static_cast<float>(Screen::width) - jx - 8)), Vector2(jx, y - 4), HostileColor, true);
+			}
+		}
 		// The guided rounds, homing and hive, apart from the dumb-fire rockets, which need no lock (US-T101).
 		int missiles = 0, hive = 0, rockets = 0; // c.Subsystems.Where(...).Sum(s => s.Ammo)
 		for (const auto& s : c->Subsystems)
@@ -1300,16 +1341,6 @@ namespace SpaceGod::UI
 	// ---------------------------------------------------------------- the reactor's split (US-T94)
 
 	void Hud::DrawReactor()
-		// US-T404: hostile recon jamming this hull, at the right end of the gauge row (ElectronicWarfare::JamFactor, read only).
-		{
-			double jam = ElectronicWarfare::JamFactor(battle, me);
-			if (jam < 1)
-			{
-				float jx = x0 + 4 * (w + 14);
-				DrawLabel(FitText(cs::Cat("JAMMED  \xC2\xB7  gunnery -", Mathf::RoundToInt(static_cast<float>((1 - jam) * 100)), "%"), minorLabel,
-					Mathf::Max(80.0f, static_cast<float>(Screen::width) - jx - 8)), Vector2(jx, y - 4), HostileColor, true);
-			}
-		}
 	{
 		if (app->Travel->Active) return;
 		auto seat = app->HeldSeat();

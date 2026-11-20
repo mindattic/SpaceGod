@@ -21,6 +21,7 @@
 #include "Combat/ElectronicWarfare.h" // US-T404
 #include "Settings/GameSetting.h" // US-T404: the paint settings' values
 #include "Combat/Fighters.h"
+#include "Combat/FleetCoordination.h" // US-T403
 #include "Embodiment/FighterSeat.h"
 #include "Ships.h"
 
@@ -233,18 +234,19 @@ namespace SpaceGod::UI
 		bool prize = focusLine && t->Kind == UnitKind::Ship && Battle::OpenPrize(t); // US-T380: stunned, and whether it lies open to boarding
 		bool stunLine = t->Stunned > 0 || prize;
 		bool threatLine = focusLine; // US-T381: which of its batteries bear on you
+		bool commandLine = focusLine && FleetCoordination::Coordinates(t); // US-T403: an enemy command ship, and what sinking it breaks
 
 		// Heading, name, class line, range line, (the focus line,) (the stun line,) hull, heat, the shields' caption and rows, the subsystems' caption, the
 		// weak point and its key; then as many subsystem kinds as the column has room for.
-		float fixedH = 6 + RowH * 4 + (focusLine ? RowH : 0) + (stunLine ? RowH : 0) + (threatLine ? RowH : 0) + RowH * 2 + RowH + patchRows * RowH + RowH + (weakLine ? RowH * 2 : 0) + 8;
+		float fixedH = 6 + RowH * 4 + (focusLine ? RowH : 0) + (stunLine ? RowH : 0) + (threatLine ? RowH : 0) + (commandLine ? RowH : 0) + RowH * 2 + RowH + patchRows * RowH + RowH + (weakLine ? RowH * 2 : 0) + 8;
 		// US-T382: its crew's nerve, as a hail to strike would find it (Battle::DemandOutcome).
 		bool crewLine = focusLine && t->Kind == UnitKind::Ship && !t->Captured && !t->PlayerControlled();
 		if (crewLine) fixedH += RowH;
-		float room = layout.FreeRight() - HudLayout::Gap;
-		int kindRows = static_cast<int>(kinds.size());
 		// US-T404: whether recon of your side paints it for your torpedoes (ElectronicWarfare::Painted, read only).
 		bool paintLine = focusLine && ElectronicWarfare::Painted(battle, t, me->Side);
 		if (paintLine) fixedH += RowH;
+		float room = layout.FreeRight() - HudLayout::Gap;
+		int kindRows = static_cast<int>(kinds.size());
 		if (fixedH + kindRows * RowH > room) kindRows = std::max(0, static_cast<int>((room - fixedH) / RowH));
 		float h = fixedH + kindRows * RowH;
 		auto r = layout.Take(HudRegion::BottomRight, CardW, h);
@@ -292,6 +294,17 @@ namespace SpaceGod::UI
 			cs::String open = prize ? cs::String("OPEN PRIZE  \xC2\xB7  open to boarding") : cs::String();
 			DrawLabel(FitText(stun.empty() ? open : open.empty() ? stun : cs::Cat(stun, "  \xC2\xB7  ", open), minorLabel, w), Vector2(x, y),
 				prize ? LockColor : Color(1.0f, 0.62f, 0.32f, 1.0f), true);
+			y += RowH;
+		}
+		// US-T403: an enemy command ship: the hulls in its net, every one of which loses its coordination (and is disrupted a
+		// while) if it goes down. Read only (FleetCoordination, BattleUnit::CommandedBy).
+		if (commandLine)
+		{
+			int netted = 0;
+			for (const auto& o : battle->Units)
+				if (o != t && o != nullptr && o->Present() && o->CommandedBy == t) netted++;
+			DrawLabel(FitText(cs::Cat("COMMAND SHIP  \xC2\xB7  sinking it disrupts ", netted, netted == 1 ? " hull" : " hulls"), minorLabel, w),
+				Vector2(x, y), LockColor, true);
 			y += RowH;
 		}
 		// US-T381: its guns that bear on you now (the same arcs the broadside readout uses for yours), named by the side of
@@ -344,6 +357,16 @@ namespace SpaceGod::UI
 			DrawLabel(FitText(nerve, minorLabel, w), Vector2(x, y), nerveTint, true);
 			y += RowH;
 		}
+		// US-T404: painted by your recon: your strike torpedoes steer PaintGuidance times as hard and its decoys draw them off
+		// PaintDecoyResist less often.
+		if (paintLine)
+		{
+			double guide = cs::Math::Max(1.0, ElectronicWarfare::PaintGuidance()->Value);
+			int resist = Mathf::RoundToInt(static_cast<float>(cs::Math::Max(0.0, cs::Math::Min(1.0, ElectronicWarfare::PaintDecoyResist()->Value)) * 100));
+			DrawLabel(FitText(cs::Cat("PAINTED  \xC2\xB7  your torpedoes home ", cs::Fmt(guide, "0.#"), "x harder, its decoys fool ", resist, "% fewer"),
+				minorLabel, w), Vector2(x, y), LockColor, true);
+			y += RowH;
+		}
 
 		// Hull and gun heat, each a caption and a bar.
 		constexpr float capW = 74;
@@ -357,16 +380,6 @@ namespace SpaceGod::UI
 
 		// The shield, patch by patch: each emitter covers the part of the hull nearest it (ShieldEmitters).
 		double total = c->Spec->Shield > 0 ? c->Shield() / c->Spec->Shield : 0;
-		// US-T404: painted by your recon: your strike torpedoes steer PaintGuidance times as hard and its decoys draw them off
-		// PaintDecoyResist less often.
-		if (paintLine)
-		{
-			double guide = cs::Math::Max(1.0, ElectronicWarfare::PaintGuidance()->Value);
-			int resist = Mathf::RoundToInt(static_cast<float>(cs::Math::Max(0.0, cs::Math::Min(1.0, ElectronicWarfare::PaintDecoyResist()->Value)) * 100));
-			DrawLabel(FitText(cs::Cat("PAINTED  \xC2\xB7  your torpedoes home ", cs::Fmt(guide, "0.#"), "x harder, its decoys fool ", resist, "% fewer"),
-				minorLabel, w), Vector2(x, y), LockColor, true);
-			y += RowH;
-		}
 		DrawLabel(patches.empty() ? cs::String("SHIELDS  \xC2\xB7  none") : cs::Cat("SHIELDS ", Pct(total), "  \xC2\xB7  ", static_cast<int>(patches.size()), patches.size() == 1 ? " emitter" : " emitters"),
 			Vector2(x, y), ShieldTint, true);
 		y += RowH;
