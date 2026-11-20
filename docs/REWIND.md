@@ -323,18 +323,26 @@ keyframe whole. That needs the engine's Oodle SDK linked into the game module, n
 recommended 2 s and lets the dense battle ring ship. Then a client's rewind becomes a command in the co-op lockstep
 stream, ordered by the host: any player may rewind, and the later request wins.
 
-## Hold to rewind (US-T409)
+## Hold to rewind (US-T409, US-T410)
 
-The designer's short rewind, beside the keyframe ring above. The rules (2026-11-19, final):
+The designer's short rewind, beside the keyframe ring above. The rules (2026-11-19, final; US-T410 revised 2 and
+added 4 and 5):
 
 1. Pressing it first sets the time warp to real time (1x), then rewinds in **real** seconds.
-2. It is free, with a **60 s** cooldown between uses.
+2. It is free, with a **10 s** cooldown between uses (was 60).
 3. **Holding** the key rewinds, up to **10 real seconds**; **letting go** resumes play from the moment reached.
+4. **Never revisit a time already rewound through:** a resume point is a floor, and no later hold goes back past it.
+   With the 10 s cooldown, you can always go back up to 10 s of fresh play, never into the old one.
+5. **Eased, not jarring:** the playback starts slow and accelerates smoothly to a constant top rate, slows to settle on
+   the oldest moment reachable, and eases to a stop when let go.
 
 Every number is a constant in `UnitySpaceApp::HoldRewindTuning` (`UnitySpaceApp.HoldRewind.inl`): `WindowS` 10,
-`CooldownS` 60, `CapitalHz` 5, `CraftHz` 20, `PlayerEveryFrame`, `AnchorS` 0.5, `PlaybackSpeed` 1, `MaxSamples`
-600,000, `MinHoldS` 0.15. The key is the rebindable `KeyAction::HoldRewind` ("holdRewind"), Shift+R by default
-(Shift+F8 stays the keyframe rewind; the two are separate keys because one is a tap and the other a hold).
+`CooldownS` 10, `StartRate` 0.25, `RampS` 0.8, `TopRate` 3, `BrakeS` 0.6, `BrakeMinRate` 0.1, `ReleaseEaseS` 0.12,
+`DeferBookings`, `ViewSystemBack`, `CapitalHz` 5, `CraftHz` 20, `PlayerEveryFrame`, `AnchorS` 0.5, `MaxSamples`
+600,000, `MinHoldS` 0.15. The arithmetic (the ease, the brake, the oldest moment with its floor, a step) is pure, in
+`Persistence/HoldRewindCurve.h`, unit-checked by `Tests/HoldRewind/HoldRewindCurveTests.cpp` (`tools/build-core.ps1`).
+The key is the rebindable `KeyAction::HoldRewind` ("holdRewind"), Shift+R by default (Shift+F8 stays the keyframe
+rewind; the two are separate keys because one is a tap and the other a hold).
 
 ### Resume: which of the candidates, and why
 
@@ -399,12 +407,55 @@ and bounded by barriers**:
 - **Readout.** "REWIND ready (hold Shift+R)", "REWIND in 42 s", and while held "<< REWIND -4.2 s", how far back play
   can go on from and why, and "let go to play on".
 
+### US-T410: complete and seamless
+
+- **The numbers:** a 10 s window and a 10 s cooldown (wall seconds, as before). **The floor:** letting go makes the
+  resume point the floor (`FloorT`): the oldest moment a later hold reaches is `max(now - WindowS, first kept,
+  floor)`, so a time already rewound through is never revisited, and what was kept before it is pruned.
+- **The ease:** the playback rate is `StartRate` at the press, smoothstepped up over `RampS` to `TopRate` (three
+  seconds of the past a second), constant after; within `BrakeS` of the oldest moment it smoothsteps down to
+  `BrakeMinRate` so the hold settles on the edge; letting go eases the rate to zero over `ReleaseEaseS` (0.12 s, short
+  so control never feels late) before play goes on. A tap still ends at once. The readout shows the rate (x0.3 ... x3.0).
+- **No replayed or missed effects:** the restore keeps the live `Battle::Fx` list, `FxSeq` and the effect owner
+  (`FxBy`, `FxByMount`): the views track the last sequence they drew, so setting it back hid the next effects and could
+  show old ones again; now effects go on from now. The HUD's hit and after-action trackers stand aside while a hold
+  plays (hulls die and come back on screen) and take stock on the first frame after a resume instead of reporting
+  the difference (`HoldRewindActive`, `HoldRewindJustResumed`).
+- **The bookings held back (barriers lifted):** the war's hooks on the fight in view (`UnitDestroyed`,
+  `UnitCaptured`, `UnitSurrendered`) are wrapped while it is recorded: a hull lost, struck or taken is booked to the
+  world (its `Ship` struck off, the wreck, the losses, the capture, the log) only once its moment is older than the
+  window, so letting go before it brings the hull back whole and the booking never happens; a resume drops the
+  bookings after it. Everything held back is booked when the fight ends (a new Core hook, `Battle::Ending`, raised by
+  `War::Step` just before `War::Resolve`; null in every fight the rewind does not watch, so AI-only runs and the
+  Bench never raise it), when the fight leaves the rewind's eye, before any save (`CaptureSave`), and on co-op. A
+  keyframe (US-T99) waits while a fresh booking waits, at most the window and a second, so its save does not book it
+  early. A booking made early (a save, a keyframe that could wait no longer) is a barrier at its moment. An AI hull
+  fleeing is the fight's own flag (the resume puts it back), so it is no longer a barrier either.
+- **The whole system drawn as it was:** while held, the world clock is set back to the moment reached (the marks keep
+  the world's date beside the fight's clock) for the drawing only (planets, ships in orbit and on the lanes, gates),
+  and put back to now on letting go (`ViewSystemBack`).
+- **Still barriers, and why:** a craft launched or landed and a hull joining (the hangars and the fleet's own lists
+  change outside the copied fight); the player's own hull lost, struck, taken or fled, and a surrender's terms settled
+  (the seat, the session, cargo and prizes must be answered at once: booked then, a barrier); a gun, craft or mech
+  taken or let go, a seat change, crossing into another body's frame; the fight ending or another coming into view.
+- **Tested:** `sg.HoldRewind selftest [quit]` (HoldRewindCommand.cpp) starts a fight off Uranus and, with no hand
+  on the keys, marks a resume point and hashes the whole fight there (`HoldRewindFightDigest`: its clock and random
+  draws to come, every unit's flags, pose, hull and mounts, every missile, round, decoy and mine), plays on 3 s, holds
+  the rewind to the mark and lets go, then checks: the moment only went back while held; the resume is at the mark;
+  the resumed fight hashes the same; hulls lost after the mark are back and none is struck off the world's books;
+  effects go on from now; the resume point is the floor; a second hold is refused during the cooldown and free after;
+  with the clock stopped for 2 s of the cooldown, the second hold stops at the floor, not the window; the second
+  resume is no earlier than the first; the ease rises monotonically to the top rate. `./tools/play.ps1 -Offscreen
+  -Capture '' -Seconds 300 -ExecCmds "sg.HoldRewind selftest quit"` runs it headless (no -capture: a capture run
+  keeps no rewind); the log's last line is `HoldRewind selftest: PASS|FAIL (n checks, m failed)` and the game exits 0
+  on a pass.
+
 ### Not yet (later stages)
 
-- Undoing barriers: a hull lost, fled or taken, a launch or a landing, a seat change. That needs the world's bookings
-  undone too, which is the keyframe-plus-replay path once the input recorder exists, or a journal of the bookings.
-- Ships off the battlefield that left or arrived in the window outside a fight (a freighter entering a gate): their
-  fleet phases are analytic in the date, but the world's clock does not go back, so they are drawn where they are now.
+- Undoing the barriers left (launches and landings, seats, the player's own hull's fate): the hangars and the
+  fleet's lists copied too, and a booking journal for the seat and the session.
+- Ships that left the system altogether in the window (an FTL jump to another star) are not redrawn outside a fight:
+  they are in another system's fleet now. Ships in orbit, on the lanes and in gates are (`ViewSystemBack`).
 - Reversed effects (an FTL flash collapsing into a hull, an explosion contracting), the hull sections' damage stage,
   the reversed audio bed, and a hold in co-op.
 

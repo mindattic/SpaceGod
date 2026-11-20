@@ -237,4 +237,17 @@ if (-not $SkipParity) {
   & $etExe (Join-Path $loreDir 'fixture') (Join-Path $repo 'Data\Prose\prose.config.json')
   if ($LASTEXITCODE -ne 0) { Write-Host 'EncounterTests: failures (see above).' -ForegroundColor Red; exit $LASTEXITCODE }
 }
+
+# ---------------------------------------------------------------- HoldRewindCurveTests (US-T410)
+$hrDir = Join-Path $core 'Tests\HoldRewind'
+$hr = Invoke-Compile @(Get-Item -LiteralPath (Join-Path $hrDir 'HoldRewindCurveTests.cpp')) $parityObjRoot
+if ($hr.Failed.Count -gt 0) { exit 1 }
+$hrExe = Join-Path $out 'HoldRewindCurveTests.exe'
+& link.exe /nologo /DEBUG @linkOpt "/OUT:$hrExe" $hr.Objs $lib
+if ($LASTEXITCODE -ne 0) { throw 'link.exe failed (HoldRewindCurveTests).' }
+Write-Host "exe     $hrExe"
+if (-not $SkipParity) {
+  & $hrExe
+  if ($LASTEXITCODE -ne 0) { Write-Host 'HoldRewindCurveTests: failures (see above).' -ForegroundColor Red; exit $LASTEXITCODE }
+}
 exit 0

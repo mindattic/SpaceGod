@@ -157,7 +157,7 @@ reverses the sky cycle. A plain key never changes meaning with Shift unless the 
 | System map: find a world, station, gate, ship or field | Ctrl+F, then Up / Down / Enter (US-T310) | system map | the field at the map's top left |
 | Quicksave / quickload / slots | F5 / F8 / F6 | anywhere | pause menu > Save / Load |
 | Rewind (again within a few seconds: further back) | Shift+F8 (US-T99) | anywhere | sg.Rewind |
-| Hold to rewind: real time, the last seconds play backward (up to 10); let go to play on from there; then a 60 s rest | Shift+R held (US-T409; the frame is the rewind's, so R's drift does nothing meanwhile) | flying a hull or watching a fight, single-player | - |
+| Hold to rewind: real time, the last seconds play backward (easing up to 3x, up to 10 s, never past the last rewind); let go to play on from there; then a 10 s rest | Shift+R held (US-T409, US-T410; the frame is the rewind's, so R's drift does nothing meanwhile) | flying a hull or watching a fight, single-player | - |
 | Pause menu | Esc (last in the Esc chain) | anywhere | Resume, Help, Save / Load, Settings > Display, Main Menu, Quit |
 | Pause menu: pick / press a button | Up / Down or W / S, then Enter or Space; Left / Right on the leave question, Stay first (US-T311) | pause menu | - |
 | Mechlab: pick a hardpoint or socket, pick what to fit, fit it | Up / Down, Left / Right, Enter (US-T331) | Mechlab view of the outfitting panel (F2) | the mouse |

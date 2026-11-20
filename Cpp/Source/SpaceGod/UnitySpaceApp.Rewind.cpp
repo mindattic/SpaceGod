@@ -122,6 +122,9 @@ namespace SpaceGod
 
 		// Only a moment a save could be made of: not between the stars, under FTL or latched to a hulk (SaveBlocker).
 		if (!rewindEnabled || !SaveBlocker().empty() || !Rewind.Due(rewindSessionS, wall, RewindBattle())) return;
+		// US-T410: a keyframe books what the hold rewind holds back (a save must hold it), which a hold could not then undo:
+		// while a fresh booking waits, the keyframe waits too (at most the window).
+		if (HoldRewindDelaysKeyframe()) return;
 		try
 		{
 			const RewindKeyframe& k = Rewind.Capture(CaptureSave(), rewindSessionS, Clock->Jd, wall, RewindBattle());
@@ -208,7 +211,7 @@ namespace SpaceGod
 
 	void UnitySpaceApp::RewindAfterLoad()
 	{
-		ClearHoldRewind(); // US-T409: a load or a keyframe rewind: the hold rewind's tracks and resume points are another world's
+		ClearHoldRewind(false); // US-T409: a load or a keyframe rewind: the hold rewind's tracks and resume points are another world's (US-T410: and its held-back bookings, thrown away with it)
 		if (rewindRestoring) return;
 		Rewind.Clear();
 		rewindSessionS = 0;

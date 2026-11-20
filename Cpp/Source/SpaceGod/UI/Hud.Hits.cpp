@@ -477,7 +477,7 @@ namespace SpaceGod::UI
 		int start = b->Fx.Count();
 		while (start > 0 && b->Fx[start - 1].Seq > hitSeq && b->Fx.Count() - start < 4000) start--;
 		hitSeq = b->FxSeq;
-		bool stale = now - hitSeenAt > 0.5f;
+		bool stale = now - hitSeenAt > 0.5f || app->HoldRewindJustResumed(); // US-T410: the fight put back is not news either
 		hitSeenAt = now;
 		if (stale) return;
 
@@ -613,6 +613,13 @@ namespace SpaceGod::UI
 	{
 		if (Event::current().type != EventType::Repaint) return;
 		float now = Time::unscaledTime;
+		// US-T410: while a hold rewind plays the past back, hulls die and come back on screen: none of it is news. The
+		// trackers take stock on the first frame after (the fight as it was put back), not report the difference.
+		if (app->HoldRewindActive())
+		{
+			hitSeenAt = -100.0f;
+			return;
+		}
 		cs::Ref<Battle> battle;
 		auto me = app->Travel->Active ? nullptr : HeldUnit(battle);
 		if (me == nullptr || battle == nullptr || me->Combat == nullptr)
@@ -660,7 +667,7 @@ namespace SpaceGod::UI
 		cs::Ref<Subsystem> mount;
 		if (auto m = cs::As<MountedTurret>(app->HeldSeat())) mount = m->Mount;
 		// Damage taken while the HUD was hidden or the game paused is not news: take stock instead.
-		bool stale = now - hitSeenAt > 0.5f;
+		bool stale = now - hitSeenAt > 0.5f || app->HoldRewindJustResumed(); // US-T410: the fight put back is not news either
 		TakeHitFx(battle, me, mount, now);
 		TrackOwnDamage(me, now, freshSeat || stale);
 		TrackWing(battle, me, now, freshSeat || stale);

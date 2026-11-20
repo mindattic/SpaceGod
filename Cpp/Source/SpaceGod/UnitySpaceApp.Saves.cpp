@@ -203,6 +203,7 @@ namespace SpaceGod
 
 	cs::Ref<SaveData> UnitySpaceApp::CaptureSave()
 	{
+		BookHoldRewindBeforeSave(); // US-T410: what the hold rewind held back from the world is booked before it is saved
 		auto data = cs::New<SaveData>();
 		data->Clock = Clock;
 		data->Galaxy = Galaxy;

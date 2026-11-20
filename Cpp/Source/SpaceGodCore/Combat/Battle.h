@@ -795,6 +795,11 @@ namespace SpaceGod::Core
 		/// <summary>Raised when pirates demand a player-flown hull's cargo (the hull, the pirates).</summary>
 		cs::Action<cs::Ref<Battle>, cs::Ref<BattleUnit>, cs::Ref<Faction>> CargoDemanded;
 
+		/// <summary>US-T410: raised once the fight is over, just before the war settles it (<see cref="War.Resolve"/>): the
+		/// game's hold rewind books here what it held back from the hooks above. Null in every fight the player's rewind
+		/// does not watch (so AI-only runs and the Bench never raise it); not saved.</summary>
+		cs::Action<cs::Ref<Battle>> Ending;
+
 		/// <summary>US-T203: battle seconds until help answering a distress call is there for a unit's side (0 once it has
 		/// joined), negative when none is coming, or null (no help ever comes). See <see cref="RaidDistress.HelpDueS"/>.</summary>
 		cs::Func<double, cs::Ref<Battle>, cs::Ref<BattleUnit>> HelpDueS;

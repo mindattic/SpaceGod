@@ -201,7 +201,11 @@ namespace SpaceGod::Core
 			// now, not when the rest have finished: free to cruise, take the gate or engage elsewhere.
 			for (const auto& u : b->Units)
 				if (u->Fled && u->PlayerControlled() && u->Ship != nullptr && u->Ship->Battle == b) u->Ship->Battle = nullptr;
-			if (b->Over) Resolve(b, jd);
+			if (b->Over)
+			{
+				if (b->Ending) b->Ending(b); // US-T410: the hold rewind's held-back bookings, before the fight is settled
+				Resolve(b, jd);
+			}
 		}
 		SelfDestruct::AdvanceOutside(world, seconds, counted);
 		// The helm's ping windows, a dark hull's cooling and a restart (US-T93), on the same clock.

@@ -1,28 +1,36 @@
-// US-T409 (docs/REWIND.md, "Hold to rewind"): the designer's short rewind. Members are declared in
+// US-T409 / US-T410 (docs/REWIND.md, "Hold to rewind"): the designer's short rewind. Members are declared in
 // UnitySpaceApp.HoldRewind.inl.
 //
 // Two records are kept, both by a read-only observer at the end of each frame that ran the simulation (never in Core,
 // never with a random draw, so AI-only runs and the Bench are what they were):
 //   - tracks: each hull's, craft's, missile's, round's and decoy's pose in the fight in view (capitals at
 //     HoldRewindTuning::CapitalHz, the rest at CraftHz, the hull held every frame) and the flown hull's helm state,
-//     with whether each hull was dead, gone or docked; they are what a hold draws, played back smoothly (Hermite on
-//     position and velocity, the nose lerped and normalised: docs/research/rewind-short-track.md);
+//     with whether each hull was dead, gone or docked, and the world's and the fight's clocks; they are what a hold
+//     draws, played back smoothly (Hermite on position and velocity, the nose lerped and normalised:
+//     docs/research/rewind-short-track.md);
 //   - resume points: every HoldRewindTuning::AnchorS, the fight's whole state by value (the Battle, every unit, its
 //     combat state, subsystems, reactor, fighter and broadside state, every missile, round, mine and decoy) and the
 //     helm's flight state. Letting go puts the newest one at or before the moment reached back over the live objects
 //     (what Sands of Time does for its actors), so play goes on from a real state, not from the drawn one.
-// What the galaxy booked from the fight (a hull lost, taken, fled, a craft launched or landed, a seat changed) cannot be
-// put back this way: each such change is a barrier, and a resume never goes back past the last one (the hold may still
-// draw further back). The world's clock, and everything outside the fight, goes on from now.
+// US-T410: the world's bookings from the fight in view (a hull lost, struck or taken: the war's hooks) wait until their
+// moment is older than the window (or the fight ends, or a save is made), so a hold can bring a lost hull back; a resume
+// drops the ones after it. What still cannot be put back (a craft launched or landed, a hull joining, a seat changed,
+// the fight's end, your own hull's fate) is a barrier: a resume never goes back past the last one. A resume never goes
+// back past the previous resume either (the floor: a moment already rewound through is never revisited). While held,
+// the world clock is set back for the drawing (planets, ships in orbit and on the lanes), and put back on letting go:
+// the world outside the fight goes on from now.
 
 #include "UnitySpaceApp.h"
 #include "UI/Hud.h"
 #include "Coop/CoopPeer.h"
 #include "Input/KeyBindings.h"
+#include "UnityCompat/UnityRuntime.h"
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <deque>
+#include <functional>
 #include <limits>
 #include <unordered_map>
 #include <utility>
@@ -37,6 +45,7 @@
 #include "Combat/Dogfighting.h"
 #include "Combat/Fighters.h"
 #include "Combat/PilotFlight.h"
+#include "Persistence/HoldRewindCurve.h"
 #include "Systems/HelmFtl.h"
 #include "Camera/StarTravel.h"
 
@@ -47,6 +56,7 @@ namespace SpaceGod
 	namespace
 	{
 		using HrTuning = UnitySpaceApp::HoldRewindTuning;
+		constexpr double HrNone = std::numeric_limits<double>::lowest();
 
 		/// <summary>One kept pose: when (lived real seconds, the ring's key), the fight's own clock then, where it was,
 		/// how it moved, where its nose pointed, and whether it was dead, gone or docked.</summary>
@@ -66,10 +76,12 @@ namespace SpaceGod
 			bool Alive = false;
 		};
 
+		/// <summary>The clocks at one lived moment: the fight's (S) and the world's (Jd).</summary>
 		struct HrClockMark
 		{
 			double T = 0;
 			double S = 0;
+			double Jd = 0;
 		};
 
 		struct HrPilotPose
@@ -102,7 +114,8 @@ namespace SpaceGod
 		};
 
 		/// <summary>What a resume cannot put back: who is in the fight and in what state, the hangars, the seats. Any
-		/// change between two frames is a barrier.</summary>
+		/// change between two frames is a barrier. US-T410: with the bookings held back, a hull lost, struck, taken or
+		/// escaped is put back by the resume point itself, so only the player's own hull's fate counts here.</summary>
 		struct HrCensus
 		{
 			const void* Fight = nullptr;
@@ -136,19 +149,25 @@ namespace SpaceGod
 			for (const auto& u : fight->Units)
 			{
 				if (u == nullptr) continue;
-				c.Dead += u->Dead ? 1 : 0;
-				c.Fled += u->Fled ? 1 : 0;
+				bool counted = !HrTuning::DeferBookings || u->PlayerControlled();
+				if (counted)
+				{
+					c.Dead += u->Dead ? 1 : 0;
+					c.Fled += u->Fled ? 1 : 0;
+					c.Struck += u->Surrendering ? 1 : 0;
+					c.Taken += u->Captured ? 1 : 0;
+				}
 				c.Docked += u->Docked ? 1 : 0;
-				c.Struck += u->Surrendering ? 1 : 0;
-				c.Taken += u->Captured ? 1 : 0;
+				// A hull struck off the world's books (its Ship destroyed) by anything but the held-back hooks.
 				c.Lost += u->Ship != nullptr && u->Ship->Destroyed ? 1 : 0;
 				if (u->Combat != nullptr)
 				{
 					c.Hangars += u->Combat->Hangar != nullptr ? u->Combat->Hangar->Count() : 0;
 					c.Hangars += u->Combat->ShuttleBay != nullptr ? u->Combat->ShuttleBay->Count() : 0;
 				}
-				unsigned long long bits = (u->Dead ? 1u : 0u) | (u->Fled ? 2u : 0u) | (u->Docked ? 4u : 0u) | (u->Surrendering ? 8u : 0u) |
-					(u->Captured ? 16u : 0u) | (u->PlayerControlled() ? 32u : 0u);
+				unsigned long long bits = (u->PlayerControlled() ? 32u : 0u);
+				if (counted) bits |= (u->Dead ? 1u : 0u) | (u->Fled ? 2u : 0u) | (u->Surrendering ? 8u : 0u) | (u->Captured ? 16u : 0u);
+				bits |= u->Docked ? 4u : 0u;
 				h = (h ^ (static_cast<unsigned long long>(u->Id) * 64 + bits)) * 1099511628211ull;
 			}
 			c.Flags = h;
@@ -348,8 +367,9 @@ namespace SpaceGod
 		}
 
 		/// <summary>Puts the fight's state at the resume point back over the live objects. The hooks the world hung on the
-		/// fight (its events) stay as they are now; everything else of the Battle, each unit and what it owns is the
-		/// resume point's.</summary>
+		/// fight (its events, and US-T410's held-back bookings round them) stay as they are now, and so do its effects
+		/// (US-T410: the Fx list and its sequence go on from now, so the views neither show an effect twice nor miss the
+		/// next ones); everything else of the Battle, each unit and what it owns is the resume point's.</summary>
 		void HrRestoreFight(const HrAnchor& a)
 		{
 			if (a.Live != nullptr && a.Copy != nullptr)
@@ -360,22 +380,32 @@ namespace SpaceGod
 				auto unitSurrendered = b.UnitSurrendered;
 				auto surrenderDecided = b.SurrenderDecided;
 				auto cargoDemanded = b.CargoDemanded;
+				auto ending = b.Ending;
 				auto helpDueS = b.HelpDueS;
 				auto fighterStep = b.FighterStep;
 				auto launch = b.Launch;
 				auto wantsAlive = b.WantsAlive;
 				auto boards = b.Boards;
+				auto fx = b.Fx;
+				int fxSeq = b.FxSeq;
+				auto fxBy = b.FxBy;
+				auto fxByMount = b.FxByMount;
 				b = *a.Copy;
 				b.UnitCaptured = std::move(unitCaptured);
 				b.UnitDestroyed = std::move(unitDestroyed);
 				b.UnitSurrendered = std::move(unitSurrendered);
 				b.SurrenderDecided = std::move(surrenderDecided);
 				b.CargoDemanded = std::move(cargoDemanded);
+				b.Ending = std::move(ending);
 				b.HelpDueS = std::move(helpDueS);
 				b.FighterStep = std::move(fighterStep);
 				b.Launch = std::move(launch);
 				b.WantsAlive = std::move(wantsAlive);
 				b.Boards = std::move(boards);
+				b.Fx = std::move(fx);
+				b.FxSeq = fxSeq;
+				b.FxBy = std::move(fxBy);
+				b.FxByMount = std::move(fxByMount);
 			}
 			for (const auto& p : a.Units) *p.first = p.second;
 			for (const auto& p : a.Combats) *p.first = p.second;
@@ -388,6 +418,29 @@ namespace SpaceGod
 			for (const auto& p : a.Mines) *p.first = p.second;
 			for (const auto& p : a.Decoys) *p.first = p.second;
 		}
+
+		/// <summary>A booking of the world's held back (US-T410): when (lived seconds) and what it does.</summary>
+		struct HrBooking
+		{
+			double T = 0;
+			std::function<void()> Fire;
+		};
+
+		/// <summary>The self-test's bookkeeping (sg.HoldRewind selftest).</summary>
+		struct HrSelfTest
+		{
+			bool On = false, Done = false, Passed = false;
+			int Phase = 0, Checks = 0, Failed = 0, Tries = 0, SettleFrames = 0;
+			cs::Ref<Battle> Fight;
+			double PhaseWall = 0, M = -1, Floor = HrNone, LastTau = std::numeric_limits<double>::max();
+			unsigned long long DM = 0, DR = 0;
+			bool HaveResume = false, TauMonotonic = true;
+			double ResumedAnchorT = 0, FloorAtResume = 0;
+			int FxSeqAtPress = 0, Resumes = 0;
+			std::vector<cs::Ref<BattleUnit>> DiedSinceM;
+			bool ForceDown = false;
+			double Target = HrNone;
+		};
 	}
 
 	struct UnitySpaceApp::HoldRewindState
@@ -412,19 +465,38 @@ namespace SpaceGod
 		HrCensus Last;
 		bool HasLast = false;
 		/// <summary>The newest barrier (lived seconds) and its reason: no resume goes back past it.</summary>
-		double BarrierT = std::numeric_limits<double>::lowest();
+		double BarrierT = HrNone;
 		cs::String BarrierWhy;
+		/// <summary>US-T410: the last resume point (lived seconds): no hold goes back past it (a time already rewound
+		/// through is never revisited).</summary>
+		double FloorT = HrNone;
 
-		bool Active = false, KeyWasDown = false;
-		double PressT = 0, Tau = 0, Oldest = 0, HeldS = 0;
+		/// <summary>US-T410: the world's bookings held back, oldest first, and the fight whose hooks hold them (with the
+		/// hooks the world had hung on it).</summary>
+		std::deque<HrBooking> Bookings;
+		cs::Ref<Battle> Hooked;
+		decltype(Battle::UnitDestroyed) OrigDestroyed;
+		decltype(Battle::UnitCaptured) OrigCaptured;
+		decltype(Battle::UnitSurrendered) OrigSurrendered;
+		decltype(Battle::SurrenderDecided) OrigDecided;
+		double KeyframeWaitSince = -1;
+
+		bool Active = false, KeyWasDown = false, Releasing = false;
+		double PressT = 0, Tau = 0, Oldest = 0, HeldS = 0, Rate = 0, ReleaseLeft = 0, ReleaseRate = 0, JdAtPress = 0;
 		std::shared_ptr<HrAnchor> AtPress;
 		/// <summary>Wall-clock seconds (Time::realtimeSinceStartupAsDouble) before the next hold may start.</summary>
 		double CooldownUntil = 0;
+		/// <summary>US-T410: frames left in which a resume is "just now" (the HUD takes stock instead of reporting).</summary>
+		int JustResumed = 0;
+
+		HrSelfTest Test;
 
 		cs::Ref<GUIStyle> Text;
 	};
 
 	bool UnitySpaceApp::HoldRewindActive() const { return holdRewind != nullptr && holdRewind->Active; }
+
+	bool UnitySpaceApp::HoldRewindJustResumed() const { return holdRewind != nullptr && holdRewind->JustResumed > 0; }
 
 	cs::Ref<Battle> UnitySpaceApp::HoldRewindBattle()
 	{
@@ -433,17 +505,215 @@ namespace SpaceGod
 		return nullptr;
 	}
 
-	void UnitySpaceApp::ClearHoldRewind()
+	unsigned long long UnitySpaceApp::HoldRewindFightDigest(const cs::Ref<Battle>& fight)
+	{
+		unsigned long long h = 1469598103934665603ull;
+		auto mixU = [&h](unsigned long long v)
+		{
+			for (int i = 0; i < 8; i++)
+			{
+				h ^= (v >> (i * 8)) & 0xffu;
+				h *= 1099511628211ull;
+			}
+		};
+		auto mixD = [&mixU](double d)
+		{
+			unsigned long long v = 0;
+			std::memcpy(&v, &d, sizeof v);
+			mixU(v);
+		};
+		auto mixV = [&mixD](const DVec3& v)
+		{
+			mixD(v.X);
+			mixD(v.Y);
+			mixD(v.Z);
+		};
+		if (fight == nullptr) return 0;
+		mixD(fight->Seconds);
+		mixU(fight->Over ? 1u : 0u);
+		mixU(static_cast<unsigned long long>(fight->Winner + 1));
+		// The random draws to come (a copy drawn from, the fight's own untouched).
+		cs::Random next = fight->Rng();
+		mixD(next.NextDouble());
+		mixD(next.NextDouble());
+		mixU(static_cast<unsigned long long>(fight->Units.Count()));
+		for (const auto& u : fight->Units)
+		{
+			if (u == nullptr) continue;
+			mixU(static_cast<unsigned long long>(u->Id));
+			mixU((u->Dead ? 1u : 0u) | (u->Fled ? 2u : 0u) | (u->Docked ? 4u : 0u) | (u->Surrendering ? 8u : 0u) | (u->Captured ? 16u : 0u));
+			mixV(u->Pos);
+			mixV(u->Vel);
+			mixV(u->Forward);
+			mixU(u->Target != nullptr ? static_cast<unsigned long long>(u->Target->Id) + 1 : 0);
+			if (u->Combat != nullptr)
+			{
+				mixD(u->Combat->Hull);
+				for (const auto& s : u->Combat->Subsystems)
+				{
+					if (s == nullptr) continue;
+					mixD(s->Hp);
+					mixD(s->Cooldown);
+					mixU(static_cast<unsigned long long>(s->Ammo));
+					mixD(s->Shield);
+				}
+			}
+		}
+		mixU(static_cast<unsigned long long>(fight->Missiles.Count()));
+		for (const auto& m : fight->Missiles)
+			if (m != nullptr)
+			{
+				mixV(m->Pos);
+				mixV(m->Vel);
+			}
+		mixU(static_cast<unsigned long long>(fight->Rounds.Count()));
+		for (const auto& r : fight->Rounds)
+			if (r != nullptr)
+			{
+				mixV(r->Pos);
+				mixV(r->Vel);
+			}
+		mixU(static_cast<unsigned long long>(fight->Decoys.Count()));
+		for (const auto& d : fight->Decoys)
+			if (d != nullptr)
+			{
+				mixV(d->Pos);
+				mixV(d->Vel);
+			}
+		mixU(static_cast<unsigned long long>(fight->Mines.Count()));
+		return h;
+	}
+
+	// ------------------------------------------------------------------------------------------- the held-back bookings
+
+	void UnitySpaceApp::BookHoldRewindUpTo(double uptoS)
 	{
 		if (holdRewind == nullptr) return;
-		double cooldown = holdRewind->CooldownUntil;
-		bool keyDown = holdRewind->KeyWasDown;
-		auto text = holdRewind->Text;
+		auto& h = *holdRewind;
+		while (!h.Bookings.empty() && h.Bookings.front().T <= uptoS)
+		{
+			auto b = std::move(h.Bookings.front());
+			h.Bookings.pop_front();
+			// Booked now: the world holds it, so no resume may go back before it.
+			if (b.T > h.BarrierT)
+			{
+				h.BarrierT = b.T;
+				h.BarrierWhy = "the world has booked a hull's fate";
+			}
+			if (b.Fire) b.Fire();
+		}
+	}
+
+	void UnitySpaceApp::BookHoldRewindBeforeSave() { BookHoldRewindUpTo(std::numeric_limits<double>::max()); }
+
+	bool UnitySpaceApp::HoldRewindDelaysKeyframe()
+	{
+		if (holdRewind == nullptr || holdRewind->Bookings.empty())
+		{
+			if (holdRewind != nullptr) holdRewind->KeyframeWaitSince = -1;
+			return false;
+		}
+		auto& h = *holdRewind;
+		if (h.KeyframeWaitSince < 0) h.KeyframeWaitSince = h.LivedS;
+		if (h.LivedS - h.KeyframeWaitSince < HrTuning::WindowS + 1.0) return true;
+		h.KeyframeWaitSince = -1;
+		return false;
+	}
+
+	void UnitySpaceApp::HookHoldRewindBookings(const cs::Ref<Battle>& fight)
+	{
+		if (holdRewind == nullptr) holdRewind = std::make_shared<HoldRewindState>();
+		auto& h = *holdRewind;
+		if (h.Hooked == fight) return;
+		if (h.Hooked != nullptr)
+		{
+			// The fight leaves the rewind's eye: what it held back is booked, and the world's own hooks go back on.
+			BookHoldRewindUpTo(std::numeric_limits<double>::max());
+			h.Hooked->UnitDestroyed = h.OrigDestroyed;
+			h.Hooked->UnitCaptured = h.OrigCaptured;
+			h.Hooked->UnitSurrendered = h.OrigSurrendered;
+			h.Hooked->SurrenderDecided = h.OrigDecided;
+			h.Hooked->Ending = nullptr;
+			h.Hooked = nullptr;
+		}
+		if (fight == nullptr || !HrTuning::DeferBookings) return;
+		h.Hooked = fight;
+		h.OrigDestroyed = fight->UnitDestroyed;
+		h.OrigCaptured = fight->UnitCaptured;
+		h.OrigSurrendered = fight->UnitSurrendered;
+		h.OrigDecided = fight->SurrenderDecided;
+		// Held back unless it is the player's own hull (the game must answer that at once: the seat, the session) or terms
+		// being settled (cargo and prizes change hands): those are booked now, after everything held back, as a barrier.
+		auto mine = [this](const cs::Ref<BattleUnit>& u)
+		{
+			return u != nullptr && (u->PlayerControlled() || (u->Ship != nullptr && World() != nullptr && u->Ship == World()->PilotedShip));
+		};
+		auto book = [this](bool now, std::function<void()> fire)
+		{
+			auto& st = *holdRewind;
+			if (now)
+			{
+				BookHoldRewindUpTo(std::numeric_limits<double>::max());
+				fire();
+				double at = st.LivedS + 1e-6;
+				if (at > st.BarrierT)
+				{
+					st.BarrierT = at;
+					st.BarrierWhy = "your own hull's fate, or a surrender's terms, was settled";
+				}
+				return;
+			}
+			// The moment it happened: within the frame lived after LivedS (a resume point taken at the end of that frame
+			// already shows it, one before does not).
+			st.Bookings.push_back(HrBooking { st.LivedS + 1e-6, std::move(fire) });
+		};
+		auto destroyed = h.OrigDestroyed;
+		fight->UnitDestroyed = [mine, book, destroyed](cs::Ref<Battle> b, cs::Ref<BattleUnit> u)
+		{
+			book(mine(u), [destroyed, b, u] { if (destroyed) destroyed(b, u); });
+		};
+		auto captured = h.OrigCaptured;
+		fight->UnitCaptured = [mine, book, captured](cs::Ref<Battle> b, cs::Ref<BattleUnit> u, cs::Ref<Faction> captor)
+		{
+			book(mine(u), [captured, b, u, captor] { if (captured) captured(b, u, captor); });
+		};
+		auto surrendered = h.OrigSurrendered;
+		fight->UnitSurrendered = [mine, book, surrendered](cs::Ref<Battle> b, cs::Ref<BattleUnit> u)
+		{
+			book(mine(u), [surrendered, b, u] { if (surrendered) surrendered(b, u); });
+		};
+		auto decided = h.OrigDecided;
+		fight->SurrenderDecided = [book, decided](cs::Ref<Battle> b, cs::Ref<BattleUnit> u, cs::Ref<Faction> captor, SurrenderTerms terms)
+		{
+			book(true, [decided, b, u, captor, terms] { if (decided) decided(b, u, captor, terms); });
+		};
+		// The fight over: everything held back is booked before the war settles it (War::Resolve reads what was booked).
+		fight->Ending = [this](cs::Ref<Battle>) { BookHoldRewindUpTo(std::numeric_limits<double>::max()); };
+	}
+
+	void UnitySpaceApp::ClearHoldRewind(bool book)
+	{
+		if (holdRewind == nullptr) return;
+		auto& h = *holdRewind;
+		if (book)
+		{
+			// The world clock, if a hold had it set back for the drawing, comes back to now first.
+			if (h.Active && Clock != nullptr && HrTuning::ViewSystemBack) Clock->SetJd(h.JdAtPress);
+			HookHoldRewindBookings(nullptr);
+		}
+		// (A load: the bookings and the hooked fight are the old world's, thrown away with it.)
+		double cooldown = h.CooldownUntil;
+		bool keyDown = h.KeyWasDown;
+		auto text = h.Text;
+		auto keptTest = h.Test;
 		*holdRewind = HoldRewindState();
 		holdRewind->CooldownUntil = cooldown;
 		holdRewind->KeyWasDown = keyDown;
 		holdRewind->Text = text;
+		holdRewind->Test = keptTest;
 	}
+
+	// ------------------------------------------------------------------------------------------- recording
 
 	void UnitySpaceApp::RecordHoldRewind(float dt)
 	{
@@ -453,7 +723,7 @@ namespace SpaceGod
 		// Single player, in a run that keeps a rewind at all (not the tour, a capture or -norewind).
 		if (!rewindEnabled || Coop::CoopPeer::Current() != nullptr || Clock == nullptr || World() == nullptr)
 		{
-			if (!h.Clock.empty() || h.Fight != nullptr) ClearHoldRewind();
+			if (!h.Clock.empty() || h.Fight != nullptr || h.Hooked != nullptr) ClearHoldRewind();
 			return;
 		}
 		// Nothing lived: the clock stopped, or between the stars (a barrier, through the seat, once flying again).
@@ -476,6 +746,8 @@ namespace SpaceGod
 			h.FightSince = t;
 			h.NextAnchorAt = 0;
 		}
+		// US-T410: the bookings of the fight in view wait out the window.
+		HookHoldRewindBookings(fight);
 		HrCensus census = HrTakeCensus(fight, ship, pilotFrameBody, piloting);
 		if (h.HasLast && !(census == h.Last))
 		{
@@ -491,7 +763,7 @@ namespace SpaceGod
 		}
 
 		double s = fight != nullptr ? fight->Seconds : 0;
-		h.Clock.push_back(HrClockMark { t, s });
+		h.Clock.push_back(HrClockMark { t, s, Clock->Jd });
 		bool capitalTick = t >= h.NextCapitalAt;
 		if (capitalTick) h.NextCapitalAt = t + 1.0 / HrTuning::CapitalHz;
 		bool craftTick = t >= h.NextCraftAt;
@@ -533,10 +805,16 @@ namespace SpaceGod
 		{
 			h.Anchors.push_back(HrCaptureAnchor(t, fight, piloting, pilot(), ship, pilotFrameBody));
 			h.NextAnchorAt = t + HrTuning::AnchorS;
+			// The self-test's mark: the state this resume point holds, hashed now (it is the live state this instant).
+			if (h.Test.On && h.Test.Phase == 1 && h.Test.M < 0 && fight != nullptr && fight == h.Test.Fight)
+			{
+				h.Test.M = t;
+				h.Test.DM = HoldRewindFightDigest(fight);
+			}
 		}
 
-		// Only the window (and one pose before it, for the curve into it) is kept.
-		double cutoff = t - HrTuning::WindowS - 1.0;
+		// Only the window (and one pose before it, for the curve into it) is kept, and nothing before the floor.
+		double cutoff = std::max(t - HrTuning::WindowS - 1.0, h.FloorT);
 		HrPruneTracks(h.Units, cutoff, h.Samples);
 		HrPruneTracks(h.Missiles, cutoff, h.Samples);
 		HrPruneTracks(h.Rounds, cutoff, h.Samples);
@@ -544,6 +822,8 @@ namespace SpaceGod
 		HrPruneFront(h.Clock, cutoff, nullptr);
 		HrPruneFront(h.Pilot, cutoff, nullptr);
 		while (h.Anchors.size() >= 2 && h.Anchors[1]->T < cutoff) h.Anchors.pop_front();
+		// What is older than the window can no longer be rewound to: the world books it now.
+		BookHoldRewindUpTo(t - HrTuning::WindowS);
 	}
 
 	cs::String UnitySpaceApp::HoldRewindRefusal()
@@ -556,15 +836,19 @@ namespace SpaceGod
 		if (Travel->Active || InFtlCruise() || Ftl->Stage != FtlStage::Idle) return "No rewind between the stars or under FTL";
 		if (rewindReplaying) return "A rewind is already replaying";
 		if (h.Fight == nullptr && h.Pilot.empty()) return "Nothing here to rewind: fly a hull or watch a fight";
-		if (h.Clock.size() < 2 || h.LivedS - h.Clock.front().T < HrTuning::MinHoldS) return "Nothing to rewind yet";
+		double oldest = HoldRewindCurve::Oldest(h.LivedS, HrTuning::WindowS, h.Clock.empty() ? h.LivedS : h.Clock.front().T, h.FloorT);
+		if (h.Clock.size() < 2 || h.LivedS - oldest < HrTuning::MinHoldS) return "Nothing to rewind yet";
 		return cs::String();
 	}
+
+	// ------------------------------------------------------------------------------------------- the hold
 
 	bool UnitySpaceApp::UpdateHoldRewind(float dt)
 	{
 		if (holdRewind == nullptr) holdRewind = std::make_shared<HoldRewindState>();
 		auto& h = *holdRewind;
-		bool down = Input.HoldRewind;
+		if (h.JustResumed > 0) h.JustResumed--;
+		bool down = Input.HoldRewind || h.Test.ForceDown;
 		bool pressed = down && !h.KeyWasDown;
 		h.KeyWasDown = down;
 		if (!h.Active)
@@ -581,19 +865,51 @@ namespace SpaceGod
 			bool piloting = IsPiloting() && World()->PilotedShip == h.PilotShip && !h.Pilot.empty();
 			h.AtPress = HrCaptureAnchor(h.LivedS, h.Fight, piloting, pilot(), piloting ? h.PilotShip : nullptr, pilotFrameBody);
 			h.Active = true;
+			h.Releasing = false;
 			h.PressT = h.LivedS;
 			h.Tau = h.LivedS;
 			h.HeldS = 0;
-			h.Oldest = std::max(h.LivedS - HrTuning::WindowS, h.Clock.front().T);
+			h.Rate = HrTuning::StartRate;
+			h.JdAtPress = Clock->Jd;
+			h.Oldest = HoldRewindCurve::Oldest(h.LivedS, HrTuning::WindowS, h.Clock.front().T, h.FloorT);
 			return true;
 		}
-		if (!down || Coop::CoopPeer::Current() != nullptr)
+		if (Coop::CoopPeer::Current() != nullptr)
 		{
 			EndHoldRewind();
 			return false;
 		}
-		h.HeldS += dt;
-		h.Tau = std::max(h.Oldest, h.Tau - static_cast<double>(dt) * HrTuning::PlaybackSpeed);
+		if (!down)
+		{
+			// Let go: a tap ends at once; a hold eases to a stop over ReleaseEaseS, then plays on.
+			if (h.HeldS < HrTuning::MinHoldS || HrTuning::ReleaseEaseS <= 0)
+			{
+				EndHoldRewind();
+				return false;
+			}
+			if (!h.Releasing)
+			{
+				h.Releasing = true;
+				h.ReleaseLeft = HrTuning::ReleaseEaseS;
+				h.ReleaseRate = h.Rate;
+			}
+			h.ReleaseLeft -= dt;
+			if (h.ReleaseLeft <= 0)
+			{
+				EndHoldRewind();
+				return false;
+			}
+			h.Rate = h.ReleaseRate * (1.0 - HoldRewindCurve::Smooth(1.0 - h.ReleaseLeft / HrTuning::ReleaseEaseS));
+		}
+		else
+		{
+			// Held (again): the ease goes on from where it was.
+			h.Releasing = false;
+			h.HeldS += dt;
+			double rate = HoldRewindCurve::Rate(h.HeldS, HrTuning::StartRate, HrTuning::TopRate, HrTuning::RampS);
+			h.Rate = HoldRewindCurve::Braked(rate, h.Tau, h.Oldest, HrTuning::BrakeS, HrTuning::BrakeMinRate);
+		}
+		h.Tau = HoldRewindCurve::Step(h.Tau, dt, h.Rate, h.Oldest, h.Test.On ? h.Test.Target : HrNone);
 		PlayHoldRewind();
 		return true;
 	}
@@ -602,20 +918,33 @@ namespace SpaceGod
 	{
 		auto& h = *holdRewind;
 		double tau = h.Tau;
+		// The clocks at the moment reached: the fight's, and (for the drawing only) the world's.
+		if (!h.Clock.empty())
+		{
+			auto it = std::lower_bound(h.Clock.begin(), h.Clock.end(), tau, [](const HrClockMark& m, double t) { return m.T < t; });
+			double s = 0, jd = h.JdAtPress;
+			if (it == h.Clock.end())
+			{
+				s = h.Clock.back().S;
+				jd = h.Clock.back().Jd;
+			}
+			else if (it == h.Clock.begin() || it->T <= tau)
+			{
+				s = it->S;
+				jd = it->Jd;
+			}
+			else
+			{
+				const HrClockMark& a = *(it - 1);
+				double f = (tau - a.T) / std::max(1e-9, it->T - a.T);
+				s = a.S + (it->S - a.S) * f;
+				jd = a.Jd + (it->Jd - a.Jd) * f;
+			}
+			if (h.Fight != nullptr) h.Fight->Seconds = s;
+			if (HrTuning::ViewSystemBack && Clock != nullptr && jd > 0) Clock->SetJd(jd);
+		}
 		if (h.Fight != nullptr)
 		{
-			if (!h.Clock.empty())
-			{
-				auto it = std::lower_bound(h.Clock.begin(), h.Clock.end(), tau, [](const HrClockMark& m, double t) { return m.T < t; });
-				if (it == h.Clock.end()) h.Fight->Seconds = h.Clock.back().S;
-				else if (it == h.Clock.begin() || it->T <= tau) h.Fight->Seconds = it->S;
-				else
-				{
-					const HrClockMark& a = *(it - 1);
-					double f = (tau - a.T) / std::max(1e-9, it->T - a.T);
-					h.Fight->Seconds = a.S + (it->S - a.S) * f;
-				}
-			}
 			for (const auto& u : h.Fight->Units)
 			{
 				if (u == nullptr) continue;
@@ -651,9 +980,12 @@ namespace SpaceGod
 	{
 		auto& h = *holdRewind;
 		h.Active = false;
+		h.Releasing = false;
 		auto atPress = h.AtPress;
 		h.AtPress = nullptr;
 		double wall = Time::realtimeSinceStartupAsDouble;
+		// The world clock comes back to now: only the fight (and the helm) go back.
+		if (HrTuning::ViewSystemBack && Clock != nullptr) Clock->SetJd(h.JdAtPress);
 		auto putBack = [this](const HrAnchor& a)
 		{
 			HrRestoreFight(a);
@@ -663,21 +995,23 @@ namespace SpaceGod
 				pilotAim = a.Pilot.Forward;
 			}
 		};
+		h.JustResumed = 2;
 		// A tap, or a hold that never got back: the present as it was at the press.
 		if (h.HeldS < HrTuning::MinHoldS || h.PressT - h.Tau < 1e-3)
 		{
 			if (atPress != nullptr) putBack(*atPress);
 			return;
 		}
-		// The resume point: the newest kept at or before the moment reached, none from before the last barrier (then
-		// the oldest after it, nearer now than the moment reached).
+		// The resume point: the newest kept at or before the moment reached, none from before the last barrier nor the
+		// floor (then the oldest after them, nearer now than the moment reached).
+		double from = std::max(h.BarrierT, h.FloorT) - 1e-9;
 		std::shared_ptr<HrAnchor> best;
 		for (const auto& a : h.Anchors)
-			if (a->T >= h.BarrierT && a->T <= h.Tau + 1e-9) best = a;
+			if (a->T >= from && a->T <= h.Tau + 1e-9) best = a;
 		bool clamped = false;
 		if (best == nullptr)
 			for (const auto& a : h.Anchors)
-				if (a->T >= h.BarrierT && a->T > h.Tau && a->T < h.PressT)
+				if (a->T >= from && a->T > h.Tau && a->T < h.PressT)
 				{
 					best = a;
 					clamped = true;
@@ -693,8 +1027,20 @@ namespace SpaceGod
 		}
 		putBack(*best);
 		double went = h.PressT - best->T;
+		if (h.Test.On)
+		{
+			h.Test.HaveResume = true;
+			h.Test.Resumes++;
+			h.Test.ResumedAnchorT = best->T;
+			h.Test.DR = h.Fight != nullptr ? HoldRewindFightDigest(h.Fight) : 0;
+			// US-T410: the floor this resume sets is h.LivedS at this instant (h.FloorT = h.LivedS below); snapshot it,
+			// since by the time the self-test's own tick checks it, h.LivedS has moved on with real play.
+			h.Test.FloorAtResume = h.LivedS;
+		}
+		// The world's bookings from after the resume point never happened now: dropped. The rest move up with the tracks.
+		while (!h.Bookings.empty() && h.Bookings.back().T > best->T) h.Bookings.pop_back();
 		// The old future is gone: what was kept after the resume point is dropped, and the rest moves up so that the
-		// resume point is now (the next hold goes back through it).
+		// resume point is now (the next hold goes back no further than it: the floor).
 		double by = h.LivedS - best->T;
 		HrTrimAndShift(h.Units, best->T, by, h.Samples);
 		HrTrimAndShift(h.Missiles, best->T, by, h.Samples);
@@ -704,10 +1050,13 @@ namespace SpaceGod
 		HrShiftPoses(h.Clock, by);
 		HrTrimBack(h.Pilot, best->T, nullptr);
 		HrShiftPoses(h.Pilot, by);
+		for (auto& b : h.Bookings) b.T += by;
 		while (!h.Anchors.empty() && h.Anchors.back()->T > best->T) h.Anchors.pop_back();
 		for (auto& a : h.Anchors) a->T += by;
-		if (h.BarrierT > std::numeric_limits<double>::lowest()) h.BarrierT += by;
+		if (h.BarrierT > HrNone) h.BarrierT += by;
+		h.FloorT = h.LivedS;
 		h.HasLast = false;
+		// The world clock in the marks kept: what is drawn of the system on the next hold is the world as it was when kept.
 		// US-T99's frame log can no longer replay across this: the fight was set back by hand, not by the logged frames.
 		// A seek lands on its keyframes from here (they hold the whole world, so they are still exact).
 		rewindFrames.clear();
@@ -735,8 +1084,9 @@ namespace SpaceGod
 		if (h.Active)
 		{
 			double back = h.PressT - h.Tau;
-			line = cs::Cat("<< REWIND  -", cs::Fmt(back, "F1"), " s");
-			if (h.Tau <= h.Oldest + 1e-6) line = cs::Cat(line, "  (as far back as it goes)");
+			line = cs::Cat("<< REWIND  -", cs::Fmt(back, "F1"), " s  (x", cs::Fmt(h.Rate, "F1"), ")");
+			if (h.Tau <= h.Oldest + 1e-6)
+				line = cs::Cat(line, h.Oldest <= h.FloorT + 1e-6 ? "  (back to the last rewind: no further)" : "  (as far back as it goes)");
 			if (h.BarrierT > h.Tau) line = cs::Cat(line, "  -  plays on no earlier than -", cs::Fmt(h.PressT - h.BarrierT, "F1"), " s: ", h.BarrierWhy);
 			line = cs::Cat(line, "  -  let go to play on");
 			tint = Color(1.0f, 0.78f, 0.3f, 1.0f);
@@ -753,5 +1103,196 @@ namespace SpaceGod
 		}
 		h.Text->normal.textColor = tint;
 		GUI::Label(r, line, h.Text);
+	}
+
+	// ------------------------------------------------------------------------------------------- the self-test
+
+	void UnitySpaceApp::BeginHoldRewindSelfTest(const cs::Ref<Battle>& fight)
+	{
+		if (holdRewind == nullptr) holdRewind = std::make_shared<HoldRewindState>();
+		auto& t = holdRewind->Test;
+		t = HrSelfTest();
+		t.On = true;
+		t.Fight = fight;
+		t.PhaseWall = Time::realtimeSinceStartupAsDouble;
+		holdRewind->CooldownUntil = 0;
+		UnityCompat::Debug::Log("HoldRewind selftest: started");
+	}
+
+	bool UnitySpaceApp::HoldRewindSelfTestPassed() const { return holdRewind != nullptr && holdRewind->Test.Done && holdRewind->Test.Passed; }
+
+	bool UnitySpaceApp::TickHoldRewindSelfTest()
+	{
+		if (holdRewind == nullptr) return false;
+		auto& h = *holdRewind;
+		auto& t = h.Test;
+		if (!t.On) return false;
+		double wall = Time::realtimeSinceStartupAsDouble;
+		auto selfCheck = [&t](bool ok, const cs::String& what)
+		{
+			t.Checks++;
+			if (!ok) t.Failed++;
+			UnityCompat::Debug::Log(cs::Cat("HoldRewind selftest: ", ok ? "PASS  " : "FAIL  ", what));
+		};
+		auto finish = [&t](const cs::String& why)
+		{
+			if (!why.empty())
+			{
+				t.Checks++;
+				t.Failed++;
+				UnityCompat::Debug::Log(cs::Cat("HoldRewind selftest: FAIL  ", why));
+			}
+			t.ForceDown = false;
+			t.Target = HrNone;
+			t.On = false;
+			t.Done = true;
+			t.Passed = t.Failed == 0;
+			UnityCompat::Debug::Log(cs::Cat("HoldRewind selftest: ", t.Passed ? "PASS" : "FAIL", " (", t.Checks, " checks, ", t.Failed, " failed)"));
+			return false;
+		};
+		if (!rewindEnabled) return finish("rewind is off in this run (-capture, -demo or -norewind): run it without them");
+		if (Coop::CoopPeer::Current() != nullptr) return finish("rewind is single-player: run it outside co-op");
+		if (wall - t.PhaseWall > 60) return finish(cs::Cat("phase ", t.Phase, " timed out"));
+		if (t.Fight == nullptr || t.Fight->Over) return finish("the fight ended before the test did");
+		switch (t.Phase)
+		{
+			case 0: // Settle: the fight recorded a few seconds, nothing held.
+			{
+				if (h.Fight != t.Fight || h.Active || h.LivedS - h.FightSince < 3.0) return true;
+				t.M = -1;
+				t.Phase = 1;
+				t.PhaseWall = wall;
+				return true;
+			}
+			case 1: // Mark: RecordHoldRewind sets M and its digest at the next resume point.
+			{
+				if (t.M < 0) return true;
+				t.Phase = 2;
+				t.PhaseWall = wall;
+				return true;
+			}
+			case 2: // Play on 3 s, then press with the stop at M.
+			{
+				if (h.LivedS - t.M < 3.0) return true;
+				if (h.BarrierT > t.M || h.FloorT > t.M)
+				{
+					// The fight changed in a way not undone (a craft launched or landed): mark again.
+					if (++t.Tries > 20) return finish("the fight never held still for 3 s without a barrier");
+					t.M = -1;
+					t.Phase = 1;
+					t.PhaseWall = wall;
+					return true;
+				}
+				t.DiedSinceM.clear();
+				for (const auto& u : t.Fight->Units)
+					if (u != nullptr && u->Dead) t.DiedSinceM.push_back(u);
+				t.FxSeqAtPress = t.Fight->FxSeq;
+				t.Target = t.M;
+				t.ForceDown = true;
+				t.LastTau = std::numeric_limits<double>::max();
+				t.TauMonotonic = true;
+				t.SettleFrames = 0;
+				t.Phase = 3;
+				t.PhaseWall = wall;
+				return true;
+			}
+			case 3: // Rewinding: the moment reached only goes back, and stops at M.
+			{
+				if (!h.Active) return true;
+				if (h.Tau > t.LastTau + 1e-9) t.TauMonotonic = false;
+				t.LastTau = h.Tau;
+				if (h.Tau > t.M + 1e-9) return true;
+				if (++t.SettleFrames < 3) return true;
+				selfCheck(t.TauMonotonic, "the moment reached only went back while held");
+				selfCheck(h.Tau >= h.Oldest - 1e-9, "the hold never went past the oldest moment");
+				t.HaveResume = false;
+				t.ForceDown = false;
+				t.Phase = 4;
+				t.PhaseWall = wall;
+				return true;
+			}
+			case 4: // Let go: the resume point is M, and the fight is exactly as it was then.
+			{
+				if (!t.HaveResume) return true;
+				selfCheck(std::fabs(t.ResumedAnchorT - t.M) < 1e-9, cs::Cat("resumed at the marked moment (", cs::Fmt(t.ResumedAnchorT, "F3"), " vs ", cs::Fmt(t.M, "F3"), ")"));
+				selfCheck(t.DR == t.DM, cs::Cat("the fight resumed is the fight as it was (digest ", cs::Fmt(static_cast<double>(t.DR % 1000000007ull), "F0"), " vs ",
+					cs::Fmt(static_cast<double>(t.DM % 1000000007ull), "F0"), ")"));
+				int revived = 0, booked = 0;
+				for (const auto& u : t.DiedSinceM)
+				{
+					if (u->Dead) continue; // dead at M too
+					revived++;
+					if (u->Ship != nullptr && u->Ship->Destroyed) booked++;
+				}
+				selfCheck(booked == 0, cs::Cat(revived, " hull(s) lost after the mark are back and none is struck off the world's books"));
+				selfCheck(t.Fight->FxSeq >= t.FxSeqAtPress, "the effects go on from now (no effect shown twice)");
+				selfCheck(std::fabs(h.FloorT - t.FloorAtResume) < 1e-9, "the resume point is the floor for the next hold");
+				cs::String refusal = HoldRewindRefusal();
+				selfCheck(cs::Strings::StartsWith(refusal, "REWIND ready in"), cs::Cat("a second hold is refused at once: ", refusal));
+				t.Floor = h.FloorT;
+				// Stop the clock for 2 s of the cooldown: the wall goes on, the lived time does not, so the floor (not the
+				// window) is what the next hold meets.
+				Clock->SetPaused(true);
+				t.Phase = 5;
+				t.PhaseWall = wall;
+				return true;
+			}
+			case 5: // The cooldown: refused until it ends, free after.
+			{
+				if (wall - t.PhaseWall >= 2.0 && Clock->Paused()) Clock->SetPaused(false);
+				if (wall < h.CooldownUntil - 0.5) return true;
+				if (wall < h.CooldownUntil)
+				{
+					if (t.SettleFrames >= 0)
+					{
+						selfCheck(!HoldRewindRefusal().empty(), "still refused just before the cooldown ends");
+						t.SettleFrames = -1;
+					}
+					return true;
+				}
+				if (wall < h.CooldownUntil + 0.2) return true;
+				cs::String refusal = HoldRewindRefusal();
+				selfCheck(refusal.empty(), cs::Cat("free again once the cooldown is over", refusal.empty() ? cs::String() : cs::Cat(": ", refusal)));
+				selfCheck(std::fabs(HrTuning::CooldownS - 10) < 1e-9 && std::fabs(HrTuning::WindowS - 10) < 1e-9, "a 10 s window and a 10 s cooldown");
+				t.Target = HrNone;
+				t.ForceDown = true;
+				t.SettleFrames = 0;
+				t.Phase = 6;
+				t.PhaseWall = wall;
+				return true;
+			}
+			case 6: // The second hold: never back past the floor (the first rewind's resume point).
+			{
+				if (!h.Active) return true;
+				if (h.Tau > h.Oldest + 1e-6) return true;
+				if (++t.SettleFrames < 3) return true;
+				selfCheck(h.Oldest >= t.Floor - 1e-9, cs::Cat("the second hold stops at the floor or later (", cs::Fmt(h.PressT - h.Oldest, "F2"), " s back)"));
+				selfCheck(h.Tau >= t.Floor - 1e-9, "never into a time already rewound through");
+				if (h.LivedS - HrTuning::WindowS < t.Floor) selfCheck(std::fabs(h.Oldest - t.Floor) < 1e-6, "the floor, not the window, is the limit here");
+				t.HaveResume = false;
+				t.ForceDown = false;
+				t.Phase = 7;
+				t.PhaseWall = wall;
+				return true;
+			}
+			case 7: // The second resume is at the floor or after; then the ease, checked in full.
+			{
+				if (!t.HaveResume) return true;
+				selfCheck(t.ResumedAnchorT >= t.Floor - 1e-9, "the second resume is no earlier than the first");
+				double last = -1;
+				bool monotonic = true, capped = true;
+				for (int i = 0; i <= 400; i++)
+				{
+					double r = HoldRewindCurve::Rate(i * 0.01, HrTuning::StartRate, HrTuning::TopRate, HrTuning::RampS);
+					if (r < last - 1e-12) monotonic = false;
+					if (r > HrTuning::TopRate + 1e-12) capped = false;
+					last = r;
+				}
+				selfCheck(monotonic && capped && std::fabs(last - HrTuning::TopRate) < 1e-9, "the playback eases up and holds its top rate");
+				return finish(cs::String());
+			}
+			default:
+				return finish("lost its place");
+		}
 	}
 }
