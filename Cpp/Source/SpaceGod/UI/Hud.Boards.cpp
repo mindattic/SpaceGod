@@ -1869,7 +1869,8 @@ namespace SpaceGod::UI
 	bool Hud::UpdateListKeys(bool keysFree)
 	{
 		// US-T393: the picker (drawn over the rest) first, else the save panel; each only while it drew last frame.
-		if (!keysFree) return false;
+		// US-T398: not while the bottom drawer is open over them (it reads the same keys from the device).
+		if (!keysFree || drawerOpen) return false;
 		int* step = nullptr;
 		bool* enter = nullptr;
 		if (app->ShowPicker && pickerDrawnFrame >= Time::frameCount - 1)
@@ -1900,8 +1901,15 @@ namespace SpaceGod::UI
 		float listH = Mathf::Clamp(seats.Count() * rowH, rowH, 360.0f);
 		// US-T393: the keys read in UpdateListKeys, applied here where the seats are: the cursor starts on the seat held (else
 		// the first or the last), then steps; a fresh opening forgets it.
-		if (pickerDrawnFrame < Time::frameCount - 1) pickerCursor = -1;
+		if (pickerDrawnFrame < Time::frameCount - 1)
+		{
+			pickerCursor = -1;
+			pickerCursorSeat = nullptr;
+		}
 		pickerDrawnFrame = Time::frameCount;
+		// US-T398: the seats are rebuilt every frame and a ship lost or launched reorders them, so the cursor follows the seat
+		// it is on, not its old row (and drops if that seat is gone).
+		if (pickerCursorSeat != nullptr) pickerCursor = EmbodiableIndexOf(seats, pickerCursorSeat);
 		if (pickerStep != 0 && seats.Count() > 0)
 		{
 			if (pickerCursor < 0 || pickerCursor >= seats.Count())
@@ -1916,6 +1924,7 @@ namespace SpaceGod::UI
 		}
 		pickerStep = 0;
 		if (pickerCursor >= seats.Count()) pickerCursor = -1;
+		pickerCursorSeat = pickerCursor >= 0 ? seats[pickerCursor] : nullptr; // US-T398
 		bool takeKeyed = pickerEnterKey;
 		pickerEnterKey = false;
 		auto r = Panel(Rect((Screen::width - w) * 0.5f, 110, w, 64 + listH + 24));

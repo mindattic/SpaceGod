@@ -310,6 +310,10 @@ private:
 	bool pickerEnterKey = false;
 	int savesStep = 0, savesCursor = -1, savesDrawnFrame = -10;
 	bool savesEnterKey = false;
+	/// <summary>US-T398: what the cursors are on (the picker's seat, the save panel's slot name), so a list rebuilt in another
+	/// order (a seat lost, a New Save or Delete re-read) keeps the cursor on the same row's thing, not on its old index.</summary>
+	cs::Ref<Core::IEmbodiable> pickerCursorSeat;
+	cs::String savesCursorSlot;
 
 	/// <summary>
 	/// The take-charge picker (F9): every seat the player could take now, from <see cref="UnitySpaceApp.PickerSeats"/>

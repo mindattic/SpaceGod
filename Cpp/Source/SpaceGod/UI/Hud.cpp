@@ -304,8 +304,15 @@ namespace SpaceGod::UI
 		float h = 116 + listH;
 		// US-T393: the keys read in UpdateListKeys, applied here where the slots are; a fresh opening forgets the cursor.
 		int slotCount = saveNames->Count();
-		if (savesDrawnFrame < Time::frameCount - 1) savesCursor = -1;
+		if (savesDrawnFrame < Time::frameCount - 1)
+		{
+			savesCursor = -1;
+			savesCursorSlot = cs::String();
+		}
 		savesDrawnFrame = Time::frameCount;
+		// US-T398: the list is re-read every second and a New Save or Delete shifts the rows after it, so the cursor follows
+		// its slot's name, not its old index (and drops if that slot is gone).
+		if (!savesCursorSlot.empty()) savesCursor = saveNames->IndexOf(savesCursorSlot);
 		if (savesStep != 0 && slotCount > 0)
 		{
 			savesCursor = savesCursor < 0 || savesCursor >= slotCount ? (savesStep > 0 ? 0 : slotCount - 1)
@@ -315,6 +322,7 @@ namespace SpaceGod::UI
 		}
 		savesStep = 0;
 		if (savesCursor >= slotCount) savesCursor = -1;
+		savesCursorSlot = savesCursor >= 0 ? (*saveNames)[savesCursor] : cs::String(); // US-T398
 		bool loadKeyed = savesEnterKey;
 		savesEnterKey = false;
 		auto r = Panel(Rect((Screen::width - w) * 0.5f, Mathf::Min(170.0f, Screen::height - h - 20), w, h));

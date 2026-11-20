@@ -23,6 +23,7 @@ namespace SpaceGod::Core
 	class Compartment;
 	class GroupOrder;
 	class StarSystem;
+	class IEmbodiable; // US-T398
 	enum class Good : int;
 	enum class ShipClass : int;
 	enum class ModuleKind : int;
