@@ -10,11 +10,13 @@
 #include "Economy/Settlement.h"
 #include "Systems/Civilization/CivHash.h" // US-T371
 #include "Systems/Civilization/Civilization.h"
+#include "Systems/Civilization/Commerce.h" // US-T386
 #include "Systems/Civilization/Culture.h"
 #include "Systems/Civilization/Kinship.h"
 #include "Systems/Civilization/Narrator.h"
 #include "Systems/Civilization/Politics.h"
 #include "Systems/Civilization/Strife.h"
+#include "Systems/Civilization/Underworld.h" // US-T386
 #include "Systems/Galaxy.h"
 #include "Systems/InterstellarWars.h" // US-T383: the summit outlook reads the wars as the resolver does
 #include "Systems/Polities.h"
@@ -1802,9 +1804,53 @@ namespace SpaceGod::UI
 						links.emplace_back(cs::Cat(trip->Conference->Name, " (", trip->Conference->Host->Name, ")"), CivPick::World(trip->Conference->Host->Name));
 				}
 			}
+			// US-T386: the god's-eye view of the underworld and the courts: a price on their head, and their trials. Read only.
+			if (civ.Underworld != nullptr && c->Alive())
+				for (const auto& k : civ.Underworld->Contracts)
+					if (k != nullptr && k->Target == c)
+					{
+						int days = static_cast<int>(std::ceil(k->DueJd - jd));
+						lines.Add(cs::Cat("Secretly, a price is on their head", k->Client != nullptr ? cs::Cat(" (paid by House ", k->Client->Surname, ")") : cs::String(),
+							days > 0 ? cs::Cat(", due in ", days, days == 1 ? " day" : " days") : cs::String(", due now"), k->Steered ? " (your hand)" : ""));
+						if (k->Client != nullptr) links.emplace_back(cs::Cat("Paid for by House ", k->Client->Surname), CivPick::House(k->Client->Id));
+						if (k->Killers != nullptr) links.emplace_back(cs::Cat("Hired: ", Narrator::OrgName(*k->Killers)), CivPick::Org(k->Killers->Id));
+					}
+			if (civ.Politics != nullptr)
+			{
+				int guilty = 0, acquitted = 0;
+				for (const auto& tr : civ.Politics->Trials)
+				{
+					if (tr == nullptr || tr->Accused != c) continue;
+					if (!tr->Decided)
+					{
+						lines.Add(cs::Cat("Accused of ", Core::ToString(tr->Charge), tr->Where != nullptr ? cs::Cat(" at ", tr->Where->Name) : cs::String(), ", trial pending"));
+						links.emplace_back(cs::Cat("Their trial for ", Core::ToString(tr->Charge)), CivPick::Trial(tr->Id));
+					}
+					else
+					{
+						(tr->Guilty && !tr->Bought ? guilty : acquitted)++;
+						links.emplace_back(cs::Cat(tr->Guilty && !tr->Bought ? "Convicted: " : "Acquitted: ", Core::ToString(tr->Charge)), CivPick::Trial(tr->Id));
+					}
+				}
+				if (guilty + acquitted > 0)
+					lines.Add(cs::Cat("Before the courts ", guilty + acquitted, guilty + acquitted == 1 ? " time" : " times", ": ", guilty, " convicted, ", acquitted, " acquitted"));
+			}
 			for (const auto& t : c->Ties)
 				if (t != nullptr && t->Other != nullptr)
 					lines.Add(cs::Cat("  ", Core::ToString(t->Kind), " of ", t->Other->FullName(), ", ", cs::Fmt(t->Strength, "0.00"), t->Other->Alive() ? "" : ", dead"));
+			// US-T387: the god's-eye view of their affairs: who they stray with (or who strays with them), whether it came out, and
+			// whether a hidden heir of it may yet come forward. Read only.
+			if (civ.Kinship != nullptr)
+				for (const auto& a : civ.Kinship->Affairs)
+				{
+					if (a == nullptr || a->Who == nullptr || a->Whom == nullptr || (a->Who != c && a->Whom != c)) continue;
+					auto lover = a->Who == c ? a->Whom : a->Who;
+					bool secret = cs::Double::IsNaN(a->FoundOutJd);
+					lines.Add(cs::Cat(secret ? "Secretly (seen only by your eye) the lover of " : "The lover of ", lover->FullName(), " since ", SocietyDate(a->StartedJd),
+						secret ? ", not found out" : cs::Cat(", found out ", SocietyDate(a->FoundOutJd)),
+						cs::Double::IsNaN(a->HeirDueJd) ? cs::String() : cs::Cat("; a hidden heir of it may come forward ", a->HeirDueJd > jd ? cs::Cat("by ", SocietyDate(a->HeirDueJd)) : cs::String("any day"))));
+					links.emplace_back(cs::Cat(secret ? "Secret lover: " : "Lover: ", lover->FullName()), CivPick::Person(lover->Id));
+				}
 			if (c->House != nullptr) links.emplace_back(cs::Cat("House ", c->House->Surname), CivPick::House(c->House->Id));
 			if (c->Spouse != nullptr) links.emplace_back(c->Spouse->FullName(), CivPick::Person(c->Spouse->Id));
 			for (const auto& t : c->Ties)
@@ -1838,19 +1884,6 @@ namespace SpaceGod::UI
 			if (o->Leader != nullptr) links.emplace_back(cs::Cat("Led by ", o->Leader->FullName()), CivPick::Person(o->Leader->Id));
 			if (o->Owner != nullptr) links.emplace_back(cs::Cat("House ", o->Owner->Surname), CivPick::House(o->Owner->Id));
 			if (o->Faction != nullptr) links.emplace_back(o->Faction->Name, CivPick::Faction(o->Faction->Name));
-			// US-T387: the god's-eye view of their affairs: who they stray with (or who strays with them), whether it came out, and
-			// whether a hidden heir of it may yet come forward. Read only.
-			if (civ.Kinship != nullptr)
-				for (const auto& a : civ.Kinship->Affairs)
-				{
-					if (a == nullptr || a->Who == nullptr || a->Whom == nullptr || (a->Who != c && a->Whom != c)) continue;
-					auto lover = a->Who == c ? a->Whom : a->Who;
-					bool secret = cs::Double::IsNaN(a->FoundOutJd);
-					lines.Add(cs::Cat(secret ? "Secretly (seen only by your eye) the lover of " : "The lover of ", lover->FullName(), " since ", SocietyDate(a->StartedJd),
-						secret ? ", not found out" : cs::Cat(", found out ", SocietyDate(a->FoundOutJd)),
-						cs::Double::IsNaN(a->HeirDueJd) ? cs::String() : cs::Cat("; a hidden heir of it may come forward ", a->HeirDueJd > jd ? cs::Cat("by ", SocietyDate(a->HeirDueJd)) : cs::String("any day"))));
-					links.emplace_back(cs::Cat(secret ? "Secret lover: " : "Lover: ", lover->FullName()), CivPick::Person(lover->Id));
-				}
 			if (o->Rival != nullptr) links.emplace_back(cs::Cat("Rival: ", Narrator::OrgName(*o->Rival)), CivPick::Org(o->Rival->Id));
 			if (o->Parent != nullptr) links.emplace_back(cs::Cat("Split from ", Narrator::OrgName(*o->Parent)), CivPick::Org(o->Parent->Id));
 			// US-T323: who is in it (the leader, then the best known), what split from it and who is set against it.
@@ -2049,6 +2082,26 @@ namespace SpaceGod::UI
 				lines.Add(cs::Cat("Sent people to ", ConferenceLine(*k, jd)));
 				if (k->Host != nullptr) links.emplace_back(cs::Cat(k->Name, " (", k->Host->Name, ")"), CivPick::World(k->Host->Name));
 			}
+			// US-T386: who holds shares in it, what it owes and to whom, and (god's-eye) whether it cooks its books. Read only.
+			if (civ.Commerce != nullptr)
+			{
+				for (const auto& st : civ.Commerce->Stakes)
+					if (st != nullptr && st->Business == b && st->Holder != nullptr)
+					{
+						lines.Add(cs::Cat("House ", st->Holder->Surname, " holds ", static_cast<int>(std::lround(st->Share * 100)), "% of it"));
+						links.emplace_back(cs::Cat("Shareholder: House ", st->Holder->Surname), CivPick::House(st->Holder->Id));
+					}
+				for (const auto& ln : civ.Commerce->Loans)
+					if (ln != nullptr && ln->Business == b && ln->Bank != nullptr)
+					{
+						lines.Add(cs::Cat("Owes ", Narrator::Money(ln->Principal), " to ", Narrator::OrgName(*ln->Bank), ", due ", SocietyDate(ln->DueJd)));
+						links.emplace_back(cs::Cat("Lender: ", Narrator::OrgName(*ln->Bank)), CivPick::Org(ln->Bank->Id));
+					}
+			}
+			if (civ.Underworld != nullptr)
+				for (const auto& fr : civ.Underworld->Frauds)
+					if (fr != nullptr && fr->Business == b)
+						lines.Add(cs::Cat("Secretly cooking its books since ", SocietyDate(fr->SinceJd), ": ", Narrator::Money(fr->Inflated), " of profit claimed and never made"));
 			int bribes = 0, exposed = 0;
 			double paid = 0;
 			for (const auto& r : society->Bribes)
@@ -2092,6 +2145,11 @@ namespace SpaceGod::UI
 							cs::Double::IsNaN(r->NextElectionJd) ? cs::String(", no elections") // US-T383: never "votes in 0 days" or less
 								: r->NextElectionJd - jd < 1 ? cs::String(", votes now")
 								: cs::Cat(r->Called ? ", election called, votes in " : ", votes in ", static_cast<int>(r->NextElectionJd - jd), " days")));
+						// US-T387: a succession in doubt, a snap election called early, and the way its last stance leaned. Read only.
+						if (!cs::Double::IsNaN(r->CrisisUntil) && r->CrisisUntil > jd)
+							lines.Add(cs::Cat("Succession crisis: who rules is in doubt until ", SocietyDate(r->CrisisUntil)));
+						if (r->Called) lines.Add("Election called early, out of turn");
+						if (r->Leaning != 0) lines.Add(cs::Cat("Its last stance leaned ", r->Leaning > 0 ? "hawkish" : "dovish"));
 						if (r->Ruler != nullptr) links.emplace_back(r->Ruler->FullName(), CivPick::Person(r->Ruler->Id));
 						if (r->Ruling != nullptr) links.emplace_back(Narrator::OrgName(*r->Ruling), CivPick::Org(r->Ruling->Id));
 					}
@@ -2145,11 +2203,6 @@ namespace SpaceGod::UI
 			float x = 0;
 			linkH = links.empty() ? 0.0f : 28.0f;
 			for (const auto& l : links)
-						// US-T387: a succession in doubt, a snap election called early, and the way its last stance leaned. Read only.
-						if (!cs::Double::IsNaN(r->CrisisUntil) && r->CrisisUntil > jd)
-							lines.Add(cs::Cat("Succession crisis: who rules is in doubt until ", SocietyDate(r->CrisisUntil)));
-						if (r->Called) lines.Add("Election called early, out of turn");
-						if (r->Leaning != 0) lines.Add(cs::Cat("Its last stance leaned ", r->Leaning > 0 ? "hawkish" : "dovish"));
 			{
 				float bw = Mathf::Min(w, link->CalcSize(GUIContent(l.first)).x + 16);
 				if (x > 0 && x + bw > w) { x = 0; linkH += 28; }

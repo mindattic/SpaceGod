@@ -741,7 +741,9 @@ namespace SpaceGod::Core
 				  "its visitors and the conferences it hosts, and a business the conferences it sent people to. A trading firm can "
 				  "also be funded by an anonymous backer, made to buy its governor or ruined by a run, a person sent on business to "
 				  "the marked world, and a hidden bribe exposed. Your eye sees what the galaxy does not: a person's secret affairs "
-				  "and any hidden heir due to come forward, and a state's succession crisis, an election called early and how it leans.")), // US-T298, US-T299, US-T304, US-T308, US-T315, US-T323, US-T325, US-T327, US-T330, US-T334, US-T337, US-T344, US-T348, US-T351, US-T354, US-T358, US-T365, US-T368, US-T371, US-T375, US-T378, US-T384, US-T385, US-T387
+				  "and any hidden heir due to come forward, and a state's succession crisis, an election called early and how it leans. "
+				  "It sees the underworld and the courts too: a price on a person's head and their trials, a firm's shareholders, "
+				  "its debts and to whom, and whether it is cooking its books.")), // US-T298, US-T299, US-T304, US-T308, US-T315, US-T323, US-T325, US-T327, US-T330, US-T334, US-T337, US-T344, US-T348, US-T351, US-T354, US-T358, US-T365, US-T368, US-T371, US-T375, US-T378, US-T384, US-T385, US-T386, US-T387
 
 			cs::New<ManualChapter>("Comms and pilots", "Hailing ships and stations, piracy by radio, and the people you meet", Keys("COMMS AND PILOTS"),
 				T("Hailing",
