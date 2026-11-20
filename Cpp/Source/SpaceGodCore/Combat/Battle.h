@@ -800,6 +800,16 @@ namespace SpaceGod::Core
 		/// does not watch (so AI-only runs and the Bench never raise it); not saved.</summary>
 		cs::Action<cs::Ref<Battle>> Ending;
 
+		/// <summary>US-T419: asked when the fight would end (<see cref="CheckOver"/>): true keeps it open a while longer, a
+		/// mop-up with <see cref="Winner"/> already set and <see cref="EndHeld"/> true, so the game's hold rewind can still
+		/// undo the win (the war settles a fight only once it is over). Null in every fight the player's rewind does not
+		/// watch (AI-only runs and the Bench never set it); not saved.</summary>
+		cs::Func<bool, cs::Ref<Battle>> HoldEnd;
+
+		/// <summary>US-T419: true while <see cref="HoldEnd"/> keeps a finished fight open (its <see cref="Winner"/> known):
+		/// the HUD and the music read it as over. False in every fight without the hook.</summary>
+		bool EndHeld = false;
+
 		/// <summary>US-T203: battle seconds until help answering a distress call is there for a unit's side (0 once it has
 		/// joined), negative when none is coming, or null (no help ever comes). See <see cref="RaidDistress.HelpDueS"/>.</summary>
 		cs::Func<double, cs::Ref<Battle>, cs::Ref<BattleUnit>> HelpDueS;

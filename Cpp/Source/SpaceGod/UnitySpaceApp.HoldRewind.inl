@@ -35,6 +35,10 @@ public:
 		/// view follows the wreck, the stick and triggers do nothing) and the readout says there is still time to rewind;
 		/// once the moment is older than the window the loss is final exactly as before. False: booked at once, a barrier.</summary>
 		static constexpr bool DeferOwnFate = true;
+		/// <summary>US-T419: true: the fight's end (a win, a defeat, both sides breaking off) waits out the window too, the
+		/// fight a mop-up meanwhile with its outcome shown, so a hold can undo it; the war settles it (loot, the ships let
+		/// go) once the moment is older than the window. False: it ends at once, a barrier.</summary>
+		static constexpr bool DeferFightEnd = true;
 		/// <summary>US-T410: true: while held, the whole system is drawn as it was (the world clock set back for the drawing
 		/// only: planets, ships in orbit and on the lanes, gates), and put back to now on letting go.</summary>
 		static constexpr bool ViewSystemBack = true;

@@ -54,6 +54,8 @@
 #include "Embodiment/MountedTurret.h" // US-T414: the full type, so Ref<MountedTurret> converts to Ref<IEmbodiable>
 #include "Embodiment/MechWalker.h" // US-T416: a deployed mech's state, captured by value
 #include "Fleet.h" // US-T418: the fleet's comings and goings through the gates
+#include "Misc/Paths.h" // US-T419: the self-test's screenshots
+#include "UnrealClient.h"
 #include "Session/ISession.h" // US-T414: the session's refusal events, for the self-test's diagnosis
 #include "Session/SessionEvents.h"
 #include "Embodiment/ShipHelm.h" // US-T414: likewise for Ref<ShipHelm>
@@ -481,6 +483,7 @@ namespace SpaceGod
 				auto surrenderDecided = b.SurrenderDecided;
 				auto cargoDemanded = b.CargoDemanded;
 				auto ending = b.Ending;
+				auto holdEnd = b.HoldEnd;
 				auto helpDueS = b.HelpDueS;
 				auto fighterStep = b.FighterStep;
 				auto launch = b.Launch;
@@ -508,6 +511,7 @@ namespace SpaceGod
 				b.SurrenderDecided = std::move(surrenderDecided);
 				b.CargoDemanded = std::move(cargoDemanded);
 				b.Ending = std::move(ending);
+				b.HoldEnd = std::move(holdEnd);
 				b.HelpDueS = std::move(helpDueS);
 				b.FighterStep = std::move(fighterStep);
 				b.Launch = std::move(launch);
@@ -567,6 +571,12 @@ namespace SpaceGod
 			cs::Ref<BattleUnit> SeatUnit;
 			double DeathMarkT = HrNone;
 			double KilledAgainWall = -1;
+			/// <summary>US-T419: the moment marked before every enemy is struck down, and the wall clock the fight was first
+			/// seen over in the last phase.</summary>
+			double EndMarkT = HrNone;
+			double OverWall = -1;
+			/// <summary>US-T419: the wall clock a screenshot was asked for, so the hold waits for it to be taken.</summary>
+			double ShotWall = -1;
 			// US-T414: the seat-change check (phases 8-13): the hull taken for it, the moment marked while piloting
 			// it (before the switch to a turret), and whether the resume landed there or was blocked by a barrier.
 			cs::Ref<Ship> SeatShip;
@@ -631,6 +641,10 @@ namespace SpaceGod
 		std::vector<double> ShipGoneAt, ShipCameAt;
 		std::vector<char> ShipWasGone;
 		bool ShipsSeen = false;
+
+		/// <summary>US-T419: lived seconds the fight watched first would have ended (HrNone: it has not, or it was fought on
+		/// since): its end waits until this is older than the window.</summary>
+		double EndHeldSince = HrNone;
 
 		HrSelfTest Test;
 
@@ -814,6 +828,7 @@ namespace SpaceGod
 			h.Hooked->UnitSurrendered = h.OrigSurrendered;
 			h.Hooked->SurrenderDecided = h.OrigDecided;
 			h.Hooked->Ending = nullptr;
+			h.Hooked->HoldEnd = nullptr; // US-T419: a fight held open ends on its next step
 			h.Hooked = nullptr;
 		}
 		if (fight == nullptr || !HrTuning::DeferBookings) return;
@@ -872,6 +887,16 @@ namespace SpaceGod
 		};
 		// The fight over: everything held back is booked before the war settles it (War::Resolve reads what was booked).
 		fight->Ending = [this](cs::Ref<Battle>) { BookHoldRewindUpTo(std::numeric_limits<double>::max()); };
+		// US-T419: the fight's end waits out the window like the losses in it, a mop-up meanwhile, so a hold can undo a win
+		// (or a defeat). Timed from the first step it would have ended on; a resume to before that starts it afresh.
+		fight->HoldEnd = [this](cs::Ref<Battle> b)
+		{
+			if (holdRewind == nullptr || !HrTuning::DeferFightEnd) return false;
+			auto& st = *holdRewind;
+			if (st.Hooked != b) return false;
+			if (st.EndHeldSince == HrNone) st.EndHeldSince = st.LivedS;
+			return st.LivedS - st.EndHeldSince < HrTuning::WindowS;
+		};
 	}
 
 	void UnitySpaceApp::ClearHoldRewind(bool book)
@@ -925,6 +950,8 @@ namespace SpaceGod
 		auto bodyShip = HrBodyShip(heldSeat);
 		auto heldNonHelm = HeldNonHelm();
 		auto fight = HoldRewindBattle();
+		// US-T419: fought on since it would have ended (or put back to before): its end, if it comes again, starts afresh.
+		if (h.Hooked == nullptr || !h.Hooked->EndHeld) h.EndHeldSince = HrNone;
 		if (fight != h.Fight)
 		{
 			// Another fight (or none): its tracks start now, and nothing before now can be played on from.
@@ -1363,6 +1390,23 @@ namespace SpaceGod
 				h.Text->alignment = TextAnchor::MiddleCenter;
 				h.Text->fontSize = 15;
 			}
+			// US-T419: the fight would be over, its end held back: the outcome, and how long is left to undo it.
+			else if (h.Hooked != nullptr && h.Hooked->EndHeld && h.EndHeldSince != HrNone)
+			{
+				double left = std::max(0.0, HrTuning::WindowS - (h.LivedS - h.EndHeldSince));
+				auto bodyShip = HrBodyShip(HeldSeat());
+				auto me = bodyShip != nullptr ? h.Hooked->UnitOf(bodyShip) : nullptr;
+				int winner = h.Hooked->Winner;
+				cs::String what = winner < 0 ? "BOTH SIDES BREAK OFF" : me == nullptr ? "THE FIGHT IS DECIDED" : winner == me->Side ? "VICTORY" : "DEFEAT";
+				cs::String how = wall < h.CooldownUntil
+					? cs::Cat("rewind ready in ", static_cast<int>(std::ceil(h.CooldownUntil - wall)), " s")
+					: cs::Cat("hold ", Input::KeyBindings::Keys(Input::KeyAction::HoldRewind), " to undo it");
+				line = cs::Cat(what, "  -  ", how, "  -  final in ", static_cast<int>(std::ceil(left)), " s");
+				tint = me != nullptr && winner == me->Side ? Color(0.55f, 1.0f, 0.62f, 1.0f) : Color(0.95f, 0.85f, 0.5f, 1.0f);
+				r = Rect((Screen::width - 900.0f) * 0.5f, 132, 900, 24);
+				h.Text->alignment = TextAnchor::MiddleCenter;
+				h.Text->fontSize = 15;
+			}
 		}
 		h.Text->normal.textColor = tint;
 		GUI::Label(r, line, h.Text);
@@ -1416,7 +1460,31 @@ namespace SpaceGod
 		if (!rewindEnabled) return finish("rewind is off in this run (-capture, -demo or -norewind): run it without them");
 		if (Coop::CoopPeer::Current() != nullptr) return finish("rewind is single-player: run it outside co-op");
 		if (wall - t.PhaseWall > 60) return finish(cs::Cat("phase ", t.Phase, " timed out"));
-		if (t.Fight == nullptr || t.Fight->Over) return finish("the fight ended before the test did");
+		// (The last phase lets the fight end, once its end has waited out the window.)
+		if (t.Fight == nullptr || (t.Fight->Over && !(t.Phase == 17 && t.KilledAgainWall >= 0))) return finish("the fight ended before the test did");
+		// US-T419: every unit on the other side struck down by a real killing impact (the fight's own kill path).
+		auto killEnemies = [&t]()
+		{
+			std::vector<cs::Ref<BattleUnit>> foes;
+			for (const auto& u : t.Fight->Units)
+				if (u != nullptr && u->Present() && !u->Dead && u->Side != t.SeatUnit->Side) foes.push_back(u);
+			for (const auto& u : foes) t.Fight->ApplyImpact(u, u->Pos, 1e15);
+			return foes.size();
+		};
+		// US-T419: the screen as drawn (the game's views and the readout), saved for a look: Saved/Screenshots/holdrewind-*.png.
+		auto shot = [](const char* name)
+		{
+			FString path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Screenshots"), FString::Printf(TEXT("holdrewind-%hs.png"), name));
+			FScreenshotRequest::RequestScreenshot(path, true, false);
+			UnityCompat::Debug::Log(cs::Cat("HoldRewind selftest: screenshot ", name));
+		};
+		auto enemiesStanding = [&t]()
+		{
+			int n = 0;
+			for (const auto& u : t.Fight->Units)
+				if (u != nullptr && u->Present() && !u->Dead && u->Side != t.SeatUnit->Side) n++;
+			return n;
+		};
 		switch (t.Phase)
 		{
 			case 0: // Settle: the fight recorded a few seconds, nothing held.
@@ -1468,6 +1536,7 @@ namespace SpaceGod
 				if (++t.SettleFrames < 3) return true;
 				selfCheck(t.TauMonotonic, "the moment reached only went back while held");
 				selfCheck(h.Tau >= h.Oldest - 1e-9, "the hold never went past the oldest moment");
+				shot("1-held");
 				// US-T418: a ship gone through a gate after the moment reached is drawn again, one that came after it
 				// is hidden, and one that came or went before it is drawn as now (fleet index 0's notes, put back after).
 				selfCheck(!h.ShipGoneAt.empty(), "the fleet's comings and goings are noted");
@@ -1711,6 +1780,15 @@ namespace SpaceGod
 			case 14: // Lost, and held back.
 			{
 				if (wall - t.PhaseWall < 0.5) return true;
+				// The readout as drawn, before the hold takes the screen (the shot is taken at the end of a later frame).
+				if (t.ShotWall < 0)
+				{
+					shot("2-hull-lost");
+					t.ShotWall = wall;
+					return true;
+				}
+				if (wall - t.ShotWall < 0.4) return true;
+				t.ShotWall = -1;
 				selfCheck(t.SeatUnit->Dead, "a killing impact kills the hull flown in the fight");
 				selfCheck(!t.SeatShip->Destroyed, "its loss is held back: the hull is still on the world's books");
 				selfCheck(IsPiloting() && World()->PilotedShip == t.SeatShip, "the helm is still held (dead in the hands), not let go");
@@ -1742,6 +1820,69 @@ namespace SpaceGod
 				selfCheck(!t.SeatShip->Destroyed, "and its loss was never booked");
 				selfCheck(IsPiloting() && World()->PilotedShip == t.SeatShip, "and you are still at its helm");
 				t.PhaseWall = wall;
+				t.Phase = 18;
+				return true;
+			}
+			// US-T419: the fight's end undone. Every enemy struck down: the fight would be won, its end is held back (a
+			// mop-up, the winner known), and a hold to before the kills plays on with the enemies alive and the fight on.
+			case 18: // Out of the cooldown, at the helm: mark a moment, then strike down every enemy.
+			{
+				if (!HoldRewindRefusal().empty()) return true;
+				if (!IsPiloting() || World()->PilotedShip != t.SeatShip) return finish("not at the helm for the fight's-end check");
+				if (t.EndMarkT == HrNone)
+				{
+					t.EndMarkT = h.LivedS;
+					t.PhaseWall = wall;
+					return true;
+				}
+				if (wall - t.PhaseWall < 0.6) return true;
+				if (killEnemies() == 0) return finish("no enemy left to strike down for the fight's-end check");
+				t.PhaseWall = wall;
+				t.Phase = 19;
+				return true;
+			}
+			case 19: // Would be over: held open, the winner known.
+			{
+				if (!t.Fight->EndHeld && wall - t.PhaseWall < 3) return true;
+				if (t.Fight->EndHeld && t.ShotWall < 0)
+				{
+					shot("3-victory-held");
+					t.ShotWall = wall;
+					return true;
+				}
+				if (t.ShotWall >= 0 && wall - t.ShotWall < 0.4) return true;
+				t.ShotWall = -1;
+				selfCheck(t.Fight->EndHeld && !t.Fight->Over, "a won fight's end is held back: still open (a mop-up), not settled");
+				selfCheck(t.Fight->Winner == t.SeatUnit->Side, "and its winner is known: your side");
+				selfCheck(h.EndHeldSince != HrNone, "and the readout says there is still time to undo it");
+				selfCheck(HoldRewindBattle() == t.Fight, "and the rewind still keeps the fight");
+				t.Target = t.EndMarkT;
+				t.ForceDown = true;
+				t.SettleFrames = 0;
+				t.PhaseWall = wall;
+				t.Phase = 20;
+				return true;
+			}
+			case 20: // Hold back to before the kills.
+			{
+				if (!h.Active) return true;
+				if (h.Tau > std::max(t.EndMarkT, h.Oldest) + 1e-6) return true;
+				if (++t.SettleFrames < 3) return true;
+				t.ForceDown = false;
+				t.HaveResume = false;
+				t.PhaseWall = wall;
+				t.Phase = 21;
+				return true;
+			}
+			case 21: // Played on from before them: the enemies are back and the fight goes on.
+			{
+				if (!t.HaveResume) return true;
+				selfCheck(t.ResumedAnchorT <= t.EndMarkT + HrTuning::AnchorS + 1e-6 && h.BarrierT < t.EndMarkT,
+					"the fight's end does not block a resume to before it");
+				selfCheck(enemiesStanding() > 0, "the enemies are back after the hold");
+				selfCheck(!t.Fight->Over && !t.Fight->EndHeld, "and the fight is on again, its end undone");
+				shot("4-fight-on-again");
+				t.PhaseWall = wall;
 				t.Phase = 17;
 				return true;
 			}
@@ -1750,19 +1891,25 @@ namespace SpaceGod
 				if (t.KilledAgainWall < 0)
 				{
 					if (!IsPiloting()) return finish("lost the helm before the second loss");
+					// US-T419: every enemy struck down with it, so the fight would end too: left alone, it is settled
+					// once the window is out, as before.
+					killEnemies();
 					t.Fight->ApplyImpact(t.SeatUnit, t.SeatUnit->Pos, 1e15);
 					t.KilledAgainWall = wall;
 					t.PhaseWall = wall;
 					t.SettleFrames = 0;
 					return true;
 				}
+				if (t.Fight->Over && t.OverWall < 0) t.OverWall = wall;
 				// Timed by the test's own clock: once the loss is booked the readout's "held" moment is rightly gone.
-				if (!t.SeatShip->Destroyed && wall - t.KilledAgainWall < HrTuning::WindowS + 3) return true;
+				if ((!t.SeatShip->Destroyed || !t.Fight->Over) && wall - t.KilledAgainWall < HrTuning::WindowS + 3) return true;
 				// Booked at the end of a frame; the helm lets go on the next frame's piloting, as for any loss.
 				if (t.SeatShip->Destroyed && IsPiloting() && ++t.SettleFrames < 5) return true;
 				selfCheck(t.SeatShip->Destroyed, "left alone past the window, the loss is booked: the hull is struck off");
 				selfCheck(wall - t.KilledAgainWall >= HrTuning::WindowS - 0.5, "and not before the window was out (it was held back till then)");
 				selfCheck(!IsPiloting(), "and the helm is let go, as a loss always was");
+				selfCheck(t.Fight->Over, "left alone past the window, the fight's end is settled too");
+				selfCheck(t.OverWall >= 0 && t.OverWall - t.KilledAgainWall >= HrTuning::WindowS - 0.5, "and not before the window was out");
 				return finish(cs::String());
 			}
 			default:

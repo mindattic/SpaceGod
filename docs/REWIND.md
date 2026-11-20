@@ -436,7 +436,8 @@ and bounded by barriers**:
   and put back to now on letting go (`ViewSystemBack`).
 - **Still barriers, and why:** crossing into another body's frame, or moving to a seat on another body (a seat
   on a hull already in battle that the player holds nothing on cannot be taken back through the embody gate);
-  the fight ending or another coming into view; and a booking forced early (a save, a keyframe that waited the
+  another fight coming into view; the fight's end only when forced (the window out, or the fight leaving the
+  rewind's eye; US-T419 holds it back otherwise); and a booking forced early (a save, a keyframe that waited the
   full window). No longer barriers: a craft launched or landed (US-T413); a unit joining mid-fight (US-T415); a
   deployed mech's state, stuck pods and the player's own guns and craft taken or let go (US-T416, US-T417); the
   player's own hull lost, taken or struck, and a surrender's terms (US-T417); a seat change on the same body
@@ -576,9 +577,32 @@ and bounded by barriers**:
   Ships present when the recording started (a load, a new system) count as always there.
 - **Tested:** the self-test checks the show/hide rule during a real hold (34 checks, all passing).
 
+### US-T419: the fight's end
+
+- `Battle::CheckOver` asks a new hook, `Battle::HoldEnd`, before it sets `Over`. The hold rewind sets it on the fight it
+  watches (with the booking hooks, `HookHoldRewindBookings`): true while the moment the fight would first have ended is
+  younger than the window. Meanwhile the fight runs on as a mop-up (`Mopping`, the state it already had with fighters
+  aloft or a boarding on), `Winner` set and `EndHeld` true, and the readout says VICTORY / DEFEAT / BOTH SIDES BREAK OFF
+  with the time left to undo it. Once the window is out it ends exactly as before: `Ending` books what waited, then
+  `War::Resolve` settles it (loot, the ships let go, the report and the music's sting).
+- Core change, but only behind the hook: null in every fight the rewind does not watch, so AI-only runs and the Bench
+  never meet it (`tools/bench.ps1`: unchanged digests).
+- Cost: after a win the fight stays a fight for up to the window (the ships in it are still in it, e.g. for an FTL jump);
+  leaving the battle space frees the player at once as before. `HrTuning::DeferFightEnd = false` turns it off.
+- The HUD follows a resume (`Hud.Hits.cpp`): the after-action timeline drops moments after the fight clock put back,
+  a tally a loss closed is reopened (its report taken down) when the loss is undone, and the passing hit/kill lines go,
+  with the kill claims of units alive again. A hull lost whose loss is still held back no longer closes the tally.
+- **Seen, not only checked:** the self-test saves the screen at four moments (`Cpp/Saved/Screenshots/holdrewind-*.png`:
+  mid-hold, YOUR HULL IS LOST, VICTORY held, the fight on again after the resume). Looking at them found the stale
+  after-action report and kill label above, both fixed and re-shot.
+- **Tested:** the self-test strikes down every enemy with real killing impacts: the end is held (open, winner known, the
+  rewind still on the fight), a hold to before the kills plays on with the enemies back and the fight on, and a second
+  win left alone in the cooldown ends the fight only once the window is out.
+
 ### Not yet (later stages)
 
 - Moving to a seat on another body during the window, and crossing into another body's frame.
+- Another fight coming into view (the rewind follows the new one from then on).
 - A ship that changed phase (left an orbit, joined a lane) in the window is still drawn where its *current* phase
   puts it at the past `jd`, as a ship's analytic state is a snapshot of now, overwritten at every phase change.
 - Reversed effects (an FTL flash collapsing into a hull, an explosion contracting), the hull sections' damage stage,

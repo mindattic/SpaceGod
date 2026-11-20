@@ -486,9 +486,22 @@ namespace SpaceGod::Core
 		}
 		bool fighting = any0 && any1 && (fight0 || fight1);
 		Mopping = !fighting;
-		if (Seconds < MaxSeconds && (fighting || Boarding() || FightersAloft() || AwaitingSurrenderTerms())) return;
+		if (Seconds < MaxSeconds && (fighting || Boarding() || FightersAloft() || AwaitingSurrenderTerms()))
+		{
+			EndHeld = false;
+			return;
+		}
+		int winner = fight0 && !fight1 ? 0 : fight1 && !fight0 ? 1 : any0 && !any1 ? 0 : any1 && !any0 ? 1 : -1;
+		// US-T419: the player's hold rewind may keep a won (or lost) fight open for its window, so the win can be undone.
+		if (Seconds < MaxSeconds && HoldEnd != nullptr && HoldEnd(shared_from_this()))
+		{
+			EndHeld = true;
+			Winner = winner;
+			return;
+		}
+		EndHeld = false;
 		Over = true;
-		Winner = fight0 && !fight1 ? 0 : fight1 && !fight0 ? 1 : any0 && !any1 ? 0 : any1 && !any0 ? 1 : -1;
+		Winner = winner;
 	}
 
 	bool Battle::IsPrize(const cs::Ref<BattleUnit>& u, const cs::Ref<BattleUnit>& target)

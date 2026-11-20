@@ -663,6 +663,26 @@ namespace SpaceGod::UI
 			hadShield = ShieldShare(me) > 0.1;
 			hullWasCritical = HullShare(me) < HullCritical;
 		}
+		// US-T419: a hold rewind put the fight back: what happened after the moment it went back to never happened. The
+		// timeline loses it, and a tally a loss or the end closed is open again (its report taken down) if that is undone.
+		if (app->HoldRewindJustResumed())
+		{
+			for (int i = hitTally.Moments.Count() - 1; i >= 0; i--)
+				if (hitTally.Moments[i].At > battle->Seconds + 1e-6) hitTally.Moments.RemoveAt(i);
+			// The passing kill and hit lines are about the moments undone (a kill there may not happen again): taken down,
+			// and a unit alive again may be claimed again when it falls.
+			hitFeed.Clear();
+			killMarkAt = -100.0f;
+			cs::List<cs::Ref<BattleUnit>> aliveAgain;
+			for (const auto& kv : hitClaimed)
+				if (kv.first != nullptr && !kv.first->Dead && !kv.first->Captured && !kv.first->Surrendering) aliveAgain.Add(kv.first);
+			for (const auto& u : aliveAgain) hitClaimed.Remove(u);
+			if (hitTallyDone && !me->Dead && !me->Fled && !battle->Over)
+			{
+				hitTallyDone = false;
+				hitReportAt = -1000.0f;
+			}
+		}
 		// A gun mount held fires only itself; every other seat fires all the hull's (or the craft's) weapons.
 		cs::Ref<Subsystem> mount;
 		if (auto m = cs::As<MountedTurret>(app->HeldSeat())) mount = m->Mount;
@@ -674,7 +694,10 @@ namespace SpaceGod::UI
 		TrackSpoofed(battle, me, now, freshSeat || stale);
 		TrackEscapes(battle, me, now, freshSeat || stale);
 		TrackMoments(battle, me, freshSeat || stale); // US-T364
-		if (battle->Over || me->Dead || me->Fled) CloseHitTally(battle, me, now);
+		// US-T419: a hull lost whose loss the hold rewind still holds back (its ship not struck off yet) may be undone: its
+		// report waits until the loss is final.
+		bool lostForGood = me->Dead && (me->Ship == nullptr || me->Ship->Destroyed);
+		if (battle->Over || lostForGood || me->Fled) CloseHitTally(battle, me, now);
 
 		// The held hull's own state: its shields going down, its hull going critical.
 		double shield = ShieldShare(me), hull = HullShare(me);
