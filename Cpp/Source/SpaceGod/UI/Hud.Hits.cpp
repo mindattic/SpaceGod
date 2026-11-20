@@ -225,9 +225,14 @@ namespace SpaceGod::UI
 			if (withdrawing > 0 && hitWithdrawSeen == 0)
 				AddMoment(cs::Cat("You called a withdrawal: ", withdrawing, withdrawing == 1 ? " ship runs" : " ships run"), Color(1.0f, 0.64f, 0.26f, 1.0f));
 			// US-T370: ships that ran under the call and, still here, turned back to the fight were called back.
+			// US-T401: only on the frame this helm's own recall order landed: a runner disabled or taken over by a co-op player
+			// also stops running and loses its call, but nobody called it back.
+			bool recallLanded = lastOrder.Seq != hitOrderSeqSeen && lastOrder.Carrier != nullptr && lastOrder.Carrier == me->Ship &&
+				cs::Strings::StartsWith(lastOrder.Toast, "Back to the fight");
 			int turnedBack = 0;
 			for (const auto& u : hitWithdrawers)
-				if (u != nullptr && u->WithdrawCalledBy != me && u->Present() && !u->Fleeing) turnedBack++;
+				if (recallLanded && u != nullptr && u->WithdrawCalledBy != me && u->Present() && !u->Fleeing && !u->PlayerControlled() &&
+						(u->Combat == nullptr || !u->Combat->Disabled())) turnedBack++;
 			if (turnedBack > 0)
 				AddMoment(cs::Cat("You called the withdrawal back: ", turnedBack, turnedBack == 1 ? " ship turns" : " ships turn", " to fight again"), callTint);
 			hitWithdrawSeen = withdrawing;

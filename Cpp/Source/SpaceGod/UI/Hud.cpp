@@ -1264,7 +1264,10 @@ namespace SpaceGod::UI
 		DrawGauge(Rect(x0 + 3 * (w + 14), y, w, 6), static_cast<float>(c->Hull / cs::Math::Max(1e-9, c->Spec->Hull)), ProgradeColor, "HULL");
 		// US-T380: an EMP's stun, which silences the guns and drives, said plainly over the gauges while it lasts.
 		if (me->Stunned > 0)
-			DrawLabel(cs::Cat("SYSTEMS KNOCKED OUT ", Mathf::CeilToInt(static_cast<float>(me->Stunned)), " s"), Vector2(x0, y - 34), HostileColor, true);
+			// US-T401: at a capital's helm the captain's orders (y - 32) and patches (y - 50) take that space, and the armour
+			// advice sits above them (y - 68), so the warning goes over all three there.
+			DrawLabel(cs::Cat("SYSTEMS KNOCKED OUT ", Mathf::CeilToInt(static_cast<float>(me->Stunned)), " s"),
+				Vector2(x0, app->PilotControlMode == PilotControl::Helm ? y - 86 : y - 34), HostileColor, true);
 		// The guided rounds, homing and hive, apart from the dumb-fire rockets, which need no lock (US-T101).
 		int missiles = 0, hive = 0, rockets = 0; // c.Subsystems.Where(...).Sum(s => s.Ammo)
 		for (const auto& s : c->Subsystems)
@@ -1554,7 +1557,8 @@ namespace SpaceGod::UI
 			onTarget,
 			me->PlayerFireHeld ? cs::Cat("  ·  VOLLEY ", Mathf::RoundToInt(built * 100), "%  (let go to fire)") : cs::String("  ·  hold left mouse to build a volley"));
 		DrawLabel(text_, Vector2(x, y), me->PlayerFireHeld ? LockColor : Dim, true);
-		DrawArmourAdvice(battle, me, x, y + 18); // US-T382
+		// US-T382; US-T401: above the captain's patches line (y - 80), clear of the flight readout and the status bar below.
+		DrawArmourAdvice(battle, me, x, me->Broadside != nullptr ? y - 98 : y - 62);
 
 		Vector2 tp;
 		float td = 0;
@@ -1600,8 +1604,10 @@ namespace SpaceGod::UI
 				harmStbd <= harmPort ? "stbd" : "port", ": -", cut, "% harm");
 		}
 		else advice = "laid as well as a slant would lay it";
-		DrawLabel(cs::Cat("ARMOUR  ", lies, " to the ", foeName, "  ·  lets home ", Mathf::RoundToInt(static_cast<float>(harmNow * 100)),
-			"% of a hit  ·  ", advice), Vector2(x, y), Dim, true);
+		// US-T401: fitted to the gauge row's width so a long name can't run off across the screen.
+		float fitW = Mathf::Max(260.0f, Mathf::Min(static_cast<float>(Screen::width) - x - 16, 4 * (120.0f + 14) + 120));
+		DrawLabel(FitText(cs::Cat("ARMOUR  ", lies, " to the ", foeName, "  ·  lets home ", Mathf::RoundToInt(static_cast<float>(harmNow * 100)),
+			"% of a hit  ·  ", advice), minorLabel, fitW), Vector2(x, y), Dim, true);
 	}
 
 	void Hud::DrawCaptain(const cs::Ref<Battle>& battle, const cs::Ref<BattleUnit>& me, float x, float y)

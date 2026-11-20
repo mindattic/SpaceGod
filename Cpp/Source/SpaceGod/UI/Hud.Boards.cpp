@@ -1668,7 +1668,7 @@ namespace SpaceGod::UI
 					return { "Launches this class of craft from your hangar into the fight.", "The craft of that class aboard, as the deck sends them out.",
 						"Until they are recalled, lost or out of fuel and ammunition." };
 				case HelmAbility::RecallWing:
-					return { "Calls every craft of your wing back aboard to rearm and repair.", "Your own wing.", "Until they are aboard." };
+					return { "Calls every craft of your wing back aboard to rearm and repair.", "Your own wing.", "Until you launch them again." }; // US-T401
 				case HelmAbility::WingAttack:
 					return { "Sends your wing onto the hull you have locked.", "Your own wing.", "Until you give the wing another call." };
 				case HelmAbility::WingGuard:
@@ -1708,8 +1708,8 @@ namespace SpaceGod::UI
 				case HelmAbility::DemandSurrender:
 					return { "Hails the locked hull to strike; its crew weigh damage, odds and nerve, and strike, run or refuse.",
 						"The locked hostile hull's crew.", "Answered at once; 20 seconds before you can hail again." };
-				case HelmAbility::BoardIt:
-					return { "Your boarders go for the locked hull once it is disabled or has struck: carriers send shuttle teams, marine hulls close to board.",
+				case HelmAbility::BoardIt: // US-T401: stunned hulls open too (Battle::OpenPrize)
+					return { "Your boarders go for the locked hull once it is disabled, stunned long enough or has struck open to boarding: carriers send shuttle teams, marine hulls close to board.",
 						"Boarders of your side within command reach.", "Until the prize is taken or no longer open to boarding." };
 				default:
 					return {};
