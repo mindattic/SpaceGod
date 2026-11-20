@@ -500,7 +500,7 @@ namespace SpaceGod
 		if (UpdateEncyclopediaKeys()) Input.Handover(); // US-T271: the Encyclopedia's search has the keys while typed in
 		if (UpdateSocietyKeys()) Input.Handover(); // US-T298: so does the Society screen's
 		if (UpdateDiscoveriesKeys()) Input.Handover(); // US-T301: so does the discoveries screen's
-		if (hud != nullptr && hud->UpdateGalaxyMapKeys()) Input.Handover(); // US-T306: and the galaxy map's find
+		if (hud != nullptr && hud->UpdateGalaxyMapKeys(!cheatMenu->IsOpen && !commsOpen)) Input.Handover(); // US-T306: and the galaxy map's find; US-T402: its pin keys only while the keys are free
 		if (hud != nullptr && hud->UpdateSystemMapKeys()) Input.Handover(); // US-T310: and the system map's
 		if (hud != nullptr && hud->UpdateHelpKeys()) Input.Handover(); // US-T346: the Help screen's and its ship catalog's step keys, while held
 		if (hud != nullptr && hud->UpdateLogsKeys()) Input.Handover(); // US-T349: and the recovered logs screen's

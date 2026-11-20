@@ -111,10 +111,11 @@ namespace SpaceGod::UI
 		/// pins the system picked to that slot (again on the same one: unpins it), a plain 1..9 picks the pinned system and
 		/// centres the map on it. True when the game's input is the map's this frame: a pin key used, or Ctrl held (so the
 		/// flight under the map neither drops a mine nor slows on a Ctrl+digit).
-		bool PinKeys();
+		/// US-T402: false while the keys are not free (the comms panel or the dev menu is up).
+		bool PinKeys(bool keysFree);
 		/// US-T393: Home while the map is up (not travelling, not typing in the find, no modifier held) centres the map on the
 		/// system you are in, as the Here button does. True on the frame it was used (the owner hands the game's input over).
-		bool HereKey();
+		bool HereKey(bool keysFree);
 
 	private:
 		/// US-T393: the map centred on the system you are in (the Here button, Home), the pan zeroed as a find's GoTo does.

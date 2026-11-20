@@ -1989,7 +1989,7 @@ namespace SpaceGod::UI
 		return UiStyle::Flat(fill, edge);
 	}
 
-	bool Hud::UpdateGalaxyMapKeys()
+	bool Hud::UpdateGalaxyMapKeys(bool keysFree)
 	{
 		if (!galaxyMap) return false;
 		if (!app->ShowGalaxyMap || app->Travel->Active)
@@ -1997,7 +1997,8 @@ namespace SpaceGod::UI
 			galaxyMap->Closed();
 			return false;
 		}
-		return galaxyMap->Typing() || galaxyMap->PinKeys() || galaxyMap->HereKey(); // US-T377: and its pin keys; US-T393: Home, here
+		// US-T402: the pin and Here keys read the keyboard directly, so they stand aside under comms or the dev menu.
+		return galaxyMap->Typing() || galaxyMap->PinKeys(keysFree) || galaxyMap->HereKey(keysFree); // US-T377: and its pin keys; US-T393: Home, here
 	}
 
 	bool Hud::UpdateSystemMapKeys()

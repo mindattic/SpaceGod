@@ -105,9 +105,9 @@ namespace SpaceGod::UI
 		pan = Vector2::zero();
 	}
 
-	bool GalaxyMapScreen::PinKeys()
+	bool GalaxyMapScreen::PinKeys(bool keysFree)
 	{
-		if (!app->ShowGalaxyMap || app->Travel->Active || finding) return false;
+		if (!keysFree || !app->ShowGalaxyMap || app->Travel->Active || finding) return false; // US-T402: not under comms or the dev menu
 		using Key = ::SpaceGod::Input::Key;
 		const ::SpaceGod::Input::InputDevice& kb = ::SpaceGod::Input::InputDevice::current();
 		auto held = [&](Key a, Key b) { return kb[a].isPressed || kb[b].isPressed; };
@@ -140,9 +140,9 @@ namespace SpaceGod::UI
 		pan = Vector2::zero();
 	}
 
-	bool GalaxyMapScreen::HereKey()
+	bool GalaxyMapScreen::HereKey(bool keysFree)
 	{
-		if (!app->ShowGalaxyMap || app->Travel->Active || finding) return false;
+		if (!keysFree || !app->ShowGalaxyMap || app->Travel->Active || finding) return false; // US-T402
 		using Key = ::SpaceGod::Input::Key;
 		const ::SpaceGod::Input::InputDevice& kb = ::SpaceGod::Input::InputDevice::current();
 		if (!kb[Key::Home].wasPressedThisFrame) return false;
