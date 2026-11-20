@@ -127,6 +127,31 @@ namespace SpaceGod::UI
 		return ctrl;
 	}
 
+	void GalaxyMapScreen::CentreOnHere()
+	{
+		// US-T393: where you are, in the middle (the zoom kept), as the system map's HERE does.
+		auto here = app->ActiveSystem;
+		if (here == nullptr)
+		{
+			app->ShowToast("No system around you to centre on");
+			return;
+		}
+		centreLy = here->PositionLy;
+		pan = Vector2::zero();
+	}
+
+	bool GalaxyMapScreen::HereKey()
+	{
+		if (!app->ShowGalaxyMap || app->Travel->Active || finding) return false;
+		using Key = ::SpaceGod::Input::Key;
+		const ::SpaceGod::Input::InputDevice& kb = ::SpaceGod::Input::InputDevice::current();
+		if (!kb[Key::Home].wasPressedThisFrame) return false;
+		auto held = [&](Key a, Key b) { return kb[a].isPressed || kb[b].isPressed; };
+		if (held(Key::LeftShift, Key::RightShift) || held(Key::LeftCtrl, Key::RightCtrl) || held(Key::LeftAlt, Key::RightAlt)) return false;
+		CentreOnHere();
+		return true;
+	}
+
 	void GalaxyMapScreen::DrawPins(Rect canvas)
 	{
 		if (!pinsLoaded) LoadPins();

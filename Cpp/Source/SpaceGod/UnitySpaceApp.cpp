@@ -493,6 +493,7 @@ namespace SpaceGod
 		if (hud != nullptr && hud->UpdateBattlePlotKey(!cheatMenu->IsOpen && !commsOpen)) Input.Handover(); // US-T367: Shift+F10, the battle plot on or off
 		if (hud != nullptr && hud->UpdateTradeKeys(!cheatMenu->IsOpen && !commsOpen)) Input.Handover(); // US-T329: the trade desk's Tab / PgUp / PgDn, on the frame pressed
 		if (hud != nullptr && hud->UpdateMechlabKeys(!cheatMenu->IsOpen && !commsOpen)) Input.Handover(); // US-T331: the Mechlab's arrows and Enter, on the frame pressed
+		if (hud != nullptr && hud->UpdateListKeys(!cheatMenu->IsOpen && !commsOpen)) Input.Handover(); // US-T393: the picker's and the save panel's Up / Down / Enter
 		if (UpdatePortKeys(!cheatMenu->IsOpen && !commsOpen)) Input.Handover(); // US-T335: the port screen's 1-9 / 0 tabs, on the frame pressed
 		UpdateInfluence(); // US-T140: the embody gate's world, this frame
 		if (Tour::ShowcaseTour::Update(*this, !cheatMenu->IsOpen)) Input.Handover(); // US-T147: the showcase tour has the keys while it runs

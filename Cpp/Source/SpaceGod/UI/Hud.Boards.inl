@@ -131,6 +131,11 @@ public:
 	/// <paramref name="keysFree"/>: no other panel has the keys this frame. True on a frame one was taken (the caller hands
 	/// input over, so the arrows' power routing and the rest under them do not also go off).</summary>
 	bool UpdateMechlabKeys(bool keysFree);
+	/// <summary>US-T393: the take-charge picker's (F9) and the save panel's (F6) keys while one is on screen: Up / Down move a
+	/// cursor through the seats or the slots, Enter takes the seat or loads the slot. <paramref name="keysFree"/>: no other
+	/// panel has the keys this frame. True on a frame one was taken (the caller hands input over: the arrows are reactor
+	/// power and Enter the FTL spool under them).</summary>
+	bool UpdateListKeys(bool keysFree);
 
 private:
 
@@ -297,6 +302,14 @@ private:
 	// ---------------------------------------------------------------- the take-charge picker (U.SPC-T446)
 
 	Vector2 pickerScroll;
+
+	/// <summary>US-T393: the take-charge picker's and the save panel's keys, read in <see cref="UpdateListKeys"/> and acted on
+	/// by the next draw (which has the rows): rows to step, whether Enter takes the row under the cursor, the cursor (-1 until a
+	/// key moves it), and the frame each last drew (its keys are live only while it is on screen).</summary>
+	int pickerStep = 0, pickerCursor = -1, pickerDrawnFrame = -10;
+	bool pickerEnterKey = false;
+	int savesStep = 0, savesCursor = -1, savesDrawnFrame = -10;
+	bool savesEnterKey = false;
 
 	/// <summary>
 	/// The take-charge picker (F9): every seat the player could take now, from <see cref="UnitySpaceApp.PickerSeats"/>

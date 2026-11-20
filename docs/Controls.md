@@ -152,6 +152,8 @@ reverses the sky cycle. A plain key never changes meaning with Shift unless the 
 | Society screen | Shift+G | anywhere | - |
 | Galaxy map: find a system or star | Ctrl+F, then Up / Down / Enter (US-T306) | galaxy map | the field at the map's top left |
 | Galaxy map: pin the system picked (again: unpin) / go to a pin | Ctrl+1..9 / 1..9 (US-T377; not while typing in the find; Ctrl held over the map drops no mine) | galaxy map | the PINS panel at the map's bottom left |
+| Galaxy map: centre on the system you are in | Home (US-T393; not while typing in the find) | galaxy map | the Here button by Reset |
+| Take-charge picker / save panel: move through the seats or slots, take the seat or load the slot | Up / Down, Enter (US-T393) | picker (F9) / save panel (F6) | the row clicked |
 | System map: find a world, station, gate, ship or field | Ctrl+F, then Up / Down / Enter (US-T310) | system map | the field at the map's top left |
 | Quicksave / quickload / slots | F5 / F8 / F6 | anywhere | pause menu > Save / Load |
 | Rewind (again within a few seconds: further back) | Shift+F8 (US-T99) | anywhere | sg.Rewind |

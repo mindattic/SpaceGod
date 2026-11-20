@@ -302,6 +302,21 @@ namespace SpaceGod::UI
 		constexpr float w = 760, rowH = 24;
 		float listH = Mathf::Min(saveNames->Count(), 14) * rowH;
 		float h = 116 + listH;
+		// US-T393: the keys read in UpdateListKeys, applied here where the slots are; a fresh opening forgets the cursor.
+		int slotCount = saveNames->Count();
+		if (savesDrawnFrame < Time::frameCount - 1) savesCursor = -1;
+		savesDrawnFrame = Time::frameCount;
+		if (savesStep != 0 && slotCount > 0)
+		{
+			savesCursor = savesCursor < 0 || savesCursor >= slotCount ? (savesStep > 0 ? 0 : slotCount - 1)
+				: Mathf::Clamp(savesCursor + savesStep, 0, slotCount - 1);
+			if (savesCursor * rowH < savesScroll.y) savesScroll.y = savesCursor * rowH;
+			else if ((savesCursor + 1) * rowH > savesScroll.y + listH) savesScroll.y = (savesCursor + 1) * rowH - listH;
+		}
+		savesStep = 0;
+		if (savesCursor >= slotCount) savesCursor = -1;
+		bool loadKeyed = savesEnterKey;
+		savesEnterKey = false;
 		auto r = Panel(Rect((Screen::width - w) * 0.5f, Mathf::Min(170.0f, Screen::height - h - 20), w, h));
 		GUI::Label(Rect(r.x + 12, r.y + 6, w - 60, 22), cs::Cat("SAVE & LOAD  ·  ", cs::Strings::ToUpperInvariant(ActiveProfile::Current()->Name)), title);
 		if (GUI::Button(Rect(r.xMax() - 34, r.y + 6, 24, 22), "X", button)) app->ShowSaves = false;
@@ -310,8 +325,8 @@ namespace SpaceGod::UI
 		cs::String blocked = app->SaveBlocker();
 		GUI::Label(Rect(r.x + 12, r.y + 30, w - 24, 18), !blocked.empty() ? blocked :
 			PlayerOptions::AutosaveSeconds() > 0 // US-T252: Settings > Gameplay > Autosave
-				? cs::Cat(SaveKeysHint(), "   ·   autosaves every ", cs::Fmt(PlayerOptions::AutosaveSeconds() / 60.0f, "0"), " minutes and on quit")
-				: cs::Cat(SaveKeysHint(), "   ·   autosaves on quit (Settings > Gameplay)"), small);
+				? cs::Cat(SaveKeysHint(), "   Up / Down, Enter load   ·   autosaves every ", cs::Fmt(PlayerOptions::AutosaveSeconds() / 60.0f, "0"), " minutes and on quit") // US-T393
+				: cs::Cat(SaveKeysHint(), "   Up / Down, Enter load   ·   autosaves on quit (Settings > Gameplay)"), small);
 		GUI::contentColor = old;
 
 		bool enabled = GUI::enabled;
@@ -333,7 +348,7 @@ namespace SpaceGod::UI
 			cs::String slot = (*saveNames)[i];
 			auto hdr = saveHeaders[i];
 			auto row0 = Rect(0, i * rowH, content.width, rowH - 2);
-			GUI::Box(row0, GUIContent::none(), row);
+			GUI::Box(row0, GUIContent::none(), i == savesCursor ? rowSelected : row); // US-T393: the keys' cursor
 			GUI::Label(Rect(row0.x + 6, row0.y + 2, 150, 18), UnitySpaceApp::SaveTitle(slot, hdr), text);
 			GUI::contentColor = hdr == nullptr ? Dim : Color::white();
 			cs::String line = hdr == nullptr ? cs::String("empty") : cs::Cat(UnitySpaceApp::DescribeSave(hdr), "   ·   saved ", hdr->SavedUtc.ToLocalTime().ToString("MMM d HH:mm"));
@@ -363,6 +378,18 @@ namespace SpaceGod::UI
 			}
 		}
 		GUI::EndScrollView();
+		// US-T393: Enter loads the slot under the cursor, as its Load button does (and not while the buttons are held back).
+		if (loadKeyed && savesCursor >= 0 && savesCursor < slotCount)
+		{
+			cs::String keyedSlot = (*saveNames)[savesCursor];
+			if (!blocked.empty()) app->ShowToast(blocked);
+			else if (saveHeaders[savesCursor] == nullptr) app->ShowToast(cs::Cat(UnitySpaceApp::SaveTitle(keyedSlot, nullptr), " is empty: nothing to load"));
+			else
+			{
+				app->RequestLoad(keyedSlot);
+				deleteArmed.clear();
+			}
+		}
 	}
 
 	// ---------------------------------------------------------------- world overlay
@@ -1956,7 +1983,7 @@ namespace SpaceGod::UI
 			galaxyMap->Closed();
 			return false;
 		}
-		return galaxyMap->Typing() || galaxyMap->PinKeys(); // US-T377: and its pin keys
+		return galaxyMap->Typing() || galaxyMap->PinKeys() || galaxyMap->HereKey(); // US-T377: and its pin keys; US-T393: Home, here
 	}
 
 	bool Hud::UpdateSystemMapKeys()

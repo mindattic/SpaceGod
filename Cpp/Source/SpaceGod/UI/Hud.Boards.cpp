@@ -58,6 +58,7 @@
 #include "Systems/InterstellarTraffic.h"
 #include "UI/Icons.h" // US-T263: the market board's sparklines
 #include "Input/KeyBindings.h" // US-T390
+#include "Input/InputDevice.h" // US-T393
 
 using namespace SpaceGod::Core;
 
@@ -1865,12 +1866,58 @@ namespace SpaceGod::UI
 
 	// ---------------------------------------------------------------- the take-charge picker (U.SPC-T446)
 
+	bool Hud::UpdateListKeys(bool keysFree)
+	{
+		// US-T393: the picker (drawn over the rest) first, else the save panel; each only while it drew last frame.
+		if (!keysFree) return false;
+		int* step = nullptr;
+		bool* enter = nullptr;
+		if (app->ShowPicker && pickerDrawnFrame >= Time::frameCount - 1)
+		{
+			step = &pickerStep;
+			enter = &pickerEnterKey;
+		}
+		else if (app->ShowSaves && savesDrawnFrame >= Time::frameCount - 1)
+		{
+			step = &savesStep;
+			enter = &savesEnterKey;
+		}
+		else return false;
+		const ::SpaceGod::Input::InputDevice& kb = ::SpaceGod::Input::InputDevice::current();
+		using Key = ::SpaceGod::Input::Key;
+		auto pressed = [&](Key k) { return kb[k].wasPressedThisFrame; };
+		if (pressed(Key::DownArrow)) { (*step)++; return true; }
+		if (pressed(Key::UpArrow)) { (*step)--; return true; }
+		if (pressed(Key::Enter) || pressed(Key::NumpadEnter)) { *enter = true; return true; }
+		return false;
+	}
+
 	void Hud::DrawPicker()
 	{
 		auto seats = app->PickerSeats();
 		auto held = app->HeldSeat();
 		constexpr float w = 560, rowH = 22;
 		float listH = Mathf::Clamp(seats.Count() * rowH, rowH, 360.0f);
+		// US-T393: the keys read in UpdateListKeys, applied here where the seats are: the cursor starts on the seat held (else
+		// the first or the last), then steps; a fresh opening forgets it.
+		if (pickerDrawnFrame < Time::frameCount - 1) pickerCursor = -1;
+		pickerDrawnFrame = Time::frameCount;
+		if (pickerStep != 0 && seats.Count() > 0)
+		{
+			if (pickerCursor < 0 || pickerCursor >= seats.Count())
+			{
+				pickerCursor = pickerStep > 0 ? 0 : seats.Count() - 1;
+				for (int i = 0; i < seats.Count(); i++)
+					if (EmbodiableEquals(seats[i], held)) pickerCursor = i;
+			}
+			else pickerCursor = Mathf::Clamp(pickerCursor + pickerStep, 0, seats.Count() - 1);
+			if (pickerCursor * rowH < pickerScroll.y) pickerScroll.y = pickerCursor * rowH;
+			else if ((pickerCursor + 1) * rowH > pickerScroll.y + listH) pickerScroll.y = (pickerCursor + 1) * rowH - listH;
+		}
+		pickerStep = 0;
+		if (pickerCursor >= seats.Count()) pickerCursor = -1;
+		bool takeKeyed = pickerEnterKey;
+		pickerEnterKey = false;
 		auto r = Panel(Rect((Screen::width - w) * 0.5f, 110, w, 64 + listH + 24));
 		GUI::Label(Rect(r.x + 12, r.y + 6, w - 24, 22), cs::Cat("TAKE CHARGE  ·  ", seats.Count(), seats.Count() == 1 ? " seat" : " seats"), title);
 		auto old = GUI::contentColor;
@@ -1893,7 +1940,13 @@ namespace SpaceGod::UI
 			bool mounted = s->Host() != nullptr && EmbodiableIndexOf(seats, s->Host()) >= 0;
 			auto rr = Rect(0, i * rowH, w - 36, rowH - 2);
 			GUI::contentColor = Color::white();
-			if (GUI::Button(rr, GUIContent::none(), isHeld ? rowSelected : row)) chosen = s;
+			bool cursor = i == pickerCursor; // US-T393
+			if (GUI::Button(rr, GUIContent::none(), isHeld || cursor ? rowSelected : row)) chosen = s;
+			if (cursor)
+			{
+				GUI::contentColor = Color(1.0f, 0.82f, 0.4f, 1.0f);
+				GUI::Label(Rect(rr.xMax() - 20, rr.y + 2, 18, 18), "\xE2\x97\x80", small);
+			}
 			auto fc = s->Faction() != nullptr ? Color(s->Faction()->Color.R, s->Faction()->Color.G, s->Faction()->Color.B) : Dim;
 			GUI::contentColor = fc;
 			float x = mounted ? 22.0f : 6.0f;
@@ -1905,9 +1958,11 @@ namespace SpaceGod::UI
 		}
 		GUI::EndScrollView();
 		GUI::contentColor = Dim;
-		GUI::Label(Rect(r.x + 12, r.yMax() - 22, 300, 18), cs::Cat("Click a seat to take it.   ", BoundKeys(::SpaceGod::Input::KeyAction::Picker), " or Esc to close"), small); // US-T390
+		GUI::Label(Rect(r.x + 12, r.yMax() - 22, w - 200, 18), cs::Cat("Click a seat, or Up / Down and Enter, to take it.   ", // US-T393
+			BoundKeys(::SpaceGod::Input::KeyAction::Picker), " or Esc to close"), small); // US-T390
 		GUI::contentColor = old;
 		if (app->AtControls() && GUI::Button(Rect(r.xMax() - 172, r.yMax() - 24, 160, 20), "Back to command (P)", button)) app->PickCommand();
+		if (chosen == nullptr && takeKeyed && pickerCursor >= 0 && pickerCursor < seats.Count()) chosen = seats[pickerCursor]; // US-T393: Enter
 		if (chosen != nullptr) app->PickSeat(chosen);
 	}
 

@@ -112,8 +112,13 @@ namespace SpaceGod::UI
 		/// centres the map on it. True when the game's input is the map's this frame: a pin key used, or Ctrl held (so the
 		/// flight under the map neither drops a mine nor slows on a Ctrl+digit).
 		bool PinKeys();
+		/// US-T393: Home while the map is up (not travelling, not typing in the find, no modifier held) centres the map on the
+		/// system you are in, as the Here button does. True on the frame it was used (the owner hands the game's input over).
+		bool HereKey();
 
 	private:
+		/// US-T393: the map centred on the system you are in (the Here button, Home), the pan zeroed as a find's GoTo does.
+		void CentreOnHere();
 		/// US-T377: the pinned systems by slot (1..9 at 0..8), by name; empty for a free slot. Saved in the profile
 		/// (galaxyMapPins), not the game save: the view's, so nothing is sent in co-op and the Bench is unchanged.
 		static constexpr int PinSlots = 9;

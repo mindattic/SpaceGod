@@ -487,7 +487,8 @@ namespace SpaceGod::UI
 			diplomacyMode = false;
 			reportAt = -10.0f;
 		}
-		if (GUI::Button(Rect(r.xMax() - 210, r.y + 10, 120, 26), "Reset view", button)) fitted = false;
+		if (GUI::Button(Rect(r.xMax() - 210, r.y + 10, 52, 26), "Here", button)) CentreOnHere(); // US-T393: Home too
+		if (GUI::Button(Rect(r.xMax() - 154, r.y + 10, 64, 26), "Reset", button)) fitted = false;
 		if (GUI::Button(Rect(r.xMax() - 82, r.y + 10, 72, 26), "Close", button)) app->ShowGalaxyMap = false;
 	}
 
