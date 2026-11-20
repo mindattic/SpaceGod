@@ -575,6 +575,7 @@ namespace SpaceGod::Core
 	{
 		able = 0;
 		if (u == nullptr || u->Combat == nullptr) return "no hull at the helm";
+		if (!InTheFight(u)) return "the hull is out of the fight"; // US-T397
 		cs::String why = LockedPrize(*this, u, target);
 		if (!why.empty()) return why;
 		if (target->Kind != UnitKind::Ship || target->Combat == nullptr) return "only a ship can be boarded";

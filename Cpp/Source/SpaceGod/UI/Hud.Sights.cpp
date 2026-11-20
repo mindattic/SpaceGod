@@ -201,7 +201,7 @@ namespace SpaceGod::UI
 				a.Ringed = isLock;
 				a.Label = isLock ? cs::Cat(o->Name(), "  ", RangeText(a.Km)) : cs::String();
 				// US-T380: a hostile hull lying open to boarding says so on its arrow.
-				if (hostile && Battle::OpenPrize(o)) a.Label = cs::Cat(a.Label.empty() ? RangeText(a.Km) : a.Label, "  OPEN PRIZE");
+				if (hostile && o->Kind == UnitKind::Ship && Battle::OpenPrize(o)) a.Label = cs::Cat(a.Label.empty() ? RangeText(a.Km) : a.Label, "  OPEN PRIZE");
 				items.Add(a);
 			}
 		}

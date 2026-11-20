@@ -228,7 +228,7 @@ namespace SpaceGod::UI
 		int patchRows = static_cast<int>((patches.size() + 1) / 2);
 		bool weakLine = fighterSeat || weak != nullptr;
 		bool focusLine = battle->Hostile(me, t); // US-T339: how many of ours are on it, and how long it has left
-		bool prize = focusLine && Battle::OpenPrize(t); // US-T380: stunned, and whether it lies open to boarding
+		bool prize = focusLine && t->Kind == UnitKind::Ship && Battle::OpenPrize(t); // US-T380: stunned, and whether it lies open to boarding
 		bool stunLine = t->Stunned > 0 || prize;
 		bool threatLine = focusLine; // US-T381: which of its batteries bear on you
 
@@ -328,6 +328,7 @@ namespace SpaceGod::UI
 			cs::String nerve;
 			Color nerveTint = Dim;
 			if (t->Surrendering) { nerve = "CREW  \xC2\xB7  struck"; nerveTint = LockColor; }
+			else if (t->Fleeing) nerve = "CREW  \xC2\xB7  running"; // US-T397: a crew already breaking off is not steady
 			else
 			{
 				auto outcome = battle->DemandOutcome(t);

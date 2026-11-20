@@ -1193,7 +1193,7 @@ namespace SpaceGod::UI
 			cs::String state = made ? cs::String("LOCKED") : cs::Cat("LOCKING ", Mathf::RoundToInt(static_cast<float>(me->LockProgress) * 100), "%");
 			WorldLabels wl(worldLabelPass); // US-T214
 			DrawLabel(cs::Cat(state, "  ", RangeText((locked->Pos - me->Pos).Length()),
-				Battle::OpenPrize(locked) && battle->Hostile(me, locked) ? cs::String("  OPEN PRIZE") : cs::String()), // US-T380
+				locked->Kind == UnitKind::Ship && Battle::OpenPrize(locked) && battle->Hostile(me, locked) ? cs::String("  OPEN PRIZE") : cs::String()), // US-T380
 				lp + Vector2(half + 6, -8), made ? LockColor : HostileColor, true);
 			// US-T381: how many of your weapons reach it at this range, and how far short the nearest of the rest falls. Read only.
 			if (c != nullptr && battle->Hostile(me, locked))
@@ -1226,7 +1226,7 @@ namespace SpaceGod::UI
 		// is seen before it is locked.
 		for (const auto& o : battle->Units)
 		{
-			if (o == me || o == locked || !o->Present() || o->Captured || !battle->Hostile(me, o) || !Battle::OpenPrize(o)) continue;
+			if (o == me || o == locked || o->Kind != UnitKind::Ship || !o->Present() || o->Captured || !battle->Hostile(me, o) || !Battle::OpenPrize(o)) continue; // US-T397: ships only
 			Vector2 op;
 			float od = 0;
 			if (!app->ToGui(app->BattleScene(battle, o->Pos), op, od)) continue;
