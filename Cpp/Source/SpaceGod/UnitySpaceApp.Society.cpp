@@ -14,6 +14,7 @@
 #include "Systems/Civilization/Civilization.h"
 #include "Systems/Civilization/Narrator.h"
 #include "Systems/Galaxy.h"
+#include "Systems/Society.h" // US-T408
 #include "UI/SocietyScreen.h"
 
 #include "HAL/PlatformTime.h"
@@ -105,6 +106,18 @@ namespace SpaceGod
 		return at == societyTrends.end() || at->second.empty() ? nullptr : &at->second;
 	}
 
+	const std::vector<UnitySpaceApp::SocietyFortuneSample>* UnitySpaceApp::HouseFortuneOf(int id) const // US-T408
+	{
+		auto at = houseFortunes.find(id);
+		return at == houseFortunes.end() || at->second.empty() ? nullptr : &at->second;
+	}
+
+	const std::vector<UnitySpaceApp::SocietyFortuneSample>* UnitySpaceApp::FirmFortuneOf(int id) const // US-T408
+	{
+		auto at = firmFortunes.find(id);
+		return at == firmFortunes.end() || at->second.empty() ? nullptr : &at->second;
+	}
+
 	void UnitySpaceApp::UpdateSocietyTrends()
 	{
 		auto civ = Galaxy != nullptr && Clock != nullptr ? Civilization::Find(*Galaxy) : nullptr;
@@ -115,6 +128,8 @@ namespace SpaceGod
 		{
 			trendCiv = civ.get();
 			societyTrends.clear();
+			houseFortunes.clear(); // US-T408
+			firmFortunes.clear();
 			trendNextJd = -1e18;
 		}
 		// A rewind: what was sampled after the day rewound to has not happened (yet).
@@ -122,6 +137,9 @@ namespace SpaceGod
 		{
 			for (auto& [name, samples] : societyTrends)
 				samples.erase(std::remove_if(samples.begin(), samples.end(), [jd](const SocietyTrendSample& s) { return s.Jd > jd; }), samples.end());
+			for (auto* fortunes : { &houseFortunes, &firmFortunes }) // US-T408
+				for (auto& [id, samples] : *fortunes)
+					samples.erase(std::remove_if(samples.begin(), samples.end(), [jd](const SocietyFortuneSample& s) { return s.Jd > jd; }), samples.end());
 			trendNextJd = jd;
 		}
 		if (jd < trendNextJd) return;
@@ -133,6 +151,20 @@ namespace SpaceGod
 			samples.push_back(SocietyTrendSample{ jd, c->Approval, c->Where->Unrest, c->Crime, c->Infected, c->Weariness });
 			if (static_cast<int>(samples.size()) > SocietyTrendMax) samples.erase(samples.begin());
 		}
+		// US-T408: every standing house's wealth and every trading firm's capital and month, read only (a house scattered or a
+		// firm ended keeps the samples it had).
+		if (Galaxy == nullptr) return;
+		auto society = Society::Find(*Galaxy);
+		if (society == nullptr) return;
+		auto keep = [jd](std::vector<SocietyFortuneSample>& samples, double value, double earned)
+		{
+			samples.push_back(SocietyFortuneSample{ jd, value, earned });
+			if (static_cast<int>(samples.size()) > SocietyTrendMax) samples.erase(samples.begin());
+		};
+		for (const auto& h : society->Houses)
+			if (h != nullptr && !h->Scattered) keep(houseFortunes[h->Id], h->Wealth, 0);
+		for (const auto& b : society->Businesses)
+			if (b != nullptr && b->Status == BusinessStatus::Trading) keep(firmFortunes[b->Id], b->Capital, b->LastMonth);
 	}
 
 	bool UnitySpaceApp::IsWatched(const CivPick& p) const

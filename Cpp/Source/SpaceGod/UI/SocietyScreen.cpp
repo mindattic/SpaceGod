@@ -2354,6 +2354,8 @@ namespace SpaceGod::UI
 		float trendsH = showTrends ? DrawTrends(0, w, selected.Name, civ, jd, false) : 0.0f;
 		CivPick powerFollow; // US-T378: who holds the world's wealth and strength
 		trendsH += showTrends ? DrawPower(0, w, selected.Name, galaxy, civ, false, powerFollow) : 0.0f;
+		bool showFortunes = event == nullptr && (selected.Kind == CivPickKind::House || selected.Kind == CivPickKind::Business); // US-T408
+		trendsH += showFortunes ? DrawFortunes(0, w, selected, galaxy, civ, jd, false) : 0.0f;
 		bool showFamily = event == nullptr && selected.Kind == CivPickKind::House; // US-T315
 		CivPick familyFollow;
 		float familyH = showFamily ? DrawFamily(0, w, selected.Id, galaxy, jd, false, familyFollow) : 0.0f;
@@ -2407,6 +2409,7 @@ namespace SpaceGod::UI
 		y += SectionGap;
 		if (showTrends) y += DrawTrends(y, w, selected.Name, civ, jd, true);
 		if (showTrends) y += DrawPower(y, w, selected.Name, galaxy, civ, true, powerFollow);
+		if (showFortunes) y += DrawFortunes(y, w, selected, galaxy, civ, jd, true); // US-T408
 		if (showFamily) y += DrawFamily(y, w, selected.Id, galaxy, jd, true, familyFollow);
 		if (showChronicle) y += DrawChronicle(y, w, galaxy, civ, true, chronicleFollow);
 		if (showTree) y += DrawFamilyTree(y, w, selected.Id, galaxy, jd, true, treeFollow);
@@ -2782,6 +2785,118 @@ namespace SpaceGod::UI
 			y += TrendRowH;
 		}
 		GUI::Label(Rect(0, y, w, 18), "Bars run oldest to newest; the brightest is today.", small);
+		return h;
+	}
+
+	float SocietyScreen::DrawFortunes(float y, float w, const CivPick& p, Galaxy& galaxy, Civilization& civ, double jd, bool draw)
+	{
+		// US-T408: a house's wealth, or a business's capital and month, over the samples the game took (UpdateSocietyTrends),
+		// each row scaled to its own largest value; read only.
+		static constexpr float FortuneRowH = 26, BarH = 20, LabelW = 120, DeltaW = 190;
+		bool isHouse = p.Kind == CivPickKind::House;
+		if (!isHouse && p.Kind != CivPickKind::Business) return 0;
+		auto society = Society::Find(galaxy);
+		if (society == nullptr) return 0;
+		cs::Ref<Household> house = isHouse ? society->HouseById(p.Id) : nullptr;
+		cs::Ref<Business> firm = isHouse ? nullptr : society->BusinessById(p.Id);
+		if (house == nullptr && firm == nullptr) return 0;
+		const auto* sampled = isHouse ? app->HouseFortuneOf(p.Id) : app->FirmFortuneOf(p.Id);
+		int rowsN = isHouse ? 1 : 2;
+		float h = HeadingH + (sampled == nullptr ? 24.0f : rowsN * FortuneRowH + 20) + SectionGap;
+		if (!draw) return h;
+
+		// The samples, then today's as the last bar (a firm that has closed has no today).
+		std::vector<UnitySpaceApp::SocietyFortuneSample> bars;
+		if (sampled != nullptr) bars = *sampled;
+		bool standing = isHouse ? !house->Scattered : firm->Status == BusinessStatus::Trading;
+		if (standing && (bars.empty() || jd - bars.back().Jd > 1))
+			bars.push_back(UnitySpaceApp::SocietyFortuneSample{ jd, isHouse ? house->Wealth : firm->Capital, isHouse ? 0.0 : firm->LastMonth });
+
+		// The steered events about it (fund, run, takeover and the rest), found once per change of the feed.
+		int n = civ.Events.Count();
+		int lastId = n > 0 && civ.Events[n - 1] != nullptr ? civ.Events[n - 1]->Id : 0;
+		cs::String key = cs::Cat(static_cast<int>(p.Kind), "|", p.Id, "|", n, "|", lastId);
+		if (key != fortuneKey)
+		{
+			fortuneKey = key;
+			fortuneSteeredJd.clear();
+			for (int i = 0; i < n; i++)
+			{
+				const auto& e = civ.Events[i];
+				if (e != nullptr && e->Steered && e->Jd > 0 && About(*e, p)) fortuneSteeredJd.push_back(e->Jd);
+			}
+		}
+
+		GUI::Label(Rect(0, y, w, HeadingH - 4), sampled == nullptr ? cs::String("FORTUNES")
+			: cs::Cat("FORTUNES  (every ", static_cast<int>(UnitySpaceApp::SocietyTrendDays), " days since ", SocietyDate(sampled->front().Jd), ")"), heading);
+		y += HeadingH;
+		if (sampled == nullptr || bars.empty())
+		{
+			GUI::Label(Rect(0, y, w, 20), cs::Cat(isHouse ? "Its wealth" : "Its capital and earnings", " are sampled every ",
+				static_cast<int>(UnitySpaceApp::SocietyTrendDays), " days while you play (not kept in saves); the first sample comes with the next."), small);
+			return h;
+		}
+		auto money = [](double v) { return v < 0 ? cs::Cat("-", Narrator::Money(-v)) : Narrator::Money(v); };
+		float chartW = Mathf::Max(60.0f, w - LabelW - DeltaW - 16);
+		float slot = chartW / static_cast<float>(UnitySpaceApp::SocietyTrendMax + 1);
+		float barW = Mathf::Max(2.0f, slot - 2);
+		Color keepColor = GUI::color;
+		for (int row = 0; row < rowsN; row++)
+		{
+			bool earned = row == 1; // a firm's month: signed, from a middle line
+			GUI::Label(Rect(0, y + 2, LabelW, 20), isHouse ? "Wealth" : earned ? "Month's earnings" : "Capital", text);
+			float x0 = LabelW;
+			GUI::color = Color(UiStyle::Edge.r, UiStyle::Edge.g, UiStyle::Edge.b, 0.25f);
+			GUI::DrawTexture(Rect(x0, y + 2, chartW, BarH), Texture2D::whiteTexture());
+			double top = 0;
+			for (const auto& b : bars) top = std::max(top, std::fabs(earned ? b.Earned : b.Value));
+			float mid = y + 2 + BarH * 0.5f, baseY = y + 2 + BarH;
+			if (earned)
+			{
+				GUI::color = UiStyle::Edge;
+				GUI::DrawTexture(Rect(x0, mid, chartW, 1), Texture2D::whiteTexture());
+			}
+			for (size_t i = 0; i < bars.size(); i++)
+			{
+				double v = earned ? bars[i].Earned : bars[i].Value;
+				bool last = i + 1 == bars.size();
+				float frac = top > 0 ? Mathf::Clamp(static_cast<float>(std::fabs(v) / top), 0.0f, 1.0f) : 0.0f;
+				Color c = earned ? (v >= 0 ? UiStyle::Good : UiStyle::Danger) : UiStyle::Accent;
+				GUI::color = Color(c.r, c.g, c.b, last ? 1.0f : 0.6f);
+				float x = x0 + static_cast<float>(i) * slot + 1;
+				if (earned)
+				{
+					float bh = Mathf::Max(1.0f, frac * BarH * 0.5f);
+					GUI::DrawTexture(Rect(x, v >= 0 ? mid - bh : mid, barW, bh), Texture2D::whiteTexture());
+				}
+				else
+				{
+					float bh = Mathf::Max(1.0f, frac * BarH);
+					GUI::DrawTexture(Rect(x, baseY - bh, barW, bh), Texture2D::whiteTexture());
+				}
+				// Your hand's mark: a steered event about it since the bar before (on the top row only).
+				if (row == 0)
+				{
+					double from = i == 0 ? -1e18 : bars[i - 1].Jd;
+					bool steeredHere = false;
+					for (double s : fortuneSteeredJd)
+						if (s > from && s <= bars[i].Jd) { steeredHere = true; break; }
+					if (steeredHere)
+					{
+						GUI::color = UiStyle::Accent;
+						GUI::DrawTexture(Rect(x, y, barW, 2), Texture2D::whiteTexture());
+					}
+				}
+			}
+			GUI::color = keepColor;
+			double first = earned ? bars.front().Earned : bars.front().Value, latest = earned ? bars.back().Earned : bars.back().Value;
+			double d = latest - first;
+			bool flat = bars.size() < 2 || std::fabs(d) < 1;
+			cs::String change = flat ? cs::String("steady") : cs::Cat(d > 0 ? "up " : "down ", money(std::fabs(d)));
+			GUI::Label(Rect(LabelW + chartW + 12, y + 2, DeltaW, 20), cs::Cat(money(latest), "  ", change), flat ? text : d > 0 ? good : bad);
+			y += FortuneRowH;
+		}
+		GUI::Label(Rect(0, y, w, 18), "Bars run oldest to newest, each row to its own largest; the brightest is today; a line over a bar: your hand moved it then.", small);
 		return h;
 	}
 

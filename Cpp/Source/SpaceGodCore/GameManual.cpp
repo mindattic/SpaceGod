@@ -745,7 +745,8 @@ namespace SpaceGod::Core
 				  "and any hidden heir due to come forward, and a state's succession crisis, an election called early and how it leans. "
 				  "It sees the underworld and the courts too: a price on a person's head and their trials, a firm's shareholders, "
 				  "its debts and to whom, and whether it is cooking its books. A person's LETTERS are the posts they wrote or got "
-				  "in the galaxy's feed, newest first.")), // US-T298, US-T299, US-T304, US-T308, US-T315, US-T323, US-T325, US-T327, US-T330, US-T334, US-T337, US-T344, US-T348, US-T351, US-T354, US-T358, US-T365, US-T368, US-T371, US-T375, US-T378, US-T384, US-T385, US-T386, US-T387, US-T395
+				  "in the galaxy's feed, newest first. A house's or business's FORTUNES chart its wealth, or its capital and month's "
+				  "earnings, every 30 days while you play, a line over the bars your hand moved.")), // US-T298, US-T299, US-T304, US-T308, US-T315, US-T323, US-T325, US-T327, US-T330, US-T334, US-T337, US-T344, US-T348, US-T351, US-T354, US-T358, US-T365, US-T368, US-T371, US-T375, US-T378, US-T384, US-T385, US-T386, US-T387, US-T395, US-T408
 
 			cs::New<ManualChapter>("Comms and pilots", "Hailing ships and stations, piracy by radio, and the people you meet", Keys("COMMS AND PILOTS"),
 				T("Hailing",

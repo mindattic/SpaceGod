@@ -169,6 +169,10 @@ namespace SpaceGod::UI
 		int timelineOpen = 0;
 		std::vector<Recent> timelineRows;
 		cs::String timelineKey, timelinePick;
+		/// US-T408: the days of the steered events about the house or business whose FORTUNES are shown (to mark its bars), and
+		/// what they were found for.
+		std::vector<double> fortuneSteeredJd;
+		cs::String fortuneKey;
 		/// US-T375: one paragraph of a house's CHRONICLE: its decade (0: how the house stands now), its prose, and the people,
 		/// houses, organisations and businesses it names (to follow).
 		struct ChronicleDecade
@@ -256,6 +260,10 @@ namespace SpaceGod::UI
 		/// <summary>US-T308: the TRENDS section of the world called <paramref name="world"/> at <paramref name="y"/> (its mood over the
 		/// samples the game took, a bar chart a row); returns its height, and draws only when <paramref name="draw"/>.</summary>
 		float DrawTrends(float y, float w, const cs::String& world, Core::Civilization& civ, double jd, bool draw);
+		/// <summary>US-T408: the FORTUNES section of the house or business <paramref name="p"/> picked (its wealth, or its capital and
+		/// month's earnings, a bar a sample the game took and today's last, the bars your hand steered marked); returns its height,
+		/// and draws only when <paramref name="draw"/>.</summary>
+		float DrawFortunes(float y, float w, const CivPick& p, Core::Galaxy& galaxy, Core::Civilization& civ, double jd, bool draw);
 		/// <summary>US-T378: the POWER section of the world called <paramref name="world"/> at <paramref name="y"/>: the houses, firms
 		/// and organisations based there, each kind ranked by its wealth, capital or strength with its share of the kind's total as a
 		/// bar (at most PowerMax each); returns its height, draws only when <paramref name="draw"/>, and sets <paramref name="follow"/>

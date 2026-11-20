@@ -54,6 +54,15 @@ public:
 	static constexpr int SocietyTrendMax = 24;
 	/// <summary>The samples of the world called <paramref name="world"/>, oldest first (null: none taken yet).</summary>
 	const std::vector<SocietyTrendSample>* SocietyTrendOf(const cs::String& world) const;
+	/// <summary>US-T408: a house's or a business's fortune on one day, taken with the worlds' trends (every SocietyTrendDays, the
+	/// same local, never-saved samples): a house's wealth, or a business's capital and the month's earnings before it.</summary>
+	struct SocietyFortuneSample
+	{
+		double Jd = 0, Value = 0, Earned = 0;
+	};
+	/// <summary>US-T408: the samples of the house (or business) with id <paramref name="id"/>, oldest first (null: none yet).</summary>
+	const std::vector<SocietyFortuneSample>* HouseFortuneOf(int id) const;
+	const std::vector<SocietyFortuneSample>* FirmFortuneOf(int id) const;
 
 private:
 	cs::Ref<UI::SocietyScreen> societyScreen;
@@ -74,6 +83,8 @@ private:
 	std::map<cs::String, std::vector<SocietyTrendSample>> societyTrends;
 	const void* trendCiv = nullptr;
 	double trendNextJd = -1e18;
+	/// <summary>US-T408: every house's and trading firm's fortune, by id, sampled alongside the worlds' trends.</summary>
+	std::map<int, std::vector<SocietyFortuneSample>> houseFortunes, firmFortunes;
 	/// <summary>US-T308: once a frame, every world's mood is sampled when a sample is due (and the future dropped after a rewind).</summary>
 	void UpdateSocietyTrends();
 	/// <summary>A "civ" entry carried out on this peer (UnitySpaceApp.Coop.cpp): the asker's line, applied here.</summary>
