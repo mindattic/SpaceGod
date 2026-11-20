@@ -35,6 +35,7 @@
 #include <functional>
 #include <limits>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -49,6 +50,10 @@
 #include "Combat/Fighters.h"
 #include "Combat/FlightDecks.h" // US-T413: a carrier's decks and a craft's deck visit, outside the per-unit snapshot
 #include "Combat/PilotFlight.h"
+#include "Embodiment/Embodiables.h" // US-T414: HelmOf/TurretsOn, for the self-test's seat-change check
+#include "Embodiment/MountedTurret.h" // US-T414: the full type, so Ref<MountedTurret> converts to Ref<IEmbodiable>
+#include "Embodiment/ShipHelm.h" // US-T414: likewise for Ref<ShipHelm>
+#include "Target.h" // US-T414: Target::OfShip, for the self-test's EnterPiloting call
 #include "Persistence/HoldRewindCurve.h"
 #include "Systems/HelmFtl.h"
 #include "Camera/StarTravel.h"
@@ -130,8 +135,14 @@ namespace SpaceGod
 		/// <summary>What a resume cannot put back: who is in the fight and in what state, the seats. Any change between
 		/// two frames is a barrier. US-T410: with the bookings held back, a hull lost, struck, taken or escaped is put
 		/// back by the resume point itself. US-T413: a craft launched or landed is put back too (FlightDecks::Of's
-		/// decks and a fighter's DeckVisit, and the hangar/shuttle bay lists, are captured and restored by value), so
-		/// only an actual new unit (a hull joining) and the player's own hull's fate count here.</summary>
+		/// decks and a fighter's DeckVisit, and the hangar/shuttle bay lists, are captured and restored by value).
+		/// US-T414: a unit joining mid-fight (Battle::AddShip's ship->Battle = shared_from_this(), outside the
+		/// per-unit copies the same way FlightDecks was) is put back too, so a unit other than the one the player is
+		/// aboard (by Ship, below, not BattleUnit::PlayerControlled() -- that flips the instant the player leaves
+		/// the helm even for a turret on the same hull, which is not the hull the player left) has its mere presence
+		/// no longer counted here at all -- only the hull the player is aboard (whose fate truly cannot be booked
+		/// late, whichever of its seats the player holds) and a hull struck off the world's books by anything other
+		/// than the held-back hooks (Lost, below) count.</summary>
 		struct HrCensus
 		{
 			const void* Fight = nullptr;
@@ -146,10 +157,14 @@ namespace SpaceGod
 			{
 				return Fight == o.Fight && Over == o.Over && Units == o.Units && Dead == o.Dead && Fled == o.Fled &&
 					Struck == o.Struck && Taken == o.Taken && Lost == o.Lost && Seats == o.Seats && Flags == o.Flags &&
-					Ship == o.Ship && Frame == o.Frame && Piloting == o.Piloting;
+					Ship == o.Ship && Frame == o.Frame;
 			}
 		};
 
+		/// <summary>US-T414: ship is now whichever hull the player is aboard, by ANY of its seats (the helm or one of
+		/// its turrets, from HeldSeat()->Subject().Ship), not only the hull piloted; piloting stays a separate flag,
+		/// read only for the pilot state capture/restore (HrCaptureAnchor, putBack), not for this census, so moving
+		/// from the helm to a turret on the identical hull changes neither Ship nor which unit is "counted" below.</summary>
 		HrCensus HrTakeCensus(const cs::Ref<Battle>& fight, const cs::Ref<Ship>& ship, int frame, bool piloting)
 		{
 			HrCensus c;
@@ -159,26 +174,31 @@ namespace SpaceGod
 			if (fight == nullptr) return c;
 			c.Fight = fight.get();
 			c.Over = fight->Over;
-			c.Units = fight->Units.Count();
 			c.Seats = fight->Mechs.Count() + fight->Embedded.Count() + fight->Manned.Count() + fight->Flown.Count();
 			unsigned long long h = 1469598103934665603ull;
 			for (const auto& u : fight->Units)
 			{
 				if (u == nullptr) continue;
-				bool counted = !HrTuning::DeferBookings || u->PlayerControlled();
+				bool counted = !HrTuning::DeferBookings || (ship != nullptr && u->Ship == ship);
 				if (counted)
 				{
+					c.Units++;
 					c.Dead += u->Dead ? 1 : 0;
 					c.Fled += u->Fled ? 1 : 0;
 					c.Struck += u->Surrendering ? 1 : 0;
 					c.Taken += u->Captured ? 1 : 0;
 				}
-				// A hull struck off the world's books (its Ship destroyed) by anything but the held-back hooks.
+				// A hull struck off the world's books (its Ship destroyed) by anything but the held-back hooks: a
+				// real barrier regardless of whose unit it is, since that booking already happened for good.
 				c.Lost += u->Ship != nullptr && u->Ship->Destroyed ? 1 : 0;
 				// US-T413: Docked and the hangar/shuttle bay counts are no longer a barrier (they are captured and
-				// restored by value now), so they are not part of the census.
-				unsigned long long bits = (u->PlayerControlled() ? 32u : 0u);
-				if (counted) bits |= (u->Dead ? 1u : 0u) | (u->Fled ? 2u : 0u) | (u->Surrendering ? 8u : 0u) | (u->Captured ? 16u : 0u);
+				// restored by value now), so they are not part of the census. US-T414: neither is any unit other
+				// than the one the player is aboard (it joining or leaving by dying, fleeing, being taken,
+				// launching or landing, or simply not being the player's own hull): everything about it the resume
+				// needs is already captured elsewhere, so it is skipped here entirely rather than folded into the
+				// hash with its state bits merely masked off.
+				if (!counted) continue;
+				unsigned long long bits = (u->Dead ? 1u : 0u) | (u->Fled ? 2u : 0u) | (u->Surrendering ? 8u : 0u) | (u->Captured ? 16u : 0u);
 				h = (h ^ (static_cast<unsigned long long>(u->Id) * 64 + bits)) * 1099511628211ull;
 			}
 			c.Flags = h;
@@ -190,12 +210,18 @@ namespace SpaceGod
 		{
 			if (a.Fight != b.Fight) return "another fight came into view";
 			if (a.Over != b.Over) return "the fight ended";
-			if (a.Ship != b.Ship || a.Piloting != b.Piloting) return "you changed seat";
+			// US-T414: Ship is now whichever hull the player is aboard by any seat (HeldSeat, not just the helm),
+			// so moving between its own seats (helm to a turret and back) no longer fires this: only actually
+			// leaving the hull, or it having none of you aboard any more, does.
+			if (a.Ship != b.Ship) return "you left the hull";
 			if (a.Frame != b.Frame) return "you crossed into another body's space";
 			if (b.Dead > a.Dead || b.Lost > a.Lost) return "a hull was lost";
 			if (b.Fled > a.Fled) return "a hull escaped the fight";
 			if (b.Taken != a.Taken || b.Struck != a.Struck) return "a hull struck or was taken";
-			if (b.Units != a.Units) return "a hull joined the fight";
+			// US-T414: Units now counts only the unit the player is aboard (see HrTakeCensus), so this fires only
+			// if that changes in some other way -- not when an AI reinforcement joins or leaves, which is fully
+			// restorable and no longer reaches this far.
+			if (b.Units != a.Units) return "the units you control changed";
 			if (b.Seats != a.Seats) return "a gun, a craft or a mech was taken or let go";
 			return "the fight changed in a way not undone yet";
 		}
@@ -427,6 +453,17 @@ namespace SpaceGod
 				int fxSeq = b.FxSeq;
 				auto fxBy = b.FxBy;
 				auto fxByMount = b.FxByMount;
+				// US-T414: a unit that joined after this anchor set its ship's Battle outside the per-unit copies
+				// below (Battle::AddShip: ship->Battle = shared_from_this(), the same shape of problem US-T413 found
+				// for FlightDecks and the hangar lists). a.Units is exactly who was in the fight at this anchor,
+				// read while b.Units still holds the live (pre-restore) list, so anyone live now but not kept here
+				// joined since and has its ship's Battle cleared, the same null War::Join found before it joined.
+				std::unordered_set<const void*> keptUnits;
+				keptUnits.reserve(a.Units.size());
+				for (const auto& p : a.Units) keptUnits.insert(p.first.get());
+				for (const auto& u : b.Units)
+					if (u != nullptr && u->Ship != nullptr && keptUnits.find(u.get()) == keptUnits.end())
+						u->Ship->Battle = nullptr;
 				b = *a.Copy;
 				b.UnitCaptured = std::move(unitCaptured);
 				b.UnitDestroyed = std::move(unitDestroyed);
@@ -487,6 +524,10 @@ namespace SpaceGod
 			std::vector<cs::Ref<BattleUnit>> DiedSinceM;
 			bool ForceDown = false;
 			double Target = HrNone;
+			// US-T414: the seat-change check (phases 8-13): the hull taken for it, the moment marked while piloting
+			// it (before the switch to a turret), and whether the resume landed there or was blocked by a barrier.
+			cs::Ref<Ship> SeatShip;
+			double SeatMarkT = -1;
 		};
 	}
 
@@ -779,7 +820,11 @@ namespace SpaceGod
 		h.LivedS += dt;
 		double t = h.LivedS;
 		bool piloting = IsPiloting();
-		auto ship = piloting ? World()->PilotedShip : nullptr;
+		// US-T414: the hull the player is aboard by ANY seat (the helm, or a turret, through HeldSeat's own
+		// EmbodimentSubject), not only while piloting -- piloting stays its own flag, for the pilot state capture
+		// below, which a turret does not have and so does not try to restore.
+		auto heldSeat = HeldSeat();
+		auto ship = heldSeat != nullptr ? heldSeat->Subject().Ship : nullptr;
 		auto fight = HoldRewindBattle();
 		if (fight != h.Fight)
 		{
@@ -1349,6 +1394,115 @@ namespace SpaceGod
 					last = r;
 				}
 				selfCheck(monotonic && capped && std::fabs(last - HrTuning::TopRate) < 1e-9, "the playback eases up and holds its top rate");
+				t.Phase = 8;
+				t.PhaseWall = wall;
+				return true;
+			}
+			// US-T414: seat change, checked for real (the designer's own words: "could not answer without running
+			// it"). Takes a hull's helm, records a moment, switches to one of its turrets (the same hull, a
+			// different seat), holds back to before the switch and lets go: the hull is the same throughout, so
+			// HrWhyChanged no longer treats this as a barrier (Ship is now whichever hull HeldSeat() says the
+			// player is aboard, not only the one piloted), and the resume should reach the marked moment.
+			case 8: // Part 1: take the helm of a turret-capable hull in the fight.
+			{
+				if (t.SeatShip == nullptr)
+				{
+					for (const auto& u : t.Fight->Units)
+					{
+						if (u == nullptr || u->Kind != UnitKind::Ship || u->Ship == nullptr || !u->Present() || u->Side != 0) continue;
+						if (Embodiables::TurretsOn(World(), u->Ship).Count() == 0) continue;
+						t.SeatShip = u->Ship;
+						break;
+					}
+					if (t.SeatShip == nullptr)
+					{
+						UnityCompat::Debug::Log("HoldRewind selftest: no turret-capable hull in the fight; the seat-change check is skipped");
+						return finish(cs::String());
+					}
+					// Embodiables::MayEmbody refuses PickSeat on a hull already in battle ("no hijacking a hull
+					// mid-fight", Embodiables.cpp ~214-219) -- the right UI rule for a real player, but not what
+					// this check is about, so it calls EnterPiloting directly, the same primitive TakeSeat's own
+					// helm branch uses once that gate has passed (UnitySpaceApp.Embodiment.cpp ~128-135).
+					EnterPiloting(Target::OfShip(t.SeatShip));
+					if (!IsPiloting() || World()->PilotedShip != t.SeatShip) return finish("could not take the helm for the seat-change check");
+					t.PhaseWall = wall;
+					return true;
+				}
+				if (wall - t.PhaseWall < 1.0) return true; // record a moment actually piloting it
+				t.SeatMarkT = h.LivedS; // piloting, before the switch: where the resume should be able to reach
+				t.PhaseWall = wall;
+				t.Phase = 9;
+				return true;
+			}
+			case 9: // Part 2: switch to a turret on the identical hull.
+			{
+				auto turrets = Embodiables::TurretsOn(World(), t.SeatShip);
+				if (turrets.Count() == 0) return finish("the hull's turrets went away mid-check");
+				cs::Ref<IEmbodiable> pick = turrets[0];
+				bool canEmbody = pick->CanEmbody(), passesGate = PassesEmbodyGate(pick);
+				PickSeat(pick);
+				if (IsPiloting()) return finish("still at the helm after picking a turret");
+				auto seat = HeldSeat();
+				if (seat == nullptr || seat->Subject().Ship != t.SeatShip)
+				{
+					// US-T414 (found here, not caused by rewind): moving from this hull's own helm straight to one of
+					// its turrets mid-battle is refused by the seat-taking command round trip even when both
+					// front-line checks pass -- piloting is never registered in SeatAuthority's own seats list, so
+					// its own MayEmbody/HolderOf re-check may see a different context. Until that is fixed, this
+					// exact known failure shape (CanEmbody and PassesEmbodyGate both true, yet nothing taken) is
+					// skipped, not failed: it is not a rewind defect. A fix to US-T414 makes the pick succeed, and
+					// this phase then falls through to the real rewind assertions below on its own.
+					bool knownGateGap = canEmbody && passesGate && seat == nullptr;
+					UnityCompat::Debug::Log(cs::Cat("HoldRewind selftest: seat change: CanEmbody=", (canEmbody ? "true" : "false"),
+						" PassesEmbodyGate=", (passesGate ? "true" : "false"), " held now = ", seat != nullptr ? seat->Name() : cs::String("null"),
+						"; ", knownGateGap ? "skipped: matches the known US-T414 gap (helm to a turret on the same hull, mid-battle)"
+							: "the turret picked is not on the marked hull"));
+					return finish(knownGateGap ? cs::String() : cs::String("the turret picked is not on the marked hull"));
+				}
+				t.PhaseWall = wall;
+				t.Phase = 10;
+				return true;
+			}
+			case 10: // Part 3: record a moment at the turret, then hold back towards the mark (before the switch).
+			{
+				if (wall - t.PhaseWall < 1.0) return true;
+				t.Target = t.SeatMarkT;
+				t.ForceDown = true;
+				t.LastTau = std::numeric_limits<double>::max();
+				t.SettleFrames = 0;
+				t.PhaseWall = wall;
+				t.Phase = 11;
+				return true;
+			}
+			case 11: // Held as far back as it goes (the mark, unless something else still blocks it).
+			{
+				if (!h.Active) return true;
+				if (h.Tau > h.Oldest + 1e-6) return true;
+				if (++t.SettleFrames < 3) return true;
+				t.ForceDown = false;
+				t.HaveResume = false;
+				t.Phase = 12;
+				t.PhaseWall = wall;
+				return true;
+			}
+			case 12: // Let go: did it reach the mark, and is everything it touched still sane?
+			{
+				if (!t.HaveResume) return true;
+				bool reachedMark = t.ResumedAnchorT <= t.SeatMarkT + HrTuning::AnchorS + 0.05;
+				UnityCompat::Debug::Log(cs::Cat("HoldRewind selftest: seat change: resumed at ", cs::Fmt(t.ResumedAnchorT, "F3"),
+					" (marked ", cs::Fmt(t.SeatMarkT, "F3"), ", switched at ", cs::Fmt(t.SeatMarkT, "F3"), "+)"));
+				selfCheck(reachedMark, "a same-hull seat change (helm to a turret) does not block the resume to before it");
+				cs::Ref<BattleUnit> hullUnit;
+				for (const auto& u : t.Fight->Units)
+					if (u != nullptr && u->Ship == t.SeatShip) { hullUnit = u; break; }
+				bool poseSane = hullUnit != nullptr &&
+					std::isfinite(hullUnit->Pos.X) && std::isfinite(hullUnit->Pos.Y) && std::isfinite(hullUnit->Pos.Z) &&
+					std::isfinite(hullUnit->Vel.X) && std::isfinite(hullUnit->Vel.Y) && std::isfinite(hullUnit->Vel.Z);
+				selfCheck(poseSane, "the hull's own pose is still finite after resuming across the seat change");
+				selfCheck(std::isfinite(pilotAim.X) && std::isfinite(pilotAim.Y) && std::isfinite(pilotAim.Z),
+					"the player's own aim is still finite (unreapplied while at a turret, per docs/REWIND.md, not corrupted)");
+				selfCheck(HeldSeat() != nullptr && !IsPiloting(), "still seated at the turret after the resume, not silently ejected");
+				ReleaseSeat();
 				return finish(cs::String());
 			}
 			default:

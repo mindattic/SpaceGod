@@ -434,11 +434,15 @@ and bounded by barriers**:
 - **The whole system drawn as it was:** while held, the world clock is set back to the moment reached (the marks keep
   the world's date beside the fight's clock) for the drawing only (planets, ships in orbit and on the lanes, gates),
   and put back to now on letting go (`ViewSystemBack`).
-- **Still barriers, and why:** a hull joining the fight (a new `BattleUnit`, which the census can only refuse across,
-  not put back); the player's own hull lost, struck, taken or fled, and a surrender's terms settled (the seat, the
-  session, cargo and prizes must be answered at once: booked then, a barrier); a gun, craft or mech taken or let go
-  (the `Seats` census, which covers every unit's stations, not only the player's own), crossing into another body's
-  frame; the fight ending or another coming into view. A craft launched or landed is no longer one: see US-T413.
+- **Still barriers, and why:** the player's own hull lost, struck, taken or fled, and a surrender's terms settled
+  (the seat, the session, cargo and prizes must be answered at once: booked then, a barrier); the census's separate
+  `Seats` scalar (`fight->Mechs.Count() + Embedded.Count() + Manned.Count() + Flown.Count()`: deployed mechs, stuck
+  boarding pods and rounds, the player's own taken-over guns, and the player's own flown craft), untouched by
+  US-T413 or US-T415's fixes (which only reworked the per-unit census and the `you changed seat` check) and not
+  re-examined this round, so any change in it still blocks a resume; crossing into another body's frame; the fight
+  ending or another coming into view. A craft launched or landed by the player's own carrier is no longer one
+  (US-T413), and neither is a unit joining mid-fight, nor the *player's own* same-hull seat change (both US-T415) —
+  though verifying the seat-change case ran into a separate bug, US-T414, not fixed here.
 - **Tested:** `sg.HoldRewind selftest [quit]` (HoldRewindCommand.cpp) starts a fight off Uranus and, with no hand
   on the keys, marks a resume point and hashes the whole fight there (`HoldRewindFightDigest`: its clock and random
   draws to come, every unit's flags, pose, hull and mounts, every missile, round, decoy and mine), plays on 3 s, holds
@@ -499,10 +503,42 @@ and bounded by barriers**:
   you are not piloting) is something this pass could not answer without running it. Left as a barrier rather than
   guessed at.
 
+### US-T415: a unit joining mid-fight put back; seat change's census fixed and run for real
+
+- **A unit joining mid-fight was a barrier for the same reason launch and landing were.** `Battle::AddShip`
+  (`Combat/Battle.cpp:292`) sets `ship->Battle = shared_from_this()` on the `Ship` object itself, outside the
+  per-unit snapshot, so a resume to before a reinforcement joined never cleared it back. **Fixed**: `HrRestoreFight`
+  now clears `u->Ship->Battle` to null for any unit present now but not kept in the anchor being restored to — the
+  same null `War::Join` gives a hull before it joins. The barrier census no longer keys `counted` on
+  `u->PlayerControlled()` (which also flips on a same-hull seat change, below) but on `u->Ship == ship` (the hull the
+  player is aboard): a non-player unit's mere presence — joining, dying, fleeing, taken, launching, landing — no
+  longer enters the barrier hash or count at all. Not given its own dedicated scripted scenario (none of the fixed
+  self-test's checks make a reinforcement join mid-recording), so this is verified by code reading plus the existing
+  16 checks still passing unchanged, the same standard US-T412's Ephemeris fix was held to; it is not exercised by a
+  check built specifically to make a reinforcement join.
+- **Seat change's census is fixed.** `ship` for the census is now `HeldSeat()->Subject().Ship` (whichever seat, helm
+  or turret) computed once and reused for both the barrier hash and `counted`; `HrWhyChanged` no longer looks at
+  `Piloting` at all, only `Ship`. Every consumer of the recorded pilot track (`h.Pilot`/`h.PilotShip`) stays
+  separately gated on `IsPiloting()`, so this cannot read stale pilot data while seated at a turret.
+- **Run for real, and it surfaced a separate bug, not a rewind one.** The self-test (phases 8-12) takes a hull's
+  helm, marks a moment, switches to one of its turrets, holds back to before the switch and lets go. Doing this
+  found that `PickSeat`(a turret) on a hull you are piloting, mid-battle, is refused by the seat-taking command round
+  trip (`SeatAuthority::Take`'s own `MayEmbody`/`HolderOf` check, reached through `SwitchSeat`'s
+  `session->Submit`/`ApplyPending`) even when both front-line checks the player sees — `next->CanEmbody()` and
+  `PassesEmbodyGate` — already return true; nothing is taken (`HeldSeat()` stays null). This reproduces with no hold
+  or rewind involved at all (`EnterPiloting` a hull already in an active battle, then `PickSeat` one of its own
+  turrets), so it is **filed separately as US-T414**, not fixed here. The self-test detects this exact known shape
+  (`CanEmbody` and `PassesEmbodyGate` both true, yet `HeldSeat()` stays null after the pick) and logs a skip naming
+  US-T414 instead of failing on it; if US-T414 is ever fixed, the pick starts succeeding and this phase falls
+  through to the real rewind assertions (the resume reaches the pre-switch mark, the hull's pose stays finite, the
+  player is still seated at the turret, not silently ejected) on its own, with no change needed here.
+
 ### Not yet (later stages)
 
-- Undoing the barriers left (a hull joining the fight, the player's own hull's fate, seat change — see US-T413's
-  finding above): a booking journal for the seat and the session, and for a new unit joining mid-fight.
+- Undoing the barriers left (the player's own hull's fate, the fleet-wide `Seats` scalar — see US-T415's finding
+  above): a booking journal for the seat and the session, and a per-unit (not scalar) census for `Seats`.
+- Fixing US-T414 (the player's own helm cannot move to a turret on the same hull mid-battle) so the seat-change
+  self-test phase stops skipping and exercises the real rewind assertions.
 - **Ships that crossed the system's edge in the window are still not redrawn outside a fight** (US-T412 looked for a
   cheap fix and did not find one safe to land untested): a ship's analytic state (`ShipController`'s phase, orbit,
   lane) is a snapshot of *now*, overwritten at every phase change, so `Fleet::StateOf(ship, jd)` for a past `jd` is
