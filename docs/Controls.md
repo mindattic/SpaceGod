@@ -128,6 +128,7 @@ reverses the sky cycle. A plain key never changes meaning with Shift unless the 
 |---|---|---|---|
 | Help | H, F1 | anywhere | pause menu > Help |
 | Encyclopedia: next / previous article, jump | Up / Down, Page Up / Page Down / Home / End (not while typing in the search) (US-T336) | Encyclopedia | - |
+| Encyclopedia / Discoveries: search | Ctrl+F (US-T394) | Encyclopedia, Discoveries | - |
 | Manual: next / previous chapter, scroll it | Up / Down (the contents follow), Page Up / Page Down, Home / End (US-T324) | manual | - |
 | Ship catalog | - | - | Help > ship catalog (US-T193) |
 | Ship catalog: next / previous hull, jump | Up / Down, Page Up / Page Down / Home / End (US-T302) | ship catalog | - |

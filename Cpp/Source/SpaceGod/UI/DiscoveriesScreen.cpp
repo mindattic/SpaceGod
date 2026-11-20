@@ -137,6 +137,7 @@ namespace SpaceGod::UI
 		Event& e = Event::current();
 		if (e.type != EventType::KeyDown) return;
 		auto keyPick = [&](int index) { Pick(Mathf::Clamp(index, 0, Mathf::Max(0, count - 1))); follow = true; e.Use(); };
+		if (e.keyCode == KeyCode::F && (e.control || e.command)) { focusFilter = true; e.Use(); return; } // US-T394: Ctrl+F to the search
 		if ((e.keyCode == KeyCode::Escape || e.keyCode == KeyCode::Return || e.keyCode == KeyCode::KeypadEnter) && typing)
 		{
 			GUIUtility::keyboardControl = 0;
@@ -172,7 +173,7 @@ namespace SpaceGod::UI
 		}
 		typing = GUI::GetNameOfFocusedControl() == FilterControl;
 		if (filter.empty())
-			GUI::Label(Rect(r.x + 10, r.y + 6, r.width - 20, 18), typing ? "a name, a system, who found it..." : "click to search what you have found", small);
+			GUI::Label(Rect(r.x + 10, r.y + 6, r.width - 20, 18), typing ? "a name, a system, who found it..." : "click or Ctrl+F to search what you have found", small);
 		else if (GUI::Button(Rect(r.x + r.width - 28, r.y + 3, 24, 24), "X", button))
 		{
 			filter.clear();

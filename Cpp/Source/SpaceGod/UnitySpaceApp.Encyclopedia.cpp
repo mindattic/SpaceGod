@@ -169,6 +169,8 @@ namespace SpaceGod
 		auto down = [&](Key k) { return kb[k].isPressed || kb[k].wasPressedThisFrame; };
 		if (down(Key::UpArrow) || down(Key::DownArrow) || down(Key::LeftArrow) || down(Key::RightArrow)
 			|| down(Key::PageUp) || down(Key::PageDown) || down(Key::Home) || down(Key::End)) return true;
+		// US-T394: Ctrl held is the screen's (Ctrl+F finds), not a mine dropped or F's flight assist.
+		if (down(Key::LeftCtrl) || down(Key::RightCtrl)) return true;
 		// US-T388: and a plain digit (no captain's order or prompt answered from under it; Shift/Ctrl/Alt digits go on).
 		if (down(Key::LeftShift) || down(Key::RightShift) || down(Key::LeftCtrl) || down(Key::RightCtrl) || down(Key::LeftAlt) || down(Key::RightAlt)) return false;
 		for (Key d : { Key::Digit0, Key::Digit1, Key::Digit2, Key::Digit3, Key::Digit4, Key::Digit5, Key::Digit6, Key::Digit7, Key::Digit8, Key::Digit9 })

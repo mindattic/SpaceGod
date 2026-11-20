@@ -227,6 +227,7 @@ namespace SpaceGod::UI
 		if (e.type != EventType::KeyDown) return;
 		int sel = SelectedRow();
 		int n = static_cast<int>(rows.size());
+		if (e.keyCode == KeyCode::F && (e.control || e.command)) { focusFilter = true; e.Use(); return; } // US-T394: Ctrl+F to the search
 		if (e.keyCode == KeyCode::Escape && typing) { closeAsked = true; e.Use(); }
 		else if ((e.keyCode == KeyCode::Return || e.keyCode == KeyCode::KeypadEnter) && typing) { GUIUtility::keyboardControl = 0; typing = false; e.Use(); }
 		else if (e.keyCode == KeyCode::DownArrow && n > 0) { Go(rows[sel < 0 ? 0 : Mathf::Min(sel + 1, n - 1)].Article->Id, false); followPick = true; e.Use(); }
@@ -275,7 +276,7 @@ namespace SpaceGod::UI
 		}
 		typing = GUI::GetNameOfFocusedControl() == FilterControl;
 		if (filter.empty())
-			GUI::Label(Rect(r.x + 10, r.y + 6, r.width - 20, 18), typing ? "type a word: pilot, mars, cargo, lock..." : "click to search every article", small);
+			GUI::Label(Rect(r.x + 10, r.y + 6, r.width - 20, 18), typing ? "type a word: pilot, mars, cargo, lock..." : "click or Ctrl+F to search every article", small);
 		else if (GUI::Button(Rect(r.x + r.width - 28, r.y + 3, 24, 24), "X", button))
 		{
 			filter.clear();
