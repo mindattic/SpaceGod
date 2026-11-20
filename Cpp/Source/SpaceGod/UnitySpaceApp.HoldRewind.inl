@@ -99,7 +99,42 @@ public:
 	/// hull and mounts, every missile, round, mine and decoy), for the self-test.</summary>
 	static unsigned long long HoldRewindFightDigest(const cs::Ref<Core::Battle>& fight);
 
+	/// <summary>US-T423: lived seconds the fight in view has been recorded (-1: none in view), for the co-op smoke.</summary>
+	double HoldRewindRecordedS() const;
+	/// <summary>US-T423: how far back a hold has gone (0 when none plays).</summary>
+	double HoldRewindBackS() const;
+	/// <summary>US-T423: in co-op, who holds the rewind key and who it waits for ("REWIND: P1 Host holds Shift+R -
+	/// waiting for P2 Client"), or empty (nobody holds it, or everyone does).</summary>
+	cs::String CoopHoldRewindWaiting() const;
+	/// <summary>US-T423: a co-op sync: the recording starts afresh on every peer (a hold under way back to its press; with
+	/// <paramref name="book"/> the held-back bookings made first, so the sync's save holds them), its frame clock, cooldown
+	/// and key edge from zero on every peer alike.</summary>
+	void ResetHoldRewindForSync(bool book);
+
 private:
+	/// <summary>US-T423: co-op. The hold plays only while every player holds the key: the host ANDs its own key with each
+	/// player's latest and writes it (with the fight it keeps and who holds) into each frame as "hr &lt;all&gt; &lt;fight&gt;
+	/// &lt;mask&gt;" (left out when idle); a frame whose clock does not step carries "ho". Every peer runs the hold on the
+	/// frame's values.</summary>
+	cs::String coopHrEntry;
+	bool coopHrAll = false, coopHrSent = false;
+	int coopHrMask = 0, coopHrLogged = 0;
+	long long coopHrStepFrame = -1;
+	cs::Ref<Core::Battle> coopHrFight;
+	bool coopHrMismatchWarned = false;
+
+	/// <summary>US-T423: the hold's own step on this frame's key (UpdateHoldRewind's body).</summary>
+	bool StepHoldRewind(float dt, bool down);
+	/// <summary>US-T423: the frame's hold key in co-op: the host's AND of every player's (and the entry it writes), a
+	/// client's from the frame replayed (its own key sent to the host when it changes).</summary>
+	bool CoopHoldRewindKey(Coop::CoopPeer& peer);
+	/// <summary>US-T423: an Update that ran the hold's step but no clock step: on the host it is a frame of its own
+	/// ("ho"); on a client a hold frame replayed is consumed.</summary>
+	void CoopHoldRewindFrame(bool held);
+	/// <summary>US-T423: the seats every player holds and the helm, hashed: in co-op any change is a barrier (a resume puts
+	/// no seat back).</summary>
+	unsigned long long CoopHoldRewindSeats();
+	long long CoopHoldRewindFrameNo(Coop::CoopPeer& peer) const;
 	/// <summary>US-T409: the tracks, the resume points and the playback (UnitySpaceApp.HoldRewind.cpp).</summary>
 	struct HoldRewindState;
 	std::shared_ptr<HoldRewindState> holdRewind;

@@ -115,6 +115,14 @@ namespace SpaceGod::Coop
 		void RequestLoad(const cs::String& slot);
 		/// A client asks for a resync now (the smoke run's deliberate one; a slow client's is "resync <frames>").
 		void RequestResync(const cs::String& why);
+		/// US-T423: a client's hold-rewind key (Shift+R) went down or up: the host plays the rewind only while every player
+		/// holds it ("hrkey 1|0", sent when it changes).
+		void RequestHoldRewind(bool down);
+		/// US-T423: the smoke run's client asks the host to hold its own rewind key too (the headless host has no keyboard).
+		void SmokeHostHold(bool down);
+		/// US-T423: the host's view of the hold-rewind key: its own (`hostDown`) and every other player's latest; `mask` the
+		/// seats holding it (bit = seat). True when every player in the roster holds it.
+		bool HostHoldAll(bool hostDown, int& mask) const;
 
 		/// The engine tick a client is in (several host frames can replay in one): edges are sent once a tick.
 		static inline long long EngineTick = 0;
@@ -160,6 +168,9 @@ namespace SpaceGod::Coop
 
 		/// At the app's clock step: opens this frame's record, with every command queued since the last one.
 		FrameRecord* HostOpenFrame();
+		/// US-T423: a frame whose clock does not step (a hold rewind playing the past back, or an Update that stopped after
+		/// the hold's step): its record carries none of the queued commands (they wait for the next frame that steps).
+		FrameRecord* HostOpenHoldFrame();
 		/// The clients' clock requests since the last frame, for the host's clock (it is the authority over time).
 		std::vector<std::pair<int, cs::String>> TakeClockRequests();
 		/// After each Update on the host: the frame goes out, digests and presence, a pending sync, the save's chunks.
@@ -241,6 +252,8 @@ namespace SpaceGod::Coop
 		long long pilotSentTick = -1;
 		std::map<int, std::vector<PilotFrame>> pilotIn;
 		std::map<int, PilotFrame> pilotLast;
+		/// US-T423: each other player's hold-rewind key as they last sent it, by seat.
+		std::map<int, bool> holdKeys;
 
 		Remote* FindRemote(ICoopLink* link);
 		void HostPresence(UnitySpaceApp* app);

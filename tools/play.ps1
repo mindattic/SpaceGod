@@ -309,6 +309,14 @@ if ($Mode -eq 'coop-smoke') {
     'hail (both peers)'                         = (Both "action 'hail ") -and (Both 'hail: The ')
     'diplomacy action (both peers)'             = Both "action 'gift "
     'statecraft carried out on the client'      = $clientText -match 'smoke: statecraft .*carried out: True'
+    # US-T423: the hold rewind in co-op: one player alone holding does nothing; every player holding plays it on both peers,
+    # at the same frames, and both play on from the same resume point (the same fight digest).
+    'hold rewind: one player alone does not rewind' = $clientText -match 'smoke: client held Shift\+R alone for 90 frames .*the rewind played on 0 of them'
+    'hold rewind: every player holding plays it (both peers)' = (Both 'hold rewind: every player holds Shift\+R at frame \d+') -and (Both 'hold rewind: plays the past back from frame \d+')
+    'hold rewind: same press and resume on both peers' = (& {
+      $hp = [regex]::Matches($hostText, 'hold rewind: (every player holds.*?frame \d+|played on [^\r\n]*)') | ForEach-Object { $_.Groups[1].Value }
+      $cp = [regex]::Matches($clientText, 'hold rewind: (every player holds.*?frame \d+|played on [^\r\n]*)') | ForEach-Object { $_.Groups[1].Value }
+      $hp.Count -ge 2 -and ($hp -join '|') -eq ($cp -join '|') })
   }
   "co-op smoke: syncs: $($syncs -join '; ')"
   foreach ($k in $checks.Keys) { "co-op smoke: $($k): $($checks[$k])" }

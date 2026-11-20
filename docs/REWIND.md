@@ -629,6 +629,39 @@ and bounded by barriers**:
   hull's helm in the fight's frame with no barrier (50 checks, all passing). The frame crossing itself is not driven
   by the test (a fight's helm never changes frame); it rides the same restore as a load.
 
+### US-T423: co-op
+
+The designer's call: in co-op the rewind plays **only while every player holds the key** (a vote). One player holding
+alone does nothing but show who it waits for (`REWIND: P2 Client holds Shift+R - waiting for P1 Host to hold Shift+R`,
+the readout's centre line on every peer, and a co-op log line whenever who holds changes).
+
+- **The key is the frame's.** A client sends its key to the host when it changes (`hrkey 1|0`, as the clock and setting
+  requests go). The host ANDs its own key with every roster player's latest (`CoopPeer::HostHoldAll`) and writes the
+  result into the frame with the fight it keeps and who holds: `hr <all> <fight index> <seat mask>` (left out when
+  nobody holds and no fight is kept). Every peer steps the hold on that value, never on its own key.
+- **Hold frames are frames.** The hold's step runs before the clock step, so a hold frame used to open no record. Now
+  the host's hold frame (and an Update that stopped at the pause menu after the hold's step) opens a record of its own
+  (`HostOpenHoldFrame`: the dt, no queued commands, which wait for the next frame that steps) marked `ho`; a client
+  replaying an `ho` frame runs the same hold step and the drawing only, and counts the frame consumed. A client frame
+  replayed again after its pause menu stopped it does not step the hold twice (`coopHrStepFrame`).
+- **Deterministic on every peer.** The cooldown runs on a clock of the frames' dt (`FrameClock`; the wall clock differs
+  per machine), single-player too (it only stops while the pause menu is open; the self-test's phases keep their own
+  wall timing). The recording, the hold and the resume run as shared steps (`coopShared`), so the helm is everyone's
+  there; the fight kept is the host's (its frame names it by index: the helm's fight, else the one its camera
+  watches); only the shared helm's seat is recorded and put back, and any player's seat or the helm changing is a
+  barrier (`HrCensus::Coop`), so a resume never needs another player's seat back. During a hold no frame steps the
+  clock, so a client's clock is never "corrected" against the host's set-back date. A machine's own saves (autosave,
+  quicksave, keyframe) do not book the held-back fates in co-op (they wait out the window on every peer alike); a sync
+  starts the recording afresh on every peer (a hold under way back to its press, the bookings made into the sync's
+  save; `ResetHoldRewindForSync`). One machine's `-norewind` does not reach the party's rewind.
+- **Proved** by the co-op smoke (`./tools/play.ps1 -Mode coop-smoke`): after its load the client starts a fight off
+  Uranus in the frames (`x <seat> hrfight`, smoke only), holds Shift+R alone for 90 frames (no rewind), then the host
+  holds too (`smokehold`, the headless host has no keyboard), both play it back from the same frame, let go, and play
+  on from the same resume point with the same fight digest; every digest after it matches. A run: the client alone 90 frames, played on 0; both peers `every player holds
+  Shift+R at frame 4095` and `plays the past back from frame 4095`; 5.33 s back after 120 frames; both `played on from
+  5.55 s back at frame 4232; fight digest 5BA426BB37DC518A`; 67 frames with both digests, 67 identical, no DESYNC, every
+  smoke check passing. The single-player self-test is unchanged at 50/50.
+
 ### Not yet (later stages)
 
 - A fight that **started** in the window (flying into one, or one coming into view): the rewind cannot go back past
@@ -638,7 +671,7 @@ and bounded by barriers**:
 - A ship that changed phase (left an orbit, joined a lane) in the window is still drawn where its *current* phase
   puts it at the past `jd`, as a ship's analytic state is a snapshot of now, overwritten at every phase change.
 - Reversed effects (an FTL flash collapsing into a hull, an explosion contracting), the hull sections' damage stage,
-  the reversed audio bed, and a hold in co-op.
+  the reversed audio bed. (A hold in co-op: US-T423.)
 
 ## Parked: checkpoint loops with ghost replays (US-T169)
 

@@ -509,6 +509,7 @@ namespace SpaceGod
 		// draws (no commands, no clock, no world, no helm); let go and the frame runs on from the moment reached.
 		if (UpdateHoldRewind(dt))
 		{
+			CoopHoldRewindFrame(true); // US-T423: in co-op a hold frame is a frame record of its own (no clock step), replayed by every peer
 			SyncShipViews();
 			AnimateScale(dt);
 			Scale()->Layout(Ephemeris(), bodyScene);
@@ -536,6 +537,9 @@ namespace SpaceGod
 		if (ScreenCleared && (OpenScreens() & ~screensOpen) != 0) ScreenCleared = false;
 		if (pauseMenu->IsOpen)
 		{
+			// US-T423: the hold's step ran this Update with no clock step to carry it: on the host a frame of its own, so every
+			// peer steps the hold alike (a client's frame waits, its hold step already taken).
+			CoopHoldRewindFrame(false);
 			FreeCursorForMenu();
 			return;
 		}

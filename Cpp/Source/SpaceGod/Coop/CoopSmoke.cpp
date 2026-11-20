@@ -75,6 +75,9 @@ namespace SpaceGod::Coop::CoopSmoke
 		double treasuryBefore = 0;
 		UnitySpaceApp* lastApp = nullptr;
 		cs::Ref<StarSystem> travelTo; // US-T64
+		// US-T423: the hold rewind: the host's own key (held at the client's ask), and the frames the client held alone.
+		bool hostHoldsRewind = false;
+		int aloneFrames = 0, aloneActive = 0;
 
 		// US-T64: a step that needs an earlier ask carried out waits for it to come back in a host frame. A client's ask
 		// reaches the host while the host is as far ahead as the client's backlog, so it comes back only once the client
@@ -147,6 +150,15 @@ namespace SpaceGod::Coop::CoopSmoke
 	}
 
 	bool Active() { return !Role().empty(); }
+
+	bool HostHoldsRewind() { return hostHoldsRewind; }
+
+	void SetHostHoldsRewind(bool down)
+	{
+		if (down == hostHoldsRewind) return;
+		hostHoldsRewind = down;
+		CoopPeer::Log(cs::Cat("smoke: host ", down ? "holds" : "lets go of", " Shift+R (the client asked)"));
+	}
 
 	Smoke::ScriptedDevice* Script() { return script.get(); }
 
@@ -227,7 +239,16 @@ namespace SpaceGod::Coop::CoopSmoke
 			bool carried = directives != nullptr && directives->Production->Name != productionBefore && app.Galaxy->Polities->Statecraft->Record().Count() > recordBefore;
 			if (Waits(2320, carried, "the orders and the gift", peer)) return;
 		}
+		// US-T423: the hold rewind waits for its fight to have been recorded a while, then for each hold to take.
+		if (Waits(3100, app.HoldRewindRecordedS() >= 4.0, "the fight recorded for the hold rewind", peer)) return;
+		if (Waits(3200, app.HoldRewindActive(), "the hold to start with every player holding", peer)) return;
+		if (Waits(3330, !app.HoldRewindActive(), "the hold to end", peer)) return;
 		long long n = ++replayed;
+		if (n > 3100 && n <= 3190)
+		{
+			aloneFrames++;
+			if (app.HoldRewindActive()) aloneActive++;
+		}
 		// The stick at the helm: throttle up, the mouse swinging the nose, a roll.
 		if (n >= 740 && n < 800) script->mouseDelta = Vector2(4.0f, 2.0f);
 		switch (n)
@@ -440,6 +461,35 @@ namespace SpaceGod::Coop::CoopSmoke
 				break;
 			case 2800:
 				CoopPeer::Log(cs::Cat("smoke: after the load the client is in ", app.ActiveSystem->Name, " at frame ", peer.Frame()));
+				break;
+			// US-T423: the hold rewind in co-op: a fight (started in the frames, on every peer), held by the client alone (no
+			// rewind: it waits for every player), then by both (it plays on both), then let go (both play on from the same
+			// resume point; the digests after it must still match).
+			case 2820:
+				CoopPeer::Log(cs::Cat("smoke: client starts a fight off Uranus for the hold rewind (an action in the frames) at frame ", peer.Frame()));
+				peer.Submit(cs::Cat("x ", Wire::I(peer.LocalSeat()), " hrfight"));
+				break;
+			case 3100:
+				CoopPeer::Log(cs::Cat("smoke: the fight has been recorded ", cs::Fmt(app.HoldRewindRecordedS(), "F1"), " s; client holds Shift+R alone at frame ", peer.Frame()));
+				script->Hold(Input::Key::LeftShift);
+				script->Hold(Input::Key::R);
+				break;
+			case 3190:
+				CoopPeer::Log(cs::Cat("smoke: client held Shift+R alone for ", aloneFrames, " frames (to frame ", peer.Frame(), "): the rewind played on ", aloneActive,
+					" of them; the readout: '", app.CoopHoldRewindWaiting(), "'; asks the host to hold it too"));
+				peer.SmokeHostHold(true);
+				break;
+			case 3200:
+				CoopPeer::Log(cs::Cat("smoke: every player holds: the rewind plays at frame ", peer.Frame(), ", ", cs::Fmt(app.HoldRewindBackS(), "F2"), " s back"));
+				break;
+			case 3320:
+				CoopPeer::Log(cs::Cat("smoke: held 120 frames: the rewind is ", cs::Fmt(app.HoldRewindBackS(), "F2"), " s back at frame ", peer.Frame(), "; client and host let go"));
+				script->Release(Input::Key::R);
+				script->Release(Input::Key::LeftShift);
+				peer.SmokeHostHold(false);
+				break;
+			case 3330:
+				CoopPeer::Log(cs::Cat("smoke: the hold is over at frame ", peer.Frame(), ": playing on"));
 				break;
 			case ClientFrames:
 				peer.SayBye();

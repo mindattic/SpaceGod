@@ -6,6 +6,8 @@
 
 #include "Coop/CoopPeer.h"
 #include "Coop/CoopSettings.h"
+#include "Coop/CoopSmoke.h" // US-T423: the smoke's fight for the hold rewind
+#include "SceneTour.h" // US-T423: TriggerSkirmish
 #include "Camera/SpaceCamera.h"
 #include "UI/Hud.h"
 #include "UI/GalaxyMapScreen.h" // US-T47
@@ -80,6 +82,7 @@ namespace SpaceGod
 			CoopApplyEntries(*peer, rec->Entries);
 			CoopShareSelection(*peer);
 			CoopHostPilotFrame(*peer, *rec); // US-T43: the helm holder's hands for this frame, into the record
+			if (!coopHrEntry.empty()) rec->Entries.push_back(coopHrEntry); // US-T423: the hold rewind's key, every player's, as this frame's hold stepped on it
 			rec->Before = ClockState::Of(*Clock);
 			Clock->Advance(dt);
 			rec->JdAfter = Clock->Jd;
@@ -632,6 +635,7 @@ namespace SpaceGod
 		}
 		coopShared--;
 		coopEverywhere--;
+		ResetHoldRewindForSync(/*book:*/ false); // US-T423: the hold rewind starts afresh on every peer from the same save
 		if (Piloted.IsNone() && !InFtlCruise()) coopHelmSeat = -1;
 		CoopWatchSession();
 		if (keepView && system == ActiveSystem->Name)
@@ -1100,6 +1104,7 @@ namespace SpaceGod
 	{
 		size_t sp = e.find(' ');
 		cs::String kind = sp == cs::String::npos ? e : e.substr(0, sp);
+		if (kind == "hr" || kind == "ho") return true; // US-T423: the hold rewind's, read at the frame's start (UpdateHoldRewind)
 		if (kind == "a")
 		{
 			auto a = Wire::Split(e, ' ', 4);
@@ -1219,6 +1224,22 @@ namespace SpaceGod
 				for (const auto& star : Galaxy->NearbyStars)
 					if (star.Name == name) { target = FtlTarget::OfStar(star); break; }
 			if (target != nullptr) PlotFtlCourse(target, a.at(0) == "1");
+		}
+		else if (verb == "hrfight" && Coop::CoopSmoke::Active())
+		{
+			// US-T423: the co-op smoke's fight for the hold rewind, started on every peer at this frame (as sg.HoldRewind
+			// selftest starts its own off Uranus) and watched, so the host keeps it.
+			auto uranus = (*Catalog())["Uranus"];
+			int body = uranus != nullptr ? uranus->Index : 0;
+			auto fight = SceneTour::TriggerSkirmish(*this, body, World()->Sol, World()->Reach,
+				cs::List<ShipClass>{ ShipClass::Battleship, ShipClass::Cruiser, ShipClass::Cruiser, ShipClass::Destroyer, ShipClass::Destroyer, ShipClass::Frigate, ShipClass::Corvette });
+			if (fight != nullptr)
+			{
+				fight->Advance(20, false);
+				WatchBattle(fight);
+			}
+			CoopPeer::Log(cs::Cat("hold rewind smoke: ", fight != nullptr ? cs::Cat(fight->Name, ", ", fight->Units.Count(), " units") : cs::String("no fight started"),
+				" at frame ", peer.Frame()));
 		}
 		else if (verb == "ftlclear") ClearFtlCourse();
 		else if (verb == "ftlauto") EngageFtlAutopilot();

@@ -25,6 +25,10 @@
 #include "UnitySpaceApp.h"
 #include "UI/Hud.h"
 #include "Coop/CoopPeer.h"
+#include "Coop/CoopSmoke.h" // US-T423: the co-op smoke's host key
+#include "Coop/CoopWire.h"
+#include "Session/LocalSession.h" // US-T423: every player's seat, for the co-op barrier
+#include "Combat/War.h" // US-T423: the fight kept, by its index in the war's battles
 #include "Input/KeyBindings.h"
 #include "UnityCompat/UnityRuntime.h"
 
@@ -72,6 +76,16 @@ namespace SpaceGod
 	{
 		using HrTuning = UnitySpaceApp::HoldRewindTuning;
 		constexpr double HrNone = std::numeric_limits<double>::lowest();
+
+		/// <summary>US-T423: in co-op the hold's steps are shared ones (UnitySpaceApp::coopShared above 0, undone however the
+		/// step leaves): the helm is everyone's there, so every peer records, plays and resumes it alike.</summary>
+		struct HrSharedScope
+		{
+			int& n;
+			bool on;
+			HrSharedScope(int& counter, bool when) : n(counter), on(when) { if (on) n++; }
+			~HrSharedScope() { if (on) n--; }
+		};
 
 		/// <summary>One kept pose: when (lived real seconds, the ring's key), the fight's own clock then, where it was,
 		/// how it moved, where its nose pointed, and whether it was dead, gone or docked.</summary>
@@ -165,6 +179,8 @@ namespace SpaceGod
 			bool Over = false;
 			int Units = 0, Dead = 0, Fled = 0, Struck = 0, Taken = 0, Lost = 0, Seats = 0;
 			unsigned long long Flags = 0;
+			/// <summary>US-T423: in co-op, every player's seat and the helm (CoopHoldRewindSeats); 0 in single-player.</summary>
+			unsigned long long Coop = 0;
 			const void* Ship = nullptr;
 			int Frame = -1;
 			bool Piloting = false;
@@ -172,7 +188,7 @@ namespace SpaceGod
 			bool operator==(const HrCensus& o) const
 			{
 				return Fight == o.Fight && Over == o.Over && Units == o.Units && Dead == o.Dead && Fled == o.Fled &&
-					Struck == o.Struck && Taken == o.Taken && Lost == o.Lost && Seats == o.Seats && Flags == o.Flags;
+					Struck == o.Struck && Taken == o.Taken && Lost == o.Lost && Seats == o.Seats && Flags == o.Flags && Coop == o.Coop;
 				// US-T422: neither the body held (Ship) nor the helm's frame (Frame) is a barrier any more: a resume puts the
 				// seat back on whichever body it was (RestoreHoldRewindSeat takes that body's helm first) and the helm in
 				// the frame it was in (the pose and its frame together, as a load does). Kept for the reasons' wording.
@@ -248,6 +264,7 @@ namespace SpaceGod
 		{
 			if (a.Fight != b.Fight) return "another fight came into view";
 			if (a.Over != b.Over) return "the fight ended";
+			if (a.Coop != b.Coop) return "a player took or let go of a seat or the helm"; // US-T423
 			// US-T414: Ship is now whichever hull the player is aboard by any seat (HeldSeat, not just the helm),
 			// so moving between its own seats (helm to a turret and back) no longer fires this: only actually
 			// leaving the hull, or it having none of you aboard any more, does.
@@ -636,7 +653,10 @@ namespace SpaceGod
 		bool Active = false, KeyWasDown = false, Releasing = false;
 		double PressT = 0, Tau = 0, Oldest = 0, HeldS = 0, Rate = 0, ReleaseLeft = 0, ReleaseRate = 0, JdAtPress = 0;
 		std::shared_ptr<HrAnchor> AtPress;
-		/// <summary>Wall-clock seconds (Time::realtimeSinceStartupAsDouble) before the next hold may start.</summary>
+		/// <summary>US-T423: real seconds of frames the hold has stepped on (each frame's dt, the frame's own in co-op): the
+		/// clock the cooldown runs on, so every peer's is the same (the wall clock differs per machine).</summary>
+		double FrameClock = 0;
+		/// <summary>FrameClock seconds before the next hold may start (US-T423: was the wall clock).</summary>
 		double CooldownUntil = 0;
 		/// <summary>US-T410: frames left in which a resume is "just now" (the HUD takes stock instead of reporting).</summary>
 		int JustResumed = 0;
@@ -833,7 +853,14 @@ namespace SpaceGod
 		}
 	}
 
-	void UnitySpaceApp::BookHoldRewindBeforeSave() { BookHoldRewindUpTo(std::numeric_limits<double>::max()); }
+	void UnitySpaceApp::BookHoldRewindBeforeSave()
+	{
+		// US-T423: in co-op a save of this machine's own (an autosave, a quicksave, a keyframe) comes when this machine
+		// says, so it must not book the shared world's held-back fates early: they wait out the window on every peer alike.
+		// A sync's save books them first everywhere (ResetHoldRewindForSync).
+		if (Coop::CoopPeer::Current() != nullptr) return;
+		BookHoldRewindUpTo(std::numeric_limits<double>::max());
+	}
 
 	bool UnitySpaceApp::HoldRewindDelaysKeyframe()
 	{
@@ -945,15 +972,89 @@ namespace SpaceGod
 			HookHoldRewindBookings(nullptr);
 		}
 		// (A load: the bookings and the hooked fight are the old world's, thrown away with it.)
-		double cooldown = h.CooldownUntil;
+		double cooldown = h.CooldownUntil, frameClock = h.FrameClock;
 		bool keyDown = h.KeyWasDown;
 		auto text = h.Text;
 		auto keptTest = h.Test;
 		*holdRewind = HoldRewindState();
+		holdRewind->FrameClock = frameClock;
 		holdRewind->CooldownUntil = cooldown;
 		holdRewind->KeyWasDown = keyDown;
 		holdRewind->Text = text;
 		holdRewind->Test = keptTest;
+	}
+
+	void UnitySpaceApp::ResetHoldRewindForSync(bool book)
+	{
+		if (holdRewind == nullptr) holdRewind = std::make_shared<HoldRewindState>();
+		{
+			HrSharedScope shared(coopShared, Coop::CoopPeer::Current() != nullptr);
+			// A hold under way comes back to its press (as a tap does), so the save is of the world as it is.
+			if (holdRewind->Active)
+			{
+				holdRewind->HeldS = 0;
+				EndHoldRewind();
+			}
+			ClearHoldRewind(book);
+		}
+		// What a load keeps for single-player (the cooldown, the key's edge) starts from zero on every peer alike.
+		holdRewind->FrameClock = 0;
+		holdRewind->CooldownUntil = 0;
+		holdRewind->KeyWasDown = false;
+		coopHrStepFrame = -1;
+		coopHrFight = nullptr;
+		coopHrEntry.clear();
+		coopHrAll = false;
+		coopHrMask = 0;
+	}
+
+	unsigned long long UnitySpaceApp::CoopHoldRewindSeats()
+	{
+		unsigned long long h = 1469598103934665603ull;
+		auto mix = [&h](long long v) { h = (h ^ static_cast<unsigned long long>(v)) * 1099511628211ull; };
+		mix(coopHelmSeat + 1);
+		mix(Piloted.IsNone() || Piloted.Ship == nullptr ? -1 : Piloted.Ship->Id);
+		if (session != nullptr)
+			for (const auto& p : session->Players())
+			{
+				mix(p.Seat);
+				mix(static_cast<long long>(session->State()->SeatIdOf(p)) + 1);
+			}
+		return h;
+	}
+
+	long long UnitySpaceApp::CoopHoldRewindFrameNo(Coop::CoopPeer& peer) const
+	{
+		// The host's frame number moves on when its record opens (at the clock step, after the hold's step).
+		return peer.IsHost() && peer.Open() == nullptr ? peer.Frame() + 1 : peer.Frame();
+	}
+
+	double UnitySpaceApp::HoldRewindRecordedS() const
+	{
+		if (holdRewind == nullptr || holdRewind->Fight == nullptr) return -1;
+		return holdRewind->LivedS - holdRewind->FightSince;
+	}
+
+	double UnitySpaceApp::HoldRewindBackS() const
+	{
+		return holdRewind != nullptr && holdRewind->Active ? holdRewind->PressT - holdRewind->Tau : 0;
+	}
+
+	cs::String UnitySpaceApp::CoopHoldRewindWaiting() const
+	{
+		Coop::CoopPeer* peer = Coop::CoopPeer::Current();
+		if (peer == nullptr || coopHrMask == 0 || coopHrAll) return cs::String();
+		cs::String holding, waiting;
+		for (const auto& p : peer->Players)
+		{
+			if (p == nullptr || p->Left) continue;
+			cs::String& to = (coopHrMask & (1 << p->Seat)) != 0 ? holding : waiting;
+			if (!to.empty()) to += ", ";
+			to += cs::Cat("P", p->Seat + 1, " ", p->Name);
+		}
+		cs::String keys = Input::KeyBindings::Keys(Input::KeyAction::HoldRewind);
+		return cs::Cat("REWIND: ", holding, " hold", holding.find(',') == cs::String::npos ? "s" : "", " ", keys, "  -  waiting for ", waiting, " to hold ", keys,
+			" (it plays only while every player holds it)");
 	}
 
 	// ------------------------------------------------------------------------------------------- recording
@@ -963,14 +1064,18 @@ namespace SpaceGod
 		if (holdRewind == nullptr) holdRewind = std::make_shared<HoldRewindState>();
 		auto& h = *holdRewind;
 		if (h.Active) return;
+		// US-T423: co-op records too, on every peer alike (the frame's dt, the host's fight, the shared helm); the rewind is
+		// the party's, so one machine's -norewind does not reach it.
+		const bool coop = Coop::CoopPeer::Current() != nullptr;
 		// Single player, in a run that keeps a rewind at all (not the tour, a capture or -norewind).
-		if (!rewindEnabled || Coop::CoopPeer::Current() != nullptr || Clock == nullptr || World() == nullptr)
+		if ((!coop && !rewindEnabled) || Clock == nullptr || World() == nullptr)
 		{
 			if (!h.Clock.empty() || h.Fight != nullptr || h.Hooked != nullptr) ClearHoldRewind();
 			return;
 		}
 		// Nothing lived: the clock stopped, or between the stars (a barrier, through the seat, once flying again).
 		if (Clock->Paused() || Travel->Active || InFtlCruise()) return;
+		HrSharedScope shared(coopShared, coop);
 
 		h.LivedS += dt;
 		double t = h.LivedS;
@@ -979,12 +1084,15 @@ namespace SpaceGod
 		// US-T414: the hull the player is aboard by ANY seat (the helm, or a turret, through HeldSeat's own
 		// EmbodimentSubject), not only while piloting -- piloting stays its own flag, for the pilot state capture
 		// below, which a turret does not have and so does not try to restore.
-		auto heldSeat = HeldSeat();
+		// US-T423: in co-op only the shared helm (each player's other seats are theirs: a change of any is a barrier).
+		cs::Ref<IEmbodiable> heldSeat = !coop ? HeldSeat()
+			: piloting && Piloted.Ship != nullptr ? cs::Ref<IEmbodiable>(Embodiables::HelmOf(World(), Piloted.Ship)) : nullptr;
 		auto ship = heldSeat != nullptr ? heldSeat->Subject().Ship : nullptr;
 		// US-T417: the census keys on the body (a craft off your own carrier is the carrier), the seat journal on the seat.
 		auto bodyShip = HrBodyShip(heldSeat);
-		auto heldNonHelm = HeldNonHelm();
-		auto fight = HoldRewindBattle();
+		auto heldNonHelm = coop ? nullptr : HeldNonHelm();
+		// US-T423: in co-op the fight the host keeps (its frame names it), so every peer keeps the same one.
+		auto fight = !coop ? HoldRewindBattle() : coopHrFight != nullptr && !coopHrFight->Over ? coopHrFight : nullptr;
 		// US-T419: fought on since it would have ended (or put back to before): its end, if it comes again, starts afresh.
 		if (h.Hooked == nullptr || !h.Hooked->EndHeld) h.EndHeldSince = HrNone;
 		if (fight != h.Fight)
@@ -1002,6 +1110,7 @@ namespace SpaceGod
 		// US-T410: the bookings of the fight in view wait out the window.
 		HookHoldRewindBookings(fight);
 		HrCensus census = HrTakeCensus(fight, bodyShip, pilotFrameBody, piloting);
+		if (coop) census.Coop = CoopHoldRewindSeats();
 		if (h.HasLast && !(census == h.Last))
 		{
 			h.BarrierWhy = HrWhyChanged(h.Last, census);
@@ -1082,12 +1191,12 @@ namespace SpaceGod
 	cs::String UnitySpaceApp::HoldRewindRefusal()
 	{
 		auto& h = *holdRewind;
-		double wall = Time::realtimeSinceStartupAsDouble;
-		if (Coop::CoopPeer::Current() != nullptr) return "Rewind is single-player for now";
-		if (!rewindEnabled) return "Rewind is off in this run (-norewind, -demo, -capture)";
-		if (wall < h.CooldownUntil) return cs::Cat("REWIND ready in ", static_cast<int>(std::ceil(h.CooldownUntil - wall)), " s");
+		// US-T423: everything here is the same on every peer in co-op (the frame clock, the shared world and helm).
+		const bool coop = Coop::CoopPeer::Current() != nullptr;
+		if (!coop && !rewindEnabled) return "Rewind is off in this run (-norewind, -demo, -capture)";
+		if (h.FrameClock < h.CooldownUntil) return cs::Cat("REWIND ready in ", static_cast<int>(std::ceil(h.CooldownUntil - h.FrameClock)), " s");
 		if (Travel->Active || InFtlCruise() || Ftl->Stage != FtlStage::Idle) return "No rewind between the stars or under FTL";
-		if (rewindReplaying) return "A rewind is already replaying";
+		if (!coop && rewindReplaying) return "A rewind is already replaying";
 		if (h.Fight == nullptr && h.Pilot.empty()) return "Nothing here to rewind: fly a hull or watch a fight";
 		double oldest = HoldRewindCurve::Oldest(h.LivedS, HrTuning::WindowS, h.Clock.empty() ? h.LivedS : h.Clock.front().T, h.FloorT);
 		if (h.Clock.size() < 2 || h.LivedS - oldest < HrTuning::MinHoldS) return "Nothing to rewind yet";
@@ -1099,13 +1208,125 @@ namespace SpaceGod
 	bool UnitySpaceApp::UpdateHoldRewind(float dt)
 	{
 		if (holdRewind == nullptr) holdRewind = std::make_shared<HoldRewindState>();
+		Coop::CoopPeer* peer = Coop::CoopPeer::Current();
+		if (peer == nullptr)
+		{
+			// US-T420: with real keys the self-test presses Shift+R itself: only the key counts, as for a player.
+			auto& h = *holdRewind;
+			return StepHoldRewind(dt, Input.HoldRewind || (h.Test.ForceDown && !h.Test.RealKeys));
+		}
+		// US-T423: co-op. Every peer steps the hold on the frame's key (every player's held, the host's call) and dt, inside
+		// the shared steps; whether the frame is a hold frame is the host's (its "ho"), which a client follows.
+		bool hostHold = false;
+		if (peer->IsClient())
+		{
+			const Coop::FrameRecord* rec = peer->ClientRecord;
+			if (rec == nullptr) return false;
+			for (const auto& e : rec->Entries)
+				if (e == "ho") hostHold = true;
+			// A frame replayed again (its Update stopped at the pause menu before the clock step) has had its hold step.
+			if (rec->Frame == coopHrStepFrame) return hostHold;
+			coopHrStepFrame = rec->Frame;
+		}
+		bool down = CoopHoldRewindKey(*peer);
+		bool held;
+		{
+			HrSharedScope shared(coopShared, true);
+			held = StepHoldRewind(dt, down);
+		}
+		if (peer->IsHost()) return held;
+		if (held != hostHold && !coopHrMismatchWarned)
+		{
+			coopHrMismatchWarned = true;
+			Coop::CoopPeer::Warn(cs::Cat("hold rewind: this peer's hold (", held ? "held" : "not held", ") differs from the host's frame ", peer->Frame(),
+				" (", hostHold ? "held" : "not held", "): following the host"));
+		}
+		return hostHold;
+	}
+
+	bool UnitySpaceApp::CoopHoldRewindKey(Coop::CoopPeer& peer)
+	{
+		namespace Wire = Coop::Wire;
+		bool local = Input.HoldRewind;
+		bool all = false;
+		int mask = 0, index = -1;
+		static const cs::List<cs::Ref<Battle>> none;
+		const auto& battles = World() != nullptr ? World()->War->Battles : none;
+		if (peer.IsHost())
+		{
+			if (Coop::CoopSmoke::HostHoldsRewind()) local = true;
+			all = peer.HostHoldAll(local, mask);
+			// The fight kept is the host's: the helm's, else the one its camera watches.
+			cs::Ref<Battle> fight;
+			{
+				HrSharedScope shared(coopShared, true);
+				fight = HoldRewindBattle();
+			}
+			for (int i = 0; fight != nullptr && i < battles.Count(); i++)
+				if (battles[i] == fight) index = i;
+			coopHrEntry = all || index >= 0 || mask != 0 ? cs::Cat("hr ", all ? 1 : 0, " ", index, " ", mask) : cs::String();
+		}
+		else
+		{
+			if (local != coopHrSent)
+			{
+				coopHrSent = local;
+				peer.RequestHoldRewind(local);
+			}
+			for (const auto& e : peer.ClientRecord->Entries)
+			{
+				if (!Wire::StartsWith(e, "hr ")) continue;
+				auto f = Wire::Split(e, ' ');
+				if (f.size() < 4) continue;
+				try
+				{
+					all = f[1] == "1";
+					index = Wire::ParseI(f[2]);
+					mask = Wire::ParseI(f[3]);
+				}
+				catch (const std::exception&) { all = false; index = -1; mask = 0; }
+			}
+		}
+		coopHrFight = index >= 0 && index < battles.Count() ? battles[index] : nullptr;
+		coopHrAll = all;
+		coopHrMask = mask;
+		int state = (all ? 1 << 8 : 0) | mask;
+		if (state != coopHrLogged)
+		{
+			coopHrLogged = state;
+			long long frame = CoopHoldRewindFrameNo(peer);
+			if (all) Coop::CoopPeer::Log(cs::Cat("hold rewind: every player holds Shift+R at frame ", frame));
+			else if (mask == 0) Coop::CoopPeer::Log(cs::Cat("hold rewind: nobody holds Shift+R at frame ", frame));
+			else Coop::CoopPeer::Log(cs::Cat("hold rewind: ", CoopHoldRewindWaiting(), " (frame ", frame, ")"));
+		}
+		return all;
+	}
+
+	void UnitySpaceApp::CoopHoldRewindFrame(bool held)
+	{
+		Coop::CoopPeer* peer = Coop::CoopPeer::Current();
+		if (peer == nullptr) return;
+		if (peer->IsHost())
+		{
+			if (peer->Open() != nullptr) return;
+			Coop::FrameRecord* rec = peer->HostOpenHoldFrame();
+			rec->Before = Coop::ClockState::Of(*Clock);
+			rec->JdAfter = Clock->Jd;
+			rec->Entries.push_back("ho");
+			if (!coopHrEntry.empty()) rec->Entries.push_back(coopHrEntry);
+			return;
+		}
+		if (held && peer->ClientRecord != nullptr) peer->Consumed = true;
+	}
+
+	bool UnitySpaceApp::StepHoldRewind(float dt, bool down)
+	{
 		auto& h = *holdRewind;
+		h.FrameClock += dt; // US-T423: the cooldown's clock
 		if (h.JustResumed > 0) h.JustResumed--;
 		// US-T417: set again by UpdatePiloting this frame while the hull flown's fate is still held back.
 		if (h.OwnFateHeld == 0) h.OwnFateSince = HrNone;
 		h.OwnFateHeld = 0;
-		// US-T420: with real keys the self-test presses Shift+R itself: only the key counts, as for a player.
-		bool down = Input.HoldRewind || (h.Test.ForceDown && !h.Test.RealKeys);
 		bool pressed = down && !h.KeyWasDown;
 		h.KeyWasDown = down;
 		if (!h.Active)
@@ -1120,7 +1341,9 @@ namespace SpaceGod
 			// The designer's rule: real time first, then real seconds back.
 			if (Clock->WarpIndex > 0) Clock->SetWarp(0);
 			bool piloting = IsPiloting() && World()->PilotedShip == h.PilotShip && !h.Pilot.empty();
-			h.AtPress = HrCaptureAnchor(h.LivedS, h.Fight, piloting, pilot(), piloting ? h.PilotShip : nullptr, pilotFrameBody, HeldNonHelm());
+			Coop::CoopPeer* peer = Coop::CoopPeer::Current();
+			// US-T423: in co-op no seat but the shared helm is put back (any player's seat changed is a barrier instead).
+			h.AtPress = HrCaptureAnchor(h.LivedS, h.Fight, piloting, pilot(), piloting ? h.PilotShip : nullptr, pilotFrameBody, peer != nullptr ? nullptr : HeldNonHelm());
 			h.Active = true;
 			h.Releasing = false;
 			h.PressT = h.LivedS;
@@ -1130,12 +1353,10 @@ namespace SpaceGod
 			h.Rate = HrTuning::StartRate;
 			h.JdAtPress = Clock->Jd;
 			h.Oldest = HoldRewindCurve::Oldest(h.LivedS, HrTuning::WindowS, h.Clock.front().T, h.FloorT);
+			if (peer != nullptr)
+				Coop::CoopPeer::Log(cs::Cat("hold rewind: plays the past back from frame ", CoopHoldRewindFrameNo(*peer), " (", h.Fight != nullptr ? h.Fight->Name : cs::String("no fight"),
+					", ", cs::Fmt(h.LivedS - h.Oldest, "F2"), " s reachable)"));
 			return true;
-		}
-		if (Coop::CoopPeer::Current() != nullptr)
-		{
-			EndHoldRewind();
-			return false;
 		}
 		if (!down)
 		{
@@ -1314,14 +1535,15 @@ namespace SpaceGod
 		h.Releasing = false;
 		auto atPress = h.AtPress;
 		h.AtPress = nullptr;
-		double wall = Time::realtimeSinceStartupAsDouble;
+		Coop::CoopPeer* peer = Coop::CoopPeer::Current();
 		// The world clock comes back to now: only the fight (and the helm) go back.
 		if (HrTuning::ViewSystemBack && Clock != nullptr) Clock->SetJd(h.JdAtPress);
-		auto putBack = [this](const HrAnchor& a)
+		auto putBack = [this, peer](const HrAnchor& a)
 		{
 			// US-T417: the seat first (its hand-backs and take-charges act on the live fight), then the fight over it, which
-			// then matches the seats it was taken with.
-			RestoreHoldRewindSeat(a.Seat, a.HasPilot, a.PilotShip);
+			// then matches the seats it was taken with. US-T423: in co-op no seat is put back (a seat or the helm changed
+			// since by any player is a barrier, so the seats are already as they were).
+			if (peer == nullptr) RestoreHoldRewindSeat(a.Seat, a.HasPilot, a.PilotShip);
 			HrRestoreFight(a);
 			if (a.HasPilot && IsPiloting() && World()->PilotedShip == a.PilotShip && a.PilotFrame >= 0)
 			{
@@ -1339,9 +1561,18 @@ namespace SpaceGod
 		h.ResumeFx = h.PressFx;
 		h.FxEnds++;
 		// A tap, or a hold that never got back: the present as it was at the press.
+		// US-T423: in co-op every peer says where it played on from, and the fight it has then (the same on every peer).
+		auto coopLog = [this, peer](const cs::String& what)
+		{
+			if (peer == nullptr) return;
+			auto& st = *holdRewind;
+			Coop::CoopPeer::Log(cs::Cat("hold rewind: played on ", what, " at frame ", CoopHoldRewindFrameNo(*peer), "; fight digest ",
+				Coop::Wire::Hex(HoldRewindFightDigest(st.Fight))));
+		};
 		if (h.HeldS < HrTuning::MinHoldS || h.PressT - h.Tau < 1e-3)
 		{
 			if (atPress != nullptr) putBack(*atPress);
+			coopLog("from the press (a tap)");
 			return;
 		}
 		// The resume point: the newest kept at or before the moment reached, none from before the last barrier nor the
@@ -1359,15 +1590,17 @@ namespace SpaceGod
 					clamped = true;
 					break;
 				}
-		h.CooldownUntil = wall + HrTuning::CooldownS;
+		h.CooldownUntil = h.FrameClock + HrTuning::CooldownS; // US-T423: on the frame clock (was the wall clock)
 		if (best == nullptr)
 		{
 			if (atPress != nullptr) putBack(*atPress);
 			ShowToast(cs::Cat("Could not play on from back there: ", h.BarrierWhy.empty() ? cs::String("nothing kept to play on from") : h.BarrierWhy,
 				", and that is not undone yet. Back to now"));
+			coopLog(cs::Cat("from the press (", h.BarrierWhy.empty() ? cs::String("nothing kept to play on from") : h.BarrierWhy, ")"));
 			return;
 		}
 		putBack(*best);
+		coopLog(cs::Cat("from ", cs::Fmt(h.PressT - best->T, "F2"), " s back", clamped ? cs::Cat(" (no further: ", h.BarrierWhy, ")") : cs::String()));
 		h.ResumeFx = h.PressFx - static_cast<float>(h.PressT - best->T);
 		double went = h.PressT - best->T;
 		if (h.Test.On)
@@ -1410,9 +1643,12 @@ namespace SpaceGod
 
 	void UnitySpaceApp::DrawHoldRewind()
 	{
-		if (holdRewind == nullptr || ScreenCleared || Coop::CoopPeer::Current() != nullptr || !rewindEnabled) return;
+		// US-T423: in co-op too (the rewind is the party's: one machine's -norewind does not hide it).
+		const bool coop = Coop::CoopPeer::Current() != nullptr;
+		if (holdRewind == nullptr || ScreenCleared || (!coop && !rewindEnabled)) return;
 		auto& h = *holdRewind;
-		if (!h.Active && h.Fight == nullptr && !IsPiloting()) return;
+		cs::String waiting = coop ? CoopHoldRewindWaiting() : cs::String();
+		if (!h.Active && h.Fight == nullptr && !IsPiloting() && waiting.empty()) return;
 		if (h.Text == nullptr)
 		{
 			h.Text = cs::New<GUIStyle>();
@@ -1420,7 +1656,7 @@ namespace SpaceGod
 			h.Text->alignment = TextAnchor::MiddleRight;
 			h.Text->clipping = TextClipping::Clip;
 		}
-		double wall = Time::realtimeSinceStartupAsDouble;
+		double wall = h.FrameClock; // US-T423: the cooldown's clock (was the wall clock)
 		cs::String line;
 		Color tint = UI::Hud::Dim;
 		Rect r(Screen::width - 520.0f, 44, 500, 20);
@@ -1431,7 +1667,7 @@ namespace SpaceGod
 			if (h.Tau <= h.Oldest + 1e-6)
 				line = cs::Cat(line, h.Oldest <= h.FloorT + 1e-6 ? "  (back to the last rewind: no further)" : "  (as far back as it goes)");
 			if (h.BarrierT > h.Tau) line = cs::Cat(line, "  -  plays on no earlier than -", cs::Fmt(h.PressT - h.BarrierT, "F1"), " s: ", h.BarrierWhy);
-			line = cs::Cat(line, "  -  let go to play on");
+			line = cs::Cat(line, coop ? "  -  every player holds: anyone lets go to play on" : "  -  let go to play on");
 			tint = Color(1.0f, 0.78f, 0.3f, 1.0f);
 			r = Rect((Screen::width - 900.0f) * 0.5f, 132, 900, 24);
 			h.Text->alignment = TextAnchor::MiddleCenter;
@@ -1443,8 +1679,17 @@ namespace SpaceGod
 			h.Text->fontSize = 12;
 			if (wall < h.CooldownUntil) line = cs::Cat("REWIND in ", static_cast<int>(std::ceil(h.CooldownUntil - wall)), " s");
 			else line = cs::Cat("REWIND ready  (hold ", Input::KeyBindings::Keys(Input::KeyAction::HoldRewind), ")");
+			// US-T423: in co-op some players hold the key and others not yet: who it is waiting for.
+			if (!waiting.empty())
+			{
+				line = wall < h.CooldownUntil ? cs::Cat(waiting, "  -  ready in ", static_cast<int>(std::ceil(h.CooldownUntil - wall)), " s") : waiting;
+				tint = Color(1.0f, 0.78f, 0.3f, 1.0f);
+				r = Rect((Screen::width - 1000.0f) * 0.5f, 132, 1000, 24);
+				h.Text->alignment = TextAnchor::MiddleCenter;
+				h.Text->fontSize = 15;
+			}
 			// US-T417: the hull flown lost or taken, its fate held back: how long is left to undo it, centred and loud.
-			if (h.OwnFateHeld != 0)
+			else if (h.OwnFateHeld != 0)
 			{
 				double left = std::max(0.0, HrTuning::WindowS - (h.LivedS - h.OwnFateSince));
 				cs::String what = h.OwnFateHeld == 2 ? "YOUR HULL IS TAKEN" : "YOUR HULL IS LOST";
@@ -1670,8 +1915,9 @@ namespace SpaceGod
 			case 5: // The cooldown: refused until it ends, free after.
 			{
 				if (wall - t.PhaseWall >= 2.0 && Clock->Paused()) Clock->SetPaused(false);
-				if (wall < h.CooldownUntil - 0.5) return true;
-				if (wall < h.CooldownUntil)
+				// US-T423: the cooldown runs on the hold's frame clock (the phases' own timing stays on the wall clock).
+				if (h.FrameClock < h.CooldownUntil - 0.5) return true;
+				if (h.FrameClock < h.CooldownUntil)
 				{
 					if (t.SettleFrames >= 0)
 					{
@@ -1680,7 +1926,7 @@ namespace SpaceGod
 					}
 					return true;
 				}
-				if (wall < h.CooldownUntil + 0.2) return true;
+				if (h.FrameClock < h.CooldownUntil + 0.2) return true;
 				cs::String refusal = HoldRewindRefusal();
 				selfCheck(refusal.empty(), cs::Cat("free again once the cooldown is over", refusal.empty() ? cs::String() : cs::Cat(": ", refusal)));
 				selfCheck(std::fabs(HrTuning::CooldownS - 10) < 1e-9 && std::fabs(HrTuning::WindowS - 10) < 1e-9, "a 10 s window and a 10 s cooldown");

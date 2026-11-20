@@ -201,6 +201,32 @@ namespace SpaceGod::Coop
 		if (IsClient() && hostLink) hostLink->Send(cs::Cat("resync ", why));
 	}
 
+	void CoopPeer::RequestHoldRewind(bool down)
+	{
+		if (IsClient() && hostLink) hostLink->Send(down ? "hrkey 1" : "hrkey 0");
+	}
+
+	void CoopPeer::SmokeHostHold(bool down)
+	{
+		if (IsClient() && hostLink) hostLink->Send(down ? "smokehold 1" : "smokehold 0");
+	}
+
+	bool CoopPeer::HostHoldAll(bool hostDown, int& mask) const
+	{
+		mask = 0;
+		bool all = true;
+		for (const auto& p : Players)
+		{
+			if (p == nullptr || p->Left) continue;
+			bool down = false;
+			if (p->Seat == localSeat) down = hostDown;
+			else if (auto k = holdKeys.find(p->Seat); k != holdKeys.end()) down = k->second;
+			if (down) mask |= 1 << p->Seat;
+			else all = false;
+		}
+		return all && mask != 0;
+	}
+
 	bool CoopPeer::FreshEdges(long long& lastTick)
 	{
 		if (!EdgesPerTick) return true;
@@ -300,6 +326,15 @@ namespace SpaceGod::Coop
 		return open.get();
 	}
 
+	FrameRecord* CoopPeer::HostOpenHoldFrame()
+	{
+		if (open) return open.get();
+		open = std::make_unique<FrameRecord>();
+		open->Frame = ++frameNo;
+		open->Dt = Time::unscaledDeltaTime;
+		return open.get();
+	}
+
 	std::vector<std::pair<int, cs::String>> CoopPeer::TakeClockRequests()
 	{
 		auto list = std::move(clockRequests);
@@ -353,6 +388,9 @@ namespace SpaceGod::Coop
 	{
 		if (!app->CoopSaveBlocker().empty()) return; // tried again next frame
 		syncWanted = false;
+		// US-T423: the hold rewind's recording is not in the save: every peer starts it afresh from the sync (a hold under
+		// way comes back to its press, the world's held-back bookings are made so the save holds them).
+		app->ResetHoldRewindForSync(/*book:*/ true);
 		double t0 = FPlatformTime::Seconds();
 		// US-T43: what the save does not hold (who flies the helm, every player's seat, the shared settings), taken before it,
 		// so every peer (this one too) takes the seats again after loading the same bytes.
@@ -434,6 +472,7 @@ namespace SpaceGod::Coop
 		if (it == remotes.end()) return;
 		int seat = it->Seat;
 		remotes.erase(it);
+		holdKeys.erase(seat); // US-T423
 		if (seat > 0)
 		{
 			pending.push_back(cs::Cat("s ", CommandCodec::Write(cs::New<ReleaseSeatCommand>(PlayerId(seat)))));
@@ -512,6 +551,15 @@ namespace SpaceGod::Coop
 					pending.push_back(cs::Cat("a ", r.Seat, " set ", rest));
 					pending.push_back(cs::Cat("set ", rest));
 				}
+			}
+			// US-T423: the hold rewind's key, every player's: the host's frames carry whether all of them hold it.
+			else if (kind == "hrkey")
+			{
+				if (r.Seat >= 0) holdKeys[r.Seat] = rest == "1";
+			}
+			else if (kind == "smokehold")
+			{
+				if (CoopSmoke::Active()) CoopSmoke::SetHostHoldsRewind(rest == "1");
 			}
 			else if (kind == "travel") pending.push_back(cs::Cat("t ", r.Seat, " ", rest));
 			else if (kind == "load") pending.push_back(cs::Cat("a ", r.Seat, " load ", rest));
