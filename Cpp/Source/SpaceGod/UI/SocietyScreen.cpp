@@ -1838,6 +1838,19 @@ namespace SpaceGod::UI
 			if (o->Leader != nullptr) links.emplace_back(cs::Cat("Led by ", o->Leader->FullName()), CivPick::Person(o->Leader->Id));
 			if (o->Owner != nullptr) links.emplace_back(cs::Cat("House ", o->Owner->Surname), CivPick::House(o->Owner->Id));
 			if (o->Faction != nullptr) links.emplace_back(o->Faction->Name, CivPick::Faction(o->Faction->Name));
+			// US-T387: the god's-eye view of their affairs: who they stray with (or who strays with them), whether it came out, and
+			// whether a hidden heir of it may yet come forward. Read only.
+			if (civ.Kinship != nullptr)
+				for (const auto& a : civ.Kinship->Affairs)
+				{
+					if (a == nullptr || a->Who == nullptr || a->Whom == nullptr || (a->Who != c && a->Whom != c)) continue;
+					auto lover = a->Who == c ? a->Whom : a->Who;
+					bool secret = cs::Double::IsNaN(a->FoundOutJd);
+					lines.Add(cs::Cat(secret ? "Secretly (seen only by your eye) the lover of " : "The lover of ", lover->FullName(), " since ", SocietyDate(a->StartedJd),
+						secret ? ", not found out" : cs::Cat(", found out ", SocietyDate(a->FoundOutJd)),
+						cs::Double::IsNaN(a->HeirDueJd) ? cs::String() : cs::Cat("; a hidden heir of it may come forward ", a->HeirDueJd > jd ? cs::Cat("by ", SocietyDate(a->HeirDueJd)) : cs::String("any day"))));
+					links.emplace_back(cs::Cat(secret ? "Secret lover: " : "Lover: ", lover->FullName()), CivPick::Person(lover->Id));
+				}
 			if (o->Rival != nullptr) links.emplace_back(cs::Cat("Rival: ", Narrator::OrgName(*o->Rival)), CivPick::Org(o->Rival->Id));
 			if (o->Parent != nullptr) links.emplace_back(cs::Cat("Split from ", Narrator::OrgName(*o->Parent)), CivPick::Org(o->Parent->Id));
 			// US-T323: who is in it (the leader, then the best known), what split from it and who is set against it.
@@ -2132,6 +2145,11 @@ namespace SpaceGod::UI
 			float x = 0;
 			linkH = links.empty() ? 0.0f : 28.0f;
 			for (const auto& l : links)
+						// US-T387: a succession in doubt, a snap election called early, and the way its last stance leaned. Read only.
+						if (!cs::Double::IsNaN(r->CrisisUntil) && r->CrisisUntil > jd)
+							lines.Add(cs::Cat("Succession crisis: who rules is in doubt until ", SocietyDate(r->CrisisUntil)));
+						if (r->Called) lines.Add("Election called early, out of turn");
+						if (r->Leaning != 0) lines.Add(cs::Cat("Its last stance leaned ", r->Leaning > 0 ? "hawkish" : "dovish"));
 			{
 				float bw = Mathf::Min(w, link->CalcSize(GUIContent(l.first)).x + 16);
 				if (x > 0 && x + bw > w) { x = 0; linkH += 28; }
