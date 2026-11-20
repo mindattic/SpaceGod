@@ -3,6 +3,7 @@
 #include "UnitySpaceApp.h"
 
 #include "Camera/SpaceCamera.h"
+#include "Coop/CoopPeer.h" // US-T414: single-player takes the seat before letting go of the helm
 #include "Combat/Battle.h"
 #include "Combat/BroadcastArrays.h" // US-T96
 #include "Combat/CombatSpecs.h" // US-T170: a craft's dry mass, for its feel
@@ -134,14 +135,21 @@ namespace SpaceGod
 			if (switching) SpaceCamera->Hurry();
 			return;
 		}
-		if (IsPiloting()) ExitPiloting();
-		if (CoopTakeSeat(next)) return; // US-T44: to the host in co-op; the view follows when a frame grants it
+		if (Coop::CoopPeer::Current() != nullptr)
+		{
+			if (IsPiloting()) ExitPiloting();
+			if (CoopTakeSeat(next)) return; // US-T44: to the host in co-op; the view follows when a frame grants it
+		}
+		// US-T414: the helm is let go only once the seat is taken. The session weighs the take against what the player
+		// holds (EmbodyContext::Of adds World->PilotedShip's helm), so leaving the helm first made a gun on the very hull
+		// flown look like a hull in battle the player had no hold on, and a refused take left the player holding nothing.
 		if (!SwitchSeat(next))
 		{
 			cs::String blocker = next->Blocker();
 			ShowToast(cs::Cat("Can't take ", next->Name(), ": ", !blocker.empty() ? blocker : cs::String("out of reach")));
 			return;
 		}
+		if (IsPiloting()) ExitPiloting();
 		auto pose = next->PoseAt(Clock->Jd);
 		seatAim = ToVector(pose.Forward.SwapYZ()).normalized();
 		Clock->SetWarp(0);
