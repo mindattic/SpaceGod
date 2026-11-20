@@ -1,8 +1,8 @@
 {
-  "_comment": "The digestHash every scenario must produce (Bench/README.md, 'Digest format'). First recorded from Unity.SpaceGod's C# Core (Bench.CSharp, US-T23); this repo is C++-only since c965508, so the C++ Core is the reference and these are re-recorded from it whenever a sim change legitimately moves them (last: US-T229). tools/bench.ps1 checks against these.",
-  "sol-idle": "14CF3950A426A4A2",
-  "high-warp": "CC6F82EC99CCE401",
-  "economy-year": "47E99136E2166522",
-  "battle": "91D433A62B3AF515",
-  "galaxy-ftl": "7D3DD9696E3F429F"
+  "_comment": "The digestHash every scenario must produce (Bench/README.md, 'Digest format'). First recorded from Unity.SpaceGod's C# Core (Bench.CSharp, US-T23); this repo is C++-only since c965508, so the C++ Core is the reference and these are re-recorded from it whenever a sim change legitimately moves them (last: US-T411, after US-T229: a git bisect over the 87 commits since found 1891497 'Stoppable escapes' (US-T98, an AI hull's spoolable FTL escape, gunners aiming for its engines while it charges) as the first to move them, a deliberate new AI mechanic, not a bug; nothing in US-T296 through US-T413 moved them further, confirmed by running Bench on the commit right before that session and on this commit and getting byte-identical digests both times).",
+  "sol-idle": "12ADEAFC29C2FE00",
+  "high-warp": "9A82A39F36854CA0",
+  "economy-year": "F945447FEE069CD3",
+  "battle": "E80E32852A674A0D",
+  "galaxy-ftl": "793766F0C2F38492"
 }
