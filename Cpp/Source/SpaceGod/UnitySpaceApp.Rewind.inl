@@ -64,7 +64,18 @@ private:
 		bool Intervened = false;
 		/// <summary>A hash of the world just after the frame (CoopDigest), on every RewindCheckEvery-th frame (0: none).</summary>
 		unsigned long long Check = 0;
+		/// <summary>US-T99: whether the frame ran the world's adventures, and round which point (the camera's, PlayerHelioKm):
+		/// a replay runs them round the logged point, as a co-op client runs them round the host's (FrameRecord), so a
+		/// restored view that stands elsewhere spawns nothing different.</summary>
+		bool Adventures = false;
+		Core::DVec3 AdventurePoint;
 	};
+	/// <summary>US-T99: the frame whose adventures this frame's CoopUpdateAdventures notes (live) or reads (replay); -1: none.</summary>
+	long long rewindAdventureSerial = -1;
+	bool rewindAdventureFromLog = false;
+	/// <summary>US-T99: single player's adventures for this frame: round the camera live (noted in the log), round the logged
+	/// point while a seek replays. Called from CoopUpdateAdventures in place of its single-player line.</summary>
+	void RewindAdventures(bool wanted);
 
 	/// <summary>Every this many logged frames the world's digest is kept, so a replay can tell whether it is re-living the
 	/// play exactly (about once a second at 60 fps).</summary>
@@ -83,7 +94,7 @@ private:
 	long long rewindNextSerial = 0;
 	/// <summary>Each keyframe's first frame after it (the frame its world steps into).</summary>
 	std::unordered_map<int, long long> rewindKeySerial;
-	/// <summary>About 10 minutes of frames at 60 fps (a frame is under 64 bytes).</summary>
+	/// <summary>About 10 minutes of frames at 60 fps (a frame is under 112 bytes).</summary>
 	static constexpr size_t RewindMaxFrames = 40000;
 	/// <summary>A seek replays at most this many real seconds of play (replay runs at the speed it was played).</summary>
 	static constexpr double RewindMaxReplayS = 90;

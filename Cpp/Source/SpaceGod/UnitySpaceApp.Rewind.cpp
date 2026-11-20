@@ -76,6 +76,9 @@ namespace SpaceGod
 			rewindFrameStarted = false;
 			if (const RewindFrame* f = RewindFrameAt(rewindReplayNext))
 			{
+				// The rest of this frame (its adventures) reads the logged frame's.
+				rewindAdventureSerial = f->Serial;
+				rewindAdventureFromLog = true;
 				if (Clock->Jd != f->JdAfter) rewindReplayDrift++;
 				// The world itself, where the play kept a check: the replay is exact only while every one matches.
 				if (f->Check != 0)
@@ -219,6 +222,8 @@ namespace SpaceGod
 
 	bool UnitySpaceApp::RewindFrameStart(float& dt)
 	{
+		rewindAdventureSerial = -1;
+		rewindAdventureFromLog = false;
 		rewindFrameStarted = Clock != nullptr;
 		if (Clock == nullptr) return false;
 		if (!rewindReplaying)
@@ -269,6 +274,33 @@ namespace SpaceGod
 		if (f.Serial % RewindCheckEvery == 0) f.Check = RewindWorldCheck();
 		rewindFrames.push_back(f);
 		while (rewindFrames.size() > RewindMaxFrames) rewindFrames.pop_front();
+		rewindAdventureSerial = f.Serial; // this frame's adventures, later in it, are noted on it
+	}
+
+	void UnitySpaceApp::RewindAdventures(bool wanted)
+	{
+		// A replayed frame runs the adventures it ran, round the point it ran them round: the camera a seek lands with
+		// need not stand where it stood (co-op's client does the same with the host's FrameRecord).
+		if (rewindAdventureFromLog)
+		{
+			if (const RewindFrame* f = RewindFrameAt(rewindAdventureSerial))
+			{
+				if (f->Adventures) World()->UpdateAdventures(Clock->Jd, f->AdventurePoint);
+				return;
+			}
+		}
+		// Live: exactly the original's line, and the frame logged this frame notes what it did.
+		DVec3 at;
+		if (wanted)
+		{
+			at = PlayerHelioKm();
+			World()->UpdateAdventures(Clock->Jd, at);
+		}
+		if (rewindAdventureSerial >= 0 && !rewindFrames.empty() && rewindFrames.back().Serial == rewindAdventureSerial)
+		{
+			rewindFrames.back().Adventures = wanted;
+			rewindFrames.back().AdventurePoint = at;
+		}
 	}
 
 	unsigned long long UnitySpaceApp::RewindWorldCheck()

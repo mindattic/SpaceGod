@@ -285,7 +285,7 @@ The owner approved the build on 2026-11-19. The phases below each land on their 
   logged dt), the clock's whole state just before it advanced (co-op's `ClockState`) and the date after, and whether the
   player touched a key, a mouse button, the wheel or the pad that frame. Frames carry consecutive serials, and each
   keyframe records the serial of the frame its world steps into next. The log holds about 10 minutes of frames (40,000,
-  under 64 bytes each). Play going on after a rewind drops the old future from the log as it goes.
+  under 112 bytes each). Play going on after a rewind drops the old future from the log as it goes.
 - *Seek.* `RewindSeek(T)` (`sg.Rewind seek <s back>`, `sg.Rewind at <session s>`, a click on the timeline bar) restores
   the keyframe at or before T, then replays the logged frames through the game's own frame: each replayed frame gets
   its logged dt and has its clock put in the logged state first (as a co-op client does with the host's frame), and the
@@ -303,12 +303,19 @@ The owner approved the build on 2026-11-19. The phases below each land on their 
   play exactly is measured in the game, not assumed: the arrival toast says when it drifted, the log gets a line
   either way, and `sg.Rewind list` shows the last replay's verdict ("exact (N checks matched)", or where it first
   drifted). The check only reads the world; nothing in the simulation calls it.
+- *Adventures replay round the logged point.* The world's adventures spawn round the camera (`PlayerHelioKm`), and a
+  restored view need not stand where the play's did. Each logged frame now also keeps whether it ran the adventures
+  and round which point, and a replayed frame runs them round that point (`RewindAdventures`), as a co-op client runs
+  them round the host's (`FrameRecord::AdventurePoint`). Live play calls them exactly as before; the log only notes it.
 - *Not yet.* The player's own input in the log is only marked, not replayed, so a seek past an action lands just before
-  it; replaying it is the input recorder (per `EmbodiableKey` frames, orders, clock keys; US-T169's requirement 1). The
-  replay checks above are how a remaining source of drift shows: the world's adventures spawn round the camera's point
-  (`PlayerHelioKm`), which a restored view need not share, and console commands (`sg.*`) are not marked as input. In
-  co-op the log is off and a seek lands on the keyframe. The analytic preview on the bar, and the US-T104 fork at the
-  first intervention after a seek, are still to come.
+  it; replaying it is the input recorder (per `EmbodiableKey` frames, orders, clock keys; US-T169's requirement 1).
+  Much of the game reads the devices directly (the screens' keys and IMGUI clicks) rather than `InputState`, so logging
+  `InputState` alone would replay only part of an action; the recorder has to sit at the device seam
+  (`Input/InputDevice.h`) or log commands. Console commands typed at the console are marked as input (their keys
+  are), but ones run from the command line (`-ExecCmds`) or a script are not; those runs are tours and captures, which
+  keep no rewind. The replay checks above show any drift that remains. In co-op the log is off and a seek lands on the
+  keyframe. The analytic preview on the bar, and the US-T104 fork at the first intervention after a seek, are still to
+  come.
 
 **Phase 4: cheaper storage and capture.** Use Oodle Kraken deltas against the parent keyframe, with every 16th
 keyframe whole. That needs the engine's Oodle SDK linked into the game module, not only into Bench.Rewind. Add the

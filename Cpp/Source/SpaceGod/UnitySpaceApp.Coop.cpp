@@ -188,7 +188,7 @@ namespace SpaceGod
 		CoopPeer* peer = CoopPeer::Current();
 		if (peer == nullptr)
 		{
-			if (wanted) World()->UpdateAdventures(Clock->Jd, PlayerHelioKm());
+			RewindAdventures(wanted); // US-T99: as before live (noted in the rewind log); round the logged point while a seek replays
 			return;
 		}
 		if (peer->IsHost())
