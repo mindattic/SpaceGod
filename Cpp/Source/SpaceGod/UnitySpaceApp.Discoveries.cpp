@@ -11,6 +11,7 @@
 #include "World.h"
 #include "Comms/Pilots.h"
 #include "Input/InputDevice.h" // US-T349
+#include "Input/KeyBindings.h" // US-T390
 #include "Law/Law.h"
 #include "Systems/DiscoveryLog.h"
 #include "Systems/Galaxy.h"
@@ -62,7 +63,7 @@ namespace SpaceGod
 				case DiscoveryKind::Derelict:
 				case DiscoveryKind::VoidSight:
 				case DiscoveryKind::Sighting:
-					ShowToast(cs::Cat("DISCOVERY LOGGED: ", e->Name, "   (Shift+O for the discoveries)"));
+					ShowToast(cs::Cat("DISCOVERY LOGGED: ", e->Name, "   (", Input::KeyBindings::Keys(Input::KeyAction::Discoveries), " for the discoveries)")); // US-T390
 					return;
 				default:
 					break;
@@ -135,7 +136,7 @@ namespace SpaceGod
 	void UnitySpaceApp::DrawDiscoveries()
 	{
 		if (!discoveriesScreen) discoveriesScreen = cs::New<UI::DiscoveriesScreen>(this);
-		if (discoveriesScreen->Draw("Esc or Shift+O to close")) ShowDiscoveries = false;
+		if (discoveriesScreen->Draw(cs::Cat("Esc or ", Input::KeyBindings::Keys(Input::KeyAction::Discoveries), " to close"))) ShowDiscoveries = false; // US-T390
 	}
 
 	bool UnitySpaceApp::UpdateDiscoveriesKeys()

@@ -10,6 +10,7 @@
 
 #include "UnitySpaceApp.h"
 #include "Input/InputDevice.h" // US-T331
+#include "Input/KeyBindings.h" // US-T390
 
 #include "Ships.h"
 #include "World.h"
@@ -184,8 +185,9 @@ namespace SpaceGod::UI
 				hardpoints, " hardpoints on ", parts.Count(), " components  ·  utility ", ShipComponents::Fitted(loadout),
 				" of ", sockets, " sockets  ·  credits ", Credits(ship->Faction->Treasury)), small);
 		GUI::Label(Rect(r.x + 12, r.y + 64, w - 24, 18), yard != nullptr
-			? "Pick a hardpoint or a utility socket (Up / Down), then what to fit (Left / Right, Enter).   E energy · B ballistic · M missile · SP spinal · SH shield · EN engine · U utility.   F2 to close"
-			: "Bring the ship alongside a shipyard (or a haven) to refit.   F2 to close", small);
+			? cs::Cat("Pick a hardpoint or a utility socket (Up / Down), then what to fit (Left / Right, Enter).   E energy · B ballistic · M missile · SP spinal · SH shield · EN engine · U utility.   ",
+				::SpaceGod::Input::KeyBindings::Keys(::SpaceGod::Input::KeyAction::Outfit), " to close")
+			: cs::Cat("Bring the ship alongside a shipyard (or a haven) to refit.   ", ::SpaceGod::Input::KeyBindings::Keys(::SpaceGod::Input::KeyAction::Outfit), " to close"), small); // US-T390
 
 		auto view = Rect(r.x + 8, r.y + 86, w - 16, listH);
 		auto content = Rect(0, 0, w - 34, contentH);

@@ -11,6 +11,7 @@
 #include "UI/HelpScreen.h"
 #include "UI/LogsScreen.h"
 #include "Input/InputDevice.h" // US-T349
+#include "Input/KeyBindings.h" // US-T390
 #include "GameLore.h"
 #include "UI/Icons.h"
 #include "Camera/SpaceCamera.h"
@@ -73,6 +74,18 @@ using namespace SpaceGod::Core;
 
 namespace SpaceGod::UI
 {
+	namespace
+	{
+		// US-T390: the save panel's keys as they are bound now, not the defaults.
+		cs::String SaveKeysHint()
+		{
+			using ::SpaceGod::Input::KeyAction;
+			using ::SpaceGod::Input::KeyBindings;
+			return cs::Cat(KeyBindings::Keys(KeyAction::QuickSave), " quicksave   ", KeyBindings::Keys(KeyAction::QuickLoad), " quickload   ",
+				KeyBindings::Keys(KeyAction::Saves), " close");
+		}
+	}
+
 	cs::Ref<ContactBook> Hud::Picture() const
 	{
 		return app->IsPiloting() && app->Piloted.Ship != nullptr ? (app->World()->Sensors != nullptr ? app->World()->Sensors->Player : nullptr) : nullptr;
@@ -134,7 +147,7 @@ namespace SpaceGod::UI
 			}
 			auto whole = Rect(0, 0, static_cast<float>(Screen::width), static_cast<float>(Screen::height));
 			if (!app->UiRects.Contains(whole)) app->UiRects.Add(whole); // the world under it takes no clicks
-			if (helpScreen->Draw("Esc, H or F1 to close")) app->ShowHelp = false;
+			if (helpScreen->Draw(cs::Cat("Esc, ", ::SpaceGod::Input::KeyBindings::Keys(::SpaceGod::Input::KeyAction::Help), " to close"))) app->ShowHelp = false; // US-T390
 			DrawToast();
 			return;
 		}
@@ -145,7 +158,7 @@ namespace SpaceGod::UI
 			if (!logsScreen) logsScreen = cs::New<LogsScreen>();
 			auto whole = Rect(0, 0, static_cast<float>(Screen::width), static_cast<float>(Screen::height));
 			if (!app->UiRects.Contains(whole)) app->UiRects.Add(whole); // the world under it takes no clicks
-			if (logsScreen->Draw(app->RecoveredLogKeys(), GameLore(), "Esc or Shift+L to close")) app->ShowLogs = false;
+			if (logsScreen->Draw(app->RecoveredLogKeys(), GameLore(), cs::Cat("Esc or ", ::SpaceGod::Input::KeyBindings::Keys(::SpaceGod::Input::KeyAction::Logs), " to close"))) app->ShowLogs = false; // US-T390
 			DrawToast();
 			return;
 		}
@@ -297,8 +310,8 @@ namespace SpaceGod::UI
 		cs::String blocked = app->SaveBlocker();
 		GUI::Label(Rect(r.x + 12, r.y + 30, w - 24, 18), !blocked.empty() ? blocked :
 			PlayerOptions::AutosaveSeconds() > 0 // US-T252: Settings > Gameplay > Autosave
-				? cs::Cat("F5 quicksave   F8 quickload   F6 close   ·   autosaves every ", cs::Fmt(PlayerOptions::AutosaveSeconds() / 60.0f, "0"), " minutes and on quit")
-				: cs::String("F5 quicksave   F8 quickload   F6 close   ·   autosaves on quit (Settings > Gameplay)"), small);
+				? cs::Cat(SaveKeysHint(), "   ·   autosaves every ", cs::Fmt(PlayerOptions::AutosaveSeconds() / 60.0f, "0"), " minutes and on quit")
+				: cs::Cat(SaveKeysHint(), "   ·   autosaves on quit (Settings > Gameplay)"), small);
 		GUI::contentColor = old;
 
 		bool enabled = GUI::enabled;

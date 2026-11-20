@@ -57,11 +57,19 @@
 #include "Systems/Galaxy.h"
 #include "Systems/InterstellarTraffic.h"
 #include "UI/Icons.h" // US-T263: the market board's sparklines
+#include "Input/KeyBindings.h" // US-T390
 
 using namespace SpaceGod::Core;
 
 namespace SpaceGod::UI
 {
+	namespace
+	{
+		// US-T390: a board's close hint names the key its binding has now, not the default it shipped with.
+		cs::String BoundKeys(::SpaceGod::Input::KeyAction action) { return ::SpaceGod::Input::KeyBindings::Keys(action); }
+		cs::String CloseHint(::SpaceGod::Input::KeyAction action) { return cs::Cat(BoundKeys(action), " to close"); }
+	}
+
 	// ---------------------------------------------------------------- bounty board
 
 	void Hud::DrawBounties()
@@ -91,10 +99,11 @@ namespace SpaceGod::UI
 			cs::Cat("BOUNTY BOARD  ·  ", port != nullptr ? cs::Cat(port->Name, "  ·  ", port->Owner->Name) : cs::String("no port in view")), title);
 		auto old = GUI::contentColor;
 		GUI::contentColor = Dim;
-		cs::String note = port == nullptr ? cs::String("Select a world with a port, or fly alongside one.   F4 to close")
-			: port->Owner->IsPirate ? cs::String("Nobody here answers to the law: a haven keeps no board.   F4 to close")
-			: board.Count() == 0 ? cs::String("Nobody is wanted here.   F4 to close")
-			: cs::Cat("Bounties posted by ", port->Owner->Name, ", biggest first; the price pays in full alive, half dead on a scanned wreck.   F4 to close");
+		cs::String closeBounties = CloseHint(::SpaceGod::Input::KeyAction::Bounties); // US-T390
+		cs::String note = port == nullptr ? cs::Cat("Select a world with a port, or fly alongside one.   ", closeBounties)
+			: port->Owner->IsPirate ? cs::Cat("Nobody here answers to the law: a haven keeps no board.   ", closeBounties)
+			: board.Count() == 0 ? cs::Cat("Nobody is wanted here.   ", closeBounties)
+			: cs::Cat("Bounties posted by ", port->Owner->Name, ", biggest first; the price pays in full alive, half dead on a scanned wreck.   ", closeBounties);
 		GUI::Label(Rect(r.x + 12, r.y + 28, w - 24, 18), note, small);
 		for (int i = 0; i < rows; i++)
 		{
@@ -158,11 +167,12 @@ namespace SpaceGod::UI
 		GUI::contentColor = Dim;
 		auto ship = app->World()->PilotedShip;
 		bool alongside = port != nullptr && ship != nullptr && app->NearPort(port);
-		cs::String note = port == nullptr ? "Select a world with a port, or fly alongside one.   F7 to close"
-			: port->Owner->IsPirate ? "A haven posts no contracts.   F7 to close"
-			: board.Count() == 0 ? "Nothing posted here today.   F7 to close"
-			: alongside ? "Jobs posted from what the system needs. Freight: buy the crates at any market and bring them in.   F7 to close"
-			: "Fly alongside to take a job (P to pilot a ship).   F7 to close";
+		cs::String closeContracts = CloseHint(::SpaceGod::Input::KeyAction::Contracts); // US-T390
+		cs::String note = port == nullptr ? cs::Cat("Select a world with a port, or fly alongside one.   ", closeContracts)
+			: port->Owner->IsPirate ? cs::Cat("A haven posts no contracts.   ", closeContracts)
+			: board.Count() == 0 ? cs::Cat("Nothing posted here today.   ", closeContracts)
+			: alongside ? cs::Cat("Jobs posted from what the system needs. Freight: buy the crates at any market and bring them in.   ", closeContracts)
+			: cs::Cat("Fly alongside to take a job (", BoundKeys(::SpaceGod::Input::KeyAction::Pilot), " to pilot a ship).   ", closeContracts);
 		GUI::Label(Rect(r.x + 12, r.y + 28, w - 24, 18), note, small);
 		double jd = app->Clock->Jd;
 		for (int i = 0; i < rows; i++)
@@ -318,7 +328,8 @@ namespace SpaceGod::UI
 			}
 		}
 		GUI::contentColor = Dim;
-		GUI::Label(Rect(x, y + 26, 460, 18), "Orders use the selected world (a route or patrol to it) or the selected ship (escort).   F10 to close", small);
+		GUI::Label(Rect(x, y + 26, 460, 18), cs::Cat("Orders use the selected world (a route or patrol to it) or the selected ship (escort).   ",
+			CloseHint(::SpaceGod::Input::KeyAction::Fleet)), small); // US-T390
 
 		// Ships and property.
 		auto view = Rect(r.x + 8, y + 48, w - 16, listH);
@@ -543,8 +554,8 @@ namespace SpaceGod::UI
 		auto old = GUI::contentColor;
 		GUI::contentColor = Dim;
 		GUI::Label(Rect(r.x + 12, r.y + 30, w - 24, 18), market != nullptr
-			? cs::Cat(market->Owner->Name, pilotRecord != nullptr && lawful ? StandingText(pilotRecord, market->Owner) : cs::String("   (select a body or a trader to change, M to close)"))
-			: cs::String("Select a port to see its market.   M to close"), small);
+			? cs::Cat(market->Owner->Name, pilotRecord != nullptr && lawful ? StandingText(pilotRecord, market->Owner) : cs::Cat("   (select a body or a trader to change, ", CloseHint(::SpaceGod::Input::KeyAction::Market), ")"))
+			: cs::Cat("Select a port to see its market.   ", CloseHint(::SpaceGod::Input::KeyAction::Market)), small); // US-T390
 		// At a yard the ship can refit: open the outfitting panel (F2) from here too.
 		if (canTrade && Outfitting::IsYard(market) && GUI::Button(Rect(r.xMax() - 110, r.y + 28, 98, 18), app->ShowOutfit ? "Outfit  [-]" : "Outfit", button))
 			app->ShowOutfit = !app->ShowOutfit;
@@ -764,7 +775,8 @@ namespace SpaceGod::UI
 		{
 			auto r0 = Panel(Rect((Screen::width - w) * 0.5f, 190, w, 52));
 			GUI::Label(Rect(r0.x + 12, r0.y + 6, w - 24, 22), "OUTFITTING", title);
-			GUI::Label(Rect(r0.x + 12, r0.y + 28, w - 24, 18), "Pilot a ship (P) and bring it to a shipyard to refit it.   F2 to close", small);
+			GUI::Label(Rect(r0.x + 12, r0.y + 28, w - 24, 18), cs::Cat("Pilot a ship (", BoundKeys(::SpaceGod::Input::KeyAction::Pilot), ") and bring it to a shipyard to refit it.   ",
+				CloseHint(::SpaceGod::Input::KeyAction::Outfit)), small); // US-T390
 			return;
 		}
 		cs::Ref<Settlement> yard = nullptr, port = nullptr;
@@ -810,9 +822,9 @@ namespace SpaceGod::UI
 		bool ringable = yard != nullptr && CruiseDrives::JumpRingRefusal(ship).empty();
 		GUI::contentColor = Dim;
 		GUI::Label(Rect(r.x + 12, r.y + 64, w - (ringable ? 224 : 24), 18), yard != nullptr
-			? (ringable ? "Pick a hardpoint, a facility or the free space, then what to fit.   F2 to close"
-				: "Pick a hardpoint, a facility or the free space, then what to fit.   Prices are this yard's market.   F2 to close")
-			: "Bring the ship alongside a shipyard (or a haven) to refit.   F2 to close", small);
+			? (ringable ? cs::Cat("Pick a hardpoint, a facility or the free space, then what to fit.   ", CloseHint(::SpaceGod::Input::KeyAction::Outfit))
+				: cs::Cat("Pick a hardpoint, a facility or the free space, then what to fit.   Prices are this yard's market.   ", CloseHint(::SpaceGod::Input::KeyAction::Outfit)))
+			: cs::Cat("Bring the ship alongside a shipyard (or a haven) to refit.   ", CloseHint(::SpaceGod::Input::KeyAction::Outfit)), small); // US-T390
 		if (ringable)
 		{
 			GUI::contentColor = Color::white();
@@ -1010,13 +1022,13 @@ namespace SpaceGod::UI
 
 		GUI::Label(Rect(40, 24, 500, 30), "SPAWN & PILOT", title);
 		GUI::contentColor = Dim;
-		GUI::Label(Rect(40, 56, 700, 20), "Click a hull to spawn and pilot it at the camera   ·   V to close", small);
+		GUI::Label(Rect(40, 56, 700, 20), cs::Cat("Click a hull to spawn and pilot it at the camera   ·   ", CloseHint(::SpaceGod::Input::KeyAction::SpawnPilot)), small); // US-T390
 		GUI::contentColor = Color::white();
 
 		if (GUI::Button(Rect(Screen::width - 210, 28, 160, 26), spawnHostile ? "FACTION: HOSTILE" : "FACTION: HOME", spawnHostile ? buttonActive : button))
 			spawnHostile = !spawnHostile;
 		// U.SPC-T601: the system's one practice fighter, at the camera, the player at its helm (Shift+V does the same).
-		if (GUI::Button(Rect(Screen::width - 470, 28, 250, 26), "PRACTICE FIGHTER HERE  (Shift+V)", button))
+		if (GUI::Button(Rect(Screen::width - 470, 28, 250, 26), cs::Cat("PRACTICE FIGHTER HERE  (", BoundKeys(::SpaceGod::Input::KeyAction::SpawnPractice), ")"), button)) // US-T390
 			app->SpawnPracticeFighter();
 		// US-T88: the dogfight demo, at a light fighter's helm (Shift-click: a heavy fighter's) against four pirates.
 		if (GUI::Button(Rect(Screen::width - 730, 28, 250, 26), "DOGFIGHT DEMO  (Shift: heavy)", button))
@@ -1073,7 +1085,7 @@ namespace SpaceGod::UI
 		if (!cargoOpen) return;
 		GUI::contentColor = Dim;
 		GUI::Label(Rect(r.x + 12, r.y + 28, w - 24, 32),
-			cargoSelected != nullptr ? "Click a cell to move the crate there  (click it again to cancel)" : "Click a crate to pick it up   [I to close]", small);
+			cargoSelected != nullptr ? "Click a cell to move the crate there  (click it again to cancel)" : cs::Cat("Click a crate to pick it up   [", CloseHint(::SpaceGod::Input::KeyAction::Cargo), "]"), small); // US-T390
 		GUI::contentColor = Color::white();
 
 		// C#'s CargoItem[hold.Width, hold.Height]: [x, y] is atCell[x * hold->Height + y].
@@ -1287,7 +1299,7 @@ namespace SpaceGod::UI
 		if (GUI::Button(Rect(r.x + 8, r.y + 6, 120, 22), UiStyle::Fold(true, "NEWS"), title)) app->ShowNews = false;
 		auto old = GUI::contentColor;
 		GUI::contentColor = Dim;
-		GUI::Label(Rect(r.x + 130, r.y + 9, w - 140, 18), "as it happens  ·  click a report to select where it happened  ·  X to close", small);
+		GUI::Label(Rect(r.x + 130, r.y + 9, w - 140, 18), cs::Cat("as it happens  ·  click a report to select where it happened  ·  ", CloseHint(::SpaceGod::Input::KeyAction::News)), small); // US-T390
 		GUI::contentColor = old;
 		for (int i = 0; i < NewsFilters().Count(); i++)
 			if (GUI::Button(Rect(r.x + 10 + i * 128, r.y + 32, 122, 20), NewsFilters()[i], newsFilter == i ? buttonActive : button))
@@ -1452,7 +1464,7 @@ namespace SpaceGod::UI
 		int seconds = Mathf::CeilToInt(static_cast<float>(hail->SecondsLeft(app->Clock->Jd)));
 		cs::String s = cs::Cat("HAILED  ·  ", cs::Strings::ToUpperInvariant(hail->By->Name), " PATROL ", cs::Strings::ToUpperInvariant(hail->Patrol->Name), "  ·  ",
 			hail->Interdiction ? cs::Cat("HEAVE TO:  1 pay the ", Credits(hail->Fine), " fine, or be fired on in ", seconds, " s")
-				: cs::Cat("CARGO SCAN: hold position, ", seconds, " s  (running is a crime)"), "    F12 parley");
+				: cs::Cat("CARGO SCAN: hold position, ", seconds, " s  (running is a crime)"), cs::Cat("    ", BoundKeys(::SpaceGod::Input::KeyAction::Hail), " parley")); // US-T390
 		auto line = GUIContent(s);
 		float lw = text->CalcSize(line).x + 28;
 		auto r = Panel(Rect((Screen::width - lw) * 0.5f, Screen::height - 112, lw, 30));
@@ -1867,7 +1879,7 @@ namespace SpaceGod::UI
 		}
 		GUI::EndScrollView();
 		GUI::contentColor = Dim;
-		GUI::Label(Rect(r.x + 12, r.yMax() - 22, 300, 18), "Click a seat to take it.   F9 or Esc to close", small);
+		GUI::Label(Rect(r.x + 12, r.yMax() - 22, 300, 18), cs::Cat("Click a seat to take it.   ", BoundKeys(::SpaceGod::Input::KeyAction::Picker), " or Esc to close"), small); // US-T390
 		GUI::contentColor = old;
 		if (app->AtControls() && GUI::Button(Rect(r.xMax() - 172, r.yMax() - 24, 160, 20), "Back to command (P)", button)) app->PickCommand();
 		if (chosen != nullptr) app->PickSeat(chosen);

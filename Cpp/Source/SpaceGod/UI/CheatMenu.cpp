@@ -5,6 +5,7 @@
 #include "GameLaunch.h"
 #include "Camera/StarTravel.h"
 #include "Input/InputDevice.h"
+#include "Input/KeyBindings.h" // US-T390
 #include "SpaceGodLog.h"
 #include "UI/Hud.h"
 #include "UI/UiStyle.h"
@@ -389,7 +390,7 @@ namespace SpaceGod::UI
 
 		const auto& cats = CheatRegistry::Categories();
 		GUI::Label(Rect(x + 18, y + 12, 300, 24), "DEV MENU", title);
-		GUI::Label(Rect(x + 130, y + 16, w - 480, 18), "every dev and debug function in one place  ·  Shift+F1 or Esc to close", small);
+		GUI::Label(Rect(x + 130, y + 16, w - 480, 18), cs::Cat("every dev and debug function in one place  ·  ", ::SpaceGod::Input::KeyBindings::Keys(::SpaceGod::Input::KeyAction::CheatMenu), " or Esc to close"), small); // US-T390
 
 		// The filter, focused from the moment the menu opens: typing searches every entry.
 		auto fieldRect = Rect(x + w - 318, y + 12, 300, 26);

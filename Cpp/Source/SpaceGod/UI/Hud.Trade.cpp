@@ -7,6 +7,7 @@
 
 #include "UnitySpaceApp.h"
 #include "Input/InputDevice.h" // US-T329
+#include "Input/KeyBindings.h" // US-T390
 
 #include "Astro.h"
 #include "Ships.h"
@@ -98,7 +99,7 @@ namespace SpaceGod::UI
 		}
 		GUI::contentColor = Dim;
 		GUI::Label(Rect(x + 8, y + 2, r.xMax() - x - 20, 18),
-			cs::Cat("account ", Credits(h->Balance()), purse != h->House ? cs::Cat("  ·  purse ", Credits(purse->Treasury)) : cs::String(), "   Tab pages  ·  F12 to close"), small);
+			cs::Cat("account ", Credits(h->Balance()), purse != h->House ? cs::Cat("  ·  purse ", Credits(purse->Treasury)) : cs::String(), "   Tab pages  ·  ", ::SpaceGod::Input::KeyBindings::Keys(::SpaceGod::Input::KeyAction::Trade), " to close"), small); // US-T390: was F12, the envoy's key
 
 		y += 28;
 		auto view = Rect(r.x + 8, y, w - 16, listH);
