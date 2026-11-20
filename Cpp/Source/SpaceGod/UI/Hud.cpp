@@ -36,6 +36,7 @@
 #include "Combat/CombatState.h"
 #include "Combat/Diplomacy.h"
 #include "Combat/Dogfighting.h"
+#include "Combat/ElectronicWarfare.h" // US-T404
 #include "Embodiment/CraftPower.h"
 #include "Embodiment/SelfDestruct.h"
 #include "Combat/EnergyWeapons.h"
@@ -1299,6 +1300,16 @@ namespace SpaceGod::UI
 	// ---------------------------------------------------------------- the reactor's split (US-T94)
 
 	void Hud::DrawReactor()
+		// US-T404: hostile recon jamming this hull, at the right end of the gauge row (ElectronicWarfare::JamFactor, read only).
+		{
+			double jam = ElectronicWarfare::JamFactor(battle, me);
+			if (jam < 1)
+			{
+				float jx = x0 + 4 * (w + 14);
+				DrawLabel(FitText(cs::Cat("JAMMED  \xC2\xB7  gunnery -", Mathf::RoundToInt(static_cast<float>((1 - jam) * 100)), "%"), minorLabel,
+					Mathf::Max(80.0f, static_cast<float>(Screen::width) - jx - 8)), Vector2(jx, y - 4), HostileColor, true);
+			}
+		}
 	{
 		if (app->Travel->Active) return;
 		auto seat = app->HeldSeat();

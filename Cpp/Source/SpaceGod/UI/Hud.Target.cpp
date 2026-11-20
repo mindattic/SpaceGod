@@ -18,6 +18,8 @@
 #include "Combat/CombatSpecs.h"
 #include "Combat/CombatState.h"
 #include "Combat/Dogfighting.h"
+#include "Combat/ElectronicWarfare.h" // US-T404
+#include "Settings/GameSetting.h" // US-T404: the paint settings' values
 #include "Combat/Fighters.h"
 #include "Embodiment/FighterSeat.h"
 #include "Ships.h"
@@ -240,6 +242,9 @@ namespace SpaceGod::UI
 		if (crewLine) fixedH += RowH;
 		float room = layout.FreeRight() - HudLayout::Gap;
 		int kindRows = static_cast<int>(kinds.size());
+		// US-T404: whether recon of your side paints it for your torpedoes (ElectronicWarfare::Painted, read only).
+		bool paintLine = focusLine && ElectronicWarfare::Painted(battle, t, me->Side);
+		if (paintLine) fixedH += RowH;
 		if (fixedH + kindRows * RowH > room) kindRows = std::max(0, static_cast<int>((room - fixedH) / RowH));
 		float h = fixedH + kindRows * RowH;
 		auto r = layout.Take(HudRegion::BottomRight, CardW, h);
@@ -352,6 +357,16 @@ namespace SpaceGod::UI
 
 		// The shield, patch by patch: each emitter covers the part of the hull nearest it (ShieldEmitters).
 		double total = c->Spec->Shield > 0 ? c->Shield() / c->Spec->Shield : 0;
+		// US-T404: painted by your recon: your strike torpedoes steer PaintGuidance times as hard and its decoys draw them off
+		// PaintDecoyResist less often.
+		if (paintLine)
+		{
+			double guide = cs::Math::Max(1.0, ElectronicWarfare::PaintGuidance()->Value);
+			int resist = Mathf::RoundToInt(static_cast<float>(cs::Math::Max(0.0, cs::Math::Min(1.0, ElectronicWarfare::PaintDecoyResist()->Value)) * 100));
+			DrawLabel(FitText(cs::Cat("PAINTED  \xC2\xB7  your torpedoes home ", cs::Fmt(guide, "0.#"), "x harder, its decoys fool ", resist, "% fewer"),
+				minorLabel, w), Vector2(x, y), LockColor, true);
+			y += RowH;
+		}
 		DrawLabel(patches.empty() ? cs::String("SHIELDS  \xC2\xB7  none") : cs::Cat("SHIELDS ", Pct(total), "  \xC2\xB7  ", static_cast<int>(patches.size()), patches.size() == 1 ? " emitter" : " emitters"),
 			Vector2(x, y), ShieldTint, true);
 		y += RowH;
