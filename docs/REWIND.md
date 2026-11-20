@@ -450,12 +450,45 @@ and bounded by barriers**:
   keeps no rewind); the log's last line is `HoldRewind selftest: PASS|FAIL (n checks, m failed)` and the game exits 0
   on a pass.
 
+### US-T412: the whole system drawn as it was, checked
+
+- **Bodies were not actually rewinding.** `ViewSystemBack` moved `Clock->Jd` back, but planets, moons, stations and
+  anything body-relative (lane endpoints, a parked ship's helio position) are laid out from
+  `Ephemeris()->Helio(i)` — a cache filled only by `Ephemeris::Update(jd)`, which normally runs inside
+  `Galaxy->Update(Clock->Jd)` (`UnitySpaceApp.cpp`); that whole call is skipped for every frame a hold plays (the held
+  branch returns before reaching it, `UnitySpaceApp.cpp` ~510-528). So while held, bodies stayed frozen at the moment
+  the hold began, and anything keyed off one (`Fleet::BaseStateOf`'s `ephemeris->Helio(s->Orbit->Body)`,
+  `Fleet.cpp` ~699) was drawn against a stale planet. Ships in free flight were fine regardless (`Fleet::StateOf`
+  takes `jd` itself, `UpdateShips`, `UnitySpaceApp.Main2.cpp` ~1009), so the fight in view, free-flying traffic and
+  the hull held always rewound correctly; only body-relative positions did not. Fixed: `PlayHoldRewind` now calls
+  `Ephemeris()->Update(jd)` itself, gated the same as `Clock->SetJd(jd)`; it is a pure recompute of that cache (no
+  RNG, no writes outside it), and the moment play resumes, the ordinary `Galaxy->Update(Clock->Jd)` call overwrites
+  it again, correctly, before anything else reads it, so neither end of a hold needs its own restore.
+
 ### Not yet (later stages)
 
 - Undoing the barriers left (launches and landings, seats, the player's own hull's fate): the hangars and the
   fleet's lists copied too, and a booking journal for the seat and the session.
-- Ships that left the system altogether in the window (an FTL jump to another star) are not redrawn outside a fight:
-  they are in another system's fleet now. Ships in orbit, on the lanes and in gates are (`ViewSystemBack`).
+- **Ships that crossed the system's edge in the window are still not redrawn outside a fight** (US-T412 looked for a
+  cheap fix and did not find one safe to land untested): a ship's analytic state (`ShipController`'s phase, orbit,
+  lane) is a snapshot of *now*, overwritten at every phase change, so `Fleet::StateOf(ship, jd)` for a past `jd` is
+  only right while the ship has not changed phase since. Two cases:
+  - **Left the system:** crossing a gate removes the hull from this system's `Fleet->Ships()` entirely
+    (`Fleet::LetGo`, `Fleet.cpp:2429`, called from `InterstellarTraffic::DepartLeader` and the escorts' loop,
+    `Systems/InterstellarTraffic.cpp` ~313-321) and wraps it in a `Passage` (`Systems/InterstellarTraffic.h` ~207-225:
+    `EnterJd`, `ExitJd`, `From`/`To` gates, a pure `Progress(jd)`), kept in `Galaxy::Traffic->InGates()`
+    (`Systems/Galaxy.h:234`). Neither `DepartLeader` nor `LetGo` touches the ship's `Orbit`/`Phase`/`PhaseStartJd`, so
+    for `jd` back to the moment it started burning for the gate, `Fleet::StateOf` on that same (still-alive) `Ship`
+    object would likely still answer right — a real path to drawing it again, but it needs its own rendering lane:
+    the per-frame ship arrays (`shipScene`/`shipRotation`/… in `UpdateShips`) are sized and indexed 1:1 with
+    `Fleet()->Ships()`, which every other system (selection, hover, the HUD, lane geometry) assumes, so a departed
+    hull cannot simply be added to that loop; it needs a separate, additional draw pass, built and tried in the
+    running game, not guessed at in a patch nobody has run.
+  - **Arrived in the window:** there is no stamped arrival time to hide it before (`InterstellarTraffic::Arrive`,
+    `Systems/InterstellarTraffic.cpp:731`, sets no such field); the nearest proxy, `PhaseStartJd`, also moves on an
+    ordinary phase change made well before the window, so keying visibility off it would hide ships that never left.
+  Both need real work (the departure side as above; the arrival side an explicit timestamp at `Arrive`/`Emerge`,
+  which is Core simulation state and so its own Bench question) before this is worth doing at all.
 - Reversed effects (an FTL flash collapsing into a hull, an explosion contracting), the hull sections' damage stage,
   the reversed audio bed, and a hold in co-op.
 

@@ -36,6 +36,7 @@
 #include <utility>
 #include <vector>
 
+#include "Ephemeris.h" // US-T412: Ephemeris()->Update(jd), so bodies rewind too (PlayHoldRewind)
 #include "Ships.h"
 #include "SimClock.h"
 #include "World.h"
@@ -941,7 +942,20 @@ namespace SpaceGod
 				jd = a.Jd + (it->Jd - a.Jd) * f;
 			}
 			if (h.Fight != nullptr) h.Fight->Seconds = s;
-			if (HrTuning::ViewSystemBack && Clock != nullptr && jd > 0) Clock->SetJd(jd);
+			if (HrTuning::ViewSystemBack && Clock != nullptr && jd > 0)
+			{
+				Clock->SetJd(jd);
+				// US-T412: Clock->Jd alone is not enough. Bodies are laid out from Ephemeris()->Helio(i), a cache
+				// filled only by Ephemeris::Update(jd), which normally runs inside Galaxy->Update(Clock->Jd) -
+				// skipped for the whole frame while a hold plays (UnitySpaceApp.cpp's held branch returns before
+				// reaching it). Without this, planets, stations, lane endpoints and anything parked in orbit (which
+				// reads the same cache, e.g. Fleet::BaseStateOf's ephemeris->Helio(s->Orbit->Body)) stay frozen at
+				// the moment the hold began while ships elsewhere correctly rewind through Fleet::StateOf(ship, jd).
+				// Ephemeris::Update is pure (no RNG, no writes outside its own cache), so this is safe every frame of
+				// a hold; the ordinary Galaxy->Update(Clock->Jd) call recomputes it again, correctly, the instant
+				// play resumes (ClearHoldRewind/EndHoldRewind need not restore it themselves).
+				if (Ephemeris() != nullptr) Ephemeris()->Update(jd);
+			}
 		}
 		if (h.Fight != nullptr)
 		{
