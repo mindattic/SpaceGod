@@ -650,6 +650,11 @@ namespace SpaceGod
 		/// since): its end waits until this is older than the window.</summary>
 		double EndHeldSince = HrNone;
 
+		/// <summary>US-T421: the effects' clock (Time::unscaledTime) at the press, the effects' clock of the moment a hold
+		/// played on from, and a count of holds ended, for the views that draw effects by their age (BattleFx).</summary>
+		float PressFx = 0, ResumeFx = 0;
+		int FxEnds = 0;
+
 		HrSelfTest Test;
 
 		cs::Ref<GUIStyle> Text;
@@ -695,6 +700,25 @@ namespace SpaceGod
 	}
 
 	bool UnitySpaceApp::HoldRewindJustResumed() const { return holdRewind != nullptr && holdRewind->JustResumed > 0; }
+
+	float UnitySpaceApp::HoldRewindFxClock(float now) const
+	{
+		if (holdRewind == nullptr || !holdRewind->Active) return now;
+		const auto& h = *holdRewind;
+		// Lived seconds are real seconds the fight ran: the moment reached, on the effects' clock.
+		return h.PressFx - static_cast<float>(h.PressT - h.Tau);
+	}
+
+	bool UnitySpaceApp::HoldRewindFxEnded(int& seen, float& resumeFx) const
+	{
+		if (holdRewind == nullptr || holdRewind->FxEnds == seen || holdRewind->Active) return false;
+		// The recording cleared (a load): the count starts again, nothing to undo.
+		bool ended = holdRewind->FxEnds > seen;
+		seen = holdRewind->FxEnds;
+		if (!ended) return false;
+		resumeFx = holdRewind->ResumeFx;
+		return true;
+	}
 
 	cs::Ref<Battle> UnitySpaceApp::HoldRewindBattle()
 	{
@@ -1093,6 +1117,7 @@ namespace SpaceGod
 			h.Active = true;
 			h.Releasing = false;
 			h.PressT = h.LivedS;
+			h.PressFx = Time::unscaledTime;
 			h.Tau = h.LivedS;
 			h.HeldS = 0;
 			h.Rate = HrTuning::StartRate;
@@ -1277,6 +1302,10 @@ namespace SpaceGod
 			}
 		};
 		h.JustResumed = 2;
+		// US-T421: the effects play on from the press (a tap, a hold that could not play on from back there) unless a
+		// resume point is put back below.
+		h.ResumeFx = h.PressFx;
+		h.FxEnds++;
 		// A tap, or a hold that never got back: the present as it was at the press.
 		if (h.HeldS < HrTuning::MinHoldS || h.PressT - h.Tau < 1e-3)
 		{
@@ -1307,6 +1336,7 @@ namespace SpaceGod
 			return;
 		}
 		putBack(*best);
+		h.ResumeFx = h.PressFx - static_cast<float>(h.PressT - best->T);
 		double went = h.PressT - best->T;
 		if (h.Test.On)
 		{
@@ -1554,6 +1584,9 @@ namespace SpaceGod
 					t.KeyChecked = true;
 					selfCheck(Input.HoldRewind, "the hold is Shift+R held down through Unreal's input (the player's own key path)");
 				}
+				// US-T421: the effects' clock is back at the moment reached (explosions there played backward to it).
+				selfCheck(std::fabs(HoldRewindFxClock(Time::unscaledTime) - (h.PressFx - static_cast<float>(h.PressT - h.Tau))) < 1e-3f
+					&& HoldRewindFxClock(Time::unscaledTime) < Time::unscaledTime - 0.5f, "the effects' clock runs back with the hold");
 				shot("1-held");
 				// US-T418: a ship gone through a gate after the moment reached is drawn again, one that came after it
 				// is hidden, and one that came or went before it is drawn as now (fleet index 0's notes, put back after).

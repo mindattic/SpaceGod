@@ -67,6 +67,14 @@ public:
 	/// instead of reporting what changed).</summary>
 	bool HoldRewindJustResumed() const;
 
+	/// <summary>US-T421: the clock the effects views age their effects by (Time::unscaledTime, <paramref name="now"/>):
+	/// while a hold plays the past back it runs backward with it, so an explosion contracts to its birth and is gone
+	/// before it; otherwise <paramref name="now"/>.</summary>
+	float HoldRewindFxClock(float now) const;
+	/// <summary>US-T421: once per hold ended (<paramref name="seen"/> the caller's count): true, with the effects' clock of
+	/// the moment play went on from. Effects born after it never happened; the rest go on from it, shifted to now.</summary>
+	bool HoldRewindFxEnded(int& seen, float& resumeFx) const;
+
 	/// <summary>US-T418: whether the ship at fleet index <paramref name="index"/> is drawn: while a hold plays the past back,
 	/// a ship that went out through a gate after the moment reached is drawn again, and one that appeared after it is
 	/// hidden; otherwise <paramref name="shownNow"/>.</summary>

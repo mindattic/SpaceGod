@@ -605,6 +605,17 @@ and bounded by barriers**:
   rewind still on the fight), a hold to before the kills plays on with the enemies back and the fight on, and a second
   win left alone in the cooldown ends the fight only once the window is out.
 
+### US-T421: effects played backward
+
+- `BattleFx` draws every effect by its age (`now - Born`). While a hold plays the past back it ages them by
+  `HoldRewindFxClock`, which runs backward with the hold (the press's clock minus how far back the hold has gone), so a
+  laser, a hit flash or an explosion plays in reverse to its birth and is gone before it. Effects already over are kept
+  for the window (a `history` list outside the effects budget, drawn only during a hold) so a hold also brings back
+  the ones that had finished. On letting go (`HoldRewindFxEnded`), the effects born after the moment played on from
+  never happened and go; the rest are shifted so they go on from that moment without a jump.
+- Projectiles, mines and decoys were already played back from their tracks. Not reversed: the audio bed.
+- **Tested:** the self-test checks the effects' clock sits at the moment reached during a hold (45 checks, all passing).
+
 ### Not yet (later stages)
 
 - Moving to a seat on another body during the window, and crossing into another body's frame.

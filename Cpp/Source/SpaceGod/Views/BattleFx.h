@@ -71,6 +71,10 @@ namespace SpaceGod::Views
 		cs::List<Effect> effects;
 		cs::Dictionary<cs::Ref<Core::Battle>, int> seen;
 		cs::List<cs::Ref<Core::Battle>> staleSeen;
+		/// <summary>US-T421: holds of the rewind ended, as last seen (UnitySpaceApp::HoldRewindFxEnded).</summary>
+		int fxEndsSeen = 0;
+		/// <summary>US-T421: effects already over, kept for the rewind's window so a hold can play them back.</summary>
+		cs::List<Effect> history;
 		cs::List<Vector3> vertices;
 		cs::List<Color> colors;
 		cs::List<Vector3> uvs;

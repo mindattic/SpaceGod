@@ -58,13 +58,40 @@ namespace SpaceGod::Views
 
 	void BattleFx::Update()
 	{
-		float now = Time::unscaledTime;
+		// US-T421: while a hold rewind plays the past back, the effects' clock runs backward with it (an explosion contracts
+		// to its birth and is gone before it); when it ends, the effects of the moments undone go and the rest go on from
+		// the moment played on from, without a jump.
+		float real = Time::unscaledTime;
+		float resumeFx = 0;
+		if (app->HoldRewindFxEnded(fxEndsSeen, resumeFx))
+		{
+			effects.RemoveAll([&](const Effect& e) { return e.Born > resumeFx + 1e-4f; });
+			history.RemoveAll([&](const Effect& e) { return e.Born > resumeFx + 1e-4f; });
+			// Over at the moment played on from: kept as history; still alive then: drawn again from there.
+			for (const auto& e : history)
+				if (resumeFx - e.Born <= e.Life) effects.Add(e);
+			history.RemoveAll([&](const Effect& e) { return resumeFx - e.Born <= e.Life; });
+			float shift = real - resumeFx;
+			for (auto& e : effects) e.Born += shift;
+			for (auto& e : history) e.Born += shift;
+		}
+		float now = app->HoldRewindFxClock(real);
+		bool rewinding = now != real;
 		auto war = app->World()->War;
 		for (const auto& b : war->Battles) Collect(b, now);
 		for (const auto& b : war->Ended) Collect(b, now);
 		PruneSeen(war);
 
-		effects.RemoveAll([&](const Effect& e) { return now - e.Born > e.Life; });
+		if (!rewinding)
+		{
+			// US-T421: an effect over is kept for the rewind's window (a hold may play it back), out of the budget below.
+			constexpr float keep = static_cast<float>(UnitySpaceApp::HoldRewindTuning::WindowS);
+			for (const auto& e : effects)
+				if (now - e.Born > e.Life && now - e.Born <= e.Life + keep) history.Add(e);
+			effects.RemoveAll([&](const Effect& e) { return now - e.Born > e.Life; });
+			history.RemoveAll([&](const Effect& e) { return now - e.Born > e.Life + keep; });
+			if (history.Count() > MaxEffects() * 4) history.RemoveRange(0, history.Count() - MaxEffects() * 4);
+		}
 		if (effects.Count() > MaxEffects()) effects.RemoveRange(0, effects.Count() - MaxEffects());
 
 		vertices.Clear();
@@ -72,6 +99,8 @@ namespace SpaceGod::Views
 		uvs.Clear();
 		indices.Clear();
 		for (const auto& e : effects) Draw(e, now);
+		if (rewinding)
+			for (const auto& e : history) Draw(e, now);
 		for (const auto& b : war->Battles) DrawMissiles(b);
 		for (const auto& b : war->Battles) DrawRounds(b);
 		for (const auto& b : war->Battles) DrawMines(b);
@@ -266,6 +295,7 @@ namespace SpaceGod::Views
 	void BattleFx::Draw(const Effect& e, float now)
 	{
 		float age = now - e.Born;
+		if (age < 0 || age > e.Life) return; // US-T421: a hold rewind has gone back to before it (or not yet into it)
 		float t = age / e.Life;
 		float fade = 1 - t;
 		switch (e.Kind)
