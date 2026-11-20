@@ -1722,6 +1722,10 @@ namespace SpaceGod::UI
 		if (!app->IsPiloting() || app->Travel->Active || app->ShowPicker) return;
 		auto helm = cs::As<ShipHelm>(app->HeldSeat());
 		if (helm == nullptr || helm->Ship == nullptr) return;
+		// US-T417: the hull flown lost or taken with its fate held back for the hold rewind: no orders to give from a wreck.
+		if (helm->Ship->Battle != nullptr)
+			if (auto mine = helm->Ship->Battle->UnitOf(helm->Ship))
+				if (mine->Dead || mine->Captured) return;
 		auto bar = HelmAbilities::Of(helm->Ship, app->World()); // US-T140: a band captain's squad order too
 		if (bar.Count() == 0) return;
 		constexpr float pad = 10, rowH = 20, gap = 18;

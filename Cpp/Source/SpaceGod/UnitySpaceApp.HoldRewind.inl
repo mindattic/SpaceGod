@@ -30,6 +30,11 @@ public:
 		/// <summary>US-T410: true: a held-back booking of the world (a hull lost, struck or taken) waits until its moment is
 		/// older than the window, so a hold can bring the hull back; false: booked at once, a barrier as in US-T409.</summary>
 		static constexpr bool DeferBookings = true;
+		/// <summary>US-T417: true: the player's OWN hull lost, taken or struck, and any surrender's terms, wait out the window
+		/// like everyone else's, so a hold can undo them too. Meanwhile the helm is held but dead in the player's hands (the
+		/// view follows the wreck, the stick and triggers do nothing) and the readout says there is still time to rewind;
+		/// once the moment is older than the window the loss is final exactly as before. False: booked at once, a barrier.</summary>
+		static constexpr bool DeferOwnFate = true;
 		/// <summary>US-T410: true: while held, the whole system is drawn as it was (the world clock set back for the drawing
 		/// only: planets, ships in orbit and on the lanes, gates), and put back to now on letting go.</summary>
 		static constexpr bool ViewSystemBack = true;
@@ -117,3 +122,12 @@ private:
 	/// <summary>US-T409: the key let go: the resume point at or before the moment reached is put back and play goes on from
 	/// there (no further back than the last change that cannot be undone yet; a tap changes nothing).</summary>
 	void EndHoldRewind();
+
+	/// <summary>US-T417: called by UpdatePiloting before the stick is read: true while the hull flown is dead or taken in its
+	/// fight but that loss is still held back (DeferOwnFate). The helm then follows the wreck and reads nothing; the caller
+	/// skips the rest of the frame's piloting.</summary>
+	bool HoldRewindOwnFateHeld(const cs::Ref<Core::Ship>& ship);
+
+	/// <summary>US-T417: the seats a resume point was taken with put back (the helm, or a gun, a craft or a mech on the same
+	/// body): so a resume to before a seat change puts the player back where they sat, not only the fight.</summary>
+	void RestoreHoldRewindSeat(const cs::Ref<Core::IEmbodiable>& seat, bool piloting, const cs::Ref<Core::Ship>& pilotShip);

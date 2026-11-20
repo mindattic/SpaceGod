@@ -434,15 +434,13 @@ and bounded by barriers**:
 - **The whole system drawn as it was:** while held, the world clock is set back to the moment reached (the marks keep
   the world's date beside the fight's clock) for the drawing only (planets, ships in orbit and on the lanes, gates),
   and put back to now on letting go (`ViewSystemBack`).
-- **Still barriers, and why:** the player's own hull lost, struck, taken or fled, and a surrender's terms settled
-  (the seat, the session, cargo and prizes must be answered at once: booked then, a barrier); the census's separate
-  `Seats` scalar (`fight->Mechs.Count() + Embedded.Count() + Manned.Count() + Flown.Count()`: deployed mechs, stuck
-  boarding pods and rounds, the player's own taken-over guns, and the player's own flown craft), untouched by
-  US-T413 or US-T415's fixes (which only reworked the per-unit census and the `you changed seat` check) and not
-  re-examined this round, so any change in it still blocks a resume; crossing into another body's frame; the fight
-  ending or another coming into view. A craft launched or landed by the player's own carrier is no longer one
-  (US-T413), and neither is a unit joining mid-fight, nor the *player's own* same-hull seat change (both US-T415) —
-  though verifying the seat-change case ran into a separate bug, US-T414, not fixed here.
+- **Still barriers, and why:** crossing into another body's frame, or moving to a seat on another body (a seat
+  on a hull already in battle that the player holds nothing on cannot be taken back through the embody gate);
+  the fight ending or another coming into view; and a booking forced early (a save, a keyframe that waited the
+  full window). No longer barriers: a craft launched or landed (US-T413); a unit joining mid-fight (US-T415); a
+  deployed mech's state, stuck pods and the player's own guns and craft taken or let go (US-T416, US-T417); the
+  player's own hull lost, taken or struck, and a surrender's terms (US-T417); a seat change on the same body
+  (US-T415's census, US-T417's seat journal, verified end to end once US-T414 was fixed).
 - **Tested:** `sg.HoldRewind selftest [quit]` (HoldRewindCommand.cpp) starts a fight off Uranus and, with no hand
   on the keys, marks a resume point and hashes the whole fight there (`HoldRewindFightDigest`: its clock and random
   draws to come, every unit's flags, pose, hull and mounts, every missile, round, decoy and mine), plays on 3 s, holds
@@ -533,12 +531,37 @@ and bounded by barriers**:
   through to the real rewind assertions (the resume reaches the pre-switch mark, the hull's pose stays finite, the
   player is still seated at the turret, not silently ejected) on its own, with no change needed here.
 
+### US-T414, US-T416, US-T417: the seat, the mechs and your own hull
+
+- **US-T414 (a bug in seat taking, not in rewind):** `TakeSeat` let go of the helm before the session weighed the
+  take, so `EmbodyContext::Of` no longer saw the hull flown (it adds `World->PilotedShip`'s helm) and the gate's "in
+  battle" rule refused a gun on the very hull being flown, leaving the player holding nothing. Single-player now
+  takes the seat first and lets go of the helm after (`UnitySpaceApp.Embodiment.cpp`); co-op keeps its routed order.
+- **US-T416:** a deployed mech (`Battle::Mechs`, a list of Refs to objects mutated in place) is captured and restored
+  by value like a `FlightDeck`.
+- **US-T417, the seat journal:** every resume point keeps the seat the player held besides the helm
+  (`HrAnchor::Seat`, with `HasPilot`/`PilotShip` for the helm). Letting go puts that seat back first
+  (`RestoreHoldRewindSeat`: the old seat taken while the current one still holds the body, so the gate lets it
+  through, then the helm entered or left), then the fight over it. The census keys the player's hull by *body*
+  (`HrBodyShip`: a craft off your own carrier is the carrier, as the embody gate counts it), so moving between seats
+  on one body is never a barrier, and the census's `Seats` count is no longer one either.
+- **US-T417, your own hull (`DeferOwnFate`):** a loss, capture or strike of the hull flown, and any surrender's
+  terms, wait out the window like everyone else's booking. Meanwhile `HoldRewindOwnFateHeld` keeps the helm but dead
+  in the hands (the view follows the wreck or the prize, the stick and triggers do nothing, the helm bar is hidden),
+  and the readout shows "YOUR HULL IS LOST (or TAKEN) - hold Shift+R to undo it - final in N s" (or when the rewind
+  is ready, inside its cooldown). A hold to before it brings the hull back alive, unbooked and still at the helm; left
+  alone, the loss is booked once older than the window and the helm lets go exactly as before. A rewind in its
+  cooldown cannot help, which is the cooldown's point.
+- **Tested:** the self-test (32 checks, run headless twice, both passing) adds: a seat change from the helm to a gun
+  on the same hull is undone strictly (the resume lands at or before the switch, the player is back at the helm, the
+  gun is the crew's again); a killing impact (`Battle::ApplyImpact`, the real kill path) on the hull flown is held
+  back (still on the world's books, the helm still held, the readout up), a hold to before it brings it back alive,
+  unbooked and at the helm, and a second loss left alone in the cooldown is booked only once the window is out and
+  then lets go of the helm. All game layer (no Core file changed), so the Bench is untouched.
+
 ### Not yet (later stages)
 
-- Undoing the barriers left (the player's own hull's fate, the fleet-wide `Seats` scalar — see US-T415's finding
-  above): a booking journal for the seat and the session, and a per-unit (not scalar) census for `Seats`.
-- Fixing US-T414 (the player's own helm cannot move to a turret on the same hull mid-battle) so the seat-change
-  self-test phase stops skipping and exercises the real rewind assertions.
+- Moving to a seat on another body during the window, and crossing into another body's frame.
 - **Ships that crossed the system's edge in the window are still not redrawn outside a fight** (US-T412 looked for a
   cheap fix and did not find one safe to land untested): a ship's analytic state (`ShipController`'s phase, orbit,
   lane) is a snapshot of *now*, overwritten at every phase change, so `Fleet::StateOf(ship, jd)` for a past `jd` is

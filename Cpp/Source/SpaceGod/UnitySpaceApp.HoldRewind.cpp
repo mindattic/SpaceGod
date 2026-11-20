@@ -52,6 +52,9 @@
 #include "Combat/PilotFlight.h"
 #include "Embodiment/Embodiables.h" // US-T414: HelmOf/TurretsOn, for the self-test's seat-change check
 #include "Embodiment/MountedTurret.h" // US-T414: the full type, so Ref<MountedTurret> converts to Ref<IEmbodiable>
+#include "Embodiment/MechWalker.h" // US-T416: a deployed mech's state, captured by value
+#include "Session/ISession.h" // US-T414: the session's refusal events, for the self-test's diagnosis
+#include "Session/SessionEvents.h"
 #include "Embodiment/ShipHelm.h" // US-T414: likewise for Ref<ShipHelm>
 #include "Target.h" // US-T414: Target::OfShip, for the self-test's EnterPiloting call
 #include "Persistence/HoldRewindCurve.h"
@@ -126,6 +129,13 @@ namespace SpaceGod
 			// copies that pointer, not what is in the list. Captured as the list's own contents and restored into the
 			// same live List object (Clear then Add), so anyone else holding the same Ref still holds the right one.
 			std::vector<std::pair<cs::Ref<cs::List<cs::Ref<Ship>>>, std::vector<cs::Ref<Ship>>>> Bays;
+			// US-T416: a deployed mech (Battle::Mechs) is its own standalone object with substantial state mutated in
+			// place (Pos, Armor, Heat, ammo, gait) -- the same shape of gap as a FlightDeck or a DeckVisit, since
+			// Mechs is a list of Refs, not embedded values. Captured and restored the same way, by value.
+			std::vector<std::pair<cs::Ref<MechWalker>, MechWalker>> Mechs;
+			// US-T417: the seat the player held at this moment besides the helm (a gun, a craft, a mech), or null: put back
+			// with the fight (RestoreHoldRewindSeat), so a seat change is undone with everything else.
+			cs::Ref<IEmbodiable> Seat;
 			bool HasPilot = false;
 			PilotState Pilot;
 			cs::Ref<Ship> PilotShip;
@@ -174,12 +184,18 @@ namespace SpaceGod
 			if (fight == nullptr) return c;
 			c.Fight = fight.get();
 			c.Over = fight->Over;
-			c.Seats = fight->Mechs.Count() + fight->Embedded.Count() + fight->Manned.Count() + fight->Flown.Count();
+			// US-T416: a mech's state is captured by value and a stuck pod (Embedded) is write-once data the Battle copy
+			// restores. US-T417: the player's own taken guns and flown craft (Manned, Flown) are put back too, with the
+			// seat itself (RestoreHoldRewindSeat), so with the bookings held back none of them is a barrier any more.
+			c.Seats = HrTuning::DeferBookings ? 0 : fight->Mechs.Count() + fight->Embedded.Count() + fight->Manned.Count() + fight->Flown.Count();
 			unsigned long long h = 1469598103934665603ull;
 			for (const auto& u : fight->Units)
 			{
 				if (u == nullptr) continue;
-				bool counted = !HrTuning::DeferBookings || (ship != nullptr && u->Ship == ship);
+				// US-T417: with every hull's fate held back (the player's own too, DeferOwnFate), no unit's dead, fled,
+				// struck or taken flag is a barrier: the resume point restores them all. A loss actually booked shows up
+				// through Lost, below, whoever's it was.
+				bool counted = !HrTuning::DeferBookings || (!HrTuning::DeferOwnFate && ship != nullptr && u->Ship == ship);
 				if (counted)
 				{
 					c.Units++;
@@ -205,6 +221,20 @@ namespace SpaceGod
 			return c;
 		}
 
+		/// <summary>US-T417: the body a seat belongs to, as the embody gate counts it (Embodiables' BodyUnit): a craft launched
+		/// from a carrier is the carrier's, so flying your own carrier's fighter is not leaving the hull.</summary>
+		cs::Ref<Ship> HrBodyShip(const cs::Ref<IEmbodiable>& seat)
+		{
+			if (seat == nullptr) return nullptr;
+			auto sub = seat->Subject();
+			auto u = sub.Unit;
+			if (u == nullptr && sub.Ship != nullptr && sub.Ship->Battle != nullptr) u = sub.Ship->Battle->UnitOf(sub.Ship);
+			if (u != nullptr && u->Fighter != nullptr && u->Fighter->Carrier != nullptr && u->Fighter->Carrier->Ship != nullptr)
+				return u->Fighter->Carrier->Ship;
+			if (sub.Ship != nullptr) return sub.Ship;
+			return u != nullptr ? u->Ship : nullptr;
+		}
+
 		/// <summary>In words, what changed between two censuses (the barrier's reason).</summary>
 		cs::String HrWhyChanged(const HrCensus& a, const HrCensus& b)
 		{
@@ -222,7 +252,7 @@ namespace SpaceGod
 			// if that changes in some other way -- not when an AI reinforcement joins or leaves, which is fully
 			// restorable and no longer reaches this far.
 			if (b.Units != a.Units) return "the units you control changed";
-			if (b.Seats != a.Seats) return "a gun, a craft or a mech was taken or let go";
+			if (b.Seats != a.Seats) return "you took or let go of a gun or a craft";
 			return "the fight changed in a way not undone yet";
 		}
 
@@ -359,7 +389,8 @@ namespace SpaceGod
 			}
 		}
 
-		std::shared_ptr<HrAnchor> HrCaptureAnchor(double t, const cs::Ref<Battle>& fight, bool piloting, const PilotState& pilot, const cs::Ref<Ship>& ship, int frame)
+		std::shared_ptr<HrAnchor> HrCaptureAnchor(double t, const cs::Ref<Battle>& fight, bool piloting, const PilotState& pilot, const cs::Ref<Ship>& ship, int frame,
+			const cs::Ref<IEmbodiable>& seat)
 		{
 			auto a = std::make_shared<HrAnchor>();
 			a->T = t;
@@ -416,9 +447,14 @@ namespace SpaceGod
 					if (r != nullptr) a->Rounds.emplace_back(r, *r);
 				for (const auto& m : fight->Mines)
 					if (m != nullptr) a->Mines.emplace_back(m, *m);
+				// US-T416: Battle::Mechs is a list of Refs; the mech objects they point to carry their own evolving
+				// state (position, armour, heat, ammo), mutated in place, not recreated.
+				for (const auto& w : fight->Mechs)
+					if (w != nullptr) a->Mechs.emplace_back(w, *w);
 				for (const auto& d : fight->Decoys)
 					if (d != nullptr) a->Decoys.emplace_back(d, *d);
 			}
+			a->Seat = seat;
 			if (piloting)
 			{
 				a->HasPilot = true;
@@ -494,6 +530,8 @@ namespace SpaceGod
 			// US-T413: a carrier's decks and a craft's own deck visit, outside the per-unit copies above.
 			for (const auto& p : a.Decks) *p.first = p.second;
 			for (const auto& p : a.Visits) *p.first = p.second;
+			// US-T416: a deployed mech's own evolving state, outside the Battle::Mechs list-of-Refs copy.
+			for (const auto& p : a.Mechs) *p.first = p.second;
 			// US-T413: the hangar/shuttle bay list is restored into the same live List object (its Ref is shared),
 			// not replaced, so anyone else holding that Ref still holds the one that now has the old contents back.
 			for (const auto& p : a.Bays)
@@ -524,6 +562,10 @@ namespace SpaceGod
 			std::vector<cs::Ref<BattleUnit>> DiedSinceM;
 			bool ForceDown = false;
 			double Target = HrNone;
+			// US-T417: the hull flown's unit (from the seat check) and the moment marked before it is killed.
+			cs::Ref<BattleUnit> SeatUnit;
+			double DeathMarkT = HrNone;
+			double KilledAgainWall = -1;
 			// US-T414: the seat-change check (phases 8-13): the hull taken for it, the moment marked while piloting
 			// it (before the switch to a turret), and whether the resume landed there or was blocked by a barrier.
 			cs::Ref<Ship> SeatShip;
@@ -576,6 +618,11 @@ namespace SpaceGod
 		double CooldownUntil = 0;
 		/// <summary>US-T410: frames left in which a resume is "just now" (the HUD takes stock instead of reporting).</summary>
 		int JustResumed = 0;
+		/// <summary>US-T417: this frame, the hull flown is lost (1) or taken (2) in its fight, its fate held back for the
+		/// window (HoldRewindOwnFateHeld): the readout says there is still time to undo it. Cleared each frame.</summary>
+		int OwnFateHeld = 0;
+		/// <summary>US-T417: lived seconds when the hull flown was first seen lost or taken, for the readout's countdown.</summary>
+		double OwnFateSince = HrNone;
 
 		HrSelfTest Test;
 
@@ -732,8 +779,11 @@ namespace SpaceGod
 		h.OrigDecided = fight->SurrenderDecided;
 		// Held back unless it is the player's own hull (the game must answer that at once: the seat, the session) or terms
 		// being settled (cargo and prizes change hands): those are booked now, after everything held back, as a barrier.
+		// US-T417: with DeferOwnFate the player's own hull waits out the window too (the helm is held dead meanwhile,
+		// HoldRewindOwnFateHeld), so nothing here is booked at once any more.
 		auto mine = [this](const cs::Ref<BattleUnit>& u)
 		{
+			if (HrTuning::DeferOwnFate) return false;
 			return u != nullptr && (u->PlayerControlled() || (u->Ship != nullptr && World() != nullptr && u->Ship == World()->PilotedShip));
 		};
 		auto book = [this](bool now, std::function<void()> fire)
@@ -773,7 +823,7 @@ namespace SpaceGod
 		auto decided = h.OrigDecided;
 		fight->SurrenderDecided = [book, decided](cs::Ref<Battle> b, cs::Ref<BattleUnit> u, cs::Ref<Faction> captor, SurrenderTerms terms)
 		{
-			book(true, [decided, b, u, captor, terms] { if (decided) decided(b, u, captor, terms); });
+			book(!HrTuning::DeferOwnFate, [decided, b, u, captor, terms] { if (decided) decided(b, u, captor, terms); });
 		};
 		// The fight over: everything held back is booked before the war settles it (War::Resolve reads what was booked).
 		fight->Ending = [this](cs::Ref<Battle>) { BookHoldRewindUpTo(std::numeric_limits<double>::max()); };
@@ -825,6 +875,9 @@ namespace SpaceGod
 		// below, which a turret does not have and so does not try to restore.
 		auto heldSeat = HeldSeat();
 		auto ship = heldSeat != nullptr ? heldSeat->Subject().Ship : nullptr;
+		// US-T417: the census keys on the body (a craft off your own carrier is the carrier), the seat journal on the seat.
+		auto bodyShip = HrBodyShip(heldSeat);
+		auto heldNonHelm = HeldNonHelm();
 		auto fight = HoldRewindBattle();
 		if (fight != h.Fight)
 		{
@@ -840,7 +893,7 @@ namespace SpaceGod
 		}
 		// US-T410: the bookings of the fight in view wait out the window.
 		HookHoldRewindBookings(fight);
-		HrCensus census = HrTakeCensus(fight, ship, pilotFrameBody, piloting);
+		HrCensus census = HrTakeCensus(fight, bodyShip, pilotFrameBody, piloting);
 		if (h.HasLast && !(census == h.Last))
 		{
 			h.BarrierWhy = HrWhyChanged(h.Last, census);
@@ -895,7 +948,7 @@ namespace SpaceGod
 
 		if (t >= h.NextAnchorAt && (fight != nullptr || piloting))
 		{
-			h.Anchors.push_back(HrCaptureAnchor(t, fight, piloting, pilot(), ship, pilotFrameBody));
+			h.Anchors.push_back(HrCaptureAnchor(t, fight, piloting, pilot(), ship, pilotFrameBody, heldNonHelm));
 			h.NextAnchorAt = t + HrTuning::AnchorS;
 			// The self-test's mark: the state this resume point holds, hashed now (it is the live state this instant).
 			if (h.Test.On && h.Test.Phase == 1 && h.Test.M < 0 && fight != nullptr && fight == h.Test.Fight)
@@ -940,6 +993,9 @@ namespace SpaceGod
 		if (holdRewind == nullptr) holdRewind = std::make_shared<HoldRewindState>();
 		auto& h = *holdRewind;
 		if (h.JustResumed > 0) h.JustResumed--;
+		// US-T417: set again by UpdatePiloting this frame while the hull flown's fate is still held back.
+		if (h.OwnFateHeld == 0) h.OwnFateSince = HrNone;
+		h.OwnFateHeld = 0;
 		bool down = Input.HoldRewind || h.Test.ForceDown;
 		bool pressed = down && !h.KeyWasDown;
 		h.KeyWasDown = down;
@@ -955,7 +1011,7 @@ namespace SpaceGod
 			// The designer's rule: real time first, then real seconds back.
 			if (Clock->WarpIndex > 0) Clock->SetWarp(0);
 			bool piloting = IsPiloting() && World()->PilotedShip == h.PilotShip && !h.Pilot.empty();
-			h.AtPress = HrCaptureAnchor(h.LivedS, h.Fight, piloting, pilot(), piloting ? h.PilotShip : nullptr, pilotFrameBody);
+			h.AtPress = HrCaptureAnchor(h.LivedS, h.Fight, piloting, pilot(), piloting ? h.PilotShip : nullptr, pilotFrameBody, HeldNonHelm());
 			h.Active = true;
 			h.Releasing = false;
 			h.PressT = h.LivedS;
@@ -1081,6 +1137,45 @@ namespace SpaceGod
 		}
 	}
 
+	void UnitySpaceApp::RestoreHoldRewindSeat(const cs::Ref<IEmbodiable>& seat, bool piloting, const cs::Ref<Ship>& pilotShip)
+	{
+		auto held = HeldNonHelm();
+		bool sameSeat = seat == nullptr ? held == nullptr : held != nullptr && EmbodiableEquals(seat, held);
+		bool helmNow = IsPiloting() && Piloted.Ship == pilotShip;
+		bool samePilot = piloting ? helmNow : !IsPiloting();
+		if (sameSeat && samePilot) return;
+		// The seat the resume point had, taken while whatever is held now still holds the body (a resume never crosses to
+		// another body: that stays a barrier), so the embody gate sees the player aboard and lets it through.
+		if (!sameSeat)
+		{
+			if (seat == nullptr) ReleaseSeat();
+			else if (!SwitchSeat(seat)) UnityCompat::Debug::LogWarning(cs::Cat("Hold rewind: could not put the player back at ", seat->Name()));
+		}
+		// Then the helm, as it was.
+		if (piloting && !helmNow && pilotShip != nullptr && !pilotShip->Destroyed) EnterPiloting(Target::OfShip(pilotShip));
+		else if (!piloting && IsPiloting()) ExitPiloting();
+	}
+
+	bool UnitySpaceApp::HoldRewindOwnFateHeld(const cs::Ref<Ship>& ship)
+	{
+		if (!HrTuning::DeferBookings || !HrTuning::DeferOwnFate || ship == nullptr || ship->Battle == nullptr) return false;
+		auto battle = ship->Battle;
+		auto unit = battle->UnitOf(ship);
+		if (unit == nullptr || !(unit->Dead || unit->Captured)) return false;
+		// Lost or taken in the fight, its booking held back: the helm follows the wreck (or the prize) and reads nothing.
+		pilotFrameBody = battle->Body;
+		SeedPilot(unit->Pos + battle->Anchor, unit->Vel, unit->Forward);
+		unit->PlayerFireHeld = false;
+		unit->PlayerSecondaryHeld = false;
+		SpaceCamera->PilotView = PilotViewRotation(PilotControlMode);
+		if (holdRewind != nullptr)
+		{
+			holdRewind->OwnFateHeld = unit->Captured ? 2 : 1;
+			if (holdRewind->OwnFateSince == HrNone) holdRewind->OwnFateSince = holdRewind->LivedS;
+		}
+		return true;
+	}
+
 	void UnitySpaceApp::EndHoldRewind()
 	{
 		auto& h = *holdRewind;
@@ -1093,6 +1188,9 @@ namespace SpaceGod
 		if (HrTuning::ViewSystemBack && Clock != nullptr) Clock->SetJd(h.JdAtPress);
 		auto putBack = [this](const HrAnchor& a)
 		{
+			// US-T417: the seat first (its hand-backs and take-charges act on the live fight), then the fight over it, which
+			// then matches the seats it was taken with.
+			RestoreHoldRewindSeat(a.Seat, a.HasPilot, a.PilotShip);
 			HrRestoreFight(a);
 			if (a.HasPilot && IsPiloting() && World()->PilotedShip == a.PilotShip && pilotFrameBody == a.PilotFrame)
 			{
@@ -1205,6 +1303,20 @@ namespace SpaceGod
 			h.Text->fontSize = 12;
 			if (wall < h.CooldownUntil) line = cs::Cat("REWIND in ", static_cast<int>(std::ceil(h.CooldownUntil - wall)), " s");
 			else line = cs::Cat("REWIND ready  (hold ", Input::KeyBindings::Keys(Input::KeyAction::HoldRewind), ")");
+			// US-T417: the hull flown lost or taken, its fate held back: how long is left to undo it, centred and loud.
+			if (h.OwnFateHeld != 0)
+			{
+				double left = std::max(0.0, HrTuning::WindowS - (h.LivedS - h.OwnFateSince));
+				cs::String what = h.OwnFateHeld == 2 ? "YOUR HULL IS TAKEN" : "YOUR HULL IS LOST";
+				cs::String how = wall < h.CooldownUntil
+					? cs::Cat("rewind ready in ", static_cast<int>(std::ceil(h.CooldownUntil - wall)), " s")
+					: cs::Cat("hold ", Input::KeyBindings::Keys(Input::KeyAction::HoldRewind), " to undo it");
+				line = cs::Cat(what, "  -  ", how, "  -  final in ", static_cast<int>(std::ceil(left)), " s");
+				tint = Color(1.0f, 0.35f, 0.3f, 1.0f);
+				r = Rect((Screen::width - 900.0f) * 0.5f, 132, 900, 24);
+				h.Text->alignment = TextAnchor::MiddleCenter;
+				h.Text->fontSize = 15;
+			}
 		}
 		h.Text->normal.textColor = tint;
 		GUI::Label(r, line, h.Text);
@@ -1405,6 +1517,9 @@ namespace SpaceGod
 			// player is aboard, not only the one piloted), and the resume should reach the marked moment.
 			case 8: // Part 1: take the helm of a turret-capable hull in the fight.
 			{
+				// The second resume (phase 7) started a cooldown: the hold in phase 10 would be refused inside it, so the
+				// mark and the switch are made once it is over, keeping them well inside the window.
+				if (t.SeatShip == nullptr && !HoldRewindRefusal().empty()) return true;
 				if (t.SeatShip == nullptr)
 				{
 					for (const auto& u : t.Fight->Units)
@@ -1440,24 +1555,25 @@ namespace SpaceGod
 				if (turrets.Count() == 0) return finish("the hull's turrets went away mid-check");
 				cs::Ref<IEmbodiable> pick = turrets[0];
 				bool canEmbody = pick->CanEmbody(), passesGate = PassesEmbodyGate(pick);
+				// US-T414 diagnosis: what the session itself says when it refuses the take.
+				auto refusals = std::make_shared<cs::String>();
+				int token = session->EventRaised() += [refusals](cs::Ref<IGameEvent> e)
+				{
+					if (auto c = cs::As<CommandRefused>(e)) *refusals = cs::Cat(*refusals, refusals->empty() ? "" : " | ", c->Reason);
+				};
 				PickSeat(pick);
+				session->EventRaised() -= token;
+				if (!refusals->empty()) UnityCompat::Debug::Log(cs::Cat("HoldRewind selftest: seat change: the session refused: ", *refusals));
 				if (IsPiloting()) return finish("still at the helm after picking a turret");
 				auto seat = HeldSeat();
 				if (seat == nullptr || seat->Subject().Ship != t.SeatShip)
 				{
-					// US-T414 (found here, not caused by rewind): moving from this hull's own helm straight to one of
-					// its turrets mid-battle is refused by the seat-taking command round trip even when both
-					// front-line checks pass -- piloting is never registered in SeatAuthority's own seats list, so
-					// its own MayEmbody/HolderOf re-check may see a different context. Until that is fixed, this
-					// exact known failure shape (CanEmbody and PassesEmbodyGate both true, yet nothing taken) is
-					// skipped, not failed: it is not a rewind defect. A fix to US-T414 makes the pick succeed, and
-					// this phase then falls through to the real rewind assertions below on its own.
-					bool knownGateGap = canEmbody && passesGate && seat == nullptr;
+					// US-T414: this used to fail for every player, not just here -- TakeSeat let go of the helm before
+					// the session weighed the take, so a gun on the hull flown looked like a hull in battle with no
+					// hold on it. Fixed in TakeSeat; a failure here now means that has come back.
 					UnityCompat::Debug::Log(cs::Cat("HoldRewind selftest: seat change: CanEmbody=", (canEmbody ? "true" : "false"),
-						" PassesEmbodyGate=", (passesGate ? "true" : "false"), " held now = ", seat != nullptr ? seat->Name() : cs::String("null"),
-						"; ", knownGateGap ? "skipped: matches the known US-T414 gap (helm to a turret on the same hull, mid-battle)"
-							: "the turret picked is not on the marked hull"));
-					return finish(knownGateGap ? cs::String() : cs::String("the turret picked is not on the marked hull"));
+						" PassesEmbodyGate=", (passesGate ? "true" : "false"), " held now = ", seat != nullptr ? seat->Name() : cs::String("null")));
+					return finish("the turret picked is not on the marked hull (US-T414 again?)");
 				}
 				t.PhaseWall = wall;
 				t.Phase = 10;
@@ -1477,7 +1593,9 @@ namespace SpaceGod
 			case 11: // Held as far back as it goes (the mark, unless something else still blocks it).
 			{
 				if (!h.Active) return true;
-				if (h.Tau > h.Oldest + 1e-6) return true;
+				// The hold is aimed at the mark (t.Target), so it parks there, or at the oldest it may reach if that is
+				// later (a barrier still standing): whichever is later is where it settles, as phase 3 checks against M.
+				if (h.Tau > std::max(t.SeatMarkT, h.Oldest) + 1e-6) return true;
 				if (++t.SettleFrames < 3) return true;
 				t.ForceDown = false;
 				t.HaveResume = false;
@@ -1488,9 +1606,10 @@ namespace SpaceGod
 			case 12: // Let go: did it reach the mark, and is everything it touched still sane?
 			{
 				if (!t.HaveResume) return true;
-				bool reachedMark = t.ResumedAnchorT <= t.SeatMarkT + HrTuning::AnchorS + 0.05;
+				// US-T417: strictly at or before the switch (the mark was taken just before it): the seat change is undone.
+				bool reachedMark = t.ResumedAnchorT <= t.SeatMarkT + 1e-6;
 				UnityCompat::Debug::Log(cs::Cat("HoldRewind selftest: seat change: resumed at ", cs::Fmt(t.ResumedAnchorT, "F3"),
-					" (marked ", cs::Fmt(t.SeatMarkT, "F3"), ", switched at ", cs::Fmt(t.SeatMarkT, "F3"), "+)"));
+					" (marked ", cs::Fmt(t.SeatMarkT, "F3"), ", switched just after)"));
 				selfCheck(reachedMark, "a same-hull seat change (helm to a turret) does not block the resume to before it");
 				cs::Ref<BattleUnit> hullUnit;
 				for (const auto& u : t.Fight->Units)
@@ -1499,10 +1618,90 @@ namespace SpaceGod
 					std::isfinite(hullUnit->Pos.X) && std::isfinite(hullUnit->Pos.Y) && std::isfinite(hullUnit->Pos.Z) &&
 					std::isfinite(hullUnit->Vel.X) && std::isfinite(hullUnit->Vel.Y) && std::isfinite(hullUnit->Vel.Z);
 				selfCheck(poseSane, "the hull's own pose is still finite after resuming across the seat change");
-				selfCheck(std::isfinite(pilotAim.X) && std::isfinite(pilotAim.Y) && std::isfinite(pilotAim.Z),
-					"the player's own aim is still finite (unreapplied while at a turret, per docs/REWIND.md, not corrupted)");
-				selfCheck(HeldSeat() != nullptr && !IsPiloting(), "still seated at the turret after the resume, not silently ejected");
-				ReleaseSeat();
+				selfCheck(std::isfinite(pilotAim.X) && std::isfinite(pilotAim.Y) && std::isfinite(pilotAim.Z), "the player's own aim is still finite");
+				// US-T417: the seat comes back with the fight: at the mark the player was at the helm, so they are again.
+				selfCheck(IsPiloting() && World()->PilotedShip == t.SeatShip && HeldNonHelm() == nullptr,
+					"the seat is put back with the fight: back at the helm, as at the mark, not left at the turret");
+				selfCheck(hullUnit != nullptr && t.Fight->Manned.Count() == 0, "and the turret is the crew's again (nothing manned)");
+				t.SeatUnit = hullUnit;
+				t.PhaseWall = wall;
+				t.Phase = 13;
+				return true;
+			}
+			// US-T417: the player's own hull lost, undone. A real impact destroys the hull flown; its loss must be held back
+			// (the hull still on the world's books, the helm held but dead), a hold to before it brings it back alive and
+			// still the player's, and a second loss left alone is final exactly as before.
+			case 13: // Out of the cooldown, still at the helm: mark a moment, then a killing impact on the hull flown.
+			{
+				if (!HoldRewindRefusal().empty()) return true;
+				if (t.SeatUnit == nullptr || !IsPiloting() || World()->PilotedShip != t.SeatShip) return finish("not at the helm for the own-hull check");
+				if (t.DeathMarkT == HrNone)
+				{
+					t.DeathMarkT = h.LivedS;
+					t.PhaseWall = wall;
+					return true;
+				}
+				if (wall - t.PhaseWall < 0.6) return true; // a resume point between the mark and the impact, at most AnchorS old
+				t.Fight->ApplyImpact(t.SeatUnit, t.SeatUnit->Pos, 1e15);
+				t.PhaseWall = wall;
+				t.Phase = 14;
+				return true;
+			}
+			case 14: // Lost, and held back.
+			{
+				if (wall - t.PhaseWall < 0.5) return true;
+				selfCheck(t.SeatUnit->Dead, "a killing impact kills the hull flown in the fight");
+				selfCheck(!t.SeatShip->Destroyed, "its loss is held back: the hull is still on the world's books");
+				selfCheck(IsPiloting() && World()->PilotedShip == t.SeatShip, "the helm is still held (dead in the hands), not let go");
+				selfCheck(h.OwnFateSince != HrNone, "the readout says the hull is lost and there is still time to undo it");
+				t.Target = t.DeathMarkT;
+				t.ForceDown = true;
+				t.SettleFrames = 0;
+				t.PhaseWall = wall;
+				t.Phase = 15;
+				return true;
+			}
+			case 15: // Hold back to before the impact.
+			{
+				if (!h.Active) return true;
+				if (h.Tau > std::max(t.DeathMarkT, h.Oldest) + 1e-6) return true;
+				if (++t.SettleFrames < 3) return true;
+				t.ForceDown = false;
+				t.HaveResume = false;
+				t.PhaseWall = wall;
+				t.Phase = 16;
+				return true;
+			}
+			case 16: // Played on from before it: alive, unbooked, still the player's.
+			{
+				if (!t.HaveResume) return true;
+				selfCheck(t.ResumedAnchorT <= t.DeathMarkT + HrTuning::AnchorS + 1e-6 && h.BarrierT < t.DeathMarkT,
+					"your own hull's loss does not block a resume to before it");
+				selfCheck(!t.SeatUnit->Dead && t.SeatUnit->Combat != nullptr && t.SeatUnit->Combat->Hull > 0, "your hull is alive again after the hold");
+				selfCheck(!t.SeatShip->Destroyed, "and its loss was never booked");
+				selfCheck(IsPiloting() && World()->PilotedShip == t.SeatShip, "and you are still at its helm");
+				t.PhaseWall = wall;
+				t.Phase = 17;
+				return true;
+			}
+			case 17: // Lost again inside the cooldown (no rewind to be had): after the window it is final, as before.
+			{
+				if (t.KilledAgainWall < 0)
+				{
+					if (!IsPiloting()) return finish("lost the helm before the second loss");
+					t.Fight->ApplyImpact(t.SeatUnit, t.SeatUnit->Pos, 1e15);
+					t.KilledAgainWall = wall;
+					t.PhaseWall = wall;
+					t.SettleFrames = 0;
+					return true;
+				}
+				// Timed by the test's own clock: once the loss is booked the readout's "held" moment is rightly gone.
+				if (!t.SeatShip->Destroyed && wall - t.KilledAgainWall < HrTuning::WindowS + 3) return true;
+				// Booked at the end of a frame; the helm lets go on the next frame's piloting, as for any loss.
+				if (t.SeatShip->Destroyed && IsPiloting() && ++t.SettleFrames < 5) return true;
+				selfCheck(t.SeatShip->Destroyed, "left alone past the window, the loss is booked: the hull is struck off");
+				selfCheck(wall - t.KilledAgainWall >= HrTuning::WindowS - 0.5, "and not before the window was out (it was held back till then)");
+				selfCheck(!IsPiloting(), "and the helm is let go, as a loss always was");
 				return finish(cs::String());
 			}
 			default:

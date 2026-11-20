@@ -1248,6 +1248,9 @@ namespace SpaceGod
 			ExitPiloting();
 			return;
 		}
+		// US-T417: lost or taken in the fight but its fate held back for the hold rewind's window: the helm follows the
+		// wreck and reads nothing until the loss is booked (then Destroyed, above) or rewound away.
+		if (HoldRewindOwnFateHeld(ship)) return;
 		// Riding a lane, or thrown out of one this frame into an ambush (U.SPC-T42).
 		if (ship->Phase == ShipPhase::Lane || (rideWarpBefore >= 0 && ship->Battle != nullptr))
 		{
