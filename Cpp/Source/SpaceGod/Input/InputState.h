@@ -275,6 +275,10 @@ namespace SpaceGod::Input
 		/// rewind is the host's load in place, not a helm input.</summary>
 		bool Rewind = false;
 
+		/// <summary>US-T409: Shift+R held, the hold rewind (docs/REWIND.md, "Hold to rewind"). Local to this machine, like
+		/// <see cref="Rewind"/>: a hold rewind is single-player for now.</summary>
+		bool HoldRewind = false;
+
 		/// <summary>While capture runs (US-T72, docs/CAPTURE.md section 5): Alt+F9 a screenshot, Alt+F10 toggles an
 		/// on-demand recording, Alt+F11 saves the replay. Local to this machine: never sent to co-op peers (they are
 		/// read-only properties, which PilotFrame's field list leaves out, as Unity's PilotFrame skips properties).</summary>

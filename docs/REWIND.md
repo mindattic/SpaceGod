@@ -323,6 +323,91 @@ keyframe whole. That needs the engine's Oodle SDK linked into the game module, n
 recommended 2 s and lets the dense battle ring ship. Then a client's rewind becomes a command in the co-op lockstep
 stream, ordered by the host: any player may rewind, and the later request wins.
 
+## Hold to rewind (US-T409)
+
+The designer's short rewind, beside the keyframe ring above. The rules (2026-11-19, final):
+
+1. Pressing it first sets the time warp to real time (1x), then rewinds in **real** seconds.
+2. It is free, with a **60 s** cooldown between uses.
+3. **Holding** the key rewinds, up to **10 real seconds**; **letting go** resumes play from the moment reached.
+
+Every number is a constant in `UnitySpaceApp::HoldRewindTuning` (`UnitySpaceApp.HoldRewind.inl`): `WindowS` 10,
+`CooldownS` 60, `CapitalHz` 5, `CraftHz` 20, `PlayerEveryFrame`, `AnchorS` 0.5, `PlaybackSpeed` 1, `MaxSamples`
+600,000, `MinHoldS` 0.15. The key is the rebindable `KeyAction::HoldRewind` ("holdRewind"), Shift+R by default
+(Shift+F8 stays the keyframe rewind; the two are separate keys because one is a tap and the other a hold).
+
+### Resume: which of the candidates, and why
+
+The research (`docs/research/rewind-short-track.md`, section 6) recommends restoring the keyframe at or before the
+moment and replaying the logged frames to it. Here that cannot reach a moment inside a fight yet: the replay stops at
+the first frame the player acted on (the input recorder does not exist), and keyframes are at least 20 wall-seconds
+apart because a capture costs 110-490 ms. A dense full-world snapshot every second (candidate ii) costs the same
+hitch every second. So the resume is **candidate (i), state restore, scoped to the fight in view and the hull flown,
+and bounded by barriers**:
+
+- **Resume points.** Every `AnchorS` (0.5 s) of lived real time, a read-only observer at the end of the frame copies
+  *by value* the fight's whole state: the `Battle` itself (its lists of units, missiles, rounds, mines and decoys, its
+  clock `Seconds`, its random generator, the recon aloft, the seats manned and flown), every `BattleUnit`, each one's
+  `ShipCombat`, `Subsystem`s, reactor and `PowerDistribution`, `FighterState` and `BroadsideCommand`, every `Missile`,
+  `KineticRound`, `Mine` and `Decoy`, and the helm's `PilotState` (the hull flown's motion). About 1 MB for a large
+  fight, a few dozen copies kept.
+- **Letting go** puts the newest resume point at or before the moment reached back over the live objects (copy
+  assignment into the same objects, so every reference between them still holds), except the `Battle`'s hooks (its
+  events and callbacks), which stay as the world set them. The fight's random generator goes back with it, so what
+  follows is a consistent continuation; it is not the same future, and need not be.
+- **Barriers.** Some changes are booked outside the fight the moment they happen, and copying the fight back cannot
+  undo them: a hull lost (the world books the loss), fled, struck or taken, a unit joining (a craft launched, a hull
+  arriving), a hangar or shuttle bay changing (a craft landed), a gun, craft or mech taken or let go, the fight ending
+  or another coming into view, and the player changing seat or crossing into another body's frame. A census of these
+  is compared every recorded frame; any change is a barrier, and no resume goes back past the newest one. The hold
+  can still *draw* further back (a capital that jumped out plays back in), and the readout says how far back play can
+  go on from ("plays on no earlier than -3.2 s: a hull was lost"); letting go resumes at the oldest resume point after
+  the barrier and says so.
+- **Not restored, by design for now:** the world's clock and everything outside the fight (ships in transit, the
+  economy, other fights) go on from now: at real time that is 10 game seconds, invisible at system scale. What the
+  law, the news or the galaxy booked in those seconds stays booked (barriers cover the losses). Inside a hull, the
+  structure's knocked-loose sections (`ModularHull`, US-T91) and a boarding party's `Interior` are not copied; the
+  hull's own fuel, cargo and crew records are not either.
+- **The keyframe ring and its log.** No keyframe is taken during a hold (the frame runs no commands). After a resume
+  the frame log is cleared, because it could not replay across a fight set back by hand; a seek then lands on the
+  keyframes, which are whole worlds and still exact.
+- **Bench and AI-only runs.** The recorder and the restore live in the game layer (`UnitySpaceApp.HoldRewind.cpp`),
+  read only until the key is let go, and draw no random numbers; nothing in Core calls them, so the Bench never meets
+  them and its digests cannot change.
+- **Co-op.** Refused with a toast, and nothing is recorded while a co-op session runs. A co-op hold would have to be a
+  host-ordered lockstep command (phase 4).
+
+### Stage 1, as built
+
+- **Recording** (single player, not in the tour, captures or `-norewind`; not while paused or between the stars): the
+  fight in view (the hull flown's, else the one watched) and the hull flown. Each unit's pose (position, velocity,
+  nose, whether dead, fled or docked) is kept at `CapitalHz` for capitals and platforms, `CraftHz` for craft, every
+  frame for the hull held, and again on any change of those flags; missiles, rounds and decoys at `CraftHz`; the
+  helm's `PilotState` every frame; the fight's clock every frame. Planets, stations and everything off the
+  battlefield need no record (they are analytic in the date), and are not rewound. The window keeps `WindowS` plus one
+  second, and projectiles stop being kept past `MaxSamples` poses.
+- **The hold.** The press sets real time, captures the present as a resume point and starts the playback. While held,
+  the moment drawn moves back at `PlaybackSpeed` real seconds per second, to at most `WindowS` back or the oldest
+  pose kept. Each frame the recorded poses at that moment are written into the fight's units (and the lists of
+  missiles, rounds and decoys in flight then), and the helm's state into the hull flown, smoothed between kept poses
+  (cubic Hermite on position and velocity, the nose lerped and normalised). Hulls that left in the window (dead,
+  fled) are drawn again; ones that arrived later are hidden before they came. The simulation does not run: the frame
+  only lays out, moves the camera and draws.
+- **Letting go** restores the resume point as above, drops what was kept after it, shifts the rest so it ends now,
+  clears the frame log and starts the 60 s cooldown. A tap (under `MinHoldS`) puts the present back and costs
+  nothing.
+- **Readout.** "REWIND ready (hold Shift+R)", "REWIND in 42 s", and while held "<< REWIND -4.2 s", how far back play
+  can go on from and why, and "let go to play on".
+
+### Not yet (later stages)
+
+- Undoing barriers: a hull lost, fled or taken, a launch or a landing, a seat change. That needs the world's bookings
+  undone too, which is the keyframe-plus-replay path once the input recorder exists, or a journal of the bookings.
+- Ships off the battlefield that left or arrived in the window outside a fight (a freighter entering a gate): their
+  fleet phases are analytic in the date, but the world's clock does not go back, so they are drawn where they are now.
+- Reversed effects (an FTL flash collapsing into a hull, an explosion contracting), the hull sections' damage stage,
+  the reversed audio bed, and a hold in co-op.
+
 ## Parked: checkpoint loops with ghost replays (US-T169)
 
 This is a design note only and nothing is built. It is parked until the US-T99 rewind lands, but the rewind build

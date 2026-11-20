@@ -54,7 +54,7 @@ namespace SpaceGod::Input
 		Orbits, Labels, Lanes, Satellites, SkyNext, SkyPrev, ToggleHud, ClearScreen,
 		// Screens and panels
 		Help, Comms, Drawer, GalaxyMap, SystemMap, Market, DockPort, Cargo, Outfit, Bounties, Contracts, Fleet, Trade, Hail,
-		Logs, Discoveries, Encyclopedia, Society /* US-T293 */, Notices /* US-T345 */, BattlePlot /* US-T367 */, SpawnPilot, SpawnPractice, QuickSave, QuickLoad, Rewind /* US-T99 */, Saves, CheatMenu, SpawnMenu,
+		Logs, Discoveries, Encyclopedia, Society /* US-T293 */, Notices /* US-T345 */, BattlePlot /* US-T367 */, SpawnPilot, SpawnPractice, QuickSave, QuickLoad, Rewind /* US-T99 */, HoldRewind /* US-T409 */, Saves, CheatMenu, SpawnMenu,
 		Count,
 	};
 

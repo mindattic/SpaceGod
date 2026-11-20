@@ -505,6 +505,28 @@ namespace SpaceGod
 		if (hud != nullptr && hud->UpdateHelpKeys()) Input.Handover(); // US-T346: the Help screen's and its ship catalog's step keys, while held
 		if (hud != nullptr && hud->UpdateLogsKeys()) Input.Handover(); // US-T349: and the recovered logs screen's
 		TutorialKeys(); // US-T254: Shift+Enter / Shift+Esc on the tutorial's card (it never takes the other keys)
+		// US-T409: the rewind key held: the last seconds play backward and the simulation stands still, so the frame only
+		// draws (no commands, no clock, no world, no helm); let go and the frame runs on from the moment reached.
+		if (UpdateHoldRewind(dt))
+		{
+			SyncShipViews();
+			AnimateScale(dt);
+			Scale()->Layout(Ephemeris(), bodyScene);
+			UpdateRadii();
+			UpdateShips(dt);
+			Structures->Layout();
+			if (!Travel->Active && !InFtlCruise())
+			{
+				KeepReoriented();
+				SpaceCamera->Update(dt, AtControls() ? Input.ForChaseCamera() : Input);
+			}
+			UpdateClipPlanes(dt);
+			UpdateStreaming(dt);
+			Sky->Update(dt);
+			UpdateViews(dt);
+			ToastAge += dt;
+			return;
+		}
 		ArbitrateInput(true); // US-T90: one owner per input this frame (the craft held, else the command view)
 		int screensOpen = OpenScreens();
 		HandleCommands();
@@ -576,6 +598,7 @@ namespace SpaceGod
 		if (hud != nullptr && hud->DrawerOpen()) lockCursor = false; // US-T200: so does the bottom drawer
 		Cursor::lockState = lockCursor ? CursorLockMode::Locked : CursorLockMode::None;
 		Cursor::visible = !lockCursor;
+		RecordHoldRewind(dt); // US-T409: this frame's poses (and a resume point when due) for the hold rewind; read only
 	}
 
 	void UnitySpaceApp::FreeCursorForMenu()
@@ -659,6 +682,7 @@ namespace SpaceGod
 		Tour::ShowcaseTour::Draw(*this); // US-T147: the showcase tour's strip
 		DrawTutorial(); // US-T254: the tutorial's card, or a first-time hint
 		DrawRewindBar(); // US-T99: the timeline bar (after Shift+F8, while a seek replays)
+		DrawHoldRewind(); // US-T409: REWIND ready / its cooldown / how far back a hold has gone
 		cheatMenu->Draw(*this); // US-T126: the dev menu, or the HUD's hint for its key
 		GUI::enabled = true;
 		if (menu) pauseMenu->Draw();

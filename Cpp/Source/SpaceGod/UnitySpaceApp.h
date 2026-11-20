@@ -118,5 +118,6 @@ namespace SpaceGod
 #include "UnitySpaceApp.Tutorial.inl" // US-T254: the guided tutorial and the first-time hints
 #include "UnitySpaceApp.NewGame.inl" // US-T247: the New Game setup page's starting situations
 #include "UnitySpaceApp.Rewind.inl" // US-T99: time reversal's keyframe ring (docs/REWIND.md)
+#include "UnitySpaceApp.HoldRewind.inl" // US-T409: hold to rewind the last seconds, let go to play on (docs/REWIND.md)
 	};
 }

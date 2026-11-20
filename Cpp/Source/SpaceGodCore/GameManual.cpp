@@ -1132,7 +1132,11 @@ namespace SpaceGod::Core
 				T("Saving",
 				  "The whole simulation saves and resumes exactly where it was. F5 quicksaves and F8 loads it; F6 opens the "
 				  "save slots, where you can make as many saves as you like. The game autosaves every five minutes and on "
-				  "quit, keeping three, and saving waits while an FTL jump is under way.")),
+				  "quit, keeping three, and saving waits while an FTL jump is under way. "
+				  "Hold Shift+R to rewind: time drops to real speed and the last seconds of the fight in view and of your hull "
+				  "play backward, up to ten; let go and play goes on from there. It is free, then rests a minute; it never goes "
+				  "back past a hull lost, fled or taken, a craft launched or landed, or a change of seat, which it cannot undo "
+				  "yet.")), // US-T409
 
 			cs::New<ManualChapter>(EveryKeyTitle, "The whole reference card: every key and control, by what it is for", cs::List<cs::String>() /* C#: null */),
 		};

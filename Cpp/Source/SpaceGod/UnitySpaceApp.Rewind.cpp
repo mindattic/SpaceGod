@@ -208,6 +208,7 @@ namespace SpaceGod
 
 	void UnitySpaceApp::RewindAfterLoad()
 	{
+		ClearHoldRewind(); // US-T409: a load or a keyframe rewind: the hold rewind's tracks and resume points are another world's
 		if (rewindRestoring) return;
 		Rewind.Clear();
 		rewindSessionS = 0;

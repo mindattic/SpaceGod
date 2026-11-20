@@ -344,6 +344,7 @@ namespace SpaceGod::Input
 				{ KeyAction::QuickSave, "quickSave", "Game: quicksave", Both, EdgeKind, { Key::F5 }, "Save to the quicksave slot." },
 				{ KeyAction::QuickLoad, "quickLoad", "Game: quickload", Both, EdgeKind, { Key::F8 }, "Load the quicksave slot." },
 				{ KeyAction::Rewind, "rewind", "Game: rewind", Both, EdgeKind, { KeyChord(Key::F8, S) }, "Rewind to the last moment kept; again within a few seconds to go further back. Play on and the old future is replaced." }, // US-T99
+				{ KeyAction::HoldRewind, "holdRewind", "Game: hold to rewind", Both, HeldKind, { KeyChord(Key::R, S) }, "Held: time drops to real speed and the last seconds of the fight (and your hull) play backward, up to 10 s; let go to play on from there. Free, then a cooldown." }, // US-T409
 				{ KeyAction::Saves, "saves", "Game: save slots", Both, EdgeKind, { Key::F6 }, "The save slots." },
 				{ KeyAction::CheatMenu, "devMenu", "Game: dev menu", Both, EdgeKind, { KeyChord(Key::F1, S) }, "The dev menu." },
 				{ KeyAction::SpawnMenu, "spawnMenu", "Game: dev spawn menu", Both, EdgeKind, { KeyChord(Key::F2, S) }, "The dev menu on its Spawn tab." },
