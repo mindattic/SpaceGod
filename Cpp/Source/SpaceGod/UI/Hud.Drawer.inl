@@ -12,6 +12,9 @@
 //   - Notices (US-T345): the last 100 notices shown here (UnitySpaceApp::Notices), newest first, each with its game time
 //     and how many times in a row it showed, filtered by kind (all, combat, trade, society, system) with F or the
 //     filter button. Shift+X opens the drawer straight on it (and closes it from there).
+//   - Objectives (US-T405): the war objectives the live wars offer the SpaceGod (LastingConsequences, US-T105), open
+//     ones first with a Take it up / Turn it down row under each offered one (the calls sg.Objectives makes; single-player
+//     only, as the console: in co-op they are shown greyed with why), then how the closed ones ended and when.
 // Shift+U opens and closes it. While open it has the keys (the comms panel's pattern): Tab / Shift+Tab or Left / Right
 // the tabs, Up / Down the rows, Enter acts on the row, PgUp / PgDn the height, Esc closes. The cursor is free meanwhile.
 
@@ -24,8 +27,8 @@ public:
 	bool DrawerOpen() const { return drawerOpen; }
 
 private:
-	enum class DrawerTab : int { Navigation, Ships, Notices /* US-T345 */ };
-	static constexpr int DrawerTabCount = 3;
+	enum class DrawerTab : int { Navigation, Ships, Notices /* US-T345 */, Objectives /* US-T405 */ };
+	static constexpr int DrawerTabCount = 4;
 
 	/// One row of the drawer: a heading (no action), a star system, a place in this system, or a hull.
 	struct DrawerItem
@@ -41,6 +44,9 @@ private:
 		cs::Ref<Core::StarSystem> system;
 		Target target = Target::None();
 		cs::Ref<Core::Ship> ship;
+		/// US-T405: a war objective's action row: the objective's Id, and whether it takes it up (else turns it down).
+		int objective = 0;
+		bool objectiveAccept = false;
 	};
 
 	bool drawerOpen = false;
@@ -79,6 +85,10 @@ private:
 	void AddDrawerShips();
 	/// US-T345: the Notices tab's rows, newest first, under the filter.
 	void AddDrawerNotices();
+	/// US-T405: the Objectives tab's rows: open objectives (each offered one with its two action rows), then closed ones.
+	void AddDrawerObjectives();
+	/// US-T405: how many closed objectives the tab lists, newest first.
+	static constexpr int DrawerClosedObjectives = 30;
 
 	/// US-T345: the drawer on <paramref name="tab"/>, its rows and scroll back to the top.
 	void SetDrawerTab(DrawerTab tab);

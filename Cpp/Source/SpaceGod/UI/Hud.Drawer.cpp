@@ -23,6 +23,8 @@
 #include "Sensors/Sensors.h"
 #include "Systems/Galaxy.h"
 #include "Systems/GateNetwork.h"
+#include "Systems/LastingConsequences.h" // US-T405
+#include "Coop/CoopPeer.h" // US-T405: objectives are taken up in single-player only, as sg.Objectives
 
 #include <algorithm>
 
@@ -88,7 +90,7 @@ namespace SpaceGod::UI
 		}
 		bool back = (pressed(Input::Key::Tab) && shift) || pressed(Input::Key::LeftArrow);
 		bool next = (pressed(Input::Key::Tab) && !shift) || pressed(Input::Key::RightArrow);
-		if (back || next) // US-T345: three tabs now, round in either direction
+		if (back || next) // US-T345, US-T405: the tabs round in either direction
 			SetDrawerTab(static_cast<DrawerTab>((static_cast<int>(drawerTab) + (next ? 1 : DrawerTabCount - 1)) % DrawerTabCount));
 		// US-T345: F (Shift+F back) steps the notice history's filter.
 		if (drawerTab == DrawerTab::Notices && pressed(Input::Key::F))
@@ -128,6 +130,7 @@ namespace SpaceGod::UI
 		drawerItems.clear();
 		if (drawerTab == DrawerTab::Navigation) AddDrawerNavigation();
 		else if (drawerTab == DrawerTab::Notices) AddDrawerNotices(); // US-T345
+		else if (drawerTab == DrawerTab::Objectives) AddDrawerObjectives(); // US-T405
 		else AddDrawerShips();
 		// The keyboard's row on a row that can take it.
 		int n = static_cast<int>(drawerItems.size());
@@ -383,12 +386,113 @@ namespace SpaceGod::UI
 		}
 	}
 
+	// US-T405: the war objectives (LastingConsequences, US-T105), read only here: Find, not Of, so drawing it makes nothing.
+	void Hud::AddDrawerObjectives()
+	{
+		auto heading = [&](const cs::String& name, const cs::String& details, Color c, int indent)
+		{
+			DrawerItem h;
+			h.name = name;
+			h.details = details;
+			h.color = c;
+			h.heading = true;
+			h.indent = indent;
+			drawerItems.push_back(h);
+		};
+		auto lc = app->Galaxy != nullptr ? LastingConsequences::Find(*app->Galaxy) : nullptr;
+		int year = app->Clock != nullptr ? app->Clock->Utc().Year() : 0;
+		auto when = [&](double jd) -> cs::String
+		{
+			if (!(jd > 0)) return cs::String("?");
+			auto t = Astro::ToDateTime(jd);
+			return t.ToString(t.Year() == year ? "MMM dd" : "yyyy MMM dd");
+		};
+		auto where = [](const cs::Ref<GodObjective>& o) { return o->System != nullptr ? cs::Cat("in ", o->System->Name) : cs::String(); };
+		bool coop = Coop::CoopPeer::Current() != nullptr;
+
+		cs::List<cs::Ref<GodObjective>> open, closed;
+		if (lc != nullptr)
+			for (const auto& o : lc->Objectives)
+			{
+				if (o == nullptr) continue;
+				if (o->Open()) open.Add(o);
+				else closed.Add(o);
+			}
+
+		heading(cs::Cat("OPEN WAR OBJECTIVES  (", open.Count(), ")"),
+			coop ? cs::String("co-op: taken up in single-player only, as sg.Objectives") : cs::String("Enter or a click takes the row's choice"), UiStyle::Accent, 0);
+		if (open.Count() == 0)
+			heading("No war offers the SpaceGod anything now.", cs::String(), UiStyle::Dim, 1);
+		for (const auto& o : open)
+		{
+			bool offered = o->Status == GodObjectiveStatus::Offered;
+			cs::String state = offered ? cs::Cat("offered ", when(o->OfferedJd)) : cs::Cat("taken up ", when(o->AcceptedJd), ": the war still runs");
+			cs::String at = where(o);
+			heading(LastingConsequences::Describe(o), at.empty() ? state : cs::Cat(at, "  ·  ", state), offered ? UiStyle::Text : UiStyle::Good, 1);
+			if (!offered) continue;
+			for (int a = 0; a < 2; a++)
+			{
+				DrawerItem it;
+				it.objectiveAccept = a == 0;
+				it.objective = o->Id;
+				it.indent = 2;
+				it.name = it.objectiveAccept ? cs::String("Take it up") : cs::String("Turn it down");
+				it.details = it.objectiveAccept ? cs::String("side with them in this war; the war's other offers are set aside") : cs::String("let it pass");
+				it.enabled = !coop;
+				if (coop) it.why = "single-player only";
+				it.color = it.objectiveAccept ? UiStyle::Good : UiStyle::Warning;
+				drawerItems.push_back(it);
+			}
+		}
+
+		heading(cs::Cat("CLOSED  (", closed.Count(), ")"), closed.Count() > DrawerClosedObjectives ? cs::Cat("the latest ", DrawerClosedObjectives) : cs::String(), UiStyle::Accent, 0);
+		if (closed.Count() == 0)
+			heading("None yet.", cs::String(), UiStyle::Dim, 1);
+		int listed = 0;
+		for (int i = closed.Count() - 1; i >= 0 && listed < DrawerClosedObjectives; i--, listed++)
+		{
+			const auto& o = closed[i];
+			cs::String how;
+			Color c = UiStyle::Dim;
+			switch (o->Status)
+			{
+				case GodObjectiveStatus::Completed: how = "carried through"; c = UiStyle::Good; break;
+				case GodObjectiveStatus::Failed: how = "failed: the war went the other way"; c = UiStyle::Danger; break;
+				case GodObjectiveStatus::Declined: how = "turned down"; break;
+				case GodObjectiveStatus::Lapsed: how = "lapsed: never taken up"; break;
+				default: how = cs::String(Core::ToString(o->Status)); break;
+			}
+			cs::String at = where(o);
+			cs::String ended = cs::Cat(how, " ", when(o->ResolvedJd));
+			heading(LastingConsequences::Describe(o), at.empty() ? ended : cs::Cat(at, "  ·  ", ended), c, 1);
+		}
+	}
+
 	void Hud::ActDrawerItem(int index)
 	{
 		if (index < 0 || index >= static_cast<int>(drawerItems.size())) return;
 		auto it = drawerItems[index]; // a copy: what it does may rebuild the list
 		if (it.heading) return;
 		drawerRow = index;
+		// US-T405: a war objective's choice, through the calls sg.Objectives makes (single-player only, as there).
+		if (it.objective != 0)
+		{
+			if (!it.enabled)
+			{
+				app->ShowToast(cs::Cat("Objectives are taken up in ", it.why));
+				return;
+			}
+			if (app->Galaxy == nullptr || app->Clock == nullptr) return;
+			auto lc = LastingConsequences::Of(*app->Galaxy);
+			auto o = lc->ObjectiveById(it.objective);
+			cs::String why = it.objectiveAccept ? lc->Accept(*app->Galaxy, o, app->Clock->Jd) : lc->Decline(o, app->Clock->Jd);
+			app->ShowToast(why.empty()
+				? cs::Cat(it.objectiveAccept ? "Objective taken up: " : "Objective declined: ", LastingConsequences::Describe(o))
+				: cs::Cat("Can't: ", why));
+			// Rebuilt on the next Layout pass (not cleared here: the drawing loop that clicked still holds its row).
+			drawerRefreshAt = -10.0f;
+			return;
+		}
 		if (it.system != nullptr)
 		{
 			if (it.system == app->ActiveSystem) return;
@@ -457,15 +561,17 @@ namespace SpaceGod::UI
 		// The grip and the tabs.
 		float pad = UiStyle::Space::Pad;
 		float x = r.x + pad, y = r.y + pad;
-		const DrawerTab tabs[] = { DrawerTab::Navigation, DrawerTab::Ships, DrawerTab::Notices };
+		const DrawerTab tabs[] = { DrawerTab::Navigation, DrawerTab::Ships, DrawerTab::Notices, DrawerTab::Objectives /* US-T405 */ };
 		for (auto tab : tabs)
 		{
 			cs::String name = tab == DrawerTab::Navigation ? cs::String("NAVIGATION")
 				: tab == DrawerTab::Notices ? cs::Cat("NOTICES  ", Input::KeyBindings::Keys(Input::KeyAction::Notices)) // US-T345
+				: tab == DrawerTab::Objectives ? cs::String("OBJECTIVES") // US-T405
 				: drawerTab == DrawerTab::Ships ? cs::Cat("SHIPS IN AREA  (", drawerShipCount, ")") : cs::String("SHIPS IN AREA");
-			if (GUI::Button(Rect(x, y, 160, 22), name, tab == drawerTab ? buttonActive : button) && tab != drawerTab)
+			float tabW = tab == DrawerTab::Objectives ? 110.0f : 160.0f;
+			if (GUI::Button(Rect(x, y, tabW, 22), name, tab == drawerTab ? buttonActive : button) && tab != drawerTab)
 				SetDrawerTab(tab);
-			x += 164;
+			x += tabW + 4;
 		}
 		// US-T345: on the Notices tab, its filter (a click steps it, as F does).
 		if (drawerTab == DrawerTab::Notices)
@@ -505,6 +611,8 @@ namespace SpaceGod::UI
 			GUI::Label(Rect(hintX, y + 2, right - 88 - hintX, 18),
 				FitText(drawerTab == DrawerTab::Notices // US-T345
 					? cs::String("Tab tabs  ·  Up/Down rows  ·  F kind  ·  PgUp/PgDn height  ·  Esc or Shift+U closes")
+					: drawerTab == DrawerTab::Objectives // US-T405
+					? cs::String("Tab tabs  ·  Up/Down rows  ·  Enter takes the choice  ·  PgUp/PgDn height  ·  Esc or Shift+U closes")
 					: cs::String("Tab tabs  ·  Up/Down rows  ·  Enter acts  ·  PgUp/PgDn height  ·  Esc or Shift+U closes"), small, right - 88 - hintX), small);
 		GUI::contentColor = old;
 
