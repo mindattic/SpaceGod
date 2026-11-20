@@ -561,15 +561,63 @@ namespace SpaceGod::UI
 				if (n->Holder == m->Holder) held++;
 			// Its strength over the last month (US-T190): rising, falling or holding.
 			cs::String trend;
-			if (auto st = model->StandingOf(m->Holder))
+			auto st = model->StandingOf(m->Holder);
+			if (st != nullptr)
 			{
 				double t = st->Trend();
 				trend = t > 0.05 ? cs::Cat("   \xE2\x96\xB2 ", cs::Fmt(t, "0.0")) : t < -0.05 ? cs::Cat("   \xE2\x96\xBC ", cs::Fmt(-t, "0.0")) : cs::String("   steady");
 			}
-			Line(y, x, w, cs::Cat("■  ", m->Holder->Name, "   ", held, (held == 1 ? " system" : " systems"), trend), Tint(m->Holder->Color, 1));
+			// US-T407: the row picks the holder (again: lets it go); its last 60 days' strength drawn at the row's right.
+			constexpr float sparkW = 60;
+			bool picked = pickedHolder == m->Holder;
+			float rowY = y;
+			Line(y, x, w - sparkW - 6, cs::Cat(picked ? "▼  " : "■  ", m->Holder->Name, "   ", held, (held == 1 ? " system" : " systems"), trend),
+				Tint(m->Holder->Color, 1));
+			if (st != nullptr && st->History.Count() > 1 && Event::current().type == EventType::Repaint)
+				StrengthSparkline(Rect(x + w - sparkW, rowY + 3, sparkW, 11), st->History, Tint(m->Holder->Color, 1));
+			if (GUI::Button(Rect(x, rowY, w, y - rowY), GUIContent::none(), GUIStyle::none()))
+				pickedHolder = picked ? nullptr : m->Holder;
+			if (!picked) continue;
+			// US-T407: what the news has brought of its gains and losses lately (GalaxyMapModel::Lately, the last 90 days), newest first.
+			int shown = 0, known = 0;
+			for (const auto& c : model->Lately)
+				if (c->To == m->Holder || c->From == m->Holder) known++;
+			if (known == 0) Line(y, x + 14, w - 14, "no gain or loss known lately", Dim);
+			for (const auto& c : model->Lately)
+			{
+				if (c->To != m->Holder && c->From != m->Holder) continue;
+				if (y + 18 > r.yMax() - 96 - 34) break;
+				bool gained = c->To == m->Holder;
+				cs::String other = gained ? (c->From != nullptr ? c->From->Name : cs::String("unclaimed")) : (c->To != nullptr ? c->To->Name : cs::String("nobody"));
+				Line(y, x + 14, w - 14, cs::Cat(gained ? "+ " : "\xE2\x88\x92 ", c->System->Name, gained ? " from " : " to ", other, UiStyle::Glyph::Separator, c->How,
+					", ", Days(model->Jd - c->Jd), " ago"), gained ? Tint(m->Holder->Color, 1) : UiStyle::Warning);
+				shown++;
+			}
+			if (shown < known) Line(y, x + 14, w - 14, cs::Cat("... and ", known - shown, " more"), Dim);
 		}
 
 		LegendHelp(r, x, w);
+	}
+
+	void GalaxyMapScreen::StrengthSparkline(Rect area, const cs::List<double>& history, Color colour)
+	{
+		// US-T407: a bar a daily review, oldest at the left, scaled to the holder's own low and high (flat: mid height).
+		auto old = GUI::color;
+		GUI::color = Color(colour.r, colour.g, colour.b, 0.12f);
+		GUI::DrawTexture(area, Icons::White());
+		double lo = history[0], hi = history[0];
+		for (double v : history) { lo = cs::Math::Min(lo, v); hi = cs::Math::Max(hi, v); }
+		GUI::color = colour;
+		float step = area.width / Territory::HistoryDays;
+		for (int k = 0; k < history.Count(); k++)
+		{
+			double f = hi - lo > 1e-9 + 1e-6 * cs::Math::Abs(hi) ? (history[k] - lo) / (hi - lo) : 0.5;
+			float bh = 1 + static_cast<float>(f) * (area.height - 1);
+			float bx = area.xMax() - (history.Count() - k) * step;
+			if (bx < area.x) continue;
+			GUI::DrawTexture(Rect(bx, area.yMax() - bh, step < 1 ? 1.0f : step, bh), Icons::White());
+		}
+		GUI::color = old;
 	}
 
 	void GalaxyMapScreen::DrawDetail(Rect r, double jd)

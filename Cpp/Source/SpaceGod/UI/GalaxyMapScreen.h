@@ -263,6 +263,9 @@ namespace SpaceGod::UI
 
 		cs::Ref<Core::StarSystem> selected, hovered;
 
+		/// US-T407: the holder picked in the legend's HOLDERS list (null: none), whose gains and losses the news has brought are listed under it.
+		cs::Ref<Core::Faction> pickedHolder;
+
 		/// A plain star on the charts picked or under the cursor (U.SPC-T420): nobody simulates it, but an FTL drive can go there.
 		cs::Nullable<Core::NearbyStar> selectedStar, hoveredStar;
 
@@ -361,6 +364,9 @@ namespace SpaceGod::UI
 		void DrawHeader(Rect r, double jd);
 
 		void DrawLegend(Rect r);
+
+		/// US-T407: a holder's daily strength over the last 60 days (FactionStanding::History) as bars, scaled to its own range.
+		void StrengthSparkline(Rect area, const cs::List<double>& history, Color colour);
 
 		void DrawDetail(Rect r, double jd);
 
