@@ -1851,6 +1851,26 @@ namespace SpaceGod::UI
 						cs::Double::IsNaN(a->HeirDueJd) ? cs::String() : cs::Cat("; a hidden heir of it may come forward ", a->HeirDueJd > jd ? cs::Cat("by ", SocietyDate(a->HeirDueJd)) : cs::String("any day"))));
 					links.emplace_back(cs::Cat(secret ? "Secret lover: " : "Lover: ", lover->FullName()), CivPick::Person(lover->Id));
 				}
+			// US-T395: LETTERS, the posts they wrote or got in the galaxy's feed (trips, births, deals), newest first. The feed
+			// names its writer and reader by full name only, so this matches the exact full name. Read only.
+			{
+				constexpr int lettersMax = 8;
+				const cs::String fullName = c->FullName();
+				int mailShown = 0, mailTotal = 0;
+				for (int fi = society->Feed.Count() - 1; fi >= 0; fi--)
+				{
+					const auto& post = society->Feed[fi];
+					if (post == nullptr || (post->From != fullName && post->To != fullName)) continue;
+					if (mailTotal++ == 0) lines.Add("LETTERS");
+					if (mailShown >= lettersMax) continue;
+					mailShown++;
+					cs::String words = !post->Text.empty() ? post->Text : post->Event != nullptr ? WordsOf(*post->Event) : cs::String();
+					bool wrote = post->From == fullName;
+					cs::String other = wrote ? post->To : post->From;
+					lines.Add(cs::Cat("  ", SocietyDate(post->Jd), "  ", wrote ? "to " : "from ", other.empty() ? cs::String("all") : other, ": ", words));
+				}
+				if (mailTotal > mailShown) lines.Add(cs::Cat("  and ", mailTotal - mailShown, " older in the feed"));
+			}
 			if (c->House != nullptr) links.emplace_back(cs::Cat("House ", c->House->Surname), CivPick::House(c->House->Id));
 			if (c->Spouse != nullptr) links.emplace_back(c->Spouse->FullName(), CivPick::Person(c->Spouse->Id));
 			for (const auto& t : c->Ties)
