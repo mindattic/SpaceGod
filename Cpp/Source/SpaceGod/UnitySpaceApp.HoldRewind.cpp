@@ -634,6 +634,8 @@ namespace SpaceGod
 			/// <summary>US-T430: a parked hull sent off on its next leg after the crossing check's mark.</summary>
 			cs::Ref<Ship> PhaseShip;
 			double PhaseWasEnd = 0;
+			/// <summary>US-T431: the danger at the body before the birth check's fight began, and just after.</summary>
+			double DangerBefore = 0, DangerRaised = 0;
 			cs::String BirthName;
 		};
 	}
@@ -1590,6 +1592,9 @@ namespace SpaceGod
 			bool unborn = HoldRewindBeforeFight(h.Fight);
 			if (unborn && h.Detached.empty())
 			{
+				// US-T431: its "has begun" toast is not said yet either.
+				if (!Toast.empty() && (Toast.find(h.Fight->Name) != cs::String::npos || Toast.find(cs::Strings::ToUpperInvariant(h.Fight->Name)) != cs::String::npos))
+					Toast.clear();
 				for (const auto& u : h.Fight->Units)
 					if (u != nullptr && u->Ship != nullptr && u->Ship->Battle == h.Fight)
 					{
@@ -2156,8 +2161,10 @@ namespace SpaceGod
 					for (int i = 0; i < 3; i++)
 						Fleet()->SpawnAt(cs::Cat("Rewind Trial Foe ", i + 1), i == 0 ? ShipClass::Cruiser : ShipClass::Destroyer, World()->Reach, uranus->Index,
 							at + DVec3(20 + i * 3, 4, 0), DVec3(-1, 0, 0), Clock->Jd);
+					t.DangerBefore = World()->War->Danger(uranus->Index); // US-T431
 					auto fight = start();
 					if (fight == nullptr) return finish("the fight for the birth check did not start");
+					t.DangerRaised = World()->War->Danger(uranus->Index);
 					t.Fight = fight;
 					t.BirthId = fight->Id;
 					t.BirthName = fight->Name;
@@ -2215,6 +2222,10 @@ namespace SpaceGod
 					for (const auto& e : World()->Events)
 						if (e.Jd >= t.Fight->StartJd - 1e-9 && e.Text.find(t.BirthName) != cs::String::npos) lines++;
 					selfCheck(lines == 0, "and the world's log no longer tells of it");
+					double dangerNow = World()->War->Danger(t.Fight->Body);
+					selfCheck(t.DangerRaised > t.DangerBefore && dangerNow <= t.DangerBefore + 1e-9,
+						cs::Cat("and the danger its start raised at the body is given back (", cs::Fmt(t.DangerBefore, "F2"), " -> ", cs::Fmt(t.DangerRaised, "F2"),
+							" -> ", cs::Fmt(dangerNow, "F2"), ")"));
 					selfCheck(h.Fight == nullptr && HoldRewindBattle() == nullptr, "and the rewind watches no fight");
 					shot("6-before-the-fight");
 					t.PhaseWall = wall;

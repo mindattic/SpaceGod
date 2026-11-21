@@ -749,6 +749,20 @@ copy (`HoldRewindShipAsWas`: its state, scene and facing on the schedule it had)
 before. **Proved** in the birth self-test's crossing phases: a parked hull is given its next leg after the mark, and
 held before the change it is drawn on the schedule it had (17/17).
 
+### What a fight's start set off, given back; nothing reported early (US-T431)
+
+- **Danger.** The war notes its danger when a battle takes its number (`TakeBattleId`) and what the start added once
+  it is announced (`Started`). `Unstart` takes exactly that back off each body, so other fights' bumps in the window
+  stay. The birth check shows it: 0.00 before, 1.50 raised, 0.00 after.
+- **Merchants turned aside.** `World::DivertAround` keeps, for the newest fight, each merchant it turned aside with a
+  copy of its course from before. `Unstart` calls `World::UndoDivert`, which puts each one's course back if nothing
+  has moved it on since (same phase, phase end and orbit as just after the turn) and removes its log line.
+- **Nothing reported early.** While a hold plays back a moment before a fight began, a toast naming that fight is
+  cleared. The ticker and the news screen show nothing dated after the moment reached (the world clock is set back
+  for the drawing), so a fight's start, its losses and any other later report are not news yet.
+- **No deprecated input.** The self-test's controller key path uses the engine's current
+  `InputKey(FInputKeyEventArgs::CreateSimulated(...))`, so the build has no deprecation warnings left.
+
 ### Not yet (later stages)
 
 - A fight born while another is watched (one replacing the other) is a barrier: the resume points of the first fight

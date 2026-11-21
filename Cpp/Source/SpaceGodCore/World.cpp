@@ -1120,10 +1120,47 @@ namespace SpaceGod::Core
 					best = p;
 				}
 			}
+			auto before = cs::New<Ship>(*s); // US-T431: the course it had, for a fight taken back
 			if (best < 0 || !Fleet->Divert(s, best, jd)) continue;
 			s->Cargo = s->HasCargo ? s->Cargo : "Empty, diverted";
-			Log(jd, cs::Cat(s->Name, " turns aside for ", (*Catalog())[best]->Name, ": fighting at ", (*Catalog())[b->Body]->Name), WorldEventKind::Info, best);
+			cs::String line = cs::Cat(s->Name, " turns aside for ", (*Catalog())[best]->Name, ": fighting at ", (*Catalog())[b->Body]->Name);
+			Log(jd, line, WorldEventKind::Info, best);
+			if (divertedFor != b->Id)
+			{
+				divertedFor = b->Id;
+				diverted.Clear();
+			}
+			DivertedHull d;
+			d.Hull = s;
+			d.Before = before;
+			d.OrbitAfter = s->Orbit.get();
+			d.PhaseAfter = s->Phase;
+			d.EndAfter = s->PhaseEndJd;
+			d.Line = line;
+			diverted.Add(d);
 		}
+	}
+
+	void World::UndoDivert(const cs::Ref<Battle>& b)
+	{
+		if (b == nullptr || divertedFor != b->Id) return;
+		for (const auto& d : diverted)
+		{
+			auto s = d.Hull;
+			if (s == nullptr || s->Destroyed || s->Battle != nullptr || s->Orbit.get() != d.OrbitAfter || s->Phase != d.PhaseAfter || s->PhaseEndJd != d.EndAfter) continue;
+			*s = *d.Before;
+			for (int i = Events.Count() - 1; i >= 0; i--)
+			{
+				if (Events[i].Jd < b->StartJd - 1e-9) break;
+				if (Events[i].Text == d.Line)
+				{
+					Events.RemoveAt(i);
+					break;
+				}
+			}
+		}
+		divertedFor = -1;
+		diverted.Clear();
 	}
 
 	cs::List<int> World::FreeShipPorts()

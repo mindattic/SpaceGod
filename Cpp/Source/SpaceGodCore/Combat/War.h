@@ -181,6 +181,14 @@ namespace SpaceGod::Core
 		int lastNamedId = -1, lastNamedKey = 0;
 		int lastGateId = -1;
 		cs::Ref<JumpGate> lastGate;
+		/// <summary>US-T431: the danger before the newest battle's start (taken with its number), and what its start added
+		/// (per body), so Unstart can give it back. Not saved.</summary>
+		cs::Dictionary<int, double> dangerBeforeStart = cs::Dictionary<int, double>();
+		cs::Dictionary<int, double> startDanger = cs::Dictionary<int, double>();
+		int startDangerId = -1;
+		/// <summary>US-T431: a battle's number taken (the danger noted first), and its start announced (what it added noted).</summary>
+		int TakeBattleId();
+		void Started(const cs::Ref<Battle>& b);
 
 	public:
 		/// <summary>Raised when a battle begins (the app may want to slow time or point the camera).</summary>

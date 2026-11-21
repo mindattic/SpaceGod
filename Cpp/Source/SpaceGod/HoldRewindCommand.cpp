@@ -32,6 +32,7 @@
 #include "Framework/Application/SlateApplication.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerInput.h"
+#include "InputKeyEventArgs.h"
 #include "InputCoreTypes.h"
 #include "HAL/IConsoleManager.h"
 #include "HAL/PlatformMisc.h"
@@ -118,10 +119,11 @@ namespace
 			}
 			if (APlayerController* pc = Controller())
 			{
+				// US-T431: the engine's current entry point (the FInputKeyParams one is deprecated and goes at the next upgrade).
 				EInputEvent e = down ? IE_Pressed : IE_Released;
-				if (down) pc->InputKey(FInputKeyParams(EKeys::LeftShift, e, 1.0));
-				pc->InputKey(FInputKeyParams(EKeys::R, e, down ? 1.0 : 0.0));
-				if (!down) pc->InputKey(FInputKeyParams(EKeys::LeftShift, e, 0.0));
+				if (down) pc->InputKey(FInputKeyEventArgs::CreateSimulated(EKeys::LeftShift, e, 1.0f));
+				pc->InputKey(FInputKeyEventArgs::CreateSimulated(EKeys::R, e, down ? 1.0f : 0.0f));
+				if (!down) pc->InputKey(FInputKeyEventArgs::CreateSimulated(EKeys::LeftShift, e, 0.0f));
 			}
 		}
 

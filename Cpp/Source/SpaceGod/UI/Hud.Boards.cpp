@@ -1238,6 +1238,9 @@ namespace SpaceGod::UI
 		for (int i = all.Count() - 1; i >= 0 && events.Count() < 4; i--)
 		{
 			auto k = all[i].Kind;
+			// US-T431: a hold rewind sets the world clock back for the drawing: what is reported after the moment reached is not
+			// news yet (a fight's start, its losses).
+			if (app->HoldRewindActive() && app->Clock != nullptr && all[i].Jd > app->Clock->Jd + 1e-9) continue;
 			if (notices == PlayerOptions::NoticeLevel::Important && k != WorldEventKind::Battle && k != WorldEventKind::Capture && k != WorldEventKind::Diplomacy)
 				continue;
 			events.Insert(0, all[i]);
@@ -1344,7 +1347,8 @@ namespace SpaceGod::UI
 		}
 		newsShown.Clear();
 		for (int i = events.Count() - 1; i >= 0 && newsShown.Count() < 200; i--)
-			if (InFilter(events[i].Kind, newsFilter)) newsShown.Add(events[i]);
+			if (InFilter(events[i].Kind, newsFilter) && !(app->HoldRewindActive() && app->Clock != nullptr && events[i].Jd > app->Clock->Jd + 1e-9)) // US-T431
+				newsShown.Add(events[i]);
 
 		auto view = Rect(r.x + 4, r.y + 58, w - 8, h - 62);
 		float width = view.width - 20, total = 0;

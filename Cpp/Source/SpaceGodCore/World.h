@@ -450,6 +450,25 @@ namespace SpaceGod::Core
 		/// </summary>
 		void DivertAround(cs::Ref<Battle> b, double jd);
 
+		/// <summary>US-T431: a fight taken back (War::Unstart): the merchants it turned aside go back to the course they had,
+		/// each only if nothing has moved its course on since, and the log's lines of their turning aside go. Only the newest
+		/// fight's are kept, and nothing of this is saved.</summary>
+		void UndoDivert(const cs::Ref<Battle>& b);
+
+	private:
+		struct DivertedHull
+		{
+			cs::Ref<Ship> Hull, Before;
+			const void* OrbitAfter = nullptr;
+			ShipPhase PhaseAfter = ShipPhase::Parked;
+			double EndAfter = 0;
+			cs::String Line;
+		};
+		int divertedFor = -1;
+		cs::List<DivertedHull> diverted;
+
+	public:
+
 		/// <summary>Where a free ship may go: any visible world but a star -- and but a hidden haven's rock,
 		/// which nobody knows to go to. Shared by the free roamers, sandbox spawns and gate arrivals.</summary>
 		cs::List<int> FreeShipPorts();

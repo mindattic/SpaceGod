@@ -337,7 +337,7 @@ namespace SpaceGod::Core
 			Fleet()->PullOut(v, jd, at, side);
 		}
 		auto helio = Fleet()->LanePoint(lurker, jd, lurker->LaneHold) + lurker->LaneHoldSide;
-		auto b = cs::New<Battle>(nextBattleId++, 0, cs::Cat((picket ? "Interdiction on the " : "Ambush on the "), lane->Name, " lane"), helio, jd, rng.Next());
+		auto b = cs::New<Battle>(TakeBattleId(), 0, cs::Cat((picket ? "Interdiction on the " : "Ambush on the "), lane->Name, " lane"), helio, jd, rng.Next());
 		// A navy's picket stops raiders and enemies on the lane in the law's name, as a patrol interdicting a
 		// wanted ship does (U.SPC-T479).
 		b->EnforcingSide = picket ? 0 : -1;
@@ -406,7 +406,7 @@ namespace SpaceGod::Core
 			BumpDanger(lane->A, 1);
 			BumpDanger(lane->B, 1);
 		}
-		BattleStarted.Invoke(b);
+		Started(b);
 	}
 
 	bool War::Forewarned(const cs::Ref<Ship>& victim, const cs::Ref<Ship>& lurker, double /*jd*/)
@@ -1053,7 +1053,7 @@ namespace SpaceGod::Core
 		Battles.Add(b);
 		world->Log(jd, cs::Cat(b->Name, ": the ", ship->Name, " opens fire on the ", target->Faction->Name, " ", cs::Strings::ToLowerInvariant(target->Spec->DisplayName), " ", target->Name), WorldEventKind::Battle, Shown(b));
 		BumpDanger(body, 1);
-		BattleStarted.Invoke(b);
+		Started(b);
 		return b;
 	}
 
@@ -1082,7 +1082,7 @@ namespace SpaceGod::Core
 		Battles.Add(b);
 		world->Log(jd, cs::Cat(b->Name, ": ", raiders[0]->Faction->Name, " raiders (", raiders[0]->Name, ") fall on the ", mark->Name), WorldEventKind::Battle, Shown(b));
 		BumpDanger(body, 1);
-		BattleStarted.Invoke(b);
+		Started(b);
 		return b;
 	}
 
@@ -1111,7 +1111,7 @@ namespace SpaceGod::Core
 		}
 		else
 		{
-			b = cs::New<Battle>(nextBattleId++, body, cs::Cat("Run down off ", (*Catalog())[body]->Name), offsetFromBodyKm, jd, rng.Next());
+			b = cs::New<Battle>(TakeBattleId(), body, cs::Cat("Run down off ", (*Catalog())[body]->Name), offsetFromBodyKm, jd, rng.Next());
 			b->AggressorSide = 1;
 			Hook(b);
 			auto approach = g->Pos - offsetFromBodyKm;
@@ -1121,7 +1121,7 @@ namespace SpaceGod::Core
 			side = 1;
 			Battles.Add(b);
 			world->Log(jd, cs::Cat(b->Name, ": the ", g->Faction()->Name, " ", g->Leader->Name, " runs down the ", ship->Name), WorldEventKind::Battle, Shown(b));
-			BattleStarted.Invoke(b);
+			Started(b);
 		}
 		for (const auto& s : g->Ships)
 		{
@@ -1141,7 +1141,7 @@ namespace SpaceGod::Core
 		auto leader = patrol->Controller();
 		if (leader->Destroyed || leader->Battle != nullptr || leader->Derelict || leader == world->PilotedShip) return nullptr;
 		if (offsetFromBodyKm.Length() > ScaleModel::NeighbourhoodKm((*Catalog())[body]) || BattleAt(body) != nullptr) return nullptr;
-		auto b = cs::New<Battle>(nextBattleId++, body, cs::Cat(name, (*Catalog())[body]->Name), offsetFromBodyKm, jd, rng.Next());
+		auto b = cs::New<Battle>(TakeBattleId(), body, cs::Cat(name, (*Catalog())[body]->Name), offsetFromBodyKm, jd, rng.Next());
 		b->EnforcingSide = 1;
 		b->AggressorSide = 1;
 		Hook(b);
@@ -1152,7 +1152,7 @@ namespace SpaceGod::Core
 		Join(b, leader, 1, false);
 		Battles.Add(b);
 		world->Log(jd, news(leader, b), WorldEventKind::Law, Shown(b));
-		BattleStarted.Invoke(b);
+		Started(b);
 		return b;
 	}
 
@@ -1226,7 +1226,7 @@ namespace SpaceGod::Core
 		Battles.Add(b);
 		world->Log(jd, cs::Cat(b->Name, ": ", Describe(b, 0), " engage ", Describe(b, 1)), WorldEventKind::Battle, Shown(b));
 		BumpDanger(body, 1.5);
-		BattleStarted.Invoke(b);
+		Started(b);
 		return b;
 	}
 
@@ -1281,7 +1281,7 @@ namespace SpaceGod::Core
 		gateBattles.TryGetValue(gate, n);
 		gateBattles[gate] = n + 1;
 		cs::String name = cs::Cat((n == 0 ? cs::String("") : cs::Cat(Ordinal(n + 1), " ")), "Battle of the ", gate->Name);
-		auto b = cs::New<Battle>(nextBattleId++, root, name, gate->PositionKm, jd, rng.Next());
+		auto b = cs::New<Battle>(TakeBattleId(), root, name, gate->PositionKm, jd, rng.Next());
 		lastGateId = b->Id; // US-T424
 		lastGate = gate;
 		Hook(b);
@@ -1304,7 +1304,7 @@ namespace SpaceGod::Core
 		Battles.Add(b);
 		world->Log(jd, cs::Cat(b->Name, ": ", Describe(b, 0), " storm the gate against ", Describe(b, 1)), WorldEventKind::Battle, root);
 		BumpDanger(root, 1.5);
-		BattleStarted.Invoke(b);
+		Started(b);
 		return b;
 	}
 
@@ -1385,7 +1385,7 @@ namespace SpaceGod::Core
 		battleCount[key] = n + 1;
 		cs::String kind = concealed ? "Skirmish in " : "Battle of ";
 		cs::String name = (n == 0 ? kind : cs::Cat(Ordinal(n + 1), " ", kind)) + place;
-		auto b = cs::New<Battle>(nextBattleId++, body, name, anchor, jd, rng.Next());
+		auto b = cs::New<Battle>(TakeBattleId(), body, name, anchor, jd, rng.Next());
 		lastNamedId = b->Id; // US-T424
 		lastNamedKey = key;
 		Hook(b);
@@ -1596,10 +1596,44 @@ namespace SpaceGod::Core
 
 	// ---------------------------------------------------------------- a fight taken back (US-T424)
 
+	int War::TakeBattleId()
+	{
+		// US-T431: the danger as it was before this fight's start, so Unstart can give back what the start added.
+		dangerBeforeStart = danger;
+		return nextBattleId++;
+	}
+
+	void War::Started(const cs::Ref<Battle>& b)
+	{
+		// US-T431: what this start added to the danger (the starters bump it after taking the number).
+		startDangerId = b->Id;
+		startDanger.Clear();
+		for (const auto& kv : danger)
+		{
+			double was = 0;
+			dangerBeforeStart.TryGetValue(kv.first, was);
+			if (kv.second > was) startDanger[kv.first] = kv.second - was;
+		}
+		dangerBeforeStart.Clear();
+		BattleStarted.Invoke(b);
+	}
+
 	bool War::Unstart(const cs::Ref<Battle>& b, double jd)
 	{
 		if (b == nullptr || !Battles.Contains(b)) return false;
 		Battles.Remove(b);
+		// US-T431: the danger its start raised, and the merchants it turned aside, given back.
+		if (startDangerId == b->Id)
+		{
+			for (const auto& kv : startDanger)
+			{
+				double now = 0;
+				if (danger.TryGetValue(kv.first, now)) danger[kv.first] = cs::Math::Max(0.0, now - kv.second);
+			}
+			startDangerId = -1;
+			startDanger.Clear();
+		}
+		world->UndoDivert(b);
 		for (const auto& u : b->Units)
 		{
 			if (u->Ship == nullptr || u->Ship->Battle != b) continue;
