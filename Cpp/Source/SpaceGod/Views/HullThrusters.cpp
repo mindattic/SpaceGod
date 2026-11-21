@@ -35,120 +35,8 @@ namespace SpaceGod::Views
 		constexpr float JumpRad = 25.0f * Mathf::Deg2Rad;
 		/// <summary>A jet whose lever gives it less than this share of the strongest's turn about an axis is not used for it.</summary>
 		constexpr float LeverShare = 0.3f;
-		/// <summary>How finely a hull's triangles are sampled for its surface, root units (the hull is one long).</summary>
-		constexpr float SampleStep = 0.03f;
 		/// <summary>The most main-engine flames a hull carries (a Void Whale capital draws nine nozzles).</summary>
 		constexpr int MaxMains = 12;
-
-		/// <summary>A point in <paramref name="t"/>'s frame taken up through its parents into <paramref name="root"/>'s.</summary>
-		Vector3 IntoRoot(const Transform* t, const Transform* root, Vector3 p)
-		{
-			while (t != nullptr && t != root)
-			{
-				p = t->localPosition + t->localRotation * Vector3::Scale(t->localScale, p);
-				auto up = t->parent.lock();
-				t = up.get();
-			}
-			return p;
-		}
-
-		/// <summary>A box's surface as a grid of points on each face.</summary>
-		void SampleBox(Vector3 mn, Vector3 mx, const Transform* t, const Transform* root, std::vector<Vector3>& pts)
-		{
-			constexpr int n = 4;
-			for (int axis = 0; axis < 3; axis++)
-				for (int side = 0; side < 2; side++)
-					for (int i = 0; i <= n; i++)
-						for (int j = 0; j <= n; j++)
-						{
-							float u = static_cast<float>(i) / n, v = static_cast<float>(j) / n;
-							float a[3] = { 0, 0, 0 };
-							a[axis] = side;
-							a[(axis + 1) % 3] = u;
-							a[(axis + 2) % 3] = v;
-							Vector3 p(mn.x + (mx.x - mn.x) * a[0], mn.y + (mx.y - mn.y) * a[1], mn.z + (mx.z - mn.z) * a[2]);
-							pts.push_back(IntoRoot(t, root, p));
-						}
-		}
-
-		/// <summary>The hull's surface as points in the root's frame: its meshes' triangles, sampled finely enough that a
-		/// broad flat face has points across it (not only at its corners), and an imported part's own box.</summary>
-		void SampleHull(const cs::Ref<Transform>& root, const cs::List<cs::Ref<Renderer>>& hull, std::vector<Vector3>& pts)
-		{
-			for (const auto& r : hull)
-			{
-				if (!r) continue;
-				auto t = r->transform();
-				auto mesh = r->DrawnMesh();
-				if (!t || !mesh) continue;
-				if (mesh->Vertices.empty())
-				{
-					auto b = mesh->bounds();
-					if (b.size().sqrMagnitude() > 0) SampleBox(b.min(), b.max(), t.get(), root.get(), pts);
-					continue;
-				}
-				std::vector<Vector3> v(mesh->Vertices.size());
-				for (size_t i = 0; i < v.size(); i++) v[i] = IntoRoot(t.get(), root.get(), mesh->Vertices[i]);
-				pts.insert(pts.end(), v.begin(), v.end());
-				for (const auto& sub : mesh->SubMeshes)
-				{
-					if (sub.Topology != MeshTopology::Triangles) continue;
-					const auto& ix = sub.Indices;
-					for (size_t k = 0; k + 2 < ix.size(); k += 3)
-					{
-						int ia = ix[k], ib = ix[k + 1], ic = ix[k + 2];
-						int count = static_cast<int>(v.size());
-						if (ia < 0 || ib < 0 || ic < 0 || ia >= count || ib >= count || ic >= count) continue;
-						Vector3 a = v[ia], b = v[ib], c = v[ic];
-						float edge = Mathf::Max(Vector3::Distance(a, b), Mathf::Max(Vector3::Distance(b, c), Vector3::Distance(c, a)));
-						int steps = static_cast<int>(Mathf::Clamp(Mathf::Ceil(edge / SampleStep), 1.0f, 12.0f));
-						if (steps == 1)
-						{
-							pts.push_back((a + b + c) / 3.0f);
-							continue;
-						}
-						for (int i = 0; i <= steps; i++)
-							for (int j = 0; j <= steps - i; j++)
-							{
-								if ((i == 0 && j == 0) || (i == steps) || (j == steps)) continue; // the corners are in already
-								float u = static_cast<float>(i) / steps, w = static_cast<float>(j) / steps;
-								pts.push_back(a + (b - a) * u + (c - a) * w);
-							}
-					}
-				}
-			}
-		}
-
-		/// <summary>
-		/// The hull's outermost surface point along <paramref name="d"/> (across the hull, from its keel line) near station
-		/// <paramref name="z"/>: the band round the station widens until it holds some of the hull. <paramref name="sideways"/>
-		/// keeps it off to the side of that way (a dorsal jet on the spine, not a wingtip).
-		/// </summary>
-		bool Outermost(const std::vector<Vector3>& pts, Vector3 c, float length, float z, Vector3 d, float sideways, Vector3& at)
-		{
-			for (float band = 0.04f * length; band <= 0.6f * length; band *= 1.6f)
-			{
-				float best = Mathf::NegativeInfinity;
-				bool any = false;
-				for (const auto& p : pts)
-				{
-					float dz = Mathf::Abs(p.z - z);
-					if (dz > band) continue;
-					Vector3 r(p.x - c.x, p.y - c.y, 0);
-					float along = Vector3::Dot(r, d);
-					float side = (r - d * along).magnitude();
-					float score = along - sideways * side - 0.3f * dz;
-					if (score > best)
-					{
-						best = score;
-						at = p;
-						any = true;
-					}
-				}
-				if (any) return true;
-			}
-			return false;
-		}
 	}
 
 	cs::Ref<Material> HullThrusters::RcsMaterial()
@@ -177,21 +65,10 @@ namespace SpaceGod::Views
 	{
 		if (!Alive(plumeMesh)) plumeMesh = MeshFactory::Plume();
 
-		std::vector<Vector3> pts;
-		SampleHull(root, hull, pts);
-		if (pts.empty())
-		{
-			// No hull drawn yet (or an odd import): a nominal fighter's box, one long and a third wide.
-			SampleBox(Vector3(-0.175f, -0.075f, -0.5f), Vector3(0.175f, 0.075f, 0.5f), nullptr, nullptr, pts);
-		}
-		Vector3 mn = pts[0], mx = pts[0];
-		for (const auto& p : pts)
-		{
-			mn = Vector3::Min(mn, p);
-			mx = Vector3::Max(mx, p);
-		}
-		Vector3 c = (mn + mx) * 0.5f;
-		float length = Mathf::Max(mx.z - mn.z, 0.05f);
+		// US-T433: the hull's own plating, its imported parts' real triangles included, each point with the way it faces.
+		HullSurface surface(root, hull);
+		Vector3 mn = surface.Min(), mx = surface.Max(), c = surface.Centre();
+		float length = surface.Length();
 
 		// ---- Main engines (US-T432): out of the nozzles the model draws, each along its own axis and as wide as its mouth.
 		if (ports.Count() > 0)
@@ -207,9 +84,15 @@ namespace SpaceGod::Views
 			}
 			sternCentre = sum / static_cast<float>(mains);
 		}
-		else AddMains(pts, mn, mx, c, length, engines);
+		else
+		{
+			std::vector<Vector3> pts;
+			pts.reserve(surface.Samples().size());
+			for (const auto& s : surface.Samples()) pts.push_back(s.P);
+			AddMains(pts, mn, mx, c, length, engines);
+		}
 
-		AddRcs(pts, mn, mx, c, length);
+		AddRcs(surface);
 	}
 
 	void HullThrusters::AddMains(const std::vector<Vector3>& pts, Vector3 mn, Vector3 mx, Vector3 c, float length, const cs::List<Vector3>& engines)
@@ -291,33 +174,41 @@ namespace SpaceGod::Views
 		sternCentre = mains > 0 ? sternSum / static_cast<float>(mains) : sc;
 	}
 
-	void HullThrusters::AddRcs(const std::vector<Vector3>& pts, Vector3 mn, Vector3 mx, Vector3 c, float length)
+	void HullThrusters::AddRcs(const HullSurface& surface)
 	{
+		Vector3 mn = surface.Min(), mx = surface.Max(), c = surface.Centre();
 		float halfW = Mathf::Max((mx.x - mn.x) * 0.5f, 0.01f), halfH = Mathf::Max((mx.y - mn.y) * 0.5f, 0.01f);
 		float rcs = Mathf::Clamp(Mathf::Min(halfW, halfH) * 0.22f + 0.008f, 0.012f, 0.045f);
+		// US-T433: each jet on plating that faces the way it fires, its exhaust clear of the hull, set into it a touch.
+		auto place = [&](Kind kind, float z, Vector3 side, Vector3 fire, float sideways, float width, float length)
+		{
+			Vector3 at, normal;
+			if (!surface.Place(z, side, fire, sideways, width * 0.5f, at, normal)) return;
+			Add(kind, at, fire, c, width, length);
+		};
 
-		// ---- RCS pods at the bow's and the stern's four corners: the hull's outermost plating that way at that station.
+		// ---- RCS quads towards the bow and the stern, at each corner: an up or down jet on the plating there facing up or
+		// down, a port or starboard one on the flank facing out that way.
 		float bow = c.z + (mx.z - c.z) * 0.72f, stern = c.z + (mn.z - c.z) * 0.72f;
 		for (int end = 0; end < 2; end++)
 			for (int sx = -1; sx <= 1; sx += 2)
 				for (int sy = -1; sy <= 1; sy += 2)
 				{
-					Vector3 d = Vector3(sx * halfW, sy * halfH, 0).normalized();
-					Vector3 at;
-					if (!Outermost(pts, c, length, end == 0 ? bow : stern, d, 0, at)) continue;
-					Add(Kind::Rcs, at, Vector3(0, static_cast<float>(sy), 0), c, rcs, rcs * 3.5f);
-					Add(Kind::Rcs, at, Vector3(static_cast<float>(sx), 0, 0), c, rcs, rcs * 3.5f);
-					// The bow pods carry the retros: they fire forward to brake.
-					if (end == 0) Add(Kind::Retro, at, Vector3::forward(), c, rcs * 1.2f, rcs * 5.0f);
+					float z = end == 0 ? bow : stern;
+					Vector3 corner = Vector3(sx * halfW, sy * halfH, 0).normalized();
+					place(Kind::Rcs, z, corner, Vector3(0, static_cast<float>(sy), 0), 0.15f, rcs, rcs * 3.5f);
+					place(Kind::Rcs, z, corner, Vector3(static_cast<float>(sx), 0, 0), 0.15f, rcs, rcs * 3.5f);
 				}
+		// ---- Retros on the bow's forward-facing plating, port and starboard: they fire forward to brake.
+		for (int sx = -1; sx <= 1; sx += 2)
+			place(Kind::Retro, c.z + (mx.z - c.z) * 0.85f, Vector3(static_cast<float>(sx), 0, 0), Vector3::forward(), 0.3f, rcs * 1.2f, rcs * 5.0f);
 
-		// ---- Roll jets on each flank amidships, up and down.
+		// ---- Roll jets on each flank amidships: one on its top plating firing up, one underneath firing down.
 		for (int sx = -1; sx <= 1; sx += 2)
 		{
-			Vector3 at;
-			if (!Outermost(pts, c, length, c.z, Vector3(static_cast<float>(sx), 0, 0), 0.5f, at)) continue;
-			Add(Kind::Rcs, at, Vector3::up(), c, rcs, rcs * 3.5f);
-			Add(Kind::Rcs, at, Vector3::down(), c, rcs, rcs * 3.5f);
+			Vector3 flank(static_cast<float>(sx), 0, 0);
+			place(Kind::Rcs, c.z, flank, Vector3::up(), 0.5f, rcs, rcs * 3.5f);
+			place(Kind::Rcs, c.z, flank, Vector3::down(), 0.5f, rcs, rcs * 3.5f);
 		}
 
 		// Each axis's turning shares against its strongest jet's: a jet with too short a lever about an axis is not used for it.

@@ -7,7 +7,7 @@ namespace SpaceGod::Views
 {
 	/// <summary>
 	/// A hull's reaction-control thrusters (US-T165), drawn as short white-blue jets: a quad of them at the bow and at the
-	/// stern (up, down, port, starboard) and a pair under and over each beam. Each fires when, and as hard as, the hull's
+	/// stern (up, down, port, starboard) and a pair under and over each beam, every one on the hull's own plating (US-T433). Each fires when, and as hard as, the hull's
 	/// spin is changing the way that jet would push it -- spinning up into a turn or braking out of it, in pitch, yaw or
 	/// roll -- so a steady swing is quiet and a snap or a stop flares at both ends, opposite ways, as real thrusters do.
 	/// Parented to the hull's view (a <see cref="ShipView"/> root, one unit long), so they scale with it at either scale.
@@ -15,9 +15,9 @@ namespace SpaceGod::Views
 	class RcsJets final
 	{
 	public:
-		/// <summary>Builds the jets on <paramref name="parent"/> (a hull's root, one unit long) round <paramref name="hull"/>,
-		/// the box of the hull as drawn in that frame.</summary>
-		RcsJets(const cs::Ref<Transform>& parent, Bounds hull);
+		/// <summary>Builds the jets on <paramref name="parent"/> (a hull's root, one unit long) on the plating of the hull its
+		/// renderers draw under it (US-T433, HullSurface): each on a face looking the way it fires, clear of the hull.</summary>
+		explicit RcsJets(const cs::Ref<Transform>& parent);
 
 		/// <summary>The hull's root the jets were built on: rebuild them when the flown hull's view is another.</summary>
 		cs::Ref<Transform> Parent() const { return parent; }

@@ -4,6 +4,7 @@
 
 #include "UnityCompat/UnityRenderingTypes.h"
 #include "Rendering/EnginePorts.h"
+#include "Views/HullSurface.h"
 
 #include <vector>
 
@@ -16,12 +17,13 @@ namespace SpaceGod::Views
 	/// <item>main engines out of the nozzles the model draws (US-T432); a model with none marked gets them on its stern
 	/// face: on the hull's engine hardpoints where it has them, else one, two or three across its aft face as its shape
 	/// fits, each set on the rearmost plating behind it;</item>
-	/// <item>an RCS pod at each corner of the bow and of the stern (the hull's outermost plating that way at that station),
-	/// each with an up/down and a port/starboard jet, the bow pods with a retro jet firing forward to brake;</item>
-	/// <item>a pair of roll jets (up and down) on each flank amidships.</item>
+	/// <item>RCS quads at each corner towards the bow and the stern: an up or down jet and a port or starboard one;</item>
+	/// <item>retros on the bow's forward-facing plating, port and starboard, firing forward to brake;</item>
+	/// <item>a pair of roll jets on each flank amidships, on its top firing up and underneath firing down.</item>
 	/// </list>
-	/// Every nozzle sits on a point of the hull's own surface (its triangles, sampled; an imported part's own box) that is
-	/// the outermost one its way at its station, so none floats clear of the hull or fires through it. Which way each RCS jet
+	/// US-T433: every RCS jet sits on the hull's own plating (HullSurface: its triangles, an imported kit part's real ones
+	/// included), on a face that looks the way the jet fires, the outermost such its way at its station, with nothing of the
+	/// hull in its exhaust's way, and fires straight along the axis it serves. Which way each RCS jet
 	/// turns the hull comes from where it sits (its lever about the hull's middle), so a pitch, yaw or roll -- spun up into
 	/// or braked out of -- fires the jets that would make it, at both ends, opposite ways.
 	/// </summary>
@@ -81,7 +83,7 @@ namespace SpaceGod::Views
 
 		void Add(Kind kind, Vector3 at, Vector3 exhaust, Vector3 centre, float width, float length);
 		void AddMains(const std::vector<Vector3>& pts, Vector3 mn, Vector3 mx, Vector3 c, float length, const cs::List<Vector3>& engines);
-		void AddRcs(const std::vector<Vector3>& pts, Vector3 mn, Vector3 mx, Vector3 c, float length);
+		void AddRcs(const HullSurface& surface);
 
 		static cs::Ref<Material> RcsMaterial();
 		static cs::Ref<Material> MainMaterial();

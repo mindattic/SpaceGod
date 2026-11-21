@@ -72,7 +72,6 @@ namespace SpaceGod
 	void UnitySpaceApp::UpdatePilotRcs(float dt)
 	{
 		cs::Ref<Transform> on;
-		Bounds box;
 		DVec3 forward, up, spin;
 		double turnDegS = 0;
 		bool drifting = false;
@@ -104,7 +103,9 @@ namespace SpaceGod
 		if (pilotRcs == nullptr || pilotRcs->Parent() != on)
 		{
 			if (pilotRcs != nullptr) pilotRcs->Hide();
-			pilotRcs = cs::New<Views::RcsJets>(on, box);
+			// US-T433: on the craft's own plating as its model draws it (this once passed a box never filled in, so every
+			// craft got the nominal one).
+			pilotRcs = cs::New<Views::RcsJets>(on);
 		}
 		auto f = forward.Normalized();
 		auto u = (up - f * DVec3::Dot(up, f));

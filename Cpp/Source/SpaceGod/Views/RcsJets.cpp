@@ -2,6 +2,9 @@
 #include "Views/RcsJets.h"
 #include "Rendering/Materials.h"
 #include "Rendering/MeshFactory.h"
+#include "Views/HullSurface.h"
+
+#include "HAL/IConsoleManager.h"
 
 namespace SpaceGod::Views
 {
@@ -33,40 +36,50 @@ namespace SpaceGod::Views
 		return jetMaterial;
 	}
 
-	RcsJets::RcsJets(const cs::Ref<Transform>& parent_, Bounds hull)
+	RcsJets::RcsJets(const cs::Ref<Transform>& parent_)
 		: parent(parent_)
 	{
 		if (!Alive(jetMesh)) jetMesh = MeshFactory::Plume();
-		// A hull with no box yet (or an odd import): a nominal fighter's, one long and a third wide.
-		auto size = hull.size();
-		if (!(size.z > 0.05f)) hull = Bounds(Vector3::zero(), Vector3(0.35f, 0.15f, 1.0f));
-		auto c = hull.center;
-		auto mn = hull.min(), mx = hull.max();
+		// US-T433: the hull as its renderers draw it under the root (a kit's imported parts by their own triangles), not a
+		// box: every jet goes on plating that faces the way it fires. A hull with nothing drawn yet is a nominal fighter's box.
+		cs::List<cs::Ref<Renderer>> hull;
+		if (parent && parent->gameObject())
+			for (const auto& r : GetComponentsInChildren<Renderer>(parent->gameObject(), true))
+				if (r && r->gameObject() && r->gameObject()->name != "RcsJet") hull.Add(r);
+		HullSurface surface(parent, hull);
+		Vector3 c = surface.Centre(), mn = surface.Min(), mx = surface.Max();
 		float bow = c.z + (mx.z - c.z) * 0.8f, stern = c.z + (mn.z - c.z) * 0.8f;
-		float jet = Mathf::Clamp(hull.size().magnitude() * 0.035f, 0.02f, 0.06f);
+		float jet = Mathf::Clamp((mx - mn).magnitude() * 0.035f, 0.02f, 0.06f);
+		auto place = [&](float z, Vector3 side, Vector3 exhaust, float sideways, float pitch, float yaw, float roll)
+		{
+			Vector3 at, normal;
+			if (surface.Place(z, side, exhaust, sideways, jet * 0.5f, at, normal)) Add(at, exhaust, pitch, yaw, roll, jet);
+		};
 		// The bow and stern quads: a pitch or a yaw is a couple, the bow pushed one way and the stern the other.
 		// Exhaust down at the bow pushes the nose up; exhaust up at the stern does too.
-		Add(Vector3(c.x, mn.y, bow), Vector3::down(), 1, 0, 0, jet);
-		Add(Vector3(c.x, mx.y, bow), Vector3::up(), -1, 0, 0, jet);
-		Add(Vector3(c.x, mx.y, stern), Vector3::up(), 1, 0, 0, jet);
-		Add(Vector3(c.x, mn.y, stern), Vector3::down(), -1, 0, 0, jet);
+		place(bow, Vector3::down(), Vector3::down(), 0.6f, 1, 0, 0);
+		place(bow, Vector3::up(), Vector3::up(), 0.6f, -1, 0, 0);
+		place(stern, Vector3::up(), Vector3::up(), 0.6f, 1, 0, 0);
+		place(stern, Vector3::down(), Vector3::down(), 0.6f, -1, 0, 0);
 		// Exhaust to port at the bow pushes the nose to starboard; exhaust to starboard at the stern does too.
-		Add(Vector3(mn.x * 0.6f + c.x * 0.4f, c.y, bow), Vector3::left(), 0, 1, 0, jet);
-		Add(Vector3(mx.x * 0.6f + c.x * 0.4f, c.y, bow), Vector3::right(), 0, -1, 0, jet);
-		Add(Vector3(mx.x * 0.6f + c.x * 0.4f, c.y, stern), Vector3::right(), 0, 1, 0, jet);
-		Add(Vector3(mn.x * 0.6f + c.x * 0.4f, c.y, stern), Vector3::left(), 0, -1, 0, jet);
-		// The beams: a clockwise roll (from behind) lifts the port side and drops the starboard.
-		Add(Vector3(mn.x, c.y, c.z), Vector3::down(), 0, 0, 1, jet);
-		Add(Vector3(mn.x, c.y, c.z), Vector3::up(), 0, 0, -1, jet);
-		Add(Vector3(mx.x, c.y, c.z), Vector3::up(), 0, 0, 1, jet);
-		Add(Vector3(mx.x, c.y, c.z), Vector3::down(), 0, 0, -1, jet);
+		place(bow, Vector3::left(), Vector3::left(), 0.6f, 0, 1, 0);
+		place(bow, Vector3::right(), Vector3::right(), 0.6f, 0, -1, 0);
+		place(stern, Vector3::right(), Vector3::right(), 0.6f, 0, 1, 0);
+		place(stern, Vector3::left(), Vector3::left(), 0.6f, 0, -1, 0);
+		// The beams: a clockwise roll (from behind) lifts the port side and drops the starboard; each jet on the beam's own
+		// top or underside, as far out as it reaches.
+		place(c.z, Vector3::left(), Vector3::down(), 0.0f, 0, 0, 1);
+		place(c.z, Vector3::left(), Vector3::up(), 0.0f, 0, 0, -1);
+		place(c.z, Vector3::right(), Vector3::up(), 0.0f, 0, 0, 1);
+		place(c.z, Vector3::right(), Vector3::down(), 0.0f, 0, 0, -1);
 	}
 
 	void RcsJets::Add(Vector3 at, Vector3 exhaust, float pitch, float yaw, float roll, float size)
 	{
 		auto go = NewGameObject("RcsJet");
 		go->transform->SetParent(parent, false);
-		go->transform->localPosition = at;
+		// A hair off the plating, so the flame's root is not lost in it.
+		go->transform->localPosition = at + exhaust * 0.004f;
 		// The plume mesh trails along its own -Z from the nozzle: turned so it trails along the exhaust.
 		go->transform->localRotation = Quaternion::LookRotation(-exhaust, Mathf::Abs(exhaust.y) > 0.9f ? Vector3::forward() : Vector3::up());
 		go->transform->localScale = Vector3::zero();
@@ -108,10 +121,13 @@ namespace SpaceGod::Views
 		hasLast = true;
 		float full = fullAccel > 1e-6f ? fullAccel : 1.0f;
 		firing = 0;
+		// sg.ThrustersLit (HullThrusters): every jet lit, to see where each sits.
+		static IConsoleVariable* allLit = IConsoleManager::Get().FindConsoleVariable(TEXT("sg.ThrustersLit"));
+		bool all = allLit != nullptr && allLit->GetInt() != 0;
 		for (auto& j : jets)
 		{
 			float push = (j.Pitch * accPitch + j.Yaw * accYaw + j.Roll * accRoll) / full;
-			float want = Mathf::Clamp01((push - DeadShare) / (1 - DeadShare));
+			float want = all ? 1.0f : Mathf::Clamp01((push - DeadShare) / (1 - DeadShare));
 			j.Level = want > j.Level ? want : Mathf::Max(want, j.Level - FadePerS * dt);
 			firing = Mathf::Max(firing, want);
 			bool on = j.Level > 0.02f;
