@@ -1658,6 +1658,7 @@ namespace SpaceGod
 		fighterViews->Update();
 		UpdatePilotRcs(dt); // US-T165: the flown hull's RCS jets, on its view (a ship's, or a seat craft's) as placed above
 		embeddedPods->Update();
+		BeginWorldFx(dt); // US-T447: the effects' clock, before BattleFx hands over a fight's hits and kills
 		battleFx->Update();
 		debrisFields->Update();
 		podBeacons->Update();
@@ -1675,6 +1676,7 @@ namespace SpaceGod
 		if (spaceFeaturesView) spaceFeaturesView->Update(); // US-T130: nebulae and ice fields
 		UpdatePathLine();
 		UpdatePossessionFx(); // US-T446: the energy crossing to the hull and seeping into it
+		UpdateWorldFx(); // US-T447: exhaust clouds, vapour, venting, gate transits and drive flashes
 	}
 
 	void UnitySpaceApp::PlaceEntryGlow(int index, int ship, Vector3 rel, float heat, double pixelsPerUnit)

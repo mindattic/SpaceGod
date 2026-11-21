@@ -592,6 +592,13 @@ namespace SpaceGod::Views
 		SetExhaust(thrusters->MainLit());
 	}
 
+	void ShipView::Vents(cs::List<Vector3>& out) const
+	{
+		if (!visible) return;
+		for (const auto& g : breaches)
+			if (g->R && g->R->enabled && g->T) out.Add(g->T->localPosition);
+	}
+
 	int ShipView::MainThrusters() const { return thrusters ? thrusters->MainCount() : 0; }
 	int ShipView::Thrusters() const { return thrusters ? thrusters->JetCount() : 0; }
 

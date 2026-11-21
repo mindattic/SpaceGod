@@ -1,0 +1,81 @@
+// Unity.SpaceGod/Smoke (US-T447, no Unity original): the world's soft clouds (engine exhaust, RCS vapour, gas venting from a
+// breach, a blast's lingering smoke) as camera-facing quads batched into one dynamic mesh, drawn back to front.
+// Each quad is a ball of cloud: a billowing edge from two octaves of value noise turned by the particle's seed, shaded as a
+// sphere under it lit by the system's star (wrapped, so the night side still reads), a bright fringe when backlit, and a hot
+// core glowing in the vertex colour that cools away with the particle's heat.
+//   TexCoord0  the quad's uv (Unity convention after SG_UnityUv)
+//   TexCoord1  x: floor = the body's albedo 0..15, fraction = the seed; y: heat (the hot core, >= 0)
+//   Vertex colour  rgb = the tint (drive / fire / vapour), a = opacity
+#ifndef SPACEGOD_SMOKE_USH
+#define SPACEGOD_SMOKE_USH
+#include "/Plugin/SpaceGodRender/SpaceGodCommon.ush"
+
+float SG_SmokeHash(float2 p)
+{
+    p = frac(p * float2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return frac(p.x * p.y);
+}
+
+float SG_SmokeNoise(float2 p)
+{
+    float2 i = floor(p), f = frac(p);
+    float2 u = f * f * (3.0 - 2.0 * f);
+    float a = SG_SmokeHash(i), b = SG_SmokeHash(i + float2(1, 0));
+    float c = SG_SmokeHash(i + float2(0, 1)), d = SG_SmokeHash(i + float2(1, 1));
+    return lerp(lerp(a, b, u.x), lerp(c, d, u.x), u.y);
+}
+
+float SG_SmokeFbm(float2 p)
+{
+    float v = 0.0, a = 0.5;
+    for (int k = 0; k < 3; k++)
+    {
+        v += a * SG_SmokeNoise(p);
+        p = p * 2.07 + float2(17.1, 9.7);
+        a *= 0.5;
+    }
+    return v / 0.875;
+}
+
+float4 SG_Smoke(float2 uvUE, float2 packed, float4 vertexColor, float3 positionCR, float3 sunRel, float3 sunColor,
+    float3 viewRight, float3 viewUp, float3 viewForward, float time)
+{
+    float2 p = SG_UnityUv(uvUE) * 2.0 - 1.0;
+    float seed = frac(packed.x);
+    float albedoLevel = floor(packed.x) / 15.0;
+    float heat = max(packed.y, 0.0);
+
+    // The billows: the seed turns and shifts the noise so no two clouds match; it churns slowly.
+    float ang = seed * 6.2831853;
+    float cs = cos(ang), sn = sin(ang);
+    float2 q = float2(cs * p.x - sn * p.y, sn * p.x + cs * p.y);
+    float2 o = float2(seed * 37.0, seed * 91.0);
+    float n = SG_SmokeFbm(q * 1.7 + o + time * 0.06);
+    float n2 = SG_SmokeFbm(q * 3.9 - o - time * 0.09);
+    float r = length(p);
+    float edge = r + (n - 0.5) * 0.7 + (n2 - 0.5) * 0.25;
+    float dens = saturate((1.0 - edge) * 1.7);
+    dens = dens * dens * (3.0 - 2.0 * dens);
+
+    // Shaded as the ball it stands for, its lumps darker in their folds.
+    float3 right = normalize(viewRight), up = normalize(viewUp), fwd = normalize(viewForward);
+    float z = sqrt(saturate(1.0 - r * r));
+    float3 nrm = normalize(right * p.x + up * p.y - fwd * (z + 0.2));
+    float3 l = normalize(sunRel - positionCR);
+    float3 v = normalize(-positionCR);
+    float wrap = saturate(dot(nrm, l) * 0.6 + 0.4);
+    float folds = 0.7 + 0.6 * (n - 0.5) + 0.3 * (n2 - 0.5);
+    // Backlit, the thin fringe glows with the star behind it.
+    float scatter = pow(saturate(dot(-v, l)), 5.0) * (1.0 - dens) * 1.2;
+    float3 albedo = lerp(float3(0.55, 0.56, 0.58), vertexColor.rgb, 0.4) * (0.15 + 0.85 * albedoLevel);
+    float3 col = albedo * (sunColor * (wrap * folds + scatter) + 0.04);
+
+    // The hot core: the drive's (or the fire's) colour glowing out of its heart while it is young.
+    float core = saturate(1.0 - r * 1.15);
+    col += vertexColor.rgb * heat * (0.25 + 1.4 * core * core) * (0.6 + 0.6 * n);
+
+    return float4(col, saturate(dens * vertexColor.a));
+}
+
+#endif

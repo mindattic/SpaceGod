@@ -57,6 +57,16 @@ namespace SpaceGod::Views
 		/// <summary>Puts every jet away and forgets the last spin, so the next shown frame does not flare from a stale one.</summary>
 		void Hide();
 
+		/// <summary>US-T447: one jet as the world's effects see it (in the root's frame: one unit long, nose +Z).</summary>
+		struct JetView
+		{
+			Vector3 At, Exhaust;
+			float Width = 0, Level = 0;
+		};
+
+		/// <summary>US-T447: the main engines' nozzles, and every other jet (RCS and retros), with how lit each is now.</summary>
+		void Jets(cs::List<JetView>& mains, cs::List<JetView>& others) const;
+
 	private:
 		enum class Kind { Main, Retro, Rcs };
 
@@ -65,6 +75,8 @@ namespace SpaceGod::Views
 			cs::Ref<Transform> T;
 			cs::Ref<MeshRenderer> R;
 			Kind K = Kind::Rcs;
+			/// <summary>Where it sits and the way its exhaust leaves (root frame; US-T447's clouds leave from there).</summary>
+			Vector3 At, Exhaust;
 			/// <summary>How it turns the hull: its share of nose-up, nose-to-starboard and clockwise acceleration (-1..1).</summary>
 			float Pitch = 0, Yaw = 0, Roll = 0;
 			float Level = 0, Phase = 0, Width = 0, Length = 0;

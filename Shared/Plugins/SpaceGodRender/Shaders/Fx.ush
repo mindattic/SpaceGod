@@ -12,7 +12,15 @@ float3 SG_Fx(float2 uvUE, float shapeSelect, float4 vertexColor)
     float3 uv = float3(SG_UnityUv(uvUE), shapeSelect);
     float2 p = uv.xy * 2.0 - 1.0;
     float shape;
-    if (uv.z < 0.5)
+    if (uv.z < -0.5)
+    {
+        // US-T447: a thin shockwave ring (WorldFx: a blast's shock, a gate's fold, a drive's ring), crisp at any radius,
+        // with a faint wash inside it.
+        float d = length(p);
+        float band = saturate(1.0 - abs(d - 0.93) * 28.0);
+        shape = (band * band * 1.6 + saturate(1.0 - abs(d - 0.93) * 7.0) * 0.25) * step(d, 1.0) + saturate(d) * step(d, 0.93) * 0.05;
+    }
+    else if (uv.z < 0.5)
     {
         // Radial: a hot core with a soft halo.
         float d = saturate(1.0 - length(p));

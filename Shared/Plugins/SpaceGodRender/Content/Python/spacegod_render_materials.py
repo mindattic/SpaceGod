@@ -591,6 +591,23 @@ def build_fx(mpc):
     return mat
 
 
+def build_smoke(mpc):
+    """US-T447: the world's soft clouds (exhaust, vapour, venting, a blast's smoke): translucent, lit by the star, billowing,
+    with a hot core in the vertex colour. TexCoord1 (Unity uv0.zw) carries albedo + seed and heat; see Smoke.ush."""
+    mat = new_material("M_Smoke", unreal.BlendMode.BLEND_TRANSLUCENT, True)
+    g = Graph(mat, mpc)
+    inputs = [("UV", ("uv", 0, "rg")), ("Packed", ("uv", 1, "rg")), ("VertexColor", ("vc",)), ("PositionCR", ("pos_cr",)),
+              ("SunRel", ("mpc_rel", "_SunPositionWS")), ("SunColor", ("mpc", "_SunColor", "rgb")),
+              ("Time", ("time",))] + EXPOSE
+    code = ("float4 c = SG_Smoke(UV, Packed, VertexColor, PositionCR, SunRel, SunColor, "
+            "ResolvedView.ViewToTranslatedWorld[0].xyz, ResolvedView.ViewToTranslatedWorld[1].xyz, "
+            "ResolvedView.ViewToTranslatedWorld[2].xyz, Time);\n"
+            "return SG_Expose(c, Exposure, SceneLuminance);")
+    c = g.custom("Unity.SpaceGod/Smoke", "Smoke.ush", code, F4, inputs)
+    finish(mat, g.mask(c, "", "rgb"), opacity=g.mask(c, "", "a"))
+    return mat
+
+
 def build_asteroids(mpc):
     mat = new_material("M_Asteroids", unreal.BlendMode.BLEND_ADDITIVE, True)
     g = Graph(mat, mpc)
@@ -722,7 +739,7 @@ def _snake(name):
 
 BUILDERS = [build_planet, build_sun, build_ring, build_gas_giant, build_sky, build_stars, build_points, build_line,
             build_glow, build_fx, build_asteroids, build_ship, build_lit, build_nebula, build_warp, build_ghost,
-            build_ghost_two_sided]
+            build_ghost_two_sided, build_smoke]
 
 
 def main():

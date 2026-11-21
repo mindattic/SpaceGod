@@ -4,6 +4,9 @@
 #include "UnitySpaceApp.h"
 #include "Rendering/Materials.h"
 #include "Views/ShipView.h"
+#include "Views/EffectsTune.h"
+#include "Views/WorldFx.h"
+#include "PlayerOptions.h"
 
 #include "Combat/Battle.h"
 #include "Combat/CombatState.h"
@@ -290,6 +293,44 @@ namespace SpaceGod::Views
 				return;
 		}
 		effects.Add(e);
+		HandToWorld(b, fx);
+	}
+
+	void BattleFx::HandToWorld(const cs::Ref<Battle>& b, const CombatFx& fx)
+	{
+		auto* world = app->Effects();
+		if (world == nullptr || world->Rewinding()) return;
+		auto at = app->BattleScene(b, fx.A);
+		// A direction in the battle's km, as a unit vector in scene axes.
+		auto toScene = [&](DVec3 dirKm)
+		{
+			if (dirKm.LengthSquared() < 1e-24) return Vector3::up();
+			auto d = app->BattleScene(b, fx.A + dirKm.Normalized() * 0.01) - at;
+			Vector3 v(static_cast<float>(d.X), static_cast<float>(d.Y), static_cast<float>(d.Z));
+			return v.sqrMagnitude() > 1e-30f ? v.normalized() : Vector3::up();
+		};
+		auto hull = [&](double km) { return static_cast<float>(app->Scale()->ShipLength(km)); };
+		const auto& u = fx.Unit;
+		switch (fx.Kind)
+		{
+			case FxKind::Impact:
+				if (u != nullptr) world->Impact(at, toScene(fx.A - u->Pos), hull(u->LengthKm), Mathf::Clamp01(static_cast<float>(fx.Size) / 400.0f));
+				break;
+			case FxKind::SubsystemDestroyed:
+				if (u != nullptr) world->Blast(at, hull(u->LengthKm), EffectsTune::SubsystemBlastShare);
+				break;
+			case FxKind::UnitDestroyed:
+				world->Blast(at, hull(fx.Size), 1.0f);
+				break;
+			case FxKind::Breach:
+				if (u != nullptr) world->BreachJet(at, toScene(fx.A - fx.B), hull(u->LengthKm));
+				break;
+			case FxKind::FtlJump:
+				if (u != nullptr) world->FtlJump(at, toScene(fx.B - fx.A), hull(u->LengthKm), false);
+				break;
+			default:
+				break;
+		}
 	}
 
 	void BattleFx::Draw(const Effect& e, float now)
@@ -514,7 +555,8 @@ namespace SpaceGod::Views
 				float r = static_cast<float>(e.Size * app->BattleKmScale()) * (0.6f + 2.2f * Mathf::Sqrt(t));
 				// US-T216: the fireball grows with the hull but never past ~160 px, its white flash ~240.
 					Sprite(c, Mathf::Max(Mathf::Min(r, PixelSize(c, 160)), PixelSize(c, 24 * (0.5f + t))), e.Color * fade * fade, Shape::Radial);
-				if (age < 0.25f) Sprite(c, Mathf::Max(Mathf::Min(r * 3, PixelSize(c, 240)), PixelSize(c, 60)), Color::white() * (1 - age / 0.25f) * 0.8f, Shape::Radial);
+				// US-T447: the white flash dims for Reduce flashes (the shockwave, embers and cloud are WorldFx's).
+				if (age < 0.25f) Sprite(c, Mathf::Max(Mathf::Min(r * 3, PixelSize(c, 240)), PixelSize(c, 60)), Color::white() * (1 - age / 0.25f) * 0.8f * PlayerOptions::FlashScale(), Shape::Radial);
 				break;
 			}
 			default:

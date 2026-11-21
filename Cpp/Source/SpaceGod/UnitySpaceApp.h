@@ -49,6 +49,7 @@
 #include "UnitySpaceApp.Tutorial.deps.h" // US-T254
 #include "UnitySpaceApp.Rewind.deps.h" // US-T99
 #include "UnitySpaceApp.Possession.deps.h" // US-T446
+#include "UnitySpaceApp.Effects.deps.h" // US-T447
 #include "NewGameSetup.h" // US-T247: the New Game setup page's choices
 
 namespace SpaceGod
@@ -124,5 +125,6 @@ namespace SpaceGod
 #include "UnitySpaceApp.Rewind.inl" // US-T99: time reversal's keyframe ring (docs/REWIND.md)
 #include "UnitySpaceApp.HoldRewind.inl" // US-T409: hold to rewind the last seconds, let go to play on (docs/REWIND.md)
 #include "UnitySpaceApp.Possession.inl" // US-T446: possession as a show, and the possessed view (docs/Possession.md)
+#include "UnitySpaceApp.Effects.inl" // US-T447: the world's effects: exhaust clouds, venting, a fight's sparks and smoke (docs/Effects.md)
 	};
 }

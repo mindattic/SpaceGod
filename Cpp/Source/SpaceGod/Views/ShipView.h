@@ -174,6 +174,12 @@ namespace SpaceGod::Views
 		int MainThrusters() const;
 		int Thrusters() const;
 
+		/// <summary>US-T447: its thrusters' jets as the world's effects read them (root frame), none before they are built.</summary>
+		const HullThrusters* JetsView() const { return thrusters.get(); }
+
+		/// <summary>US-T447: where its breaches burn this frame (root frame, one unit long): the hull vents from there.</summary>
+		void Vents(cs::List<Vector3>& out) const;
+
 		/// <summary>
 		/// A destroyed ship: bow and stern drift apart and tumble, the hull blackens, fires burn at
 		/// the break and on the wreck, then the pieces burn out and vanish.

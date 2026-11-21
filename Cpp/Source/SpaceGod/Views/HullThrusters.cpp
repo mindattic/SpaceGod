@@ -18,7 +18,8 @@ namespace SpaceGod::Views
 	{
 		/// US-T432/US-T433: every jet lit at once, so where each sits and the way it fires can be seen (sg.Thrusters).
 		TAutoConsoleVariable<int32> CVarAllLit(TEXT("sg.ThrustersLit"), 0,
-			TEXT("1: every hull's thrusters (main engines, retros, RCS) drawn lit at full, to check where they sit (US-T432, US-T433)."));
+			TEXT("1: every hull's thrusters (main engines, retros, RCS) drawn lit at full, to check where they sit (US-T432, US-T433); "
+				"2: the main engines alone (US-T447's exhaust shots)."));
 
 		cs::Ref<Mesh> plumeMesh;
 		cs::Ref<Material> rcsMaterial, mainMaterial;
@@ -251,6 +252,8 @@ namespace SpaceGod::Views
 		j.T = go->transform;
 		j.R = r;
 		j.K = kind;
+		j.At = at;
+		j.Exhaust = exhaust;
 		if (kind == Kind::Rcs)
 		{
 			// Its push is against its exhaust; its turn, that push about the hull's middle. Signs as the hull reads them:
@@ -309,10 +312,11 @@ namespace SpaceGod::Views
 		float full = fullAccel > 1e-6f ? fullAccel : 1.0f;
 		float lit = Mathf::Clamp01(intensity);
 		mainLevel = 0;
-		bool all = CVarAllLit.GetValueOnGameThread() != 0;
+		int forced = CVarAllLit.GetValueOnGameThread();
 		for (auto& j : jets)
 		{
-			if (all) j.Level = 1;
+			if (forced == 1 || (forced == 2 && j.K == Kind::Main)) j.Level = 1;
+			else if (forced == 2) j.Level = 0;
 			else if (j.K == Kind::Rcs)
 			{
 				float push = settled ? (j.Pitch * accPitch + j.Yaw * accYaw + j.Roll * accRoll) / full : 0.0f;
@@ -349,6 +353,19 @@ namespace SpaceGod::Views
 				width = j.Width * (0.6f + 0.4f * j.Level) * (0.7f + 0.3f * glow);
 			}
 			j.T->localScale = Vector3(width, width, length);
+		}
+	}
+
+	void HullThrusters::Jets(cs::List<JetView>& outMains, cs::List<JetView>& others) const
+	{
+		for (const auto& j : jets)
+		{
+			JetView v;
+			v.At = j.At;
+			v.Exhaust = j.Exhaust;
+			v.Width = j.Width;
+			v.Level = j.Level;
+			(j.K == Kind::Main ? outMains : others).Add(v);
 		}
 	}
 

@@ -102,6 +102,10 @@ namespace SpaceGod::Views
 
 		void Spawn(const cs::Ref<Core::Battle>& b, const Core::CombatFx& fx, float now);
 
+		/// <summary>US-T447: what a fight's event leaves in the world besides its flash (WorldFx): a hit's sparks, debris and
+		/// smoke, a blast's shockwave, embers and lingering cloud, a breach's jet of air, a jump's flash.</summary>
+		void HandToWorld(const cs::Ref<Core::Battle>& b, const Core::CombatFx& fx);
+
 		void Draw(const Effect& e, float now);
 
 		/// <summary>The shield shell's radius in ship lengths: between the inner and outer edge of ShipView's ring.</summary>
