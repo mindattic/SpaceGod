@@ -78,6 +78,8 @@ namespace SpaceGod::Coop::CoopSmoke
 		// US-T423: the hold rewind: the host's own key (held at the client's ask), and the frames the client held alone.
 		bool hostHoldsRewind = false;
 		int aloneFrames = 0, aloneActive = 0;
+		// US-T424: the fight born for the birth hold.
+		cs::Ref<Battle> bornFight;
 
 		// US-T64: a step that needs an earlier ask carried out waits for it to come back in a host frame. A client's ask
 		// reaches the host while the host is as far ahead as the client's backlog, so it comes back only once the client
@@ -243,6 +245,9 @@ namespace SpaceGod::Coop::CoopSmoke
 		if (Waits(3100, app.HoldRewindRecordedS() >= 4.0, "the fight recorded for the hold rewind", peer)) return;
 		if (Waits(3200, app.HoldRewindActive(), "the hold to start with every player holding", peer)) return;
 		if (Waits(3330, !app.HoldRewindActive(), "the hold to end", peer)) return;
+		// US-T424: the birth hold waits for the cooldown to let it start, then for it to end.
+		if (Waits(3960, app.HoldRewindActive(), "the birth hold to start with every player holding", peer)) return;
+		if (Waits(4160, !app.HoldRewindActive(), "the birth hold to end", peer)) return;
 		long long n = ++replayed;
 		if (n > 3100 && n <= 3190)
 		{
@@ -490,6 +495,39 @@ namespace SpaceGod::Coop::CoopSmoke
 				break;
 			case 3330:
 				CoopPeer::Log(cs::Cat("smoke: the hold is over at frame ", peer.Frame(), ": playing on"));
+				break;
+			// US-T424: a fight born in the window, taken back in co-op. The first fight is taken off (the rewind then watches
+			// none), a fresh one is born off Neptune, and once the cooldown is out every player holds back past its start: every
+			// peer takes it back at the same frame and plays on from before it (the digests after must still match).
+			case 3700:
+				CoopPeer::Log(cs::Cat("smoke: client takes the first fight off for the birth hold at frame ", peer.Frame()));
+				peer.Submit(cs::Cat("x ", Wire::I(peer.LocalSeat()), " hrdrop"));
+				break;
+			case 3800:
+				CoopPeer::Log(cs::Cat("smoke: client starts a fight off Neptune (born now) at frame ", peer.Frame()));
+				peer.Submit(cs::Cat("x ", Wire::I(peer.LocalSeat()), " hrborn"));
+				bornFight = nullptr;
+				break;
+			case 3950:
+			{
+				// The newest fight the war holds: the one born at 3800.
+				for (const auto& b : app.World()->War->Battles)
+					if (b != nullptr && (bornFight == nullptr || b->Id > bornFight->Id)) bornFight = b;
+				CoopPeer::Log(cs::Cat("smoke: the born fight is ", bornFight != nullptr ? bornFight->Name : cs::String("missing"), "; client and host hold Shift+R at frame ", peer.Frame()));
+				script->Hold(Input::Key::LeftShift);
+				script->Hold(Input::Key::R);
+				peer.SmokeHostHold(true);
+				break;
+			}
+			case 4150:
+				CoopPeer::Log(cs::Cat("smoke: held 200 frames: the rewind is ", cs::Fmt(app.HoldRewindBackS(), "F2"), " s back at frame ", peer.Frame(), "; client and host let go"));
+				script->Release(Input::Key::R);
+				script->Release(Input::Key::LeftShift);
+				peer.SmokeHostHold(false);
+				break;
+			case 4170:
+				CoopPeer::Log(cs::Cat("smoke: after the birth hold the war holds the born fight: ",
+					bornFight != nullptr && app.World()->War->Battles.Contains(bornFight) ? "True" : "False", " at frame ", peer.Frame()));
 				break;
 			case ClientFrames:
 				peer.SayBye();

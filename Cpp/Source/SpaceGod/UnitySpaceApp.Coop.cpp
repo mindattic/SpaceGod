@@ -1241,6 +1241,27 @@ namespace SpaceGod
 			CoopPeer::Log(cs::Cat("hold rewind smoke: ", fight != nullptr ? cs::Cat(fight->Name, ", ", fight->Units.Count(), " units") : cs::String("no fight started"),
 				" at frame ", peer.Frame()));
 		}
+		else if (verb == "hrdrop" && Coop::CoopSmoke::Active())
+		{
+			// US-T424: the smoke's first fight taken off the war on every peer at this frame (as a hold rewind would take back a
+			// fight born in its window), so the rewind watches none before the next is born.
+			auto fight = battleTimeFor;
+			bool dropped = fight != nullptr && World()->War->Unstart(fight, Clock->Jd);
+			battleTimeFor = nullptr;
+			CoopPeer::Log(cs::Cat("hold rewind smoke: ", fight != nullptr ? fight->Name : cs::String("no fight"), dropped ? " taken off the war" : " not held by the war",
+				" at frame ", peer.Frame()));
+		}
+		else if (verb == "hrborn" && Coop::CoopSmoke::Active())
+		{
+			// US-T424: a fight born now on every peer (off Neptune, not run on: its clock at 0) and watched, for a hold back past
+			// its start.
+			auto neptune = (*Catalog())["Neptune"];
+			int body = neptune != nullptr ? neptune->Index : 0;
+			auto fight = SceneTour::TriggerSkirmish(*this, body, World()->Sol, World()->Reach,
+				cs::List<ShipClass>{ ShipClass::Cruiser, ShipClass::Destroyer, ShipClass::Frigate });
+			if (fight != nullptr) WatchBattle(fight);
+			CoopPeer::Log(cs::Cat("hold rewind smoke: born ", fight != nullptr ? cs::Cat(fight->Name, " #", fight->Id) : cs::String("no fight"), " at frame ", peer.Frame()));
+		}
 		else if (verb == "ftlclear") ClearFtlCourse();
 		else if (verb == "ftlauto") EngageFtlAutopilot();
 		else if (verb == "reset")

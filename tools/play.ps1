@@ -317,6 +317,11 @@ if ($Mode -eq 'coop-smoke') {
       $hp = [regex]::Matches($hostText, 'hold rewind: (every player holds.*?frame \d+|played on [^\r\n]*)') | ForEach-Object { $_.Groups[1].Value }
       $cp = [regex]::Matches($clientText, 'hold rewind: (every player holds.*?frame \d+|played on [^\r\n]*)') | ForEach-Object { $_.Groups[1].Value }
       $hp.Count -ge 2 -and ($hp -join '|') -eq ($cp -join '|') })
+    # US-T424: a fight born in the window (off Neptune, in the frames) held back past its start by every player: every
+    # peer takes it back and plays on from before it, at the same frame (the check above compares every resume line).
+    'hold rewind: a fight born in the window taken back (both peers)' = (Both 'hold rewind smoke: born ') -and
+      (Both 'hold rewind: played on from [\d.]+ s back[^\r\n]*: before [^\r\n]* began') -and
+      ($clientText -match 'smoke: after the birth hold the war holds the born fight: False')
   }
   "co-op smoke: syncs: $($syncs -join '; ')"
   foreach ($k in $checks.Keys) { "co-op smoke: $($k): $($checks[$k])" }

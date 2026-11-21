@@ -1142,7 +1142,8 @@ namespace SpaceGod
 		auto fight = !coop ? HoldRewindBattle() : coopHrFight != nullptr && !coopHrFight->Over ? coopHrFight : nullptr;
 		// US-T424: a fight left (the hull flew clear of it, or it went out of view) is still kept while it goes on, so a hold
 		// can go back to before the hull left it (the resume point puts the hull back in it); only another fight replaces it.
-		if (fight == nullptr && !coop && HrTuning::KeepFightLeft && h.Fight != nullptr && !h.Fight->Over && World()->War != nullptr &&
+		// (In co-op too: the fight kept and the war are the same on every peer, so every peer keeps the same one.)
+		if (fight == nullptr && HrTuning::KeepFightLeft && h.Fight != nullptr && !h.Fight->Over && World()->War != nullptr &&
 			World()->War->Battles.Contains(h.Fight))
 			fight = h.Fight;
 		// US-T419: fought on since it would have ended (or put back to before): its end, if it comes again, starts afresh.
@@ -1158,7 +1159,8 @@ namespace SpaceGod
 			// ...US-T424: unless it is the first fight watched since none was: then the helm's resume points before it stay,
 			// and a resume to one of them takes the fight back if it was born now (or lets the hull go of it, or leaves a
 			// fight that only came into view going on from now).
-			entering = HrTuning::UndoFightStart && !coop && h.Fight == nullptr && fight != nullptr;
+			// (In co-op too: every peer sees the same fight entered at the same frame, and takes it back at the same frame.)
+			entering = HrTuning::UndoFightStart && h.Fight == nullptr && fight != nullptr;
 			h.Entered = entering ? fight : nullptr;
 			h.EnteredT = entering ? t : HrNone;
 			h.EnteredBorn = entering && fight->Seconds <= HrTuning::BornS && World()->War != nullptr && World()->War->Battles.Contains(fight);
@@ -1238,7 +1240,9 @@ namespace SpaceGod
 		}
 		if (piloting) h.Pilot.push_back(HrPilotPose { t, pilot(), pilotFrameBody });
 
-		if (t >= h.NextAnchorAt && (fight != nullptr || piloting))
+		// US-T424: a resume point every AnchorS even with no fight or helm (an empty one: nothing of a fight to put back), so
+		// a hold can play on from before a fight began when only watching.
+		if (t >= h.NextAnchorAt)
 		{
 			h.Anchors.push_back(HrCaptureAnchor(t, fight, piloting, pilot(), ship, pilotFrameBody, heldNonHelm));
 			h.NextAnchorAt = t + HrTuning::AnchorS;
@@ -1749,7 +1753,7 @@ namespace SpaceGod
 			h.EndHeldSince = HrNone;
 		}
 		putBack(*best);
-		coopLog(cs::Cat("from ", cs::Fmt(h.PressT - best->T, "F2"), " s back", clamped ? cs::Cat(" (no further: ", h.BarrierWhy, ")") : cs::String()));
+		coopLog(cs::Cat("from ", cs::Fmt(h.PressT - best->T, "F2"), " s back", clamped ? cs::Cat(" (no further: ", h.BarrierWhy, ")") : cs::String(), beforeFight));
 		h.ResumeFx = h.PressFx - static_cast<float>(h.PressT - best->T);
 		double went = h.PressT - best->T;
 		if (h.Test.On)

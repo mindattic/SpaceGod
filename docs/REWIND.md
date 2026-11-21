@@ -735,7 +735,20 @@ unit; their schedules run on underneath), and the war lists it, numbers it, coun
 
 - A ship that changed phase (left an orbit, joined a lane) in the window is still drawn where its *current* phase
   puts it at the past `jd`, as a ship's analytic state is a snapshot of now, overwritten at every phase change.
-- In co-op, a fight's start and a fight left are still barriers (US-T424 and US-T426 are single-player).
+- A fight born while another is watched (one replacing the other) is a barrier: the resume points of the first fight
+  are cleared when the second takes its place.
+
+### Co-op too (US-T428)
+
+A fight born in the window is taken back, and a fight left is kept, in co-op as in single-player. Every peer sees the
+same fight entered at the same frame (the host's frame names it, the war is the same everywhere), keeps the same one
+when it is left, and takes it back at the same frame of the shared resume. Resume points are now kept every `AnchorS`
+with no fight or helm too (empty ones), so a hold can play on from before a fight began when only watching. Each
+peer's resume line says so ("played on from 4.33 s back: before Battle of Neptune began at frame 5142").
+**Proved** by the co-op smoke. After its first hold, the client takes that fight off the war in the frames (`hrdrop`,
+smoke only), and a fight is born off Neptune in the frames (`hrborn`, its clock at 0). Once the cooldown is out, both
+players hold for 200 frames back past its start and let go. Both peers played on from the same moment before it began
+at the same frame, the war holds it no more, and all 79 digests were identical.
 
 ## Parked: checkpoint loops with ghost replays (US-T169)
 

@@ -24,7 +24,7 @@ namespace SpaceGod::Coop
 
 	namespace CoopSmoke
 	{
-		constexpr int ClientFrames = 3600; // US-T43's longer run; US-T423: and the hold rewind at the end
+		constexpr int ClientFrames = 4300; // US-T43's longer run; US-T423: and the hold rewind at the end; US-T424: and the birth hold
 
 		/// US-T423: the host holds its own hold-rewind key (the client's "smokehold" asks it to: the host has no keyboard).
 		bool HostHoldsRewind();
