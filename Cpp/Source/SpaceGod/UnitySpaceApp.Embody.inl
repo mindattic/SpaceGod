@@ -170,6 +170,7 @@ public:
 	static constexpr double MechShoulderBack = 2.6, MechShoulderRise = 1.5;
 
 private:
+	// US-T434: both kept in battle km (drawn height over BattleKmScale), so a seat's zoom easing on redraws them in step.
 	double evaPilotHeight = 0;
 	double mechHeight = 0; // US-T83: the last drawn height, kept in flight
 

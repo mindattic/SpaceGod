@@ -150,6 +150,16 @@ namespace SpaceGod::Core
 		cs::String Verb;
 	};
 
+	/// <summary>US-T434: the true sizes of the inhabited things that are not hulls (<see cref="IEmbodiable.InhabitedSizeKm"/>).</summary>
+	struct InhabitedSizes
+	{
+		/// <summary>A person in a suit (an EVA worker on the plating, an ejected pilot), km.</summary>
+		static constexpr double PersonKm = 0.0018;
+
+		/// <summary>A constellation satellite with its panels out, km.</summary>
+		static constexpr double SatelliteKm = 0.008;
+	};
+
 	class Battle;
 	class BattleUnit;
 	class Ship;
@@ -310,6 +320,14 @@ namespace SpaceGod::Core
 
 		/// <summary>What it is in the world: its hull, its part of it, where it is.</summary>
 		virtual EmbodimentSubject Subject() const = 0;
+
+		/// <summary>
+		/// US-T434: how big the thing the player inhabits through it is, in true km: a hull's or station's length (a gun is
+		/// the hull it is mounted on), a person's or a mech's height. The view draws the world round it by this
+		/// (<see cref="ScaleModel.SeatZoomFor"/>): the smaller it is, the bigger the world looks. Never read by the simulation.
+		/// By default the length of its subject's unit, else its ship; 0 when it has neither (drawn as from no seat).
+		/// </summary>
+		SPACEGODCORE_API virtual double InhabitedSizeKm() const;
 
 		/// C# object.Equals(object) / GetHashCode(): reference identity unless a seat overrides them.
 		virtual bool Equals(const cs::Ref<IEmbodiable>& obj) const { return obj.get() == this; }

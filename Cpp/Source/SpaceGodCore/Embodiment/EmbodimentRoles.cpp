@@ -11,10 +11,31 @@
 #include "Embodiment/StationSeat.h"
 #include "Combat/Battle.h"
 #include "Combat/CombatState.h"
+#include "Combat/CombatSpecs.h"
 #include "Ships.h"
 
 namespace SpaceGod::Core
 {
+	// ------------------------------------------------------------ US-T434: the size of what is inhabited
+
+	double IEmbodiable::InhabitedSizeKm() const
+	{
+		auto s = Subject();
+		if (s.Unit != nullptr && s.Unit->LengthKm > 0) return s.Unit->LengthKm;
+		if (s.Ship != nullptr) return s.Ship->LengthKm();
+		return 0;
+	}
+
+	double StationSeat::InhabitedSizeKm() const
+	{
+		// The station's own hull, in a fight or out of one (its unit only exists in a fight).
+		if (Combat != nullptr && Combat->Spec != nullptr && Combat->Spec->LengthKm > 0) return Combat->Spec->LengthKm;
+		double fromSubject = IEmbodiable::InhabitedSizeKm();
+		return fromSubject > 0 ? fromSubject : CombatSpec::PlatformLengthKm;
+	}
+
+	double SatelliteSeat::InhabitedSizeKm() const { return InhabitedSizes::SatelliteKm; }
+
 	namespace
 	{
 		void Add(EmbodimentRolePanel& p, const char* key, cs::String label, bool ready = true) { p.Abilities.Add(EmbodimentAbility(key, std::move(label), ready)); }

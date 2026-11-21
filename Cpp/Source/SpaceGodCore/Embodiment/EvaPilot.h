@@ -126,6 +126,7 @@ namespace SpaceGod::Core
 		EmbodimentCameraRig CameraRig() const override;
 		EmbodimentRolePanel RolePanel() override;
 		EmbodimentSubject Subject() const override;
+		double InhabitedSizeKm() const override { return InhabitedSizes::PersonKm; } // US-T434: a person in a suit
 
 		/// <summary>The torpedo's casing direction (tail to nose), unit.</summary>
 		static DVec3 AxisOf(const cs::Ref<Missile>& m);

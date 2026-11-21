@@ -45,7 +45,7 @@ namespace SpaceGod::Views
 					for (int k = 0; k < Points; k++)
 					{
 						double a = cs::Math::PI * 2 * k / (Points - 1);
-						auto o = app->Scale()->LocalOffset(host, (u * cs::Math::Cos(a) + v * cs::Math::Sin(a)) * radius);
+						auto o = app->Scale()->BodyLocalOffset(host, (u * cs::Math::Cos(a) + v * cs::Math::Sin(a)) * radius);
 						points[k] = Vector3(static_cast<float>(o.X), static_cast<float>(o.Y), static_cast<float>(o.Z));
 					}
 					// The edges read a little brighter than the dust between them.

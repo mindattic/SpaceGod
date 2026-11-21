@@ -208,6 +208,21 @@ public:
 private:
 	void AnimateScale(float dt);
 
+	/// <summary>US-T434: eases the scale model's seat zoom (ScaleModel::SeatZoomFor) toward the one for what this player
+	/// inhabits now (the helm's hull or the seat held; 1 with neither), in log space, every frame. This peer's own view only.</summary>
+	void AnimateSeatZoom(float dt);
+
+public:
+	/// <summary>US-T434: how big what this player inhabits is (true km): the seat held, else the hull at the helm; 0 for
+	/// neither (the free view).</summary>
+	double InhabitedSizeKm() const;
+
+	/// <summary>US-T434: a test's stand-in for <see cref="InhabitedSizeKm"/> (km; 0 or less for none). Never saved.</summary>
+	double SeatZoomOverrideKm = 0;
+
+	/// <summary>US-T434: a test points the stick at a seat (Unity axes), so the view looks that way (sg.SeatScale).</summary>
+	void AimSeatForTest(Vector3 direction) { if (direction.sqrMagnitude() > 1e-12f) seatAim = direction.normalized(); }
+
 public:
 	void ShowToast(const cs::String& message);
 

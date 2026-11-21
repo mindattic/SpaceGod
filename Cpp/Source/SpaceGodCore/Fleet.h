@@ -230,6 +230,10 @@ namespace SpaceGod::Core
 		/// <summary>The scale blend the view draws at (<see cref="ScaleModel.Blend"/>: 0 realistic, 1 gameplay), for the drawn solve.</summary>
 		double DrawnBlend = 1.0;
 
+		/// <summary>US-T434: the seat's zoom the view draws at (<see cref="ScaleModel.SeatZoom"/>: hulls and the heights over a
+		/// world), for the drawn solve. View only, like <see cref="DrawnBlend"/>, so it may differ between co-op peers.</summary>
+		double DrawnSeatZoom = 1.0;
+
 		/// <summary>
 		/// US-T226: the hull the view is framed on (the one flown from the helm; null for none) and the way the camera looks at
 		/// it (ecliptic axes). In the drawn solve a hull near it is kept clear not only of its sphere but off the camera's line

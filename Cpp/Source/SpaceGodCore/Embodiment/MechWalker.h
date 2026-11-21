@@ -208,6 +208,7 @@ namespace SpaceGod::Core
 		EmbodimentCameraRig CameraRig() const override;
 		EmbodimentRolePanel RolePanel() override;
 		EmbodimentSubject Subject() const override;
+		double InhabitedSizeKm() const override { return HeightKm; } // US-T434: the mech's own height
 
 	private:
 		SG_SERIALIZABLE(MechWalker); // US-T270: ObjectGraph registration (Persistence/Registrations)

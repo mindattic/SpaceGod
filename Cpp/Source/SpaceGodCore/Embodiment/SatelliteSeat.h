@@ -72,6 +72,7 @@ namespace SpaceGod::Core
 		EmbodimentCameraRig CameraRig() const override;
 		EmbodimentRolePanel RolePanel() override;
 		EmbodimentSubject Subject() const override;
+		double InhabitedSizeKm() const override; // US-T434: a satellite's own size
 
 		bool Equals(const cs::Ref<IEmbodiable>& obj) const override;
 		size_t GetHashCode() const override;

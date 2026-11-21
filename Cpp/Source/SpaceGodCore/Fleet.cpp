@@ -274,6 +274,7 @@ namespace SpaceGod::Core
 		// The same neighbourhood the view places the ship's sidestep in (UnitySpaceApp::KmToSceneNear).
 		ScaleModel scale;
 		scale.SetBlend(blend);
+		scale.SetSeatZoom(DrawnSeatZoom); // US-T434: the seat's zoom the view draws at (only the drawn solve asks)
 		auto def = (*catalog)[body];
 		double d = (helioKm - ephemeris->Helio(body)).Length();
 		if (d > ScaleModel::NeighbourhoodKm(def))
@@ -396,7 +397,7 @@ namespace SpaceGod::Core
 			sb.Pos = sb.Pos + off[static_cast<size_t>(i)];
 			double lead = 0;
 			formation.TryGetValue(s, lead);
-			double drawnHalf = 0.5 * ScaleModel::LogLerp(s->LengthKm() / ScaleModel::KmPerUnit, ScaleModel::GameShipScale * s->LengthKm(), DrawnBlend) * ShipLod::ExtentFactor(s);
+			double drawnHalf = 0.5 * ScaleModel::LogLerp(s->LengthKm() / ScaleModel::KmPerUnit, ScaleModel::GameplayShipLength(s->LengthKm(), DrawnSeatZoom), DrawnBlend) * ShipLod::ExtentFactor(s);
 			double perKm = SceneUnitsPerKm(worlds[static_cast<size_t>(i)], sb.Pos, DrawnBlend);
 			sb.Lateral = perKm / SceneUnitsPerKm(worlds[static_cast<size_t>(i)], sb.Pos, DrawnBlend, true);
 			double grow = s->LengthKm() > 0 ? drawnHalf / perKm / sb.RadiusKm : 1;
@@ -408,7 +409,7 @@ namespace SpaceGod::Core
 		{
 			auto s = held[k];
 			auto& sb = bodies[static_cast<size_t>(n + k)];
-			double drawnHalf = 0.5 * ScaleModel::LogLerp(s->LengthKm() / ScaleModel::KmPerUnit, ScaleModel::GameShipScale * s->LengthKm(), DrawnBlend) * ShipLod::ExtentFactor(s);
+			double drawnHalf = 0.5 * ScaleModel::LogLerp(s->LengthKm() / ScaleModel::KmPerUnit, ScaleModel::GameplayShipLength(s->LengthKm(), DrawnSeatZoom), DrawnBlend) * ShipLod::ExtentFactor(s);
 			sb.RadiusKm = cs::Math::Max(sb.RadiusKm, drawnHalf / SceneUnitsPerKm(heldWorlds[static_cast<size_t>(k)], sb.Pos, DrawnBlend));
 			// US-T226: the hull the view is framed on keeps others off the camera's line through it, further along it the
 			// more the scale compresses space (none past its sphere at the realistic scale, where the sim already parted them).
@@ -430,7 +431,7 @@ namespace SpaceGod::Core
 		{
 			const auto& o = obstacles[k];
 			auto& sb = bodies[static_cast<size_t>(n + nh + k)];
-			double drawnHalf = 0.5 * ScaleModel::LogLerp(o.LengthKm / ScaleModel::KmPerUnit, ScaleModel::GameShipScale * o.LengthKm, DrawnBlend);
+			double drawnHalf = 0.5 * ScaleModel::LogLerp(o.LengthKm / ScaleModel::KmPerUnit, ScaleModel::GameplayShipLength(o.LengthKm, DrawnSeatZoom), DrawnBlend);
 			sb.RadiusKm = cs::Math::Max(sb.RadiusKm, drawnHalf / SceneUnitsPerKm(o.Body, o.HelioKm, DrawnBlend));
 		}
 		Separate(bodies, off, SeparationPasses, SeparationMargin);

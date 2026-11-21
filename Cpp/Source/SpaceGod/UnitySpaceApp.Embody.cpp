@@ -243,7 +243,7 @@ namespace SpaceGod
 			auto host = Target::OfUnit(m->Battle, m->Hull);
 			double length = TargetRadius(host) * 2;
 			if (length <= 0) return false;
-			mechHeight = length * MechHeightLengths;
+			mechHeight = length * MechHeightLengths / cs::Math::Max(BattleKmScale(), 1e-30); // US-T434: kept in battle km
 			auto n = m->RoofLocal(); // US-T270: the plating's own normal, not the way out from the hull's middle
 			up = m->Hull->LocalDirToWorld(n).Normalized().SwapYZ();
 			scene = TargetScene(host) + m->Hull->LocalDirToWorld(m->Local).SwapYZ() * length;
@@ -254,7 +254,7 @@ namespace SpaceGod
 			{
 				auto anchor = m->Carrier != nullptr && m->Carrier->Present() ? m->Carrier : nullptr;
 				double length = anchor != nullptr ? TargetRadius(Target::OfUnit(m->Battle, anchor)) * 2 : 0;
-				mechHeight = length > 0 ? length * MechHeightLengths : cs::Math::Max(BattleKmScale() * MechWalker::HeightKm, 1e-9);
+				mechHeight = length > 0 ? length * MechHeightLengths / cs::Math::Max(BattleKmScale(), 1e-30) : MechWalker::HeightKm;
 			}
 			scene = BattleScene(m->Battle, m->Pos);
 			up = m->Up.SwapYZ();
@@ -262,7 +262,7 @@ namespace SpaceGod
 		auto f = m->Facing.SwapYZ();
 		f = f - up * DVec3::Dot(f, up);
 		forward = f.LengthSquared() > 1e-12 ? f.Normalized() : DVec3::Cross(up, DVec3::UnitX).Normalized();
-		height = mechHeight;
+		height = cs::Math::Max(mechHeight * BattleKmScale(), 1e-9); // US-T434: the seat's zoom may have changed since
 		return true;
 	}
 
@@ -284,15 +284,15 @@ namespace SpaceGod
 		{
 			auto craft = Target::OfUnit(p->Battle, p->Craft);
 			double length = TargetRadius(craft) * 2;
-			if (length > 0) evaPilotHeight = length * PilotHeightLengths;
+			if (length > 0) evaPilotHeight = length * PilotHeightLengths / cs::Math::Max(BattleKmScale(), 1e-30); // US-T434: kept in battle km
 		}
-		if (evaPilotHeight <= 0) evaPilotHeight = cs::Math::Max(BattleKmScale() * 0.004, 1e-9);
+		if (evaPilotHeight <= 0) evaPilotHeight = 0.004;
 		scene = BattleScene(p->Battle, p->Pos);
 		up = p->Up.SwapYZ();
 		forward = p->Facing.SwapYZ();
 		forward = forward - up * DVec3::Dot(forward, up);
 		forward = forward.LengthSquared() > 1e-12 ? forward.Normalized() : DVec3::Cross(up, DVec3::UnitX).Normalized();
-		height = evaPilotHeight;
+		height = cs::Math::Max(evaPilotHeight * BattleKmScale(), 1e-9); // US-T434: the seat's zoom may have changed since
 		return true;
 	}
 

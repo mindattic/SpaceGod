@@ -512,6 +512,7 @@ namespace SpaceGod
 			CoopHoldRewindFrame(true); // US-T423: in co-op a hold frame is a frame record of its own (no clock step), replayed by every peer
 			SyncShipViews();
 			AnimateScale(dt);
+			AnimateSeatZoom(dt); // US-T434
 			Scale()->Layout(Ephemeris(), bodyScene);
 			UpdateRadii();
 			UpdateShips(dt);
@@ -562,6 +563,7 @@ namespace SpaceGod
 		SyncShipViews();
 
 		AnimateScale(dt);
+		AnimateSeatZoom(dt); // US-T434: the world drawn round what this player inhabits
 		Scale()->Layout(Ephemeris(), bodyScene);
 		UpdateRadii();
 		UpdateDogfightDemo(); // US-T88: the demo the game was launched for (-dogfight, the main menu's button)

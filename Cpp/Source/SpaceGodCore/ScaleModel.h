@@ -49,15 +49,71 @@ namespace SpaceGod::Core
 		// 1/43 of it, as it truly is. Only hardware-vs-planet and orbital distances are compressed.
 		static constexpr double GameShipScale = 7.0;
 
+		/// <summary>
+		/// US-T434: the world drawn round what the player inhabits. Every tuning number of it lives here.
+		///
+		/// The seat taken (a ship's helm, a fighter's cockpit, a station, a gun, an EVA suit, a mech) says how big the thing
+		/// inhabited is (<see cref="IEmbodiable.InhabitedSizeKm"/>), which gives a zoom (<see cref="SeatZoomFor"/>, 1 with no
+		/// seat). The zoom shrinks everything near a world relative to the world itself, by two mappings:
+		///  - hardware: every hull, station, gate, wreck and battle (and the battles' own km with them) is drawn at zoom times
+		///    its gameplay size (<see cref="ShipLength"/>), so hull-to-hull sizes stay true;
+		///  - altitude: in a planet's or moon's neighbourhood (<see cref="NeighbourhoodKm"/>, where parked hulls, stations and
+		///    its battles are laid out) the drawn height of hardware above its surface is multiplied by a factor that is the
+		///    zoom at the surface and eases (smoothstep in true distance) to 1 at the neighbourhood's edge
+		///    (<see cref="LocalDistance"/>), so the hull, its camera and its neighbours sit proportionally lower and the world
+		///    fills more of the sky. The worlds themselves never move: <see cref="Layout"/> (every body's place) and
+		///    <see cref="BodyLocalOffset"/> (orbit lines, rings) use the unzoomed mapping, as does the Sun's every mapping,
+		///    and no body's drawn radius changes.
+		/// Every camera rig is sized in the held thing's drawn radii, so from the seat the held thing reads the same and the
+		/// world grows round it: from a 16 m fighter Jupiter swells to fill the view, from a 3 km capital ship's helm it is
+		/// barely bigger than from the free view, from a station a little more than that, from a person on the plating most.
+		/// The hardware shrinks at least as much as the altitude, so nothing is ever drawn nearer a world than it is today.
+		///
+		/// zoom = clamp((size / SeatZoomFullKm) ^ SeatZoomExponent, SeatZoomMin, 1): log-linear in the true size, 1 (the free
+		/// view's own gameplay scale) for anything SeatZoomFullKm or bigger. A 16 m fighter is 0.11, a 300 m frigate 0.36,
+		/// a 1.4 km defence platform 0.66, a 3.2 km carrier 0.91, a person 0.046.
+		///
+		/// It only applies at the gameplay scale: both mappings are blended in log space with the true (realistic) ones by
+		/// <see cref="Blend"/>, so the realistic scale (G) stays true proportions whatever is held, and in between the seat's
+		/// effect is zoom^Blend. Changing seat eases the zoom in log space with a time constant of
+		/// <see cref="SeatZoomEaseSeconds"/> (the app's job: never a snap). Drawing only: nothing in the simulation reads it.
+		/// </summary>
+		static constexpr double SeatZoomFullKm = 4.0;
+		static constexpr double SeatZoomExponent = 0.4;
+		static constexpr double SeatZoomMin = 0.04;
+		static constexpr double SeatZoomEaseSeconds = 0.6;
+
+		/// <summary>US-T434: the zoom for a seat on something <paramref name="inhabitedKm"/> big (0 or less: no seat, 1).</summary>
+		static double SeatZoomFor(double inhabitedKm);
+
 	private:
 		static constexpr double EarthRadiusKm = 6371.0;
 
 		double blend = 1.0;
 
+		/// <summary>US-T434: the seat's zoom drawn at now (<see cref="SeatZoomFor"/>, eased by the app); 1 for none.</summary>
+		double seatZoom = 1.0;
+
 	public:
 		/// <summary>0 = realistic, 1 = gameplay.</summary>
 		double Blend() const { return blend; }
 		void SetBlend(double value) { blend = cs::Math::Max(0.0, cs::Math::Min(1.0, value)); }
+
+		/// <summary>US-T434: the seat's zoom the view draws at now (see <see cref="SeatZoomFor"/>).</summary>
+		double SeatZoom() const { return seatZoom; }
+		void SetSeatZoom(double value) { seatZoom = cs::Math::Max(SeatZoomMin, cs::Math::Min(1.0, value)); }
+
+		/// <summary>US-T434: the gameplay hardware length (scene units) of something <paramref name="lengthKm"/> long at a
+		/// seat's zoom: the one formula the view's drawing and the fleet's drawn solve both use.</summary>
+		static double GameplayShipLength(double lengthKm, double zoom) { return GameShipScale * zoom * lengthKm; }
+
+		/// <summary>US-T434: <see cref="GameplayLocalDistance"/> with a seat's zoom applied to the height above the body in its
+		/// neighbourhood (see <see cref="SeatZoomFor"/>); the static one, which the simulation reads, is never zoomed.</summary>
+		static double SeatLocalDistance(const cs::Ref<BodyDefinition>& body, double distanceKm, double zoom);
+
+		/// <summary>US-T434: <see cref="LocalOffset"/> without the seat's zoom: where the worlds themselves are drawn (a moon's
+		/// place and orbit line, a ring), which never move for a seat.</summary>
+		DVec3 BodyLocalOffset(const cs::Ref<BodyDefinition>& body, DVec3 trueOffsetKm) const;
 
 		static double LogLerp(double a, double b, double t);
 

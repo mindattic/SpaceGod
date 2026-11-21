@@ -934,6 +934,25 @@ namespace SpaceGod
 		Scale()->SetBlend(scaleFrom + (ScaleGoal - scaleFrom) * e);
 	}
 
+	double UnitySpaceApp::InhabitedSizeKm() const
+	{
+		if (SeatZoomOverrideKm > 0) return SeatZoomOverrideKm;
+		if (auto held = HeldNonHelm()) return held->InhabitedSizeKm();
+		if (IsPiloting() && Piloted.Ship != nullptr) return Piloted.Ship->LengthKm();
+		return 0;
+	}
+
+	void UnitySpaceApp::AnimateSeatZoom(float dt)
+	{
+		// US-T434: the world drawn round what is inhabited, eased in log space (a factor per second, never a snap).
+		double goal = Core::ScaleModel::SeatZoomFor(InhabitedSizeKm());
+		double now = Scale()->SeatZoom();
+		double k = 1.0 - cs::Math::Exp(-static_cast<double>(dt) / Core::ScaleModel::SeatZoomEaseSeconds);
+		double next = cs::Math::Exp(cs::Math::Log(now) + (cs::Math::Log(goal) - cs::Math::Log(now)) * k);
+		if (cs::Math::Abs(cs::Math::Log(next / goal)) < 1e-4) next = goal;
+		Scale()->SetSeatZoom(next);
+	}
+
 	void UnitySpaceApp::ShowToast(const cs::String& message)
 	{
 		if (coopMuteToasts > 0) return; // US-T44 (US-T43): another player's action, replayed here
@@ -1010,6 +1029,7 @@ namespace SpaceGod
 		float response = 1.0f - Mathf::Exp(-dt * 3.0f);
 		// The fleet keeps hulls clear at the size they are drawn at this blend (US-T209).
 		Fleet()->DrawnBlend = Scale()->Blend();
+		Fleet()->DrawnSeatZoom = Scale()->SeatZoom(); // US-T434: and at the zoom of the seat this player holds
 		// ... and off the camera's line through the hull flown from the helm, so none is drawn over it (US-T226).
 		{
 			auto look = SpaceCamera->Rotation * Vector3::forward();
@@ -1757,7 +1777,7 @@ namespace SpaceGod
 				Ephemeris()->SampleOrbitTrail(i, Clock->Jd, orbitSamples);
 				for (int k = 0; k < orbitSamples.Count(); k++)
 				{
-					auto o = Scale()->LocalOffset(parent, orbitSamples[k]);
+					auto o = Scale()->BodyLocalOffset(parent, orbitSamples[k]); // US-T434: a world's orbit never moves for a seat
 					orbitPoints[k] = Vector3(static_cast<float>(o.X), static_cast<float>(o.Y), static_cast<float>(o.Z));
 				}
 				line->SetPoints(orbitPoints, orbitPoints.Count(), color, 1.0f, 0.12f);

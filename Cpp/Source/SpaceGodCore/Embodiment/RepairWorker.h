@@ -150,6 +150,7 @@ namespace SpaceGod::Core
 		EmbodimentCameraRig CameraRig() const override;
 		EmbodimentRolePanel RolePanel() override;
 		EmbodimentSubject Subject() const override;
+		double InhabitedSizeKm() const override { return InhabitedSizes::PersonKm; } // US-T434: a person in a suit
 
 		bool Equals(const cs::Ref<IEmbodiable>& obj) const override;
 		size_t GetHashCode() const override;

@@ -31,12 +31,34 @@ namespace SpaceGod::Core
 
 	double ScaleModel::ShipLength(double lengthKm) const
 	{
-		return LogLerp(lengthKm / KmPerUnit, GameShipScale * lengthKm, blend);
+		return LogLerp(lengthKm / KmPerUnit, GameplayShipLength(lengthKm, seatZoom), blend);
+	}
+
+	double ScaleModel::SeatZoomFor(double inhabitedKm)
+	{
+		if (!(inhabitedKm > 0)) return 1.0;
+		double zoom = cs::Math::Pow(inhabitedKm / SeatZoomFullKm, SeatZoomExponent);
+		return cs::Math::Max(SeatZoomMin, cs::Math::Min(1.0, zoom));
 	}
 
 	double ScaleModel::LocalDistance(const cs::Ref<BodyDefinition>& body, double distanceKm) const
 	{
-		return LogLerp(distanceKm / KmPerUnit, GameplayLocalDistance(body, distanceKm), blend);
+		return LogLerp(distanceKm / KmPerUnit, SeatLocalDistance(body, distanceKm, seatZoom), blend);
+	}
+
+	double ScaleModel::SeatLocalDistance(const cs::Ref<BodyDefinition>& body, double distanceKm, double zoom)
+	{
+		double game = GameplayLocalDistance(body, distanceKm);
+		double r = body->RadiusKm;
+		if (zoom >= 1 || r <= 0 || distanceKm <= r || body->UsesStellarMapping()) return game;
+		// The height above the drawn surface times a factor rising from the zoom at the surface to 1 at the neighbourhood's edge:
+		// both rise with distance and stay positive, so the mapping stays monotonic (InverseLocalDistance holds).
+		double rDisplay = GameplayRadius(r);
+		double edge = NeighbourhoodKm(body);
+		if (edge <= r) return game;
+		double u = cs::Math::Max(0.0, cs::Math::Min(1.0, (distanceKm - r) / (edge - r)));
+		double f = zoom + (1.0 - zoom) * u * u * (3.0 - 2.0 * u);
+		return rDisplay + (game - rDisplay) * f;
 	}
 
 	double ScaleModel::GameplayLocalDistance(const cs::Ref<BodyDefinition>& body, double distanceKm)
@@ -83,6 +105,13 @@ namespace SpaceGod::Core
 		return trueOffsetKm.SwapYZ() * (LocalDistance(body, d) / d);
 	}
 
+	DVec3 ScaleModel::BodyLocalOffset(const cs::Ref<BodyDefinition>& body, DVec3 trueOffsetKm) const
+	{
+		double d = trueOffsetKm.Length();
+		if (d <= 0) return DVec3::Zero;
+		return trueOffsetKm.SwapYZ() * (LogLerp(d / KmPerUnit, GameplayLocalDistance(body, d), blend) / d);
+	}
+
 	DVec3 ScaleModel::InverseLocalOffset(const cs::Ref<BodyDefinition>& body, DVec3 sceneOffset) const
 	{
 		double s = sceneOffset.Length();
@@ -101,7 +130,7 @@ namespace SpaceGod::Core
 				scenePositions[i] = DVec3::Zero;
 				continue;
 			}
-			scenePositions[i] = scenePositions[b->ParentIndex] + LocalOffset((*catalog)[b->ParentIndex], ephemeris->Relative(i));
+			scenePositions[i] = scenePositions[b->ParentIndex] + BodyLocalOffset((*catalog)[b->ParentIndex], ephemeris->Relative(i)); // US-T434: worlds never move for a seat
 		}
 	}
 
