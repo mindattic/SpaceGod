@@ -627,6 +627,10 @@ namespace SpaceGod
 			bool Birth = false, SawUnborn = false;
 			double BirthMarkT = HrNone;
 			int BirthId = -1;
+			/// <summary>US-T428: the crossing check: the moment marked, and the frame and offset the helm had then.</summary>
+			double CrossMarkT = HrNone;
+			int CrossFrom = -1;
+			DVec3 CrossOffset;
 			cs::String BirthName;
 		};
 	}
@@ -1908,7 +1912,7 @@ namespace SpaceGod
 		t.On = true;
 		t.Birth = true;
 		t.SeatShip = ship;
-		t.Phase = 100;
+		t.Phase = 90; // US-T428: the crossing check first, then the birth
 		t.PhaseWall = Time::realtimeSinceStartupAsDouble;
 		holdRewind->CooldownUntil = 0;
 		UnityCompat::Debug::Log("HoldRewind selftest: started (a fight born in the window)");
@@ -1972,10 +1976,76 @@ namespace SpaceGod
 			auto start = [this, ship]() { return World()->War->TryStartPlayerBattle(ship, pilotFrameBody, pilotOffsetKm(), pilotForward(), Clock->Jd); };
 			switch (t.Phase)
 			{
+				// US-T428: crossing into another body's space undone: the helm put into a moon's space (the cruise frame's own
+				// rebase), then a hold back to before puts it back in the planet's frame where it was.
+				case 90:
+				{
+					if (!IsPiloting() || World()->PilotedShip != ship) return finish("not at the helm for the crossing check");
+					if (h.Pilot.empty() || h.LivedS - h.Pilot.front().T < 2.0) return true;
+					if (t.CrossMarkT == HrNone)
+					{
+						t.CrossMarkT = h.LivedS;
+						t.CrossFrom = pilotFrameBody;
+						t.CrossOffset = pilotOffsetKm();
+						t.PhaseWall = wall;
+						return true;
+					}
+					if (wall - t.PhaseWall < 0.7) return true;
+					int moon = -1;
+					for (const auto& b : Catalog()->Bodies())
+						if (b->ParentIndex == pilotFrameBody && b->RadiusKm > 100)
+						{
+							moon = b->Index;
+							break;
+						}
+					if (moon < 0) return finish("no moon to cross into for the crossing check");
+					auto m = (*Catalog())[moon];
+					SetpilotOffsetKm(Ephemeris()->Helio(moon) - Ephemeris()->Helio(pilotFrameBody) + DVec3(1, 0.2, 0.1).Normalized() * (m->RadiusKm * 4));
+					RebaseCruiseFrame();
+					selfCheck(pilotFrameBody == moon, cs::Cat("the helm crossed into ", m->Name, "'s space"));
+					t.PhaseWall = wall;
+					t.Phase = 91;
+					return true;
+				}
+				case 91: // In the moon's space a second: hold back to the mark.
+				{
+					if (wall - t.PhaseWall < 1.0) return true;
+					t.Target = t.CrossMarkT;
+					t.ForceDown = true;
+					t.SettleFrames = 0;
+					t.PhaseWall = wall;
+					t.Phase = 92;
+					return true;
+				}
+				case 92:
+				{
+					if (!h.Active) return true;
+					if (h.Tau > std::max(t.CrossMarkT, h.Oldest) + 1e-6) return true;
+					if (++t.SettleFrames < 3) return true;
+					t.ForceDown = false;
+					t.HaveResume = false;
+					t.PhaseWall = wall;
+					t.Phase = 93;
+					return true;
+				}
+				case 93: // Played on from before: in the planet's space again, where it was.
+				{
+					if (!t.HaveResume) return true;
+					selfCheck(t.ResumedAnchorT <= t.CrossMarkT + HrTuning::AnchorS + 1e-6 && h.BarrierT < t.CrossMarkT,
+						"crossing into another body's space does not block a resume to before it");
+					selfCheck(pilotFrameBody == t.CrossFrom && helmFlight != nullptr && helmFlight->FrameBody == t.CrossFrom,
+						cs::Cat("and the helm is back in ", (*Catalog())[t.CrossFrom]->Name, "'s frame"));
+					double off = (pilotOffsetKm() - t.CrossOffset).Length();
+					selfCheck(off < 5.0, cs::Cat("where it was before the crossing (", cs::Fmt(off, "F3"), " km off)"));
+					t.PhaseWall = wall;
+					t.Phase = 100;
+					return true;
+				}
 				case 100: // At the helm, no fight: fly 3 s, mark, then bring the enemy in and the fight begins.
 				{
 					if (!IsPiloting() || World()->PilotedShip != ship) return finish("not at the helm for the birth check");
 					if (h.Fight != nullptr) return finish(cs::Cat("a fight was already in view before the birth check: ", h.Fight->Name));
+					if (!HoldRewindRefusal().empty()) return true; // US-T428: the crossing check's cooldown
 					if (h.Pilot.empty() || h.LivedS - h.Pilot.front().T < 3.0) return true;
 					if (t.BirthMarkT == HrNone)
 					{

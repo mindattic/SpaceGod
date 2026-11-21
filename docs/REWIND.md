@@ -731,6 +731,13 @@ unit; their schedules run on underneath), and the war lists it, numbers it, coun
   played reversed per hold (`CombatSounds: hold rewind heard backward: bed played, 64 sounds played reversed`). The
   self-test passed 56/56 in that run.
 
+### Crossing into another body's space, tested (US-T429)
+
+`sg.HoldRewind selftest birth` now opens with a crossing check (phases 90-93). At the helm off Uranus, it marks a
+moment, then puts the helm into a moon's space (Miranda), where the cruise frame's own rebase (`RebaseCruiseFrame`)
+moves the helm into the moon's frame. A hold back to the mark puts the helm back in Uranus's frame, where it was
+(0.000 km off): US-T422's frame and pose put back together. The check passed 16/16 with the birth checks.
+
 ### Not yet (later stages)
 
 - A ship that changed phase (left an orbit, joined a lane) in the window is still drawn where its *current* phase
