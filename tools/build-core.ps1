@@ -287,4 +287,22 @@ if (-not $SkipParity) {
   & $hdExe
   if ($LASTEXITCODE -ne 0) { Write-Host 'HudDockTests: failures (see above).' -ForegroundColor Red; exit $LASTEXITCODE }
 }
+
+# ---------------------------------------------------------------- AmbientMixTests (US-T448)
+# The space soundscape's mixing (Cpp/Source/SpaceGod/Audio/AmbientMix.h, header-only, no engine): which beds play where, how
+# loud, the crossfade. Needs nothing of SpaceGodCore.lib.
+$amDir = Join-Path $core 'Tests\Ambience'
+$amHeader = Join-Path $repo 'Cpp\Source\SpaceGod\Audio\AmbientMix.h'
+$amObj = Join-Path $parityObjRoot 'Tests\Ambience\AmbientMixTests.obj'
+if ((Test-Path -LiteralPath $amObj) -and (Get-Item -LiteralPath $amHeader).LastWriteTimeUtc -gt (Get-Item -LiteralPath $amObj).LastWriteTimeUtc) { Remove-Item -LiteralPath $amObj -Force }
+$am = Invoke-Compile @(Get-Item -LiteralPath (Join-Path $amDir 'AmbientMixTests.cpp')) $parityObjRoot
+if ($am.Failed.Count -gt 0) { exit 1 }
+$amExe = Join-Path $out 'AmbientMixTests.exe'
+& link.exe /nologo /DEBUG @linkOpt "/OUT:$amExe" $am.Objs
+if ($LASTEXITCODE -ne 0) { throw 'link.exe failed (AmbientMixTests).' }
+Write-Host "exe     $amExe"
+if (-not $SkipParity) {
+  & $amExe
+  if ($LASTEXITCODE -ne 0) { Write-Host 'AmbientMixTests: failures (see above).' -ForegroundColor Red; exit $LASTEXITCODE }
+}
 exit 0
