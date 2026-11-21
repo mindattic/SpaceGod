@@ -1371,12 +1371,68 @@ namespace SpaceGod
 		return cs::Math::Max(best, 1e-7);
 	}
 
+	namespace
+	{
+		/// US-T442: each surface the god camera can be at or inside: a body's sphere or a hull's (structure's, ring's)
+		/// bounding sphere, scene units. visit(signed gap, radius, isBody); the gap is negative inside.
+		template <typename Visit>
+		void GodEachSurface(Core::DVec3 p, const cs::List<Core::DVec3>& bodyScene, const cs::List<double>& bodyRadius, const cs::Ref<Core::Fleet>& fleet,
+			const cs::List<Core::DVec3>& shipScene, const cs::List<double>& shipLength, const cs::Ref<Views::StructureViews>& structures, Visit visit)
+		{
+			for (int i = 0; i < bodyScene.Count() && i < bodyRadius.Count(); i++)
+				if (bodyRadius[i] > 0) visit((p - bodyScene[i]).Length() - bodyRadius[i], bodyRadius[i], true);
+			const auto& ships = fleet->Ships();
+			for (int i = 0; i < ships.Count() && i < shipScene.Count() && i < shipLength.Count(); i++)
+			{
+				if (ships[i]->Destroyed || ships[i]->Controller()->Phase == Core::ShipPhase::Landed) continue;
+				double r = shipLength[i] * 0.5;
+				visit((p - shipScene[i]).Length() - r, r, false);
+			}
+			for (auto kv : structures->Scenes)
+			{
+				double r = structures->Sizes.At(kv.first) * 0.5;
+				visit((p - kv.second).Length() - r, r, false);
+			}
+			for (auto kv : structures->RingScenes)
+			{
+				double r = structures->Sizes.At(kv.first) * 0.5;
+				visit((p - kv.second).Length() - r, r, false);
+			}
+		}
+	}
+
+	double UnitySpaceApp::SwimDistance(Core::DVec3 p)
+	{
+		// Either side of a surface counts, so the camera keeps moving inside; the floor (a share of the body's radius, a
+		// quarter of a hull's half-length) keeps it from creeping to a stop as it crosses a skin.
+		double best = cs::Double::MaxValue;
+		GodEachSurface(p, bodyScene, bodyRadius, Fleet(), shipScene, shipLength, Structures, [&](double gap, double r, bool isBody)
+		{
+			best = cs::Math::Min(best, cs::Math::Max(cs::Math::Abs(gap), r * (isBody ? 0.01 : 0.25)));
+		});
+		return cs::Math::Max(best, 1e-6);
+	}
+
+	double UnitySpaceApp::ClipDistance(Core::DVec3 p)
+	{
+		// Outside everything, the old near surface. Inside a body the nearest skin (its inside's shells lie between),
+		// within 0.2% to 5% of its radius; inside a hull 1% of its half-length, its decks and compartments being all round.
+		double best = cs::Double::MaxValue;
+		GodEachSurface(p, bodyScene, bodyRadius, Fleet(), shipScene, shipLength, Structures, [&](double gap, double r, bool isBody)
+		{
+			double d = gap >= 0 ? gap : isBody ? cs::Math::Max(cs::Math::Min(-gap, r * 0.05), r * 0.002) : r * 0.01;
+			best = cs::Math::Min(best, d);
+		});
+		return cs::Math::Max(best, 1e-7);
+	}
+
 	// ---------------------------------------------------------------- views
 
 	void UnitySpaceApp::UpdateClipPlanes(float dt)
 	{
 		// Going through a gate, the ring passes close by, nearer than anything else.
-		double nearest = cs::Math::Min(NearestSurface(SpaceCamera->ScenePosition), Travel->GateClearance());
+		// US-T442: ClipDistance, which stays sane inside a body or a hull, where the god camera can go.
+		double nearest = cs::Math::Min(ClipDistance(SpaceCamera->ScenePosition), Travel->GateClearance());
 		UnityCamera->nearClipPlane = static_cast<float>(cs::Math::Max(1e-6, cs::Math::Min(nearest * 0.25, 20.0)));
 		UnityCamera->farClipPlane = 5e8f;
 		// US-T170: what is flown this frame (the helm's hull, a cockpit, an EVA worker) has its feel stepped; with nothing

@@ -1433,8 +1433,11 @@ namespace SpaceGod::UI
 		else
 		{
 			double kmPerSec = SceneSpeedToKmS(cam->CurrentSpeed);
+			// US-T442: the god camera has no collision; inside its frame body it says so.
+			int frameBody = cam->FrameBody();
+			bool inside = (cam->ScenePosition - app->BodyScene(frameBody)).Length() < app->TargetRadius(Target::OfBody(frameBody));
 			s = cs::Cat("FREE  ·  swim x", cs::Fmt(cam->SpeedMultiplier, "0.##"), "  ·  ", SpeedText(kmPerSec),
-				"  ·  near ", (*app->Catalog())[cam->FrameBody()]->Name);
+				inside ? "  ·  inside " : "  ·  near ", (*app->Catalog())[frameBody]->Name);
 		}
 		// The band the bottom line has (HudLayout::BottomBand): beside the right-hand column, less the tanker call and the
 		// reorient toggle either side of it. Centred on the screen when it fits there, else in the band.

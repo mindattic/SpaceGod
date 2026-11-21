@@ -4,6 +4,7 @@
 #include "UnityCompat/UnityRenderingTypes.h"
 
 #include <tuple>
+#include <vector>
 
 namespace SpaceGod::Core
 {
@@ -101,6 +102,17 @@ namespace SpaceGod::Views
 		cs::List<int> shieldWedgeStart, shieldWedgeCount;
 		cs::List<Color> shieldVertexColors;
 
+		/// <summary>US-T442: the god view from inside the hull: its decks, compartments and structural modules as a
+		/// wireframe (built the first time the camera goes in), and its hull renderers drawn in a see-through skin, their own
+		/// materials kept to give back.</summary>
+		cs::Ref<MeshRenderer> interiorWire;
+		cs::Ref<Material> interiorSkin;
+		std::vector<cs::Ref<Renderer>> skinned;
+		std::vector<std::vector<cs::Ref<Material>>> skinnedOriginals;
+		float interiorShown = 0;
+		void BuildInterior();
+		void RestoreSkin();
+
 		static constexpr const char* EngineGlowId = "_EngineGlow";
 		static constexpr const char* HighlightId = "_Highlight";
 		static constexpr const char* ColorId = "_Tint";
@@ -189,6 +201,13 @@ namespace SpaceGod::Views
 		void SetDetail(bool full);
 
 		void SetVisible(bool value);
+
+		/// <summary>
+		/// US-T442: the free (god) camera inside the hull's box, <paramref name="fade"/> 0 (outside, drawn as ever) to 1 (well
+		/// in): the hull is drawn as a two-sided see-through skin, thinning deeper in, and its insides (the hull's modules,
+		/// decks, compartments and the passages between them) as a wireframe. Drawing only: nothing about the ship changes.
+		/// </summary>
+		void SetInterior(float fade);
 
 	private:
 		static void EnsureStatics();

@@ -47,6 +47,12 @@ namespace SpaceGod::Cameras
 		/// <summary>Distance from a scene point to the nearest surface (body or ship hull), scene units.</summary>
 		virtual double NearestSurface(Core::DVec3 scenePosition) = 0;
 
+		/// <summary>US-T442: what free swim's speed scales with. The god camera has no collision and goes inside bodies and
+		/// hulls, where NearestSurface is nothing: the distance to the nearest surface on either side, with a floor of a
+		/// share of the size of what it is at, so it neither crawls at a skin nor stops inside. NearestSurface unless the
+		/// world knows better.</summary>
+		virtual double SwimDistance(Core::DVec3 scenePosition) { return NearestSurface(scenePosition); }
+
 		/// <summary>A target's own facing, scene (Unity) axes; identity when it has none.</summary>
 		virtual Quaternion TargetRotation(const Target& target) = 0;
 	};
@@ -274,8 +280,6 @@ namespace SpaceGod::Cameras
 	private:
 		/// <summary>Frame hysteresis: enter a child's SOI below 92% of it, leave ours above 108%.</summary>
 		void UpdateFrame();
-
-		bool PushOutOfBodies(Core::DVec3* normal = nullptr);
 	};
 
 	const char* ToString(SpaceCamera::CameraMode v);

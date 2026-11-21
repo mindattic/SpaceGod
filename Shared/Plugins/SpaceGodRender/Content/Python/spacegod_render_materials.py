@@ -673,6 +673,23 @@ def build_ghost(mpc):
     return mat
 
 
+def build_ghost_two_sided(mpc):
+    """US-T442: the god view's see-through skin, drawn from inside a planet or a hull. M_Ghost's flat translucent colour,
+    but two-sided (from inside a closed mesh every face is a back face) and stronger where the skin is seen edge-on
+    (_GhostRim is the opacity facing the eye, 1 edge-on), so a hull's shape still reads through it."""
+    mat = new_material("M_GhostTwoSided", unreal.BlendMode.BLEND_TRANSLUCENT, True)
+    g = Graph(mat, mpc)
+    inputs = [("NormalWS", ("normal_ws",)), ("PositionCR", ("pos_cr",)),
+              vec4("_GhostColor", (0.35, 0.75, 1.0, 0.3)), scalar("_GhostRim", 0.5)] + EXPOSE
+    code = ("float3 v = normalize(-PositionCR);\n"
+            "float f = 1.0 - abs(dot(normalize(NormalWS), v));\n"
+            "float a = _GhostColor.a * lerp(_GhostRim, 1.0, f * f);\n"
+            "return SG_Expose(float4(_GhostColor.rgb * (1.0 + f), saturate(a)), Exposure, SceneLuminance);")
+    c = g.custom("Unity.SpaceGod/GhostTwoSided", "Points.ush", code, F4, inputs)
+    finish(mat, g.mask(c, "", "rgb"), opacity=g.mask(c, "", "a"))
+    return mat
+
+
 def build_lit(mpc):
     mat = new_material("M_Lit", unreal.BlendMode.BLEND_OPAQUE, False)
     g = Graph(mat, mpc)
@@ -704,7 +721,8 @@ def _snake(name):
 
 
 BUILDERS = [build_planet, build_sun, build_ring, build_gas_giant, build_sky, build_stars, build_points, build_line,
-            build_glow, build_fx, build_asteroids, build_ship, build_lit, build_nebula, build_warp, build_ghost]
+            build_glow, build_fx, build_asteroids, build_ship, build_lit, build_nebula, build_warp, build_ghost,
+            build_ghost_two_sided]
 
 
 def main():

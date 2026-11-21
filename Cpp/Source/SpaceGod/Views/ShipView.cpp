@@ -7,15 +7,21 @@
 #include "Rendering/StarSparrowKit.h"
 #include "Rendering/UscKit.h"
 #include "Views/HullThrusters.h"
+#include "Views/InteriorWire.h"
+#include "UnityCompat/ShaderBinding.h"
 #include "Rendering/EnginePorts.h"
 
 #include "Combat/CombatSpecs.h"
 #include "Combat/PilotTuning.h"
 #include "Combat/CombatState.h"
 #include "Combat/ModularHull.h"
+#include "Combat/Boarding.h" // US-T442: the compartments drawn from inside
 #include "Combat/ShipComponents.h" // US-T269
 #include "Economy/BeltMining.h"
 #include "Ships.h"
+
+#include <algorithm>
+#include <cmath>
 
 using namespace SpaceGod::Core;
 
@@ -951,6 +957,165 @@ namespace SpaceGod::Views
 		else
 		{
 			for (const auto& p : parts) p->ShownDestroyed = !p->Sub->Destroyed();
+		}
+	}
+	// ---------------------------------------------------------------- US-T442: inside, from the god view
+
+	namespace
+	{
+		Color CompartmentColor(Core::CompartmentKind kind)
+		{
+			switch (kind)
+			{
+				case Core::CompartmentKind::Bridge: return Color(1.0f, 0.85f, 0.3f);
+				case Core::CompartmentKind::Engineering: return Color(1.0f, 0.5f, 0.2f);
+				case Core::CompartmentKind::Hangar: return Color(0.45f, 1.0f, 0.5f);
+				case Core::CompartmentKind::Hold: return Color(0.85f, 0.7f, 0.45f);
+				case Core::CompartmentKind::Quarters: return Color(0.55f, 0.75f, 1.0f);
+				case Core::CompartmentKind::Battery: return Color(1.0f, 0.35f, 0.35f);
+				case Core::CompartmentKind::BreacherBay: return Color(1.0f, 0.4f, 0.8f);
+				case Core::CompartmentKind::Barracks: return Color(0.75f, 0.55f, 1.0f);
+				default: return Color(0.8f, 0.85f, 0.9f);
+			}
+		}
+	}
+
+	void ShipView::BuildInterior()
+	{
+		Bounds box = HullBox();
+		if (box.size().sqrMagnitude() < 1e-8f) box = Bounds(Vector3::zero(), Vector3(0.2f, 0.15f, 1.0f));
+		Vector3 mn = box.min(), mx = box.max(), c = box.center, h = box.extents;
+		InteriorWire::Lines lines;
+		lines.Box(c, h, Color(0.55f, 0.75f, 0.95f, 0.45f));
+
+		// Decks: one every ~12 m of the hull's height (one for a small craft, at most ten), each a frame round the deck with
+		// its frames across it every tenth of the hull.
+		double lengthM = Ship ? Ship->LengthKm() * 1000.0 : 100.0;
+		int decks = Mathf::Clamp(static_cast<int>(Mathf::Round(static_cast<float>(box.size().y * lengthM / 12.0))), 1, 10);
+		Color deck(0.6f, 0.78f, 0.95f, 0.4f);
+		for (int k = 1; k <= decks; k++)
+		{
+			float y = mn.y + box.size().y * static_cast<float>(k) / static_cast<float>(decks + 1);
+			Vector3 dh(h.x * 0.9f, 0, h.z * 0.96f);
+			lines.Box(Vector3(c.x, y, c.z), dh, deck);
+			for (int f = 1; f < 10; f++)
+			{
+				float z = c.z - dh.z + 2 * dh.z * static_cast<float>(f) / 10.0f;
+				lines.Segment(Vector3(c.x - dh.x, y, z), Vector3(c.x + dh.x, y, z), Color(deck.r, deck.g, deck.b, 0.22f));
+			}
+		}
+
+		auto combat = Ship ? Ship->Combat : nullptr;
+		if (combat && combat->Spec)
+		{
+			// The hull's structural modules (keel sections and sponsons), as laid out; never laid out here for the first time
+			// (Structure() would), so the simulation's own state is left as it was.
+			auto structure = combat->HasStructure() ? combat->Structure() : Core::ModularHull::For(combat->Spec);
+			if (structure)
+				for (const auto& m : structure->Modules)
+				{
+					if (!m || m->Detached) continue;
+					Color mc = m->Kind == Core::HullModuleKind::Sponson ? Color(0.35f, 1.0f, 0.75f, 0.75f) : Color(0.35f, 0.85f, 1.0f, 0.75f);
+					if (m->Shattered()) mc = Color(1.0f, 0.3f, 0.25f, 0.75f);
+					lines.Box(Vector3(static_cast<float>(m->Centre.X), static_cast<float>(m->Centre.Y), static_cast<float>(m->Centre.Z)),
+						Vector3(static_cast<float>(m->HalfExtent.X), static_cast<float>(m->HalfExtent.Y), static_cast<float>(m->HalfExtent.Z)), mc);
+				}
+
+			// The compartments along the keel, each a box reaching halfway to its neighbours, one deck tall, at its height; those
+			// at the same place along the keel share the beam side by side. The passages between them are lines.
+			auto interior = combat->Interior;
+			if (interior && interior->Compartments.Count() > 0)
+			{
+				const auto& rooms = interior->Compartments;
+				int n = rooms.Count();
+				std::vector<double> zs;
+				for (const auto& r : rooms) if (r) zs.push_back(r->Z);
+				std::sort(zs.begin(), zs.end());
+				zs.erase(std::unique(zs.begin(), zs.end(), [](double a, double b) { return std::abs(a - b) < 0.01; }), zs.end());
+				float deckHalf = box.size().y / static_cast<float>(decks + 1) * 0.42f;
+				std::vector<Vector3> centres(static_cast<size_t>(n), c);
+				for (int i = 0; i < n; i++)
+				{
+					const auto& r = rooms[i];
+					if (!r) continue;
+					size_t at = 0;
+					while (at + 1 < zs.size() && std::abs(zs[at] - r->Z) >= 0.01) at++;
+					double lo = at > 0 ? 0.5 * (zs[at - 1] + zs[at]) : mn.z;
+					double hi = at + 1 < zs.size() ? 0.5 * (zs[at] + zs[at + 1]) : mx.z;
+					lo = std::max(lo, static_cast<double>(mn.z));
+					hi = std::min(hi, static_cast<double>(mx.z));
+					if (hi - lo < 0.01) { double m = 0.5 * (lo + hi); lo = m - 0.005; hi = m + 0.005; }
+					// Side by side with the others at this place.
+					int same = 0, slot = 0;
+					for (int j = 0; j < n; j++)
+						if (rooms[j] && std::abs(rooms[j]->Z - r->Z) < 0.01) { if (j < i) slot++; same++; }
+					float beam = h.x * 0.7f;
+					float w = 2 * beam / static_cast<float>(same);
+					float x = c.x - beam + w * (static_cast<float>(slot) + 0.5f);
+					float y = Mathf::Clamp(static_cast<float>(r->Y), mn.y + deckHalf, mx.y - deckHalf);
+					Vector3 centre(x, y, static_cast<float>(0.5 * (lo + hi)));
+					centres[static_cast<size_t>(i)] = centre;
+					Color rc = CompartmentColor(r->Kind);
+					rc.a = 0.9f;
+					lines.Box(centre, Vector3(w * 0.45f, deckHalf, static_cast<float>(0.5 * (hi - lo)) * 0.92f), rc);
+				}
+				for (int i = 0; i < n; i++)
+				{
+					if (!rooms[i]) continue;
+					for (int j : rooms[i]->Links)
+						if (j > i && j < n && rooms[j]) lines.Segment(centres[static_cast<size_t>(i)], centres[static_cast<size_t>(j)], Color(1, 1, 1, 0.6f));
+				}
+			}
+		}
+		cs::String name = Ship ? Ship->Name + " Interior" : cs::String("Interior");
+		interiorWire = InteriorWire::Attach(name, Root->transform, InteriorWire::Build(name, lines));
+		interiorSkin = InteriorWire::Skin(name + " Skin");
+	}
+
+	void ShipView::RestoreSkin()
+	{
+		for (size_t i = 0; i < skinned.size(); i++)
+			if (Alive(skinned[i]) && i < skinnedOriginals.size()) skinned[i]->SetSharedMaterials(skinnedOriginals[i]);
+		skinned.clear();
+		skinnedOriginals.clear();
+	}
+
+	void ShipView::SetInterior(float fade)
+	{
+		bool shown = fade > 0 && visible && Root;
+		if (!shown && interiorShown <= 0) return;
+		if (shown && !interiorWire) BuildInterior();
+		interiorShown = shown ? fade : 0;
+		if (interiorWire)
+		{
+			interiorWire->enabled = shown;
+			if (shown) interiorWire->sharedMaterial()->SetColor("_Color", Color(1, 1, 1, 0.3f + 0.7f * fade));
+		}
+		if (!shown)
+		{
+			RestoreSkin();
+			return;
+		}
+		// Many hull parts overlap from inside, each a layer of skin: thinner than a body's one shell.
+		InteriorWire::SetSkin(interiorSkin, Color(0.55f, 0.72f, 0.9f), InteriorWire::SkinOpacity(fade, 0.55f, 0.12f));
+		// Every solid part of the model in the skin (the hull's own renderers and its hardpoints, masts and fittings, not its
+		// glows, effects or lines); one this view gave a new material since (a wreck's scorch, a refit) is kept again.
+		for (const auto& r : GetComponentsInChildren<Renderer>(Root, true))
+		{
+			if (!Alive(r) || r == interiorWire) continue;
+			auto m = r->sharedMaterial();
+			if (m == interiorSkin) continue;
+			cs::String shader = m && m->shader ? UnityCompat::ShaderBinding::ShaderName(m->shader.get()) : cs::String();
+			if (shader == "Glow" || shader == "Fx" || shader == "Line" || shader == "Points" || shader == "Ghost" || shader == "Ring") continue;
+			size_t at = 0;
+			while (at < skinned.size() && skinned[at] != r) at++;
+			if (at == skinned.size())
+			{
+				skinned.push_back(r);
+				skinnedOriginals.push_back(r->sharedMaterials());
+			}
+			else skinnedOriginals[at] = r->sharedMaterials();
+			r->SetSharedMaterial(interiorSkin);
 		}
 	}
 }

@@ -236,7 +236,8 @@ namespace SpaceGod::Cameras
 		// Re-derive the position from the frame (the frame body may have moved or the scale changed).
 		ScenePosition = FramePosition();
 
-		double surface = cs::Math::Max(world->NearestSurface(ScenePosition), 1e-6);
+		// US-T442: the god camera goes inside bodies and hulls; the gap either side of the nearest surface sets its pace.
+		double surface = cs::Math::Max(world->SwimDistance(ScenePosition), 1e-6);
 		double speed = surface * 0.9 * SpeedMultiplier * (input.Boost ? 6 : 1) * (input.Slow ? 0.15 : 1);
 		CurrentSpeed = speed;
 
@@ -248,15 +249,9 @@ namespace SpaceGod::Cameras
 		auto delta = DVec3(velocity.x, velocity.y, velocity.z) * dt;
 		if (delta.LengthSquared() > 0) ApplySceneDelta(delta);
 
-		ScenePosition = FramePosition();
-		// Pushed off a surface: drop only the velocity driving into it. Scaling all of it (as this once did) throttled a camera
-		// flying straight away to a fraction of its speed every frame it sat on the skin, so swim felt hooked on the planet.
-		DVec3 pushNormal;
-		if (PushOutOfBodies(&pushNormal))
-		{
-			double inward = -(velocity.x * pushNormal.X + velocity.y * pushNormal.Y + velocity.z * pushNormal.Z);
-			if (inward > 0) velocity += Vector3(static_cast<float>(pushNormal.X), static_cast<float>(pushNormal.Y), static_cast<float>(pushNormal.Z)) * static_cast<float>(inward);
-		}
+		// US-T442: no collision. The god camera swims through planets, stars and hulls (it once was pushed back out onto
+		// each body's skin); from inside, the body or hull is drawn see-through with its inside as a
+		// wireframe (UnitySpaceApp::UpdateGodInterior).
 		UpdateFrame();
 		ScenePosition = FramePosition();
 	}
@@ -386,9 +381,8 @@ namespace SpaceGod::Cameras
 		double derivative = cs::Math::Max(scale->LocalDistanceDerivative(body, d), 1e-15);
 		auto trueDeltaScene = dirScene * (radial / derivative) + tangential * (d / sceneDist);
 		trueOffset += trueDeltaScene.SwapYZ();
-
-		double minimum = body->RadiusKm * 1.002;
-		if (trueOffset.Length() < minimum) trueOffset = trueOffset.Normalized() * minimum;
+		// US-T442: no keep-out above the frame body's surface: inside it the scale mapping is linear, so the true offset
+		// stays exact down to its centre.
 	}
 
 	void SpaceCamera::SetScenePosition(DVec3 scenePosition)
@@ -446,27 +440,5 @@ namespace SpaceGod::Cameras
 				return;
 			}
 		}
-	}
-
-	bool SpaceCamera::PushOutOfBodies(DVec3* normal)
-	{
-		auto pos = ScenePosition;
-		bool pushed = false;
-		for (int i = 0; i < world->Catalog()->Count(); i++)
-		{
-			auto c = world->BodyScene(i);
-			double minimum = world->Scale()->DisplayRadius((*world->Catalog())[i]) * 1.003;
-			auto d = pos - c;
-			double len = d.Length();
-			if (len < minimum)
-			{
-				auto n = len > 0 ? d / len : DVec3::UnitY;
-				pos = c + n * minimum;
-				if (normal) *normal = n;
-				pushed = true;
-			}
-		}
-		if (pushed) SetScenePosition(pos);
-		return pushed;
 	}
 }

@@ -135,6 +135,7 @@ namespace SpaceGod::UnityCompat
 			if (n == "Stars") return -1000;
 			if (n == "Nebula") return -500; // US-T145: the sky's local layer, behind every line and glow in the system
 			if (n == "Warp") return 30;     // US-T145: the jump's streaks, over everything
+			if (n == "GhostTwoSided") return -20; // US-T442: the skin seen from inside, under the wireframe drawn within it
 			if (n == "Line") return -10;
 			if (n == "Glow") return 10;
 			if (n == "Fx") return 20;

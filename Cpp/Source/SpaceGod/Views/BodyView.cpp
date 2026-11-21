@@ -8,6 +8,7 @@
 #include "Rendering/SscKit.h"
 #include "Rendering/VoidStationModel.h"
 #include "Rendering/VoidSiteModel.h"
+#include "Views/InteriorWire.h"
 #include "UnitySpaceApp.h"
 
 #include "Astro.h"
@@ -18,6 +19,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <vector>
 
 using namespace SpaceGod::Core;
 
@@ -129,7 +131,7 @@ namespace SpaceGod::Views
 			auto glowGo = NewGameObject("Corona");
 			glowGo->transform->SetParent(parent, false);
 			AddComponent<MeshFilter>(glowGo)->sharedMesh = quadMesh();
-			auto glowRenderer = AddComponent<MeshRenderer>(glowGo);
+			glowRenderer = AddComponent<MeshRenderer>(glowGo);
 			glowMaterial = Materials::Create(Materials::Glow(), "Corona");
 			glowMaterial->SetColor("_Color", Color(1.0f, 0.72f, 0.4f) * t);
 			glowMaterial->SetFloat("_Intensity", 1.1f);
@@ -498,5 +500,71 @@ namespace SpaceGod::Views
 	{
 		renderer->enabled = visible && Body->IsVisible() && !sscRoot;
 		if (sscRoot) sscRoot->SetActive(visible);
+	}
+	// ---------------------------------------------------------------- US-T442: inside, from the god view
+
+	bool BodyView::HasInterior() const
+	{
+		return Body->IsVisible() && !station && !voidStation && !voidSite && renderer;
+	}
+
+	void BodyView::BuildInterior()
+	{
+		Color tint(Body->Color.R, Body->Color.G, Body->Color.B);
+		auto lighter = [](Color c, float k) { return Color(c.r + (1 - c.r) * k, c.g + (1 - c.g) * k, c.b + (1 - c.b) * k, c.a); };
+		InteriorWire::Lines lines;
+		// The skin's own latitude and longitude, every 15 degrees, in a lighter tone of the body's colour.
+		lines.Sphere(1.0f, 12, 11, 96, lighter(tint, 0.55f));
+		// Its layers, each a coarser shell: a star's radiative zone and core; a gas giant's metallic hydrogen and rocky core;
+		// a rocky world's crust, outer core and inner core (Earth's proportions: Moho near the top, the core at 0.55 of the
+		// radius, the inner core at 0.19).
+		struct Layer { float R; Color C; };
+		std::vector<Layer> layers;
+		if (Body->IsStar()) layers = { { 0.70f, Color(1.0f, 0.62f, 0.25f) }, { 0.25f, Color(1.0f, 0.97f, 0.85f) } };
+		else if (Body->GasGiant) layers = { { 0.80f, Color(0.62f, 0.78f, 1.0f) }, { 0.14f, Color(0.95f, 0.6f, 0.3f) } };
+		else layers = { { 0.90f, Color(0.78f, 0.5f, 0.3f) }, { 0.55f, Color(1.0f, 0.58f, 0.18f) }, { 0.19f, Color(1.0f, 0.93f, 0.6f) } };
+		for (const auto& l : layers) lines.Sphere(l.R, 8, 5, 64, l.C);
+		// The axis through the poles, and spokes across the equator from the centre out to the skin, so depth reads.
+		Color axis(0.85f, 0.9f, 1.0f, 0.9f);
+		lines.Segment(Vector3(0, -1.25f, 0), Vector3(0, 1.25f, 0), axis);
+		for (int i = 0; i < 12; i++)
+		{
+			float a = 2.0f * Mathf::PI * static_cast<float>(i) / 12.0f;
+			lines.Segment(Vector3::zero(), Vector3(Mathf::Cos(a), 0, Mathf::Sin(a)), Color(axis.r, axis.g, axis.b, 0.45f));
+		}
+		interiorWire = InteriorWire::Attach(Body->Name + " Interior", Root->transform, InteriorWire::Build(Body->Name + " Interior", lines));
+
+		auto skinGo = NewGameObject(Body->Name + " Skin");
+		skinGo->transform->SetParent(Root->transform, false);
+		AddComponent<MeshFilter>(skinGo)->sharedMesh = sphereMesh();
+		interiorSkin = AddComponent<MeshRenderer>(skinGo);
+		interiorSkinMaterial = InteriorWire::Skin(Body->Name + " Skin");
+		interiorSkin->SetSharedMaterial(interiorSkinMaterial);
+		interiorSkin->shadowCastingMode = ShadowCastingMode::Off;
+		interiorSkin->receiveShadows = false;
+		interiorSkin->enabled = false;
+	}
+
+	void BodyView::SetInterior(float fade)
+	{
+		if (!HasInterior()) return;
+		bool shown = fade > 0 && renderer->enabled;
+		if (!shown && interiorShown <= 0) return;
+		if (shown && !interiorWire) BuildInterior();
+		interiorShown = shown ? fade : 0;
+		if (interiorWire)
+		{
+			interiorWire->enabled = shown;
+			if (shown) interiorWire->sharedMaterial()->SetColor("_Color", Color(1, 1, 1, 0.25f + 0.75f * fade));
+		}
+		if (interiorSkin)
+		{
+			interiorSkin->enabled = shown;
+			// A star seen from inside glows in its own light; a world's skin is its own colour, dark.
+			Color tint = Body->IsStar() ? Color(1.0f, 0.8f, 0.5f) : Color(Body->Color.R, Body->Color.G, Body->Color.B);
+			if (shown) InteriorWire::SetSkin(interiorSkinMaterial, tint, InteriorWire::SkinOpacity(fade));
+		}
+		// Inside a star its corona would sit in front of the eye and wash the whole view out.
+		if (glowRenderer) glowRenderer->enabled = !shown;
 	}
 }

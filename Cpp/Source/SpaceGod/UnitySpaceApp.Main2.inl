@@ -299,6 +299,19 @@ private:
 public:
 	double NearestSurface(Core::DVec3 p) override;
 
+	/// <summary>US-T442: what the free camera's speed scales with (see ICameraWorld::SwimDistance): the distance to the
+	/// nearest surface either side of it, never under a share of the size of the body or hull it is at.</summary>
+	double SwimDistance(Core::DVec3 p) override;
+
+	/// <summary>US-T442: the gap the near clip plane is set from: NearestSurface outside everything; inside a body or a
+	/// hull, small enough for its inside's wireframe close by and still a share of its size (no depth fighting).</summary>
+	double ClipDistance(Core::DVec3 p);
+
+	/// <summary>US-T442: the god view inside a planet or a hull: each frame, how far the free camera is inside each body and
+	/// each hull drawn as a model goes to its view (BodyView/ShipView::SetInterior), which draws its skin see-through and
+	/// its inside as a wireframe (UnitySpaceApp.GodInside.cpp). Off at the controls, in a seat, in focus and in travel.</summary>
+	void UpdateGodInterior();
+
 	/// US-T78: the renderers of the model drawn for a body (its sphere and ring) or a ship (its hull, no FX); empty for any
 	/// other kind, or a ship not streamed in. The audit's focus probes compare where they are drawn with the focus.
 	cs::List<cs::Ref<UnityCompat::Renderer>> ModelRenderersOf(const Target& target);

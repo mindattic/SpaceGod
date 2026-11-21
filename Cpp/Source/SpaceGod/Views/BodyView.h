@@ -26,6 +26,15 @@ namespace SpaceGod::Views
 		cs::Ref<Material> ringMaterial;
 		cs::Ref<Transform> glow;
 		cs::Ref<Material> glowMaterial;
+		cs::Ref<MeshRenderer> glowRenderer;
+
+		/// <summary>US-T442: the god view from inside the sphere: its structure as a wireframe (shells at its layers'
+		/// depths, its own latitude and longitude, the axis) and its skin seen through from within; built the first time
+		/// the camera goes in.</summary>
+		cs::Ref<MeshRenderer> interiorWire, interiorSkin;
+		cs::Ref<Material> interiorSkinMaterial;
+		float interiorShown = 0;
+		void BuildInterior();
 
 	public:
 		/// <summary>Scales how large a star's corona is kept on screen from afar (1 normally): arriving from between the
@@ -103,6 +112,17 @@ namespace SpaceGod::Views
 		void UpdateWeather(double jd, double simSecondsPerSecond);
 
 		void SetVisible(bool visible);
+
+		/// <summary>
+		/// US-T442: the free (god) camera inside the sphere, <paramref name="fade"/> 0 (outside, drawn as ever) to 1 (well
+		/// in): its skin is drawn semi-transparent from within, thinning as the camera goes deeper, and its inside as a
+		/// wireframe, so the rest of the game shows through. A star's corona is put away while inside it. Spheres only: a
+		/// station, a void station or a void site draws as ever.
+		/// </summary>
+		void SetInterior(float fade);
+
+		/// <summary>Whether it draws an inside for the god view (a visible sphere: a star, planet, dwarf planet or moon).</summary>
+		bool HasInterior() const;
 
 		static Vector3 ToUnity(Core::DVec3 ecliptic)
 		{

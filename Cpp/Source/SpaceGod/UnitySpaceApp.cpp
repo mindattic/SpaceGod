@@ -526,6 +526,7 @@ namespace SpaceGod
 			UpdateStreaming(dt);
 			Sky->Update(dt);
 			UpdateViews(dt);
+			UpdateGodInterior(); // US-T442
 			ToastAge += dt;
 			return;
 		}
@@ -595,6 +596,7 @@ namespace SpaceGod
 		UpdateSkyTravel(dt); // US-T145
 		UpdateViews(dt);
 		UpdateOccluderGhost(); // US-T185: the model hiding the focused target is drawn as a ghost
+		UpdateGodInterior(); // US-T442: inside a body or a hull, the god view draws it from within
 		UpdateHover();
 		HandleSelectionClicks();
 
