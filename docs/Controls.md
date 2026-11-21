@@ -51,7 +51,8 @@ trigger LT, roll LB / RB (sink / rise in command), boost A (a mech's jets), drif
 focus Y, flight assist RS click, embody LS click, back / pause menu Menu, help View. Fixed: Esc, the number keys, the left and right
 mouse buttons' own fire, select and look, the sticks' movement and aim, the d-pad's reactor / time / ship steps, and the pad in menus.
 
-**HUD mode** (`KeyAction::HudMode`, `InputState::HudMode`): the cursor and the HUD's pull-out drawers (the drawer HUD comes next).
+**HUD mode** (`KeyAction::HudMode`, `InputState::HudMode`): switches between the minimal HUD (how a game starts) and the full HUD with its
+cursor and pull-out drawers on every edge (US-T439; docs/HUD.md).
 The plan named Z, but Z is roll left at the controls (and every plain key is taken), so it defaults to **Caps Lock** (a key added for
 it, with the numpad's digits and point); bind Z (or anything) to it on the page.
 

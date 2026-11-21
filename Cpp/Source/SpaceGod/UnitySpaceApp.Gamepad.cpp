@@ -16,6 +16,7 @@ namespace SpaceGod
 		if (cheatMenu != nullptr && cheatMenu->IsOpen) return true; // US-T126
 		if (commsOpen) return true; // US-T137
 		if (hud != nullptr && hud->DrawerOpen()) return true; // US-T200
+		if (HudMode && ShowHud && !ScreenCleared) return true; // US-T439: the HUD mode's drawers, as the cursor is freed for them
 		return ClickPanelOpen();
 	}
 }

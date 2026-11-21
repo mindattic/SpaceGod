@@ -239,7 +239,7 @@ namespace SpaceGod
 	void UnitySpaceApp::DrawTractorHud()
 	{
 		DrawMiningHud(); // US-T264: the mining beam's readout, drawn with the tractor beam's
-		if (tractorReadout.empty() || !ShowHud || ScreenCleared) return;
+		if (tractorReadout.empty() || !ShowHud || ScreenCleared || !HudModeOn()) return; // US-T439: the full HUD's
 		if (tractorStyle == nullptr)
 		{
 			tractorBack = UI::Hud::Solid(Color(0.03f, 0.07f, 0.06f, 0.82f), Color(0.45f, 1.0f, 0.78f, 0.7f));

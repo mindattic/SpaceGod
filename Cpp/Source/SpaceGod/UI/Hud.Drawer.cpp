@@ -146,7 +146,7 @@ namespace SpaceGod::UI
 	HudDrawers::Frame Hud::DrawerFrame()
 	{
 		HudDrawers::Frame f;
-		f.hudMode = true;
+		f.hudMode = app->HudModeOn(); // US-T439: the minimal HUD shows the pinned drawers and the urgent tabs only
 		f.screenW = static_cast<float>(Screen::width);
 		f.screenH = static_cast<float>(Screen::height);
 		float left = SafeLeft() + HudLayout::Margin, right = SafeRight() - HudLayout::Margin;
@@ -176,6 +176,8 @@ namespace SpaceGod::UI
 		RegisterDrawers();
 		auto f = DrawerFrame();
 		auto r = drawers.EdgeExtent(HudDock::Edge::Right, f);
+		// US-T439: with no window on it (the minimal HUD), its urgent tabs still keep the bottom drawers clear of them.
+		if (r.Empty()) r = drawers.EdgeTabExtent(HudDock::Edge::Right, f);
 		if (r.Empty()) return;
 		// Its windows stand from the column's foot as the reactor and the sensors did: the column's next panel goes over them.
 		layout.Take(HudRegion::BottomRight, r.w, (f.bands[static_cast<int>(HudDock::Edge::Right)].Bottom() - r.y));
@@ -191,7 +193,7 @@ namespace SpaceGod::UI
 		RegisterDrawers();
 		float dt = Mathf::Min(Time::unscaledDeltaTime, 0.1f);
 		bool available = DrawerAvailable();
-		drawers.Tick(dt, true);
+		drawers.Tick(dt, app->HudModeOn()); // US-T439
 		// The keys are the drawer's while the one opened by its key shows.
 		if (drawerKeys && !drawers.Visible(DrawerTabId(drawerTab))) drawerKeys = false;
 		if (!keysFree || !available) return false;

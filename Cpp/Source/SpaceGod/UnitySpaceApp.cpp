@@ -602,6 +602,7 @@ namespace SpaceGod
 		bool lockCursor = (Input.LookHeld || (AtControls() && !ClickPanelOpen())) && !ModelViewer::CapturesInput() && !cheatMenu->IsOpen; // US-T126
 		if (commsOpen) lockCursor = false; // US-T137: the comms panel takes clicks
 		if (hud != nullptr && hud->DrawerOpen()) lockCursor = false; // US-T200: so does the bottom drawer
+		if (HudMode && ShowHud && !ScreenCleared) lockCursor = false; // US-T439: so does the HUD mode (its drawers take clicks; a click fires only off them)
 		Cursor::lockState = lockCursor ? CursorLockMode::Locked : CursorLockMode::None;
 		Cursor::visible = !lockCursor;
 		RecordHoldRewind(dt); // US-T409: this frame's poses (and a resume point when due) for the hold rewind; read only
@@ -735,6 +736,8 @@ namespace SpaceGod
 		HandleSaveCommands();
 		// F11 clears the screen anywhere, between the stars too (U.SPC-T496).
 		if (i.ClearScreen) ScreenCleared = !ScreenCleared;
+		// US-T439: the HUD key (Caps Lock unless rebound), anywhere, between the stars too: the minimal HUD or the full one.
+		if (i.HudMode) HudMode = !HudMode;
 		if (Travel->Active || InFtlCruise())
 		{
 			// Between the stars only time and the escape hatch work (and under the hull's own drive, U.SPC-T417, not

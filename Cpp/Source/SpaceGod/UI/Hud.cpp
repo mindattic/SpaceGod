@@ -251,24 +251,34 @@ namespace SpaceGod::UI
 		DrawOffscreenArrows(); // US-T128: targets off the screen, at its edge
 		DrawCombatHud();
 		ReserveDrawerEdges(); // US-T438: the right edge's drawers (the reactor, US-T94, and the sensors, US-T93) take BottomRight's first slot
-		DrawTopBar();
+		// US-T439: the minimal HUD (the HUD mode off) keeps the reticle, the world's markers and the combat overlays above, the
+		// pinned drawers, urgent alerts and prompts, and whatever the player opens by its key; the always-on panels that are
+		// not drawers yet (US-T440) show in the HUD mode only.
+		bool full = app->HudModeOn();
+		if (full) DrawTopBar();
 		if (app->ShowNews) DrawNews();
-		else DrawTicker();
-		DrawNavigator();
+		else if (full) DrawTicker();
+		if (full) DrawNavigator();
 		// TopRight before the selection card, which takes what the right-hand column has left between its stacks.
-		if (!app->ShowMarket) DrawOpportunityBoard();
+		if (!app->ShowMarket && full) DrawOpportunityBoard();
 		if (app->ShowMarket) DrawMarket();
-		DrawHarvest(true); // US-T211: the gas works panel, TopRight after the board
-		DrawHunters();
-		DrawSelection();
-		DrawStatus();
+		if (full)
+		{
+			DrawHarvest(true); // US-T211: the gas works panel, TopRight after the board
+			DrawHunters();
+			DrawSelection();
+			DrawStatus();
+		}
 		DrawSalvage();
 		DrawBoarding();
 		DrawHail();
 		DrawLaneRide();
-		DrawFtl();
-		DrawSeat();
-		DrawHelmAbilities(); // US-T106
+		if (full)
+		{
+			DrawFtl();
+			DrawSeat();
+			DrawHelmAbilities(); // US-T106
+		}
 		DrawBattlePlot(); // US-T367
 		DrawCourseMarker();
 		DrawInterdiction();
@@ -655,6 +665,7 @@ namespace SpaceGod::UI
 		// The same conditions and sizes DrawTicker and DrawNews draw by, so the slot is the panel's.
 		newsRect = Rect(0, 0, 0, 0);
 		if (!app->ShowHud) return;
+		if (!app->ShowNews && !app->HudModeOn()) return; // US-T439: the minimal HUD has no ticker
 		if (app->ShowNews)
 		{
 			newsRect = layout.Take(HudRegion::TopCentre, 760, Mathf::Min(Screen::height * 0.5f, 420.0f));

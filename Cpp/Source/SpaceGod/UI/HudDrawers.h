@@ -17,7 +17,7 @@
 // group's tab dragged out of its strip (or a stacked member's header) tears that drawer off into a window of its own. The
 // title bar's buttons pin it, switch a group between tabs and a stack, and close it. With the HUD mode on, every edge shows
 // the closed drawers whose home is there as pull-out tabs: a click pulls one out, a drag tears it off floating. A drawer's
-// alert (DrawerAlert) makes its tab glow, and shows the tab, with the alert's line, in the minimal HUD too.
+// alert (DrawerAlert) makes its tab glow; an urgent one (level 2) shows the tab, with the alert's line, in the minimal HUD too.
 //
 // Every frame goes through the HUD's Panel()/RegisterUi (the Frame's callbacks), so the world under a drawer takes no clicks
 // and world labels under it are hidden. The layout math is HudDock.h's, unit-checked. The whole layout saves to a JSON object
@@ -188,6 +188,9 @@ namespace SpaceGod::UI
 		/// The box the windows docked on <paramref name="edge"/> and drawn this frame take together (empty: none), for the HUD
 		/// to keep its other panels clear of them. Lays out as Draw will (call before drawing the panels).
 		HudDock::Box EdgeExtent(HudDock::Edge edge, const Frame& f);
+		/// The box the pull-out tabs on <paramref name="edge"/> take this frame (empty: none), e.g. the minimal HUD's urgent
+		/// tab on an edge with no window drawn (US-T439). Lays out as Draw will.
+		HudDock::Box EdgeTabExtent(HudDock::Edge edge, const Frame& f);
 
 		/// Lays out and draws every window and edge tab, and handles the drags. Once per GUI pass, over the HUD's panels.
 		void Draw(const Frame& f);
@@ -249,6 +252,9 @@ namespace SpaceGod::UI
 
 		void Layout(const Frame& f);
 		void DrawWindow(int index, const Frame& f);
+		struct EdgeTab { cs::String id, label; int level; };
+		/// The tabs each edge shows this frame (after Layout) and their lengths along it.
+		void CollectEdgeTabs(const Frame& f, std::vector<EdgeTab> (&on)[HudDock::EdgeCount], std::vector<float> (&lens)[HudDock::EdgeCount]) const;
 		void DrawEdgeTabs(const Frame& f);
 		void HandleDrag(const Frame& f);
 		void Drop(const Frame& f);

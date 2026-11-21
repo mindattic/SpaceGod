@@ -716,12 +716,9 @@ namespace SpaceGod::UI
 		GUI::fade = oldFade;
 	}
 
-	void HudDrawers::DrawEdgeTabs(const Frame& f)
+	void HudDrawers::CollectEdgeTabs(const Frame& f, std::vector<EdgeTab> (&on)[HudDock::EdgeCount], std::vector<float> (&lens)[HudDock::EdgeCount]) const
 	{
 		const auto& st = f.styles;
-		struct Tab { cs::String id, label; int level; };
-		std::vector<Tab> on[HudDock::EdgeCount];
-		std::vector<float> lens[HudDock::EdgeCount];
 		for (const auto& s : specs)
 		{
 			if (!Available(s.id)) continue;
@@ -730,12 +727,39 @@ namespace SpaceGod::UI
 			const auto& w = windows[wi];
 			if (VisibleNow(w, f.hudMode) && w.drawn) continue; // in its window (a group's tab strip shows the rest)
 			auto a = AlertOf(s.id);
-			if (!f.hudMode && a.level == 0) continue; // the minimal HUD shows only the tabs that raise something
+			if (!f.hudMode && a.level < 2) continue; // the minimal HUD shows only the tabs that raise something urgent (US-T439)
 			cs::String label = !f.hudMode && !a.text.empty() ? cs::Cat(s.title, UiStyle::Glyph::Separator, a.text) : s.title;
 			int e = static_cast<int>(HomeEdge(w, f));
 			on[e].push_back({ s.id, label, a.level });
 			lens[e].push_back(std::min(260.0f, TextW(st.small, label) + 18));
 		}
+	}
+
+	HudDock::Box HudDrawers::EdgeTabExtent(Edge edge, const Frame& f)
+	{
+		Layout(f);
+		std::vector<EdgeTab> on[HudDock::EdgeCount];
+		std::vector<float> lens[HudDock::EdgeCount];
+		CollectEdgeTabs(f, on, lens);
+		int e = static_cast<int>(edge);
+		Box out;
+		bool any = false;
+		for (const auto& b : HudDock::EdgeTabs(edge, f.bands[e], lens[e], TabH, 4))
+		{
+			if (!any) { out = b; any = true; continue; }
+			float x0 = std::min(out.x, b.x), y0 = std::min(out.y, b.y);
+			float x1 = std::max(out.Right(), b.Right()), y1 = std::max(out.Bottom(), b.Bottom());
+			out = Box(x0, y0, x1 - x0, y1 - y0);
+		}
+		return out;
+	}
+
+	void HudDrawers::DrawEdgeTabs(const Frame& f)
+	{
+		const auto& st = f.styles;
+		std::vector<EdgeTab> on[HudDock::EdgeCount];
+		std::vector<float> lens[HudDock::EdgeCount];
+		CollectEdgeTabs(f, on, lens);
 		auto& ev = Event::current();
 		auto old = GUI::contentColor;
 		for (int e = 0; e < HudDock::EdgeCount; e++)

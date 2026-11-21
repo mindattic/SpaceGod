@@ -150,7 +150,7 @@ namespace SpaceGod
 			auto r = Rect(10, 50, w, h);
 			// US-T208: a full-screen screen (spawn, manual, galaxy map) owns the top left: the badge would sit on its titles.
 			bool fullScreen = ShowSpawn || ShowHelp || ShowLogs /* US-T261 */ || ShowDiscoveries /* US-T259 */ || ShowEncyclopedia /* US-T271 */ || ShowSociety /* US-T293 */ || ((ShowGalaxyMap || ShowSystemMap /* US-T258 */) && !Travel->Active);
-			if (!fullScreen)
+			if (!fullScreen && HudModeOn()) // US-T439: the meter is the full HUD's (the refusal below is an alert: always)
 			{
 			if (!UiRects.Contains(r)) UiRects.Add(r); // US-T212: world names skip it
 			GUI::Box(r, GUIContent::none(), influencePanel);

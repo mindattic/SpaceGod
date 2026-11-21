@@ -245,6 +245,19 @@ public:
 	/// </summary>
 	bool ScreenCleared = false;
 
+	/// <summary>
+	/// US-T439: the HUD mode (KeyAction::HudMode, Caps Lock by default; docs/HUD.md). Off (how a game starts) the HUD is the
+	/// minimal one: the reticle, the world's markers and the combat overlays, the pinned drawers, urgent alerts and prompts,
+	/// and whatever the player opens by its key. On, the cursor is free, the gamepad drives the GUI, every drawer pulled out
+	/// shows with the closed ones as tabs on every edge, and the panels not yet drawers show as before. U (ShowHud) and F11
+	/// (ScreenCleared) keep their meanings in either.
+	/// </summary>
+	bool HudMode = false;
+
+	/// <summary>US-T439: whether the HUD draws in full: the HUD mode on, or the guided tutorial or the showcase tour running
+	/// (they point at HUD panels). Only HudMode itself frees the cursor.</summary>
+	bool HudModeOn() const;
+
 	bool ShowMarket = false;
 	bool ShowCargo = false;
 

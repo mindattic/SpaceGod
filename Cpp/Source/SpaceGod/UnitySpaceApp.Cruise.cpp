@@ -633,7 +633,7 @@ namespace SpaceGod
 				}
 			}
 		}
-		if (!SystemCruiseActive()) return;
+		if (!SystemCruiseActive() || !HudModeOn()) return; // US-T439: the readout is the full HUD's (the drive's look above shows in either)
 		if (cruiseStyle == nullptr)
 		{
 			cruiseBack = UI::Hud::Solid(Color(0.03f, 0.05f, 0.08f, 0.82f), Color(0.45f, 0.85f, 1.0f, 0.7f));

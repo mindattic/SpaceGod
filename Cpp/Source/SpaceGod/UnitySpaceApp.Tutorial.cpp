@@ -229,6 +229,12 @@ namespace SpaceGod
 
 	void UnitySpaceApp::DismissTutorialHint() { tutorialHint = -1; }
 
+	// US-T439: the tutorial's steps and the showcase tour point at HUD panels, so the HUD draws in full while either runs.
+	bool UnitySpaceApp::HudModeOn() const
+	{
+		return HudMode || (tutorial != nullptr && tutorial->Running()) || Tour::ShowcaseTour::Running();
+	}
+
 	// ---------------------------------------------------------------- the cards
 
 	void UnitySpaceApp::DrawTutorial()
