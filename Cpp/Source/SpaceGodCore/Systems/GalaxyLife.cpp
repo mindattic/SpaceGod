@@ -9,6 +9,7 @@
 #include "Economy/Goods.h"
 #include "Economy/Settlement.h"
 #include "Fleet.h"
+#include "Infrastructure/Berths.h"
 #include "Infrastructure/Infrastructure.h"
 #include "Persistence/ObjectGraph.h"
 #include "Ships.h"
@@ -58,16 +59,8 @@ namespace SpaceGod::Core
 			}
 		}
 
-		double StationKm(StructureKind k)
-		{
-			switch (k)
-			{
-				case StructureKind::Depot: return 1.4;
-				case StructureKind::Relay: return 0.6;
-				case StructureKind::Habitat: return 2.2;
-				default: return 1.8;
-			}
-		}
+		/// US-T435: built to the size that berths dozens of ships (Berths::LengthKmFor, every length in BerthTuning).
+		double StationKm(StructureKind k) { return Berths::LengthKmFor(k); }
 
 		cs::Ref<StarSystem> SystemOf(Galaxy& galaxy, const cs::Ref<World>& w)
 		{

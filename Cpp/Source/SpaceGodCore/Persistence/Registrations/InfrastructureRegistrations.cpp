@@ -115,7 +115,7 @@ namespace SpaceGod::Core
 		SG_F(Constellations), SG_F(Rings), SG_F(Structures), SG_F(catalog), SG_F(ephemeris))
 
 	SG_SERIALIZE(OrbitalStructure, "Unity.SpaceGod.Core.OrbitalStructure",
-		SG_F(Body), SG_F(Industry), SG_F(Kind), SG_F(Lagrange), SG_F(LengthKm), SG_F(Name), SG_F(Note), SG_F(Orbit),
+		SG_F(Berthed), SG_F(Body), SG_F(Holding), SG_F(Industry), SG_F(Kind), SG_F(Lagrange), SG_F(LengthKm), SG_F(Name), SG_F(Note), SG_F(Orbit),
 		SG_F(Real), SG_F(Settlement), SG_F(owner))
 
 	SG_SERIALIZE(Satellite, "Unity.SpaceGod.Core.Satellite",

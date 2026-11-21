@@ -10,6 +10,7 @@
 #include "Combat/Battle.h"
 #include "Combat/War.h"
 #include "Ephemeris.h"
+#include "Infrastructure/Berths.h"
 #include "Infrastructure/Infrastructure.h"
 #include "World.h"
 
@@ -382,7 +383,7 @@ namespace SpaceGod::Core
 		if (world->Infrastructure != nullptr)
 			for (const auto& st : world->Infrastructure->Structures)
 			{
-				double r = std::max(0.01, st->LengthKm * 0.5);
+				double r = std::max(0.01, Berths::SolidKm(*st) * 0.5); // US-T435: its core, inside its piers
 				DVec3 c = st->HelioAt(world->Ephemeris, jd) - helioKm;
 				if (c.Length() > reachKm + r) continue;
 				out.push_back(SphereObstacle{ c, r });

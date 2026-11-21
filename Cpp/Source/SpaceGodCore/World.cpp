@@ -146,7 +146,12 @@ namespace SpaceGod::Core
 		EnsureBioMass(jd)->Update(jd);
 		if (LaneUpkeep) LaneUpkeep->Update(jd);
 		if (Sensors) Sensors->Update(jd);
-		if (Infrastructure) Infrastructure->UpdateSatellites(jd);
+		if (Infrastructure)
+		{
+			Infrastructure->UpdateSatellites(jd);
+			// US-T435: who is berthed at which station (reads the ships, writes only the berths).
+			Infrastructure->UpdateBerths(Fleet->Ships(), Economy, PilotedShip);
+		}
 		Shocks->Update(jd);
 		Law->Update(jd);
 		Outlaws->Update(jd);

@@ -5,6 +5,8 @@
 #include "DVec3.h"
 #include "Ships.h" // ShipClass (by value, in View::HullClass)
 
+#include <vector>
+
 namespace SpaceGod
 {
 	class UnitySpaceApp;
@@ -47,7 +49,33 @@ namespace SpaceGod::Views
 			cs::Ref<GameObject> Station;
 			/// <summary>How many of <see cref="Renderers"/> are the procedural model's (the station's follow them).</summary>
 			int BaseRenderers = -1;
+			/// <summary>US-T435: what turns (a habitat's wheel, the model and the pack's station under it); the root itself, and
+			/// the docking spine and the ships berthed on it, are despun.</summary>
+			cs::Ref<Transform> Spinner;
+			/// <summary>US-T435: the docking piers, arms and berth lights round the model.</summary>
+			cs::Ref<Renderer> Gantry;
+			/// <summary>US-T435: each berth in the root's unit frame: where a berthed hull's nose meets its arm, and the way the
+			/// hull points (in at the station).</summary>
+			struct Slot
+			{
+				Vector3 Nose;
+				Vector3 In;
+				Vector3 Up;
+			};
+			std::vector<Slot> Berths;
+			/// <summary>US-T435: ships waiting for a berth line up from here (root units) outward along <see cref="HoldOut"/>.</summary>
+			Vector3 HoldFrom;
+			Vector3 HoldOut = Vector3(0, 0, 1);
 		};
+
+		/// <summary>US-T435: lays out <paramref name="v"/>'s berths round its model as drawn (its piers along the flanks, or a
+		/// spinning station's spine through its hub) and (re)builds its gantry.</summary>
+		void LayoutBerths(const cs::Ref<View>& v);
+
+		/// <summary>US-T435: where <paramref name="s"/> is drawn now: its scene position, size (scene units) and despun rotation.</summary>
+		bool Frame(const cs::Ref<View>& v, Core::DVec3& scene, double& size, Quaternion& rotation) const;
+
+		cs::Ref<View> ViewOf(const cs::Ref<Core::OrbitalStructure>& s) const;
 
 		/// <summary>US-T143: (re)builds a structure's Space Station Creator model in its owner's livery, hiding the procedural
 		/// one; leaves the procedural model for a kind the pack does not draw or without the pack.</summary>
@@ -92,6 +120,23 @@ namespace SpaceGod::Views
 		/// <summary>US-T186: draws <paramref name="s"/>, a structure added to the system's infrastructure after it was laid
 		/// out (the spawn menu's stations). Nothing if it is drawn already.</summary>
 		void Add(const cs::Ref<Core::OrbitalStructure>& s);
+
+		/// <summary>
+		/// US-T435: where a hull <paramref name="lengthScene"/> long (scene units) berthed at <paramref name="s"/>'s berth
+		/// <paramref name="berth"/> is drawn this frame: nose-in at the end of its docking arm, square to the pier. Computed
+		/// fresh (the ships are placed before <see cref="Layout"/>). False for a berth the station does not have.
+		/// </summary>
+		bool BerthPose(const cs::Ref<Core::OrbitalStructure>& s, int berth, double lengthScene, Core::DVec3& scene, Quaternion& rotation) const;
+
+		/// <summary>US-T435: where a hull waiting <paramref name="place"/>th in line for a berth at <paramref name="s"/> holds,
+		/// off the station's end, nose towards it.</summary>
+		bool HoldPose(const cs::Ref<Core::OrbitalStructure>& s, int place, double lengthScene, Core::DVec3& scene, Quaternion& rotation) const;
+
+		/// <summary>US-T435: where <paramref name="s"/> is drawn now (scene position, size in scene units, despun rotation).</summary>
+		bool FrameOf(const cs::Ref<Core::OrbitalStructure>& s, Core::DVec3& scene, double& size, Quaternion& rotation) const
+		{
+			return Frame(ViewOf(s), scene, size, rotation);
+		}
 
 	private:
 		cs::Ref<View> Create(const cs::Ref<Core::OrbitalStructure>& s, const cs::Ref<Transform>& parent);

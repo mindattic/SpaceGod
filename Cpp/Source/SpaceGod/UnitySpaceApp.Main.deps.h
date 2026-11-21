@@ -42,6 +42,7 @@ namespace SpaceGod::Core
 	class LaneSite;
 	class Opportunity;
 	class Settlement;
+	class OrbitalStructure;
 }
 
 namespace SpaceGod::Cameras

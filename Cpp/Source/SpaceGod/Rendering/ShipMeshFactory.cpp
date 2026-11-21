@@ -847,6 +847,16 @@ namespace SpaceGod::Rendering
 		});
 	}
 
+	cs::Ref<Mesh> ShipMeshFactory::GetBerthGantry(const cs::String& key, cs::Ref<Faction> faction, const std::vector<BerthBox>& boxes)
+	{
+		return Cached(cs::Cat("Berths ", key), faction, [&boxes](Builder& b)
+		{
+			auto steel = Color(0.66f, 0.67f, 0.7f, 1.0f);
+			for (const auto& box : boxes)
+				b.Box(box.Center, box.Size, box.Light ? b.Glow(Color(0.55f, 0.9f, 1.0f)) : steel);
+		});
+	}
+
 	/// <summary>The ISS or Tiangong: a truss with modules and solar arrays (one unit across).</summary>
 	cs::Ref<Mesh> ShipMeshFactory::GetCrewedStation(bool tiangong)
 	{

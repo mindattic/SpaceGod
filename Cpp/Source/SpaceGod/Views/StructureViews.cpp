@@ -1,6 +1,8 @@
 // Port of Unity.SpaceGod Runtime/Views/StructureViews.cs (US-T30).
 #include "Views/StructureViews.h"
 
+#include "Views/HullSurface.h"
+
 #include "UnitySpaceApp.h"
 #include "Rendering/ShipMeshFactory.h"
 #include "Rendering/ShipModels.h"
@@ -10,8 +12,10 @@
 
 #include "BodyCatalog.h"
 #include "BodyOrientation.h"
+#include "Combat/CombatSpecs.h"
 #include "Economy/Settlement.h"
 #include "Ephemeris.h"
+#include "Infrastructure/Berths.h"
 #include "Infrastructure/Infrastructure.h"
 #include "Lagrange.h"
 #include "RenderLod.h"
@@ -80,7 +84,10 @@ namespace SpaceGod::Views
 		v->Root = root;
 		v->Spin = UnityRandom::value() * 360;
 		v->Owner = s->Owner();
-		auto model = Part(root->transform, ModelMesh(s), "Model");
+		// US-T435: the model turns under a spinner of its own, so the root (and the docking spine on it) stays despun.
+		v->Spinner = NewGameObject("Spin")->transform;
+		v->Spinner->SetParent(root->transform, false);
+		auto model = Part(v->Spinner, ModelMesh(s), "Model");
 		v->Model = GetComponent<MeshFilter>(model->gameObject());
 		cs::List<cs::Ref<Renderer>> list{ model };
 		if (s->Kind == StructureKind::Shipyard)
@@ -101,6 +108,7 @@ namespace SpaceGod::Views
 		}
 		v->Renderers = list.ToArray();
 		AttachStation(v);
+		LayoutBerths(v);
 		return v;
 	}
 
@@ -111,6 +119,13 @@ namespace SpaceGod::Views
 		cs::String model = Rendering::SscKit::ForStructure(s->Kind, s->Industry, s->Name);
 		if (model.empty()) return;
 		auto modelRenderer = GetComponent<MeshRenderer>(v->Model->gameObject());
+		if (Alive(v->Gantry))
+		{
+			// US-T435: laid out again round the rebuilt model (LayoutBerths), so off the list first.
+			v->Renderers.Remove(v->Gantry);
+			Destroy(v->Gantry->gameObject());
+			v->Gantry = nullptr;
+		}
 		if (v->BaseRenderers < 0) v->BaseRenderers = v->Renderers.Count();
 		if (Alive(v->Station))
 		{
@@ -121,7 +136,7 @@ namespace SpaceGod::Views
 			Destroy(v->Station);
 		}
 		auto holder = NewGameObject("Station");
-		holder->transform->SetParent(v->Root->transform, false);
+		holder->transform->SetParent(v->Spinner != nullptr ? v->Spinner : v->Root->transform, false);
 		cs::List<cs::Ref<Renderer>> parts;
 		// A habitat's (and gateway's) ring turns about the model's +Z, as the procedural ring does.
 		bool ring = s->Kind == StructureKind::Habitat || s->Kind == StructureKind::Gateway;
@@ -193,7 +208,6 @@ namespace SpaceGod::Views
 
 	void StructureViews::Update(bool visible)
 	{
-		const auto& scene = app->BodyScenes();
 		double jd = app->Clock->Jd;
 		double ppu = app->PixelsPerUnitAtUnitDistance();
 
@@ -213,29 +227,22 @@ namespace SpaceGod::Views
 				v->Owner = s->Owner();
 				v->Model->sharedMesh = ModelMesh(s);
 				if (Alive(v->Station)) AttachStation(v);
+				LayoutBerths(v);
 			}
 
 			auto t = v->Root->transform;
 			t->localPosition = rel;
 			t->localScale = Vector3::one() * static_cast<float>(size);
-			// Long axis along the orbit; habitats face their ring to the planet's pole and spin.
-			if (s->AtLagrange())
+			// Long axis along the orbit; habitats face their ring to the planet's pole and spin (the wheel only: US-T435's
+			// docking spine through its hub, and the ships berthed on it, are despun).
+			DVec3 framed;
+			double framedSize = 0;
+			Quaternion rotation;
+			if (Frame(v, framed, framedSize, rotation)) t->localRotation = rotation;
+			if (s->Kind == StructureKind::Habitat && !s->AtLagrange() && v->Spinner != nullptr)
 			{
-				auto toSun = app->Relative(scene[0]) - rel;
-				t->localRotation = Quaternion::LookRotation(Vector3::Cross(toSun, Vector3::up()).normalized() + Vector3::up() * 0.01f, -toSun);
-			}
-			else
-			{
-				auto tangent = s->Orbit->TangentAt(jd).SwapYZ();
-				auto up = s->Orbit->OffsetAt(jd).SwapYZ().Normalized();
-				auto f = Vector3(static_cast<float>(tangent.X), static_cast<float>(tangent.Y), static_cast<float>(tangent.Z));
-				auto u = Vector3(static_cast<float>(up.X), static_cast<float>(up.Y), static_cast<float>(up.Z));
-				if (s->Kind == StructureKind::Habitat)
-				{
-					v->Spin = cs::Mod(v->Spin + Time::deltaTime * 12.0f, 360.0f);
-					t->localRotation = Quaternion::LookRotation(u, f) * Quaternion::Euler(0, 0, v->Spin);
-				}
-				else t->localRotation = Quaternion::LookRotation(f, u);
+				v->Spin = cs::Mod(v->Spin + Time::deltaTime * 12.0f, 360.0f);
+				v->Spinner->localRotation = Quaternion::Euler(0, 0, v->Spin);
 			}
 
 			block.SetFloat(EngineGlowId, 1.4f);
@@ -286,6 +293,14 @@ namespace SpaceGod::Views
 		int ribs = !cls.has_value() ? 0 : Mathf::Clamp(Mathf::CeilToInt(static_cast<float>(progress / 0.6 * v->Ribs.Count())), 0, v->Ribs.Count());
 		for (int i = 0; i < v->Ribs.Count(); i++) v->Ribs[i]->gameObject()->SetActive(i < ribs && progress < 0.97);
 		bool plated = cls.has_value() && progress >= 0.6;
+		// US-T435: the hull on the slip at its own length against the yard's (a yard is built for capital ships, so a frigate
+		// sits small in its cradle), never past the cradle's 80%.
+		if (cls.has_value() && v->S->LengthKm > 0)
+		{
+			const auto& spec = CombatSpec::Of(*cls);
+			double share = spec != nullptr ? spec->LengthKm / v->S->LengthKm : 0.8;
+			v->Slip->localScale = Vector3::one() * Mathf::Clamp(static_cast<float>(share), 0.05f, 0.8f);
+		}
 		if (plated && (!Alive(v->Hull) || v->HullClass != cls || v->HullOwner != settlement->Owner))
 		{
 			if (Alive(v->Hull)) Destroy(v->Hull);
@@ -327,5 +342,203 @@ namespace SpaceGod::Views
 				for (const auto& r : GetComponentsInChildren<Renderer>(v->Hull)) r->SetPropertyBlock(block);
 			}
 		}
+	}
+
+	// ---------------------------------------------------------------- berths (US-T435)
+
+	cs::Ref<StructureViews::View> StructureViews::ViewOf(const cs::Ref<OrbitalStructure>& s) const
+	{
+		for (const auto& v : views)
+			if (v->S == s) return v;
+		return nullptr;
+	}
+
+	bool StructureViews::Frame(const cs::Ref<View>& v, DVec3& scene, double& size, Quaternion& rotation) const
+	{
+		if (v == nullptr) return false;
+		auto s = v->S;
+		auto eph = app->Ephemeris();
+		auto scale = app->Scale();
+		const auto& bodies = app->BodyScenes();
+		double jd = app->Clock->Jd;
+		scene = s->AtLagrange() ? scale->MapNear(eph, bodies, Lagrange::MappedNear(app->Catalog(), s->Body, s->Lagrange), s->Helio(eph))
+			: bodies[s->Body] + scale->LocalOffset((*app->Catalog())[s->Body], s->Orbit->OffsetAt(jd));
+		size = scale->ShipLength(s->LengthKm);
+		if (s->AtLagrange())
+		{
+			auto d = bodies[0] - scene;
+			auto toSun = Vector3(static_cast<float>(d.X), static_cast<float>(d.Y), static_cast<float>(d.Z));
+			rotation = Quaternion::LookRotation(Vector3::Cross(toSun, Vector3::up()).normalized() + Vector3::up() * 0.01f, -toSun);
+			return true;
+		}
+		auto tangent = s->Orbit->TangentAt(jd).SwapYZ();
+		auto up = s->Orbit->OffsetAt(jd).SwapYZ().Normalized();
+		auto f = Vector3(static_cast<float>(tangent.X), static_cast<float>(tangent.Y), static_cast<float>(tangent.Z));
+		auto u = Vector3(static_cast<float>(up.X), static_cast<float>(up.Y), static_cast<float>(up.Z));
+		// A habitat faces its wheel to the planet's pole (the wheel's spin is its spinner's, not the root's).
+		rotation = s->Kind == StructureKind::Habitat ? Quaternion::LookRotation(u, f) : Quaternion::LookRotation(f, u);
+		return true;
+	}
+
+	namespace
+	{
+		Vector3 AbsOf(Vector3 a) { return Vector3(Mathf::Abs(a.x), Mathf::Abs(a.y), Mathf::Abs(a.z)); }
+
+		/// A box spanning la along axis a, lb along b and lc along c (each a unit axis, either way).
+		Vector3 Span(Vector3 a, float la, Vector3 b, float lb, Vector3 c, float lc) { return AbsOf(a) * la + AbsOf(b) * lb + AbsOf(c) * lc; }
+
+		int Milli(float x) { return Mathf::RoundToInt(x * 1000.0f); }
+	}
+
+	void StructureViews::LayoutBerths(const cs::Ref<View>& v)
+	{
+		if (Alive(v->Gantry))
+		{
+			v->Renderers.Remove(v->Gantry);
+			Destroy(v->Gantry->gameObject());
+		}
+		v->Gantry = nullptr;
+		v->Berths.clear();
+		auto s = v->S;
+		int capacity = s->BerthCount();
+		int perPier = Berths::PerPier(s->Kind, s->LengthKm);
+		if (capacity <= 0 || perPier <= 0 || s->LengthKm <= 0) return;
+
+		// The model as drawn (the pack's station, else the procedural one), measured in the root's unit frame with its wheel
+		// unturned.
+		cs::List<cs::Ref<Renderer>> drawn;
+		if (Alive(v->Station))
+			for (int i = cs::Math::Max(0, v->BaseRenderers); i < v->Renderers.Count(); i++) drawn.Add(v->Renderers[i]);
+		else if (v->Renderers.Count() > 0) drawn.Add(v->Renderers[0]);
+		Quaternion spun = v->Spinner != nullptr ? v->Spinner->localRotation : Quaternion::identity();
+		if (v->Spinner != nullptr) v->Spinner->localRotation = Quaternion::identity();
+		HullSurface hull(v->Root->transform, drawn);
+		if (v->Spinner != nullptr) v->Spinner->localRotation = spun;
+		Vector3 mn = hull.Min(), mx = hull.Max(), c = hull.Centre();
+
+		float L = static_cast<float>(s->LengthKm);
+		float pitch = static_cast<float>(BerthTuning::PitchKm) / L;
+		float arm = static_cast<float>(BerthTuning::ArmKm) / L;
+		float t = Mathf::Clamp(0.06f / L, 0.003f, 0.02f); // a girder about 60 m thick
+		float hold = static_cast<float>(BerthTuning::HoldSpacingKm) / L;
+		std::vector<Rendering::ShipMeshFactory::BerthBox> boxes;
+		auto box = [&boxes](Vector3 centre, Vector3 size, bool light)
+		{
+			Rendering::ShipMeshFactory::BerthBox b;
+			b.Center = centre;
+			b.Size = size;
+			b.Light = light;
+			boxes.push_back(b);
+		};
+
+		if (Berths::Spins(s->Kind))
+		{
+			// A despun docking spine along the wheel's axis (+Z) through its hub, out past the wheel on both sides; four ways
+			// round it a berth every pitch, each hull nose-in on an arm off the spine.
+			int perSide = perPier / 2;
+			float face = Mathf::Max(mx.z - c.z, c.z - mn.z);
+			float r = Mathf::Max(2.0f * t, 0.012f);
+			float z0 = face + arm;
+			float tip = z0 + perSide * pitch;
+			box(c, Vector3(2 * r, 2 * r, 2 * tip), false);
+			const Vector3 ways[] = { Vector3::right(), Vector3::left(), Vector3::up(), Vector3::down() };
+			for (int side = 0; side < 2; side++)
+				for (int k = 0; k < perSide; k++)
+				{
+					float z = (side == 0 ? 1.0f : -1.0f) * (z0 + (k + 0.5f) * pitch);
+					for (const auto& w : ways)
+					{
+						auto across = Mathf::Abs(w.x) > 0.5f ? Vector3::up() : Vector3::right();
+						Vector3 at = c + Vector3(0, 0, z);
+						box(at + w * (r + arm * 0.5f), Span(w, arm, across, t, Vector3::forward(), t), false);
+						Vector3 nose = at + w * (r + arm);
+						box(nose, Vector3::one() * (t * 1.8f), true);
+						View::Slot slot;
+						slot.Nose = nose;
+						slot.In = -w;
+						slot.Up = Vector3::forward();
+						v->Berths.push_back(slot);
+					}
+				}
+			float rim = Mathf::Max(Mathf::Max(mx.x - c.x, c.x - mn.x), Mathf::Max(mx.y - c.y, c.y - mn.y));
+			v->HoldOut = Vector3::right();
+			v->HoldFrom = c + Vector3::right() * (rim + hold);
+		}
+		else
+		{
+			// Four piers down the station's length (its longer horizontal axis), one off each flank, a berth every pitch;
+			// each hull nose-in on an arm out from the plating.
+			bool alongZ = (mx.z - mn.z) >= (mx.x - mn.x);
+			Vector3 A = alongZ ? Vector3::forward() : Vector3::right();
+			Vector3 H = alongZ ? Vector3::right() : Vector3::forward();
+			float span = perPier * pitch;
+			float first = -0.5f * span + 0.5f * pitch;
+			struct Flank { Vector3 N; float Out; Vector3 Across; };
+			const Flank flanks[] = {
+				{ H, Vector3::Dot(mx - c, H), Vector3::up() },
+				{ -H, Vector3::Dot(c - mn, H), Vector3::up() },
+				{ Vector3::up(), mx.y - c.y, H },
+				{ Vector3::down(), c.y - mn.y, H },
+			};
+			for (const auto& f : flanks)
+			{
+				// The pier: a girder along the flank at the arms' ends.
+				box(c + f.N * (f.Out + arm), Span(A, span + 0.3f * pitch, f.N, t, f.Across, 2 * t), false);
+				for (int k = 0; k < perPier; k++)
+				{
+					Vector3 at = c + A * (first + k * pitch);
+					box(at + f.N * (f.Out + arm * 0.5f), Span(f.N, arm, A, t, f.Across, t), false);
+					Vector3 nose = at + f.N * (f.Out + arm + t);
+					box(nose, Vector3::one() * (t * 1.8f), true);
+					View::Slot slot;
+					slot.Nose = nose;
+					slot.In = -f.N;
+					slot.Up = f.Across;
+					v->Berths.push_back(slot);
+				}
+			}
+			float reach = Mathf::Max(0.5f * span, Mathf::Max(Vector3::Dot(mx - c, A), Vector3::Dot(c - mn, A)));
+			v->HoldOut = A;
+			v->HoldFrom = c + A * (reach + hold);
+		}
+
+		cs::String key = cs::Cat(static_cast<int>(s->Kind), " ", perPier, " ", Milli(L), " ", Milli(mn.x), ",", Milli(mn.y), ",", Milli(mn.z),
+			" ", Milli(mx.x), ",", Milli(mx.y), ",", Milli(mx.z));
+		v->Gantry = Part(v->Root->transform, Rendering::ShipMeshFactory::GetBerthGantry(key, s->Owner(), boxes), "Berths");
+		v->Renderers.Add(v->Gantry);
+	}
+
+	bool StructureViews::BerthPose(const cs::Ref<OrbitalStructure>& s, int berth, double lengthScene, DVec3& scene, Quaternion& rotation) const
+	{
+		auto v = ViewOf(s);
+		if (v == nullptr || berth < 0 || berth >= static_cast<int>(v->Berths.size())) return false;
+		DVec3 at;
+		double size = 0;
+		Quaternion frame;
+		if (!Frame(v, at, size, frame)) return false;
+		const auto& slot = v->Berths[static_cast<size_t>(berth)];
+		Vector3 in = frame * slot.In;
+		Vector3 nose = frame * (slot.Nose * static_cast<float>(size));
+		scene = at + DVec3(nose.x, nose.y, nose.z) - DVec3(in.x, in.y, in.z) * (0.5 * lengthScene);
+		rotation = Quaternion::LookRotation(in, frame * slot.Up);
+		return true;
+	}
+
+	bool StructureViews::HoldPose(const cs::Ref<OrbitalStructure>& s, int place, double lengthScene, DVec3& scene, Quaternion& rotation) const
+	{
+		auto v = ViewOf(s);
+		if (v == nullptr || place < 0 || v->Berths.empty()) return false;
+		DVec3 at;
+		double size = 0;
+		Quaternion frame;
+		if (!Frame(v, at, size, frame)) return false;
+		Vector3 out = frame * v->HoldOut;
+		Vector3 from = frame * (v->HoldFrom * static_cast<float>(size));
+		double spacing = cs::Math::Max(BerthTuning::HoldSpacingKm / s->LengthKm * size, 1.4 * lengthScene);
+		double along = place * spacing + 0.5 * lengthScene;
+		scene = at + DVec3(from.x, from.y, from.z) + DVec3(out.x, out.y, out.z) * along;
+		auto upAxis = Mathf::Abs(Vector3::Dot(v->HoldOut, Vector3::up())) > 0.9f ? Vector3::right() : Vector3::up();
+		rotation = Quaternion::LookRotation(-out, frame * upAxis);
+		return true;
 	}
 }

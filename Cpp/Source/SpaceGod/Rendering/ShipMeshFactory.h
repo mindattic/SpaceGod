@@ -116,6 +116,18 @@ namespace SpaceGod::Rendering
 		/// </summary>
 		static cs::Ref<Mesh> GetDockingRing(cs::Ref<Core::Faction> faction);
 
+		/// <summary>US-T435: one box of a station's docking gantry, in the station's unit frame (a lit one is a berth's light).</summary>
+		struct BerthBox
+		{
+			Vector3 Center;
+			Vector3 Size;
+			bool Light = false;
+		};
+
+		/// <summary>US-T435: a station's docking piers, arms and berth lights (StructureViews lays them out round its model),
+		/// cached by <paramref name="key"/> (the layout's own description) and the owner's livery.</summary>
+		static cs::Ref<Mesh> GetBerthGantry(const cs::String& key, cs::Ref<Core::Faction> faction, const std::vector<BerthBox>& boxes);
+
 		/// <summary>The ISS or Tiangong: a truss with modules and solar arrays (one unit across).</summary>
 		static cs::Ref<Mesh> GetCrewedStation(bool tiangong);
 

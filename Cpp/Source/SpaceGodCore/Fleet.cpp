@@ -24,6 +24,7 @@
 #include "Economy/Economy.h"
 #include "Economy/LocalTraffic.h"
 #include "Economy/Propulsion.h"
+#include "Infrastructure/Berths.h"
 #include "Infrastructure/Infrastructure.h"
 #include "Systems/InterstellarTraffic.h"
 #include "Systems/JumpGate.h"
@@ -255,8 +256,9 @@ namespace SpaceGod::Core
 		{
 			HullObstacle o;
 			o.HelioKm = st->HelioAt(ephemeris, jd);
-			o.LengthKm = st->LengthKm;
-			o.RadiusKm = cs::Math::Max(0.01, st->LengthKm * 0.5); // as a hull meets it (SectionColliders::StationsNear)
+			// US-T435: its solid core, not the open docking space its piers reach out into.
+			o.LengthKm = Berths::SolidKm(*st);
+			o.RadiusKm = cs::Math::Max(0.01, o.LengthKm * 0.5); // as a hull meets it (SectionColliders::StationsNear)
 			o.Body = st->Body;
 			out.Add(o);
 		}

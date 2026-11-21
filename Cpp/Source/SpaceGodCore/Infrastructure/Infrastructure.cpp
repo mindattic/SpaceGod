@@ -4,9 +4,11 @@
 
 #include "BodyCatalog.h"
 #include "BodyOrientation.h"
+#include "Combat/Diplomacy.h"
 #include "Economy/Economy.h"
 #include "Economy/Settlement.h"
 #include "Ephemeris.h"
+#include "Infrastructure/Berths.h"
 #include "Infrastructure/Satellite.h"
 #include "Kepler.h"
 #include "OrbitalElements.h"
@@ -15,6 +17,8 @@
 
 #include <cmath>
 #include <tuple>
+#include <unordered_map>
+#include <vector>
 
 namespace SpaceGod::Core
 {
@@ -275,6 +279,234 @@ namespace SpaceGod::Core
 		return result;
 	}
 
+	// ---------------------------------------------------------------- berths (US-T435)
+
+	int OrbitalStructure::BerthCount() const { return Berths::Capacity(*this); }
+
+	int OrbitalStructure::BerthsTaken() const
+	{
+		int n = 0;
+		for (const auto& s : Berthed)
+			if (s != nullptr) n++;
+		return n;
+	}
+
+	int OrbitalStructure::BerthOf(const cs::Ref<Ship>& ship) const
+	{
+		for (int i = 0; i < Berthed.Count(); i++)
+			if (Berthed[i] == ship) return i;
+		return -1;
+	}
+
+	int OrbitalStructure::HoldingPlace(const cs::Ref<Ship>& ship) const
+	{
+		for (int i = 0; i < Holding.Count(); i++)
+			if (Holding[i] == ship) return i;
+		return -1;
+	}
+
+	namespace
+	{
+		/// A ship that calls at its world's stations while parked there: a civilian hull going about its business.
+		bool CallsWhileParked(const cs::Ref<Ship>& s, const cs::Ref<Ship>& piloted)
+		{
+			return s != nullptr && s != piloted && !s->Destroyed && !s->Derelict && s->Battle == nullptr && !s->IsEscort() &&
+				s->Phase == ShipPhase::Parked && s->Orbit != nullptr && !s->Wander && !s->OutOfPropellant &&
+				s->Spec != nullptr && !s->Spec->IsMilitary && s->Faction != nullptr && !s->Faction->IsPirate;
+		}
+
+		bool Gone(const cs::Ref<Ship>& s) { return s == nullptr || s->Destroyed; }
+	}
+
+	bool Infrastructure::Admit(OrbitalStructure& st, const cs::Ref<Ship>& ship)
+	{
+		int count = st.BerthCount();
+		while (st.Berthed.Count() < count) st.Berthed.Add(nullptr);
+		for (int i = 0; i < count; i++)
+			if (st.Berthed[i] == nullptr)
+			{
+				st.Berthed[i] = ship;
+				return true;
+			}
+		return false;
+	}
+
+	void Infrastructure::ClearHolding(OrbitalStructure& st)
+	{
+		while (st.Holding.Count() > 0 && st.BerthsTaken() < st.BerthCount() && Admit(st, st.Holding[0])) st.Holding.RemoveAt(0);
+	}
+
+	void Infrastructure::IndexBerths()
+	{
+		berthIndex.clear();
+		for (const auto& st : Structures)
+		{
+			for (int i = 0; i < st->Berthed.Count(); i++)
+				if (st->Berthed[i] != nullptr) berthIndex[st->Berthed[i].get()] = { st.get(), i };
+			for (int i = 0; i < st->Holding.Count(); i++)
+				if (st->Holding[i] != nullptr) berthIndex[st->Holding[i].get()] = { st.get(), -(i + 1) };
+		}
+		berthIndexValid = true;
+	}
+
+	void Infrastructure::UpdateBerths(const cs::List<cs::Ref<Ship>>& ships, const cs::Ref<Economy>& economy, const cs::Ref<Ship>& piloted)
+	{
+		// The stations ships call at, by world, in the infrastructure's own order.
+		std::unordered_map<int, std::vector<OrbitalStructure*>> atBody;
+		bool any = false;
+		for (const auto& st : Structures)
+		{
+			if (st->BerthCount() <= 0) continue;
+			any = true;
+			if (st->AtLagrange() || st->Settlement == nullptr || st->Settlement->Fallen) continue;
+			atBody[st->Body].push_back(st.get());
+		}
+		if (!any) return;
+		auto diplomacy = economy != nullptr ? economy->Diplomacy : nullptr;
+		// Where each ship may berth now: the station asked for, or its world's stations that will clear it in.
+		auto stationsFor = [&](const cs::Ref<Ship>& s, std::vector<OrbitalStructure*>& out)
+		{
+			out.clear();
+			cs::Ref<OrbitalStructure> asked;
+			if (requested.TryGetValue(s, asked))
+			{
+				if (asked != nullptr && !Gone(s)) out.push_back(asked.get());
+				return;
+			}
+			if (!CallsWhileParked(s, piloted)) return;
+			auto it = atBody.find(s->Orbit->Body);
+			if (it == atBody.end()) return;
+			for (auto* st : it->second)
+				if (diplomacy == nullptr || diplomacy->CanDockAt(s->Faction, st->Settlement)) out.push_back(st);
+		};
+		auto contains = [](const std::vector<OrbitalStructure*>& v, const OrbitalStructure* st)
+		{
+			for (auto* x : v)
+				if (x == st) return true;
+			return false;
+		};
+
+		// Ships that have left (or no longer call) give up their berths and their places in line.
+		std::vector<OrbitalStructure*> where;
+		for (const auto& st : Structures)
+		{
+			for (int i = 0; i < st->Berthed.Count(); i++)
+			{
+				auto s = st->Berthed[i];
+				if (s == nullptr) continue;
+				stationsFor(s, where);
+				if (!contains(where, st.get())) st->Berthed[i] = nullptr;
+			}
+			for (int i = st->Holding.Count() - 1; i >= 0; i--)
+			{
+				stationsFor(st->Holding[i], where);
+				if (!contains(where, st.get())) st->Holding.RemoveAt(i);
+			}
+			// Those already waiting are cleared in first, in the order they came.
+			ClearHolding(*st);
+		}
+		IndexBerths();
+
+		// Newcomers, in the fleet's order: the lowest free berth at the first of their stations with one, else the line.
+		for (const auto& s : ships)
+		{
+			if (s == nullptr || berthIndex.count(s.get()) > 0) continue;
+			stationsFor(s, where);
+			if (where.empty()) continue;
+			size_t start = static_cast<size_t>(cs::Math::Max(0, s->Id)) % where.size();
+			bool placed = false;
+			for (size_t k = 0; k < where.size() && !placed; k++)
+			{
+				auto* st = where[(start + k) % where.size()];
+				if (st->BerthsTaken() < st->BerthCount()) placed = Admit(*st, s);
+			}
+			if (!placed) where[start]->Holding.Add(s);
+		}
+		IndexBerths();
+	}
+
+	cs::Ref<OrbitalStructure> Infrastructure::BerthingStationOf(const cs::Ref<SpaceGod::Core::Settlement>& port) const
+	{
+		if (port == nullptr) return nullptr;
+		static const StructureKind order[] = { StructureKind::Habitat, StructureKind::Gateway, StructureKind::Shipyard, StructureKind::Depot, StructureKind::Factory };
+		for (auto kind : order)
+		{
+			cs::Ref<OrbitalStructure> best;
+			for (const auto& st : Structures)
+			{
+				if (st->Settlement != port || st->Kind != kind || st->BerthCount() <= 0) continue;
+				if (best == nullptr || st->BerthCount() - st->BerthsTaken() > best->BerthCount() - best->BerthsTaken()) best = st;
+			}
+			if (best != nullptr) return best;
+		}
+		return nullptr;
+	}
+
+	int Infrastructure::RequestBerth(const cs::Ref<OrbitalStructure>& station, const cs::Ref<Ship>& ship)
+	{
+		if (station == nullptr || ship == nullptr || station->BerthCount() <= 0) return -1;
+		if (!berthIndexValid) IndexBerths();
+		int berth = -1;
+		auto at = BerthedAt(ship, berth);
+		if (at == station)
+		{
+			requested[ship] = station;
+			return berth;
+		}
+		ReleaseBerth(ship);
+		requested[ship] = station;
+		if (station->BerthsTaken() < station->BerthCount() && station->Holding.Count() == 0 && Admit(*station, ship))
+		{
+			IndexBerths();
+			return station->BerthOf(ship);
+		}
+		station->Holding.Add(ship);
+		IndexBerths();
+		return -1;
+	}
+
+	void Infrastructure::ReleaseBerth(const cs::Ref<Ship>& ship)
+	{
+		if (ship == nullptr) return;
+		requested.Remove(ship);
+		for (const auto& st : Structures)
+		{
+			bool freed = false;
+			for (int i = 0; i < st->Berthed.Count(); i++)
+				if (st->Berthed[i] == ship) { st->Berthed[i] = nullptr; freed = true; }
+			for (int i = st->Holding.Count() - 1; i >= 0; i--)
+				if (st->Holding[i] == ship) st->Holding.RemoveAt(i);
+			if (freed) ClearHolding(*st);
+		}
+		IndexBerths();
+	}
+
+	cs::Ref<OrbitalStructure> Infrastructure::BerthedAt(const cs::Ref<Ship>& ship, int& berth) const
+	{
+		berth = -1;
+		if (ship == nullptr) return nullptr;
+		if (!berthIndexValid) const_cast<Infrastructure*>(this)->IndexBerths();
+		auto it = berthIndex.find(ship.get());
+		if (it == berthIndex.end() || it->second.second < 0) return nullptr;
+		berth = it->second.second;
+		for (const auto& st : Structures)
+			if (st.get() == it->second.first) return st;
+		return nullptr;
+	}
+
+	cs::Ref<OrbitalStructure> Infrastructure::HoldingAt(const cs::Ref<Ship>& ship, int& place) const
+	{
+		place = -1;
+		if (ship == nullptr) return nullptr;
+		if (!berthIndexValid) const_cast<Infrastructure*>(this)->IndexBerths();
+		auto it = berthIndex.find(ship.get());
+		if (it == berthIndex.end() || it->second.second >= 0) return nullptr;
+		place = -it->second.second - 1;
+		for (const auto& st : Structures)
+			if (st.get() == it->second.first) return st;
+		return nullptr;
+	}
+
 	cs::String Infrastructure::FacilityName(IndustryKind k)
 	{
 		switch (k)
@@ -303,10 +535,10 @@ namespace SpaceGod::Core
 			{
 				auto k = f->Recipe->Kind;
 				if (k == IndustryKind::Mine || k == IndustryKind::Farm) continue;
-				if (k == IndustryKind::Shipyard) list.Add(std::make_tuple(StructureKind::Shipyard, k, cs::Cat(s->Name, " ", FacilityName(k)), 3.5));
-				else list.Add(std::make_tuple(StructureKind::Factory, k, cs::Cat(s->Name, " ", FacilityName(k)), 1.6));
+				if (k == IndustryKind::Shipyard) list.Add(std::make_tuple(StructureKind::Shipyard, k, cs::Cat(s->Name, " ", FacilityName(k)), Berths::LengthKmFor(StructureKind::Shipyard)));
+				else list.Add(std::make_tuple(StructureKind::Factory, k, cs::Cat(s->Name, " ", FacilityName(k)), Berths::LengthKmFor(StructureKind::Factory)));
 			}
-			if (s->Population >= 100e3 && b->Kind != BodyKind::Station) list.Add(std::make_tuple(StructureKind::Habitat, IndustryKind::Farm, cs::Cat(s->Name, " Habitat"), 2.2));
+			if (s->Population >= 100e3 && b->Kind != BodyKind::Station) list.Add(std::make_tuple(StructureKind::Habitat, IndustryKind::Farm, cs::Cat(s->Name, " Habitat"), Berths::LengthKmFor(StructureKind::Habitat)));
 
 			for (const auto& [kind, industry, name, km] : list)
 			{
@@ -412,17 +644,17 @@ namespace SpaceGod::Core
 
 	void Infrastructure::AddSolLagrangeStations(const cs::Ref<Faction>& inner, const cs::Ref<Faction>& trojans)
 	{
-		AtPoint("Cislunar Depot", StructureKind::Depot, "Moon", LagrangePoint::L1, 1.2, inner,
+		AtPoint("Cislunar Depot", StructureKind::Depot, "Moon", LagrangePoint::L1, Berths::LengthKmFor(StructureKind::Depot), inner,
 			"Propellant depot at Earth-Moon L1, the low-energy waypoint between Earth and the Moon (game layer).");
-		AtPoint("L1 Gateway", StructureKind::Gateway, "Moon", LagrangePoint::L1, 2.0, inner,
+		AtPoint("L1 Gateway", StructureKind::Gateway, "Moon", LagrangePoint::L1, Berths::LengthKmFor(StructureKind::Gateway), inner,
 			"Transfer station at Earth-Moon L1, where Earth-Moon traffic changes ships (game layer).");
-		AtPoint("Farside Depot", StructureKind::Depot, "Moon", LagrangePoint::L2, 1.0, inner,
+		AtPoint("Farside Depot", StructureKind::Depot, "Moon", LagrangePoint::L2, Berths::LengthKmFor(StructureKind::Depot), inner,
 			"Propellant depot at Earth-Moon L2, beyond the Moon, for ships leaving cislunar space (game layer).");
 		AtPoint("Sunward Relay", StructureKind::Relay, "Earth", LagrangePoint::L1, 0.4, inner,
 			"Signal station at Sun-Earth L1: an hour's warning of solar storms, relayed across the system (game layer).");
-		AtPoint("Outbound Depot", StructureKind::Depot, "Earth", LagrangePoint::L2, 1.4, inner,
+		AtPoint("Outbound Depot", StructureKind::Depot, "Earth", LagrangePoint::L2, Berths::LengthKmFor(StructureKind::Depot), inner,
 			"Propellant depot at Sun-Earth L2, the departure point for the outer system (game layer).");
-		AtPoint("Greek Camp Depot", StructureKind::Depot, "Jupiter", LagrangePoint::L4, 1.2, trojans,
+		AtPoint("Greek Camp Depot", StructureKind::Depot, "Jupiter", LagrangePoint::L4, Berths::LengthKmFor(StructureKind::Depot), trojans,
 			"Propellant depot at Sun-Jupiter L4, 60 degrees ahead of Jupiter, serving the Greek camp's miners (game layer).");
 		AtPoint("Trojan Camp Relay", StructureKind::Relay, "Jupiter", LagrangePoint::L5, 0.4, trojans,
 			"Signal station at Sun-Jupiter L5, 60 degrees behind Jupiter, the only ears in the Trojan camp (game layer).");

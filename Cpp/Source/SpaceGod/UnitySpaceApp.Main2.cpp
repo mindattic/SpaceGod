@@ -1128,6 +1128,23 @@ namespace SpaceGod
 				}
 
 				Core::DVec3 facing;
+				// US-T435: a hull calling at a station is drawn in its berth there (nose-in on its arm), or holding off the
+				// station's end while every berth is taken: square to the station, never sidestepping.
+				if (drawn->Phase == Core::ShipPhase::Parked && Structures != nullptr && World()->Infrastructure != nullptr)
+				{
+					int berth = -1, place = -1;
+					double length = shipLength[i] * Core::ShipLod::ExtentFactor(ship);
+					Quaternion moored;
+					bool placed = false;
+					if (auto station = World()->Infrastructure->BerthedAt(ship, berth)) placed = Structures->BerthPose(station, berth, length, shipScene[i], moored);
+					else if (auto line = World()->Infrastructure->HoldingAt(ship, place)) placed = Structures->HoldPose(line, place, length, shipScene[i], moored);
+					if (placed)
+					{
+						shipRotation[i] = moored;
+						shipRotationInitialised[i] = true;
+						continue;
+					}
+				}
 				if (drawn->Phase == Core::ShipPhase::Parked)
 				{
 					auto orbit = drawn->Orbit;

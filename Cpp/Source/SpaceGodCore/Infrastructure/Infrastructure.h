@@ -9,6 +9,9 @@
 #include "Lagrange.h"
 #include "Persistence/Serializable.h"
 
+#include <unordered_map>
+#include <utility>
+
 namespace SpaceGod::Core
 {
 	class BodyCatalog;
@@ -99,6 +102,26 @@ namespace SpaceGod::Core
 
 		/// <summary>A yard's progress on the hull in its cradle (0..1), or 0.</summary>
 		double SlipProgress() const;
+
+		// ---------------------------------------------------------------- berths (US-T435)
+
+		/// <summary>The hull in each berth, by berth number (null: free). Sized to <see cref="BerthCount"/> as ships come.</summary>
+		cs::List<cs::Ref<Ship>> Berthed;
+
+		/// <summary>Ships that called with every berth taken, holding off the station in the order they came.</summary>
+		cs::List<cs::Ref<Ship>> Holding;
+
+		/// <summary>How many hulls it can berth at once (Berths::Capacity: its kind and length).</summary>
+		int BerthCount() const;
+
+		/// <summary>Berths taken now.</summary>
+		int BerthsTaken() const;
+
+		/// <summary>The berth <paramref name="ship"/> is in here, or -1.</summary>
+		int BerthOf(const cs::Ref<Ship>& ship) const;
+
+		/// <summary>Where <paramref name="ship"/> is in the line holding for a berth here (0 first), or -1.</summary>
+		int HoldingPlace(const cs::Ref<Ship>& ship) const;
 
 		cs::String ToString() const { return Name; }
 		SG_SERIALIZABLE(OrbitalStructure); // ObjectGraph registration (Persistence/Registrations)
@@ -279,6 +302,58 @@ namespace SpaceGod::Core
 		cs::Ref<OrbitalStructure> YardOf(const cs::Ref<SpaceGod::Core::Settlement>& s) const;
 
 		cs::List<cs::Ref<DockingRing>> RingsAt(int body) const;
+
+		// ---------------------------------------------------------------- berths (US-T435)
+
+		/// <summary>
+		/// Who is berthed where, brought up to date (World::Update, after the fleet moves). A ship calls at a station while it
+		/// is parked at the station's world (a civilian hull of a faction cleared to dock at its port: not a warship on
+		/// patrol, not a pirate, not one wandering, stranded, in a fight or flown from a helm), or while a berth has been
+		/// asked for it (<see cref="RequestBerth"/>, the player's docking). Each caller keeps the berth it has; a ship that has
+		/// left (or no longer calls) frees its berth; a new caller takes the lowest free berth at the first of its world's
+		/// stations (from one picked by its id, so traffic spreads over them) with one free, and holds off its own station
+		/// only when every berth at all of them is taken, cleared in, in the order it came, as one frees. Reads the ships and
+		/// writes nothing but the berths (and draws nothing from any random stream), so the simulation runs as it did.
+		/// </summary>
+		void UpdateBerths(const cs::List<cs::Ref<Ship>>& ships, const cs::Ref<Economy>& economy, const cs::Ref<Ship>& piloted);
+
+		/// <summary>The station a ship would berth at for a port: its habitat, else its gateway, its yard, its depot or its
+		/// works (the one with the most berths free); null for a port with nothing in orbit that takes ships.</summary>
+		cs::Ref<OrbitalStructure> BerthingStationOf(const cs::Ref<SpaceGod::Core::Settlement>& port) const;
+
+		/// <summary>
+		/// Asks <paramref name="station"/> for a berth for <paramref name="ship"/> (the player's docking): the berth it gets
+		/// (it keeps one it already has, and the request holds it there however it flies until <see cref="ReleaseBerth"/>),
+		/// or -1 with every berth taken, when it joins the line holding off the station (<see cref="OrbitalStructure::HoldingPlace"/>)
+		/// and is cleared into the first berth that frees.
+		/// </summary>
+		int RequestBerth(const cs::Ref<OrbitalStructure>& station, const cs::Ref<Ship>& ship);
+
+		/// <summary>Gives up whatever berth or place in a line <paramref name="ship"/> has, and its request; the next ship
+		/// holding there is cleared in.</summary>
+		void ReleaseBerth(const cs::Ref<Ship>& ship);
+
+		/// <summary>The station <paramref name="ship"/> is berthed at (and its berth), or null.</summary>
+		cs::Ref<OrbitalStructure> BerthedAt(const cs::Ref<Ship>& ship, int& berth) const;
+
+		/// <summary>The station <paramref name="ship"/> is holding off for a berth (and its place in the line), or null.</summary>
+		cs::Ref<OrbitalStructure> HoldingAt(const cs::Ref<Ship>& ship, int& place) const;
+
+	private:
+		/// <summary>The station each ship has asked a berth of (the player's docking). Not saved: docking is the player's view
+		/// of being alongside (UnitySpaceApp::Dock), so a loaded game starts undocked and the berth is freed.</summary>
+		cs::Dictionary<cs::Ref<Ship>, cs::Ref<OrbitalStructure>> requested;
+
+		/// <summary>Ship to (station, berth or -(place + 1) holding), rebuilt from the stations' lists whenever they change.
+		/// Not saved: a loaded game rebuilds it on first use.</summary>
+		std::unordered_map<const Ship*, std::pair<OrbitalStructure*, int>> berthIndex;
+		bool berthIndexValid = false;
+
+		void IndexBerths();
+		static bool Admit(OrbitalStructure& st, const cs::Ref<Ship>& ship);
+		static void ClearHolding(OrbitalStructure& st);
+
+	public:
 
 		// ---------------------------------------------------------------- building
 

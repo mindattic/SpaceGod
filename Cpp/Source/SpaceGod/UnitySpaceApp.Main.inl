@@ -273,6 +273,26 @@ public:
 	/// undocks and closes it.</summary>
 	cs::Ref<Core::Settlement> DockedAt;
 
+	/// <summary>US-T435: the station of the port docked at whose berth the held hull is moored in (and the berth, and the
+	/// hull), or null for a port with nothing in orbit that takes ships. The berth is the station's real capacity
+	/// (Infrastructure::RequestBerth), given up on casting off.</summary>
+	cs::Ref<Core::OrbitalStructure> DockedStation;
+	int DockedBerth = -1;
+	cs::Ref<Core::Ship> DockedShip;
+
+	/// <summary>US-T435: the port the held hull is holding off for a berth at (every berth at its station taken), and the
+	/// station; it is cleared in and docks as one frees, while it stays alongside.</summary>
+	cs::Ref<Core::Settlement> PendingDock;
+	cs::Ref<Core::OrbitalStructure> PendingDockStation;
+
+	/// <summary>US-T435: holds the hull docked in its berth (where the station draws it, matching the station's motion);
+	/// any stick input casts off. <paramref name="seed"/> on docking: brings it in, facing the station.</summary>
+	void MoorAtBerth(bool seed);
+
+	/// <summary>US-T435: the offset from <paramref name="body"/> (km, ecliptic) the scale model draws at
+	/// <paramref name="scene"/>, by Newton's method from <paramref name="guessKm"/> (in the body's neighbourhood).</summary>
+	bool SceneToFrameKm(int body, Core::DVec3 scene, Core::DVec3 guessKm, Core::DVec3& km);
+
 	/// <summary>The port screen (US-T266), open while docked; Esc closes it without undocking (Shift+M opens it again).</summary>
 	bool ShowPort = false;
 
