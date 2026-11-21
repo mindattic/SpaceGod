@@ -3,6 +3,7 @@
 #include "Systems/ProceduralSystems.h"
 #include "Systems/StarSystemSpec.h"
 #include "Systems/StarSystemBuilder.h"
+#include "Systems/Frontier.h"
 #include "Systems/FrontierSystems.h"
 #include "Systems/NearbySystems.h"
 #include "OrbitalElements.h"
@@ -107,6 +108,9 @@ namespace SpaceGod::Core
 			e->Name = Designation(starSeed);
 			e->Source = SourceName;
 			e->Seed = starSeed;
+			// US-T449: out on the frontier, a strange one is charted as an unidentified object (its own stream: the cell's is untouched).
+			auto odd = Frontier::Classify(starSeed, at);
+			if (odd != FrontierKind::None) Frontier::Chart(*e, odd);
 			list.Add(e);
 		}
 		return list;
@@ -235,6 +239,9 @@ namespace SpaceGod::Core
 		}
 		system->Summary = planets == 0 ? cs::Cat("A lone ", Kind(made->Spectral), " with no planets. Fiction, from the galaxy's seed.")
 			: cs::Cat("A ", Kind(made->Spectral), " with ", planets, " planet", (planets == 1 ? "" : "s"), ". Fiction, from the galaxy's seed.");
+		// US-T449: a strange frontier star made what it is, from a stream of its own after everything above was drawn.
+		auto odd = Frontier::Classify(star->Seed, star->PositionLy);
+		if (odd != FrontierKind::None) Frontier::Furnish(*system, odd, star->Seed, seed);
 		return system;
 	}
 

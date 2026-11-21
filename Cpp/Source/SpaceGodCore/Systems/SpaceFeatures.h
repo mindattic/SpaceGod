@@ -90,5 +90,13 @@ namespace SpaceGod::Core
 		static double HavenScanKm(double reachKm, double maskAtHaven, double maskAtScanner, bool pinging);
 		static constexpr double FlyInKm = 4000;
 		static constexpr double PingInNebulaKm = 40000;
+
+		/// <summary>
+		/// US-T449: the frontier system whose root is <paramref name="root"/> is strange in a way that shows here
+		/// (<see cref="Frontier.Note"/>): a star wrapped in a nebula, a white dwarf in the shell it shed, or a comet cloud's
+		/// falling ice. Its features are built with that from then on (derived, never saved: noted again when the system
+		/// is defined or loaded). <paramref name="frontierKind"/> is a <see cref="FrontierKind"/>.
+		/// </summary>
+		static void Mark(const cs::String& root, int frontierKind);
 	};
 }

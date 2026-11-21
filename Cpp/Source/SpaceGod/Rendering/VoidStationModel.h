@@ -37,6 +37,9 @@ namespace SpaceGod::Rendering
 		/// <summary>One of the two gimbal rings outside the shell (0 inner, 1 outer), in the XZ plane (axis +Y).</summary>
 		static cs::Ref<Mesh> Gimbal(int which);
 
+		/// <summary>US-T449: a frontier relic, an ancient ring-world broken into arcs, radius 1 in the XZ plane (axis +Y).</summary>
+		static cs::Ref<Mesh> Relic();
+
 		/// <summary>
 		/// A material for one station's metal: the ship shader (sun-lit plated metal, vertex coloured), its emissive
 		/// parts glowing the generator's violet. Owned by the view (destroyed with its system).

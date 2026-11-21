@@ -16,6 +16,7 @@
 #include "Information/GalaxyMap.h"
 #include "Information/LightSpeed.h"
 #include "Information/News.h"
+#include "Systems/Frontier.h" // US-T449
 #include "Systems/FtlNavigation.h"
 #include "Systems/GateConstruction.h"
 #include "Systems/GateNetwork.h"
@@ -30,6 +31,7 @@
 #include "GameLore.h"
 #include "Lore/LoreKeys.h"
 
+#include <algorithm>
 #include <iterator>
 
 using namespace SpaceGod::Core;
@@ -47,6 +49,8 @@ namespace SpaceGod::UI
 		fitted = false;
 		builtAt = -10.0f;
 		if (!modeLoaded) LoadMode(); // US-T262: the mode this profile last used
+		if (RequestedMode >= 0) { mode = static_cast<MapMode>(RequestedMode); RequestedMode = -1; } // US-T449: a script's choice, not saved
+		if (RequestFit) { fitted = false; RequestFit = false; }
 	}
 
 	void GalaxyMapScreen::Draw()
@@ -267,6 +271,14 @@ namespace SpaceGod::UI
 	{
 		GUI::BeginClip(canvas);
 		auto local = Rect(0, 0, canvas.width, canvas.height);
+		// US-T449: what the labels must keep clear of, in the canvas's own coordinates: the find field (and its results)
+		// and the pins panel over the map.
+		placedLabels.clear();
+		auto toLocal = [&](Rect r) { return Rect(r.x - canvas.x - 4, r.y - canvas.y - 4, r.width + 8, r.height + 8); };
+		if (findRect.width > 0) placedLabels.push_back(toLocal(findRect));
+		if (findListRect.width > 0) placedLabels.push_back(toLocal(findListRect));
+		if (pinsRect.width > 0) placedLabels.push_back(toLocal(pinsRect));
+		std::vector<StarLabel> starLabels;
 		auto focus = selected != nullptr && selected != app->ActiveSystem ? selected : hovered;
 		// Nothing picked: the helm's plotted course (U.SPC-T516).
 		if ((focus == nullptr || focus == app->ActiveSystem) && app->Course != nullptr && !app->Course->Done()) focus = app->Course->Destination;
@@ -395,23 +407,129 @@ namespace SpaceGod::UI
 				GUI::color = old;
 			}
 
-			cs::String name = m->System->Name == "Sol System" ? cs::String("SOL") : cs::Strings::ToUpperInvariant(m->System->Name);
-			Label(p + Vector2(12, -20), name, m->Here ? Accent : m->Known() ? Color::white() : Unknown, false);
+			// US-T449: the labels are placed after every star is drawn, the most wanted first, kept from overprinting.
+			if (!local.Contains(p)) continue;
+			StarLabel l;
+			l.P = p;
+			l.Name = m->System->Name == "Sol System" ? cs::String("SOL") : cs::Strings::ToUpperInvariant(m->System->Name);
+			l.NameColor = m->Here ? Accent : m->Known() ? Color::white() : Unknown;
 			if (!political)
 			{
 				// US-T262: the mode's own line under the name.
 				bool tinted = false;
 				auto tint = ModeTint(m, tinted);
-				Label(p + Vector2(12, -5), ModeSub(m), tinted ? Color(tint.r, tint.g, tint.b, 0.95f) : Dim, true);
-				continue;
+				l.Sub = ModeSub(m);
+				l.SubColor = tinted ? Color(tint.r, tint.g, tint.b, 0.95f) : Dim;
+				if (mode == MapMode::Exploration && Frontier::KindOf(*m->System) != FrontierKind::None) l.SubColor = Color(DeepColor.r, DeepColor.g, DeepColor.b, 0.95f);
 			}
-			cs::String sub = m->Here ? cs::String("you are here")
-				: !m->Known() ? cs::String("no news")
-				: (m->Holder != nullptr ? cs::Cat(m->Holder->Name, "  ·  ") : cs::String("unclaimed  ·  ")) + Age(m->AgeDays);
-			Label(p + Vector2(12, -5), sub, m->Holder != nullptr && showTerritory ? Tint(m->Holder->Color, 0.95f) : Dim, true);
+			else
+			{
+				l.Sub = m->Here ? cs::String("you are here")
+					: !m->Known() ? cs::String("no news")
+					: (m->Holder != nullptr ? cs::Cat(m->Holder->Name, "  ·  ") : cs::String("unclaimed  ·  ")) + Age(m->AgeDays);
+				l.SubColor = m->Holder != nullptr && showTerritory ? Tint(m->Holder->Color, 0.95f) : Dim;
+			}
+			bool picked = m->System == selected || m->System == hovered;
+			l.Must = m->Here || picked;
+			l.SubAlways = l.Must;
+			bool strange = mode == MapMode::Exploration && Frontier::KindOf(*m->System) != FrontierKind::None;
+			l.Priority = m->Here ? 0 : picked ? 1 : strange ? 2 : m->Known() ? 3 : 4;
+			// Among equals, the nearer the middle of the view the sooner (what the eye is on keeps its name).
+			l.Order = (p - local.center()).sqrMagnitude();
+			starLabels.push_back(l);
 		}
+		PlaceStarLabels(starLabels, local);
 		DrawFindMarks(local); // US-T306
 		GUI::EndClip();
+	}
+
+	Vector2 GalaxyMapScreen::LabelSize(const cs::String& s, bool minor)
+	{
+		const auto& style = minor ? labelDim : label;
+		return style->CalcSize(GUIContent(s));
+	}
+
+	bool GalaxyMapScreen::LabelFree(const Rect& placed, const Rect& local) const
+	{
+		// A little air round each name (the measured size runs a touch under the drawn text).
+		Rect r(placed.x - 4, placed.y - 2, placed.width + 8, placed.height + 4);
+		if (r.xMin() < local.xMin() + 2 || r.yMin() < local.yMin() + 2 || r.xMax() > local.xMax() - 2 || r.yMax() > local.yMax() - 2) return false;
+		for (const auto& o : placedLabels)
+			if (o.Overlaps(r)) return false;
+		return true;
+	}
+
+	void GalaxyMapScreen::PlaceStarLabels(std::vector<StarLabel>& labels, const Rect& local)
+	{
+		// US-T449: the names, the most wanted first (here, the picked one, a strange system, the heard-from, the rest), each at
+		// the first spot round its star that is clear: right, left, below, above. A subtitle goes with its name only where
+		// both fit (always for here and the picked one); a name with no clear spot is left off until zoom spreads the stars
+		// (here and the picked one are drawn regardless). Every name is still there on hover.
+		std::stable_sort(labels.begin(), labels.end(), [](const StarLabel& a, const StarLabel& b)
+		{
+			return a.Priority != b.Priority ? a.Priority < b.Priority : a.Order < b.Order;
+		});
+		for (const auto& l : labels)
+		{
+			Vector2 ns = LabelSize(l.Name, false);
+			Vector2 ss = l.Sub.empty() ? Vector2(0, 0) : LabelSize(l.Sub, true);
+			const float gap = 1;
+			auto blockAt = [&](int spot, bool withSub, Vector2& nameAt, Vector2& subAt, Rect& block)
+			{
+				float w = withSub ? Mathf::Max(ns.x, ss.x) : ns.x;
+				float h = withSub ? ns.y + gap + ss.y - 4 : ns.y;
+				Vector2 at;
+				switch (spot)
+				{
+				case 0: at = l.P + Vector2(12, -20); break;          // right (the old place)
+				case 1: at = l.P + Vector2(-12 - w, -20); break;     // left
+				case 2: at = l.P + Vector2(-w * 0.5f, 12); break;    // below
+				default: at = l.P + Vector2(-w * 0.5f, -16 - h); break; // above
+				}
+				nameAt = at;
+				subAt = at + Vector2(0, ns.y + gap - 4);
+				block = Rect(at.x, at.y + 2, w, h - 2);
+			};
+			Vector2 nameAt, subAt;
+			Rect block;
+			bool placed = false, sub = false;
+			for (int pass = 0; pass < 2 && !placed; pass++)
+			{
+				bool withSub = pass == 0 && !l.Sub.empty();
+				if (pass == 0 && l.Sub.empty()) continue;
+				for (int spot = 0; spot < 4 && !placed; spot++)
+				{
+					blockAt(spot, withSub, nameAt, subAt, block);
+					if (LabelFree(block, local)) { placed = true; sub = withSub; }
+				}
+			}
+			if (!placed && l.Must)
+			{
+				blockAt(0, !l.Sub.empty(), nameAt, subAt, block);
+				placed = true;
+				sub = !l.Sub.empty();
+			}
+			if (!placed) continue;
+			if (l.SubAlways && !l.Sub.empty() && !sub)
+			{
+				// Here and the picked one keep their line: under the name, wherever it went.
+				sub = true;
+				block.height += ss.y;
+				block.width = Mathf::Max(block.width, ss.x);
+			}
+			placedLabels.push_back(block);
+			{
+				// A faint dark backing, so the contact rings and lines crowding a star don't strike through its name.
+				float w = sub ? Mathf::Max(ns.x, ss.x) : ns.x;
+				float bottom = sub ? subAt.y + ss.y - 2 : nameAt.y + ns.y - 2;
+				auto old = GUI::color;
+				GUI::color = Color(0.02f, 0.03f, 0.06f, 0.85f);
+				GUI::DrawTexture(Rect(nameAt.x - 3, nameAt.y + 2, w + 6, bottom - nameAt.y - 2), Icons::White());
+				GUI::color = old;
+			}
+			Label(nameAt, l.Name, l.NameColor, false);
+			if (sub) Label(subAt, l.Sub, l.SubColor, true);
+		}
 	}
 
 	void GalaxyMapScreen::FlowDots(Vector2 a, Vector2 b, const cs::Ref<MapLink>& l)

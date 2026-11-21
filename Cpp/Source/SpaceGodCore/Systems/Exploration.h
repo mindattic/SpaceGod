@@ -36,6 +36,8 @@ namespace SpaceGod::Core
 		Anomaly,
 		/// <summary>A ship graveyard (<see cref="Graveyards"/>), come on.</summary>
 		Graveyard,
+		/// <summary>US-T449: a strange frontier system's heart (a pulsar, a black hole...) or a relic, come to (<see cref="Frontier"/>).</summary>
+		Phenomenon,
 	};
 	SPACEGODCORE_API const char* ToString(SurveyKind v);
 

@@ -15,6 +15,7 @@
 #include "SimClock.h"
 #include "Systems/Biomes.h"
 #include "Systems/DeepSpace.h"
+#include "Systems/Frontier.h" // US-T449
 #include "Systems/Galaxy.h"
 #include "Systems/HelmFtl.h"
 #include "World.h"
@@ -176,6 +177,7 @@ namespace SpaceGod
 		frame.System = ActiveSystem->Name;
 		frame.Wild = Rendering::SystemSkies::IsWild(frame.System);
 		frame.Hero = frame.System == SkyHeroSystem();
+		frame.Giants = Core::Frontier::KindOf(*ActiveSystem) == Core::FrontierKind::None && !Core::Frontier::IsUncharted(*ActiveSystem); // US-T449
 		frame.Interstellar = interstellar;
 		frame.CenterRelative = Relative(BodyScene(0));
 		frame.RimRadius = static_cast<float>(SkyRimScene());

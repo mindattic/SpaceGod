@@ -43,6 +43,8 @@ namespace SpaceGod::Core
 		Sighting,
 		/// <summary>A named pilot met (hailed, embodied, fought or rescued).</summary>
 		Pilot,
+		/// <summary>US-T449: something strange out on the frontier (a pulsar, a black hole, a relic...), come to.</summary>
+		Phenomenon,
 	};
 	SPACEGODCORE_API const char* ToString(DiscoveryKind v);
 
@@ -125,6 +127,16 @@ namespace SpaceGod::Core
 		int Sweep(const Galaxy& galaxy, const Place& place, double jd);
 
 		/// <summary>
+		/// US-T449: writes in body <paramref name="index"/> of <paramref name="system"/> as surveyed (<paramref name="how"/>: "come
+		/// close to", "picked up on a ping"): on uncharted frontier ground this is what reveals it to the views. False if it was
+		/// on the log already or is no body to survey (the root, a star, a barycentre).
+		/// </summary>
+		bool Reveal(const StarSystem& system, int index, double jd, const char* how);
+
+		/// <summary>US-T449: whether body <paramref name="name"/> of <paramref name="system"/> is on the log (surveyed).</summary>
+		bool HasBody(const cs::String& system, const cs::String& name) const;
+
+		/// <summary>
 		/// The scanner's readings of a find, as the simulation stands now (a body's gravity and temperature, a settlement's
 		/// people and flag, a pilot's rank and hull...), a line each; when the thing can no longer be found (a system let go,
 		/// a pilot dead and gone) only what was written in at the time.
@@ -135,7 +147,7 @@ namespace SpaceGod::Core
 		static const char* Heading(DiscoveryKind kind);
 
 		/// <summary>How many kinds there are (the last kind's value plus one).</summary>
-		static constexpr int KindCount = static_cast<int>(DiscoveryKind::Pilot) + 1;
+		static constexpr int KindCount = static_cast<int>(DiscoveryKind::Phenomenon) + 1;
 
 	private:
 		/// <summary>The ids of <see cref="Entries"/>, built again whenever it falls out of step (after a load). Not saved.</summary>

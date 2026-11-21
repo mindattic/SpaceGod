@@ -15,6 +15,7 @@
 #include "BodyDefinition.h"
 #include "BodyOrientation.h"
 #include "ScaleModel.h"
+#include "Systems/Frontier.h"
 #include "Systems/VoidSites.h"
 
 #include <algorithm>
@@ -91,6 +92,11 @@ namespace SpaceGod::Views
 			return;
 		}
 		if (BuildVoidSite(parent)) return;
+		if (Frontier::IsPulsar(*body) || Frontier::IsBlackHole(*body) || Frontier::IsRogue(*body) || Frontier::IsRelic(*body))
+		{
+			BuildFrontierBody(parent); // US-T449
+			return;
+		}
 		if (station)
 		{
 			material = ShipModels::ProceduralMaterial();
@@ -268,6 +274,238 @@ namespace SpaceGod::Views
 			glow->localPosition = relative + toCamera * Mathf::Min(radius * 1.05f, distance * 0.5f);
 			glow->localRotation = Quaternion::LookRotation(-toCamera, Vector3::up());
 			glow->localScale = Vector3::one() * size;
+		}
+		if (pulsar || blackHole || rogue || relic) ApplyFrontierBody(relative, radius, cameraForward);
+	}
+
+	// ---------------------------------------------------------------- US-T449: the frontier's strange bodies
+
+	cs::Ref<Transform> BodyView::AddGlowQuad(const cs::Ref<Transform>& parent, const cs::String& name, Color color, float intensity, float falloff, cs::Ref<Material>& made)
+	{
+		auto go = NewGameObject(name);
+		go->transform->SetParent(parent, false);
+		AddComponent<MeshFilter>(go)->sharedMesh = quadMesh();
+		auto r = AddComponent<MeshRenderer>(go);
+		made = Materials::Create(Materials::Glow(), name);
+		made->SetColor("_Color", color);
+		made->SetFloat("_Intensity", intensity);
+		made->SetFloat("_Falloff", falloff);
+		r->SetSharedMaterial(made);
+		r->shadowCastingMode = ShadowCastingMode::Off;
+		r->receiveShadows = false;
+		return go->transform;
+	}
+
+	cs::Ref<Transform> BodyView::AddGlowBand(const cs::Ref<Transform>& parent, const cs::String& name, const std::vector<float>& radii, const std::vector<float>& us,
+		float intensity, float falloff, cs::Ref<Material>& made, cs::Ref<Mesh>& mesh, std::vector<float>& angles, std::vector<float>* radial)
+	{
+		// Rings of vertices in the local XY plane (its normal +Z, as a glow quad's), uv (u, 0.5): the Glow shader's radial
+		// falloff then runs across the band, peaking where u is 0.5 and gone where it is 1.
+		const int segments = 128;
+		const int rings = static_cast<int>(radii.size());
+		std::vector<Vector3> vertices;
+		std::vector<Vector2> uvs;
+		std::vector<Color> colors;
+		angles.clear();
+		if (radial) radial->clear();
+		for (int i = 0; i <= segments; i++)
+		{
+			float a = Mathf::PI * 2.0f * i / segments;
+			for (int j = 0; j < rings; j++)
+			{
+				vertices.push_back(Vector3(Mathf::Sin(a), Mathf::Cos(a), 0) * radii[j]); // a measured from +Y
+				uvs.push_back(Vector2(us[j], 0.5f));
+				colors.push_back(Color::white());
+				angles.push_back(a);
+				if (radial) radial->push_back(rings > 1 ? static_cast<float>(j) / (rings - 1) : 0);
+			}
+		}
+		std::vector<int> triangles;
+		for (int i = 0; i < segments; i++)
+			for (int j = 0; j + 1 < rings; j++)
+			{
+				int a = i * rings + j, b = a + 1, c = a + rings, d = c + 1;
+				// Both windings: whichever face is toward the eye is drawn.
+				int quad[12] = { a, b, c, c, b, d, a, c, b, c, d, b };
+				triangles.insert(triangles.end(), quad, quad + 12);
+			}
+		mesh = Materials::Own(cs::New<Mesh>(name));
+		mesh->MarkDynamic();
+		mesh->SetVertices(vertices);
+		mesh->SetUVs(0, uvs);
+		mesh->SetColors(colors);
+		mesh->SetTriangles(triangles, 0);
+		mesh->RecalculateNormals();
+
+		auto go = NewGameObject(name);
+		go->transform->SetParent(parent, false);
+		AddComponent<MeshFilter>(go)->sharedMesh = mesh;
+		auto r = AddComponent<MeshRenderer>(go);
+		made = Materials::Create(Materials::Glow(), name);
+		made->SetColor("_Color", Color::white());
+		made->SetFloat("_Intensity", intensity);
+		made->SetFloat("_Falloff", falloff);
+		r->SetSharedMaterial(made);
+		r->shadowCastingMode = ShadowCastingMode::Off;
+		r->receiveShadows = false;
+		return go->transform;
+	}
+
+	void BodyView::ColourBand(const cs::Ref<Mesh>& mesh, const std::vector<float>& angles, const std::vector<float>* radial, float lean, Color hot, Color cool)
+	{
+		// Relativistic beaming, roughly: the gas coming toward the eye (local +Y) brightens by about the cube of its Doppler
+		// factor and shifts blue-white, the gas going away dims and reddens. Lean is the sine of the tilt (0 face-on, where
+		// all of it moves across the line of sight and none of it is boosted).
+		const float beta = 0.4f;
+		float top = Mathf::Pow(1 + beta * lean, 3.0f);
+		std::vector<Color> colors(angles.size());
+		for (size_t i = 0; i < angles.size(); i++)
+		{
+			float toward = Mathf::Cos(angles[i]);
+			float boost = Mathf::Pow(1 + beta * lean * toward, 3.0f) / top;
+			Color c = Color::Lerp(cool, hot, 0.5f + 0.5f * toward * lean);
+			// The inner edge runs hottest.
+			if (radial) c = Color::Lerp(Color::Lerp(c, Color::white(), 0.45f), c, (*radial)[i]);
+			colors[i] = Color(c.r * boost, c.g * boost, c.b * boost, 1);
+		}
+		mesh->SetColors(colors);
+	}
+
+	void BodyView::BuildFrontierBody(const cs::Ref<Transform>& parent)
+	{
+		pulsar = Frontier::IsPulsar(*Body);
+		blackHole = Frontier::IsBlackHole(*Body);
+		rogue = Frontier::IsRogue(*Body);
+		relic = Frontier::IsRelic(*Body);
+		if (pulsar)
+		{
+			// The neutron star: a small white-hot core (drawn at PulsarCoreScale of the radius the view frames, so it sits
+			// inside its glare rather than filling the frame as a flat white disc), a tight blue-white glare on it, a wider
+			// soft halo, and the beams through it.
+			material = Materials::Create(Materials::Sun(), Body->Name);
+			material->SetColor("_Color", Color(0.78f, 0.88f, 1.0f));
+			material->SetFloat("_Intensity", 1.0f);
+			pulsarHalo = AddGlowQuad(parent, "Pulsar Halo", Color(0.35f, 0.55f, 1.0f), 0.7f, 1.6f, pulsarHaloMaterial);
+			accretionGlare = AddGlowQuad(parent, "Pulsar Glare", Color(0.75f, 0.88f, 1.0f), 1.6f, 4.0f, glowMaterial);
+			glowRenderer = GetComponent<MeshRenderer>(accretionGlare->gameObject());
+			beam = AddGlowQuad(parent, "Pulsar Beams", Color(0.6f, 0.8f, 1.0f), 1.5f, 1.4f, beamMaterial);
+		}
+		else if (blackHole)
+		{
+			// The shadow: nothing comes out, so it is drawn unlit black (the hull shader with no albedo, no plating, no rim:
+			// the star shader would give it a limb). The disc in its equator and the ring of bent light about it are the
+			// only light.
+			material = Materials::Create(Materials::Ship(), Body->Name);
+			material->SetColor("_Color", Color(0, 0, 0));
+			material->SetColor("_Tint", Color(0, 0, 0));
+			material->SetFloat("_UseVertexColor", 0);
+			material->SetFloat("_PlatingStrength", 0);
+			material->SetFloat("_Highlight", 0);
+			material->SetFloat("_EngineGlow", 0);
+			// The disc, in units of the shadow's radius: hot and sharp at its inner edge (the last stable orbit), fading out.
+			// Kept under white at its peak and fading steeply: close up it fills most of the view, and additive over a
+			// nebula a brighter or flatter disc washes the whole frame out to white.
+			accretionDisc = AddGlowBand(parent, "Accretion Disc", { 2.0f, 2.6f, 6.5f }, { 0.5f, 0.56f, 1.0f }, 0.6f, 3.2f,
+				accretionMaterial, discMesh, discAngles, &discRadial);
+			// The photon ring: thin and bright just outside the shadow, faint out to the lensed glow round it.
+			photonRing = AddGlowBand(parent, "Photon Ring", { 0.97f, 1.04f, 1.3f }, { 1.0f, 0.5f, 1.0f }, 1.4f, 2.4f,
+				photonMaterial, photonMesh, photonAngles, nullptr);
+		}
+		else if (rogue)
+		{
+			// A dark world, no sun to light it: it shows by a faint glow of its own heat and the rim of starlight on it.
+			material = Materials::Create(Materials::Planet(), Body->Name);
+			material->SetFloat("_UseTexture", 0);
+			material->SetColor("_Color", Color(0.2f, 0.17f, 0.2f));
+			material->SetFloat("_NoiseStrength", 0.12f);
+			material->SetFloat("_NoiseScale", 2.2f);
+			material->SetColor("_AtmoColor", Color(0.55f, 0.18f, 0.14f));
+			material->SetFloat("_AtmoStrength", 0.6f);
+			material->SetFloat("_Highlight", 0.35f);
+			accretionGlare = AddGlowQuad(parent, "Rogue Warmth", Color(0.5f, 0.14f, 0.1f), 0.45f, 2.4f, accretionGlareMaterial);
+		}
+		else
+		{
+			// A relic: the broken ring-world in place of a sphere, in the void stations' weathered metal.
+			GetComponent<MeshFilter>(Root)->sharedMesh = VoidStationModel::Relic();
+			material = VoidStationModel::CreateMetal(Body->Name);
+		}
+		renderer->SetSharedMaterial(material);
+	}
+
+	void BodyView::ApplyFrontierBody(Vector3 relative, float radius, Vector3 cameraForward)
+	{
+		float distance = relative.magnitude();
+		Vector3 toCamera = distance > 0 ? -relative / distance : -cameraForward;
+		Vector3 pole = ToUnity(Body->Pole);
+		if (pole.sqrMagnitude() < 1e-6f) pole = Vector3::up();
+		pole = pole.normalized();
+		// A quad lying along <axis>, turned about it to face the camera as nearly as it can.
+		auto along = [&](Vector3 axis)
+		{
+			Vector3 f = -toCamera - axis * Vector3::Dot(-toCamera, axis);
+			if (f.sqrMagnitude() < 1e-8f) f = Vector3::Cross(axis, Mathf::Abs(axis.y) < 0.9f ? Vector3::up() : Vector3::right());
+			return Quaternion::LookRotation(f.normalized(), axis);
+		};
+		if (pulsar && beam)
+		{
+			// The magnetic axis, 50 degrees off the spin axis, swept round it: real pulsars spin up to hundreds of times a
+			// second; the view turns it no faster than a lighthouse so the sweep reads.
+			double spinS = Mathf::Max(0.001f, static_cast<float>(Body->RotationHours * 3600));
+			float period = Mathf::Clamp(static_cast<float>(spinS) * 4.0f, 1.6f, 6.0f);
+			Vector3 side = Vector3::Cross(pole, Mathf::Abs(pole.y) < 0.9f ? Vector3::up() : Vector3::right()).normalized();
+			float a = Time::unscaledTime * 360.0f / period;
+			Vector3 magnetic = (Quaternion::AngleAxis(a, pole) * (Quaternion::AngleAxis(50.0f, side) * pole)).normalized();
+			// The core is small within the radius the view frames (and labels, and picks) the pulsar by.
+			Root->transform->localScale = Vector3::one() * (radius * PulsarCoreScale);
+			float core = radius * PulsarCoreScale;
+			float length = Mathf::Max(radius * 40.0f, distance * 0.8f);
+			beam->localPosition = relative;
+			beam->localRotation = along(magnetic);
+			beam->localScale = Vector3(Mathf::Max(core * 1.2f, length * 0.008f), length, 1);
+			// The glare on the core, just in front of it, and the soft halo out to about the framed radius, behind.
+			accretionGlare->localPosition = relative + toCamera * Mathf::Min(core * 1.05f, distance * 0.5f);
+			accretionGlare->localRotation = Quaternion::LookRotation(-toCamera, Vector3::up());
+			accretionGlare->localScale = Vector3::one() * Mathf::Max(core * 5.0f, distance * 0.02f);
+			pulsarHalo->localPosition = relative - toCamera * Mathf::Min(core, distance * 0.5f);
+			pulsarHalo->localRotation = Quaternion::LookRotation(-toCamera, Vector3::up());
+			pulsarHalo->localScale = Vector3::one() * Mathf::Max(radius * 2.4f, distance * 0.05f);
+			// Brightest when a beam sweeps toward the eye, as a pulsar is seen to pulse.
+			float facing = Mathf::Abs(Vector3::Dot(magnetic, toCamera));
+			beamMaterial->SetFloat("_Intensity", 1.1f + 1.6f * Mathf::Pow(facing, 6.0f));
+			glowMaterial->SetFloat("_Intensity", 1.4f + 1.4f * Mathf::Pow(facing, 8.0f));
+			pulsarHaloMaterial->SetFloat("_Intensity", 0.6f + 0.5f * Mathf::Pow(facing, 8.0f));
+		}
+		else if (blackHole)
+		{
+			// The body is drawn as the shadow (the framing, labels and picking take its radius); the disc lies in the
+			// equator from twice that out, and from far off is kept a few percent of the view so it still reads.
+			float unit = Mathf::Max(radius, distance * 0.012f);
+			// The gas turns about the pole (velocity pole x p at p), so the side coming toward the eye is where
+			// toCamera x pole points.
+			Vector3 approach = Vector3::Cross(toCamera, pole);
+			float lean = Mathf::Clamp01(approach.magnitude());
+			approach = lean > 1e-3f ? approach / lean : Vector3::Cross(pole, Mathf::Abs(pole.y) < 0.9f ? Vector3::up() : Vector3::right()).normalized();
+			accretionDisc->localPosition = relative;
+			accretionDisc->localRotation = Quaternion::LookRotation(pole, approach);
+			accretionDisc->localScale = Vector3::one() * unit;
+			if (lastDoppler < 0 || Mathf::Abs(lean - lastDoppler) > 0.02f)
+			{
+				lastDoppler = lean;
+				ColourBand(discMesh, discAngles, &discRadial, lean, Color(0.85f, 0.92f, 1.0f), Color(1.0f, 0.42f, 0.12f));
+				ColourBand(photonMesh, photonAngles, nullptr, lean * 0.6f, Color(1.0f, 0.97f, 0.9f), Color(1.0f, 0.62f, 0.3f));
+			}
+			// The photon ring faces the eye, round the shadow (its bright side with the disc's).
+			photonRing->localPosition = relative;
+			photonRing->localRotation = Quaternion::LookRotation(-toCamera, approach);
+			photonRing->localScale = Vector3::one() * radius;
+		}
+		else if (rogue)
+		{
+			material->SetFloat("_Highlight", 0.35f);
+			accretionGlare->localPosition = relative - toCamera * Mathf::Min(radius * 0.5f, distance * 0.5f);
+			accretionGlare->localRotation = Quaternion::LookRotation(-toCamera, Vector3::up());
+			accretionGlare->localScale = Vector3::one() * (radius * 3.2f);
 		}
 	}
 
@@ -505,7 +743,7 @@ namespace SpaceGod::Views
 
 	bool BodyView::HasInterior() const
 	{
-		return Body->IsVisible() && !station && !voidStation && !voidSite && renderer;
+		return Body->IsVisible() && !station && !voidStation && !voidSite && !relic && !blackHole && renderer;
 	}
 
 	void BodyView::BuildInterior()

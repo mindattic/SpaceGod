@@ -96,6 +96,7 @@ namespace SpaceGod::UI
 		{
 			auto b = (*catalog)[i];
 			if (b == nullptr || !b->IsVisible()) continue;
+			if (app->BodyUncharted(i)) continue; // US-T449: on uncharted frontier ground, only what has been surveyed is mapped
 			Item it;
 			it.Body = i;
 			it.Key = cs::Cat("b", i);

@@ -21,6 +21,7 @@
 #include "Persistence/Profiles.h"
 #include "Settings/GameSetting.h"
 #include "Systems/DeepSpace.h"
+#include "Systems/Frontier.h"
 #include "Systems/Galaxy.h"
 #include "Systems/StarDiscovery.h"
 #include "Systems/SystemSources.h"
@@ -313,6 +314,15 @@ namespace SpaceGod::UI
 			return cs::Cat(tradeSell ? "sells " : "buy ", Credits(price), "  ·  ", MarketIntel::AgeText(age));
 		}
 		case MapMode::Exploration:
+		{
+			// US-T449: a strange system says what it is first, on its one line (never a second label over the first).
+			auto odd = Frontier::KindOf(*m->System);
+			if (odd != FrontierKind::None)
+			{
+				cs::String what = Frontier::Title(odd);
+				return m->Here ? cs::Cat(what, "  ·  you are here") : look != nullptr && look->Visited ? cs::Cat(what, "  ·  visited") : what;
+			}
+		}
 			if (m->Here) return "you are here";
 			if (look != nullptr && look->Visited) return m->System->IsVoidBase ? "visited  ·  void station" : "visited";
 			if (m->System->IsVoidBase) return m->Known() ? "void station  ·  heard from" : "void station";
@@ -387,6 +397,62 @@ namespace SpaceGod::UI
 
 		if (mode == MapMode::Exploration)
 		{
+			// US-T449: the frontier gradient about Sol: known space, then ever less charted and stranger. Each band's edge a
+			// ring in the map's plane, warm at the near frontier to violet at the deep, named where it crosses the right.
+			const int bands = static_cast<int>(sizeof(Frontier::BandLy) / sizeof(Frontier::BandLy[0]));
+			for (int b = 0; b < bands; b++)
+			{
+				double r = Frontier::BandLy[b];
+				float t = bands > 1 ? static_cast<float>(b) / (bands - 1) : 0;
+				auto c = Color::Lerp(FrontierColor, DeepColor, t);
+				const int n = 120;
+				Vector2 prev;
+				for (int k = 0; k <= n; k++)
+				{
+					double a = cs::Math::PI * 2 * k / n;
+					auto p = Project(local, DVec3(r * cs::Math::Cos(a), r * cs::Math::Sin(a), 0));
+					if (k > 0 && (k % 2 == 0)) Line(prev, p, Color(c.r, c.g, c.b, 0.22f + 0.2f * t), 1.2f + 0.6f * t);
+					prev = p;
+				}
+				// The ring's label on its lower right, where it is wholly in the view and clear of the find field, the pins and
+				// the other rings' labels (the rings are concentric, so each lands further out along the same diagonal).
+				cs::String ringText = cs::Cat(cs::Fmt(r, "0"), " ly  \xC2\xB7  ", cs::Strings::ToUpperInvariant(Frontier::BandName(b + 1)));
+				Vector2 size = LabelSize(ringText, true);
+				float bestScore = -1e9f;
+				Rect bestRect;
+				for (int k = 0; k < 96; k++)
+				{
+					double a = cs::Math::PI * 2 * k / 96;
+					auto p = Project(local, DVec3(r * cs::Math::Cos(a), r * cs::Math::Sin(a), 0));
+					Rect at(p.x + 6, p.y - 2, size.x, size.y - 2);
+					if (!LabelFree(at, local)) continue;
+					float score = p.y + 0.6f * p.x;
+					if (score > bestScore) { bestScore = score; bestRect = at; }
+				}
+				if (bestScore > -1e8f)
+				{
+					placedLabels.push_back(bestRect);
+					Label(Vector2(bestRect.x, bestRect.y - 2), ringText, Color(c.r, c.g, c.b, 0.8f), true);
+				}
+			}
+			// The unidentified objects on the charts (strange readings nobody has gone to see), and the strange systems seen.
+			float glint = 0.5f + 0.5f * Mathf::Sin(Time::unscaledTime * 3);
+			for (const auto& n : chartStars)
+				if (n.SpectralType == "?")
+				{
+					auto p = Project(local, n.PositionLy);
+					if (!local.Contains(p)) continue;
+					Ring(p, 7 + 2 * glint, Color(DeepColor.r, DeepColor.g, DeepColor.b, 0.45f + 0.35f * glint), 1.4f);
+				}
+			for (const auto& m : model->Systems)
+			{
+				auto odd = Frontier::KindOf(*m->System);
+				if (odd == FrontierKind::None) continue;
+				auto p = Project(local, m->System->PositionLy);
+				if (!local.Contains(p)) continue;
+				Ring(p, 11, DeepColor, 2.0f); // what it is goes on its own line under its name (ModeSub)
+			}
+
 			// Void stations among the plain stars on the charts, and the undiscovered frontier just past them.
 			for (const auto& n : chartStars)
 				if (voidStationNames.count(n.Name) > 0)
@@ -522,6 +588,23 @@ namespace SpaceGod::UI
 			Swatch(y, x, w, Unknown, "charted, never heard from", false);
 			Swatch(y, x, w, VoidColor, "void station (ringed)", false);
 			Swatch(y, x, w, FrontierColor, "detected, undiscovered (?)", true);
+			Swatch(y, x, w, DeepColor, "strange, unidentified (ringed)", false);
+			y += 6;
+			// US-T449: the frontier gradient, and how deep the player is in it.
+			Heading(y, x, w, "THE FRONTIER");
+			{
+				double here = app->ActiveSystem != nullptr ? app->ActiveSystem->PositionLy.Length() : 0;
+				double depth = app->ActiveSystem != nullptr ? Frontier::Depth(app->ActiveSystem->PositionLy) : 0;
+				int band = 0;
+				for (double edge : Frontier::BandLy) if (here > edge) band++;
+				Line(y, x, w, cs::Cat("Here: ", cs::Fmt(here, "0"), " ly from Sol, ", Frontier::BandName(band),
+					depth > 0 ? cs::Cat(" (", cs::Fmt(depth * 100, "0"), "% deep)") : cs::String()), Color::Lerp(FrontierColor, DeepColor, static_cast<float>(depth)));
+				int odd = 0, unknown = 0;
+				for (const auto& m : model->Systems) if (Frontier::KindOf(*m->System) != FrontierKind::None) odd++;
+				for (const auto& n : chartStars) if (n.SpectralType == "?") unknown++;
+				Line(y, x, w, cs::Cat(odd, odd == 1 ? " strange system" : " strange systems", " come to, ", unknown, " unidentified on the charts"), DeepColor);
+				Line(y, x, w, cs::Cat("Past ", cs::Fmt(Frontier::StartLy, "0"), " ly stars are charted only nearer you the deeper they lie, nobody's traffic goes, worlds stay unknown until scanned or come near, and more and more systems are strange."), Dim);
+			}
 			y += 6;
 			Line(y, x, w, cs::Cat("A star is discovered when a lookout comes within ", cs::Fmt(StarDiscovery::Range()->Value, "0.#"),
 				" ly of it; the contacts shown are within twice that of the charts."), Dim);

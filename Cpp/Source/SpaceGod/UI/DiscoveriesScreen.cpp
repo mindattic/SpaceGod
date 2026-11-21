@@ -34,6 +34,7 @@ namespace SpaceGod::UI
 			case DiscoveryKind::VoidSight: return "Void stations keep a sight or two worth the detour while the drive cools: stop at one.";
 			case DiscoveryKind::Sighting: return "Bio Mass blooms in the systems you are in, and Void Raider strikes and signs of the Watcher out between the stars.";
 			case DiscoveryKind::Pilot: return "A pilot is met by hailing them, flying their hull, fighting them or pulling them out of a wreck.";
+			case DiscoveryKind::Phenomenon: return "Out on the frontier, far past the known stars, some systems are strange: pulsars, black holes, rogue planets, relics. Go there to find one.";
 		}
 		return "";
 	}

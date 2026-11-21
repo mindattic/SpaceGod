@@ -13,7 +13,11 @@
 #include "Input/InputDevice.h" // US-T349
 #include "Input/KeyBindings.h" // US-T390
 #include "Law/Law.h"
+#include "Ephemeris.h"
+#include "Combat/CombatState.h"
+#include "Sensors/SensorPosture.h"
 #include "Systems/DiscoveryLog.h"
+#include "Systems/Frontier.h"
 #include "Systems/Galaxy.h"
 #include "Systems/HelmFtl.h"
 #include "UI/DiscoveriesScreen.h"
@@ -28,9 +32,56 @@ namespace SpaceGod
 		return *Galaxy->DiscoveryLog;
 	}
 
+	bool UnitySpaceApp::BodyUncharted(int index)
+	{
+		if (Galaxy == nullptr || ActiveSystem == nullptr || index <= 0) return false;
+		auto cat = Catalog();
+		if (cat == nullptr || index >= cat->Count()) return false;
+		const auto& b = (*cat)[index];
+		if (b->Kind == BodyKind::Star || b->Kind == BodyKind::Barycentre) return false;
+		if (!Frontier::IsUncharted(*ActiveSystem)) return false;
+		return !Discoveries().HasBody(ActiveSystem->Name, b->Name);
+	}
+
+	int UnitySpaceApp::UnchartedBodies()
+	{
+		auto cat = Catalog();
+		if (cat == nullptr || ActiveSystem == nullptr || !Frontier::IsUncharted(*ActiveSystem)) return 0;
+		int n = 0;
+		for (int i = 1; i < cat->Count(); i++)
+			if (BodyUncharted(i)) n++;
+		return n;
+	}
+
+	void UnitySpaceApp::RevealFrontierBodies()
+	{
+		// A few times a second is plenty: what is near changes slowly.
+		double now = Time::unscaledTime;
+		if (now - revealedAt < 0.25 && revealedAt >= 0) return;
+		revealedAt = now;
+		if (ActiveSystem == nullptr || !Frontier::IsUncharted(*ActiveSystem)) return;
+		auto cat = Catalog();
+		auto eph = Ephemeris();
+		if (cat == nullptr || eph == nullptr) return;
+		const DVec3 eye = PlayerHelioKm();
+		// A ping from the helm reaches far further than eyes and passive sensors.
+		bool ping = IsPiloting() && Piloted.Ship != nullptr && SensorPosture::Lit(Piloted.Ship->Combat.get());
+		auto& log = Discoveries();
+		for (int i = 1; i < cat->Count(); i++)
+		{
+			const auto& b = (*cat)[i];
+			if (b->Kind == BodyKind::Star || b->Kind == BodyKind::Barycentre || log.HasBody(ActiveSystem->Name, b->Name)) continue;
+			double reach = Frontier::RevealKm(*b) * (ping ? 25.0 : 1.0);
+			if ((eph->Helio(i) - eye).Length() > reach) continue;
+			if (log.Reveal(*ActiveSystem, i, Clock->Jd, ping ? "picked up on a ping" : "come near on uncharted ground"))
+				ShowToast(cs::Cat("UNCHARTED BODY REVEALED: ", b->Name));
+		}
+	}
+
 	void UnitySpaceApp::UpdateDiscoveries()
 	{
 		if (Galaxy == nullptr || ActiveSystem == nullptr || Clock == nullptr) return;
+		RevealFrontierBodies(); // US-T449
 		int scanned = Selected.IsBody() ? Selected.Body : -1;
 		int nearBody = IsPiloting() ? PilotFrameBody() : -1;
 		bool changed = ActiveSystem.get() != discoverySystem || scanned != discoveryScanned || nearBody != discoveryNear || Galaxy.get() != discoveryGalaxy;
@@ -63,6 +114,7 @@ namespace SpaceGod
 				case DiscoveryKind::Derelict:
 				case DiscoveryKind::VoidSight:
 				case DiscoveryKind::Sighting:
+				case DiscoveryKind::Phenomenon: // US-T449
 					ShowToast(cs::Cat("DISCOVERY LOGGED: ", e->Name, "   (", Input::KeyBindings::Keys(Input::KeyAction::Discoveries), " for the discoveries)")); // US-T390
 					return;
 				default:

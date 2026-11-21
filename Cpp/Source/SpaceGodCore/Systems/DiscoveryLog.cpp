@@ -14,6 +14,7 @@
 #include "Persistence/ObjectGraph.h"
 #include "Ships.h"
 #include "Systems/DeepSpace.h"
+#include "Systems/Frontier.h"
 #include "Systems/Galaxy.h"
 #include "Systems/Graveyards.h"
 #include "Systems/VoidSites.h"
@@ -34,6 +35,7 @@ namespace SpaceGod::Core
 			case DiscoveryKind::VoidSight: return "VoidSight";
 			case DiscoveryKind::Sighting: return "Sighting";
 			case DiscoveryKind::Pilot: return "Pilot";
+			case DiscoveryKind::Phenomenon: return "Phenomenon";
 		}
 		return "Star";
 	}
@@ -51,6 +53,7 @@ namespace SpaceGod::Core
 			case DiscoveryKind::VoidSight: return "Void sights";
 			case DiscoveryKind::Sighting: return "Sightings";
 			case DiscoveryKind::Pilot: return "Pilots met";
+			case DiscoveryKind::Phenomenon: return "Phenomena";
 		}
 		return "";
 	}
@@ -217,6 +220,18 @@ namespace SpaceGod::Core
 			if (star == nullptr) log.Record(DiscoveryKind::Star, Id("star", name, name), name, name, root != nullptr ? root->Index : 0, jd, "", kindNote, LoreKeys::System(name));
 			else if (star->Note.find("isited") == cs::String::npos) { star->Note = star->Note.empty() ? cs::String("Visited") : cs::Cat(star->Note, "; visited"); log.Version++; }
 
+			// US-T449: what is strange about a frontier system, found by going there.
+			auto odd = Frontier::KindOf(sys);
+			if (odd != FrontierKind::None)
+			{
+				int at = root != nullptr ? root->Index : 0;
+				if (odd == FrontierKind::Relic && cat != nullptr)
+					for (int i = 0; i < cat->Count(); i++)
+						if (Frontier::IsRelic(*(*cat)[i])) at = i;
+				log.Record(DiscoveryKind::Phenomenon, Id("oddity", name, name), cs::Cat(Frontier::Title(odd), ": ", name), name, at, jd, "",
+					cs::Cat(Frontier::Describe(odd), " ", cs::Fmt(sys.PositionLy.Length(), "0"), " ly from Sol."));
+			}
+
 			const auto& world = sys.World;
 			if (world != nullptr && world->Economy != nullptr)
 				for (const auto& s : world->Economy->Settlements)
@@ -278,6 +293,18 @@ namespace SpaceGod::Core
 				cs::Cat(Cap(Article(BodyWord(b->Kind))), parent, ", ", how),
 				LoreKeys::Body(b->Kind, sys.Name, b->Name));
 		}
+	}
+
+	bool DiscoveryLog::Reveal(const StarSystem& system, int index, double jd, const char* how)
+	{
+		int before = Entries.Count();
+		SweepBody(*this, system, index, jd, how);
+		return Entries.Count() > before;
+	}
+
+	bool DiscoveryLog::HasBody(const cs::String& system, const cs::String& name) const
+	{
+		return Has(Id("body", system, name));
 	}
 
 	int DiscoveryLog::Sweep(const Galaxy& galaxy, const Place& place, double jd)
@@ -459,6 +486,30 @@ namespace SpaceGod::Core
 			}
 			case DiscoveryKind::Sighting:
 				break;
+			case DiscoveryKind::Phenomenon:
+			{
+				// US-T449: the readings of the strange thing at the system's heart (or the relic).
+				if (sys == nullptr) break;
+				lines.Add(cs::Cat(cs::Fmt(sys->PositionLy.Length(), "0.0"), " ly from Sol, ", cs::Fmt(Frontier::Depth(sys->PositionLy) * 100, "0"), "% into the frontier"));
+				if (cat == nullptr || e.Body < 0 || e.Body >= cat->Count()) break;
+				const auto& b = (*cat)[e.Body];
+				if (Frontier::IsBlackHole(*b))
+				{
+					lines.Add(cs::Cat("Mass ", cs::Fmt(b->Gm / 1.32712440018e11, "0.0"), " Suns; event horizon ", cs::Fmt(b->RadiusKm * 2, "0.0"), " km across"));
+					lines.Add(cs::Cat("Accretion disc shining at ", cs::Fmt(b->LuminositySolar, "0.###"), " Sun"));
+				}
+				else if (Frontier::IsPulsar(*b))
+				{
+					double spinS = b->RotationHours * 3600;
+					lines.Add(cs::Cat("Neutron star ", cs::Fmt(b->RadiusKm * 2, "0.0"), " km across, ", cs::Fmt(b->Gm / 1.32712440018e11, "0.00"), " Suns"));
+					lines.Add(cs::Cat("Spin period ", cs::Fmt(spinS, "0.####"), " s; surface ", cs::Fmt(b->TeffK, "N0"), " K"));
+				}
+				else if (b->IsStar())
+					lines.Add(cs::Cat(b->SpectralType, ", ", cs::Fmt(b->TeffK, "N0"), " K, radius ", cs::Fmt(b->RadiusKm, "N0"), " km"));
+				else
+					lines.Add(cs::Cat(Cap(BodyWord(b->Kind)), " of ", b->ParentName, ", ", cs::Fmt(b->RadiusKm * 2, "N0"), " km across"));
+				break;
+			}
 		}
 		return lines;
 	}

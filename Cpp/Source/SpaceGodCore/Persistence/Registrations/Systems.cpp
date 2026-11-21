@@ -92,6 +92,7 @@
 #include "Systems/StrategicCommand.h"
 #include "Systems/Territory.h" // US-T190
 #include "Systems/DiscoveryLog.h" // US-T259
+#include "Systems/Frontier.h" // US-T449
 #include "Lore/Encyclopedia.h" // US-T271
 #include "Trajectories.h"
 #include "World.h"
@@ -379,7 +380,11 @@ namespace SpaceGod::Core
 	SG_SERIALIZE(SystemSpec, "Unity.SpaceGod.Core.SystemSpec",
 		SG_F(Companions), SG_F(DecDeg), SG_F(Discs), SG_F(DistanceLy), SG_F(Name), SG_F(NeighbourName),
 		SG_F(OverviewSpanAu), SG_F(Planets), SG_F(Primary), SG_F(RaDeg), SG_F(ReferenceIDeg), SG_F(ReferenceNodeDeg),
-		SG_F(Stations), SG_F(Summary))
+		SG_F(Stations), SG_F(Summary),
+		SG_OPT(Oddity), // US-T449: absent from older saves
+		SG_LOADED([](SystemSpec& s) { Frontier::Note(s); }))
+
+	SG_ENUM(FrontierKind, "SpaceGod.Core.FrontierKind")
 
 	SG_SERIALIZE(Voyage, "Unity.SpaceGod.Core.Voyage",
 		SG_F(AtGate), SG_F(AtGateJd), SG_F(ByCruise), SG_F(Campaign), SG_F(Convoy), SG_F(Destination), SG_F(DropDir),

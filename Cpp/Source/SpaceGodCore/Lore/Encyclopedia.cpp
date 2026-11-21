@@ -309,6 +309,7 @@ namespace SpaceGod::Core
 			case DiscoveryKind::Derelict: return EncyclopediaCategory::Stations;
 			case DiscoveryKind::Sighting: return EncyclopediaCategory::Lore;
 			case DiscoveryKind::Pilot: return EncyclopediaCategory::Pilots;
+			case DiscoveryKind::Phenomenon: return EncyclopediaCategory::Astronomy; // US-T449
 		}
 		return EncyclopediaCategory::Systems;
 	}

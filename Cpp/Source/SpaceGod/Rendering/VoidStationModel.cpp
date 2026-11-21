@@ -248,7 +248,7 @@ namespace SpaceGod::Rendering
 
 		cs::Ref<Mesh>& Cached(int slot)
 		{
-			static cs::Ref<Mesh> meshes[5];
+			static cs::Ref<Mesh> meshes[6];
 			return meshes[slot];
 		}
 	}
@@ -291,6 +291,52 @@ namespace SpaceGod::Rendering
 			b.Beam(dir * (radius + 0.02f) - tangent * 0.012f, dir * (radius + 0.02f) + tangent * 0.012f, Vector3::up(), 0.01f, 0.02f, Lamp);
 		}
 		mesh = b.ToMesh(which == 0 ? "VoidStationGimbalInner" : "VoidStationGimbalOuter");
+		return mesh;
+	}
+
+	cs::Ref<Mesh> VoidStationModel::Relic()
+	{
+		auto& mesh = Cached(5);
+		if (Alive(mesh)) return mesh;
+		Builder b;
+		// US-T449: an ancient ring-world, broken: a broad band (its floor) between two rim walls, in arcs with gaps where
+		// whole spans have fallen away, a few of its lights still burning, and wreckage drifting by the breaks.
+		const Color Bronze(0.42f, 0.38f, 0.32f, 1.0f), Soot(0.2f, 0.19f, 0.18f, 1.0f), Verdigris(0.3f, 0.42f, 0.38f, 1.0f);
+		const int segments = 120;
+		auto gap = [](int k) { return (k >= 14 && k < 23) || (k >= 61 && k < 66) || (k >= 92 && k < 104); };
+		for (int k = 0; k < segments; k++)
+		{
+			float a0 = Mathf::PI * 2 * k / segments, a1 = Mathf::PI * 2 * (k + 1) / segments;
+			Vector3 d0(Mathf::Cos(a0), 0, Mathf::Sin(a0)), d1(Mathf::Cos(a1), 0, Mathf::Sin(a1));
+			if (gap(k))
+			{
+				// What fell: a few slabs tumbling just off the line of the ring.
+				if (k % 3 == 0)
+				{
+					float h = Hash(d0, 7) - 0.5f, o = Hash(d0, 8) * 0.12f;
+					b.Beam(d0 * (1.0f + o) + Vector3(0, h * 0.3f, 0), d1 * (1.0f + o) + Vector3(0, h * 0.3f + 0.02f, 0), Vector3(0.3f, 1, 0.1f).normalized(), 0.02f, 0.09f, Soot);
+				}
+				continue;
+			}
+			float shade = Hash(d0, 3);
+			Color floor = shade < 0.2f ? Soot : shade < 0.35f ? Verdigris : Bronze;
+			b.Beam(d0, d1, Vector3::up(), 0.018f, 0.22f, floor);
+			// The rim walls, standing inward from the floor's edges.
+			for (float s : { -1.0f, 1.0f })
+				b.Beam(d0 * 0.975f + Vector3(0, s * 0.11f, 0), d1 * 0.975f + Vector3(0, s * 0.11f, 0), Vector3::up(), 0.05f, 0.012f, Bronze);
+			// Ribs across the floor every few spans, and now and then a light that has never gone out.
+			if (k % 4 == 0) b.Beam(d0 * 1.012f + Vector3(0, -0.11f, 0), d0 * 1.012f + Vector3(0, 0.11f, 0), d0, 0.02f, 0.02f, Soot);
+			if (k % 11 == 5) b.Beam(d0 * 0.95f, d0 * 0.95f + Vector3(0, 0.02f, 0), Vector3::right(), 0.012f, 0.012f, Lamp);
+		}
+		// Shadow squares on an inner ring, mostly fallen too.
+		for (int k = 0; k < 10; k++)
+		{
+			if (k == 2 || k == 3 || k == 7) continue;
+			float a0 = Mathf::PI * 2 * k / 10, a1 = a0 + Mathf::PI * 2 / 22;
+			Vector3 d0(Mathf::Cos(a0), 0, Mathf::Sin(a0)), d1(Mathf::Cos(a1), 0, Mathf::Sin(a1));
+			b.Beam(d0 * 0.42f, d1 * 0.42f, Vector3::up(), 0.006f, 0.16f, Soot);
+		}
+		mesh = b.ToMesh("FrontierRelic");
 		return mesh;
 	}
 

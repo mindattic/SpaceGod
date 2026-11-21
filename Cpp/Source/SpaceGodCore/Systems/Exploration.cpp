@@ -15,7 +15,9 @@
 #include "Events/EventDirector.h"
 #include "Events/Opportunity.h"
 #include "Persistence/ObjectGraph.h"
+#include "Astro.h"
 #include "Systems/DeepSpace.h"
+#include "Systems/Frontier.h"
 #include "Systems/Galaxy.h"
 #include "Systems/Graveyards.h"
 #include "Systems/Polities.h"
@@ -34,6 +36,7 @@ namespace SpaceGod::Core
 		case SurveyKind::Sight: return "Sight";
 		case SurveyKind::Anomaly: return "Anomaly";
 		case SurveyKind::Graveyard: return "Graveyard";
+		case SurveyKind::Phenomenon: return "Phenomenon";
 		}
 		return "?";
 	}
@@ -121,6 +124,7 @@ namespace SpaceGod::Core
 		case SurveyKind::Sight: return 30000;
 		case SurveyKind::Anomaly: return 25000;
 		case SurveyKind::Graveyard: return 30000;
+		case SurveyKind::Phenomenon: return 60000;
 		}
 		return 10000;
 	}
@@ -301,6 +305,29 @@ namespace SpaceGod::Core
 		auto cat = world->Catalog();
 		if (cat == nullptr || cat->Count() == 0) return;
 		bool beyond = ly > StarDiscovery::KnownToLy;
+
+		// US-T449: a strange frontier system's heart, come to (a relic, come near): worth far more than an ordinary star.
+		auto odd = Frontier::KindOf(*system);
+		if (odd != FrontierKind::None)
+		{
+			cs::String key = cs::Cat("oddity|", system->Name);
+			if (!IsSurveyed(key))
+			{
+				int target = 0;
+				double reach = cs::Math::Max(system->ExtentKm * 1.2, 30 * Astro::AuKm);
+				if (odd == FrontierKind::Relic)
+					for (int i = 0; i < cat->Count(); i++)
+						if (Frontier::IsRelic(*(*cat)[i]))
+						{
+							target = i;
+							reach = cs::Math::Max(SurveyKm, SurveyRadii * (*cat)[i]->RadiusKm) * 10;
+						}
+				if ((world->Ephemeris->HelioAt(target, jd) - at).Length() <= reach)
+					Record(galaxy, world, system, hull, SurveyKind::Phenomenon, key, cs::Cat(Frontier::Title(odd), " (", system->Name, ")"), system->Name,
+						cs::Math::Max(BaseValue(SurveyKind::Phenomenon), Frontier::SurveyValue(odd)), ly, jd, target);
+			}
+		}
+
 		for (int i = 0; i < cat->Count(); i++)
 		{
 			auto b = (*cat)[i];

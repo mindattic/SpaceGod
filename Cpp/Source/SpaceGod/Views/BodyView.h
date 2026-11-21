@@ -5,6 +5,8 @@
 #include "GasGiantWeather.h"
 #include "Rendering/VoidSiteModel.h"
 
+#include <vector>
+
 namespace SpaceGod::Core
 {
 	class BodyDefinition;
@@ -79,6 +81,36 @@ namespace SpaceGod::Views
 
 		/// <summary>Lays out and turns the debris and faces the halo to the camera.</summary>
 		void ApplyVoidSite(Vector3 relative, float radius, Vector3 cameraForward);
+
+		// US-T449: the frontier's strange bodies. A pulsar is a small white-hot core (a fraction of the radius the framing
+		// takes) in a tight blue-white glare and a wider halo, its two beams sweeping round its spin axis (one long glow
+		// through the star along its magnetic axis); a black hole is a black shadow, a tilted accretion disc in its equator
+		// (hot at its inner edge, the side turning toward the eye brighter and bluer: Doppler beaming) and a thin photon ring
+		// hugging the shadow (no wide glow quad: up close it washed the view out white); a rogue planet is a dark world faintly warm; a relic is a broken ring-world.
+		bool pulsar = false, blackHole = false, rogue = false, relic = false;
+		cs::Ref<Transform> beam;
+		cs::Ref<Material> beamMaterial;
+		cs::Ref<Transform> accretionDisc;
+		cs::Ref<Material> accretionMaterial;
+		cs::Ref<Transform> accretionGlare;
+		cs::Ref<Material> accretionGlareMaterial;
+		cs::Ref<Transform> photonRing, pulsarHalo;
+		cs::Ref<Material> photonMaterial, pulsarHaloMaterial;
+		cs::Ref<Mesh> discMesh, photonMesh;
+		std::vector<float> discAngles, photonAngles, discRadial;
+		/// <summary>The disc's Doppler lean last coloured in (-1: never), so its colours are only rebuilt when it changes.</summary>
+		float lastDoppler = -1;
+		/// <summary>The pulsar's core, a share of the radius the view frames it at: small and dazzling within its glare.</summary>
+		static constexpr float PulsarCoreScale = 0.22f;
+		void BuildFrontierBody(const cs::Ref<Transform>& parent);
+		void ApplyFrontierBody(Vector3 relative, float radius, Vector3 cameraForward);
+		cs::Ref<Transform> AddGlowQuad(const cs::Ref<Transform>& parent, const cs::String& name, Color color, float intensity, float falloff, cs::Ref<Material>& made);
+		/// <summary>A flat band of rings (radius, glow-profile u) drawn with the Glow material: its glow peaks where u is 0.5
+		/// and dies where u is 1, so the profile across the band is set by the rings. Both faces drawn.</summary>
+		cs::Ref<Transform> AddGlowBand(const cs::Ref<Transform>& parent, const cs::String& name, const std::vector<float>& radii, const std::vector<float>& us,
+			float intensity, float falloff, cs::Ref<Material>& made, cs::Ref<Mesh>& mesh, std::vector<float>& angles, std::vector<float>* radial);
+		/// <summary>Colours a band: brighter and bluer toward its local +Y by <paramref name="lean"/> (0 even, 1 edge-on).</summary>
+		static void ColourBand(const cs::Ref<Mesh>& mesh, const std::vector<float>& angles, const std::vector<float>* radial, float lean, Color hot, Color cool);
 
 		// A flare star brightens suddenly and fades over seconds (Proxima Centauri).
 		bool flareStar = false;

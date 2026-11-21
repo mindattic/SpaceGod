@@ -711,6 +711,15 @@ namespace SpaceGod::UI
 			bool occluded = pxRadius < 3 && app->Occluded(scene, i);
 			if (occluded) continue;
 
+			// US-T449: on uncharted frontier ground a world nobody has surveyed has no marker and no name: only what the eye
+			// sees of it, and once it is big enough to see, a question.
+			if (app->BodyUncharted(i))
+			{
+				if (pxRadius > 2.5f && app->ShowLabels)
+					DrawLabel("UNCHARTED", p + Vector2(pxRadius + 5, -8), Color(0.75f, 0.7f, 0.55f, 0.7f), true);
+				continue;
+			}
+
 			auto tint = BodyTint(body);
 			float iconSize = Icons::PixelSize(body);
 			if (pxRadius < iconSize * 0.3f)

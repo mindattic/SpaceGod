@@ -4,6 +4,8 @@
 #include "Systems/GalaxyStreaming.h"
 #include "Systems/Galaxy.h"
 #include "Systems/SystemSources.h"
+#include "Systems/Frontier.h"
+#include "Systems/ProceduralSystems.h"
 #include "Systems/StarSystemSpec.h"
 #include "Systems/DeepSpace.h"
 #include "Systems/GateConstruction.h"
@@ -93,6 +95,12 @@ namespace SpaceGod::Core
 				continue;
 			}
 			if (ChartedStar(e->Name) || count >= cap) continue;
+			// US-T449: out on the frontier little is known until you go: the deeper a generated star lies, the nearer it is charted.
+			if (e->Source == ProceduralSystems::SourceName)
+			{
+				double depth = Frontier::Depth(e->PositionLy);
+				if (depth > 0 && (e->PositionLy - atLy).Length() > Frontier::ChartReachLy(chartLy, depth)) continue;
+			}
 			NearbyStars.Add(e->ToNearbyStar());
 			charted.Add(e->Name);
 			count++;

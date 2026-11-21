@@ -3,6 +3,7 @@
 #include "Systems/SpaceFeatures.h"
 
 #include "Astro.h"
+#include "Systems/StarSystemSpec.h"
 #include "Systems/VoidSites.h"
 #include "Systems/VoidStations.h"
 
@@ -107,11 +108,46 @@ namespace SpaceGod::Core
 			return f;
 		}
 
+		// US-T449: the frontier systems marked as showing their strangeness here, by root (derived: see SpaceFeatures::Mark).
+		std::map<cs::String, int>& Marked() { static std::map<cs::String, int> m; return m; }
+
+		/// <summary>US-T449: what a marked frontier system holds, on a stream of its own (the place's usual features are
+		/// drawn first, unchanged).</summary>
+		void AddFrontier(PlaceFeatures& f, const cs::String& root, FrontierKind kind)
+		{
+			Stream rng(cs::Cat(root, "/frontier"));
+			if (kind == FrontierKind::Nebula)
+				f.Nebulae.Add(MakeNebula(rng, cs::Cat("the ", root, " Nebula"), DVec3(rng.Range(-1, 1), rng.Range(-1, 1), rng.Range(-0.3, 0.3)) * Astro::AuKm,
+					rng.Range(6, 14) * Astro::AuKm, 150));
+			else if (kind == FrontierKind::WhiteDwarf)
+			{
+				// A planetary nebula: a shell, so its puffs sit on a sphere about the dwarf, bright where the shell is thick.
+				double r = rng.Range(3, 6) * Astro::AuKm;
+				auto n = MakeNebula(rng, cs::Cat("the ", root, " Shell"), DVec3::Zero, r * 1.15, 140);
+				for (auto& p : n.Puffs)
+				{
+					auto d = p.OffsetKm.LengthSquared() > 1 ? p.OffsetKm.Normalized() : DVec3(1, 0, 0);
+					p.OffsetKm = d * (r * rng.Range(0.85, 1.1));
+					p.RadiusKm = r * rng.Range(0.12, 0.3);
+				}
+				f.Nebulae.Add(n);
+			}
+			else if (kind == FrontierKind::CometCloud)
+				for (int i = 0; i < 3; i++)
+				{
+					double a = rng.Range(0, cs::Math::PI * 2), d = rng.Range(3, 25) * Astro::AuKm;
+					f.IceFields.Add(MakeIceField(rng, cs::Cat(root, " Infall ", static_cast<char>('A' + i)), DVec3(cs::Math::Cos(a), cs::Math::Sin(a), rng.Range(-0.3, 0.3)) * d,
+						rng.Range(0.3, 0.9) * Astro::AuKm, 380));
+				}
+		}
+
 		PlaceFeatures Build(const cs::String& root)
 		{
 			PlaceFeatures f;
 			// Sol is kept as it really is.
 			if (root.empty() || root == "Sun" || root == "Sol" || root == "Sol System") return f;
+			auto marked = Marked().find(root);
+			if (marked != Marked().end()) AddFrontier(f, root, static_cast<FrontierKind>(marked->second));
 			Stream rng(cs::Cat(root, "/features"));
 			if (cs::Strings::StartsWith(root, VoidStations::Prefix))
 			{
@@ -169,6 +205,18 @@ namespace SpaceGod::Core
 		auto it = cache.find(root);
 		if (it != cache.end()) return it->second;
 		return cache[root] = Build(root);
+	}
+
+	void SpaceFeatures::Mark(const cs::String& root, int frontierKind)
+	{
+		std::lock_guard<std::mutex> lock(Gate());
+		auto& marked = Marked();
+		auto was = marked.find(root);
+		if (was != marked.end() && was->second == frontierKind) return;
+		marked[root] = frontierKind;
+		// Already built without it (asked for before the system was noted): add it in place, so what callers hold stays good.
+		auto it = Cache().find(root);
+		if (it != Cache().end() && was == marked.end()) AddFrontier(it->second, root, static_cast<FrontierKind>(frontierKind));
 	}
 
 	double SpaceFeatures::SensorMask(const cs::String& root, DVec3 offsetKm)

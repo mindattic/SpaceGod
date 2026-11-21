@@ -366,7 +366,7 @@ namespace SpaceGod::Views
 
 		// The painting's giant worlds, out in the volume near its rim: from the centre each covers the disc it was painted
 		// with; flying out, they drift by as the distant bodies they are.
-		bool showGiants = volume && !f.Hero && f.Warp < 0.6f;
+		bool showGiants = volume && !f.Hero && f.Giants && f.Warp < 0.6f; // US-T449: f.Giants
 		if (showGiants) BuildGiants(f.System);
 		float giantDistance = f.RimRadius * 0.86f;
 		for (auto& g : giants)

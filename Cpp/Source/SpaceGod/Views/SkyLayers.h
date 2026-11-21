@@ -82,6 +82,13 @@ namespace SpaceGod::Views
 			cs::String System;
 			bool Hero = false, Wild = false;
 
+			/// <summary>
+			/// US-T449: whether the painting's giant worlds are drawn as bodies out in the volume. Not in a strange or uncharted
+			/// frontier system: a painted giant there is a world the survey never finds (its worlds are unknown until scanned),
+			/// and seen through the volume's gas it read as a stray translucent sphere over the pulsar or the black hole.
+			/// </summary>
+			bool Giants = true;
+
 			/// <summary>Between the stars (the FTL crossing and its void stops): the Milky Way only.</summary>
 			bool Interstellar = false;
 

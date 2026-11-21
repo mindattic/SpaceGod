@@ -98,6 +98,13 @@ namespace SpaceGod::UI
 		MapMode Mode() const { return mode; }
 		void SetMode(MapMode m);
 
+		/// <summary>US-T449: a mode a script asks for (sg.Frontier), taken up the next time the map draws, then cleared
+		/// (-1: none). The map is the app's own, so a console command has no other way to reach it.</summary>
+		static inline int RequestedMode = -1;
+
+		/// <summary>US-T449: a script's request to fit the whole map again (its systems' spread) the next time it draws.</summary>
+		static inline bool RequestFit = false;
+
 		// ---------------------------------------------------------------- US-T306: find (GalaxyMapScreen.Find.cpp)
 
 		/// Whether the find field has the keys (the owner hands the game's input over meanwhile).
@@ -224,6 +231,8 @@ namespace SpaceGod::UI
 		static constexpr Color HeardColor = Color(0.45f, 0.7f, 1.0f);
 		static constexpr Color VoidColor = Color(0.75f, 0.5f, 1.0f);
 		static constexpr Color FrontierColor = Color(1.0f, 0.85f, 0.45f);
+		/// <summary>US-T449: the deep frontier and its strange things.</summary>
+		static constexpr Color DeepColor = Color(0.72f, 0.45f, 1.0f);
 		static constexpr Color BioColor = Color(0.55f, 0.95f, 0.3f);
 		static constexpr Color WatcherColor = Color(0.8f, 0.45f, 1.0f);
 		static constexpr Color CalmColor = Color(0.35f, 0.85f, 0.75f);
@@ -440,6 +449,23 @@ namespace SpaceGod::UI
 		void Swatch(float& y, float x, float w, Color c, const cs::String& s, bool dashed);
 
 		void Label(Vector2 p, const cs::String& s, Color c, bool minor);
+
+		// US-T449: labels kept apart. Each draw of the map clears these; a label placed takes its rect, and the next one
+		// tries other spots round its star or drops (its subtitle first) rather than overprint it. The find field, its
+		// results and the pins panel are taken first, so nothing is drawn under them.
+		std::vector<Rect> placedLabels;
+		Vector2 LabelSize(const cs::String& s, bool minor);
+		bool LabelFree(const Rect& r, const Rect& local) const;
+		struct StarLabel
+		{
+			Vector2 P;
+			cs::String Name, Sub;
+			Color NameColor, SubColor;
+			int Priority = 0;
+			float Order = 0;
+			bool Must = false, SubAlways = false;
+		};
+		void PlaceStarLabels(std::vector<StarLabel>& labels, const Rect& local);
 
 		static void Line(Vector2 a, Vector2 b, Color color, float thickness);
 

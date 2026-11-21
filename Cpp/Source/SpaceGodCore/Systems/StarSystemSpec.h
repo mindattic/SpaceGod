@@ -200,6 +200,38 @@ namespace SpaceGod::Core
 	};
 
 	/// <summary>
+	/// US-T449: what makes a system out past the charted neighbourhood strange (see <see cref="Frontier"/>): None for an
+	/// ordinary star; the rest are found only on the frontier, more often the deeper it lies.
+	/// </summary>
+	enum class FrontierKind : int
+	{
+		None,
+		/// <summary>A neutron star sweeping two beams round the sky as it spins.</summary>
+		Pulsar,
+		/// <summary>A stellar black hole feeding on a glowing accretion disc.</summary>
+		BlackHole,
+		/// <summary>A white dwarf in the shell of gas it threw off, its inner worlds long since swallowed.</summary>
+		WhiteDwarf,
+		/// <summary>Two brown dwarfs circling each other, no true star among them.</summary>
+		BrownDwarfs,
+		/// <summary>A planet with no star at all, cast out of its system, its moons still with it.</summary>
+		RoguePlanet,
+		/// <summary>Two stars bound together.</summary>
+		Binary,
+		/// <summary>A close pair with a third star far out.</summary>
+		Trinary,
+		/// <summary>A star wrapped in a nebula that swallows sensors.</summary>
+		Nebula,
+		/// <summary>A vast cloud of comets ringing the system, some falling in.</summary>
+		CometCloud,
+		/// <summary>The ruin of an ancient ring-shaped structure nobody living built.</summary>
+		Relic,
+		/// <summary>Worlds on wild orbits: steep, eccentric, some running backwards.</summary>
+		Wanderers,
+	};
+	SPACEGODCORE_API const char* ToString(FrontierKind v);
+
+	/// <summary>
 	/// A real star system as data: where it is, its stars, its catalogued planets and discs, and any
 	/// invented stations. <see cref="StarSystemBuilder"/> turns it into bodies. Values are sourced in
 	/// Systems/SOURCES.md; only what the planet and station summaries call assumed or fiction is not.
@@ -232,6 +264,9 @@ namespace SpaceGod::Core
 		double OverviewSpanAu = cs::Double::NaN;
 
 		cs::String Summary;
+
+		/// <summary>US-T449: what is strange about it, for a frontier system (see <see cref="Frontier"/>); saved, absent from older saves.</summary>
+		FrontierKind Oddity = FrontierKind::None;
 
 		DVec3 PositionLy() const;
 

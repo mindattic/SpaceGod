@@ -45,6 +45,23 @@ public:
 	/// <summary>The screen's own textures go with the Hud's (U.SPC-T366).</summary>
 	void DestroyDiscoveriesTextures();
 
+	/// <summary>
+	/// US-T449: whether body <paramref name="index"/> of the system in view is still unknown: the system is uncharted
+	/// frontier ground (Core::Frontier::IsUncharted) and nobody has surveyed the body yet. The views draw no name or marker
+	/// for it until it is revealed: by the eye or the helm coming within Frontier::RevealKm of it, a ping from the helm (far
+	/// wider), or selecting it on the scan card.
+	/// </summary>
+	bool BodyUncharted(int index);
+
+	/// <summary>US-T449: how many bodies of the system in view are still unknown.</summary>
+	int UnchartedBodies();
+
+private:
+	/// <summary>US-T449: reveals the bodies of uncharted ground the eye, the helm or a ping has come near enough to.</summary>
+	void RevealFrontierBodies();
+	double revealedAt = -1;
+public:
+
 private:
 	cs::Ref<UI::DiscoveriesScreen> discoveriesScreen;
 	int discoveryFrames = 0;
