@@ -1878,7 +1878,7 @@ namespace SpaceGod::UI
 	{
 		// US-T393: the picker (drawn over the rest) first, else the save panel; each only while it drew last frame.
 		// US-T398: not while the bottom drawer is open over them (it reads the same keys from the device).
-		if (!keysFree || drawerOpen) return false;
+		if (!keysFree || DrawerOpen()) return false;
 		int* step = nullptr;
 		bool* enter = nullptr;
 		if (app->ShowPicker && pickerDrawnFrame >= Time::frameCount - 1)

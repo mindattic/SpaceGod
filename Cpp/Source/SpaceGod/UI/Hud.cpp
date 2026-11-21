@@ -250,8 +250,7 @@ namespace SpaceGod::UI
 		DrawFlightMarkers();
 		DrawOffscreenArrows(); // US-T128: targets off the screen, at its edge
 		DrawCombatHud();
-		DrawReactor(); // US-T94: BottomRight's first slot
-		DrawSensors(); // US-T93: stacked over the reactor
+		ReserveDrawerEdges(); // US-T438: the right edge's drawers (the reactor, US-T94, and the sensors, US-T93) take BottomRight's first slot
 		DrawTopBar();
 		if (app->ShowNews) DrawNews();
 		else DrawTicker();
@@ -262,7 +261,6 @@ namespace SpaceGod::UI
 		DrawHarvest(true); // US-T211: the gas works panel, TopRight after the board
 		DrawHunters();
 		DrawSelection();
-		DrawDrawerHandle(); // US-T200: the status band's bottom-left slot, before the status line takes the rest
 		DrawStatus();
 		DrawSalvage();
 		DrawBoarding();
@@ -282,7 +280,7 @@ namespace SpaceGod::UI
 		if (app->ShowTrade) DrawTradeDesk();
 		if (app->ShowPort) DrawPort(); // US-T266: the port screen, docked
 		if (app->ShowPicker) DrawPicker();
-		DrawDrawer(); // US-T200: pulled up over the docked panels
+		drawers.Draw(DrawerFrame()); // US-T438: the drawers and their edge tabs (US-T200's bottom drawer among them), over the docked panels
 		if (app->ShowSaves) DrawSaves();
 		DrawToast();
 	}
@@ -1342,31 +1340,34 @@ namespace SpaceGod::UI
 
 	// ---------------------------------------------------------------- the reactor's split (US-T94)
 
-	void Hud::DrawReactor()
+	bool Hud::ReactorAvailable() const
 	{
-		if (app->Travel->Active) return;
+		if (app->Travel->Active) return false;
 		auto seat = app->HeldSeat();
-		if (seat == nullptr || !CraftPower::Shares(seat)) return;
-		// Screen space, a fixed size: the same at the gameplay and the realistic scale. BottomRight's first slot, the
-		// sensors and then the selection card stacked over it (US-T152); taken on every event so they are placed alike
-		// in the Layout pass and the Repaint. Not registered as UI, so it never eats a click.
-		constexpr float w = 232, h = 142, segW = 56, segH = 9, gap = 3, step = 76;
-		auto r = layout.Take(HudRegion::BottomRight, w, h);
-		RegisterUi(r); // US-T212
-		if (Event::current().type != EventType::Repaint) return;
+		return seat != nullptr && CraftPower::Shares(seat);
+	}
+
+	void Hud::DrawReactorBody(Rect content)
+	{
+		// US-T438: a drawer (docked up the right edge by default, under the sensors): the drawer manager frames and places it
+		// and its title says REACTOR; this is its content. Screen space, a fixed size: the same at either scale.
+		constexpr float segW = 56, segH = 9, gap = 3, step = 76;
+		if (!ReactorAvailable() || Event::current().type != EventType::Repaint) return;
+		auto seat = app->HeldSeat();
 		auto held = CraftPower::Of(seat, false);
 		PowerDistribution even; // nothing moved yet: the even share it runs at
 		const PowerDistribution& p = held != nullptr ? *held : even;
-		GUI::Box(r, GUIContent::none(), panel);
+		auto r = Rect(content.x - 4, content.y - 4, content.width + 8, content.height + 4); // the old panel's insets measure from here
+		float h = r.height;
 		cs::String preset = p.PresetName();
 		// Powered down (US-T93): the split waits for the restart, nothing runs on it now.
 		bool offline = SensorPosture::Offline(SelfDestruct::CombatOf(seat));
-		if (offline) DrawLabel("REACTOR  \xC2\xB7  OFFLINE", Vector2(r.x + 10, r.y + 6), Color(0.6f, 0.75f, 1.0f), true);
-		else DrawLabel(preset.empty() ? cs::String("REACTOR") : cs::Cat("REACTOR  \xC2\xB7  ", preset), Vector2(r.x + 10, r.y + 6), Accent, true);
+		if (offline) DrawLabel("OFFLINE", Vector2(r.x + 10, r.y + 4), Color(0.6f, 0.75f, 1.0f), true);
+		else DrawLabel(preset.empty() ? cs::String("EVEN SHARE") : preset, Vector2(r.x + 10, r.y + 4), Accent, true);
 		const char* names[] = { "WEAPONS", "SHIELDS", "ENGINES" };
 		const Color colors[] = { Color(1.0f, 0.62f, 0.32f), Color(0.45f, 0.7f, 1.0f), Color(0.55f, 1.0f, 0.62f) };
 		auto old = GUI::color;
-		float base = r.y + 30 + PowerDistribution::MaxPips * (segH + gap);
+		float base = r.y + 26 + PowerDistribution::MaxPips * (segH + gap);
 		for (int k = 0; k < 3; k++)
 		{
 			auto s = static_cast<PowerSystem>(k);
@@ -1386,19 +1387,22 @@ namespace SpaceGod::UI
 
 	// ---------------------------------------------------------------- the sensors and power (US-T93)
 
-	void Hud::DrawSensors()
+	bool Hud::SensorsAvailable() const
 	{
-		if (app->Travel->Active || !app->IsPiloting()) return;
+		if (app->Travel->Active || !app->IsPiloting()) return false;
+		auto ship = app->Piloted.Ship;
+		return ship != nullptr && ship->Combat != nullptr && app->World()->Sensors != nullptr;
+	}
+
+	void Hud::DrawSensorsBody(Rect content)
+	{
+		// US-T438: a drawer, over the reactor's on the right edge by default; screen space, the same at either scale.
+		if (!SensorsAvailable() || Event::current().type != EventType::Repaint) return;
 		auto ship = app->Piloted.Ship;
 		auto sensors = app->World()->Sensors;
-		if (ship == nullptr || ship->Combat == nullptr || sensors == nullptr) return;
 		auto c = ship->Combat;
-		// Stacked over the reactor's panel in BottomRight (US-T152), the same width; screen space, the same at either scale.
-		constexpr float w = 232, h = 62;
-		auto r = layout.Take(HudRegion::BottomRight, w, h);
-		RegisterUi(r); // US-T212
-		if (Event::current().type != EventType::Repaint) return;
-		GUI::Box(r, GUIContent::none(), panel);
+		auto r = Rect(content.x - 4, content.y - 6, content.width + 8, content.height + 6); // the old panel's insets measure from here
+		float w = r.width;
 		auto state = SensorPosture::StateOf(c);
 		float pulse = 0.65f + 0.35f * Mathf::Abs(Mathf::Sin(Time::unscaledTime * 4.0f));
 		const Color darkBlue(0.55f, 0.72f, 1.0f), amber(1.0f, 0.75f, 0.3f), hot(1.0f, 0.42f, 0.25f);

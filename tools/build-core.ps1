@@ -269,4 +269,22 @@ if (-not $SkipParity) {
   & $bcExe
   if ($LASTEXITCODE -ne 0) { Write-Host 'BindingCoreTests: failures (see above).' -ForegroundColor Red; exit $LASTEXITCODE }
 }
+
+# ---------------------------------------------------------------- HudDockTests (US-T438)
+# The HUD drawers' layout math (Cpp/Source/SpaceGod/UI/HudDock.h, header-only, no engine): edge stacks, splitting, snapping,
+# keeping windows on screen, edge tabs. Needs nothing of SpaceGodCore.lib.
+$hdDir = Join-Path $core 'Tests\HudDock'
+$hdHeader = Join-Path $repo 'Cpp\Source\SpaceGod\UI\HudDock.h'
+$hdObj = Join-Path $parityObjRoot 'Tests\HudDock\HudDockTests.obj'
+if ((Test-Path -LiteralPath $hdObj) -and (Get-Item -LiteralPath $hdHeader).LastWriteTimeUtc -gt (Get-Item -LiteralPath $hdObj).LastWriteTimeUtc) { Remove-Item -LiteralPath $hdObj -Force }
+$hd = Invoke-Compile @(Get-Item -LiteralPath (Join-Path $hdDir 'HudDockTests.cpp')) $parityObjRoot
+if ($hd.Failed.Count -gt 0) { exit 1 }
+$hdExe = Join-Path $out 'HudDockTests.exe'
+& link.exe /nologo /DEBUG @linkOpt "/OUT:$hdExe" $hd.Objs
+if ($LASTEXITCODE -ne 0) { throw 'link.exe failed (HudDockTests).' }
+Write-Host "exe     $hdExe"
+if (-not $SkipParity) {
+  & $hdExe
+  if ($LASTEXITCODE -ne 0) { Write-Host 'HudDockTests: failures (see above).' -ForegroundColor Red; exit $LASTEXITCODE }
+}
 exit 0

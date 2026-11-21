@@ -6,6 +6,7 @@
 #include "UnityCompat/UnityTypes.h"
 #include "UnityCompat/UnityGui.h"
 #include "Target.h"
+#include "UI/HudDrawers.h" // US-T438
 
 #include <vector>
 

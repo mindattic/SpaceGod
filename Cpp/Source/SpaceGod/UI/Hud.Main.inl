@@ -325,8 +325,7 @@ private:
 
 	/// At any controls with a reactor to share (US-T94, <see cref="Core::CraftPower"/>): the weapons / shields / engines pips,
 	/// what each runs at, the preset when it is one, and the keys. Screen space only, so it reads the same at the gameplay
-	/// and realistic scales.
-	void DrawReactor();
+	/// and realistic scales. US-T438: a drawer now (Hud.Drawer.inl: DrawReactorBody, docked up the right edge).
 
 	/// At any controls (US-T97, <see cref="Core::SelfDestruct"/>): the arming bar while Shift+Backspace is held, then the
 	/// countdown, big, in the middle of the screen, and the key to abort it. Screen space, so it reads the same at the
@@ -336,8 +335,7 @@ private:
 	/// At a ship's helm (US-T93, <see cref="Core::SensorPosture"/>): the sensors' and the reactor's state, above the reactor
 	/// panel: PASSIVE (and when the next ping is ready), PING / LIT UP nn s after an active ping, DARK with the hull's heat
 	/// cooling toward its floor, RESTARTING nn s with its bar; the signature, and the keys. Screen space only, so it reads the
-	/// same at the gameplay and realistic scales.
-	void DrawSensors();
+	/// same at the gameplay and realistic scales. US-T438: a drawer now (Hud.Drawer.inl: DrawSensorsBody).
 
 	/// At a capital ship's helm (U.SPC-T272): how many guns bear where the player is looking (their fire cones take that
 	/// line in, U.SPC-T533) and how many of them are loaded, the volley building while the trigger is held, and the hull

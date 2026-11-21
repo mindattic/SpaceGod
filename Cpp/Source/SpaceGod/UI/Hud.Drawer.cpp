@@ -1,6 +1,6 @@
-// US-T200: the bottom drawer (see UI/Hud.Drawer.inl for the declarations and the rule): a handle at the bottom left
-// pulls it up; Navigation lists the systems and this system's places, Ships in area the hulls about, a click hailing one
-// in range (UnitySpaceApp::HailShip, US-T201).
+// US-T200: the bottom drawer (see UI/Hud.Drawer.inl for the declarations and the rule), four drawers of the HUD's drawer
+// system since US-T438 (and the reactor's and the sensors' drawers registered beside them); Navigation lists the systems
+// and this system's places, Ships in area the hulls about, a click hailing one in range (UnitySpaceApp::HailShip, US-T201).
 
 #include "UI/Hud.h"
 
@@ -25,6 +25,9 @@
 #include "Systems/GateNetwork.h"
 #include "Systems/LastingConsequences.h" // US-T405
 #include "Coop/CoopPeer.h" // US-T405: objectives are taken up in single-player only, as sg.Objectives
+#include "Embodiment/CraftPower.h" // US-T438: the reactor's drawer
+#include "Embodiment/SelfDestruct.h"
+#include "Sensors/SensorPosture.h" // US-T438: the sensors' drawer
 
 #include <algorithm>
 
@@ -34,12 +37,6 @@ namespace SpaceGod::UI
 {
 	namespace
 	{
-		/// "▲" (Arial's WGL4 triangle, like UiStyle's fold marks): the handle's pull-up mark.
-		constexpr const char* GlyphUp = "\xE2\x96\xB2"; // U+25B2
-
-		/// How much of the free height (under the top bar, over the status line) each drawer step takes.
-		constexpr float StepFraction[] = { 0.3f, 0.52f, 0.8f };
-
 		cs::String RoleName(ShipRole r)
 		{
 			return cs::Strings::ToLowerInvariant(cs::String(Core::ToString(r)));
@@ -51,93 +48,243 @@ namespace SpaceGod::UI
 		return app->ShowHud && !app->ScreenCleared && !app->ShowSpawn && !app->ShowHelp && !app->ShowLogs /* US-T261 */ && !app->ShowDiscoveries /* US-T259 */ && !app->ShowEncyclopedia /* US-T271 */ && !app->ShowSociety /* US-T293 */ && !(app->ShowGalaxyMap && !app->Travel->Active) && !(app->ShowSystemMap && !app->Travel->Active) /* US-T258 */;
 	}
 
+	// ---------------------------------------------------------------- the drawers (US-T438)
+
+	const char* Hud::DrawerTabId(DrawerTab tab)
+	{
+		switch (tab)
+		{
+			case DrawerTab::Ships: return DrawerShipsId;
+			case DrawerTab::Notices: return DrawerNoticesId;
+			case DrawerTab::Objectives: return DrawerObjectivesId;
+			default: return DrawerNavigationId;
+		}
+	}
+
+	const char* Hud::DrawerTabTitle(DrawerTab tab)
+	{
+		switch (tab)
+		{
+			case DrawerTab::Ships: return "SHIPS IN AREA";
+			case DrawerTab::Notices: return "NOTICES";
+			case DrawerTab::Objectives: return "OBJECTIVES";
+			default: return "NAVIGATION";
+		}
+	}
+
+	void Hud::RegisterDrawers()
+	{
+		if (drawersRegistered) return;
+		drawersRegistered = true;
+		using HudDock::Edge;
+		// The bottom drawer's four, one window of tabs along the bottom edge (filling it), closed to begin with as it was.
+		for (int t = 0; t < DrawerTabCount; t++)
+		{
+			auto tab = static_cast<DrawerTab>(t);
+			DrawerSpec s;
+			s.id = DrawerTabId(tab);
+			s.title = DrawerTabTitle(tab);
+			s.edge = Edge::Bottom;
+			s.size = Vector2(0, 420);
+			s.shown = false;
+			s.group = "bottom";
+			s.available = [this] { return DrawerAvailable(); };
+			s.draw = [this, tab](Rect r) { DrawDrawerTab(tab, r); };
+			if (tab == DrawerTab::Ships) s.title = "SHIPS";
+			if (tab == DrawerTab::Objectives) // US-T405: the offers waiting on the SpaceGod
+				s.alert = [this]
+				{
+					DrawerAlert a;
+					auto lc = app->Galaxy != nullptr ? LastingConsequences::Find(*app->Galaxy) : nullptr;
+					if (lc == nullptr) return a;
+					int offered = 0;
+					for (const auto& o : lc->Objectives)
+						if (o != nullptr && o->Status == GodObjectiveStatus::Offered) offered++;
+					if (offered > 0) a = DrawerAlert{ 1, cs::Cat(offered, offered == 1 ? " offer" : " offers") };
+					return a;
+				};
+			drawers.Register(std::move(s));
+		}
+		// The reactor (US-T94) and the sensors (US-T93): up the right edge from the bottom, the reactor first, at the controls.
+		{
+			DrawerSpec s;
+			s.id = DrawerReactorId;
+			s.title = "REACTOR";
+			s.edge = Edge::Right;
+			s.size = Vector2(240, 158);
+			s.available = [this] { return ReactorAvailable(); };
+			s.draw = [this](Rect r) { DrawReactorBody(r); };
+			s.alert = [this]
+			{
+				auto seat = app->HeldSeat();
+				return seat != nullptr && SensorPosture::Offline(SelfDestruct::CombatOf(seat)) ? DrawerAlert{ 2, "OFFLINE" } : DrawerAlert();
+			};
+			drawers.Register(std::move(s));
+		}
+		{
+			DrawerSpec s;
+			s.id = DrawerSensorsId;
+			s.title = "SENSORS";
+			s.edge = Edge::Right;
+			s.size = Vector2(240, 82);
+			s.available = [this] { return SensorsAvailable(); };
+			s.draw = [this](Rect r) { DrawSensorsBody(r); };
+			s.alert = [this]
+			{
+				auto ship = app->Piloted.Ship;
+				auto c = ship != nullptr ? ship->Combat : nullptr;
+				if (c == nullptr) return DrawerAlert();
+				if (SensorPosture::Lit(c.get())) return DrawerAlert{ 2, "LIT UP" }; // every sensor in reach hears the hull
+				if (SensorPosture::StateOf(c) == PowerState::Restarting) return DrawerAlert{ 1, "RESTARTING" };
+				return DrawerAlert();
+			};
+			drawers.Register(std::move(s));
+		}
+		drawers.ResetLayout();
+	}
+
+	HudDrawers::Frame Hud::DrawerFrame()
+	{
+		HudDrawers::Frame f;
+		f.hudMode = true;
+		f.screenW = static_cast<float>(Screen::width);
+		f.screenH = static_cast<float>(Screen::height);
+		float left = SafeLeft() + HudLayout::Margin, right = SafeRight() - HudLayout::Margin;
+		float top = HudLayout::TopBarBottom + HudLayout::Margin;
+		// The status line's band at the foot (40 high with its gap, as the bottom drawer always sat on it).
+		float foot = f.screenH - 40 - HudLayout::Gap;
+		using HudDock::Box;
+		using HudDock::Edge;
+		// The left edge: under the navigator's title bar (it stays a fixed panel until US-T440), down to the foot.
+		f.bands[static_cast<int>(Edge::Left)] = Box(left, 10 + 34 + HudLayout::Gap, Mathf::Max(0.0f, right - left), Mathf::Max(0.0f, foot - 50));
+		f.bands[static_cast<int>(Edge::Top)] = Box(left, top, Mathf::Max(0.0f, right - left), Mathf::Max(0.0f, foot - top));
+		// The right edge: the right-hand column's bottom stack, from over the dev menu's hint up to under the top bar.
+		float rightBottom = f.screenH - HudLayout::Margin - HudLayout::DevHintStrip;
+		f.bands[static_cast<int>(Edge::Right)] = Box(left, top, Mathf::Max(0.0f, right - left), Mathf::Max(0.0f, rightBottom - top));
+		// The bottom edge: from the left edge to the right-hand column (as the bottom drawer was), on the status line.
+		float x1 = Mathf::Min(layout.BottomColumnLeft(), SafeRight()) - HudLayout::Margin;
+		if (x1 - left < 520) x1 = Mathf::Min(left + 520, right);
+		f.bands[static_cast<int>(Edge::Bottom)] = Box(left, top, Mathf::Max(0.0f, x1 - left), Mathf::Max(0.0f, foot - top));
+		f.panel = [this](Rect r) { return Panel(r); };
+		f.registerUi = [this](Rect r) { RegisterUi(r); };
+		f.styles = HudDrawers::Styles{ panel, title, small, button, buttonActive };
+		return f;
+	}
+
+	void Hud::ReserveDrawerEdges()
+	{
+		RegisterDrawers();
+		auto f = DrawerFrame();
+		auto r = drawers.EdgeExtent(HudDock::Edge::Right, f);
+		if (r.Empty()) return;
+		// Its windows stand from the column's foot as the reactor and the sensors did: the column's next panel goes over them.
+		layout.Take(HudRegion::BottomRight, r.w, (f.bands[static_cast<int>(HudDock::Edge::Right)].Bottom() - r.y));
+	}
+
+	bool Hud::DrawerOpen() const
+	{
+		return drawerKeys && drawers.Visible(DrawerTabId(drawerTab));
+	}
+
 	bool Hud::UpdateDrawer(bool keysFree)
 	{
+		RegisterDrawers();
 		float dt = Mathf::Min(Time::unscaledDeltaTime, 0.1f);
 		bool available = DrawerAvailable();
-		if (!available) drawerOpen = false;
-		// Pulled up (and let down) over a fifth of a second.
-		drawerShown = Mathf::MoveTowards(drawerShown, drawerOpen ? 1.0f : 0.0f, dt * 5.0f);
+		drawers.Tick(dt, true);
+		// The keys are the drawer's while the one opened by its key shows.
+		if (drawerKeys && !drawers.Visible(DrawerTabId(drawerTab))) drawerKeys = false;
 		if (!keysFree || !available) return false;
 
 		const Input::InputDevice& kb = Input::InputDevice::current();
 		auto pressed = [&](Input::Key k) { return kb[k].wasPressedThisFrame; };
 		bool shift = kb[Input::Key::LeftShift].isPressed || kb[Input::Key::RightShift].isPressed;
-		// US-T345: Shift+X (unless rebound) opens the drawer on the notice history, and closes it from there.
+		auto open = [&](DrawerTab tab)
+		{
+			if (tab != drawerTab) SetDrawerTab(tab);
+			drawers.Open(DrawerTabId(tab), true);
+			drawerKeys = true;
+			drawerTabs[static_cast<int>(tab)].followRow = true;
+		};
+		// US-T345: Shift+X (unless rebound) opens the notice history, and closes it from there.
 		if (Input::KeyBindings::Pressed(Input::KeyAction::Notices, kb))
 		{
-			if (drawerOpen && drawerTab == DrawerTab::Notices) drawerOpen = false;
-			else
-			{
-				drawerOpen = true;
-				if (drawerTab != DrawerTab::Notices) SetDrawerTab(DrawerTab::Notices);
-				drawerFollowRow = true;
-			}
+			if (drawers.Visible(DrawerNoticesId)) { drawers.Close(DrawerNoticesId); drawerKeys = false; }
+			else open(DrawerTab::Notices);
 			return true; // the key is spent (X alone is the news feed's: it does not go off under it)
 		}
 		if (Input::KeyBindings::Pressed(Input::KeyAction::Drawer, kb)) // US-T249: Shift+U unless rebound
 		{
-			drawerOpen = !drawerOpen;
-			drawerFollowRow = true;
+			if (drawers.Visible(DrawerTabId(drawerTab))) { drawers.Close(DrawerTabId(drawerTab)); drawerKeys = false; }
+			else open(drawerTab);
 			return true; // the key is spent (U alone is the HUD's: it does not go off under it)
 		}
-		if (!drawerOpen) return false;
+		if (!DrawerOpen()) return false;
 
+		auto id = DrawerTabId(drawerTab);
+		auto& st = drawerTabs[static_cast<int>(drawerTab)];
 		if (pressed(Input::Key::Escape))
 		{
-			drawerOpen = false;
+			drawers.Close(id);
+			drawerKeys = false;
 			return true;
 		}
 		bool back = (pressed(Input::Key::Tab) && shift) || pressed(Input::Key::LeftArrow);
 		bool next = (pressed(Input::Key::Tab) && !shift) || pressed(Input::Key::RightArrow);
-		if (back || next) // US-T345, US-T405: the tabs round in either direction
-			SetDrawerTab(static_cast<DrawerTab>((static_cast<int>(drawerTab) + (next ? 1 : DrawerTabCount - 1)) % DrawerTabCount));
+		if (back || next) // US-T345, US-T405: the four round in either direction
+		{
+			open(static_cast<DrawerTab>((static_cast<int>(drawerTab) + (next ? 1 : DrawerTabCount - 1)) % DrawerTabCount));
+			return true;
+		}
 		// US-T345: F (Shift+F back) steps the notice history's filter.
 		if (drawerTab == DrawerTab::Notices && pressed(Input::Key::F))
 		{
 			noticeFilter = (noticeFilter + (shift ? NoticeFilterCount - 1 : 1)) % NoticeFilterCount;
-			drawerRow = 0;
-			drawerScroll = Vector2::zero();
-			drawerItems.clear();
-			drawerRefreshAt = -10.0f;
+			st = DrawerTabState();
 		}
-		if (pressed(Input::Key::PageUp)) drawerStep = std::min(drawerStep + 1, DrawerSteps - 1);
-		if (pressed(Input::Key::PageDown))
+		// PgUp / PgDn: its window a step bigger or smaller (smaller than the least closes it, as the drawer's lowest step did).
+		if (pressed(Input::Key::PageUp)) drawers.Grow(id, 1);
+		if (pressed(Input::Key::PageDown) && !drawers.Grow(id, -1))
 		{
-			if (drawerStep == 0) drawerOpen = false;
-			else drawerStep--;
+			drawers.Close(id);
+			drawerKeys = false;
+			return true;
 		}
-		if (pressed(Input::Key::DownArrow)) { drawerRow = DrawerStepRow(drawerRow, 1); drawerFollowRow = true; }
-		if (pressed(Input::Key::UpArrow)) { drawerRow = DrawerStepRow(drawerRow, -1); drawerFollowRow = true; }
-		if (pressed(Input::Key::Enter) || pressed(Input::Key::NumpadEnter)) ActDrawerItem(drawerRow);
-		return true; // open, the drawer has the keys (the comms panel's pattern)
+		if (pressed(Input::Key::DownArrow)) { st.row = DrawerStepRow(drawerTab, st.row, 1); st.followRow = true; }
+		if (pressed(Input::Key::UpArrow)) { st.row = DrawerStepRow(drawerTab, st.row, -1); st.followRow = true; }
+		if (pressed(Input::Key::Enter) || pressed(Input::Key::NumpadEnter)) ActDrawerItem(drawerTab, st.row);
+		return true; // open by its key, the drawer has the keys (the comms panel's pattern)
 	}
 
-	int Hud::DrawerStepRow(int from, int dir) const
+	int Hud::DrawerStepRow(DrawerTab tab, int from, int dir) const
 	{
-		int n = static_cast<int>(drawerItems.size());
+		const auto& items = drawerTabs[static_cast<int>(tab)].items;
+		int n = static_cast<int>(items.size());
 		if (n == 0) return 0;
 		int i = std::clamp(from, 0, n - 1);
 		for (int j = i + dir; j >= 0 && j < n; j += dir)
-			if (!drawerItems[j].heading) return j;
+			if (!items[j].heading) return j;
 		return i;
 	}
 
 	// ---------------------------------------------------------------- rows
 
-	void Hud::RebuildDrawerItems()
+	void Hud::RebuildDrawerItems(DrawerTab tab)
 	{
 		drawerItems.clear();
-		if (drawerTab == DrawerTab::Navigation) AddDrawerNavigation();
-		else if (drawerTab == DrawerTab::Notices) AddDrawerNotices(); // US-T345
-		else if (drawerTab == DrawerTab::Objectives) AddDrawerObjectives(); // US-T405
+		if (tab == DrawerTab::Navigation) AddDrawerNavigation();
+		else if (tab == DrawerTab::Notices) AddDrawerNotices(); // US-T345
+		else if (tab == DrawerTab::Objectives) AddDrawerObjectives(); // US-T405
 		else AddDrawerShips();
+		auto& st = drawerTabs[static_cast<int>(tab)];
+		st.items.swap(drawerItems);
+		drawerItems.clear();
 		// The keyboard's row on a row that can take it.
-		int n = static_cast<int>(drawerItems.size());
-		if (n == 0) { drawerRow = 0; return; }
-		drawerRow = std::clamp(drawerRow, 0, n - 1);
-		if (drawerItems[drawerRow].heading) drawerRow = DrawerStepRow(drawerRow, 1);
-		if (drawerItems[drawerRow].heading) drawerRow = DrawerStepRow(drawerRow, -1);
+		int n = static_cast<int>(st.items.size());
+		if (n == 0) { st.row = 0; return; }
+		st.row = std::clamp(st.row, 0, n - 1);
+		if (st.items[st.row].heading) st.row = DrawerStepRow(tab, st.row, 1);
+		if (st.items[st.row].heading) st.row = DrawerStepRow(tab, st.row, -1);
 	}
 
 	void Hud::AddDrawerNavigation()
@@ -321,10 +468,11 @@ namespace SpaceGod::UI
 	void Hud::SetDrawerTab(DrawerTab tab)
 	{
 		drawerTab = tab;
-		drawerRow = 0;
-		drawerScroll = Vector2::zero();
-		drawerItems.clear();
-		drawerRefreshAt = -10.0f;
+		auto& st = drawerTabs[static_cast<int>(tab)];
+		st.row = 0;
+		st.scroll = Vector2::zero();
+		st.items.clear();
+		st.refreshAt = -10.0f;
 	}
 
 	void Hud::AddDrawerNotices()
@@ -468,12 +616,13 @@ namespace SpaceGod::UI
 		}
 	}
 
-	void Hud::ActDrawerItem(int index)
+	void Hud::ActDrawerItem(DrawerTab tab, int index)
 	{
-		if (index < 0 || index >= static_cast<int>(drawerItems.size())) return;
-		auto it = drawerItems[index]; // a copy: what it does may rebuild the list
+		auto& st = drawerTabs[static_cast<int>(tab)];
+		if (index < 0 || index >= static_cast<int>(st.items.size())) return;
+		auto it = st.items[index]; // a copy: what it does may rebuild the list
 		if (it.heading) return;
-		drawerRow = index;
+		st.row = index;
 		// US-T405: a war objective's choice, through the calls sg.Objectives makes (single-player only, as there).
 		if (it.objective != 0)
 		{
@@ -490,7 +639,7 @@ namespace SpaceGod::UI
 				? cs::Cat(it.objectiveAccept ? "Objective taken up: " : "Objective declined: ", LastingConsequences::Describe(o))
 				: cs::Cat("Can't: ", why));
 			// Rebuilt on the next Layout pass (not cleared here: the drawing loop that clicked still holds its row).
-			drawerRefreshAt = -10.0f;
+			st.refreshAt = -10.0f;
 			return;
 		}
 		if (it.system != nullptr)
@@ -504,7 +653,11 @@ namespace SpaceGod::UI
 			// In range, hailed (US-T201): the comms panel takes over, so the drawer lets itself down.
 			if (it.enabled)
 			{
-				if (app->HailShip(it.ship)) drawerOpen = false;
+				if (app->HailShip(it.ship))
+				{
+					drawers.Close(DrawerTabId(tab));
+					drawerKeys = false;
+				}
 				return;
 			}
 			app->Select(it.target);
@@ -523,119 +676,84 @@ namespace SpaceGod::UI
 
 	// ---------------------------------------------------------------- drawing
 
-	void Hud::DrawDrawerHandle()
+	void Hud::DrawDrawerTab(DrawerTab tab, Rect r)
 	{
-		auto r = Panel(layout.TakeBottomLeft(DrawerHandleW, 30));
-		cs::String caption = cs::Cat(drawerOpen ? UiStyle::Glyph::FoldOpen : GlyphUp, "  DRAWER  [Shift+U]");
-		if (GUI::Button(Rect(r.x + 4, r.y + 4, r.width - 8, 22), caption,drawerOpen ? buttonActive : button))
-		{
-			drawerOpen = !drawerOpen;
-			drawerFollowRow = true;
-		}
-	}
-
-	void Hud::DrawDrawer()
-	{
-		if (drawerShown <= 0.001f) return;
+		auto& st = drawerTabs[static_cast<int>(tab)];
 		// Rebuilt on a Layout pass only (a few times a second), so the Repaint after it places the same rows.
-		if (Event::current().type == EventType::Layout && (drawerItems.empty() || Time::unscaledTime - drawerRefreshAt > 0.25f))
+		if (Event::current().type == EventType::Layout && (st.items.empty() || Time::unscaledTime - st.refreshAt > 0.25f))
 		{
-			RebuildDrawerItems();
-			drawerRefreshAt = Time::unscaledTime;
+			RebuildDrawerItems(tab);
+			st.refreshAt = Time::unscaledTime;
 		}
-
-		// Between the left edge and the right-hand column, its foot on the status line, pulled up to the step's height.
-		float x0 = SafeLeft() + HudLayout::Margin;
-		float x1 = Mathf::Min(layout.BottomColumnLeft(), SafeRight()) - HudLayout::Margin;
-		if (x1 - x0 < 520) x1 = Mathf::Min(x0 + 520, SafeRight() - HudLayout::Margin);
-		float foot = Screen::height - 40 - HudLayout::Gap;
-		float room = Mathf::Max(120.0f, foot - (HudLayout::TopBarBottom + HudLayout::Margin));
-		float full = Mathf::Max(120.0f, room *StepFraction[std::clamp(drawerStep, 0, DrawerSteps - 1)]);
-		// Eased up from the foot.
-		float t = drawerShown;
-		float eased = 1 - (1 - t) * (1 - t);
-		float h = Mathf::Max(36.0f, full * eased);
-		auto r = Panel(Rect(x0, foot - h, x1 - x0, h));
 		auto old = GUI::contentColor;
 
-		// The grip and the tabs.
-		float pad = UiStyle::Space::Pad;
-		float x = r.x + pad, y = r.y + pad;
-		const DrawerTab tabs[] = { DrawerTab::Navigation, DrawerTab::Ships, DrawerTab::Notices, DrawerTab::Objectives /* US-T405 */ };
-		for (auto tab : tabs)
-		{
-			cs::String name = tab == DrawerTab::Navigation ? cs::String("NAVIGATION")
-				: tab == DrawerTab::Notices ? cs::Cat("NOTICES  ", Input::KeyBindings::Keys(Input::KeyAction::Notices)) // US-T345
-				: tab == DrawerTab::Objectives ? cs::String("OBJECTIVES") // US-T405
-				: drawerTab == DrawerTab::Ships ? cs::Cat("SHIPS IN AREA  (", drawerShipCount, ")") : cs::String("SHIPS IN AREA");
-			float tabW = tab == DrawerTab::Objectives ? 110.0f : 160.0f;
-			if (GUI::Button(Rect(x, y, tabW, 22), name, tab == drawerTab ? buttonActive : button) && tab != drawerTab)
-				SetDrawerTab(tab);
-			x += tabW + 4;
-		}
+		// The tab's buttons: the Notices filter, then the full screens a drawer opens.
+		float x = r.x, y = r.y + 2;
+		float right = r.xMax();
+		auto fits = [&](float w) { return x + w <= right; };
 		// US-T345: on the Notices tab, its filter (a click steps it, as F does).
-		if (drawerTab == DrawerTab::Notices)
+		if (tab == DrawerTab::Notices && fits(140))
 		{
 			if (GUI::Button(Rect(x, y, 140, 22), cs::Cat("KIND: ", NoticeFilterName(noticeFilter), "  F"), noticeFilter != 0 ? buttonActive : button))
 			{
 				noticeFilter = (noticeFilter + 1) % NoticeFilterCount;
-				drawerRow = 0;
-				drawerScroll = Vector2::zero();
-				drawerItems.clear();
-				drawerRefreshAt = -10.0f;
+				st = DrawerTabState();
 			}
 			x += 144;
 		}
 		// US-T258: the system map, this system drawn top-down (Shift+[).
-		if (GUI::Button(Rect(x, y, 150, 22), "SYSTEM MAP  Shift+[", button)) app->ShowSystemMap = true;
-		x += 154;
-		// US-T271: the Encyclopedia, every article in one place.
-		if (GUI::Button(Rect(x, y, 170, 22), cs::Cat("ENCYCLOPEDIA  ", Input::KeyBindings::Keys(Input::KeyAction::Encyclopedia)), button)) app->ShowEncyclopedia = true;
-		x += 174;
-		// US-T293: the Society screen, the galaxy's people and the SpaceGod's hand in their affairs.
-		if (GUI::Button(Rect(x, y, 150, 22), cs::Cat("SOCIETY  ", Input::KeyBindings::Keys(Input::KeyAction::Society)), button)) app->ShowSociety = true;
-		x += 154;
-		// The height: a step up or down (the keys' PgUp / PgDn), and close.
-		float right = r.xMax() - pad;
-		if (GUI::Button(Rect(right - 24, y, 24, 22), "X", button)) drawerOpen = false;
-		if (GUI::Button(Rect(right - 52, y, 24, 22), UiStyle::Glyph::FoldOpen, button))
+		if (fits(150))
 		{
-			if (drawerStep == 0) drawerOpen = false;
-			else drawerStep--;
+			if (GUI::Button(Rect(x, y, 150, 22), "SYSTEM MAP  Shift+[", button)) app->ShowSystemMap = true;
+			x += 154;
 		}
-		if (GUI::Button(Rect(right - 80, y, 24, 22), GlyphUp, drawerStep >= DrawerSteps - 1 ? buttonActive : button))
-			drawerStep = std::min(drawerStep + 1, DrawerSteps - 1);
+		// US-T271: the Encyclopedia, every article in one place.
+		if (fits(170))
+		{
+			if (GUI::Button(Rect(x, y, 170, 22), cs::Cat("ENCYCLOPEDIA  ", Input::KeyBindings::Keys(Input::KeyAction::Encyclopedia)), button)) app->ShowEncyclopedia = true;
+			x += 174;
+		}
+		// US-T293: the Society screen, the galaxy's people and the SpaceGod's hand in their affairs.
+		if (fits(150))
+		{
+			if (GUI::Button(Rect(x, y, 150, 22), cs::Cat("SOCIETY  ", Input::KeyBindings::Keys(Input::KeyAction::Society)), button)) app->ShowSociety = true;
+			x += 154;
+		}
 		GUI::contentColor = UiStyle::Dim;
 		float hintX = x + 8;
-		if (right - 88 - hintX > 60)
-			GUI::Label(Rect(hintX, y + 2, right - 88 - hintX, 18),
-				FitText(drawerTab == DrawerTab::Notices // US-T345
-					? cs::String("Tab tabs  ·  Up/Down rows  ·  F kind  ·  PgUp/PgDn height  ·  Esc or Shift+U closes")
-					: drawerTab == DrawerTab::Objectives // US-T405
-					? cs::String("Tab tabs  ·  Up/Down rows  ·  Enter takes the choice  ·  PgUp/PgDn height  ·  Esc or Shift+U closes")
-					: cs::String("Tab tabs  ·  Up/Down rows  ·  Enter acts  ·  PgUp/PgDn height  ·  Esc or Shift+U closes"), small, right - 88 - hintX), small);
+		if (right - hintX > 60)
+		{
+			cs::String count = tab == DrawerTab::Ships ? cs::Cat(drawerShipCount, " in sight  ·  ") : cs::String();
+			cs::String keys = tab == DrawerTab::Notices // US-T345
+				? cs::String("Tab next  ·  Up/Down rows  ·  F kind  ·  PgUp/PgDn size  ·  Esc or Shift+U closes")
+				: tab == DrawerTab::Objectives // US-T405
+				? cs::String("Tab next  ·  Up/Down rows  ·  Enter takes the choice  ·  PgUp/PgDn size  ·  Esc or Shift+U closes")
+				: cs::String("Tab next  ·  Up/Down rows  ·  Enter acts  ·  PgUp/PgDn size  ·  Esc or Shift+U closes");
+			GUI::Label(Rect(hintX, y + 2, right - hintX, 18), FitText(cs::Cat(count, keys), small, right - hintX), small);
+		}
 		GUI::contentColor = old;
 
 		// The rows, scrolled.
 		float top = y + 22 + UiStyle::Space::Tight + 2;
-		if (r.yMax() - pad - top < DrawerRowH) return; // still coming up
-		auto view = Rect(r.x + 4, top, r.width - 8, r.yMax() - pad + 4 - top);
-		int n = static_cast<int>(drawerItems.size());
+		if (r.yMax() - top < DrawerRowH) return; // still coming out
+		auto view = Rect(r.x, top, r.width, r.yMax() - top);
+		int n = static_cast<int>(st.items.size());
 		auto content = Rect(0, 0, view.width - 18, n * DrawerRowH);
-		if (drawerFollowRow && n > 0)
+		if (st.followRow && n > 0)
 		{
-			float rowY = drawerRow * DrawerRowH;
-			if (rowY < drawerScroll.y) drawerScroll.y = rowY;
-			if (rowY + DrawerRowH > drawerScroll.y + view.height) drawerScroll.y = rowY + DrawerRowH - view.height;
-			drawerFollowRow = false;
+			float rowY = st.row * DrawerRowH;
+			if (rowY < st.scroll.y) st.scroll.y = rowY;
+			if (rowY + DrawerRowH > st.scroll.y + view.height) st.scroll.y = rowY + DrawerRowH - view.height;
+			st.followRow = false;
 		}
-		drawerScroll = GUI::BeginScrollView(view, drawerScroll, content);
+		bool keyed = drawerKeys && drawerTab == tab;
+		st.scroll = GUI::BeginScrollView(view, st.scroll, content);
 		for (int i = 0; i < n; i++)
 		{
-			const auto& it = drawerItems[i];
+			const auto& it = st.items[i];
 			auto rr = Rect(0, i * DrawerRowH, content.width, DrawerRowH);
 			// Only the rows in sight are drawn (a long list scrolls).
-			if (rr.yMax() < drawerScroll.y || rr.y > drawerScroll.y + view.height) continue;
+			if (rr.yMax() < st.scroll.y || rr.y > st.scroll.y + view.height) continue;
 			float indentX = it.indent * 14.0f;
 			if (it.heading)
 			{
@@ -645,7 +763,7 @@ namespace SpaceGod::UI
 				GUI::contentColor = old;
 				continue;
 			}
-			bool cursor = i == drawerRow;
+			bool cursor = keyed && i == st.row;
 			bool selected = !it.target.IsNone() && app->Selected == it.target;
 			auto style = cursor || selected ? rowSelected : row;
 			Color tint = it.color;
@@ -654,8 +772,8 @@ namespace SpaceGod::UI
 			auto rowRect = Rect(rr.x + 4 + indentX, rr.y, rr.width - indentX - 4, rr.height);
 			if (GUI::Button(rowRect, GUIContent::none(), style))
 			{
-				drawerRow = i;
-				ActDrawerItem(i);
+				st.row = i;
+				ActDrawerItem(tab, i);
 			}
 			// ActDrawerItem may have rebuilt nothing (the list is rebuilt on Layout only), so `it` still stands.
 			NameAndDetails(rowRect, it.name, it.details, style);

@@ -34,7 +34,7 @@ namespace SpaceGod::UI
 
 	bool Hud::UpdateTradeKeys(bool keysFree)
 	{
-		if (!keysFree || !app->ShowTrade || !DrawerAvailable() || drawerOpen) return false;
+		if (!keysFree || !app->ShowTrade || !DrawerAvailable() || DrawerOpen()) return false;
 		const Input::InputDevice& kb = Input::InputDevice::current();
 		auto pressed = [&](Input::Key k) { return kb[k].wasPressedThisFrame; };
 		bool shift = kb[Input::Key::LeftShift].isPressed || kb[Input::Key::RightShift].isPressed;
