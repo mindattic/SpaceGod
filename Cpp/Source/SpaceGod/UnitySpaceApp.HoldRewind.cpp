@@ -547,6 +547,14 @@ namespace SpaceGod
 				b.FxByMount = std::move(fxByMount);
 			}
 			for (const auto& p : a.Units) *p.first = p.second;
+			// US-T424: a hull that has left the fight since (flown clear: War::Update clears its Battle once it is Fled) is in it
+			// again at a resume point from before it left.
+			if (a.Live != nullptr)
+				for (const auto& p : a.Units)
+				{
+					auto ship = p.first->Ship;
+					if (ship != nullptr && !p.first->Fled && !ship->Destroyed && ship->Battle == nullptr) ship->Battle = a.Live;
+				}
 			for (const auto& p : a.Combats) *p.first = p.second;
 			for (const auto& p : a.Subsystems) *p.first = p.second;
 			for (const auto& p : a.Powers) *p.first = p.second;
@@ -607,6 +615,8 @@ namespace SpaceGod
 			double ShotWall = -1;
 			/// <summary>US-T422: the moment marked before the helm is let go.</summary>
 			double LeaveMarkT = HrNone;
+			/// <summary>US-T424: the moment marked before the hull flies clear of the fight.</summary>
+			double FleeMarkT = HrNone;
 			// US-T414: the seat-change check (phases 8-13): the hull taken for it, the moment marked while piloting
 			// it (before the switch to a turret), and whether the resume landed there or was blocked by a barrier.
 			cs::Ref<Ship> SeatShip;
@@ -634,6 +644,12 @@ namespace SpaceGod
 		cs::Ref<Battle> Entered;
 		double EnteredT = HrNone;
 		bool EnteredBorn = false;
+		/// <summary>US-T424: while a hold plays back a moment before the fight entered was born, its ships are let out of it
+		/// (their Battle cleared, so everything that reads it, the HUD's fight panels and status lines too, sees no fight);
+		/// these are put back in before anything else when the moment reached is after its start again, or the hold ends.</summary>
+		std::vector<cs::Ref<Ship>> Detached;
+		/// <summary>US-T426: the resume point whose hulls' damage the playback shows now (null: the present's).</summary>
+		const HrAnchor* DamageShown = nullptr;
 		std::unordered_map<const BattleUnit*, HrTrack<BattleUnit>> Units;
 		std::unordered_map<const Missile*, HrTrack<Missile>> Missiles;
 		std::unordered_map<const KineticRound*, HrTrack<KineticRound>> Rounds;
@@ -745,6 +761,15 @@ namespace SpaceGod
 		if (holdRewind == nullptr || !holdRewind->Active || battle == nullptr) return false;
 		const auto& h = *holdRewind;
 		return h.EnteredBorn && h.Entered == battle && h.Tau < h.EnteredT;
+	}
+
+	void UnitySpaceApp::HoldRewindReattach()
+	{
+		if (holdRewind == nullptr || holdRewind->Detached.empty()) return;
+		auto& h = *holdRewind;
+		for (const auto& s : h.Detached)
+			if (s != nullptr && s->Battle == nullptr && h.Entered != nullptr) s->Battle = h.Entered;
+		h.Detached.clear();
 	}
 
 	bool UnitySpaceApp::HoldRewindJustResumed() const { return holdRewind != nullptr && holdRewind->JustResumed > 0; }
@@ -985,6 +1010,7 @@ namespace SpaceGod
 	void UnitySpaceApp::ClearHoldRewind(bool book)
 	{
 		if (holdRewind == nullptr) return;
+		HoldRewindReattach(); // US-T424
 		auto& h = *holdRewind;
 		if (book)
 		{
@@ -1114,6 +1140,11 @@ namespace SpaceGod
 		auto heldNonHelm = coop ? nullptr : HeldNonHelm();
 		// US-T423: in co-op the fight the host keeps (its frame names it), so every peer keeps the same one.
 		auto fight = !coop ? HoldRewindBattle() : coopHrFight != nullptr && !coopHrFight->Over ? coopHrFight : nullptr;
+		// US-T424: a fight left (the hull flew clear of it, or it went out of view) is still kept while it goes on, so a hold
+		// can go back to before the hull left it (the resume point puts the hull back in it); only another fight replaces it.
+		if (fight == nullptr && !coop && HrTuning::KeepFightLeft && h.Fight != nullptr && !h.Fight->Over && World()->War != nullptr &&
+			World()->War->Battles.Contains(h.Fight))
+			fight = h.Fight;
 		// US-T419: fought on since it would have ended (or put back to before): its end, if it comes again, starts afresh.
 		if (h.Hooked == nullptr || !h.Hooked->EndHeld) h.EndHeldSince = HrNone;
 		bool entering = false;
@@ -1483,8 +1514,18 @@ namespace SpaceGod
 		if (h.Fight != nullptr)
 		{
 			// US-T424: before a fight born in the window began, none of it is there (its ships are drawn on their schedules,
-			// HoldRewindBeforeFight; the hull flown on the helm's track).
+			// HoldRewindBeforeFight; the hull flown on the helm's track), and its ships are out of it for every reader.
 			bool unborn = HoldRewindBeforeFight(h.Fight);
+			if (unborn && h.Detached.empty())
+			{
+				for (const auto& u : h.Fight->Units)
+					if (u != nullptr && u->Ship != nullptr && u->Ship->Battle == h.Fight)
+					{
+						u->Ship->Battle = nullptr;
+						h.Detached.push_back(u->Ship);
+					}
+			}
+			else if (!unborn) HoldRewindReattach();
 			auto flown = IsPiloting() ? World()->PilotedShip : nullptr;
 			for (const auto& u : h.Fight->Units)
 			{
@@ -1503,6 +1544,22 @@ namespace SpaceGod
 				u->Dead = p.Dead;
 				u->Fled = p.Fled;
 				u->Docked = p.Docked || notYet;
+			}
+			// US-T426: the hulls' damage as it was (parts shot away, breaches, the hull's share), from the resume point at or
+			// after the moment reached, so a hull mends as the hold goes back past its wounds. Every way a hold ends puts a
+			// whole resume point (or the press's) back over it, so nothing of this lasts.
+			const HrAnchor* damage = nullptr;
+			for (const auto& a : h.Anchors)
+				if (a->Live == h.Fight && a->T >= tau - 1e-9)
+				{
+					damage = a.get();
+					break;
+				}
+			if (damage != nullptr && damage != h.DamageShown)
+			{
+				for (const auto& p : damage->Combats) *p.first = p.second;
+				for (const auto& p : damage->Subsystems) *p.first = p.second;
+				h.DamageShown = damage;
 			}
 			double interval = 1.0 / HrTuning::CraftHz;
 			HrPlayProjectiles(h.Fight->Missiles, h.Missiles, tau, interval);
@@ -1581,6 +1638,8 @@ namespace SpaceGod
 	void UnitySpaceApp::EndHoldRewind()
 	{
 		auto& h = *holdRewind;
+		HoldRewindReattach(); // US-T424: the fight's ships back in it before anything reads them
+		h.DamageShown = nullptr; // US-T426: what is put back below (or the press) replaces the damage the playback showed
 		h.Active = false;
 		h.Releasing = false;
 		auto atPress = h.AtPress;
@@ -1956,6 +2015,8 @@ namespace SpaceGod
 					if (HoldRewindBeforeFight(t.Fight) && !t.SawUnborn)
 					{
 						t.SawUnborn = true;
+						selfCheck(ship->Battle == nullptr && PilotUnit() == nullptr,
+							"held before it began, the hull is in no fight for anything reading it (the HUD's fight panels too)");
 						shot("5-before-the-fight-held");
 						t.ShotWall = wall;
 					}
@@ -2350,6 +2411,9 @@ namespace SpaceGod
 				if (!h.Active) return true;
 				if (h.Tau > std::max(t.DeathMarkT, h.Oldest) + 1e-6) return true;
 				if (++t.SettleFrames < 3) return true;
+				// US-T426: still held, before the impact: the hull is drawn whole again (its damage played back), not wrecked.
+				selfCheck(t.SeatUnit->Combat != nullptr && t.SeatUnit->Combat->Hull > 0 && !t.SeatUnit->Dead,
+					"held back before the impact, the hull's damage is played back too: whole again while still held");
 				t.ForceDown = false;
 				t.HaveResume = false;
 				t.PhaseWall = wall;
@@ -2479,6 +2543,59 @@ namespace SpaceGod
 					"leaving the hull does not block a resume to before it");
 				selfCheck(IsPiloting() && World()->PilotedShip == t.SeatShip, "and the player is back at its helm");
 				selfCheck(t.SeatShip->Battle != nullptr && pilotFrameBody == t.SeatShip->Battle->Body, "in the fight's frame");
+				t.PhaseWall = wall;
+				t.Phase = 26;
+				return true;
+			}
+			// US-T424: flying clear of the fight is no barrier: the rewind keeps the fight left, and a hold to before puts the
+			// hull back in it.
+			case 26: // Out of the cooldown, at the helm: mark, then fly clear (the helm put well past the fight's edge).
+			{
+				if (!HoldRewindRefusal().empty()) return true;
+				if (!IsPiloting() || World()->PilotedShip != t.SeatShip || t.SeatShip->Battle != t.Fight) return finish("not at the helm in the fight for the fly-clear check");
+				if (t.FleeMarkT == HrNone)
+				{
+					t.FleeMarkT = h.LivedS;
+					t.PhaseWall = wall;
+					return true;
+				}
+				if (wall - t.PhaseWall < 0.6) return true;
+				auto out = t.SeatUnit->Pos.LengthSquared() > 1e-9 ? t.SeatUnit->Pos.Normalized() : DVec3::UnitX;
+				SeedPilot(t.Fight->Anchor + out * (Battle::EscapeKm * 2.0), DVec3::Zero, out);
+				t.PhaseWall = wall;
+				t.Phase = 27;
+				return true;
+			}
+			case 27: // Clear of it: the hull is out, the rewind still keeps the fight; hold back to the mark.
+			{
+				if (t.SeatShip->Battle == t.Fight && wall - t.PhaseWall < 5) return true;
+				selfCheck(t.SeatShip->Battle == nullptr && t.SeatUnit->Fled, "flown clear: the hull is out of the fight");
+				selfCheck(h.Fight == t.Fight, "and the rewind still keeps the fight it left");
+				t.Target = t.FleeMarkT;
+				t.ForceDown = true;
+				t.SettleFrames = 0;
+				t.PhaseWall = wall;
+				t.Phase = 28;
+				return true;
+			}
+			case 28:
+			{
+				if (!h.Active) return true;
+				if (h.Tau > std::max(t.FleeMarkT, h.Oldest) + 1e-6) return true;
+				if (++t.SettleFrames < 3) return true;
+				t.ForceDown = false;
+				t.HaveResume = false;
+				t.PhaseWall = wall;
+				t.Phase = 29;
+				return true;
+			}
+			case 29: // Played on from before: back in the fight, at its helm.
+			{
+				if (!t.HaveResume) return true;
+				selfCheck(t.ResumedAnchorT <= t.FleeMarkT + HrTuning::AnchorS + 1e-6 && h.BarrierT < t.FleeMarkT,
+					"flying clear of the fight does not block a resume to before it");
+				selfCheck(t.SeatShip->Battle == t.Fight && !t.SeatUnit->Fled, "and the hull is back in the fight");
+				selfCheck(IsPiloting() && World()->PilotedShip == t.SeatShip, "at its helm");
 				t.PhaseWall = wall;
 				t.Phase = 17;
 				return true;

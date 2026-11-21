@@ -46,6 +46,9 @@ public:
 		static constexpr bool UndoFightStart = true;
 		/// <summary>US-T424: a fight first seen with no more than this many of its own seconds fought was born then.</summary>
 		static constexpr double BornS = 1.0;
+		/// <summary>US-T424: true: a fight the hull flew clear of (or that went out of view) is still kept while it goes on, so
+		/// leaving it is no barrier: a hold to before puts the hull back in it. False: leaving it is a barrier.</summary>
+		static constexpr bool KeepFightLeft = true;
 		/// <summary>US-T410: true: while held, the whole system is drawn as it was (the world clock set back for the drawing
 		/// only: planets, ships in orbit and on the lanes, gates), and put back to now on letting go.</summary>
 		static constexpr bool ViewSystemBack = true;
@@ -195,6 +198,9 @@ private:
 	/// rounds and decoys and into the hull flown, for the views to draw (the moment the hold ends puts a whole state
 	/// back over all of it).</summary>
 	void PlayHoldRewind();
+
+	/// <summary>US-T424: puts the ships a hold let out of a fight not yet born back in it (see HoldRewindState::Detached).</summary>
+	void HoldRewindReattach();
 
 	/// <summary>US-T409: the key let go: the resume point at or before the moment reached is put back and play goes on from
 	/// there (no further back than the last change that cannot be undone yet; a tap changes nothing).</summary>

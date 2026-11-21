@@ -695,13 +695,31 @@ unit; their schedules run on underneath), and the war lists it, numbers it, coun
   schedule; the world's log no longer tells of it; the rewind watches no fight. Begun again, it is the same fight by
   number and name.
 
+### No fight before it began, a fight left, damage played back (US-T426)
+
+- **No fight before it began, anywhere.** While the hold plays back a moment before a born fight began, its ships are
+  let out of it (`Ship::Battle` cleared, `HoldRewindState::Detached`). The simulation does not step during a hold, so
+  this is only what everything reads: the HUD's fight panels, the helm's order bar and the status lines all show the
+  hull "under your helm", as before the fight. They go back in as soon as the moment reached is after its start, and
+  before anything else when the hold ends (`HoldRewindReattach`).
+- **A fight left is kept** (`KeepFightLeft`). The rewind keeps a fight the hull flew clear of, or one that went out of
+  view, while it goes on (only another fight replaces it), so leaving it is no barrier. A resume point from before the
+  hull left puts the hull back in it (`HrRestoreFight`: a unit not fled at the resume point gets its ship's `Battle`
+  back, the mirror of US-T414's joiners).
+- **Damage played back.** As the hold passes each resume point, its hulls' combat state and systems are written over
+  the live ones (`DamageShown`), so a hull mends as the hold goes back past its wounds (parts shot away come back,
+  breaches close, the hull share rises). Every way a hold ends puts a whole resume point (or the press's) back over it.
+- **Proved.** The birth check adds one check (12/12): held before the fight began, the hull is in no fight for
+  anything reading it. The main self-test adds a check that the hull is whole again while still held before its loss,
+  and phases 26-29: the helm is put well past the fight's edge, the hull is out of it with the fight still kept, and a
+  hold to before puts it back in the fight at its helm (56/56).
+
 ### Not yet (later stages)
 
 - A ship that changed phase (left an orbit, joined a lane) in the window is still drawn where its *current* phase
   puts it at the past `jd`, as a ship's analytic state is a snapshot of now, overwritten at every phase change.
-- The hull sections' damage stage, and the reversed audio bed. (Reversed battle effects: US-T421; a hold in co-op:
-  US-T423; a fight that began in the window: US-T424, single-player.)
-- A fight left (the hull flew clear, or the fight went out of view) is still a barrier.
+- The reversed audio bed. In co-op, a fight's start and a fight left are still barriers (US-T424 and US-T426 are
+  single-player).
 
 ## Parked: checkpoint loops with ghost replays (US-T169)
 
