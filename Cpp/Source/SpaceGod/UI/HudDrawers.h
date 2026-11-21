@@ -195,6 +195,8 @@ namespace SpaceGod::UI
 		void Detach(const cs::String& id, Rect r);
 		/// Its window's group shown as tabs (else stacked).
 		void SetTabbed(const cs::String& id, bool tabbed);
+		/// US-T441: its window's docked size set by hand (w x h, as DrawerWindow::size; it no longer follows its content).
+		void SetSize(const cs::String& id, Vector2 size);
 
 		/// The drawer's window grown (dir 1) or shrunk (-1) a step across its edge (a floating one in height). False when it
 		/// was already as small as it goes and dir is -1 (the caller may close it).

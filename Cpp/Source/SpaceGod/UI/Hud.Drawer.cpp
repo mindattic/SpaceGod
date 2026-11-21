@@ -116,6 +116,20 @@ namespace SpaceGod::UI
 		}
 		// US-T440: every other panel's drawer, at its default edge (the reactor and the sensors stay first up the right edge).
 		RegisterPanelDrawers();
+		// US-T441: the Layouts drawer (the presets: use, save, save as, rename, delete, reset, the Layout keys' slots), closed
+		// to its tab on the left edge.
+		{
+			DrawerSpec s;
+			s.id = DrawerLayoutsId;
+			s.title = "LAYOUTS";
+			s.shortTitle = "LAYOUT";
+			s.edge = Edge::Left;
+			s.size = Vector2(380, 300);
+			s.shown = false;
+			s.available = [this] { return DrawerAvailable(); };
+			s.draw = [this](Rect r) { DrawLayouts(r); };
+			drawers.Register(std::move(s));
+		}
 		// The bottom drawer's four, one window of tabs along the bottom edge (filling it), closed to begin with as it was; last on
 		// that edge, so pulled out it stands over the status line and the helm's lines (US-T440).
 		for (int t = 0; t < DrawerTabCount; t++)
@@ -147,6 +161,7 @@ namespace SpaceGod::UI
 			drawers.Register(std::move(s));
 		}
 		drawers.ResetLayout();
+		LoadActiveLayout(); // US-T441: the player's chosen preset on screen
 	}
 
 	HudDrawers::Frame Hud::DrawerFrame()
@@ -195,6 +210,14 @@ namespace SpaceGod::UI
 		float dt = Mathf::Min(Time::unscaledDeltaTime, 0.1f);
 		bool available = DrawerAvailable();
 		drawers.Tick(dt, app->HudModeOn()); // US-T439
+		UpdateLayoutSituation(dt); // US-T441
+		// US-T441: the Layouts drawer's name field has the keys while it is typed in.
+		if (layoutTyping)
+		{
+			if (drawers.Visible(DrawerLayoutsId)) return true;
+			layoutTyping = false;
+			layoutNameMode = 0;
+		}
 		// The keys are the drawer's while the one opened by its key shows.
 		if (drawerKeys && !drawers.Visible(DrawerTabId(drawerTab))) drawerKeys = false;
 		if (!keysFree || !available) return false;

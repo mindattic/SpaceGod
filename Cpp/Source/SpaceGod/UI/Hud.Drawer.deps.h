@@ -10,6 +10,11 @@
 
 #include <vector>
 
+namespace SpaceGod::Shared::Json
+{
+	class JsonObject; // US-T441
+}
+
 namespace SpaceGod::Core
 {
 	class Ship;

@@ -121,6 +121,9 @@ namespace SpaceGod::Input
 		/// HUD's pull-out drawers, or back to the quiet screen. Nothing reads it yet (the drawer HUD comes next).</summary>
 		bool HudMode = false;
 
+		/// <summary>US-T441: a HUD layout key pressed this frame (KeyAction::Layout1..5, unbound by default): its slot 0-4, or -1.</summary>
+		int LayoutKey = -1;
+
 		/// <summary>F11 (U.SPC-T496): clears the screen of all its UI but the reticle in use, and brings it all back.</summary>
 		bool ClearScreen = false;
 		bool ToggleMarket = false;

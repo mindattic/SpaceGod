@@ -126,6 +126,9 @@ namespace SpaceGod::Input
 		ToggleCheatMenu = hit(A::CheatMenu);
 		ToggleHud = hit(A::ToggleHud);
 		HudMode = hit(A::HudMode); // US-T437
+		LayoutKey = -1; // US-T441
+		for (int k = 0; k < 5; k++)
+			if (hit(static_cast<A>(static_cast<int>(A::Layout1) + k))) LayoutKey = k;
 		// US-T266: Shift+M asks the port alongside for docking clearance (and opens or closes the port screen), M alone the market.
 		ToggleMarket = hit(A::Market);
 		DockPort = hit(A::DockPort);
@@ -381,6 +384,7 @@ namespace SpaceGod::Input
 		SelectClicked = SelectDoubleClicked = RightClicked = false;
 		Focus = Escape = ToggleScale = TimeFaster = TimeSlower = TogglePause = ResetTime = false;
 		HudMode = false; // US-T437
+		LayoutKey = -1; // US-T441
 		ToggleOrbits = ToggleLabels = ToggleHelp = ToggleHud = ClearScreen = ToggleMarket = DockPort = ToggleCargo = ToggleOutfit = ToggleSilent = ToggleBounties = ToggleContracts = ToggleFleet = ToggleTrade = ToggleGalaxyMap = ToggleNews = ToggleSpawn = WatchBattle = ToggleLanes = ToggleSatellites = ToggleReorient = CycleShips = CycleBackward = Home = Pilot = LockTarget = LockAttacker = ActivateGate = EngageFtl = false;
 		QuickSave = QuickLoad = ToggleSaves = Rewind = HoldRewind = false;
 		ToggleSystemMap = false; // US-T258

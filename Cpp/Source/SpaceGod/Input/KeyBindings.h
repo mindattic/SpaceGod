@@ -59,7 +59,7 @@ namespace SpaceGod::Input
 		// Time and scale
 		TogglePause, TimeFaster, TimeSlower, ToggleScale,
 		// View
-		Orbits, Labels, Lanes, Satellites, SkyNext, SkyPrev, ToggleHud, ClearScreen, HudMode /* US-T437 */,
+		Orbits, Labels, Lanes, Satellites, SkyNext, SkyPrev, ToggleHud, ClearScreen, HudMode /* US-T437 */, Layout1, Layout2, Layout3, Layout4, Layout5 /* US-T441 */,
 		// Screens and panels
 		PauseMenu /* US-T437 */, Help, Comms, Drawer, GalaxyMap, SystemMap, Market, DockPort, Cargo, Outfit, Bounties, Contracts, Fleet, Trade, Hail,
 		Logs, Discoveries, Encyclopedia, Society /* US-T293 */, Notices /* US-T345 */, BattlePlot /* US-T367 */, SpawnPilot, SpawnPractice, QuickSave, QuickLoad, Rewind /* US-T99 */, HoldRewind /* US-T409 */, Saves, CheatMenu, SpawnMenu,

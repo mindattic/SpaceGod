@@ -82,6 +82,46 @@ public:
 	/// <summary>US-T440: the most content height the drawing drawer could have (what its edge leaves it).</summary>
 	float PlaceRoom() const;
 
+	// ---- US-T441: layout presets (UI/Hud.Layouts.cpp; docs/HUD.md, "Layouts")
+	// A preset is a whole drawer layout (HudDrawers::Save's JSON) under a name. Five are built in (Default, today's layout;
+	// Combat, Commerce, Piracy, Exploration: each a recipe on the default), and the player saves their own, or a copy of a
+	// built-in over it (reset puts the built-in back). Kept per profile in settings.json's game block, never in a save or
+	// co-op: game.hudLayouts = { active, slots: [5 names], presets: { name: layout } }. The Layouts drawer lists them.
+	static constexpr const char* DrawerLayoutsId = "layouts";
+	static constexpr int LayoutSlots = 5;
+	/// The built-in presets, in the list's order.
+	static const std::vector<cs::String>& BuiltinLayouts();
+	static bool IsBuiltinLayout(const cs::String& name);
+	/// Every preset: the built-ins, then the player's own as they were made.
+	std::vector<cs::String> LayoutNames();
+	/// The player's chosen preset (the one the HUD goes back to after a situation's).
+	cs::String ActiveLayout();
+	/// The preset on screen now (a situation's, while one holds and the option is on).
+	const cs::String& ShownLayout() const { return layoutShown; }
+	/// A built-in the player saved a copy of (reset puts it back).
+	bool LayoutOverridden(const cs::String& name);
+	/// Puts the preset on screen; <paramref name="makeActive"/>: and makes it the player's chosen one. Drawers opened by a key
+	/// (the market, the cargo hold, the boards, the port) and the Layouts drawer keep whether they are open. False: no such preset.
+	bool ApplyLayout(const cs::String& name, bool makeActive = true);
+	/// The layout on screen saved as <paramref name="name"/> (over the player's own of that name, or as a copy of a built-in).
+	bool SaveLayout(const cs::String& name);
+	/// A player's own preset (or a built-in's copy, the built-in coming back) under a new name, not a built-in's or another's.
+	bool RenameLayout(const cs::String& from, const cs::String& to);
+	/// A player's own preset gone (a built-in cannot be; reset its copy instead).
+	bool DeleteLayout(const cs::String& name);
+	/// A built-in's copy dropped: the built-in as it ships (on screen again when it is the one shown).
+	bool ResetLayoutPreset(const cs::String& name);
+	/// The preset a Layout 1-5 key (slot 0-4) switches to ("" when the slot is free), and setting it (a name in one slot only).
+	cs::String LayoutInSlot(int slot);
+	void SetLayoutSlot(int slot, const cs::String& name);
+	/// A Layout 1-5 key pressed: its preset applied and made the chosen one.
+	void LayoutKey(int slot);
+	/// The whole game.hudLayouts block as JSON text, and put back (sg.HudLayout leaves the profile as it found it).
+	cs::String LayoutsJson();
+	void RestoreLayoutsJson(const cs::String& json);
+	/// What a preset name may be: trimmed, 1 to 24 characters ("" when it is none).
+	static cs::String CleanLayoutName(const cs::String& name);
+
 private:
 	enum class DrawerTab : int { Navigation, Ships, Notices /* US-T345 */, Objectives /* US-T405 */ };
 	static constexpr int DrawerTabCount = 4;
@@ -201,3 +241,36 @@ private:
 	bool SensorsAvailable() const;
 	void DrawReactorBody(Rect r);
 	void DrawSensorsBody(Rect r);
+
+	// ---- US-T441: layout presets (UI/Hud.Layouts.cpp)
+	cs::String layoutShown = "Default";
+	bool layoutsLoaded = false;
+	/// The Layouts drawer: the row picked, the name being typed (save as, rename), whether its field has the keys, its scroll.
+	cs::String layoutPicked;
+	cs::String layoutName;
+	bool layoutTyping = false;
+	/// 0: the name field saves as; 1: it renames the picked preset.
+	int layoutNameMode = 0;
+	Vector2 layoutScroll;
+	cs::String layoutStatus;
+	float layoutStatusAt = -10.0f;
+	cs::Ref<GUIStyle> layoutField;
+	cs::Ref<Texture2D> layoutFieldTexture;
+	/// "switch layout with the situation": the situation last acted on ("" none, else the preset it calls for), the one
+	/// seen now and since when (it must hold a moment before the layout follows).
+	cs::String situationActed, situationSeen;
+	float situationSince = 0;
+	/// The profile's game.hudLayouts block (made when missing), written back after a change.
+	cs::Ref<Shared::Json::JsonObject> LayoutsBlock();
+	void SaveLayoutsBlock();
+	/// The built-in's recipe on the layout as it is (after ResetLayout).
+	void ApplyBuiltinRecipe(const cs::String& name);
+	/// Once, after the drawers are registered: the chosen preset on screen.
+	void LoadActiveLayout();
+	/// Each frame: the option "switch layout with the situation" (combat: Combat, docked: Commerce, else the chosen one).
+	void UpdateLayoutSituation(float dt);
+	/// The situation's preset now ("" none).
+	cs::String LayoutSituation() const;
+	/// The Layouts drawer's content.
+	void DrawLayouts(Rect r);
+	void LayoutNotice(const cs::String& text);

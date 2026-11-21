@@ -235,6 +235,11 @@ namespace SpaceGod::Input
 				{ KeyAction::ToggleHud, "hud", "View: HUD", Both, EdgeKind, { Key::U }, "The HUD's panels and readouts off or on." },
 				{ KeyAction::ClearScreen, "clearScreen", "View: clear screen", Both, EdgeKind, { Key::F11 }, "Every piece of UI but the reticle off, and back." },
 				{ KeyAction::HudMode, "hudMode", "View: HUD mode", Both, EdgeKind, { Key::CapsLock }, "The cursor and the HUD's pull-out drawers on every edge, or back to the quiet screen. (Z, the owner's pick, is roll left at the controls: rebind it here if you like.)" }, // US-T437
+				{ KeyAction::Layout1, "layout1", "View: HUD layout 1", Both, EdgeKind, {}, "The HUD layout in slot 1 (Default unless changed in the Layouts drawer). Unbound to begin with." }, // US-T441
+				{ KeyAction::Layout2, "layout2", "View: HUD layout 2", Both, EdgeKind, {}, "The HUD layout in slot 2 (Combat unless changed in the Layouts drawer). Unbound to begin with." },
+				{ KeyAction::Layout3, "layout3", "View: HUD layout 3", Both, EdgeKind, {}, "The HUD layout in slot 3 (Commerce unless changed in the Layouts drawer). Unbound to begin with." },
+				{ KeyAction::Layout4, "layout4", "View: HUD layout 4", Both, EdgeKind, {}, "The HUD layout in slot 4 (Piracy unless changed in the Layouts drawer). Unbound to begin with." },
+				{ KeyAction::Layout5, "layout5", "View: HUD layout 5", Both, EdgeKind, {}, "The HUD layout in slot 5 (Exploration unless changed in the Layouts drawer). Unbound to begin with." },
 
 				{ KeyAction::PauseMenu, "pauseMenu", "Screen: back / pause menu", Both, EdgeKind, { Pad(PadButton::Menu) }, "Back out of what is open, then the pause menu, as Esc does (Esc always does it too)." }, // US-T437: the pad's pause of before
 				{ KeyAction::Help, "help", "Screen: help", Both, EdgeKind, { Key::H, Key::F1, Pad(PadButton::View) }, "The help screen." },

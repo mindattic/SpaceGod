@@ -56,6 +56,12 @@ cursor and pull-out drawers on every edge (US-T439; docs/HUD.md).
 The plan named Z, but Z is roll left at the controls (and every plain key is taken), so it defaults to **Caps Lock** (a key added for
 it, with the numpad's digits and point); bind Z (or anything) to it on the page.
 
+**HUD layout 1-5** (`KeyAction::Layout1`..`Layout5`, `InputState::LayoutKey`, View group; US-T441): each puts the HUD layout preset in
+its slot on screen and makes it the chosen one (slots 1-5 hold Default, Combat, Commerce, Piracy and Exploration until changed in the
+Layouts drawer; docs/HUD.md, "Layouts"). **Unbound** to begin with, so they take no key from anything; bind them on the page. A slot with
+no preset says so in a toast. The option **Switch HUD layout with the situation** (Settings > Gameplay, `gameplay.layoutWithSituation`,
+off to begin with) shows Combat in a fight and Commerce docked, and the chosen layout again after.
+
 The text a profile keeps for an action (`controls.key.<action>` in the Key bindings group; `Input/BindingCore.h`):
 bindings joined by ", ", `None` when every slot is empty. One binding is `[Mode:]input`, the mode one of `Press`, `Hold`,
 `DoubleTap`, `LongPress` (none: the action's own), the input `[Ctrl+][Shift+][Alt+]KeyName` (`T`, `Shift+T`, `NumpadMultiply`),

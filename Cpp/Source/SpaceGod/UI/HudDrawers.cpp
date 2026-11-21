@@ -486,6 +486,14 @@ namespace SpaceGod::UI
 		if (i >= 0) windows[i].tabbed = tabbed;
 	}
 
+	void HudDrawers::SetSize(const cs::String& id, Vector2 size)
+	{
+		int i = WindowOf(id);
+		if (i < 0) return;
+		windows[i].size = size;
+		windows[i].fitted = false;
+	}
+
 	bool HudDrawers::Grow(const cs::String& id, int dir)
 	{
 		int i = WindowOf(id);

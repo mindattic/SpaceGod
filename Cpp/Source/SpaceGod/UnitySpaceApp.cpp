@@ -741,6 +741,7 @@ namespace SpaceGod
 		if (i.ClearScreen) ScreenCleared = !ScreenCleared;
 		// US-T439: the HUD key (Caps Lock unless rebound), anywhere, between the stars too: the minimal HUD or the full one.
 		if (i.HudMode) HudMode = !HudMode;
+		if (i.LayoutKey >= 0 && hud != nullptr) hud->LayoutKey(i.LayoutKey); // US-T441: Layout 1-5, the preset in that slot
 		if (Travel->Active || InFtlCruise())
 		{
 			// Between the stars only time and the escape hatch work (and under the hull's own drive, U.SPC-T417, not

@@ -40,6 +40,8 @@ namespace SpaceGod
 		static const cs::Ref<Core::ChoiceSetting>& Notices();
 		/// The pause menu's Main Menu and Quit ask first.
 		static const cs::Ref<Core::ToggleSetting>& ConfirmQuit();
+		/// US-T441: the HUD's layout follows the situation (a fight: Combat; docked: Commerce; else the chosen preset). Off by default.
+		static const cs::Ref<Core::ToggleSetting>& LayoutWithSituation();
 
 		// ---------------------------------------------------------------- Accessibility
 

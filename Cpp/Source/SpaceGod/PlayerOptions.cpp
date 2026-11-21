@@ -83,6 +83,14 @@ namespace SpaceGod
 		return value;
 	}
 
+	const cs::Ref<ToggleSetting>& PlayerOptions::LayoutWithSituation()
+	{
+		static const cs::Ref<ToggleSetting> value = cs::New<ToggleSetting>("gameplay.layoutWithSituation", Gameplay, "Switch HUD layout with the situation", false,
+			"The HUD's drawers take the Combat layout in a fight and the Commerce layout docked, and your chosen layout again after (US-T441).",
+			"hud layout preset drawers combat commerce docked situation automatic");
+		return value;
+	}
+
 	// ---------------------------------------------------------------- Accessibility
 
 	const cs::Ref<RangeSetting>& PlayerOptions::UiScale()
@@ -129,7 +137,7 @@ namespace SpaceGod
 
 	void PlayerOptions::Declare()
 	{
-		AutosaveInterval(); DistanceUnits(); Notices(); ConfirmQuit();
+		AutosaveInterval(); DistanceUnits(); Notices(); ConfirmQuit(); LayoutWithSituation();
 		UiScale(); TextSize(); HudOpacity(); StancePalette(); ReduceFlashes();
 	}
 

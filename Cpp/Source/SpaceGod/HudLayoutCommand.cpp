@@ -7,11 +7,17 @@
 // the navigator, the selection card, the status line...), and each modal-like drawer opened by its flag as its key does:
 // the market, the cargo hold, the fleet and the port (docked at Earth's port), and the market again in the minimal HUD (a
 // drawer opened by its key shows there too); checks each shows, where it should, and closes with its flag.
+// US-T441 (layout presets): then each built-in preset (Default, Combat, Commerce, Piracy, Exploration) in HUD mode and in the
+// minimal HUD, a preset saved, a built-in saved over and reset, Layout 1, the Layouts drawer pulled out (and kept out as another
+// preset is used from it), a preset renamed and deleted, and "switch layout with the situation" docked at Earth (Commerce) and
+// undocked (the chosen one back); the profile's presets and the option are put back as they were.
 //   sg.HudLayout [shot <dir>] [quit]   (screenshots: <dir>/hudlayout-*.png; without a dir, Saved/Screenshots)
 
 #include "UnitySpaceApp.h"
 
 #include "GameLaunch.h"
+#include "PlayerOptions.h"
+#include "Settings/GameSetting.h"
 #include "SpaceGodLog.h"
 #include "UI/Hud.h"
 #include "UI/HudDrawers.h"
@@ -35,6 +41,7 @@
 #include "Misc/Paths.h"
 #include "UnrealClient.h"
 
+#include <algorithm>
 #include <functional>
 #include <memory>
 #include <vector>
@@ -72,6 +79,9 @@ namespace
 		/// The layout and the mode before the run, put back at the end.
 		cs::String savedLayout;
 		bool savedMode = false, saved = false;
+		/// US-T441: the profile's presets, the preset shown and the situation option before the run, put back at the end.
+		cs::String savedPresets, savedShown;
+		bool savedSituation = false, savedPresetsSet = false;
 		int failures = 0;
 		size_t setUp = static_cast<size_t>(-1);
 		bool First()
@@ -112,6 +122,13 @@ namespace
 			if (!saved || app == nullptr) return;
 			saved = false;
 			app->HudMode = savedMode;
+			if (savedPresetsSet && app->CoopHud() != nullptr)
+			{
+				savedPresetsSet = false;
+				SpaceGod::PlayerOptions::LayoutWithSituation()->Set(savedSituation);
+				app->CoopHud()->RestoreLayoutsJson(savedPresets);
+				app->CoopHud()->ApplyLayout(savedShown, false);
+			}
 			if (auto* d = Drawers(*app)) d->Load(SpaceGod::Shared::Json::JsonObject::Parse(savedLayout));
 		}
 
@@ -435,6 +452,165 @@ namespace
 			return true;
 		});
 		shot(TEXT("minimal-market"));
+		// ---- US-T441: the layout presets
+		push(TEXT("US-T441: the presets kept aside, undocked, HUD mode"), [run](UnitySpaceApp& app, double t)
+		{
+			auto* hud = app.CoopHud();
+			if (hud == nullptr) return false;
+			if (run->First())
+			{
+				run->savedPresets = hud->LayoutsJson();
+				run->savedShown = hud->ShownLayout();
+				run->savedSituation = SpaceGod::PlayerOptions::LayoutWithSituation()->Value;
+				run->savedPresetsSet = true;
+				SpaceGod::PlayerOptions::LayoutWithSituation()->Set(false);
+				app.ShowMarket = false;
+				app.HudMode = true;
+			}
+			return t >= 0.5;
+		});
+		for (const auto& name : Hud::BuiltinLayouts())
+		{
+			FString tag = T(name).ToLower();
+			push(FString::Printf(TEXT("US-T441: the %s preset on screen"), *T(name)), [run, lit, name](UnitySpaceApp& app, double t)
+			{
+				if (run->First())
+				{
+					app.HudMode = true;
+					app.CoopHud()->ApplyLayout(name, false);
+				}
+				lit(app);
+				return t >= 1.5;
+			});
+			push(FString::Printf(TEXT("%s checked"), *tag), [run, log, name, tag](UnitySpaceApp& app, double)
+			{
+				auto* d = Drawers(app);
+				log(app, *tag);
+				run->Expect(app.CoopHud()->ShownLayout() == name, *FString::Printf(TEXT("%s: the preset shown"), *tag));
+				auto leftDocked = [d](const char* id)
+				{
+					int w = d->WindowOf(id);
+					return w >= 0 && d->Windows()[w].docked && d->Windows()[w].edge == HudDock::Edge::Left && d->Windows()[w].members.size() == 1;
+				};
+				if (name == "Default") run->Expect(!d->Pinned(Hud::DrawerReactorId) && !d->Pinned(Hud::DrawerNavigatorId), TEXT("default: nothing pinned"));
+				if (name == "Combat")
+					run->Expect(d->Pinned(Hud::DrawerReactorId) && d->Pinned(Hud::DrawerSensorsId) && d->Pinned(Hud::DrawerTargetId) && d->Pinned(Hud::DrawerHelmId) && !d->Shown(Hud::DrawerOpportunitiesId),
+						TEXT("combat: the reactor, the sensors, the target and the helm pinned, the opportunities closed"));
+				if (name == "Commerce")
+					run->Expect(d->Pinned(Hud::DrawerNavigatorId) && d->Pinned(Hud::DrawerOpportunitiesId) && d->Pinned(Hud::DrawerTopBarId), TEXT("commerce: the navigator, the opportunities and the clock pinned"));
+				if (name == "Piracy")
+					run->Expect(d->Pinned(Hud::DrawerSensorsId) && d->Pinned(Hud::DrawerHuntersId) && leftDocked(Hud::DrawerShipsId) && d->Visible(Hud::DrawerShipsId),
+						TEXT("piracy: the sensors and the hunters pinned, the ships in the area down the left edge"));
+				if (name == "Exploration")
+					run->Expect(d->Pinned(Hud::DrawerNavigatorId) && leftDocked(Hud::DrawerNavigationId) && d->Visible(Hud::DrawerNavigationId),
+						TEXT("exploration: the navigator pinned, the Navigation list down the left edge"));
+				run->Expect(!d->Visible(Hud::DrawerMarketId), *FString::Printf(TEXT("%s: the market (opened by its key) left closed"), *tag));
+				return true;
+			});
+			shot(*FString::Printf(TEXT("preset-%s"), *tag));
+			push(FString::Printf(TEXT("the %s preset in the minimal HUD"), *T(name)), [run, lit](UnitySpaceApp& app, double t)
+			{
+				if (run->First()) app.HudMode = false;
+				lit(app);
+				return t >= 1.5;
+			});
+			shot(*FString::Printf(TEXT("preset-%s-minimal"), *tag));
+		}
+		push(TEXT("US-T441: a preset saved, a built-in saved over and reset, Layout 1"), [run](UnitySpaceApp& app, double)
+		{
+			auto* hud = app.CoopHud();
+			auto* d = Drawers(app);
+			hud->ApplyLayout("Piracy", false);
+			d->SetPinned(Hud::DrawerNavigatorId, true);
+			run->Expect(hud->SaveLayout("  My hunt  "), TEXT("presets: saved as My hunt"));
+			auto names = hud->LayoutNames();
+			run->Expect(std::find(names.begin(), names.end(), cs::String("My hunt")) != names.end() && hud->ActiveLayout() == "My hunt", TEXT("presets: My hunt listed (trimmed) and chosen"));
+			hud->ApplyLayout("Default", false);
+			run->Expect(hud->ApplyLayout("My hunt", false) && d->Pinned(Hud::DrawerNavigatorId) && d->Pinned(Hud::DrawerHuntersId), TEXT("presets: My hunt comes back as saved"));
+			run->Expect(!hud->RenameLayout("My hunt", "Combat") && !hud->DeleteLayout("Combat"), TEXT("presets: a built-in's name is not taken, a built-in not deleted"));
+			hud->ApplyLayout("Combat", false);
+			d->SetPinned(Hud::DrawerNavigatorId, true);
+			run->Expect(hud->SaveLayout("Combat") && hud->LayoutOverridden("Combat"), TEXT("presets: Combat saved over (the player's copy)"));
+			run->Expect(hud->ResetLayoutPreset("Combat") && !hud->LayoutOverridden("Combat") && !d->Pinned(Hud::DrawerNavigatorId), TEXT("presets: Combat reset to the built-in (on screen too)"));
+			hud->SetLayoutSlot(0, "My hunt");
+			run->Expect(hud->LayoutInSlot(0) == "My hunt" && hud->LayoutInSlot(1) == "Combat", TEXT("presets: My hunt on Layout 1, Combat still on 2"));
+			hud->LayoutKey(0);
+			run->Expect(hud->ShownLayout() == "My hunt", TEXT("presets: Layout 1 puts My hunt on screen"));
+			return true;
+		});
+		push(TEXT("US-T441: the Layouts drawer pulled out"), [run, lit](UnitySpaceApp& app, double t)
+		{
+			if (run->First())
+			{
+				app.HudMode = true;
+				Drawers(app)->Open(Hud::DrawerLayoutsId);
+			}
+			lit(app);
+			return t >= 1.5;
+		});
+		push(TEXT("layouts drawer checked"), [run, log](UnitySpaceApp& app, double)
+		{
+			auto* d = Drawers(app);
+			log(app, TEXT("layouts"));
+			auto r = d->RectOf(Hud::DrawerLayoutsId);
+			run->Expect(d->Visible(Hud::DrawerLayoutsId) && r.x < 60, TEXT("layouts: the drawer shows, on the left edge"));
+			return true;
+		});
+		shot(TEXT("layouts"));
+		push(TEXT("US-T441: another preset used from the drawer keeps it open"), [run, lit](UnitySpaceApp& app, double t)
+		{
+			if (run->First()) app.CoopHud()->ApplyLayout("Exploration");
+			lit(app);
+			return t >= 1.5;
+		});
+		push(TEXT("layouts kept checked"), [run](UnitySpaceApp& app, double)
+		{
+			run->Expect(Drawers(app)->Visible(Hud::DrawerLayoutsId) && app.CoopHud()->ActiveLayout() == "Exploration", TEXT("layouts: Exploration chosen, the drawer still out"));
+			return true;
+		});
+		shot(TEXT("layouts-exploration"));
+		push(TEXT("US-T441: My hunt renamed, then deleted"), [run](UnitySpaceApp& app, double)
+		{
+			auto* hud = app.CoopHud();
+			run->Expect(hud->RenameLayout("My hunt", "Night hunt") && hud->LayoutInSlot(0) == "Night hunt", TEXT("presets: renamed, its slot follows"));
+			run->Expect(hud->DeleteLayout("Night hunt") && hud->LayoutInSlot(0).empty(), TEXT("presets: deleted, its slot free"));
+			auto names = hud->LayoutNames();
+			run->Expect(names.size() == Hud::BuiltinLayouts().size(), TEXT("presets: only the built-ins left"));
+			return true;
+		});
+		push(TEXT("US-T441: switch with the situation on, docked at Earth"), [run, lit, earth](UnitySpaceApp& app, double t)
+		{
+			if (run->First())
+			{
+				Drawers(app)->Close(Hud::DrawerLayoutsId);
+				app.CoopHud()->ApplyLayout("Default");
+				SpaceGod::PlayerOptions::LayoutWithSituation()->Set(true);
+				for (const auto& s : app.Economy()->At(earth(app)))
+					if (s->Discovered() && app.Dock(s)) break;
+			}
+			lit(app);
+			return t >= 2.5;
+		});
+		push(TEXT("situation docked checked"), [run, log](UnitySpaceApp& app, double)
+		{
+			log(app, TEXT("situation docked"));
+			run->Expect(app.DockedAt != nullptr && app.CoopHud()->ShownLayout() == "Commerce" && app.CoopHud()->ActiveLayout() == "Default",
+				TEXT("situation: docked, Commerce shown, Default still the chosen one"));
+			return true;
+		});
+		shot(TEXT("situation-docked"));
+		push(TEXT("US-T441: undocked, the chosen layout back"), [run, lit](UnitySpaceApp& app, double t)
+		{
+			if (run->First()) app.Undock(cs::String());
+			lit(app);
+			return t >= 2.5;
+		});
+		push(TEXT("situation undocked checked"), [run](UnitySpaceApp& app, double)
+		{
+			run->Expect(app.DockedAt == nullptr && app.CoopHud()->ShownLayout() == "Default", TEXT("situation: undocked, Default back"));
+			SpaceGod::PlayerOptions::LayoutWithSituation()->Set(false);
+			return true;
+		});
 		push(TEXT("the layout and the mode put back"), [run](UnitySpaceApp& app, double)
 		{
 			app.ShowMarket = false;
@@ -454,6 +630,8 @@ namespace
 		TEXT("US-T438/US-T439/US-T440: sg.HudLayout [shot <dir>] [quit] takes a practice fighter's helm and screenshots the HUD's drawers: the minimal HUD, "
 			"HUD mode with its edge tabs, a drawer floated, two drawers docked into a tabbed group, a collapsed and a pinned window (and the minimal "
 			"HUD with only the pinned one), HUD mode with every default drawer, the market, the cargo hold, the fleet and the port opened (and the "
-			"market in the minimal HUD); checks the layout saves and loads back the same; puts the layout and the mode back after."),
+			"market in the minimal HUD); US-T441: each built-in layout preset (HUD mode and minimal), the Layouts drawer, a preset saved, "
+			"renamed and deleted, a built-in saved over and reset, Layout 1, and the layout following the situation (docked: Commerce); "
+			"checks the layout saves and loads back the same; puts the layout, the mode and the profile's presets back after."),
 		FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& args) { Start(args); }));
 }

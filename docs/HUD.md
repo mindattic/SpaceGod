@@ -7,8 +7,8 @@ key**, switches between the quiet screen and the full HUD with its drawers.
 Code: `Cpp/Source/SpaceGod/UI/HudDrawers.h/.cpp` (the registry and window manager), `UI/HudDock.h` (the layout math, unit
 checked by `SpaceGodCore/Tests/HudDock/HudDockTests.cpp` through `tools/build-core.ps1`), `UI/Hud.Drawer.*` (the bottom
 drawer's four, the reactor and the sensors), `UI/Hud.DrawerPanels.cpp` (every other panel's drawer and its default edge),
-`UI/Hud.cpp` (`Hud::Draw`, the minimal HUD). Tickets: US-T438 (drawers), US-T439 (the HUD key and the minimal HUD), US-T440
-(every panel a drawer); saved layouts ("Combat", "Commerce", "Piracy"...) come in US-T441.
+`UI/Hud.cpp` (`Hud::Draw`, the minimal HUD), `UI/Hud.Layouts.cpp` (the layout presets and the Layouts drawer). Tickets: US-T438 (drawers), US-T439 (the HUD key and the minimal HUD), US-T440
+(every panel a drawer), US-T441 (layout presets: "Combat", "Commerce", "Piracy"...).
 
 ## The HUD key (minimal HUD and HUD mode)
 
@@ -84,6 +84,7 @@ resized by hand.
 | Navigator (`navigator`) | left edge, first | HUD mode |
 | Influence (`influence`) | left edge, under the navigator | HUD mode |
 | Cargo (`cargo`) | left edge, at the foot (its far stack) | its key, either mode |
+| Layouts (`layouts`) | left edge, closed to its tab | HUD mode (US-T441: the presets, below) |
 | Rewind (`holdrewind`) | right edge, at the top (REWIND ready / its cooldown) | alert, always shown, no frame in the minimal HUD |
 | Opportunities (`opportunities`) | right edge, top stack | HUD mode, while the market is closed |
 | Market (`market`) | right edge, top stack (the opportunities' place) | its key, either mode |
@@ -134,7 +135,69 @@ their default windows; names that are not registered are dropped):
 
 `w`/`h` is the docked size (a `w` of 0 fills the edge's width, an `h` of 0 on the left or right edge its height),
 `x`/`y`/`fw`/`fh` the floating rect, `far` the edge's far stack, `fit` whether it still follows its content's size, `centred`
-whether a floating window is still kept centred. US-T441's presets store these.
+whether a floating window is still kept centred. The layout presets (below) store these.
+
+## Layouts (presets)
+
+A **layout preset** is a whole arrangement of the drawers under a name: which are pulled out, pinned, collapsed, where each is
+docked or floats, which are grouped. The player does not have to manage the HUD's data drawer by drawer: they pick the layout for
+what they are doing, then pull out and pin what they want on top of it, and save it if they like it (US-T441).
+
+Five are built in. Each starts from the default layout:
+
+| Preset | Pinned (on the quiet screen too) | Closed to its tab | Moved |
+| --- | --- | --- | --- |
+| Default | nothing (the layout the HUD starts with) | | |
+| Combat | reactor, sensors, target, helm, seat, hunted, status | opportunities, headlines, influence, gas works | |
+| Commerce | clock & scale, navigator, opportunities, selection, gas works, status | hunted, headlines | |
+| Piracy | sensors, target, selection, hunted, status | opportunities, gas works, influence, headlines | Ships in area torn off the bottom drawer, down the left edge, pinned |
+| Exploration | clock & scale, navigator, selection, sensors, status | hunted, opportunities, gas works, influence | Navigation (every system and place; its buttons open the system map, the encyclopedia, society) torn off the bottom drawer, down the left edge, pinned |
+
+Drawers opened by a key (the market, the cargo hold, the boards, the fleet, outfitting, the trade desk, the port, the picker, saves,
+the news feed) keep whether they are open when a preset is put on screen (a preset never closes the port or opens the market under
+the player), but take the preset's place; the Layouts drawer keeps whether it is open too. A drawer a layout does not name (one added
+since it was saved) takes its default place.
+
+**The Layouts drawer** (`layouts`, on the left edge, closed to its tab; pull it out in HUD mode) lists the presets, the one on screen
+marked with `>`, the chosen one (when a situation's shows instead) marked *chosen*, a player's own *(yours)* and a built-in saved
+over *(your copy)*:
+
+| What | How |
+| --- | --- |
+| Put one on screen | USE on its row: it is also the chosen one, the layout the HUD starts with next time |
+| Pick one | Click its name (SAVE, RENAME, DELETE and RESET act on the picked one) |
+| Save | SAVE: the screen as it is now, over the picked preset (over a built-in: a copy of it the player keeps) |
+| Save as | Type a name in the field, SAVE AS (or Enter): a new preset (1 to 24 characters; a built-in's name is refused unless that built-in is picked) |
+| Rename | RENAME, type the new name, RENAME (or Enter): a player's own, or a built-in's copy (the built-in comes back as it ships); Esc leaves the field |
+| Delete | DELETE: a player's own (the Default layout chosen if it was) |
+| Reset | RESET: a built-in's copy dropped, the built-in as it ships (on screen again if it shows) |
+| Layout key | The number on a row: which Layout 1-5 key puts it on screen (a click steps it; past 5, none). One preset a slot |
+| With the situation | WITH THE SITUATION: the option below, on or off |
+
+While the name field is typed in, it has the keys (the ship does not fly, the HUD key types nothing).
+
+**Keys.** HUD layout 1-5 (View group, **unbound** to begin with; docs/Controls.md) put the preset in their slot on screen; the
+slots hold Default, Combat, Commerce, Piracy and Exploration until changed.
+
+**Switch layout with the situation** (Settings > Gameplay, off to begin with): in a fight at the controls (the hull held is in a
+battle that is not over) the Combat preset shows, docked the Commerce preset, otherwise the chosen one. A situation has to hold a
+second before the layout follows (a fight blinking in and out does not flicker it); it changes only when the situation does, so a
+preset picked by hand meanwhile stays until then. The chosen preset is never changed by a situation. Combat and Commerce are the
+player's copies when they saved over them.
+
+**Where they are kept.** In the profile's `settings.json`, the game block, so they belong to the player and outlive a load; nothing
+of them is in a game save or sent in co-op (each peer has its own):
+
+```json
+"hudLayouts": { "active": "My hunt",
+  "slots": ["Default", "My hunt", "Commerce", "Piracy", "Exploration"],
+  "presets": { "My hunt": { "version": 1, "windows": [ ... ] }, "Combat": { ... } } }
+```
+
+`presets` holds the player's own and the built-ins they saved over (a built-in that is not there is its recipe,
+`Hud::ApplyBuiltinRecipe`); `slots` is missing until a slot is changed. Code: `Hud::ApplyLayout(name, makeActive)`, `SaveLayout`,
+`RenameLayout`, `DeleteLayout`, `ResetLayoutPreset`, `LayoutNames`, `ActiveLayout`, `ShownLayout`, `LayoutInSlot` / `SetLayoutSlot`
+(UI/Hud.Drawer.inl).
 
 ## For code: making a panel a drawer
 
@@ -181,6 +244,13 @@ flag, and the market again in the minimal HUD (`minimal-market`). It checks the 
 each drawer starts where its panel was (the top bar centred at the top, the navigator top left, the status line on the foot,
 the selection card over the reactor, the fleet floating centred), that each modal opens and closes with its flag, and puts
 the layout and the mode back as they were.
+
+US-T441 adds: each built-in preset in HUD mode and in the minimal HUD (`preset-<name>`, `preset-<name>-minimal`), checking what
+each pins, closes and docks and that the market (opened by its key) stays closed; a preset saved (its name trimmed), applied back,
+a built-in's name refused for a rename and a built-in refused for a delete, Combat saved over and reset, a preset put on Layout 1 and
+the key pressed; the Layouts drawer pulled out (`layouts`) and kept out while Exploration is used from it (`layouts-exploration`); the
+preset renamed (its slot following) and deleted (its slot freed); and the situation option docked at Earth (Commerce shown, Default
+still chosen: `situation-docked`) and undocked (Default back). The profile's presets, the preset shown and the option are put back.
 
 ```powershell
 ./tools/play.ps1 -Offscreen -Capture '' -Seconds 300 -ExecCmds "sg.HudLayout shot R:/Temp/hudlayout quit"
