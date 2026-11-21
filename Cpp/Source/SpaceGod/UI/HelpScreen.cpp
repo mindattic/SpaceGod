@@ -18,6 +18,7 @@ namespace SpaceGod::UI
 	{
 		/// US-T249: the keys the profile has rebound (Settings > Controls > Key bindings), each action with its keys now and
 		/// the default it replaced: printed above a chapter's key lists, which give the default keys. Null when none is.
+		/// US-T437: every slot, Primary / Secondary / Tertiary, whatever it holds (keys, the mouse, the pad, a mode).
 		cs::Ref<HelpSection> ReboundSection()
 		{
 			using namespace ::SpaceGod::Input;
@@ -28,10 +29,12 @@ namespace SpaceGod::UI
 				auto a = static_cast<KeyAction>(i);
 				const auto& b = KeyBindings::Binding(a);
 				if (b->IsDefault()) continue;
-				cs::String was;
-				for (const KeyChord& c : b->Default)
+				cs::String was, now;
+				for (const InputBinding& c : b->Default)
 					if (!c.Empty()) was = cs::Cat(was, was.empty() ? "" : "  /  ", c.Display());
-				section->Lines.Add(HelpLine(b->ValueText(), cs::Cat(KeyBindings::Name(a), "  (default ", was.empty() ? cs::String("unbound") : was, ")")));
+				for (int s = 0; s < KeyBindingSetting::Slots; s++)
+					now = cs::Cat(now, s == 0 ? "" : "   ", KeyBindingSetting::SlotName(s), " ", b->Value[s].Empty() ? cs::String("-") : b->Value[s].Display());
+				section->Lines.Add(HelpLine(b->ValueText(), cs::Cat(KeyBindings::Name(a), ":  ", now, "  (default ", was.empty() ? cs::String("unbound") : was, ")")));
 			}
 			section->Lines.Add(HelpLine("", "Settings > Controls > Key bindings changes these; Reset there puts a key back."));
 			return section;
@@ -240,17 +243,19 @@ namespace SpaceGod::UI
 		cs::List<PadLine> lines;
 		lines.Add(PadLine{ "LS", "Left stick: thrust and strafe at the controls; the camera's swim in command." });
 		lines.Add(PadLine{ "RS", "Right stick: aim (the look the hull is pulled after); in command, look about. In menus it scrolls." });
-		for (int i = 0; i < static_cast<int>(PadAction::Count); i++)
+		// US-T437: every action's pad bindings, from the one table (Settings > Controls > Key bindings).
+		for (int i = 0; i < static_cast<int>(KeyAction::Count); i++)
 		{
-			auto a = static_cast<PadAction>(i);
-			PadButton b = Gamepad::ButtonFor(a);
-			if (b == PadButton::None) continue;
-			cs::String glyph = ToString(b);
-			if (b == PadButton::LeftStick || b == PadButton::RightStick) glyph = cs::Cat(glyph, " click");
-			lines.Add(PadLine{ glyph, Gamepad::ActionName(a) });
+			auto a = static_cast<KeyAction>(i);
+			for (const InputBinding& b : KeyBindings::Binding(a)->Value)
+			{
+				if (!b.IsPad()) continue;
+				cs::String mode = b.trigger == Trigger::Auto ? cs::String() : cs::Cat(" (", cs::Strings::ToLowerInvariant(TriggerLabel(b.trigger)), ")");
+				lines.Add(PadLine{ b.PadGlyph(), cs::Cat(KeyBindings::Name(a), mode) });
+			}
 		}
 		lines.Add(PadLine{ "D-pad", "At the controls, the reactor: left weapons, up shields, right engines, down an even share. In command: up / down time faster / slower, right / left the next / previous ship." });
-		lines.Add(PadLine{ "Menus", "D-pad or left stick moves the highlight, A presses, B backs out. Rebind the buttons, dead zone and aim speed under Settings > Controls." });
+		lines.Add(PadLine{ "Menus", "D-pad or left stick moves the highlight, A presses, B backs out. Rebind the buttons under Settings > Controls > Key bindings; the dead zone and aim speed are under Settings > Controls." });
 		return lines;
 	}
 

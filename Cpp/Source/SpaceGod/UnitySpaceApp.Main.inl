@@ -513,6 +513,9 @@ public:
 	/// <summary>The model a battle unit is drawn with (a ship's view, or a platform), for parenting things to its hull.</summary>
 	cs::Ref<Transform> UnitTransform(const cs::Ref<Core::BattleUnit>& u);
 
+	/// <summary>US-T437: Esc's pause menu, for a check command to open a page of (sg.Bindings).</summary>
+	const cs::Ref<UI::PauseMenu>& PauseMenuForChecks() const { return pauseMenu; }
+
 private:
 	cs::Ref<Views::LineStrip> pathLine;
 	cs::List<Vector3> pathPoints = cs::NewArray<Vector3>(64);

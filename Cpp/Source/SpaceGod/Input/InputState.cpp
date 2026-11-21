@@ -16,32 +16,43 @@ namespace SpaceGod::Input
 		const InputDevice& kb = InputDevice::current();
 		const InputDevice& mouse = InputDevice::current();
 		Reset();
+		KeyBindings::Tick(); // US-T437: a double-tap's or long press's timing steps on every frame, read or not
 		if (suspended || !kb.present || !mouse.present) return;
 
 		// US-T249: every key through the action map (Input/KeyBindings.h): the profile's bindings, the original's keys by default.
+		// US-T437: and the mouse's and the pad's bindings with them (the pad's left out while a menu has it).
 		using A = KeyAction;
 		auto down = [&](KeyAction a) { return KeyBindings::Held(a, kb); };
 		auto hit = [&](KeyAction a) { return KeyBindings::Pressed(a, kb); };
 		auto axis = [&](KeyAction positive, KeyAction negative) { return (down(positive) ? 1.0f : 0.0f) - (down(negative) ? 1.0f : 0.0f); };
+		// US-T437: the few actions whose pad binding means something else in command (the bumpers sink and rise, the drift
+		// button backs out, the boost button is a mech's jets) are read apart: from the keys and mouse, and from the pad.
+		bool padGame = !Gamepad::MenuMode;
+		auto downKeys = [&](KeyAction a) { return KeyBindings::Held(a, kb, BindSources::KeyboardMouse); };
+		auto downPad = [&](KeyAction a) { return padGame && KeyBindings::Held(a, kb, BindSources::Pad); };
+		auto hitPad = [&](KeyAction a) { return padGame && KeyBindings::Pressed(a, kb, BindSources::Pad); };
 
 		Move = Vector3(axis(A::StrafeRight, A::StrafeLeft), axis(A::Rise, A::Sink), axis(A::MoveForward, A::MoveBack));
 		Move.y = Mathf::Clamp(Move.y, -1.0f, 1.0f);
-		Boost = down(A::Boost);
-		keyBoost = Boost; // US-T83
+		keyBoost = downKeys(A::Boost); // US-T83
+		padBoost = downPad(A::Boost); // US-T83: a mech's jets (GiveWalkerKeys)
+		Boost = keyBoost || padBoost;
 		JumpJets = down(A::JumpJets); // US-T83: the mech's, kept only while one is held (GiveWalkerKeys)
 		jumpJetsPressed = hit(A::JumpJets);
 		Slow = down(A::Slow);
 		Cruise = down(A::Cruise);
 		ToggleSystemCruise = hit(A::SystemCruise); // US-T127: Shift+J, the cruise drive
 		ThrottleStep = hit(A::MoveForward) ? 1 : hit(A::MoveBack) ? -1 : 0;
-		Roll = axis(A::RollRight, A::RollLeft);
+		Roll = (downKeys(A::RollRight) ? 1.0f : 0.0f) - (downKeys(A::RollLeft) ? 1.0f : 0.0f);
+		padBumpers = (downPad(A::RollRight) ? 1.0f : 0.0f) - (downPad(A::RollLeft) ? 1.0f : 0.0f); // US-T250: rise and sink in command
+		Roll = Mathf::Clamp(Roll + padBumpers, -1.0f, 1.0f);
 		// US-T87: Alt held is the manoeuvre key at the controls (a turn-and-burn's flip); with F9-F11 under capture, and
 		// Shift+Alt+K, Alt keeps its other meanings, which only read it with another key.
 		Manoeuvre = down(A::Manoeuvre);
 		// US-T165: at the controls, held (or pressed on, then off, set to toggle); R alone toggles auto-reorient in command.
 		// US-T250: the pad's drift button is R too (one latch for both in toggle mode), but only while the pad is the game's.
-		const ButtonControl& padDrift = Gamepad::MenuMode ? ButtonControl() : Gamepad::Action(PadAction::Drift);
-		Drift = DriftKey::Read(down(A::Drift) || padDrift.isPressed, hit(A::Drift) || padDrift.wasPressedThisFrame);
+		Drift = DriftKey::Read(down(A::Drift), hit(A::Drift));
+		padBack = hitPad(A::Drift); // in command it backs out (Arbitrate)
 		// US-T94: the arrows move reactor power at the controls (Core::PowerKey): Left weapons, Up shields, Right engines a
 		// pip at a time, Down an even share; Shift with one of the three, all the reactor can spare to it.
 		PowerKey = hit(A::PowerAllWeapons) ? 3 : hit(A::PowerWeapons) ? 0
@@ -51,7 +62,8 @@ namespace SpaceGod::Input
 
 		MousePosition = mouse.position;
 		MouseDelta = mouse.delta;
-		Fire = mouse.leftButton.isPressed && !pointerOverUi;
+		Fire = (mouse.leftButton.isPressed && !pointerOverUi) || down(A::Fire); // US-T437: the pad's trigger (RT by default) too
+		padSecondary = down(A::SecondaryFire); // US-T437: the seat's second trigger (LT by default), the right button's at the controls
 		FireEmp = mouse.middleButton.isPressed && !pointerOverUi;
 		DropMine = hit(A::DropMine);
 		LookHeld = mouse.rightButton.isPressed;
@@ -94,7 +106,7 @@ namespace SpaceGod::Input
 
 		Focus = hit(A::Focus);
 		ToggleFlightAssist = hit(A::FlightAssist);
-		Escape = kb[Key::Escape].wasPressedThisFrame; // fixed: Esc backs out of everything, menus included
+		Escape = kb[Key::Escape].wasPressedThisFrame || hit(A::PauseMenu); // fixed: Esc backs out of everything, menus included; US-T437: and the pause menu's bindings (the pad's Menu)
 		ToggleScale = hit(A::ToggleScale);
 		TimeFaster = hit(A::TimeFaster);
 		TimeSlower = hit(A::TimeSlower);
@@ -113,6 +125,7 @@ namespace SpaceGod::Input
 		ToggleHelp = hit(A::Help);
 		ToggleCheatMenu = hit(A::CheatMenu);
 		ToggleHud = hit(A::ToggleHud);
+		HudMode = hit(A::HudMode); // US-T437
 		// US-T266: Shift+M asks the port alongside for docking clearance (and opens or closes the port screen), M alone the market.
 		ToggleMarket = hit(A::Market);
 		DockPort = hit(A::DockPort);
@@ -221,14 +234,12 @@ namespace SpaceGod::Input
 	{
 		const GamepadDevice& pad = GamepadDevice::current();
 		if (!pad.present) return;
-		auto held = [](PadAction a) { return Gamepad::Action(a).isPressed; };
-		auto pressed = [](PadAction a) { return Gamepad::Action(a).wasPressedThisFrame; };
 
 		// A menu, panel or screen is up: the pad is the GUI's (UnityCompat/GuiPadNav moves the focus and presses), and the
 		// game hears only Esc from B or the pause button, as the keyboard's Esc closes what is open.
 		if (Gamepad::MenuMode)
 		{
-			if (pad[PadButton::B].wasPressedThisFrame || pressed(PadAction::Pause)) Escape = true;
+			if (pad[PadButton::B].wasPressedThisFrame || KeyBindings::Pressed(KeyAction::PauseMenu, InputDevice::current(), BindSources::Pad)) Escape = true;
 			return;
 		}
 
@@ -246,24 +257,9 @@ namespace SpaceGod::Input
 		padLook = Gamepad::AimDelta(Time::unscaledDeltaTime);
 		MouseDelta += padLook;
 
-		Fire = Fire || held(PadAction::Fire);
-		padSecondary = held(PadAction::Secondary);
-		padBumpers = (held(PadAction::RollRight) ? 1.0f : 0.0f) - (held(PadAction::RollLeft) ? 1.0f : 0.0f);
-		Roll = Mathf::Clamp(Roll + padBumpers, -1.0f, 1.0f);
-		padBoost = held(PadAction::Boost); // US-T83: a mech's jets (GiveWalkerKeys)
-		Boost = Boost || padBoost;
-		Manoeuvre = Manoeuvre || held(PadAction::Flip);
-		padBack = pressed(PadAction::Drift); // the drift itself was read with R, above
-		if (pressed(PadAction::LockFocus))
-		{
-			// Y: lock at the controls, focus in command (Arbitrate keeps the owner's meaning, as T and F share theirs).
-			LockTarget = true;
-			Focus = true;
-		}
-		if (pressed(PadAction::FlightAssist)) ToggleFlightAssist = true;
-		if (pressed(PadAction::Embody)) Pilot = true;
-		if (pressed(PadAction::Pause)) Escape = true;
-		if (pressed(PadAction::Help)) ToggleHelp = true;
+		// US-T437: the pad's buttons (fire, second trigger, bumpers, boost, flip, drift, lock / focus, flight assist, embody,
+		// pause, help) are the actions' bindings now, read with the keys in Poll (Y is both lock and focus by default, and
+		// Arbitrate keeps the owner's meaning, as T and F share theirs). What stays here is fixed: the sticks and the d-pad.
 
 		padDpad = pad[PadButton::DPadLeft].wasPressedThisFrame ? 0 : pad[PadButton::DPadUp].wasPressedThisFrame ? 1
 			: pad[PadButton::DPadRight].wasPressedThisFrame ? 2 : pad[PadButton::DPadDown].wasPressedThisFrame ? 3 : -1;
@@ -384,6 +380,7 @@ namespace SpaceGod::Input
 		Boost = Slow = Fire = Cruise = FireEmp = DropMine = false;
 		SelectClicked = SelectDoubleClicked = RightClicked = false;
 		Focus = Escape = ToggleScale = TimeFaster = TimeSlower = TogglePause = ResetTime = false;
+		HudMode = false; // US-T437
 		ToggleOrbits = ToggleLabels = ToggleHelp = ToggleHud = ClearScreen = ToggleMarket = DockPort = ToggleCargo = ToggleOutfit = ToggleSilent = ToggleBounties = ToggleContracts = ToggleFleet = ToggleTrade = ToggleGalaxyMap = ToggleNews = ToggleSpawn = WatchBattle = ToggleLanes = ToggleSatellites = ToggleReorient = CycleShips = CycleBackward = Home = Pilot = LockTarget = LockAttacker = ActivateGate = EngageFtl = false;
 		QuickSave = QuickLoad = ToggleSaves = Rewind = HoldRewind = false;
 		ToggleSystemMap = false; // US-T258

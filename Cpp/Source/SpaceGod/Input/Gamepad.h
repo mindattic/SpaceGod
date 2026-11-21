@@ -11,9 +11,12 @@
 // instead (UnityCompat/GuiPadNav): d-pad or left stick moves a visible focus between the controls, A presses, B (or Menu)
 // is Esc, the right stick scrolls. The game then reads nothing else of the pad.
 //
-// Every action's button is a Controls setting (remappable from Settings > Controls, kept per profile), as are the dead
-// zone, the aim sensitivity and an inverted aim. The Help screen shows the pad's buttons when the pad was used last
-// (LastUsed).
+// US-T437: the pad's buttons, triggers and stick directions are bindings of the actions (Input/KeyBindings.h), beside
+// the keys and the mouse: each pad default of before (fire RT, second trigger LT, roll LB/RB, boost A, drift B, flip X,
+// lock/focus Y, flight assist RS, embody LS, pause Menu, help View) is that action's default binding now, rebound under
+// Settings > Controls > Key bindings like any other. The sticks' movement and aim, the d-pad's reactor/time/ship steps
+// and B's back-out in menus stay fixed. The dead zone, the aim sensitivity and an inverted aim are Controls settings. The
+// Help screen shows the pad's buttons when the pad was used last (LastUsed).
 //
 // No Unreal headers here: only UnrealInputDevice.cpp touches the engine.
 
@@ -22,27 +25,12 @@
 
 namespace SpaceGod::Core
 {
-	class ChoiceSetting;
 	class RangeSetting;
 	class ToggleSetting;
 }
 
 namespace SpaceGod::Input
 {
-	/// <summary>An Xbox-layout pad's buttons (Unreal's Gamepad_FaceButton_Bottom is A ...). <c>Count</c> is not a button.</summary>
-	enum class PadButton : int
-	{
-		None,
-		A, B, X, Y,
-		LeftBumper, RightBumper, LeftTrigger, RightTrigger,
-		View, Menu, LeftStick, RightStick,
-		DPadUp, DPadDown, DPadLeft, DPadRight,
-		Count,
-	};
-
-	/// <summary>The button's glyph as the Help screen and the settings print it ("A", "LB", "RT", "View" ...).</summary>
-	const char* ToString(PadButton button);
-
 	/// <summary>One frame of the pad: the sticks (raw, -1..1, y up: pushed away from the player is +), the triggers (0..1)
 	/// and every button as a <see cref="ButtonControl"/> (a trigger is also a button, pulled past half way).</summary>
 	class GamepadDevice final
@@ -70,13 +58,6 @@ namespace SpaceGod::Input
 		ButtonControl none;
 	};
 
-	/// <summary>The pad's remappable actions, in Settings > Controls' order.</summary>
-	enum class PadAction : int
-	{
-		Fire, Secondary, RollLeft, RollRight, Boost, Drift, Flip, LockFocus, FlightAssist, Embody, Pause, Help,
-		Count,
-	};
-
 	class Gamepad final
 	{
 	public:
@@ -86,18 +67,8 @@ namespace SpaceGod::Input
 		static const cs::Ref<Core::RangeSetting>& AimSensitivity();
 		/// <summary>Controls: pushing the right stick forward looks (and pitches) down instead of up.</summary>
 		static const cs::Ref<Core::ToggleSetting>& InvertAim();
-		/// <summary>Controls: the button an action is on.</summary>
-		static const cs::Ref<Core::ChoiceSetting>& Binding(PadAction action);
-		/// <summary>What the action does, as its setting and the Help screen name it.</summary>
-		static const char* ActionName(PadAction action);
-
 		/// <summary>Builds every pad setting (the declaration source GameSettingsHost registers).</summary>
 		static void Declare();
-
-		/// <summary>The button <paramref name="action"/> is bound to now (<see cref="PadButton::None"/>: unbound).</summary>
-		static PadButton ButtonFor(PadAction action);
-		/// <summary>The bound button's state this frame (never pressed when unbound).</summary>
-		static const ButtonControl& Action(PadAction action);
 
 		/// <summary>A raw stick through the dead zone (radial, rescaled), the result's length 0..1.</summary>
 		static Vector2 Stick(Vector2 raw);

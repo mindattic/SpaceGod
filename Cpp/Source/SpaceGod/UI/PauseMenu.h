@@ -71,7 +71,22 @@ namespace SpaceGod::UI
 
 		/// US-T249: the Key bindings page listening for a key: the action (an Input::KeyAction) and slot clicked, -1 while
 		/// it is not. Update takes the next chord pressed into it; Esc cancels.
+		/// US-T437: any input (a key chord, a mouse button or wheel step, a pad button, trigger or stick); Esc, or
+		/// BindingTuning::CaptureTimeoutS with nothing pressed, cancels. captureFresh: the listening has not been armed yet
+		/// (what is held when it starts is not taken); captureSwallow: an input was just taken, and the page's buttons and the
+		/// pad's menu focus ignore the mouse and the pad until they are let go of, so the press binds and clicks nothing.
 		int captureAction = -1, captureSlot = -1;
+		float captureStartedAt = 0;
+		bool captureFresh = false, captureSwallow = false;
+
+		/// US-T437: the Key bindings page's slot the keys have picked on the picked row (0 Primary .. 2 Tertiary): Enter listens
+		/// on it, M steps its mode, Backspace clears it.
+		int bindingColumn = 0;
+
+		/// US-T437: the top of each shown setting's row in the list (the bindings page puts a group's header above its first
+		/// action, so the rows are not evenly spaced), for the keys' pick to scroll into view; and a group to scroll to.
+		cs::List<float> shownRowTops;
+		cs::String scrollToGroup;
 
 		/// US-T252: Main Menu or Quit picked with Confirm before quitting on: the question shown over the first page.
 		enum class Leave : int { None, MainMenu, Quit };
@@ -97,6 +112,7 @@ namespace SpaceGod::UI
 
 		bool stylesReady = false;
 		cs::Ref<GUIStyle> panel, title, text, small, button, buttonActive, row, rowSelected, countdown, field, label;
+		cs::Ref<GUIStyle> modeButton, modeActive; // US-T437
 		cs::Ref<Texture2D> panelTexture, shadeTexture, buttonTexture, buttonActiveTexture, rowHoverTexture, rowSelectedTexture, fieldTexture;
 
 	public:
@@ -188,10 +204,21 @@ namespace SpaceGod::UI
 
 		/// US-T249: a key binding's row: its action and any clash on the left, its three key slots (click one, then press
 		/// the key) and Reset (Clear while a slot listens) on the right.
-		void DrawKeyBinding(const cs::Ref<Core::GameSetting>& setting, Rect r, bool showGroup);
+		/// US-T437: the slots are Primary, Secondary and Tertiary, each with its trigger mode under it (click to step it:
+		/// Press, Hold, Double-tap, Long press), and each listens for any input.
+		void DrawKeyBinding(const cs::Ref<Core::GameSetting>& setting, Rect r, bool showGroup, bool picked);
 
 		/// US-T249: while a slot listens, the chord pressed this frame goes into it; Esc (or leaving the page) cancels.
+		/// US-T437: any input, from the keyboard, the mouse or the pad; Esc or the timeout cancels.
 		void UpdateCapture(bool escape);
+		/// US-T437: starts listening on the slot (the first empty one when the slot asked is empty).
+		void StartCapture(int action, int slot);
+		/// US-T437: the slot's trigger mode stepped on (Press, Hold, Double-tap, Long press, round again).
+		static void StepTrigger(const cs::Ref<Core::GameSetting>& setting, int slot);
+		/// US-T437: keeps the swallow on while the mouse or the pad is still held, and the pad's menu focus held with it.
+		void UpdateSwallow();
+		/// US-T437: the top of shown setting <paramref name="i"/>'s row in the list.
+		float RowTop(int i) const;
 
 		/// Whether every word of <paramref name="query"/> is among <paramref name="words"/>.
 		static bool MatchesAll(const cs::String& words, const cs::String& query);
@@ -209,6 +236,12 @@ namespace SpaceGod::UI
 		void EnsureStyles();
 
 	public:
+		/// US-T437 (sg.Bindings): opens straight on Settings > Controls > Key bindings, scrolled to <paramref name="group"/>'s
+		/// header, or to an action of that name ("HUD mode"); the top when empty.
+		void ShowKeyBindings(const cs::String& group = cs::String());
+		/// US-T437 (sg.Bindings): the bindings page listening on <paramref name="slot"/> of the action, as a click would.
+		void ListenOn(int action, int slot);
+
 		/// The menu's own styles are going with whatever owns it -- the game session or the main menu
 		/// (U.SPC-T366): DontSave outlives the scene otherwise, so every session (or trip through the main menu)
 		/// that opened Settings would leave its textures behind.

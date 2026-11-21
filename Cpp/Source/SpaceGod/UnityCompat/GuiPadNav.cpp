@@ -3,12 +3,12 @@
 #include "UnityCompat/GuiPadNav.h"
 #include "UnityCompat/UnityRuntime.h"
 #include "Input/Gamepad.h"
+#include "Input/KeyBindings.h" // US-T437: the pause menu's pad binding
 
 namespace SpaceGod::UnityCompat
 {
 	using ::SpaceGod::Input::Gamepad;
 	using ::SpaceGod::Input::GamepadDevice;
-	using ::SpaceGod::Input::PadAction;
 	using ::SpaceGod::Input::PadButton;
 
 	namespace
@@ -209,6 +209,17 @@ namespace SpaceGod::UnityCompat
 		if (f == nullptr && focusId != 0) f = Nearest(Centre(focusRect));
 		if (f == nullptr && Gamepad::LastUsed) f = First();
 
+		if (Hold)
+		{
+			// US-T437: the bindings page has the pad: the focus stays where it is, nothing is pressed.
+			if (f != nullptr)
+			{
+				focusId = f->id;
+				focusRect = f->rect;
+			}
+			return;
+		}
+
 		int dir = PadDirection(pad);
 		bool accept = pad[PadButton::A].wasPressedThisFrame;
 		if (f == nullptr && (dir >= 0 || accept))
@@ -263,7 +274,8 @@ namespace SpaceGod::UnityCompat
 		}
 
 		// B, or the pause button: Esc.
-		escape = pad[PadButton::B].wasPressedThisFrame || Gamepad::Action(PadAction::Pause).wasPressedThisFrame;
+		escape = pad[PadButton::B].wasPressedThisFrame
+			|| ::SpaceGod::Input::KeyBindings::Pressed(::SpaceGod::Input::KeyAction::PauseMenu, ::SpaceGod::Input::InputDevice::current(), ::SpaceGod::Input::BindSources::Pad);
 		if (escape)
 		{
 			Event e = Make(EventType::KeyDown, mouse);

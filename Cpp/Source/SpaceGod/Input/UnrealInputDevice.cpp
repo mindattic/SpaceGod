@@ -77,6 +77,15 @@ namespace SpaceGod::Input
 				set(Key::DownArrow, EKeys::Down);
 				set(Key::LeftArrow, EKeys::Left);
 				set(Key::RightArrow, EKeys::Right);
+				// US-T437: bindable, read by nothing unless bound (Caps Lock is the HUD mode's by default).
+				set(Key::CapsLock, EKeys::CapsLock);
+				const FKey numpad[] =
+				{
+					EKeys::NumPadZero, EKeys::NumPadOne, EKeys::NumPadTwo, EKeys::NumPadThree, EKeys::NumPadFour, EKeys::NumPadFive, EKeys::NumPadSix,
+					EKeys::NumPadSeven, EKeys::NumPadEight, EKeys::NumPadNine,
+				};
+				for (int i = 0; i < 10; i++) set(static_cast<Key>(static_cast<int>(Key::Numpad0) + i), numpad[i]);
+				set(Key::NumpadPeriod, EKeys::Decimal);
 				return m;
 			}();
 			return map;
@@ -144,6 +153,7 @@ namespace SpaceGod::Input
 			for (int i = static_cast<int>(Key::None) + 1; i < static_cast<int>(Key::Count); i++)
 				if (device[static_cast<Key>(i)].wasPressedThisFrame) return true;
 			return device.leftButton.wasPressedThisFrame || device.rightButton.wasPressedThisFrame || device.middleButton.wasPressedThisFrame
+				|| device.backButton.wasPressedThisFrame || device.forwardButton.wasPressedThisFrame // US-T437
 				|| device.delta.sqrMagnitude() > 9.0f || device.scrollY != 0.0f;
 		}
 	}
@@ -173,6 +183,8 @@ namespace SpaceGod::Input
 		Read(pc, EKeys::LeftMouseButton, device.leftButton);
 		Read(pc, EKeys::RightMouseButton, device.rightButton);
 		Read(pc, EKeys::MiddleMouseButton, device.middleButton);
+		Read(pc, EKeys::ThumbMouseButton, device.backButton); // US-T437: the side buttons, Mouse 4 and Mouse 5
+		Read(pc, EKeys::ThumbMouseButton2, device.forwardButton);
 
 		// Unreal: origin top-left; Unity: bottom-left. Off the viewport (or no viewport) the pointer stays where it was.
 		float x = 0, y = 0;
@@ -191,6 +203,10 @@ namespace SpaceGod::Input
 		if (notches == 0.0f)
 			notches = (pc->WasInputKeyJustPressed(EKeys::MouseScrollUp) ? 1.0f : 0.0f) - (pc->WasInputKeyJustPressed(EKeys::MouseScrollDown) ? 1.0f : 0.0f);
 		device.scrollY = notches * WheelUnitsPerNotch;
+		// US-T437: a wheel step as a button tapped within the frame, for a binding to the wheel.
+		auto step = [](ButtonControl& c, bool turned) { c.isPressed = c.wasPressedThisFrame = c.wasReleasedThisFrame = turned; };
+		step(device.wheelUp, notches > 0.0f);
+		step(device.wheelDown, notches < 0.0f);
 
 		// US-T250: the pad, and which device was used last (the GUI's focus highlight and the Help screen's pad buttons).
 		FeedPad(pc);

@@ -117,6 +117,10 @@ namespace SpaceGod::Input
 		/// <summary>U: the lighter toggle, the HUD's panels and readouts off while the names and markers on the view stay.</summary>
 		bool ToggleHud = false;
 
+		/// <summary>US-T437: the HUD mode key pressed this frame (KeyAction::HudMode, Caps Lock by default): the cursor and the
+		/// HUD's pull-out drawers, or back to the quiet screen. Nothing reads it yet (the drawer HUD comes next).</summary>
+		bool HudMode = false;
+
 		/// <summary>F11 (U.SPC-T496): clears the screen of all its UI but the reticle in use, and brings it all back.</summary>
 		bool ClearScreen = false;
 		bool ToggleMarket = false;

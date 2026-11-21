@@ -31,6 +31,10 @@ namespace SpaceGod::UnityCompat
 		/// The pad is the GUI's this frame.
 		static bool Engaged();
 
+		/// US-T437: the bindings page is listening for (or has just taken) a pad input: the pad moves no focus, presses
+		/// nothing and backs out of nothing until it is let go of, so the press is the binding's and not the page's.
+		static inline bool Hold = false;
+
 		/// Repaint: control `id` was drawn at `screen` (GUI units, cut to its clip) — a stop for the pad's focus. A control
 		/// drawn at `local` (the current group's coordinates) then calls DrawFocus, which rings it when it has the focus.
 		static void Register(int id, const Rect& screen, Kind kind);

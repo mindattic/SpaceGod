@@ -3,6 +3,7 @@
 
 #include "ActiveProfile.h"
 #include "GameSettingsHost.h"
+#include "Input/Gamepad.h" // US-T437
 #include "Input/KeyBindings.h" // US-T249
 #include "PlayerOptions.h" // US-T252
 #include "Settings/GameSetting.h"
@@ -12,6 +13,7 @@
 #include "UI/DisplayOptions.h"
 #include "UI/Hud.h"
 #include "UI/UiInput.h" // US-T311
+#include "UnityCompat/GuiPadNav.h" // US-T437
 
 using namespace SpaceGod::Core;
 
@@ -42,6 +44,8 @@ namespace SpaceGod::UI
 		if (confirm != nullptr) Revert();
 		leaving = Leave::None;
 		captureAction = captureSlot = -1; // US-T249
+		captureSwallow = false; // US-T437
+		UnityCompat::GuiPadNav::Hold = false;
 		IsOpen = false;
 		Time::timeScale = timeScaleBefore;
 	}
@@ -54,11 +58,14 @@ namespace SpaceGod::UI
 			if (escape || confirm->Tick(realSeconds)) Revert();
 			return;
 		}
+		UpdateSwallow(); // US-T437
 		if (captureAction >= 0)
 		{
 			UpdateCapture(escape); // US-T249: Esc cancels the listening slot, not the page
+			UpdateSwallow();
 			return;
 		}
+		if (captureSwallow) return; // US-T437: the input just bound is still held: it does nothing else
 		if (!escape)
 		{
 			if (page == Page::Main) MainKeys(); // US-T311
@@ -282,7 +289,10 @@ namespace SpaceGod::UI
 		if (group.empty() || !groups.Contains(group))
 			group = playerGroups.Count() > 0 ? playerGroups[0] : groups.Count() > 0 ? groups[0] : cs::String();
 
-		float w = Mathf::Min(820, Screen::width - 40), h = Mathf::Min(560, Screen::height - 40);
+		// US-T437: the bindings' three slots and their modes want a wider panel (the page, or a search that finds them).
+		bool bindingsPage = cs::Strings::IsNullOrWhiteSpace(search) && group == Input::KeyBindings::Group;
+		bool wide = bindingsPage || !cs::Strings::IsNullOrWhiteSpace(search);
+		float w = Mathf::Min(wide ? 1120.0f : 820.0f, Screen::width - 40.0f), h = Mathf::Min(wide ? 640.0f : 560.0f, Screen::height - 40.0f);
 		auto r = Centred(w, h);
 		GUI::Box(r, GUIContent::none(), panel);
 		GUI::Label(Rect(r.x + 20, r.y + 14, w - 40, 22), "SETTINGS", title);
@@ -363,13 +373,73 @@ namespace SpaceGod::UI
 		int rows = shown.Count() + (displayFound ? 1 : 0);
 		cs::String heading = searching ? cs::Cat(rows, " found for \"", cs::Strings::Trim(search), "\"") : !group.empty() ? group : cs::String("Nothing to set");
 		GUI::Label(Rect(px, top, pw, 22), heading, text);
-		if (!searching && group == Input::KeyBindings::Group) // US-T249: how the page works
+		float listTop = top + 28;
+		const float headerH = 26;
+		if (bindingsPage) // US-T249: how the page works; US-T437: any input, three slots, a mode each
+		{
 			GUI::Label(Rect(px + 110, top + 3, pw - 110, 18),
-				captureAction >= 0 ? cs::String("Press the key (hold Shift, Ctrl or Alt with it for a chord)  ·  Esc cancels  ·  Clear empties the slot")
-					: cs::String("Click a key to change it  ·  Esc, the number keys and the mouse stay fixed  ·  gamepad buttons: Controls"), small);
+				captureAction >= 0 ? cs::String("Press any key (with Shift, Ctrl or Alt for a chord), mouse button, wheel, pad button, trigger or stick")
+					: cs::String("Click a slot, then press any key, mouse button, wheel, pad button, trigger or stick to bind it"), small);
+			GUI::Label(Rect(px, top + 22, pw, 18),
+				captureAction >= 0 ? cs::String("Esc cancels (or wait)  ·  Clear empties the slot  ·  the left and right mouse buttons bind only with Shift, Ctrl or Alt held")
+					: cs::String("The mode under a slot steps Press / Hold / Double-tap / Long press  ·  Esc, the number keys, the left / right mouse buttons and the sticks' moves stay fixed"), small);
+			// The slots' column heads, over the rows' slots (DrawKeyBinding lays them out the same way).
+			float cw = pw - 18;
+			const float gap = 6, resetW = 60;
+			float slotW = Mathf::Clamp((cw * 0.62f - resetW - 2 * gap) / Input::KeyBindingSetting::Slots, 96.0f, 168.0f);
+			float controlW = slotW * Input::KeyBindingSetting::Slots + gap * (Input::KeyBindingSetting::Slots - 1);
+			float cx = px + cw - controlW - resetW - 24 + 12;
+			for (int i = 0; i < Input::KeyBindingSetting::Slots; i++)
+				GUI::Label(Rect(cx + i * (slotW + gap), top + 42, slotW, 18), cs::Strings::ToUpperInvariant(Input::KeyBindingSetting::SlotName(i)), text);
+			listTop = top + 62;
 
-		auto view = Rect(px, top + 28, pw, bottom - top - 28);
-		auto content = Rect(0, 0, pw - 18, Mathf::Max(rows * SettingRowH, 1.0f));
+			// US-T437: every action by its group (its name's prefix), groups in the order first met, actions in the page's.
+			cs::List<cs::String> order;
+			for (const auto& s : shown)
+			{
+				cs::String g = Input::KeyBindings::GroupOf(Input::KeyBindings::ActionOf(*s));
+				if (!order.Contains(g)) order.Add(g);
+			}
+			cs::List<cs::Ref<GameSetting>> grouped;
+			for (const auto& g : order)
+				for (const auto& s : shown)
+					if (Input::KeyBindings::GroupOf(Input::KeyBindings::ActionOf(*s)) == g) grouped.Add(s);
+			shown = grouped;
+		}
+
+		auto view = Rect(px, listTop, pw, bottom - listTop);
+		// US-T437: each row's top (a group's header above its first action on the bindings page).
+		shownRowTops.Clear();
+		cs::List<std::pair<cs::String, float>> headers;
+		float contentH = displayFound ? SettingRowH : 0.0f;
+		{
+			cs::String last;
+			for (int i = 0; i < shown.Count(); i++)
+			{
+				if (bindingsPage)
+				{
+					cs::String g = Input::KeyBindings::GroupOf(Input::KeyBindings::ActionOf(*shown[i]));
+					if (g != last)
+					{
+						headers.Add(std::make_pair(g, contentH));
+						contentH += headerH;
+						last = g;
+					}
+				}
+				shownRowTops.Add(contentH);
+				contentH += SettingRowH;
+			}
+		}
+		if (!scrollToGroup.empty())
+		{
+			for (const auto& hd : headers)
+				if (hd.first == scrollToGroup) settingsScroll.y = hd.second;
+			for (int i = 0; i < shown.Count(); i++) // or an action by its name, two rows above it
+				if (bindingsPage && Input::KeyBindings::ShortName(Input::KeyBindings::ActionOf(*shown[i])) == scrollToGroup)
+					settingsScroll.y = Mathf::Max(0.0f, shownRowTops[i] - 2 * SettingRowH);
+			scrollToGroup.clear();
+		}
+		auto content = Rect(0, 0, pw - 18, Mathf::Max(contentH, 1.0f));
 		// US-T322: what the keys act on next frame.
 		shownSettings = shown;
 		displayRowShown = displayFound;
@@ -386,11 +456,18 @@ namespace SpaceGod::UI
 			if (GUI::Button(Rect(content.width - 266, y + 10, 200, 28), "Open Display", button)) OpenDisplay();
 			y += SettingRowH;
 		}
+		for (const auto& hd : headers) // US-T437: the bindings page's group heads
+		{
+			GUI::Label(Rect(4, hd.second + 4, content.width - 8, headerH - 6), cs::Strings::ToUpperInvariant(hd.first), text);
+			GUI::DrawTexture(Rect(4, hd.second + headerH - 3, content.width - 8, 1), buttonActiveTexture);
+		}
 		for (int i = 0; i < shown.Count(); i++)
 		{
+			y = shownRowTops[i];
+			bool isBinding = cs::As<Input::KeyBindingSetting>(shown[i]) != nullptr;
 			if (i == settingsPick) GUI::DrawTexture(Rect(0, y, content.width, SettingRowH - 2), rowSelectedTexture); // US-T322
-			DrawSetting(shown[i], Rect(0, y, content.width, SettingRowH), searching);
-			y += SettingRowH;
+			if (isBinding) DrawKeyBinding(shown[i], Rect(0, y, content.width, SettingRowH), searching, i == settingsPick); // US-T437
+			else DrawSetting(shown[i], Rect(0, y, content.width, SettingRowH), searching);
 		}
 		if (rows == 0)
 			GUI::Label(Rect(4, 4, content.width - 8, 40), searching ? "No setting matches that." : "No system has declared a setting yet.", small);
@@ -409,7 +486,8 @@ namespace SpaceGod::UI
 		GUI::enabled = enabled;
 		// US-T322: the keys' hint, between Reset and Back.
 		GUI::Label(Rect(px + 230, by + 6, r.xMax() - 20 - 110 - 10 - (px + 230), 18),
-			"Up / Down pick  ·  Left / Right change  ·  Enter flips  ·  Del resets  ·  PgUp / PgDn group  ·  Ctrl+F search", small);
+			bindingsPage ? "Up / Down pick  ·  Left / Right slot  ·  Enter listens  ·  M mode  ·  Backspace clears  ·  Del resets  ·  PgUp / PgDn group" // US-T437
+				: "Up / Down pick  ·  Left / Right change  ·  Enter flips  ·  Del resets  ·  PgUp / PgDn group  ·  Ctrl+F search", small);
 		if (GUI::Button(Rect(r.xMax() - 20 - 110, by, 110, 30), "Back", button))
 		{
 			search = ""; // the button leaves the page outright; only Esc stops at clearing a search first
@@ -469,7 +547,7 @@ namespace SpaceGod::UI
 		{
 			settingsPick = settingsPick < 0 ? (move > 0 ? 0 : count - 1) : (settingsPick + move + count) % count;
 			// The list follows the pick (the Display row, when a search found it, sits above the settings).
-			float rowTop = (settingsPick + (displayRowShown ? 1 : 0)) * SettingRowH;
+			float rowTop = RowTop(settingsPick); // US-T437: the bindings page's rows sit under their groups' heads
 			if (rowTop < settingsScroll.y) settingsScroll.y = rowTop;
 			else if (rowTop + SettingRowH > settingsScroll.y + settingsViewH) settingsScroll.y = rowTop + SettingRowH - settingsViewH;
 			return;
@@ -482,21 +560,21 @@ namespace SpaceGod::UI
 			setting->Reset();
 			return;
 		}
+		if (auto binding = cs::As<Input::KeyBindingSetting>(setting)) // US-T437: the slots, by the keys
+		{
+			if (pressed(KeyCode::RightArrow) || pressed(KeyCode::D)) bindingColumn = Mathf::Min(bindingColumn + 1, Input::KeyBindingSetting::Slots - 1);
+			else if (pressed(KeyCode::LeftArrow) || pressed(KeyCode::A)) bindingColumn = Mathf::Max(bindingColumn - 1, 0);
+			else if (pressed(KeyCode::M)) StepTrigger(setting, bindingColumn);
+			else if (pressed(KeyCode::Backspace)) binding->Set(bindingColumn, Input::InputBinding());
+			else if (pressed(KeyCode::Return) || pressed(KeyCode::KeypadEnter) || pressed(KeyCode::Space))
+				StartCapture(static_cast<int>(Input::KeyBindings::ActionOf(*setting)), bindingColumn);
+			return;
+		}
 		int change = pressed(KeyCode::RightArrow) || pressed(KeyCode::D) ? 1 : pressed(KeyCode::LeftArrow) || pressed(KeyCode::A) ? -1 : 0;
 		bool enter = pressed(KeyCode::Return) || pressed(KeyCode::KeypadEnter) || pressed(KeyCode::Space);
 		if (change == 0 && !enter) return;
 
-		if (auto binding = cs::As<Input::KeyBindingSetting>(setting))
-		{
-			if (!enter) return;
-			// Listening on the first empty slot, else the first: as a click on an empty slot would.
-			int slot = 0;
-			for (int i = Input::KeyBindingSetting::Slots - 1; i >= 0; i--)
-				if (binding->Value[i].Empty()) slot = i;
-			captureAction = static_cast<int>(Input::KeyBindings::ActionOf(*setting));
-			captureSlot = slot;
-		}
-		else if (auto toggle = cs::As<ToggleSetting>(setting))
+		if (auto toggle = cs::As<ToggleSetting>(setting))
 		{
 			toggle->Set(change > 0 ? true : change < 0 ? false : !toggle->Value);
 		}
@@ -548,7 +626,7 @@ namespace SpaceGod::UI
 	{
 		if (cs::As<Input::KeyBindingSetting>(setting))
 		{
-			DrawKeyBinding(setting, r, showGroup); // US-T249
+			DrawKeyBinding(setting, r, showGroup, false); // US-T249
 			return;
 		}
 		const float controlW = 250, resetW = 60;
@@ -587,74 +665,170 @@ namespace SpaceGod::UI
 		GUI::enabled = enabled;
 	}
 
-	void PauseMenu::DrawKeyBinding(const cs::Ref<GameSetting>& setting, Rect r, bool showGroup)
+	void PauseMenu::DrawKeyBinding(const cs::Ref<GameSetting>& setting, Rect r, bool showGroup, bool picked)
 	{
 		using namespace ::SpaceGod::Input;
 		auto binding = cs::As<KeyBindingSetting>(setting);
 		KeyAction action = KeyBindings::ActionOf(*setting);
-		const float slotW = 104, gap = 6, resetW = 60;
+		const float gap = 6, resetW = 60;
+		// US-T437: three slots, Primary / Secondary / Tertiary, as wide as the row allows (the page's panel is wider).
+		const float slotW = Mathf::Clamp((r.width * 0.62f - resetW - 2 * gap) / KeyBindingSetting::Slots, 96.0f, 168.0f);
 		const float controlW = slotW * KeyBindingSetting::Slots + gap * (KeyBindingSetting::Slots - 1);
 		float textW = r.width - controlW - resetW - 24;
 		bool listeningHere = captureAction == static_cast<int>(action);
+		// An input just taken: the mouse's release and the pad's press must not click a slot again (UpdateSwallow).
+		bool clicks = !captureSwallow;
 
-		// A chord another action live in the same place also answers to (shared defaults aside: those are told apart by
+		// An input another action live in the same place also answers to (shared defaults aside: those are told apart by
 		// where each is live) is named under the label, so a clash is seen where it is made.
 		cs::String clash;
-		for (const KeyChord& c : binding->Value)
+		for (const InputBinding& c : binding->Value)
 			for (KeyAction other : KeyBindings::Conflicts(action, c))
 				clash = cs::Cat(clash, clash.empty() ? "" : ", ", c.Display(), " is also ", KeyBindings::Name(other));
-		GUI::Label(Rect(r.x + 4, r.y + 4, textW, 20), showGroup ? cs::Cat(setting->Group, "  ·  ", setting->Label) : setting->Label, label);
+		cs::String name = showGroup ? cs::Cat(setting->Group, "  ·  ", setting->Label) : KeyBindings::ShortName(action);
+		GUI::Label(Rect(r.x + 4, r.y + 4, textW, 20), name, label);
 		GUI::Label(Rect(r.x + 4, r.y + 24, textW, SettingRowH - 26), clash.empty() ? setting->Description : cs::Cat("CLASH: ", clash), small);
 
-		float cx = r.x + textW + 12, cy = r.y + 10;
-		int firstEmpty = KeyBindingSetting::Slots;
-		for (int i = KeyBindingSetting::Slots - 1; i >= 0; i--)
-			if (binding->Value[i].Empty()) firstEmpty = i;
+		float cx = r.x + textW + 12;
 		for (int i = 0; i < KeyBindingSetting::Slots; i++)
 		{
 			bool listening = listeningHere && captureSlot == i;
-			const KeyChord& c = binding->Value[i];
-			cs::String shown = listening ? cs::String("press a key...") : c.Empty() ? cs::String("-") : c.Display();
-			if (GUI::Button(Rect(cx + i * (slotW + gap), cy, slotW, 28), shown, listening ? buttonActive : button))
+			const InputBinding& c = binding->Value[i];
+			float x = cx + i * (slotW + gap);
+			// The keys' pick: the picked row's picked slot is underlined.
+			if (picked && i == bindingColumn && !listeningHere) GUI::DrawTexture(Rect(x - 2, r.y + 2, slotW + 4, SettingRowH - 6), rowSelectedTexture);
+			cs::String shown = listening ? cs::String("press anything...") : c.Empty() ? cs::String("-") : cs::String(c.With(Trigger::Auto).Display());
+			if (GUI::Button(Rect(x, r.y + 4, slotW, 26), shown, listening ? buttonActive : button) && clicks)
 			{
 				if (listening) captureAction = captureSlot = -1; // clicked again: stop listening
-				else
-				{
-					captureAction = static_cast<int>(action);
-					captureSlot = c.Empty() ? firstEmpty : i; // the bound slots come first: an empty one fills the first gap
-				}
+				else StartCapture(static_cast<int>(action), i);
 			}
+			// The slot's trigger mode, stepped by a click. Lit when it is not the action's own.
+			bool enabled = GUI::enabled;
+			GUI::enabled = enabled && !c.Empty() && !listening;
+			cs::String mode = c.Empty() ? cs::String(" ") : cs::String(TriggerLabel(Resolve(c.trigger, binding->HeldKind)));
+			if (GUI::Button(Rect(x, r.y + 33, slotW, 20), mode, c.trigger != Trigger::Auto ? modeActive : modeButton) && clicks)
+				StepTrigger(setting, i);
+			GUI::enabled = enabled;
 		}
 
 		bool enabled = GUI::enabled;
 		if (listeningHere)
 		{
-			if (GUI::Button(Rect(r.xMax() - resetW, cy, resetW, 28), "Clear", button))
+			if (GUI::Button(Rect(r.xMax() - resetW, r.y + 4, resetW, 26), "Clear", button) && clicks)
 			{
-				binding->Set(captureSlot, KeyChord());
+				binding->Set(captureSlot, InputBinding());
 				captureAction = captureSlot = -1;
 			}
 			return;
 		}
 		GUI::enabled = enabled && !setting->IsDefault();
-		if (GUI::Button(Rect(r.xMax() - resetW, cy, resetW, 28), "Reset", button)) setting->Reset();
+		if (GUI::Button(Rect(r.xMax() - resetW, r.y + 4, resetW, 26), "Reset", button) && clicks) setting->Reset();
 		GUI::enabled = enabled;
+	}
+
+	void PauseMenu::StartCapture(int action, int slot)
+	{
+		using namespace ::SpaceGod::Input;
+		if (action < 0 || action >= static_cast<int>(KeyAction::Count)) return;
+		const auto& binding = KeyBindings::Binding(static_cast<KeyAction>(action));
+		// The bound slots come first: an empty one fills the first gap.
+		if (slot < 0 || slot >= KeyBindingSetting::Slots || binding->Value[slot].Empty())
+		{
+			slot = KeyBindingSetting::Slots - 1;
+			for (int i = KeyBindingSetting::Slots - 1; i >= 0; i--)
+				if (binding->Value[i].Empty()) slot = i;
+		}
+		captureAction = action;
+		captureSlot = slot;
+		captureFresh = true;
+		captureStartedAt = Time::unscaledTime;
+		UnityCompat::GuiPadNav::Hold = true;
+	}
+
+	void PauseMenu::StepTrigger(const cs::Ref<GameSetting>& setting, int slot)
+	{
+		using namespace ::SpaceGod::Input;
+		auto binding = cs::As<KeyBindingSetting>(setting);
+		if (binding == nullptr || slot < 0 || slot >= KeyBindingSetting::Slots || binding->Value[slot].Empty()) return;
+		int now = static_cast<int>(Resolve(binding->Value[slot].trigger, binding->HeldKind));
+		int next = now + 1 >= static_cast<int>(Trigger::Count) ? static_cast<int>(Trigger::Press) : now + 1;
+		binding->SetTrigger(slot, static_cast<Trigger>(next));
+	}
+
+	void PauseMenu::UpdateSwallow()
+	{
+		using namespace ::SpaceGod::Input;
+		if (captureSwallow)
+		{
+			const InputDevice& kb = InputDevice::current();
+			const GamepadDevice& pad = GamepadDevice::current();
+			bool busy = false;
+			if (kb.present)
+				for (MouseButton m : { MouseButton::Left, MouseButton::Right, MouseButton::Middle, MouseButton::Back, MouseButton::Forward })
+					busy = busy || kb.Button(m).isPressed || kb.Button(m).wasReleasedThisFrame;
+			if (pad.present)
+			{
+				for (int i = static_cast<int>(PadButton::None) + 1; i < static_cast<int>(PadButton::Count); i++)
+					busy = busy || pad[static_cast<PadButton>(i)].isPressed || pad[static_cast<PadButton>(i)].wasReleasedThisFrame;
+				busy = busy || pad.leftStick.sqrMagnitude() > 0.09f || pad.rightStick.sqrMagnitude() > 0.09f || pad.leftTrigger > 0.3f || pad.rightTrigger > 0.3f;
+			}
+			if (!busy) captureSwallow = false;
+		}
+		UnityCompat::GuiPadNav::Hold = IsOpen && (captureAction >= 0 || captureSwallow);
+	}
+
+	float PauseMenu::RowTop(int i) const
+	{
+		if (i >= 0 && i < shownRowTops.Count()) return shownRowTops[i];
+		return (i + (displayRowShown ? 1 : 0)) * SettingRowH;
+	}
+
+	void PauseMenu::ShowKeyBindings(const cs::String& g)
+	{
+		if (!IsOpen) OpenSettings();
+		page = Page::Settings;
+		ShowGroup(Input::KeyBindings::Group);
+		scrollToGroup = g;
+	}
+
+	void PauseMenu::ListenOn(int action, int slot)
+	{
+		StartCapture(action, slot);
+		captureFresh = false; // shown listening at once (the shot holds still)
+		captureStartedAt = Time::unscaledTime + 3600.0f;
 	}
 
 	void PauseMenu::UpdateCapture(bool escape)
 	{
 		using namespace ::SpaceGod::Input;
-		if (escape || page != Page::Settings || captureAction >= static_cast<int>(KeyAction::Count))
+		if (page != Page::Settings || captureAction >= static_cast<int>(KeyAction::Count))
 		{
 			captureAction = captureSlot = -1;
 			return;
 		}
-		KeyChord chord;
-		if (KeyBindings::Capture(InputDevice::current(), chord))
+		const GamepadDevice& pad = GamepadDevice::current();
+		if (captureFresh)
 		{
-			KeyBindings::Binding(static_cast<KeyAction>(captureAction))->Set(captureSlot, chord);
-			captureAction = captureSlot = -1;
+			// What is held as the listening starts (a stick still pushed from moving the focus) is not taken.
+			KeyBindings::BeginCapture(pad);
+			captureFresh = false;
+			captureStartedAt = Time::unscaledTime;
 		}
+		// Taken first: the pad's B (or a binding's own Esc-like press) binds rather than cancels.
+		InputBinding taken;
+		if (KeyBindings::Capture(InputDevice::current(), pad, taken))
+		{
+			const auto& binding = KeyBindings::Binding(static_cast<KeyAction>(captureAction));
+			taken.trigger = binding->Value[captureSlot].trigger; // the slot keeps its mode
+			binding->Set(captureSlot, taken);
+			captureAction = captureSlot = -1;
+			captureSwallow = true;
+			UnityCompat::GuiPadNav::Hold = true;
+			return;
+		}
+		if (escape || Time::unscaledTime - captureStartedAt > static_cast<float>(KeyBindings::Tuning().CaptureTimeoutS))
+			captureAction = captureSlot = -1;
 	}
 
 	bool PauseMenu::MatchesAll(const cs::String& words, const cs::String& query)
@@ -774,6 +948,9 @@ namespace SpaceGod::UI
 		buttonActive = S::ButtonOnStyle(button, buttonActiveTexture);
 		row = S::RowStyle(T::Label, rowHoverTexture);
 		rowSelected = S::RowSelectedStyle(row, rowSelectedTexture);
+		// US-T437: a binding slot's trigger mode, a small button under the slot (lit when it is not the action's own).
+		modeButton = S::ButtonStyle(T::Caption, buttonTexture, buttonActiveTexture);
+		modeActive = S::ButtonOnStyle(modeButton, buttonActiveTexture);
 	}
 
 	void PauseMenu::DestroyOwnedTextures()

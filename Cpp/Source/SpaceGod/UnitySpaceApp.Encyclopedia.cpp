@@ -66,8 +66,8 @@ namespace SpaceGod
 			const auto& binding = KeyBindings::Binding(action);
 			int context = KeyBindings::Context(action);
 			cs::String where = context == KeyContext::Command ? cs::String("  (in command)") : context == KeyContext::Controls ? cs::String("  (at the controls)") : cs::String();
-			lines[g].Add(EncyclopediaSection{ KeyBindings::Keys(action), cs::Cat(label, where, ": ", binding->Description) });
-			keywords[g] = cs::Cat(keywords[g], " ", label, " ", binding->Keywords, " ", KeyBindings::Keys(action));
+			lines[g].Add(EncyclopediaSection{ binding->ValueText() /* US-T437: every slot */, cs::Cat(label, where, ": ", binding->Description) });
+			keywords[g] = cs::Cat(keywords[g], " ", label, " ", binding->Keywords, " ", binding->ValueText());
 		}
 		for (size_t g = 0; g < groups.size(); g++)
 			book.AddControls(cs::Cat("keys-", groups[g]), cs::Cat(groups[g], " keys"),
@@ -78,18 +78,15 @@ namespace SpaceGod
 		cs::List<EncyclopediaSection> pad;
 		pad.Add(EncyclopediaSection{ "LS", "Left stick: thrust and strafe at the controls; the camera's swim in command." });
 		pad.Add(EncyclopediaSection{ "RS", "Right stick: aim (the look the hull is pulled after); in command, look about. In menus it scrolls." });
-		for (int i = 0; i < static_cast<int>(PadAction::Count); i++)
+		for (int i = 0; i < static_cast<int>(KeyAction::Count); i++) // US-T437: the pad's bindings, from the one table
 		{
-			auto a = static_cast<PadAction>(i);
-			PadButton b = Gamepad::ButtonFor(a);
-			if (b == PadButton::None) continue;
-			cs::String glyph = ToString(b);
-			if (b == PadButton::LeftStick || b == PadButton::RightStick) glyph = cs::Cat(glyph, " click");
-			pad.Add(EncyclopediaSection{ glyph, Gamepad::ActionName(a) });
+			auto a = static_cast<KeyAction>(i);
+			for (const InputBinding& b : KeyBindings::Binding(a)->Value)
+				if (b.IsPad()) pad.Add(EncyclopediaSection{ b.PadGlyph(), KeyBindings::Name(a) });
 		}
 		pad.Add(EncyclopediaSection{ "D-pad", "At the controls, the reactor: left weapons, up shields, right engines, down an even share. In command: up / down time faster / slower, right / left the next / previous ship." });
 		pad.Add(EncyclopediaSection{ "Menus", "D-pad or left stick moves the highlight, A presses, B backs out." });
-		book.AddControls("gamepad", "Gamepad", "The pad's buttons as they are bound now; rebind them, the dead zone and the aim speed under Settings > Controls",
+		book.AddControls("gamepad", "Gamepad", "The pad's buttons as they are bound now; rebind them under Settings > Controls > Key bindings, the dead zone and the aim speed under Settings > Controls",
 			pad, "gamepad pad controller stick trigger button xbox");
 	}
 

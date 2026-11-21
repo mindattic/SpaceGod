@@ -4,7 +4,9 @@ One table per area: action, key, where it works, menu path. The in-game Help scr
 copy of this file; when a key changes, change both. Keys are read in `Input/InputState.cpp` (the shared per-frame poll, left and
 right Shift / Ctrl / Alt both count), plus the modal panels that own the keys while open (dev menu `UI/CheatMenu.cpp`, comms
 `UnitySpaceApp.Comms.cpp`, bottom drawer `UI/Hud.Drawer.cpp`, tour `Tour/ShowcaseTour.cpp`, gas-giant contract
-`HarvestPlay.cpp`). There is no gamepad binding: the input seam (`Input/UnrealInputDevice.cpp`) maps the keyboard and mouse only.
+`HarvestPlay.cpp`). The keys (and the mouse's and pad's bindings) are the action map's, `Input/KeyBindings.h`, rebindable under
+Settings > Controls > Key bindings (see Bindings below); the input seam (`Input/UnrealInputDevice.cpp`) reads the keyboard, the mouse
+and the pad.
 `Cpp/Config/DefaultInput.ini` holds engine settings only, no action or key mappings.
 
 **Command view** = the free SpaceGod camera. **Controls** = at any seat (helm, fighter, station, gun, worker). `InputState::Arbitrate`
@@ -16,6 +18,53 @@ fighter, Shift+K next sky, Shift+P EVA, Shift+T tractor, Shift+J cruise drive, S
 Shift+Insert run hot, Shift+Del roll patches, Shift+Backspace self-destruct, Shift+/ launched craft, Shift+Tab backwards).
 Ctrl is "fine / slow" (and mine / docking mode at the controls). Alt is the manoeuvre key (flip, broadside stance); Shift+Alt+K
 reverses the sky cycle. A plain key never changes meaning with Shift unless the table says so.
+
+## Bindings (US-T249, US-T437)
+
+Settings > Controls > Key bindings lists every action by group (Move, Flight, Combat, Sensors, Reactor, Travel, Seats, Command,
+Time, View, Screen, Game), each with three slots, **Primary**, **Secondary** and **Tertiary**, and Reset per action and for the page.
+Click a slot (or pick the row with Up / Down, the slot with Left / Right, and press Enter; on the pad, A on it) and press anything:
+
+- a key, with Shift / Ctrl / Alt held for a chord (a modifier pressed and let go alone binds the modifier itself);
+- a mouse button: the side buttons (Mouse 4, Mouse 5) and the middle as they are, the left and right only with a modifier held
+  (alone they fire, select and look, and press the page's buttons); a wheel step up or down, with modifiers too;
+- a pad button, a trigger (at the pad's own click) or a stick pushed one way (past 60% to be taken; it then counts past 50%).
+
+Esc cancels; so does waiting 6 s (a pad has no Esc: its B binds). Clear empties the slot (Backspace on the picked slot does it
+from the keys). Under each slot its **trigger mode** steps on a click (M from the keys): **Press**, **Hold**, **Double-tap**,
+**Long press**. Each action has its own mode (a held action, thrust or boost, is Hold; a toggle or a screen is Press), shown unlit;
+another mode is lit:
+
+| Mode | A held action (thrust, roll, boost, fire...) | A pressed action (a toggle, a screen...) |
+|---|---|---|
+| Press | a tap latches it on, the next off | fires on the press |
+| Hold | held while the input is | fires on the press and again on the release (on only while held) |
+| Double-tap | the second press within 0.3 s holds it while that press is held | fires on the second press within 0.3 s |
+| Long press | held from 0.5 s into a hold until let go | fires once a hold reaches 0.5 s |
+
+A clash (an input another action live in the same place answers to with the same touch) is named under the action as
+"CLASH: ...". Pairs shared by default (F focus / flight assist, T reset time / lock, pad Y focus / lock...) are told apart by where
+each is live, and a double-tap or long press on an input is told apart from its press, so neither is flagged.
+
+The pad's buttons are the actions' default bindings beside the keys (they were a map of their own before US-T437): fire RT, second
+trigger LT, roll LB / RB (sink / rise in command), boost A (a mech's jets), drift B (back out in command), flip X, lock target and
+focus Y, flight assist RS click, embody LS click, back / pause menu Menu, help View. Fixed: Esc, the number keys, the left and right
+mouse buttons' own fire, select and look, the sticks' movement and aim, the d-pad's reactor / time / ship steps, and the pad in menus.
+
+**HUD mode** (`KeyAction::HudMode`, `InputState::HudMode`): the cursor and the HUD's pull-out drawers (the drawer HUD comes next).
+The plan named Z, but Z is roll left at the controls (and every plain key is taken), so it defaults to **Caps Lock** (a key added for
+it, with the numpad's digits and point); bind Z (or anything) to it on the page.
+
+The text a profile keeps for an action (`controls.key.<action>` in the Key bindings group; `Input/BindingCore.h`):
+bindings joined by ", ", `None` when every slot is empty. One binding is `[Mode:]input`, the mode one of `Press`, `Hold`,
+`DoubleTap`, `LongPress` (none: the action's own), the input `[Ctrl+][Shift+][Alt+]KeyName` (`T`, `Shift+T`, `NumpadMultiply`),
+`[mods]MouseLeft|MouseRight|MouseMiddle|Mouse4|Mouse5|WheelUp|WheelDown`, `Pad:A|B|X|Y|LB|RB|View|Menu|LS|RS|DPadUp|DPadDown|DPadLeft|DPadRight`,
+`Pad:LT|RT[>NN]` or `Pad:LeftStickUp ... Pad:RightStickRight[>NN]` (`>NN`: past NN%). Examples: `Shift+K, NumpadMultiply`,
+`Mouse4, DoubleTap:Pad:A`, `LongPress:Shift+R`. A line from before US-T437 (keys only, no `Pad:`) loads exactly as it did and gains
+the action's default pad binding in a free slot, as the old pad map still worked; once a player clears an action's pad binding,
+`Pad:None` is written to keep it cleared. The double-tap window, the long-press time, a stick's default threshold, the capture
+threshold and the listening timeout are `BindingTuning` (`Input/BindingCore.h`; the one instance is `KeyBindings::Tuning()`).
+The pure part is unit-checked by `BindingCoreTests` (tools/build-core.ps1); `sg.Bindings [quit]` screenshots the page.
 
 ## Camera and god view
 
@@ -162,7 +211,7 @@ reverses the sky cycle. A plain key never changes meaning with Shift unless the 
 | Pause menu: pick / press a button | Up / Down or W / S, then Enter or Space; Left / Right on the leave question, Stay first (US-T311) | pause menu | - |
 | Mechlab: pick a hardpoint or socket, pick what to fit, fit it | Up / Down, Left / Right, Enter (US-T331) | Mechlab view of the outfitting panel (F2) | the mouse |
 | Port screen: open a tab | 1-9, 0: the tabs from the left (US-T335) | docked, port screen open (Shift+M) | the tab strip |
-| Settings: pick / change / reset a setting, step the groups, search | Up / Down pick, Left / Right change, Enter or Space flips (or listens, on a key binding), Delete resets, Page Up / Page Down group, Ctrl+F search (Enter or Down leaves it) (US-T322) | Settings page | the mouse |
+| Settings: pick / change / reset a setting, step the groups, search | Up / Down pick, Left / Right change, Enter or Space flips (or listens, on a key binding), Delete resets, Page Up / Page Down group, Ctrl+F search (Enter or Down leaves it) (US-T322); on Key bindings Left / Right pick the slot, Enter listens, M steps its mode, Backspace clears it (US-T437) | Settings page | the mouse, the pad |
 | Main menu: pick / press a button | Up / Down or W / S, then Enter or Space (US-T314) | main menu, its Co-op and Extras pages | - |
 | New Game page: starting situation, start | Left / Right (Up / Down a row) while no field is typed in, Enter to start or host (US-T317) | New Game setup page | - |
 | Showcase tour | - | - | main menu, dev menu > Showcase, sg.Tour; then Right/N, Left/B, S, Space, 1-9, O, Esc |
@@ -179,6 +228,7 @@ Staged checks (US-T218, US-T224), each logging its numbers under LogSpaceGod and
 
 | Command | What it stages |
 |---|---|
+| `sg.Bindings [quit]` | Settings > Controls > Key bindings opened (US-T437): the top, the Combat group, the View group with the HUD mode bound to Z, Mouse 4 and a double-tapped stick (and Z's clash with roll left), and a slot listening; the HUD mode's binding is put back after; `Saved/Screenshots/bindings-*.png` |
 | `sg.Ghost [shot <file>] [quit]` | Two hulls on one line of sight, the far one focused: the near one drawn as the see-through occluder ghost (US-T185); logs each hull's materials; also `<file>-opaque.png` (focus let go) and `<file>-far-alone.png` |
 | `sg.LaneRide [shot <dir>] [quit]` | A fighter flown into a space lane, steered about inside the tube (US-T196), then out past its wall; logs the offset, sideways speed and speed every half second, and the speed bleeding down to the hull's own every quarter second; `lane-1..4-*.png` |
 | `sg.CapitalRoll [shot <dir>] [seconds=60] [preroll=90] [quit]` | The big battle off Uranus run on `preroll` battle seconds, the camera on the capital under the most fire; each second its roll, the threat's bearing and the shield field it shows the threat against its strongest face and every other roll (US-T187); `roll-NN.png` every 5 s |

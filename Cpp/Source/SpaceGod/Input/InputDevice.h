@@ -8,38 +8,11 @@
 //
 // No Unreal headers here: only UnrealInputDevice.cpp touches the engine.
 
+#include "Input/BindingCore.h" // US-T437: Key, MouseButton, PadButton and the bindings' pure part
 #include "UnityCompat/UnityTypes.h"
 
 namespace SpaceGod::Input
 {
-	/// <summary>
-	/// The keys the game reads, by the names of Unity Input System's <c>Key</c> members the original's bindings use
-	/// (<c>kb.wKey</c> is <see cref="Key::W"/>, <c>kb.backquoteKey</c> is <see cref="Key::Backquote"/>...).
-	/// <see cref="UnrealInputDevice"/> maps each onto its Unreal <c>FKey</c>. <c>Count</c> is not a key (the table size).
-	/// </summary>
-	enum class Key : int
-	{
-		None,
-		A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z,
-		Digit0, Digit1, Digit2, Digit3, Digit4, Digit5, Digit6, Digit7, Digit8, Digit9,
-		F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12,
-		Space, Enter, NumpadEnter, Escape, Tab, Backspace, Backquote, Quote, Semicolon, Comma, Period, Slash, Backslash,
-		LeftBracket, RightBracket, Minus, Equals, NumpadPlus, NumpadMinus, NumpadMultiply, NumpadDivide,
-		LeftShift, RightShift, LeftCtrl, RightCtrl, LeftAlt, RightAlt,
-		Insert, Delete, Home, End, PageUp, PageDown, Pause,
-		UpArrow, DownArrow, LeftArrow, RightArrow,
-		Count,
-	};
-	const char* ToString(Key key);
-
-	enum class MouseButton : int
-	{
-		Left,
-		Right,
-		Middle,
-	};
-	const char* ToString(MouseButton button);
-
 	/// <summary>One key or mouse button this frame, as Unity's <c>ButtonControl</c> reports it: held, went down this
 	/// frame, came up this frame (both edges can be set in one frame for a tap shorter than a frame).</summary>
 	struct ButtonControl
@@ -73,6 +46,15 @@ namespace SpaceGod::Input
 		ButtonControl leftButton;
 		ButtonControl rightButton;
 		ButtonControl middleButton;
+
+		/// <summary>US-T437: the side buttons (Unity's <c>backButton</c> / <c>forwardButton</c>: Mouse 4 and Mouse 5).</summary>
+		ButtonControl backButton;
+		ButtonControl forwardButton;
+
+		/// <summary>US-T437: a wheel step this frame, as a button tapped within the frame (held, went down and came up all
+		/// set on a frame the wheel turned that way), for a binding to the wheel.</summary>
+		ButtonControl wheelUp;
+		ButtonControl wheelDown;
 
 		/// <summary><c>kb[key]</c> (the Input System's own indexer; <c>kb.wKey</c> is <c>kb[Key.W]</c>).</summary>
 		const ButtonControl& operator[](Key key) const;

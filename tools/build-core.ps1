@@ -250,4 +250,23 @@ if (-not $SkipParity) {
   & $hrExe
   if ($LASTEXITCODE -ne 0) { Write-Host 'HoldRewindCurveTests: failures (see above).' -ForegroundColor Red; exit $LASTEXITCODE }
 }
+
+# ---------------------------------------------------------------- BindingCoreTests (US-T437)
+# The input bindings' pure part (Cpp/Source/SpaceGod/Input/BindingCore.h, header-only, no engine): text round trips,
+# the profile text of before US-T437, and the trigger modes' timing. Needs nothing of SpaceGodCore.lib.
+$bcDir = Join-Path $core 'Tests\Bindings'
+# Its header lives outside SpaceGodCore, so the header stamp above does not see it: an edited header rebuilds it here.
+$bcHeader = Join-Path $repo 'Cpp\Source\SpaceGod\Input\BindingCore.h'
+$bcObj = Join-Path $parityObjRoot 'Tests\Bindings\BindingCoreTests.obj'
+if ((Test-Path -LiteralPath $bcObj) -and (Get-Item -LiteralPath $bcHeader).LastWriteTimeUtc -gt (Get-Item -LiteralPath $bcObj).LastWriteTimeUtc) { Remove-Item -LiteralPath $bcObj -Force }
+$bc = Invoke-Compile @(Get-Item -LiteralPath (Join-Path $bcDir 'BindingCoreTests.cpp')) $parityObjRoot
+if ($bc.Failed.Count -gt 0) { exit 1 }
+$bcExe = Join-Path $out 'BindingCoreTests.exe'
+& link.exe /nologo /DEBUG @linkOpt "/OUT:$bcExe" $bc.Objs
+if ($LASTEXITCODE -ne 0) { throw 'link.exe failed (BindingCoreTests).' }
+Write-Host "exe     $bcExe"
+if (-not $SkipParity) {
+  & $bcExe
+  if ($LASTEXITCODE -ne 0) { Write-Host 'BindingCoreTests: failures (see above).' -ForegroundColor Red; exit $LASTEXITCODE }
+}
 exit 0

@@ -4,28 +4,10 @@
 #include "Camera/SpaceCamera.h"
 #include "Settings/GameSetting.h"
 
-#include <vector>
-
 using namespace SpaceGod::Core;
 
 namespace SpaceGod::Input
 {
-	const char* ToString(PadButton button)
-	{
-		static const char* const names[] =
-		{
-			"None",
-			"A", "B", "X", "Y",
-			"LB", "RB", "LT", "RT",
-			"View", "Menu", "LS", "RS",
-			"D-pad up", "D-pad down", "D-pad left", "D-pad right",
-			"Count",
-		};
-		static_assert(sizeof(names) / sizeof(names[0]) == static_cast<size_t>(PadButton::Count) + 1, "PadButton names out of step with the enum");
-		int i = static_cast<int>(button);
-		return i >= 0 && i <= static_cast<int>(PadButton::Count) ? names[i] : "";
-	}
-
 	// ---------------------------------------------------------------- the device
 
 	const ButtonControl& GamepadDevice::operator[](PadButton button) const
@@ -66,63 +48,6 @@ namespace SpaceGod::Input
 
 	// ---------------------------------------------------------------- settings
 
-	namespace
-	{
-		/// The buttons a binding can pick, in the setting's order (the d-pad is the reactor's and the menus', not bindable),
-		/// then None.
-		const PadButton bindable[] =
-		{
-			PadButton::A, PadButton::B, PadButton::X, PadButton::Y,
-			PadButton::LeftBumper, PadButton::RightBumper, PadButton::LeftTrigger, PadButton::RightTrigger,
-			PadButton::View, PadButton::Menu, PadButton::LeftStick, PadButton::RightStick,
-		};
-		constexpr int bindableCount = static_cast<int>(sizeof(bindable) / sizeof(bindable[0]));
-
-		const cs::List<cs::String>& BindingOptions()
-		{
-			static const cs::List<cs::String> options = []
-			{
-				cs::List<cs::String> o;
-				for (PadButton b : bindable) o.Add(ToString(b));
-				o.Add("None");
-				return o;
-			}();
-			return options;
-		}
-
-		int OptionOf(PadButton button)
-		{
-			for (int i = 0; i < bindableCount; i++)
-				if (bindable[i] == button) return i;
-			return bindableCount; // None
-		}
-
-		struct ActionInfo
-		{
-			const char* key;
-			const char* name;
-			PadButton button;
-			const char* description;
-		};
-
-		const ActionInfo actions[] =
-		{
-			{ "controls.pad.fire", "Fire", PadButton::RightTrigger, "Held: fires the guns at the controls (the left mouse button's)." },
-			{ "controls.pad.secondary", "Secondary fire", PadButton::LeftTrigger, "Held: a seat's second trigger (the right mouse button's at the controls)." },
-			{ "controls.pad.rollLeft", "Roll left / descend", PadButton::LeftBumper, "Held: rolls anticlockwise at the controls (Z); in command the camera sinks." },
-			{ "controls.pad.rollRight", "Roll right / rise", PadButton::RightBumper, "Held: rolls clockwise at the controls (X); in command the camera rises." },
-			{ "controls.pad.boost", "Boost", PadButton::A, "Held: boost (Shift)." },
-			{ "controls.pad.drift", "Drift / back", PadButton::B, "At the controls: drift (R, hold or toggle as the drift key is set). In command: back out (Esc)." },
-			{ "controls.pad.flip", "Flip (manoeuvre)", PadButton::X, "Held: the turn-and-burn's flip onto the retrograde (Alt)." },
-			{ "controls.pad.lockFocus", "Lock target / focus", PadButton::Y, "At the controls: lock the target (T). In command: focus the selection (F)." },
-			{ "controls.pad.flightAssist", "Flight assist", PadButton::RightStick, "At the controls: flight assist on or off (F)." },
-			{ "controls.pad.embody", "Embody / let go", PadButton::LeftStick, "Take the controls of what is selected, or let go of them (P)." },
-			{ "controls.pad.pause", "Pause menu", PadButton::Menu, "Esc: back out, and the pause menu." },
-			{ "controls.pad.help", "Help", PadButton::View, "The help screen (H)." },
-		};
-		static_assert(sizeof(actions) / sizeof(actions[0]) == static_cast<size_t>(PadAction::Count), "pad actions out of step with the enum");
-	}
-
 	const cs::Ref<RangeSetting>& Gamepad::DeadZone()
 	{
 		static const cs::Ref<RangeSetting> value = cs::New<RangeSetting>("controls.pad.deadZone", SettingGroups::Controls,
@@ -151,46 +76,14 @@ namespace SpaceGod::Input
 		return value;
 	}
 
-	const cs::Ref<ChoiceSetting>& Gamepad::Binding(PadAction action)
-	{
-		static const std::vector<cs::Ref<ChoiceSetting>> settings = []
-		{
-			std::vector<cs::Ref<ChoiceSetting>> s;
-			for (const ActionInfo& a : actions)
-				s.push_back(cs::New<ChoiceSetting>(a.key, SettingGroups::Controls, cs::Cat("Gamepad: ", a.name), BindingOptions(),
-					OptionOf(a.button), a.description, "gamepad controller button binding remap"));
-			return s;
-		}();
-		int i = static_cast<int>(action);
-		return settings[i >= 0 && i < static_cast<int>(PadAction::Count) ? i : 0];
-	}
-
-	const char* Gamepad::ActionName(PadAction action)
-	{
-		int i = static_cast<int>(action);
-		return i >= 0 && i < static_cast<int>(PadAction::Count) ? actions[i].name : "";
-	}
-
 	void Gamepad::Declare()
 	{
 		DeadZone();
 		AimSensitivity();
 		InvertAim();
-		for (int i = 0; i < static_cast<int>(PadAction::Count); i++) Binding(static_cast<PadAction>(i));
 	}
 
 	// ---------------------------------------------------------------- reads
-
-	PadButton Gamepad::ButtonFor(PadAction action)
-	{
-		int index = Binding(action)->Index;
-		return index >= 0 && index < bindableCount ? bindable[index] : PadButton::None;
-	}
-
-	const ButtonControl& Gamepad::Action(PadAction action)
-	{
-		return GamepadDevice::current()[ButtonFor(action)];
-	}
 
 	Vector2 Gamepad::Stick(Vector2 raw)
 	{
