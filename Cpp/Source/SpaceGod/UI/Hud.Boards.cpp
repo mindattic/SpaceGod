@@ -1417,7 +1417,7 @@ namespace SpaceGod::UI
 				app->Piloted.Ship != nullptr ? cs::Cat("  ·  PROPELLANT ", app->Piloted.Ship->Propellant() <= 1e-6 ? cs::String("DRY") : Percent(app->Piloted.Ship->PropellantFraction())) : cs::String(),
 				pilotRecord != nullptr && pilotRecord->Wanted() ? cs::Cat("  ·  WANTED ", Credits(pilotRecord->TotalBounty())) : cs::String(),
 				SensorText());
-			keys = cs::Cat("   (", ControlHint(app->PilotControlMode), ", Z/X roll, F flight assist, Shift boost, F3 silent running, P to release)");
+			keys = cs::Cat("   (", ControlHint(app->PilotControlMode), ", Ctrl+A/D roll, F flight assist, Shift boost, F3 silent running, P to release)");
 			shortKeys = "   (H all keys, P to release)";
 		}
 		else if (cam->Mode == Cameras::SpaceCamera::CameraMode::Focus)

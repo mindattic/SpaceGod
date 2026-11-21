@@ -16,7 +16,7 @@ command, flight keys (flight assist, lock, flip, drift, power, self-destruct, pi
 **Modifier convention.** Shift makes the "bigger / other" sibling of a key (Shift+F1 dev menu next to F1 help, Shift+V practice
 fighter, Shift+K next sky, Shift+P EVA, Shift+T tractor, Shift+J cruise drive, Shift+F3 go dark, Shift+H comms, Shift+U drawer,
 Shift+Insert run hot, Shift+Del roll patches, Shift+Backspace self-destruct, Shift+/ launched craft, Shift+Tab backwards).
-Ctrl is "fine / slow" (and mine / docking mode at the controls). Alt is the manoeuvre key (flip, broadside stance); Shift+Alt+K
+Ctrl is "fine / slow" (and docking mode at the controls) when held on its own, and the roll's modifier: Ctrl+A / Ctrl+D roll, and a held binding needing more modifiers takes its key from a plainer one while they are held (Ctrl+A rolls only; A alone strafes; Ctrl held as the roll's modifier is not fine movement). A mine is Ctrl+M (US-T445); Z and X are free for systems, power and quick-use slots. Alt is the manoeuvre key (flip, broadside stance); Shift+Alt+K
 reverses the sky cycle. A plain key never changes meaning with Shift unless the table says so.
 
 ## Bindings (US-T249, US-T437)
@@ -104,12 +104,12 @@ The pure part is unit-checked by `BindingCoreTests` (tools/build-core.ps1); `sg.
 | Thrust / telegraph | W / S | controls | - |
 | Strafe, rise | A D, Q E | controls (capital: turn) | - |
 | Lateral boost | Shift+A/D, Q/E | light fighters | - |
-| Roll | Z / X | controls | - |
+| Roll | Ctrl+A / Ctrl+D (US-T445; A/D alone still strafe) | controls | - |
 | Flight assist | F | controls | - |
 | Flip (turn and burn) / broadside stance | Alt (hold) | controls / capital | - |
 | Drift | R (hold) | fighters, launched craft | sg.Drift |
 | Reactor power | Left / Up / Right / Down (Shift: all to one) | controls | - |
-| Docking mode / drop a mine | Ctrl | freighters near a port / combat | - |
+| Docking mode (held) / drop a mine | Ctrl held / Ctrl+M (US-T445) | freighters near a port / combat | - |
 | Tactical cruise | J (hold) | helm, out of a fight | - |
 | Cruise drive (spool, drop out) | Shift+J | helm | dev menu > Travel |
 | Lane: come off / carry on | 1 / 2-9 | on a lane | - |

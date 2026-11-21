@@ -423,7 +423,7 @@ namespace SpaceGod
 			flightFeel.Kick(); // US-T170: the broadside goes out and the whole hull shudders with it
 		}
 		helmTriggerWas = helm && unit->PlayerFireHeld;
-		// The rest of the arsenal (U.SPC-T271): the EMP on the middle button, a mine on Ctrl; an auto turret needs no hand.
+		// The rest of the arsenal (U.SPC-T271): the EMP on the middle button, a mine on Ctrl+M (US-T445); an auto turret needs no hand.
 		unit->PlayerEmpHeld = Input.FireEmp && armed;
 		if (Input.DropMine && armed) unit->PlayerMineRequested = true;
 		// A hauler's Ctrl in a fight (US-T170), outside a port's approach where it is docking mode: flares and chaff from
@@ -465,7 +465,7 @@ namespace SpaceGod
 		// Roll the weak shield patches away from the heaviest fire, on a capital with patches to choose between (U.SPC-T502).
 		if (Input.ToggleRollPatches && PilotControlMode == Core::PilotControl::Helm && Core::Broadsides::Commands(unit) && Core::WeakPatches::HasPatches(unit->Combat))
 			ShowToast(Core::WeakPatches::ToggleOrder(unit)
-				? "Helm: roll our weak patches away from their fire (steer as you like; Z/X overrides it while held)"
+				? "Helm: roll our weak patches away from their fire (steer as you like; Ctrl+A/D overrides it while held)"
 				: "Helm: the roll is yours");
 	}
 

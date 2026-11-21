@@ -132,7 +132,7 @@ namespace SpaceGod::Input
 	namespace
 	{
 		using namespace KeyContext;
-		constexpr int S = KeyMods::Shift, A = KeyMods::Alt;
+		constexpr int S = KeyMods::Shift, A = KeyMods::Alt, C = KeyMods::Ctrl;
 		constexpr bool HeldAct = true, EdgeKind = false;
 
 		InputBinding Pad(PadButton b) { return InputBinding::OfPad(b); }
@@ -162,8 +162,8 @@ namespace SpaceGod::Input
 				{ KeyAction::Boost, "boost", "Move: boost", Both, HeldAct, { Key::LeftShift, Key::RightShift, Pad(PadButton::A) }, "Held: boost (and the hard boost of a fighter)." },
 				{ KeyAction::Slow, "slow", "Move: fine / docking", Both, HeldAct, { Key::LeftCtrl, Key::RightCtrl }, "Held: fine movement; a freighter's docking mode in a port's approach." },
 
-				{ KeyAction::RollLeft, "rollLeft", "Flight: roll left", Controls, HeldAct, { Key::Z, Pad(PadButton::LeftBumper) }, "Held: roll anticlockwise. (In command the pad's bumper sinks the camera instead.)" },
-				{ KeyAction::RollRight, "rollRight", "Flight: roll right", Controls, HeldAct, { Key::X, Pad(PadButton::RightBumper) }, "Held: roll clockwise. (In command the pad's bumper raises the camera instead.)" },
+				{ KeyAction::RollLeft, "rollLeft", "Flight: roll left", Controls, HeldAct, { InputBinding(Key::A, C), Pad(PadButton::LeftBumper) }, "Held: roll anticlockwise (US-T445: Ctrl+A; A alone still strafes). (In command the pad's bumper sinks the camera instead.)" },
+				{ KeyAction::RollRight, "rollRight", "Flight: roll right", Controls, HeldAct, { InputBinding(Key::D, C), Pad(PadButton::RightBumper) }, "Held: roll clockwise (US-T445: Ctrl+D; D alone still strafes). (In command the pad's bumper raises the camera instead.)" },
 				{ KeyAction::Manoeuvre, "manoeuvre", "Flight: flip (manoeuvre)", Controls, HeldAct, { Key::LeftAlt, Key::RightAlt, Pad(PadButton::X) }, "Held: swing the nose onto the retrograde for a turn and burn; a capital's broadside stance." },
 				{ KeyAction::Cruise, "cruise", "Flight: tactical cruise", Controls, HeldAct, { Key::J }, "Held: the stronger drive tier, out of a fight." },
 				{ KeyAction::SystemCruise, "systemCruise", "Flight: cruise drive", Controls, EdgeKind, { InputBinding(Key::J, S) }, "Spool the in-system cruise drive for what the nose is on, or drop out of it." },
@@ -176,7 +176,7 @@ namespace SpaceGod::Input
 				{ KeyAction::LockTarget, "lockTarget", "Combat: lock target", Controls, EdgeKind, { Key::T, Pad(PadButton::Y) }, "Lock (or clear) the hull under the mouse or selected." },
 				{ KeyAction::LockAttacker, "lockAttacker", "Combat: lock attacker", Controls, EdgeKind, { InputBinding(Key::B, S) }, "Lock the hostile engaging you, nearest first; again for the next one engaging you. With nobody on you, the nearest hostile." }, // US-T307
 				{ KeyAction::Tractor, "tractor", "Combat: tractor beam", Controls, EdgeKind, { InputBinding(Key::T, S) }, "The tractor beam on the nearest cargo pod in reach, or off." },
-				{ KeyAction::DropMine, "dropMine", "Combat: drop mine", Controls, EdgeKind, { Key::LeftCtrl, Key::RightCtrl }, "In a fight: a mine dropped astern." },
+				{ KeyAction::DropMine, "dropMine", "Combat: drop mine", Controls, EdgeKind, { InputBinding(Key::M, C) }, "In a fight: a mine dropped astern (US-T445: Ctrl+M; Ctrl is the roll's modifier now)." },
 				{ KeyAction::TunePhasers, "tunePhasers", "Combat: tune phasers", Controls, EdgeKind, { Key::Insert }, "Retune the phaser arrays: a narrow lance or a wide sweep." },
 				{ KeyAction::RunHot, "runHot", "Combat: run hot", Controls, EdgeKind, { InputBinding(Key::Insert, S) }, "At a big ship's helm: the crew runs the guns and drive hot, or throttles down." },
 				{ KeyAction::SensorPing, "sensorPing", "Sensors: active ping", Controls, EdgeKind, { Key::Tab }, "An active ping (at a void stop too)." },
@@ -407,6 +407,36 @@ namespace SpaceGod::Input
 			return false;
 		}
 
+		/// US-T445: a held binding stands aside while another held action live in the same place has a binding on the same
+		/// input needing more of the modifiers held, and they are (Ctrl+A held rolls; A's plain strafe stands aside). And a
+		/// modifier key bound on its own (Ctrl held: fine movement) stands aside while it is the modifier of such a more
+		/// specific held binding whose input is down (Ctrl+A held is a roll, not a slow strafe).
+		bool HeldPreEmpted(KeyAction action, const InputBinding& c, int held, const InputDevice& kb)
+		{
+			if (!c.UsesMods()) return false;
+			int context = Info(action).context;
+			int asMod = KeyMods::None;
+			if (c.source == BindSource::Key && c.mods == KeyMods::None)
+			{
+				Key k = c.AsKey();
+				asMod = k == Key::LeftCtrl || k == Key::RightCtrl ? KeyMods::Ctrl : k == Key::LeftShift || k == Key::RightShift ? KeyMods::Shift
+					: k == Key::LeftAlt || k == Key::RightAlt ? KeyMods::Alt : KeyMods::None;
+			}
+			for (const ActionInfo& other : Actions())
+			{
+				if (other.action == action || !other.held || (other.context & context) == 0) continue;
+				for (const InputBinding& o : KeyBindings::Binding(other.action)->Value)
+				{
+					if (o.Empty() || !o.UsesMods() || (held & o.mods) != o.mods) continue;
+					// The same input with more modifiers, all held.
+					if (o.source == c.source && o.code == c.code && o.mods != c.mods && (o.mods & c.mods) == c.mods) return true;
+					// This modifier key, as the modifier of a more specific held key binding that is down.
+					if (asMod != KeyMods::None && o.source == BindSource::Key && (o.mods & asMod) != 0 && kb[o.AsKey()].isPressed) return true;
+				}
+			}
+			return false;
+		}
+
 		/// While a menu has the pad (Gamepad::MenuMode) its bindings stand aside: it moves the menu's focus instead.
 		int DefaultSources() { return Gamepad::MenuMode ? BindSources::KeyboardMouse : BindSources::All; }
 
@@ -492,7 +522,7 @@ namespace SpaceGod::Input
 		{
 			const InputBinding& b = setting.Value[i];
 			if (b.Empty() || (SourceBit(b) & sources) == 0) continue;
-			if (Evaluate(action, i, setting, kb, pad, held).held) return true;
+			if (Evaluate(action, i, setting, kb, pad, held).held && !(kb.present && HeldPreEmpted(action, b, held, kb))) return true;
 		}
 		return false;
 	}

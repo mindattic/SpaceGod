@@ -1044,7 +1044,7 @@ namespace SpaceGod
 		if (CoopHelmMine()) Select(t); // US-T44 (US-T43): the holder's view (every peer flies the helm, one watches from it)
 		if (CoopHelmMine()) SpaceCamera->EnterPilotChase(t, 6); // US-T44
 		Clock->SetWarp(0);
-		ShowToast(cs::Cat("Piloting ", ship->Name, ", ", Clock->Warp().Label, "  (", HelmControls::Of(ship).Hint(), "; P to release, . to speed up, Left-click to fire, T to lock a target, Z/X to roll, F flight assist, hold J to cruise)"));
+		ShowToast(cs::Cat("Piloting ", ship->Name, ", ", Clock->Warp().Label, "  (", HelmControls::Of(ship).Hint(), "; P to release, . to speed up, Left-click to fire, T to lock a target, Ctrl+A/D to roll, F flight assist, hold J to cruise)"));
 		if (riding)
 		{
 			BeginRide(ship, false);

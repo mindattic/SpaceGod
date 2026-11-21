@@ -333,8 +333,9 @@ namespace SpaceGod::Coop::CoopSmoke
 					app.CoopHelmSeat(), ") at frame ", peer.Frame(), "; flies it"));
 				script->Hold(Input::Key::W);
 				break;
-			case 760: script->Hold(Input::Key::X); break;
-			case 780: script->Release(Input::Key::X); break;
+			// US-T445: the roll is Ctrl+D now (Z/X freed).
+			case 760: script->Hold(Input::Key::LeftCtrl); script->Hold(Input::Key::D); break;
+			case 780: script->Release(Input::Key::D); script->Release(Input::Key::LeftCtrl); break;
 			case 820:
 				script->Tap(Input::Key::F); // flight assist off, in the pilot loop on every peer
 				break;
@@ -559,6 +560,9 @@ namespace SpaceGod::Coop::CoopSmoke
 			script->Tap(Input::Key::Digit7);
 		}
 		else if (fighter != nullptr && n == fighterFrom + 80) script->Tap(Input::Key::F);
-		else if (fighter != nullptr && n == fighterFrom + 100) script->Tap(Input::Key::LeftCtrl);
+		// US-T445: a mine is Ctrl+M now.
+		else if (fighter != nullptr && n == fighterFrom + 100) script->Hold(Input::Key::LeftCtrl);
+		else if (fighter != nullptr && n == fighterFrom + 101) script->Tap(Input::Key::M);
+		else if (fighter != nullptr && n == fighterFrom + 103) script->Release(Input::Key::LeftCtrl);
 	}
 }
