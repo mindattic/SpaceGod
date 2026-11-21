@@ -1086,7 +1086,8 @@ namespace SpaceGod
 				shipStates[i] = st;
 				// US-T213: a hull in a battle is where its unit fights (the battle's anchor plus its place in it), not at the
 				// point its schedule holds, so the HUD's altitude and anything reading ShipStateOf see the fight's true place.
-				if (ship->Battle != nullptr && World()->Law != nullptr)
+				// US-T424: not while a hold plays back a moment before the fight began (it is where its schedule had it then).
+				if (ship->Battle != nullptr && World()->Law != nullptr && !HoldRewindBeforeFight(ship->Battle))
 					if (auto u = ship->Battle->UnitOf(ship))
 						shipStates[i].HelioKm = World()->Law->BattleHelio(ship->Battle, jd) + u->Pos;
 
@@ -1182,12 +1183,16 @@ namespace SpaceGod
 			auto ship = ships[i];
 			if (ship->Destroyed) continue;
 			auto battle = ship->Battle;
+			// US-T424: a hold playing back a moment before this fight began draws the ship out of it (blending back to its
+			// schedule as it blended in); the hull flown where the helm's track has it, at once.
+			bool flown = ship == World()->PilotedShip;
+			if (battle != nullptr && HoldRewindBeforeFight(battle)) battle = nullptr;
 			int body = battle != nullptr ? battle->Body : ship->Controller()->Orbit->Body;
 			if (battle != shipLastBattle[i])
 			{
 				auto current = DrawnScene(i);
 				shipBlendFrom[i] = current - bodyScene[body];
-				shipBlendT[i] = 0;
+				shipBlendT[i] = flown && HoldRewindActive() ? 1.0f : 0.0f;
 				shipLastBattle[i] = battle;
 			}
 			if (battle != nullptr)

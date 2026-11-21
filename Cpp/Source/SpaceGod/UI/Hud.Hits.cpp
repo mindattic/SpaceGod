@@ -9,6 +9,8 @@
 #include "Camera/SpaceCamera.h"
 #include "Camera/StarTravel.h"
 #include "Combat/Battle.h"
+#include "Combat/War.h" // US-T424: a fight taken back
+#include "World.h"
 #include "Combat/CombatSpecs.h"
 #include "Combat/CombatState.h"
 #include "Combat/Dogfighting.h"
@@ -624,6 +626,10 @@ namespace SpaceGod::UI
 		auto me = app->Travel->Active ? nullptr : HeldUnit(battle);
 		if (me == nullptr || battle == nullptr || me->Combat == nullptr)
 		{
+			// US-T424: a fight a hold rewind took back (not over, yet no longer the war's) never happened: no report of it.
+			bool takenBack = hitBattle != nullptr && !hitBattle->Over && app->World() != nullptr && app->World()->War != nullptr &&
+				!app->World()->War->Battles.Contains(hitBattle);
+			if (takenBack) hitTallyDone = true;
 			if (hitBattle != nullptr && hitUnit != nullptr) CloseHitTally(hitBattle, hitUnit, now);
 			DrawAfterAction(now);
 			hitBattle = nullptr;

@@ -58,6 +58,8 @@
 #include "Embodiment/MountedTurret.h" // US-T414: the full type, so Ref<MountedTurret> converts to Ref<IEmbodiable>
 #include "Embodiment/MechWalker.h" // US-T416: a deployed mech's state, captured by value
 #include "Fleet.h" // US-T418: the fleet's comings and goings through the gates
+#include "BodyCatalog.h" // US-T424: the birth check's hull, off Uranus
+#include "BodyDefinition.h"
 #include "Misc/Paths.h" // US-T419: the self-test's screenshots
 #include "UnrealClient.h"
 #include "Session/ISession.h" // US-T414: the session's refusal events, for the self-test's diagnosis
@@ -262,7 +264,7 @@ namespace SpaceGod
 		/// <summary>In words, what changed between two censuses (the barrier's reason).</summary>
 		cs::String HrWhyChanged(const HrCensus& a, const HrCensus& b)
 		{
-			if (a.Fight != b.Fight) return "another fight came into view";
+			if (a.Fight != b.Fight) return b.Fight == nullptr ? "the fight was left behind" : "another fight came into view";
 			if (a.Over != b.Over) return "the fight ended";
 			if (a.Coop != b.Coop) return "a player took or let go of a seat or the helm"; // US-T423
 			// US-T414: Ship is now whichever hull the player is aboard by any seat (HeldSeat, not just the helm),
@@ -609,6 +611,13 @@ namespace SpaceGod
 			// it (before the switch to a turret), and whether the resume landed there or was blocked by a barrier.
 			cs::Ref<Ship> SeatShip;
 			double SeatMarkT = -1;
+			/// <summary>US-T424: the birth check (sg.HoldRewind selftest birth): a hull flown off Uranus with no fight, a
+			/// fight then begun on it, and a hold back to before it began. The moment marked before, the fight's number and
+			/// name, and whether the playback was seen drawing the moment before it.</summary>
+			bool Birth = false, SawUnborn = false;
+			double BirthMarkT = HrNone;
+			int BirthId = -1;
+			cs::String BirthName;
 		};
 	}
 
@@ -620,6 +629,11 @@ namespace SpaceGod
 
 		cs::Ref<Battle> Fight;
 		double FightSince = 0;
+		/// <summary>US-T424: the fight watched since EnteredT, entered with none watched before (UndoFightStart): the resume
+		/// points kept before it (the helm's) are kept, and whether it was born then (BornS) or was already under way.</summary>
+		cs::Ref<Battle> Entered;
+		double EnteredT = HrNone;
+		bool EnteredBorn = false;
 		std::unordered_map<const BattleUnit*, HrTrack<BattleUnit>> Units;
 		std::unordered_map<const Missile*, HrTrack<Missile>> Missiles;
 		std::unordered_map<const KineticRound*, HrTrack<KineticRound>> Rounds;
@@ -724,6 +738,13 @@ namespace SpaceGod
 		if (h.ShipCameAt[i] != HrNone && h.Tau < h.ShipCameAt[i]) return false;
 		if (h.ShipGoneAt[i] != HrNone && h.Tau < h.ShipGoneAt[i]) return true;
 		return shownNow;
+	}
+
+	bool UnitySpaceApp::HoldRewindBeforeFight(const cs::Ref<Battle>& battle) const
+	{
+		if (holdRewind == nullptr || !holdRewind->Active || battle == nullptr) return false;
+		const auto& h = *holdRewind;
+		return h.EnteredBorn && h.Entered == battle && h.Tau < h.EnteredT;
 	}
 
 	bool UnitySpaceApp::HoldRewindJustResumed() const { return holdRewind != nullptr && holdRewind->JustResumed > 0; }
@@ -1095,14 +1116,22 @@ namespace SpaceGod
 		auto fight = !coop ? HoldRewindBattle() : coopHrFight != nullptr && !coopHrFight->Over ? coopHrFight : nullptr;
 		// US-T419: fought on since it would have ended (or put back to before): its end, if it comes again, starts afresh.
 		if (h.Hooked == nullptr || !h.Hooked->EndHeld) h.EndHeldSince = HrNone;
+		bool entering = false;
 		if (fight != h.Fight)
 		{
-			// Another fight (or none): its tracks start now, and nothing before now can be played on from.
+			// Another fight (or none): its tracks start now, and nothing before now can be played on from...
 			h.Units.clear();
 			h.Missiles.clear();
 			h.Rounds.clear();
 			h.Decoys.clear();
-			h.Anchors.clear();
+			// ...US-T424: unless it is the first fight watched since none was: then the helm's resume points before it stay,
+			// and a resume to one of them takes the fight back if it was born now (or lets the hull go of it, or leaves a
+			// fight that only came into view going on from now).
+			entering = HrTuning::UndoFightStart && !coop && h.Fight == nullptr && fight != nullptr;
+			h.Entered = entering ? fight : nullptr;
+			h.EnteredT = entering ? t : HrNone;
+			h.EnteredBorn = entering && fight->Seconds <= HrTuning::BornS && World()->War != nullptr && World()->War->Battles.Contains(fight);
+			if (!entering) h.Anchors.clear();
 			h.Fight = fight;
 			h.FightSince = t;
 			h.NextAnchorAt = 0;
@@ -1111,9 +1140,24 @@ namespace SpaceGod
 		HookHoldRewindBookings(fight);
 		HrCensus census = HrTakeCensus(fight, bodyShip, pilotFrameBody, piloting);
 		if (coop) census.Coop = CoopHoldRewindSeats();
-		if (h.HasLast && !(census == h.Last))
+		// US-T424: the fight entered is no barrier (only what else changed this frame): the census before it counted none.
+		HrCensus was = h.Last;
+		if (entering)
 		{
-			h.BarrierWhy = HrWhyChanged(h.Last, census);
+			was.Fight = census.Fight;
+			was.Over = census.Over;
+			was.Units = census.Units;
+			was.Dead = census.Dead;
+			was.Fled = census.Fled;
+			was.Struck = census.Struck;
+			was.Taken = census.Taken;
+			was.Lost = census.Lost;
+			was.Seats = census.Seats;
+			was.Flags = census.Flags;
+		}
+		if (h.HasLast && !(census == was))
+		{
+			h.BarrierWhy = HrWhyChanged(was, census);
 			h.BarrierT = t;
 		}
 		h.Last = census;
@@ -1419,7 +1463,8 @@ namespace SpaceGod
 				s = a.S + (it->S - a.S) * f;
 				jd = a.Jd + (it->Jd - a.Jd) * f;
 			}
-			if (h.Fight != nullptr) h.Fight->Seconds = s;
+			// US-T424: before the fight was entered the marks hold no clock of it (it stays at its first, put back on letting go).
+			if (h.Fight != nullptr && (h.EnteredT == HrNone || tau >= h.EnteredT)) h.Fight->Seconds = s;
 			if (HrTuning::ViewSystemBack && Clock != nullptr && jd > 0)
 			{
 				Clock->SetJd(jd);
@@ -1437,6 +1482,10 @@ namespace SpaceGod
 		}
 		if (h.Fight != nullptr)
 		{
+			// US-T424: before a fight born in the window began, none of it is there (its ships are drawn on their schedules,
+			// HoldRewindBeforeFight; the hull flown on the helm's track).
+			bool unborn = HoldRewindBeforeFight(h.Fight);
+			auto flown = IsPiloting() ? World()->PilotedShip : nullptr;
 			for (const auto& u : h.Fight->Units)
 			{
 				if (u == nullptr) continue;
@@ -1446,7 +1495,8 @@ namespace SpaceGod
 				HrPose p;
 				if (!HrPoseAt(poses, tau, p)) continue;
 				// A hull that came into the fight after its tracks began is not there yet before its first pose.
-				bool notYet = !poses.empty() && poses.front().T > h.FightSince + 0.5 && tau < poses.front().T;
+				bool notYet = (!poses.empty() && poses.front().T > h.FightSince + 0.5 && tau < poses.front().T) ||
+					(unborn && (flown == nullptr || u->Ship != flown));
 				u->Pos = p.Pos;
 				u->Vel = p.Vel;
 				u->Forward = p.Fwd;
@@ -1599,6 +1649,46 @@ namespace SpaceGod
 			coopLog(cs::Cat("from the press (", h.BarrierWhy.empty() ? cs::String("nothing kept to play on from") : h.BarrierWhy, ")"));
 			return;
 		}
+		// US-T424: a resume point from before the fight watched was entered: the fight is taken back if it was born in the
+		// window, let go of by the hull if the hull joined one already under way, or (one that only came into view) left to
+		// go on from now; either way the helm plays on from back there, outside it.
+		cs::String beforeFight;
+		if (h.Entered != nullptr && h.Entered == h.Fight && best->T < h.EnteredT)
+		{
+			auto fight = h.Fight;
+			// What it held back never happened now; its hooks go back to the world's (nothing left to book).
+			while (!h.Bookings.empty() && h.Bookings.back().T > best->T) h.Bookings.pop_back();
+			HookHoldRewindBookings(nullptr);
+			if (h.EnteredBorn && World()->War != nullptr && World()->War->Unstart(fight, Clock->Jd))
+			{
+				if (battleTimeFor == fight) battleTimeFor = nullptr;
+				beforeFight = cs::Cat(": before ", fight->Name, " began");
+			}
+			else
+			{
+				// Under way before the hull came: it goes on as it was at the press (the playback moved its units).
+				if (atPress != nullptr) HrRestoreFight(*atPress);
+				auto ship = World()->PilotedShip;
+				auto mine = ship != nullptr && ship->Battle == fight ? fight->UnitOf(ship) : nullptr;
+				if (mine != nullptr)
+				{
+					// The hull joined it in the window: out of it again, as a hull that flew clear of a fight is.
+					mine->Fled = true;
+					ship->Battle = nullptr;
+					beforeFight = cs::Cat(": before you joined ", fight->Name);
+				}
+				else beforeFight = cs::Cat(": before ", fight->Name, " came into view (it goes on from now)");
+			}
+			h.Units.clear();
+			h.Missiles.clear();
+			h.Rounds.clear();
+			h.Decoys.clear();
+			h.Fight = nullptr;
+			h.Entered = nullptr;
+			h.EnteredT = HrNone;
+			h.EnteredBorn = false;
+			h.EndHeldSince = HrNone;
+		}
 		putBack(*best);
 		coopLog(cs::Cat("from ", cs::Fmt(h.PressT - best->T, "F2"), " s back", clamped ? cs::Cat(" (no further: ", h.BarrierWhy, ")") : cs::String()));
 		h.ResumeFx = h.PressFx - static_cast<float>(h.PressT - best->T);
@@ -1638,7 +1728,8 @@ namespace SpaceGod
 		rewindFrames.clear();
 		rewindKeySerial.clear();
 		ShowToast(cs::Cat("Rewound ", cs::Fmt(went, "F1"), " s", clamped ? cs::Cat(" (no further: ", h.BarrierWhy, ")") : cs::String(),
-			h.Fight == nullptr ? cs::String(": your hull's flight; the rest of the system goes on from now") : cs::String(": play on")));
+			!beforeFight.empty() ? beforeFight
+			: h.Fight == nullptr ? cs::String(": your hull's flight; the rest of the system goes on from now") : cs::String(": play on")));
 	}
 
 	void UnitySpaceApp::DrawHoldRewind()
@@ -1738,6 +1829,29 @@ namespace SpaceGod
 		UnityCompat::Debug::Log("HoldRewind selftest: started");
 	}
 
+	bool UnitySpaceApp::BeginHoldRewindBirthSelfTest()
+	{
+		if (holdRewind == nullptr) holdRewind = std::make_shared<HoldRewindState>();
+		auto uranus = (*Catalog())["Uranus"];
+		if (uranus == nullptr || World()->Sol == nullptr) return false;
+		// Held out where a fight there is laid out, as the main self-test's skirmish is.
+		auto dir = DVec3(1, 0.15, 0.4).Normalized();
+		auto ship = Fleet()->SpawnAt("Rewind Trial", ShipClass::Cruiser, World()->Sol, uranus->Index, dir * Battle::AnchorDistanceKm(uranus), -dir, Clock->Jd);
+		if (ship == nullptr) return false;
+		if (IsPiloting()) ExitPiloting();
+		EnterPiloting(Target::OfShip(ship));
+		auto& t = holdRewind->Test;
+		t = HrSelfTest();
+		t.On = true;
+		t.Birth = true;
+		t.SeatShip = ship;
+		t.Phase = 100;
+		t.PhaseWall = Time::realtimeSinceStartupAsDouble;
+		holdRewind->CooldownUntil = 0;
+		UnityCompat::Debug::Log("HoldRewind selftest: started (a fight born in the window)");
+		return IsPiloting();
+	}
+
 	bool UnitySpaceApp::HoldRewindSelfTestPassed() const { return holdRewind != nullptr && holdRewind->Test.Done && holdRewind->Test.Passed; }
 
 	bool UnitySpaceApp::HoldRewindSelfTestWantsKey() const { return holdRewind != nullptr && holdRewind->Test.On && holdRewind->Test.ForceDown; }
@@ -1780,6 +1894,115 @@ namespace SpaceGod
 		if (!rewindEnabled) return finish("rewind is off in this run (-capture, -demo or -norewind): run it without them");
 		if (Coop::CoopPeer::Current() != nullptr) return finish("rewind is single-player: run it outside co-op");
 		if (wall - t.PhaseWall > 60) return finish(cs::Cat("phase ", t.Phase, " timed out"));
+		// US-T419: the screen as drawn (the game's views and the readout), saved for a look: Saved/Screenshots/holdrewind-*.png.
+		auto shot = [](const char* name)
+		{
+			FString path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Screenshots"), FString::Printf(TEXT("holdrewind-%hs.png"), name));
+			FScreenshotRequest::RequestScreenshot(path, true, false);
+			UnityCompat::Debug::Log(cs::Cat("HoldRewind selftest: screenshot ", name));
+		};
+		// US-T424: the birth check, phases 100 to 104.
+		if (t.Birth)
+		{
+			auto ship = t.SeatShip;
+			if (ship == nullptr || ship->Destroyed) return finish("the hull flown for the birth check was lost");
+			auto start = [this, ship]() { return World()->War->TryStartPlayerBattle(ship, pilotFrameBody, pilotOffsetKm(), pilotForward(), Clock->Jd); };
+			switch (t.Phase)
+			{
+				case 100: // At the helm, no fight: fly 3 s, mark, then bring the enemy in and the fight begins.
+				{
+					if (!IsPiloting() || World()->PilotedShip != ship) return finish("not at the helm for the birth check");
+					if (h.Fight != nullptr) return finish(cs::Cat("a fight was already in view before the birth check: ", h.Fight->Name));
+					if (h.Pilot.empty() || h.LivedS - h.Pilot.front().T < 3.0) return true;
+					if (t.BirthMarkT == HrNone)
+					{
+						t.BirthMarkT = h.LivedS;
+						t.PhaseWall = wall;
+						return true;
+					}
+					if (wall - t.PhaseWall < 0.7) return true;
+					// A Reach squadron parked a few km off: hostile and armed, so the fight starts where the hull is.
+					auto uranus = (*Catalog())["Uranus"];
+					auto at = pilotOffsetKm();
+					for (int i = 0; i < 3; i++)
+						Fleet()->SpawnAt(cs::Cat("Rewind Trial Foe ", i + 1), i == 0 ? ShipClass::Cruiser : ShipClass::Destroyer, World()->Reach, uranus->Index,
+							at + DVec3(20 + i * 3, 4, 0), DVec3(-1, 0, 0), Clock->Jd);
+					auto fight = start();
+					if (fight == nullptr) return finish("the fight for the birth check did not start");
+					t.Fight = fight;
+					t.BirthId = fight->Id;
+					t.BirthName = fight->Name;
+					t.PhaseWall = wall;
+					t.Phase = 101;
+					return true;
+				}
+				case 101: // Born and watched: fight 2 s, then hold back to the mark.
+				{
+					if (h.Fight != t.Fight) return true;
+					if (h.LivedS - h.EnteredT < 2.0) return true;
+					selfCheck(h.Entered == t.Fight && h.EnteredBorn, "the fight begun on the hull is seen being born in the window");
+					selfCheck(h.EnteredT > t.BirthMarkT, "after the moment marked");
+					selfCheck(ship->Battle == t.Fight && World()->War->Battles.Contains(t.Fight), "and the hull is in it");
+					t.Target = t.BirthMarkT;
+					t.ForceDown = true;
+					t.SettleFrames = 0;
+					t.PhaseWall = wall;
+					t.Phase = 102;
+					return true;
+				}
+				case 102:
+				{
+					if (!h.Active) return true;
+					if (HoldRewindBeforeFight(t.Fight) && !t.SawUnborn)
+					{
+						t.SawUnborn = true;
+						shot("5-before-the-fight-held");
+						t.ShotWall = wall;
+					}
+					if (t.ShotWall >= 0 && wall - t.ShotWall < 0.4) return true;
+					if (h.Tau > std::max(t.BirthMarkT, h.Oldest) + 1e-6) return true;
+					if (++t.SettleFrames < 3) return true;
+					t.ShotWall = -1;
+					t.ForceDown = false;
+					t.HaveResume = false;
+					t.PhaseWall = wall;
+					t.Phase = 103;
+					return true;
+				}
+				case 103: // Played on from before it began: no fight, the hull free at its helm.
+				{
+					if (!t.HaveResume) return true;
+					selfCheck(t.SawUnborn, "the playback drew the moment before the fight began (its ships out of it)");
+					selfCheck(t.ResumedAnchorT <= t.BirthMarkT + HrTuning::AnchorS + 1e-6, "a fight born in the window does not block a resume to before it");
+					selfCheck(!World()->War->Battles.Contains(t.Fight), "the fight is taken back: the war no longer holds it");
+					selfCheck(ship->Battle == nullptr && IsPiloting() && World()->PilotedShip == ship, "the hull is out of it, still at its helm");
+					bool shipsFree = true;
+					for (const auto& u : t.Fight->Units)
+						if (u != nullptr && u->Ship != nullptr && u->Ship->Battle == t.Fight) shipsFree = false;
+					selfCheck(shipsFree, "and every ship that was in it is back on its own schedule");
+					int lines = 0;
+					for (const auto& e : World()->Events)
+						if (e.Jd >= t.Fight->StartJd - 1e-9 && e.Text.find(t.BirthName) != cs::String::npos) lines++;
+					selfCheck(lines == 0, "and the world's log no longer tells of it");
+					selfCheck(h.Fight == nullptr && HoldRewindBattle() == nullptr, "and the rewind watches no fight");
+					shot("6-before-the-fight");
+					t.PhaseWall = wall;
+					t.Phase = 104;
+					return true;
+				}
+				case 104: // The same hull and squadron fight again: the fight it starts is the same one, by number and name.
+				{
+					if (wall - t.PhaseWall < 1.0) return true;
+					auto again = ship->Battle != nullptr ? ship->Battle : start();
+					if (again == nullptr) return finish("the fight did not begin again after it was taken back");
+					selfCheck(again->Id == t.BirthId && again->Name == t.BirthName, cs::Cat("begun again, it is the same fight by number and name (",
+						again->Name, " #", again->Id, ", was ", t.BirthName, " #", t.BirthId, ")"));
+					return finish(cs::String());
+				}
+				default:
+					return finish("lost its place");
+			}
+		}
 		// (The last phase lets the fight end, once its end has waited out the window.)
 		if (t.Fight == nullptr || (t.Fight->Over && !(t.Phase == 17 && t.KilledAgainWall >= 0))) return finish("the fight ended before the test did");
 		// US-T419: every unit on the other side struck down by a real killing impact (the fight's own kill path).
@@ -1790,13 +2013,6 @@ namespace SpaceGod
 				if (u != nullptr && u->Present() && !u->Dead && u->Side != t.SeatUnit->Side) foes.push_back(u);
 			for (const auto& u : foes) t.Fight->ApplyImpact(u, u->Pos, 1e15);
 			return foes.size();
-		};
-		// US-T419: the screen as drawn (the game's views and the readout), saved for a look: Saved/Screenshots/holdrewind-*.png.
-		auto shot = [](const char* name)
-		{
-			FString path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Screenshots"), FString::Printf(TEXT("holdrewind-%hs.png"), name));
-			FScreenshotRequest::RequestScreenshot(path, true, false);
-			UnityCompat::Debug::Log(cs::Cat("HoldRewind selftest: screenshot ", name));
 		};
 		auto enemiesStanding = [&t]()
 		{

@@ -1282,6 +1282,8 @@ namespace SpaceGod::Core
 		gateBattles[gate] = n + 1;
 		cs::String name = cs::Cat((n == 0 ? cs::String("") : cs::Cat(Ordinal(n + 1), " ")), "Battle of the ", gate->Name);
 		auto b = cs::New<Battle>(nextBattleId++, root, name, gate->PositionKm, jd, rng.Next());
+		lastGateId = b->Id; // US-T424
+		lastGate = gate;
 		Hook(b);
 		auto approach = DVec3::Cross(gate->PositionKm.Normalized(), DVec3::UnitZ);
 		b->ApproachAxis = approach.LengthSquared() > 1e-6 ? approach.Normalized() : DVec3::UnitX;
@@ -1384,6 +1386,8 @@ namespace SpaceGod::Core
 		cs::String kind = concealed ? "Skirmish in " : "Battle of ";
 		cs::String name = (n == 0 ? kind : cs::Cat(Ordinal(n + 1), " ", kind)) + place;
 		auto b = cs::New<Battle>(nextBattleId++, body, name, anchor, jd, rng.Next());
+		lastNamedId = b->Id; // US-T424
+		lastNamedKey = key;
 		Hook(b);
 		auto approach = DVec3::Cross(anchor.Normalized(), DVec3::UnitZ);
 		if (approach.LengthSquared() < 1e-6) approach = DVec3::UnitX;
@@ -1588,6 +1592,48 @@ namespace SpaceGod::Core
 		if (u->Kind != UnitKind::Fighter && world->Outlaws != nullptr) world->Outlaws->OnHullLost(b, u, pod, reactor, jd);
 		c->Interior->TakeCrew(c->Interior->Crew());
 		c->Interior->TakeMarines(c->Interior->Marines());
+	}
+
+	// ---------------------------------------------------------------- a fight taken back (US-T424)
+
+	bool War::Unstart(const cs::Ref<Battle>& b, double jd)
+	{
+		if (b == nullptr || !Battles.Contains(b)) return false;
+		Battles.Remove(b);
+		for (const auto& u : b->Units)
+		{
+			if (u->Ship == nullptr || u->Ship->Battle != b) continue;
+			u->Ship->Battle = nullptr;
+			// Pulled out of a lane by the ambush's pulse: back in it and on its way (the player's own hull is the helm's).
+			if (u->Ship->Phase == ShipPhase::Adrift && u->Ship != world->PilotedShip) Fleet()->ResumeLane(u->Ship, jd);
+		}
+		// Its number, and the count its name took, given back while it is the newest battle (nothing has taken the next).
+		if (b->Id == nextBattleId - 1)
+		{
+			nextBattleId--;
+			int n = 0;
+			if (lastNamedId == b->Id && battleCount.TryGetValue(lastNamedKey, n))
+			{
+				if (n <= 1) battleCount.Remove(lastNamedKey);
+				else battleCount[lastNamedKey] = n - 1;
+			}
+			if (lastGateId == b->Id && lastGate != nullptr && gateBattles.TryGetValue(lastGate, n))
+			{
+				if (n <= 1) gateBattles.Remove(lastGate);
+				else gateBattles[lastGate] = n - 1;
+			}
+		}
+		lastNamedId = lastGateId = -1;
+		lastGate = nullptr;
+		// The log's line of its start (the starters name it; a gate ambush's line names the gate instead, and stays).
+		for (int i = world->Events.Count() - 1; i >= 0; i--)
+		{
+			const auto& e = world->Events[i];
+			if (e.Jd < b->StartJd - 1e-9) break;
+			if (e.Kind != WorldEventKind::Battle && e.Kind != WorldEventKind::Law) continue;
+			if (e.Text.find(b->Name) != cs::String::npos) world->Events.RemoveAt(i);
+		}
+		return true;
 	}
 
 	// ---------------------------------------------------------------- after the battle

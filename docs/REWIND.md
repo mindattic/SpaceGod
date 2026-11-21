@@ -662,16 +662,46 @@ the readout's centre line on every peer, and a co-op log line whenever who holds
   5.55 s back at frame 4232; fight digest 5BA426BB37DC518A`; 67 frames with both digests, 67 identical, no DESYNC, every
   smoke check passing. The single-player self-test is unchanged at 50/50.
 
+### A fight that began in the window (US-T424)
+
+A fight's start is no longer a barrier. Whole-world snapshots were not needed: a battle's creation touches the world
+in few places that last. Its ships are only marked as in it (`Join` and `AddShip` set `Ship::Battle` and place a
+unit; their schedules run on underneath), and the war lists it, numbers it, counts its name and logs its start.
+
+- **Entering a fight.** When the rewind starts watching a fight with none watched before (`UndoFightStart`), the
+  helm's resume points from before it are kept (another fight replacing one still clears them, a barrier as before),
+  and the fight entered is not a census change. It was **born** then if it had fought no more than `BornS` (1 s) of
+  its own clock and the war holds it.
+- **Playing back past the start.** Before a born fight began (`HoldRewindBeforeFight`) none of it is drawn: its
+  ships blend back to where their schedules had them (the same 2 s blend they entered it with), its other units are
+  hidden, and the hull flown follows the helm's track at once. The fight's clock stays at its first moment.
+- **Playing on from before it.** A born fight is taken back: `War::Unstart` takes it off the war's list unresolved (no
+  `BattleEnded`, nothing booked), clears every ship's `Battle` (a hull an ambush pulled out of a lane goes back into
+  it), gives back its number and its name's count while nothing has come after it, and removes its start from the
+  world's log. Its held-back bookings were all from after the resume point, so they are dropped, and its hooks go
+  back to the world's. The helm plays on from the resume point, outside any fight. If the hull is still where the
+  fight found it, the fight begins again, as the same battle by number and name.
+- **Not born there.** A fight already under way when the hull joined it lets the hull go (out of it, as a hull that
+  flew clear is), and one that only came into view goes on from now (its units, moved by the playback, are put back
+  as they were at the press). Either way the helm plays on from back there.
+- **What stays.** What the start set off elsewhere: the danger it raised at the body, and traders already turned away
+  round it (`World::DivertAround`). Single-player only: in co-op entering a fight still clears the resume points
+  (the barrier as before).
+- **Proved** by `sg.HoldRewind selftest birth quit`. It takes the helm of a cruiser spawned off Uranus with no fight
+  about, flies 3 s, marks a moment, and brings a Reach squadron alongside so the fight begins on the hull. After 2 s
+  of fighting it holds back to the mark. The checks: the fight was seen born after the mark; the playback drew the
+  moment before it (screenshot `holdrewind-5-before-the-fight-held.png`); the resume point is at the mark; the war no
+  longer holds the fight; the hull is out of it and still at its helm; every ship that was in it is back on its
+  schedule; the world's log no longer tells of it; the rewind watches no fight. Begun again, it is the same fight by
+  number and name.
+
 ### Not yet (later stages)
 
-- A fight that **started** in the window (flying into one, or one coming into view): the rewind cannot go back past
-  its start. A battle's creation is spread over about ten war entry points (`TryStart*`, `Enforce`, `StrikeAt`,
-  gate ambushes...), each drawing on the war's random numbers, numbering the battle, pulling ships in (`Join`) and
-  writing the world's log and news; undoing it means either whole-world snapshots or the US-T99 save-based rewind.
 - A ship that changed phase (left an orbit, joined a lane) in the window is still drawn where its *current* phase
   puts it at the past `jd`, as a ship's analytic state is a snapshot of now, overwritten at every phase change.
-- Reversed effects (an FTL flash collapsing into a hull, an explosion contracting), the hull sections' damage stage,
-  the reversed audio bed. (A hold in co-op: US-T423.)
+- The hull sections' damage stage, and the reversed audio bed. (Reversed battle effects: US-T421; a hold in co-op:
+  US-T423; a fight that began in the window: US-T424, single-player.)
+- A fight left (the hull flew clear, or the fight went out of view) is still a barrier.
 
 ## Parked: checkpoint loops with ghost replays (US-T169)
 

@@ -39,6 +39,13 @@ public:
 		/// fight a mop-up meanwhile with its outcome shown, so a hold can undo it; the war settles it (loot, the ships let
 		/// go) once the moment is older than the window. False: it ends at once, a barrier.</summary>
 		static constexpr bool DeferFightEnd = true;
+		/// <summary>US-T424: true: a fight that began in the window (flown into, or sprung on you) is no barrier: a hold
+		/// back past its start takes it back (War::Unstart: its ships to their schedules, as if it had not begun), and play
+		/// goes on from the helm's resume point before it; a fight that only came into view (already under way) goes on from
+		/// now while the helm goes back, and one the hull joined lets it go again. False: its start is a barrier.</summary>
+		static constexpr bool UndoFightStart = true;
+		/// <summary>US-T424: a fight first seen with no more than this many of its own seconds fought was born then.</summary>
+		static constexpr double BornS = 1.0;
 		/// <summary>US-T410: true: while held, the whole system is drawn as it was (the world clock set back for the drawing
 		/// only: planets, ships in orbit and on the lanes, gates), and put back to now on letting go.</summary>
 		static constexpr bool ViewSystemBack = true;
@@ -80,10 +87,17 @@ public:
 	/// hidden; otherwise <paramref name="shownNow"/>.</summary>
 	bool HoldRewindShipShown(int index, bool shownNow) const;
 
+	/// <summary>US-T424: true while a hold plays back a moment before <paramref name="battle"/> began (a fight born in the
+	/// window): its ships are drawn where their schedules had them, not in it, and its other units not at all.</summary>
+	bool HoldRewindBeforeFight(const cs::Ref<Core::Battle>& battle) const;
+
 	/// <summary>US-T410: the self-test (sg.HoldRewind selftest): watches <paramref name="fight"/>, then drives the hold by
 	/// itself and checks the resumed state, the floor, the cooldown and the ease. Each frame's <see cref="TickHoldRewindSelfTest"/>
 	/// says whether it is still running; the summary line is "HoldRewind selftest: PASS|FAIL (n checks, m failed)".</summary>
 	void BeginHoldRewindSelfTest(const cs::Ref<Core::Battle>& fight);
+	/// <summary>US-T424: the birth check (sg.HoldRewind selftest birth): takes the helm of a hull spawned off Uranus with no
+	/// fight about, then begins one on it and holds back to before it began. False if it could not be set up.</summary>
+	bool BeginHoldRewindBirthSelfTest();
 	bool TickHoldRewindSelfTest();
 	/// <summary>US-T410: the self-test's last verdict (true: every check passed).</summary>
 	bool HoldRewindSelfTestPassed() const;

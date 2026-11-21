@@ -176,6 +176,12 @@ namespace SpaceGod::Core
 		double warStartJd = 0, ceasefireUntilJd = -1;
 		int nextBattleId = 0, builtWarships = 0;
 
+		/// <summary>US-T424: the name count (battleCount's key) and gate count the newest battle took, so Unstart can give them
+		/// back. Not saved: a load starts with none, and Unstart then leaves the counts as they are.</summary>
+		int lastNamedId = -1, lastNamedKey = 0;
+		int lastGateId = -1;
+		cs::Ref<JumpGate> lastGate;
+
 	public:
 		/// <summary>Raised when a battle begins (the app may want to slow time or point the camera).</summary>
 		cs::Event<cs::Ref<Battle>> BattleStarted;
@@ -240,6 +246,15 @@ namespace SpaceGod::Core
 		cs::Ref<Battle> BattleAt(int body) const;
 
 		cs::Ref<GroupOrder> OrderOf(const cs::Ref<Ship>& leader) const;
+
+		/// <summary>US-T424: takes back a fight that began only moments ago, as if it had not begun: it leaves the war's list
+		/// unresolved (no BattleEnded, nothing booked of it), every ship still in it goes back to its own schedule (one an
+		/// ambush pulled out of a lane back into it), and the battle's number, its name's count and its "has begun" line in
+		/// the world's log are taken back where nothing has come after them. What it set off elsewhere stays (the danger
+		/// it raised at the body, traders already turned away round it). Only the game's hold rewind calls this, on a fight
+		/// it watched being born inside its window and with nothing booked of it since; never the Bench. False if the war
+		/// does not hold it.</summary>
+		bool Unstart(const cs::Ref<Battle>& b, double jd);
 
 		// ---------------------------------------------------------------- per frame
 

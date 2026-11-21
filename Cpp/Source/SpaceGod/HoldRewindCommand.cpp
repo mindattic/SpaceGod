@@ -7,6 +7,10 @@
 // is "HoldRewind selftest: PASS|FAIL (n checks, m failed)". With quit the game exits after it (status 0 on a pass).
 //
 //   ./tools/play.ps1 -Offscreen -Capture '' -Seconds 300 -ExecCmds "sg.HoldRewind selftest quit"
+//
+// US-T424: "sg.HoldRewind selftest birth quit" checks a fight born in the window instead: a hull flown off Uranus with no
+// fight about, a fight begun on it, a hold back to before it began (the fight taken back, the hull free at its helm), and
+// the fight begun again being the same one by number and name.
 
 #include "UnitySpaceApp.h"
 
@@ -74,6 +78,9 @@ namespace
 	struct SelfTestRun
 	{
 		bool Quit = false, AskedNewGame = false, Began = false;
+		/// <summary>US-T424: "birth": the check of a fight born in the window (a hull flown off Uranus, a fight begun on
+		/// it, a hold back to before it began) instead of the fight-long one.</summary>
+		bool Birth = false;
 		double Started = FPlatformTime::Seconds();
 		cs::Ref<Battle> Fight;
 
@@ -153,6 +160,21 @@ namespace
 				return now - Started < 180.0 || Finish(false, TEXT("no game came up"));
 			}
 			if (now - Started < 3.0) return true;
+			if (!Began && Birth)
+			{
+				app->Clock->SetPaused(false);
+				app->Clock->SetWarp(0);
+				if (!app->BeginHoldRewindBirthSelfTest()) return Finish(false, TEXT("could not take the helm for the birth check"));
+				app->SetHoldRewindSelfTestRealKeys(true);
+				if (auto* actor = HoldRewindActor())
+				{
+					WasScripted = actor->bScriptedInput;
+					actor->bScriptedInput = false;
+				}
+				Began = true;
+				UE_LOG(LogSpaceGod, Display, TEXT("sg.HoldRewind selftest birth: at the helm off Uranus"));
+				return true;
+			}
 			if (!Began)
 			{
 				auto uranus = (*app->Catalog())["Uranus"];
@@ -209,7 +231,10 @@ namespace
 			}
 			auto run = std::make_shared<SelfTestRun>();
 			for (int i = 1; i < args.Num(); i++)
+			{
 				if (args[i].Equals(TEXT("quit"), ESearchCase::IgnoreCase)) run->Quit = true;
+				if (args[i].Equals(TEXT("birth"), ESearchCase::IgnoreCase)) run->Birth = true;
+			}
 			FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([run](float)
 			{
 				try { return run->Tick(); }
