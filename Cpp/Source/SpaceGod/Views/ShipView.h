@@ -135,7 +135,7 @@ namespace SpaceGod::Views
 
 		// ---------------------------------------------------------------- per frame
 
-		void Apply(Vector3 relative, Quaternion rotation, float length, bool burning, bool highlighted);
+		void Apply(Vector3 relative, Quaternion rotation, float length, bool burning, float highlight);
 
 		/// <summary>
 		/// The middle of the hull as drawn (the box round its hull meshes: sections, an imported craft's parts, a

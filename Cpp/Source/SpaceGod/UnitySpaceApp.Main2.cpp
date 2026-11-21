@@ -1456,7 +1456,8 @@ namespace SpaceGod
 		fovKick *= Mathf::Exp(-dt * 3.5f);
 		GateFlash = Mathf::Max(0.0f, GateFlash - dt / GateFlashS);
 		LaneExitFade = Mathf::Max(0.0f, LaneExitFade - dt / LaneExitFadeS);
-		UnityCamera->fieldOfView = Mathf::Clamp(cameraFov + fovKick + Travel->FovKick() - HelmFoldDeg * HelmGateFold(), 10.0f, 150.0f);
+		// US-T446: and breathes a touch narrower as the SpaceGod goes into a seat, wider as it lets go.
+		UnityCamera->fieldOfView = Mathf::Clamp(cameraFov + fovKick + Travel->FovKick() - HelmFoldDeg * HelmGateFold() - PossessionFovBreath(), 10.0f, 150.0f);
 	}
 
 	Vector3 UnitySpaceApp::Relative(Core::DVec3 scene)
@@ -1562,6 +1563,7 @@ namespace SpaceGod
 			ClearAtmosphere();
 			return;
 		}
+		UpdatePossession(); // US-T446: what is held against last frame, the show's clock, the possessed view's ease
 		UpdateLights();
 		auto forward = SpaceCamera->Rotation * Vector3::forward();
 		double pixelsPerUnit = PixelsPerUnitAtUnitDistance();
@@ -1589,6 +1591,8 @@ namespace SpaceGod
 			if (shipViews[i] == nullptr) continue;
 			// US-T418: a hold playing the past back draws a ship that came in during it as not there yet...
 			if (!HoldRewindShipShown(i, true)) { shipViews[i]->SetVisible(false); continue; }
+			// US-T446: possessed, only what the pilot perceives is drawn (its picture's live tracks, what is close enough to see).
+			if (!PerceivesShipModel(i)) { shipViews[i]->SetVisible(false); continue; }
 			// ...and one that went out through a gate during it as still on its way there (drawn as any live hull below).
 			bool backFromGate = ship->Destroyed && ship->GateDeparted && HoldRewindShipShown(i, false);
 			if (ship->Destroyed && !backFromGate)
@@ -1636,8 +1640,9 @@ namespace SpaceGod
 			auto target = Target::OfShip(ship);
 			auto unit = ship->Battle ? ship->Battle->UnitOf(ship) : nullptr;
 			bool thrusting = shipStates[i].Burning || (unit != nullptr && unit->Vel.LengthSquared() > 1e-4);
+			// US-T446: the hull possessed has its own rim lit as the energy seeps in.
 			shipViews[i]->Apply(rel, shipRotation[i], static_cast<float>(shipLength[i]), shipStates[i].Burning,
-				target == Selected || target == Hovered);
+				Mathf::Max(target == Selected || target == Hovered ? 1.0f : 0.0f, PossessionHullRim(ship)));
 			shipViews[i]->ApplyCombat(ship->Combat, ship->Battle != nullptr, thrusting, Time::unscaledTime, dt);
 			// US-T231: its thrusters, on its own hull, firing with its burn, its braking and its drawn swing; the helm's
 			// hull burns its RCS bright while it drifts, as the thrusters are then all it has.
@@ -1648,7 +1653,7 @@ namespace SpaceGod
 		for (int g = glowIndex; g < entryGlows.Count(); g++) std::get<0>(entryGlows[g])->gameObject()->SetActive(false);
 
 		UpdatePlatforms();
-		laneView->Update(ShowLanes);
+		laneView->Update(ShowLanes && PerceptionShown() < 0.5f); // US-T446: the lanes are the god's chart, not a pilot's view
 		gateView->Update(true, nearGate);
 		fighterViews->Update();
 		UpdatePilotRcs(dt); // US-T165: the flown hull's RCS jets, on its view (a ship's, or a seat craft's) as placed above
@@ -1669,6 +1674,7 @@ namespace SpaceGod
 		if (harvesterView) harvesterView->Update(); // US-T146: the gas works, and the player's contract with them
 		if (spaceFeaturesView) spaceFeaturesView->Update(); // US-T130: nebulae and ice fields
 		UpdatePathLine();
+		UpdatePossessionFx(); // US-T446: the energy crossing to the hull and seeping into it
 	}
 
 	void UnitySpaceApp::PlaceEntryGlow(int index, int ship, Vector3 rel, float heat, double pixelsPerUnit)
@@ -1811,7 +1817,8 @@ namespace SpaceGod
 		if (refresh) orbitRefreshTimer = 0.2f;
 
 		// US-T134: orbits add nothing in a fight -- out in ~0.4 s when one starts nearby, back in ~1.5 s after.
-		bool battle = BattleNearPlayer();
+		// US-T446: nor in a possessed view: the orbits are the god's chart (back in ~1.5 s with the god's view on letting go).
+		bool battle = BattleNearPlayer() || PerceptionShown() > 0.5f;
 		// Real frame time, not the capped step: a heavy battle frame (dt held at 0.1 s) would stretch the 0.4 s fade over seconds.
 		dt = Mathf::Min(Time::unscaledDeltaTime, 1.0f);
 		orbitBattleFade = battle ? Mathf::Max(0.0f, orbitBattleFade - dt / 0.4f) : Mathf::Min(1.0f, orbitBattleFade + dt / 1.5f);
@@ -1994,7 +2001,8 @@ namespace SpaceGod
 
 		const auto& ships = Fleet()->Ships();
 		// At the helm only what the scanners hold can be picked (U.SPC-T66), unless it is close enough to see.
-		auto picture = IsPiloting() && Piloted.Ship != nullptr && World()->Sensors ? World()->Sensors->Player : nullptr;
+		// US-T446: in any seat, what it perceives (PerceivedPicture: the helm's scanners, a seat's own sensors or eyes).
+		auto picture = PerceivedPicture();
 		for (int i = 0; i < ships.Count(); i++)
 		{
 			if (ships[i]->Destroyed || ships[i]->Controller()->Phase == Core::ShipPhase::Landed) continue;
@@ -2002,7 +2010,7 @@ namespace SpaceGod
 			float depth;
 			if (!ToGui(shipScene[i], p, depth)) continue;
 			double px = Core::ShipLod::ApparentPx(shipLength[i] * Core::ShipLod::ExtentFactor(ships[i]), depth, ppu);
-			if (picture != nullptr && ships[i] != Piloted.Ship && !Core::ShipLod::DrawsModel(px) && picture->Of(ships[i]) == nullptr) continue;
+			if (picture != nullptr && ships[i] != Piloted.Ship && !(Core::ShipLod::DrawsModel(px) && PerceivesShipModel(i)) && picture->Of(ships[i]) == nullptr) continue;
 			if (FoldedShips.Contains(ships[i]) && !Core::ShipLod::DrawsModel(px)) continue;
 			double pickRadius = cs::Math::Max(px * 0.5, UI::Icons::PixelSize(ships[i]->Spec->Class) * 0.5 + 4);
 			double d = (p - gui).magnitude();

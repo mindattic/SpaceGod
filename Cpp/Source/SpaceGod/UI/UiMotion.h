@@ -38,6 +38,10 @@ namespace SpaceGod::UI::UiMotion
 	/// Whether anything moves this frame (off under reduced motion and in scripted runs).
 	bool Enabled();
 
+	/// US-T446: whether the profile asks for reduced motion (Settings > Accessibility), scripted run or not: the world's own
+	/// effects (the possession show) still play in a screenshot run, and hold still only for a player who asked.
+	bool ProfileReducesMotion();
+
 	/// Real seconds, the clock every transition here runs on.
 	double Now();
 

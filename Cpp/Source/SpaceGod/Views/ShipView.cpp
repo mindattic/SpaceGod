@@ -507,7 +507,7 @@ namespace SpaceGod::Views
 		return any ? box : Bounds();
 	}
 
-	void ShipView::Apply(Vector3 relative, Quaternion rotation, float length, bool burning, bool highlighted)
+	void ShipView::Apply(Vector3 relative, Quaternion rotation, float length, bool burning, float highlight)
 	{
 		auto t = Root->transform;
 		t->localPosition = relative;
@@ -539,7 +539,7 @@ namespace SpaceGod::Views
 		}
 
 		block.SetFloat(EngineGlowId, burning ? 2.2f : 0.35f);
-		block.SetFloat(HighlightId, highlighted ? 1.0f : 0.0f);
+		block.SetFloat(HighlightId, highlight); // 0/1 selected, more while possessed (US-T446)
 		block.SetColor(ColorId, Color::white());
 		SetBlock();
 		if (towRenderer) towRenderer->SetPropertyBlock(block);

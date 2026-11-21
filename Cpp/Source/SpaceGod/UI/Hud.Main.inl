@@ -394,6 +394,13 @@ private:
 
 	static float Frac(float x);
 
+	// ---------------------------------------------------------------- US-T446: possession (Hud.Possession.cpp)
+
+	/// <summary>The possession show's faint wash over the screen, and the possessed view's frame: a pilot's sensor brackets, a
+	/// person's visor, a station's panoramic bands, each with its caption, eased in and out with the view.</summary>
+	void DrawPossession();
+	cs::Ref<Texture2D> visorTexture, bandTexture;
+
 	/// Streaks of light streaming out from <paramref name="centre"/>, longer and faster with
 	/// <paramref name="strength"/>; <paramref name="seed"/> gives a set its own pattern.
 	void DrawStreaks(Vector2 centre, float strength, int count, Color tint, int seed, float maxLength);

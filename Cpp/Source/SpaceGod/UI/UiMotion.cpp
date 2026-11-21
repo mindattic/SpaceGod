@@ -175,6 +175,18 @@ namespace SpaceGod::UI::UiMotion
 		return !reduce;
 	}
 
+	bool ProfileReducesMotion()
+	{
+		static uint64 readFrame = ~0ull;
+		static bool reduce = false;
+		if (readFrame != GFrameCounter)
+		{
+			readFrame = GFrameCounter;
+			reduce = ReadReduceMotion();
+		}
+		return reduce;
+	}
+
 	double Now() { return FPlatformTime::Seconds(); }
 
 	float EaseOut(float t)

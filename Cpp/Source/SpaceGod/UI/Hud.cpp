@@ -90,7 +90,8 @@ namespace SpaceGod::UI
 
 	cs::Ref<ContactBook> Hud::Picture() const
 	{
-		return app->IsPiloting() && app->Piloted.Ship != nullptr ? (app->World()->Sensors != nullptr ? app->World()->Sensors->Player : nullptr) : nullptr;
+		// US-T446: whatever seat is held, what its pilot perceives (the helm's scanners, a seat's sensors, a person's eyes).
+		return app->PerceivedPicture();
 	}
 
 	Color Hud::LostColor(const cs::Ref<Contact>& contact)
@@ -107,6 +108,8 @@ namespace SpaceGod::UI
 		if (contact == nullptr || !contact->Cold())
 		{
 			scene = app->ShipScene(ship);
+			// US-T446: a live track is drawn where the light it was seen by left it, back along its course by the delay.
+			if (contact != nullptr) scene += app->PerceivedLagOffset(ship, contact->LagSeconds());
 			if (contact != nullptr) lastSeenScene[ship] = scene;
 			return true;
 		}
@@ -250,6 +253,7 @@ namespace SpaceGod::UI
 			}
 		}
 		DrawLaneEffects();
+		DrawPossession(); // US-T446: the possession show's breath, and the possessed view's frame (with the HUD off too)
 		DrawSelfDestruct(); // US-T97: shown with the HUD off too
 		if (!app->ShowHud)
 		{
@@ -2069,6 +2073,7 @@ namespace SpaceGod::UI
 	{
 		// UnityEngine.Object.Destroy(tex) -> dropping the reference (the last one releases the Unreal texture).
 		panelTexture = rowHoverTexture = rowSelectedTexture = buttonTexture = buttonActiveTexture = nullptr;
+		visorTexture = bandTexture = nullptr; // US-T446
 		if (galaxyMap) galaxyMap->DestroyOwnedTextures();
 		if (systemMap) systemMap->DestroyOwnedTextures(); // US-T258
 		if (helpScreen) helpScreen->DestroyOwnedTextures();
