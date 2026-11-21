@@ -3,6 +3,8 @@
 
 #include <iterator>
 #include <tuple>
+#include <unordered_map>
+#include <vector>
 
 #include "Ships.h"
 #include "Combat/BulkFreighters.h"
@@ -158,6 +160,15 @@ namespace SpaceGod::Rendering
 		void Nozzle(Vector3 center, float radius, float length)
 		{
 			Cylinder(center, radius, length, Dark, true, 12);
+			// US-T432: its glowing back face is where the drive's flame leaves.
+			if (keep)
+			{
+				EnginePort p;
+				p.Position = Vector3(center.x, center.y, center.z - length * 0.5f);
+				p.Exhaust = Vector3::back();
+				p.Radius = radius;
+				nozzles.push_back(p);
+			}
 		}
 
 		cs::Ref<Mesh> ToMesh(const cs::String& name)
@@ -168,7 +179,18 @@ namespace SpaceGod::Rendering
 			mesh->SetColors(colors);
 			mesh->SetTriangles(triangles, 0);
 			mesh->RecalculateBounds();
+			if (!nozzles.empty()) NozzleTable()[mesh.get()] = nozzles;
 			return mesh;
+		}
+
+	private:
+		std::vector<EnginePort> nozzles;
+
+	public:
+		static std::unordered_map<const Mesh*, std::vector<EnginePort>>& NozzleTable()
+		{
+			static std::unordered_map<const Mesh*, std::vector<EnginePort>> table;
+			return table;
 		}
 	};
 
@@ -636,6 +658,14 @@ namespace SpaceGod::Rendering
 	}
 
 	/// <summary>A blackened stub left where a hardpoint was shot away.</summary>
+	std::vector<EnginePort> ShipMeshFactory::NozzlesOf(const cs::Ref<Mesh>& mesh)
+	{
+		if (!mesh) return {};
+		auto& table = Builder::NozzleTable();
+		auto it = table.find(mesh.get());
+		return it == table.end() ? std::vector<EnginePort>() : it->second;
+	}
+
 	cs::Ref<Mesh> ShipMeshFactory::GetScar()
 	{
 		if (scar != nullptr) return scar;

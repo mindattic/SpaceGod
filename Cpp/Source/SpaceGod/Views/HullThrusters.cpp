@@ -3,6 +3,8 @@
 #include "Rendering/Materials.h"
 #include "Rendering/MeshFactory.h"
 
+#include "HAL/IConsoleManager.h"
+
 #include <algorithm>
 #include <cmath>
 #include <vector>
@@ -14,6 +16,10 @@ namespace SpaceGod::Views
 
 	namespace
 	{
+		/// US-T432/US-T433: every jet lit at once, so where each sits and the way it fires can be seen (sg.Thrusters).
+		TAutoConsoleVariable<int32> CVarAllLit(TEXT("sg.ThrustersLit"), 0,
+			TEXT("1: every hull's thrusters (main engines, retros, RCS) drawn lit at full, to check where they sit (US-T432, US-T433)."));
+
 		cs::Ref<Mesh> plumeMesh;
 		cs::Ref<Material> rcsMaterial, mainMaterial;
 
@@ -31,6 +37,8 @@ namespace SpaceGod::Views
 		constexpr float LeverShare = 0.3f;
 		/// <summary>How finely a hull's triangles are sampled for its surface, root units (the hull is one long).</summary>
 		constexpr float SampleStep = 0.03f;
+		/// <summary>The most main-engine flames a hull carries (a Void Whale capital draws nine nozzles).</summary>
+		constexpr int MaxMains = 12;
 
 		/// <summary>A point in <paramref name="t"/>'s frame taken up through its parents into <paramref name="root"/>'s.</summary>
 		Vector3 IntoRoot(const Transform* t, const Transform* root, Vector3 p)
@@ -163,7 +171,8 @@ namespace SpaceGod::Views
 		return mainMaterial;
 	}
 
-	HullThrusters::HullThrusters(const cs::Ref<Transform>& root_, const cs::List<cs::Ref<Renderer>>& hull, const cs::List<Vector3>& engines)
+	HullThrusters::HullThrusters(const cs::Ref<Transform>& root_, const cs::List<cs::Ref<Renderer>>& hull, const cs::List<Vector3>& engines,
+		const cs::List<Rendering::EnginePort>& ports)
 		: root(root_)
 	{
 		if (!Alive(plumeMesh)) plumeMesh = MeshFactory::Plume();
@@ -183,10 +192,29 @@ namespace SpaceGod::Views
 		}
 		Vector3 c = (mn + mx) * 0.5f;
 		float length = Mathf::Max(mx.z - mn.z, 0.05f);
-		float halfW = Mathf::Max((mx.x - mn.x) * 0.5f, 0.01f), halfH = Mathf::Max((mx.y - mn.y) * 0.5f, 0.01f);
-		float rcs = Mathf::Clamp(Mathf::Min(halfW, halfH) * 0.22f + 0.008f, 0.012f, 0.045f);
 
-		// ---- Main engines, on the stern: over the engine hardpoints aft of the middle where it has them, else across its
+		// ---- Main engines (US-T432): out of the nozzles the model draws, each along its own axis and as wide as its mouth.
+		if (ports.Count() > 0)
+		{
+			Vector3 sum = Vector3::zero();
+			for (const auto& p : ports)
+			{
+				if (mains >= MaxMains) break;
+				float width = Mathf::Clamp(p.Radius * 2.2f, 0.008f, 0.3f);
+				Add(Kind::Main, p.Position, p.Exhaust, c, width, Mathf::Clamp(width * 4.5f, 0.06f, 0.7f));
+				sum += p.Position;
+				mains++;
+			}
+			sternCentre = sum / static_cast<float>(mains);
+		}
+		else AddMains(pts, mn, mx, c, length, engines);
+
+		AddRcs(pts, mn, mx, c, length);
+	}
+
+	void HullThrusters::AddMains(const std::vector<Vector3>& pts, Vector3 mn, Vector3 mx, Vector3 c, float length, const cs::List<Vector3>& engines)
+	{
+		// A model with no nozzles marked: over the engine hardpoints aft of the middle where it has them, else across its
 		// aft face as its shape fits. Each sits on the rearmost plating behind its column, so its plume clears the hull.
 		float sternBand = mn.z + 0.07f * length;
 		float sMinX = mx.x, sMaxX = mn.x, sMinY = mx.y, sMaxY = mn.y;
@@ -261,6 +289,12 @@ namespace SpaceGod::Views
 			mains++;
 		}
 		sternCentre = mains > 0 ? sternSum / static_cast<float>(mains) : sc;
+	}
+
+	void HullThrusters::AddRcs(const std::vector<Vector3>& pts, Vector3 mn, Vector3 mx, Vector3 c, float length)
+	{
+		float halfW = Mathf::Max((mx.x - mn.x) * 0.5f, 0.01f), halfH = Mathf::Max((mx.y - mn.y) * 0.5f, 0.01f);
+		float rcs = Mathf::Clamp(Mathf::Min(halfW, halfH) * 0.22f + 0.008f, 0.012f, 0.045f);
 
 		// ---- RCS pods at the bow's and the stern's four corners: the hull's outermost plating that way at that station.
 		float bow = c.z + (mx.z - c.z) * 0.72f, stern = c.z + (mn.z - c.z) * 0.72f;
@@ -384,9 +418,11 @@ namespace SpaceGod::Views
 		float full = fullAccel > 1e-6f ? fullAccel : 1.0f;
 		float lit = Mathf::Clamp01(intensity);
 		mainLevel = 0;
+		bool all = CVarAllLit.GetValueOnGameThread() != 0;
 		for (auto& j : jets)
 		{
-			if (j.K == Kind::Rcs)
+			if (all) j.Level = 1;
+			else if (j.K == Kind::Rcs)
 			{
 				float push = settled ? (j.Pitch * accPitch + j.Yaw * accYaw + j.Roll * accRoll) / full : 0.0f;
 				float want = Mathf::Clamp01((push - DeadShare) / (1 - DeadShare));

@@ -3,6 +3,9 @@
 // placed on the hull's own surface and firing with its thrust, turn, roll and braking.
 
 #include "UnityCompat/UnityRenderingTypes.h"
+#include "Rendering/EnginePorts.h"
+
+#include <vector>
 
 namespace SpaceGod::Views
 {
@@ -10,8 +13,9 @@ namespace SpaceGod::Views
 	/// A hull's thrusters (US-T231), built once from the hull as drawn and parented to its view's root (one unit long, nose
 	/// +Z, up +Y, starboard +X), so they scale with it at either scale:
 	/// <list type="bullet">
-	/// <item>main engines on the stern face: on the hull's engine hardpoints where it has them, else one, two or three
-	/// across its aft face as its shape fits, each set on the rearmost plating behind it;</item>
+	/// <item>main engines out of the nozzles the model draws (US-T432); a model with none marked gets them on its stern
+	/// face: on the hull's engine hardpoints where it has them, else one, two or three across its aft face as its shape
+	/// fits, each set on the rearmost plating behind it;</item>
 	/// <item>an RCS pod at each corner of the bow and of the stern (the hull's outermost plating that way at that station),
 	/// each with an up/down and a port/starboard jet, the bow pods with a retro jet firing forward to brake;</item>
 	/// <item>a pair of roll jets (up and down) on each flank amidships.</item>
@@ -25,8 +29,11 @@ namespace SpaceGod::Views
 	{
 	public:
 		/// <summary>Builds the thrusters on <paramref name="root"/> round the hull drawn by <paramref name="hull"/> (renderers
-		/// under that root); <paramref name="engines"/> are its engine hardpoints in the root's frame, if it has any.</summary>
-		HullThrusters(const cs::Ref<Transform>& root, const cs::List<cs::Ref<Renderer>>& hull, const cs::List<Vector3>& engines);
+		/// under that root). <paramref name="ports"/> are the engine nozzles its model draws (US-T432, Rendering::EnginePorts,
+		/// in the root's frame): the main engines fire out of them, each along its own axis. A model with none marked falls
+		/// back to <paramref name="engines"/>, its engine hardpoints in the root's frame, or its stern's own shape.</summary>
+		HullThrusters(const cs::Ref<Transform>& root, const cs::List<cs::Ref<Renderer>>& hull, const cs::List<Vector3>& engines,
+			const cs::List<Rendering::EnginePort>& ports);
 
 		/// <summary>Where the main engines' exhaust leaves the hull: the middle of their nozzles, in the root's frame.</summary>
 		Vector3 SternCentre() const { return sternCentre; }
@@ -73,6 +80,8 @@ namespace SpaceGod::Views
 		float accPitch = 0, accYaw = 0, accRoll = 0;
 
 		void Add(Kind kind, Vector3 at, Vector3 exhaust, Vector3 centre, float width, float length);
+		void AddMains(const std::vector<Vector3>& pts, Vector3 mn, Vector3 mx, Vector3 c, float length, const cs::List<Vector3>& engines);
+		void AddRcs(const std::vector<Vector3>& pts, Vector3 mn, Vector3 mx, Vector3 c, float length);
 
 		static cs::Ref<Material> RcsMaterial();
 		static cs::Ref<Material> MainMaterial();

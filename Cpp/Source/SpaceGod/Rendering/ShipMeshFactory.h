@@ -2,6 +2,9 @@
 // Port of Unity.SpaceGod Runtime/Rendering/ShipMeshFactory.cs (US-T30).
 
 #include "UnityCompat/UnityRenderingTypes.h"
+#include "Rendering/EnginePorts.h"
+
+#include <vector>
 
 namespace SpaceGod::Core
 {
@@ -85,6 +88,10 @@ namespace SpaceGod::Rendering
 
 		/// <summary>A blackened stub left where a hardpoint was shot away.</summary>
 		static cs::Ref<Mesh> GetScar();
+
+		/// <summary>US-T432: the engine nozzles a mesh built here draws (their glowing mouths, in the mesh's frame), so the
+		/// flames can leave from them; empty for a mesh with none, or one not built here.</summary>
+		static std::vector<EnginePort> NozzlesOf(const cs::Ref<Mesh>& mesh);
 
 		// ---------------------------------------------------------------- orbital structures
 

@@ -1,5 +1,6 @@
 // US-T142: every ship drawn from Ebal Studios' Ultimate Spaceships Creator (see UscKit.h, docs/ThirdPartyArt.md).
 #include "Rendering/UscKit.h"
+#include "Rendering/EnginePorts.h"
 #include "Rendering/HullLighting.h"
 #include "Rendering/Materials.h"
 #include "Rendering/ShipMeshFactory.h"
@@ -19,6 +20,7 @@
 #include <cctype>
 #include <cmath>
 #include <unordered_map>
+#include <vector>
 
 using namespace SpaceGod::Core;
 
@@ -282,6 +284,59 @@ namespace SpaceGod::Rendering
 
 		bool Pirate(const cs::Ref<Faction>& f) { return f && f->IsPirate; }
 
+		// ------------------------------------------------------------ engine ports
+
+		struct PortRow
+		{
+			const char* Model;
+			std::vector<EnginePort> Ports;
+		};
+
+		/// US-T432: the engine nozzles each ship of the pack draws (its glowing exhausts, or the rearmost aft faces of a craft
+		/// with none lit), found by tools/usc_ports.py from the pack itself, in the model frame.
+		const std::vector<PortRow>& PortTable()
+		{
+			static const std::vector<PortRow> rows = []
+			{
+				std::vector<PortRow> r;
+				struct Raw { float P[3]; float N[3]; float R; };
+#define USC_PORTS(model, ...)                                                                                            \
+				{                                                                                                            \
+					std::vector<Raw> raw = __VA_ARGS__;                                                                      \
+					PortRow row{ model, {} };                                                                                \
+					for (const auto& p : raw)                                                                                \
+					{                                                                                                        \
+						EnginePort e;                                                                                        \
+						e.Position = Vector3(p.P[0], p.P[1], p.P[2]);                                                        \
+						e.Exhaust = Vector3(p.N[0], p.N[1], p.N[2]);                                                         \
+						e.Radius = p.R;                                                                                      \
+						row.Ports.push_back(e);                                                                              \
+					}                                                                                                        \
+					r.push_back(row);                                                                                        \
+				}
+#include "Rendering/UscPorts.inl"
+#undef USC_PORTS
+				return r;
+			}();
+			return rows;
+		}
+
+		/// Marks a model's own nozzles on the section each is in.
+		void MarkPorts(const cs::String& model, bool split, const cs::Ref<Transform>& stern, const cs::Ref<Transform>& bow)
+		{
+			for (const auto& row : PortTable())
+			{
+				if (model != row.Model) continue;
+				for (const auto& p : row.Ports)
+					EnginePorts::Mark(split && p.Position.z >= ShipMeshFactory::SplitZ ? bow : stern, p.Position, p.Exhaust, p.Radius);
+				return;
+			}
+		}
+
+		/// Where a thruster module's glowing mouth sits along its own length, from its middle (aft is negative), found by
+		/// tools/usc_ports.py: the Galactic Leopard bell glows from a little way inside its skirt, the Void Whale's at its lip.
+		float MouthOf(const cs::String& family) { return family == "VoidWhale" ? -0.477f : -0.239f; }
+
 		/// Thruster bells on every Engine hardpoint of the layout (their glows sit in them), sized to the class.
 		void Engines(const cs::Ref<Transform>& stern, const cs::List<cs::Ref<SubsystemDef>>* layout, const cs::Ref<Faction>& faction, float r,
 			cs::List<cs::Ref<Renderer>>& renderers)
@@ -294,9 +349,15 @@ namespace SpaceGod::Rendering
 				if (d && d->Kind == SubsystemKind::Engine)
 				{
 					float bell = r * 2.4f;
-					auto mr = Module(stern, cs::Cat(family, "Thruster"), Vector3(static_cast<float>(d->X), static_cast<float>(d->Y), static_cast<float>(d->Z) + bell * 0.2f),
-						Vector3(r * 2.2f, r * 2.2f, bell), material, Vector3::zero(), cs::Cat("Engine", n++));
-					if (mr) renderers.Add(mr);
+					Vector3 middle(static_cast<float>(d->X), static_cast<float>(d->Y), static_cast<float>(d->Z) + bell * 0.2f);
+					auto mr = Module(stern, cs::Cat(family, "Thruster"), middle, Vector3(r * 2.2f, r * 2.2f, bell), material, Vector3::zero(), cs::Cat("Engine", n));
+					if (mr)
+					{
+						renderers.Add(mr);
+						// US-T432: its glow and flame leave from the bell's own mouth, the width of its throat.
+						EnginePorts::Mark(stern, middle + Vector3(0, 0, MouthOf(family) * bell), Vector3::back(), r * 0.8f, n);
+					}
+					n++;
 				}
 		}
 
@@ -442,6 +503,7 @@ namespace SpaceGod::Rendering
 		auto stern_ = NewChild(parent, split ? "Stern" : "Hull");
 		cs::Ref<Transform> bow_ = split ? NewChild(parent, "Bow") : nullptr;
 		Hull(model, faction, split, stern_, split ? bow_ : stern_, renderers);
+		MarkPorts(model, split, stern_, bow_);
 		if (civil == CivilCraft::None)
 		{
 			if (float r = BellOf(cls); r > 0) Engines(stern_, layout, faction, r, renderers);

@@ -2,6 +2,7 @@
 #include "Views/FighterViews.h"
 
 #include "UnitySpaceApp.h"
+#include "Rendering/EnginePorts.h"
 #include "Rendering/Materials.h"
 #include "Rendering/MeshFactory.h"
 #include "Rendering/ShipMeshFactory.h"
@@ -113,7 +114,8 @@ namespace SpaceGod::Views
 				float markPx = 5.0f * (Mathf::Clamp01((hp - static_cast<float>(MarkFloorPx)) / static_cast<float>(MarkFullPx - MarkFloorPx)) * 0.6f + 0.4f)
 					* (1.0f - Mathf::Clamp01((hp - static_cast<float>(MarkFadePx)) / static_cast<float>(MarkFadePx)));
 				float px = markPx * Mathf::Max(rel.magnitude(), 1e-6f) / static_cast<float>(ppu);
-				v->Glow->localPosition = rel - fwd.normalized() * static_cast<float>(app->Scale()->ShipLength(u->LengthKm)) * 0.55f;
+				// On its nozzles (US-T432), a hair behind them: the hull's own turn and scale carry the point.
+				v->Glow->localPosition = rel + v->Hull->transform->localRotation * (v->EngineAt * static_cast<float>(app->Scale()->ShipLength(u->LengthKm)));
 				v->Glow->SetRotation(Quaternion::LookRotation(v->Glow->position() - cam->position(), cam->up()));
 				v->Glow->localScale = Vector3::one() * Mathf::Max(px, static_cast<float>(app->Scale()->ShipLength(u->LengthKm)) * 0.8f);
 
@@ -234,6 +236,20 @@ namespace SpaceGod::Views
 			auto mr = AddComponent<MeshRenderer>(v->Hull);
 			mr->SetSharedMaterial(shipMaterial());
 			mr->shadowCastingMode = ShadowCastingMode::Off;
+			for (const auto& n : ShipMeshFactory::NozzlesOf(GetComponent<MeshFilter>(v->Hull)->sharedMesh))
+				Rendering::EnginePorts::Mark(v->Hull->transform, n.Position, n.Exhaust, n.Radius);
+		}
+		// US-T432: its engine glow on the middle of the nozzles its model draws, a little out along their exhaust.
+		auto ports = Rendering::EnginePorts::Of(v->Hull->transform);
+		if (ports.Count() > 0)
+		{
+			Vector3 mid = Vector3::zero(), out = Vector3::zero();
+			for (const auto& p : ports)
+			{
+				mid += p.Position;
+				out += p.Exhaust * p.Radius;
+			}
+			v->EngineAt = (mid + out) / static_cast<float>(ports.Count());
 		}
 
 		auto glow = NewGameObject("Engine");

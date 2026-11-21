@@ -50,6 +50,12 @@ if (-not $SkipPrepare) {
     ForEach-Object { "$_" } | Where-Object { $_ -match '^USC' }
   $ErrorActionPreference = 'Stop'
   if (-not (Get-ChildItem -LiteralPath $pieces -Filter '*.fbx' -ErrorAction SilentlyContinue)) { throw 'The Blender step wrote no pieces.' }
+  # US-T432: each ship's own engine nozzles (its glowing exhausts) into the table UscKit marks them from.
+  $ports = Join-Path $repo 'Cpp\Source\SpaceGod\Rendering\UscPorts.inl'
+  $ErrorActionPreference = 'Continue'
+  & $Blender -b --factory-startup --python (Join-Path $PSScriptRoot 'usc_ports.py') -- $source $pieces $ports 2>&1 |
+    ForEach-Object { "$_" } | Where-Object { $_ -match '^USC' }
+  $ErrorActionPreference = 'Stop'
 }
 
 $engine = Find-UnrealEngine $EngineVersion

@@ -7,6 +7,7 @@
 #include "Rendering/StarSparrowKit.h"
 #include "Rendering/UscKit.h"
 #include "Views/HullThrusters.h"
+#include "Rendering/EnginePorts.h"
 
 #include "Combat/CombatSpecs.h"
 #include "Combat/PilotTuning.h"
@@ -90,6 +91,16 @@ namespace SpaceGod::Views
 		plume->shadowCastingMode = ShadowCastingMode::Off;
 
 		exhaust = BuildExhaust(Root->transform);
+		// US-T432: until its thrusters are built, the one plume and the embers leave from the middle of its nozzles.
+		auto ports = Rendering::EnginePorts::Of(Root->transform);
+		if (ports.Count() > 0)
+		{
+			Vector3 mid = Vector3::zero();
+			for (const auto& p : ports) mid += p.Position;
+			mid = mid / static_cast<float>(ports.Count());
+			plumeGo->transform->localPosition = mid;
+			exhaust->transform()->localPosition = mid;
+		}
 
 		BuildShieldRing();
 
@@ -371,7 +382,20 @@ namespace SpaceGod::Views
 
 		if (sub->Kind() == SubsystemKind::Engine)
 		{
-			auto g = NewGlow(section, pos + Vector3(0, 0, -0.035f), 0.06f, engineMaterial, part);
+			// US-T432: in the mouth of the bell the model bolted on this hardpoint, a hair out along its exhaust; a hull with
+			// no bell marked keeps the glow just behind the hardpoint.
+			int engine = 0;
+			for (const auto& s : Ship->Combat->Subsystems)
+			{
+				if (s == sub) break;
+				if (s->Kind() == SubsystemKind::Engine) engine++;
+			}
+			cs::Ref<Transform> at = section;
+			Vector3 glowAt = pos + Vector3(0, 0, -0.035f);
+			Rendering::EnginePort port;
+			if (Rendering::EnginePorts::ForEngine(Root->transform, engine, at, port)) glowAt = port.Position + port.Exhaust * (port.Radius * 0.5f);
+			else at = section;
+			auto g = NewGlow(at, glowAt, 0.06f, engineMaterial, part);
 			g->Engine = true;
 		}
 		// The reactor, and a bridge buried at the centre of the hull with no viewports (U.SPC-T492), show nothing outside.
@@ -547,7 +571,7 @@ namespace SpaceGod::Views
 			for (const auto& s : Ship->Combat->Subsystems)
 				if (s->Kind() == SubsystemKind::Engine)
 					engines.Add(Vector3(static_cast<float>(s->Def->X), static_cast<float>(s->Def->Y), static_cast<float>(s->Def->Z)));
-			thrusters = cs::New<HullThrusters>(Root->transform, renderers, engines);
+			thrusters = cs::New<HullThrusters>(Root->transform, renderers, engines, Rendering::EnginePorts::Of(Root->transform));
 			// The exhaust's embers leave from the stern's own nozzles, not a fixed point behind the root.
 			exhaust->transform()->localPosition = thrusters->SternCentre();
 			plume->enabled = false;

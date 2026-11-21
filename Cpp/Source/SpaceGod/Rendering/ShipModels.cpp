@@ -1,6 +1,7 @@
 // Port of Unity.SpaceGod Runtime/Rendering/ShipModels.cs (US-T30).
 #include "Rendering/ShipModels.h"
 #include "Rendering/AssetStreamer.h"
+#include "Rendering/EnginePorts.h"
 #include "Rendering/HullLighting.h"
 #include "Rendering/Materials.h"
 #include "Rendering/ShipMeshFactory.h"
@@ -141,6 +142,8 @@ namespace SpaceGod::Rendering
 		mr->shadowCastingMode = ShadowCastingMode::Off;
 		mr->receiveShadows = false;
 		renderers.Add(mr);
+		// US-T432: the flames leave from the nozzles the procedural hull draws.
+		for (const auto& n : ShipMeshFactory::NozzlesOf(mesh)) EnginePorts::Mark(go->transform, n.Position, n.Exhaust, n.Radius);
 		return go->transform;
 	}
 

@@ -10,6 +10,8 @@
 #include "Economy/LocalTraffic.h"
 #include "Ships.h"
 
+#include "Rendering/EnginePorts.h"
+
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInterface.h"
 #include "Misc/App.h"
@@ -120,6 +122,11 @@ namespace SpaceGod::Rendering
 			cs::String Name;
 			/// Which section a warship's part goes in when its middle would put it wrong (-1: by its middle).
 			int Section = -1;
+			/// US-T432: an engine bell's mouth (aft, at PortZ, PortRadius across), marked as an EnginePort; PortEngine is the
+			/// Engine hardpoint it is the bell of (-1: none).
+			bool Port = false;
+			float PortZ = 0, PortRadius = 0;
+			int PortEngine = -1;
 		};
 
 		/// A class's recipe as it is assembled: helpers for the shapes every recipe uses.
@@ -154,10 +161,14 @@ namespace SpaceGod::Rendering
 			Part& Beam(Vector3 centre, Vector3 size, Vector3 euler = Vector3::zero()) { return Add(P::Weapon, centre, size, euler); }
 
 			/// An engine: its bell (the Thruster) with its exit at zBack, and the Engine module ahead of it.
-			void Engine(float x, float y, float zBack, float r, float length)
+			void Engine(float x, float y, float zBack, float r, float length, int engine = -1)
 			{
 				float bell = r * 1.25f;
-				Add(P::Thruster, Vector3(x, y, zBack + bell * 0.5f), Vector3(r * 2.2f, r * 2.2f, bell));
+				auto& t = Add(P::Thruster, Vector3(x, y, zBack + bell * 0.5f), Vector3(r * 2.2f, r * 2.2f, bell));
+				t.Port = true;
+				t.PortZ = zBack;
+				t.PortRadius = r * 0.9f;
+				t.PortEngine = engine;
 				if (length > 0) Add(P::Engine, Vector3(x, y, zBack + bell * 0.85f + length * 0.5f), Vector3(r * 1.8f, r * 1.8f, length));
 			}
 
@@ -200,7 +211,7 @@ namespace SpaceGod::Rendering
 					for (const auto& d : *layout)
 						if (d && d->Kind == SubsystemKind::Engine)
 						{
-							Engine(static_cast<float>(d->X), static_cast<float>(d->Y), static_cast<float>(d->Z) - 0.03f, r, length);
+							Engine(static_cast<float>(d->X), static_cast<float>(d->Y), static_cast<float>(d->Z) - 0.03f, r, length, n);
 							n++;
 						}
 				if (n == 0)
@@ -812,8 +823,11 @@ namespace SpaceGod::Rendering
 		for (const auto& p : r.Parts)
 		{
 			int section = p.Section >= 0 ? p.Section : p.Pos.z >= ShipMeshFactory::SplitZ ? ShipMeshFactory::Bow : ShipMeshFactory::Stern;
-			auto mr = Place(split && section == ShipMeshFactory::Bow ? bow : stern, p, material);
+			auto into = split && section == ShipMeshFactory::Bow ? bow : stern;
+			auto mr = Place(into, p, material);
 			if (mr) renderers.Add(mr);
+			// US-T432: an engine's flame and glow leave from its bell's own mouth.
+			if (mr && p.Port) EnginePorts::Mark(into, Vector3(p.Pos.x, p.Pos.y, p.PortZ), Vector3::back(), p.PortRadius, p.PortEngine);
 		}
 		return true;
 	}
