@@ -631,6 +631,9 @@ namespace SpaceGod
 			double CrossMarkT = HrNone;
 			int CrossFrom = -1;
 			DVec3 CrossOffset;
+			/// <summary>US-T430: a parked hull sent off on its next leg after the crossing check's mark.</summary>
+			cs::Ref<Ship> PhaseShip;
+			double PhaseWasEnd = 0;
 			cs::String BirthName;
 		};
 	}
@@ -707,6 +710,20 @@ namespace SpaceGod
 		std::vector<char> ShipWasGone;
 		bool ShipsSeen = false;
 
+		/// <summary>US-T430: per fleet index, a copy of the ship as its current phase set it (Now), and the copy before its
+		/// last change of phase (Before, with the lived seconds it changed), kept while the change is inside the window: a
+		/// hold draws the ship from Before at a moment before the change. Drawing only.</summary>
+		struct ShipWas
+		{
+			const Ship* Of = nullptr;
+			cs::Ref<Ship> Now, Before;
+			double ChangedAt = HrNone;
+			int Phase = -1;
+			double PhaseEndJd = 0;
+			const void* Orbit = nullptr;
+		};
+		std::vector<ShipWas> ShipsWere;
+
 		/// <summary>US-T419: lived seconds the fight watched first would have ended (HrNone: it has not, or it was fought on
 		/// since): its end waits until this is older than the window.</summary>
 		double EndHeldSince = HrNone;
@@ -745,7 +762,54 @@ namespace SpaceGod
 				h.ShipWasGone[i] = gone ? 1 : 0;
 			}
 			h.ShipsSeen = true;
+
+			// US-T430: each hull's schedule as its phase set it, and the one before its last change while that is in the window.
+			h.ShipsWere.resize(n);
+			for (size_t i = 0; i < n; i++)
+			{
+				const auto& ship = ships[static_cast<int>(i)];
+				auto& w = h.ShipsWere[i];
+				if (ship == nullptr || ship->Destroyed || ship->IsEscort())
+				{
+					w = HoldRewindState::ShipWas();
+					continue;
+				}
+				int phase = static_cast<int>(ship->Phase);
+				const void* orbit = ship->Orbit.get();
+				if (w.Of != ship.get() || w.Now == nullptr)
+				{
+					w = HoldRewindState::ShipWas();
+					w.Of = ship.get();
+					w.Now = cs::New<Ship>(*ship);
+				}
+				else if (w.Phase != phase || w.PhaseEndJd != ship->PhaseEndJd || w.Orbit != orbit)
+				{
+					w.Before = w.Now;
+					w.ChangedAt = t;
+					w.Now = cs::New<Ship>(*ship);
+				}
+				w.Phase = phase;
+				w.PhaseEndJd = ship->PhaseEndJd;
+				w.Orbit = orbit;
+				// Out of the window: the change can no longer be played back past.
+				if (w.Before != nullptr && w.ChangedAt < t - HrTuning::WindowS - 1.0)
+				{
+					w.Before = nullptr;
+					w.ChangedAt = HrNone;
+				}
+			}
 		}
+	}
+
+	cs::Ref<Ship> UnitySpaceApp::HoldRewindShipAsWas(int index, const cs::Ref<Ship>& ship) const
+	{
+		if (holdRewind == nullptr || !holdRewind->Active || index < 0 || ship == nullptr) return ship;
+		const auto& h = *holdRewind;
+		size_t i = static_cast<size_t>(index);
+		if (i >= h.ShipsWere.size()) return ship;
+		const auto& w = h.ShipsWere[i];
+		if (w.Of != ship.get() || w.Before == nullptr || !(h.Tau < w.ChangedAt)) return ship;
+		return w.Before;
 	}
 
 	bool UnitySpaceApp::HoldRewindShipShown(int index, bool shownNow) const
@@ -1991,6 +2055,28 @@ namespace SpaceGod
 						return true;
 					}
 					if (wall - t.PhaseWall < 0.7) return true;
+					// US-T430: a parked hull sent off on its next leg after the mark: the hold must draw it parked before that.
+					if (t.PhaseShip == nullptr)
+					{
+						const auto& all = Fleet()->Ships();
+						for (int i = 0; i < all.Count() && t.PhaseShip == nullptr; i++)
+						{
+							auto s = all[i];
+							if (s == nullptr || s->Destroyed || s->IsEscort() || s->Battle != nullptr || s == ship || s->Phase != ShipPhase::Parked) continue;
+							double end = s->PhaseEndJd;
+							const void* orbit = s->Orbit.get();
+							Fleet()->ScheduleNext(s, Clock->Jd);
+							if (s->Phase != ShipPhase::Parked || s->PhaseEndJd != end || s->Orbit.get() != orbit)
+							{
+								t.PhaseShip = s;
+								t.PhaseWasEnd = end;
+							}
+						}
+						int parked = 0;
+						for (int i = 0; i < all.Count(); i++)
+							if (all[i] != nullptr && !all[i]->Destroyed && all[i]->Phase == ShipPhase::Parked) parked++;
+						UnityCompat::Debug::Log(cs::Cat("HoldRewind selftest: ", parked, " parked hulls; sent off: ", t.PhaseShip != nullptr ? t.PhaseShip->Name : cs::String("none")));
+					}
 					int moon = -1;
 					for (const auto& b : Catalog()->Bodies())
 						if (b->ParentIndex == pilotFrameBody && b->RadiusKm > 100)
@@ -2022,6 +2108,16 @@ namespace SpaceGod
 					if (!h.Active) return true;
 					if (h.Tau > std::max(t.CrossMarkT, h.Oldest) + 1e-6) return true;
 					if (++t.SettleFrames < 3) return true;
+					// US-T430: held before the hull left its orbit, it is drawn parked, as it was.
+					if (t.PhaseShip != nullptr)
+					{
+						int idx = Fleet()->Ships().IndexOf(t.PhaseShip);
+						auto drawn = HoldRewindShipAsWas(idx, t.PhaseShip);
+						selfCheck(drawn != t.PhaseShip && drawn->Phase == ShipPhase::Parked && drawn->PhaseEndJd == t.PhaseWasEnd,
+							cs::Cat("held before the ", t.PhaseShip->Name, "'s schedule changed, it is drawn on the one it had (parked, phase now ",
+								static_cast<int>(t.PhaseShip->Phase), ")"));
+					}
+					else selfCheck(false, "a parked hull whose schedule moves on, for the change-of-phase check");
 					t.ForceDown = false;
 					t.HaveResume = false;
 					t.PhaseWall = wall;

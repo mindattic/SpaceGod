@@ -90,6 +90,10 @@ public:
 	/// hidden; otherwise <paramref name="shownNow"/>.</summary>
 	bool HoldRewindShipShown(int index, bool shownNow) const;
 
+	/// <summary>US-T430: the ship at fleet index <paramref name="index"/> to draw: while a hold plays back a moment before its
+	/// last change of phase in the window (an orbit left, a lane joined), a copy of it as it was before; otherwise itself.</summary>
+	cs::Ref<Core::Ship> HoldRewindShipAsWas(int index, const cs::Ref<Core::Ship>& ship) const;
+
 	/// <summary>US-T424: true while a hold plays back a moment before <paramref name="battle"/> began (a fight born in the
 	/// window): its ships are drawn where their schedules had them, not in it, and its other units not at all.</summary>
 	bool HoldRewindBeforeFight(const cs::Ref<Core::Battle>& battle) const;

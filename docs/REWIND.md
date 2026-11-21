@@ -738,10 +738,19 @@ moment, then puts the helm into a moon's space (Miranda), where the cruise frame
 moves the helm into the moon's frame. A hold back to the mark puts the helm back in Uranus's frame, where it was
 (0.000 km off): US-T422's frame and pose put back together. The check passed 16/16 with the birth checks.
 
+### A change of phase, drawn as it was (US-T430)
+
+A ship's analytic state is a snapshot of its current phase, overwritten at every change, so a ship that changed
+phase (left an orbit, joined a lane, was given its next leg) in the window used to be drawn where its new schedule
+put it at the past date. The recording now keeps, per fleet index, a copy of each hull as its current phase set it.
+On a change (its phase, phase end or orbit), the old copy becomes `Before`, with the moment of the change, kept while
+that moment is in the window. While a hold plays back a moment before the change, the view draws the ship from that
+copy (`HoldRewindShipAsWas`: its state, scene and facing on the schedule it had). Escorts follow their leaders as
+before. **Proved** in the birth self-test's crossing phases: a parked hull is given its next leg after the mark, and
+held before the change it is drawn on the schedule it had (17/17).
+
 ### Not yet (later stages)
 
-- A ship that changed phase (left an orbit, joined a lane) in the window is still drawn where its *current* phase
-  puts it at the past `jd`, as a ship's analytic state is a snapshot of now, overwritten at every phase change.
 - A fight born while another is watched (one replacing the other) is a barrier: the resume points of the first fight
   are cleared when the second takes its place.
 

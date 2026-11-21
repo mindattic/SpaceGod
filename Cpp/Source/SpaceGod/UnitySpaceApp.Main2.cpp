@@ -1082,7 +1082,10 @@ namespace SpaceGod
 					continue;
 				}
 
-				auto st = Fleet()->StateOf(ship, jd);
+				// US-T430: while a hold plays back a moment before the ship's last change of phase (an orbit left, a lane joined),
+				// it is drawn on the schedule it had then, not the one it has now at a past date.
+				auto drawn = HoldRewindShipAsWas(i, ship);
+				auto st = Fleet()->StateOf(drawn, jd);
 				shipStates[i] = st;
 				// US-T213: a hull in a battle is where its unit fights (the battle's anchor plus its place in it), not at the
 				// point its schedule holds, so the HUD's altitude and anything reading ShipStateOf see the fight's true place.
@@ -1105,37 +1108,37 @@ namespace SpaceGod
 				}
 
 				Core::DVec3 facing;
-				if (ship->Phase == Core::ShipPhase::Parked)
+				if (drawn->Phase == Core::ShipPhase::Parked)
 				{
-					auto orbit = ship->Orbit;
+					auto orbit = drawn->Orbit;
 					shipScene[i] = bodyScene[orbit->Body] + Scale()->LocalOffset((*Catalog())[orbit->Body], orbit->OffsetAt(jd));
 					facing = st.Facing.SwapYZ();
 				}
-				else if (ship->Phase == Core::ShipPhase::Queued || ship->Planetside())
+				else if (drawn->Phase == Core::ShipPhase::Queued || drawn->Planetside())
 				{
 					// At a docking ring: in the ringed world's own (turning) neighbourhood.
-					int body = ship->Ring->Body;
+					int body = drawn->Ring->Body;
 					shipScene[i] = bodyScene[body] + Scale()->LocalOffset((*Catalog())[body], st.HelioKm - Ephemeris()->Helio(body));
 					facing = st.Facing.SwapYZ();
 				}
-				else if (ship->Phase == Core::ShipPhase::Lane)
+				else if (drawn->Phase == Core::ShipPhase::Lane)
 				{
 					Core::DVec3 travel;
-					auto onLane = Scale()->LaneScene(Ephemeris(), bodyScene, Fleet()->Lanes, ship, st.Progress, travel);
-					auto side = SideScene(Fleet()->LanePoint(ship, jd, st.Progress), ship->LaneHoldSide);
-					shipScene[i] = onLane + side * Core::Fleet::LaneRejoin(ship, jd);
+					auto onLane = Scale()->LaneScene(Ephemeris(), bodyScene, Fleet()->Lanes, drawn, st.Progress, travel);
+					auto side = SideScene(Fleet()->LanePoint(drawn, jd, st.Progress), drawn->LaneHoldSide);
+					shipScene[i] = onLane + side * Core::Fleet::LaneRejoin(drawn, jd);
 					facing = travel;
 				}
-				else if (ship->Phase == Core::ShipPhase::Lurk || ship->Phase == Core::ShipPhase::Adrift)
+				else if (drawn->Phase == Core::ShipPhase::Lurk || drawn->Phase == Core::ShipPhase::Adrift)
 				{
 					Core::DVec3 along;
-					shipScene[i] = LaneHoldScene(ship, along);
+					shipScene[i] = LaneHoldScene(drawn, along);
 					facing = along;
 				}
 				else
 				{
 					Core::DVec3 travel;
-					shipScene[i] = TransitScene(ship, st.Progress, travel);
+					shipScene[i] = TransitScene(drawn, st.Progress, travel);
 					facing = travel;
 				}
 
