@@ -817,7 +817,9 @@ perfectly state-exact harmless. Desync detection: every 60 frames each peer hash
 (Bench/CSharp's idea, cut down: the clock, every system's date, detail level and counts, every faction's treasury, and in the
 active system every ship's position, every settlement's people and stock, every battle unit and who holds which seat;
 FNV-1a), clients send theirs, the host compares and logs `digests match` or `DESYNC`, and a desync resyncs (at most three
-times a player). A client also clamps its clock to the host's date after each frame (`clock corrections`: 0 so far).
+times a player). US-T444: every peer keeps the text of its last 20 digests; on a `DESYNC` the host writes its own to
+`Saved/Logs/CoopDigest-<host name>-<frame>.txt` and tells the client (`digestdump <frame>`) to write its own beside it, so
+a `diff` of the two names the line (system, ship, settlement, unit, seat, helm or statecraft) that drifted. A client also clamps its clock to the host's date after each frame (`clock corrections`: 0 so far).
 
 **Failure modes.** What the hash catches and the save fixes: anything a peer does to the Core outside the frames. Since
 US-T43 normal play does nothing of the kind (the helm, the cockpit, the HUD's writers, loads and settings all go through the

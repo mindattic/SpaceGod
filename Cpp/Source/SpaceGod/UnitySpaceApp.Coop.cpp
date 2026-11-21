@@ -695,7 +695,9 @@ namespace SpaceGod
 		return sb;
 	}
 
-	cs::String UnitySpaceApp::CoopDigest()
+	cs::String UnitySpaceApp::CoopDigest() { return Wire::Hex(Wire::Fnv1a64(CoopDigestText())); }
+
+	cs::String UnitySpaceApp::CoopDigestText()
 	{
 		cs::String sb;
 		sb.reserve(64 * 1024);
@@ -755,7 +757,7 @@ namespace SpaceGod
 		sb += cs::Cat(" ", Course != nullptr && Course->Destination != nullptr ? Course->Destination->Name : cs::String("-"), " ",
 			PlottedCourse != nullptr ? "ftl" : "-", InFtlCruise() ? " cruise" : "", "\n");
 		CoopDigestStatecraft(sb); // US-T47
-		return Wire::Hex(Wire::Fnv1a64(sb));
+		return sb;
 	}
 
 	void UnitySpaceApp::CoopDigestStatecraft(cs::String& sb)

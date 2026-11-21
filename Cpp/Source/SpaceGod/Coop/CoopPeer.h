@@ -273,5 +273,13 @@ namespace SpaceGod::Coop
 		bool running = false, welcomed = false, refused = false;
 
 		void SendDigest(UnitySpaceApp* app, long long frame);
+
+		// US-T444: the text of the last few digests, so a desync can be written out on both ends and compared.
+		static constexpr size_t KeptDigestTexts = 20;
+		std::map<long long, cs::String> digestTexts;
+		/// Keeps the digest's text for the frame and returns its hash (CoopDigest's).
+		cs::String KeepDigest(long long frame, cs::String text);
+		/// Writes the digest text kept for the frame to Saved/Logs/CoopDigest-<name>-<frame>.txt.
+		void DumpDigest(long long frame);
 	};
 }

@@ -102,6 +102,8 @@ public:
 	/// it, every system's date, detail and counts, every faction's treasury, and in the active system every ship's
 	/// position, every settlement's people and stock, every battle unit, and who holds which seat; hashed with FNV-1a.
 	cs::String CoopDigest();
+	/// US-T444: the text CoopDigest hashes, one line per thing (kept by the peers so a desync can be written out and compared).
+	cs::String CoopDigestText();
 	/// US-T47: the strategy layer and statecraft, as the galaxy map's screens write them (the C# track's text): the polity
 	/// the party speaks for, every polity's directives, the objectives, pacts, proposals waiting and the record, and between
 	/// every two states how they stand and what each thinks of the other.

@@ -20,6 +20,8 @@
 #include "HAL/PlatformProcess.h"
 #include "HAL/PlatformTime.h"
 #include "Misc/DateTime.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
 #include "Misc/ScopeLock.h"
 #include "Serialization/Archive.h"
 #include "Templates/UniquePtr.h"
@@ -352,7 +354,7 @@ namespace SpaceGod::Coop
 				if (r.State == RemoteState::Syncing || r.State == RemoteState::Running) r.Link->Send(msg);
 			if (app != nullptr && rec->Frame % DigestEvery == 0 && (!remotes.empty() || CoopSmoke::Active()))
 			{
-				cs::String d = app->CoopDigest();
+				cs::String d = KeepDigest(rec->Frame, app->CoopDigestText());
 				digests[rec->Frame] = d;
 				digests.erase(rec->Frame - DigestEvery * 64);
 				Log(cs::Cat("digest frame ", rec->Frame, " = ", d, " (", localName, ", player 1)"));
@@ -415,7 +417,7 @@ namespace SpaceGod::Coop
 		haveSyncChunks = true;
 		syncId++;
 		syncFrame = frameNo;
-		cs::String digest = app->CoopDigest();
+		cs::String digest = KeepDigest(frameNo, app->CoopDigestText());
 		digests[frameNo] = digest;
 		int sent = 0;
 		for (auto& r : remotes)
@@ -665,6 +667,9 @@ namespace SpaceGod::Coop
 		}
 		Desyncs++;
 		Warn(cs::Cat("DESYNC at frame ", frame, ": host ", ours, ", ", NameOf(r.Seat), " (player ", r.Seat + 1, ") ", theirs));
+		// US-T444: both ends write the digest's text for the frame, so the two can be compared line by line.
+		DumpDigest(frame);
+		r.Link->Send(cs::Cat("digestdump ", frame));
 		if (r.State != RemoteState::Running) return; // a sync is already on its way
 		if (++r.Resyncs > MaxResyncs)
 		{
@@ -711,9 +716,31 @@ namespace SpaceGod::Coop
 
 	void CoopPeer::SendDigest(UnitySpaceApp* app, long long frame)
 	{
-		cs::String d = app->CoopDigest();
+		cs::String d = KeepDigest(frame, app->CoopDigestText());
 		Log(cs::Cat("digest frame ", frame, " = ", d, " (", localName, ", player ", localSeat + 1, ")"));
 		if (hostLink) hostLink->Send(cs::Cat("digest ", frame, " ", d));
+	}
+
+	cs::String CoopPeer::KeepDigest(long long frame, cs::String text)
+	{
+		cs::String d = Wire::Hex(Wire::Fnv1a64(text));
+		digestTexts[frame] = std::move(text);
+		while (digestTexts.size() > KeptDigestTexts) digestTexts.erase(digestTexts.begin());
+		return d;
+	}
+
+	void CoopPeer::DumpDigest(long long frame)
+	{
+		auto it = digestTexts.find(frame);
+		if (it == digestTexts.end())
+		{
+			Warn(cs::Cat("no digest text kept for frame ", frame, " to write out"));
+			return;
+		}
+		FString path = FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectLogDir(),
+			ToF(cs::Cat("CoopDigest-", localName, "-", frame, ".txt"))));
+		bool ok = FFileHelper::SaveStringToFile(ToF(it->second), *path, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
+		Log(cs::Cat("digest text for frame ", frame, (ok ? " written to " : " NOT written to "), cs::String(TCHAR_TO_UTF8(*path))));
 	}
 
 	void CoopPeer::SayBye()
@@ -793,6 +820,7 @@ namespace SpaceGod::Coop
 				chunks[static_cast<size_t>(i)] = msg.substr(b + 1);
 				if (hostLink) hostLink->Send(cs::Cat("ack ", id, " ", i));
 			}
+			else if (kind == "digestdump") DumpDigest(Wire::ParseL(msg.substr(11))); // US-T444
 			else if (kind == "roster")
 			{
 				auto lines = Wire::Split(msg, '\n');

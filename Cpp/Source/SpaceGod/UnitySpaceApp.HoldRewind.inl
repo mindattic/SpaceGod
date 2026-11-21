@@ -178,6 +178,11 @@ private:
 	/// resume point. Read only.</summary>
 	void RecordHoldRewind(float dt);
 
+	/// <summary>US-T444: between the stars (a star trip under way, or FTL cruise), so nothing lives for the rewind. In co-op
+	/// the host's answer, carried in its frame's Post as HrBetweenPost (a party trip runs only in the host's view).</summary>
+	bool HrBetweenStars();
+	static constexpr const char* HrBetweenPost = "hr-between";
+
 	/// <summary>US-T409: forgets every track and resume point (a load, a keyframe rewind, co-op). US-T410: the bookings held
 	/// back are made first (<paramref name="book"/>), unless the world they belong to is being thrown away (a load).</summary>
 	void ClearHoldRewind(bool book = true);

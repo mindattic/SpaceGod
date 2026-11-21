@@ -1189,6 +1189,25 @@ namespace SpaceGod
 
 	// ------------------------------------------------------------------------------------------- recording
 
+	bool UnitySpaceApp::HrBetweenStars()
+	{
+		bool local = Travel->Active || InFtlCruise();
+		Coop::CoopPeer* peer = Coop::CoopPeer::Current();
+		if (peer == nullptr) return local;
+		// US-T444: a party trip is the host's view's alone (a client's view only follows its Activate, so a client's
+		// Travel is never active): the host's frame says whether it was between the stars, so the rewind's lived seconds,
+		// and the held-back bookings they let go, stand still on every peer alike.
+		if (peer->IsHost())
+		{
+			if (local && peer->Open() != nullptr) peer->Open()->Post.push_back(HrBetweenPost);
+			return local;
+		}
+		if (peer->ClientRecord == nullptr) return local;
+		for (const auto& p : peer->ClientRecord->Post)
+			if (p == HrBetweenPost) return true;
+		return false;
+	}
+
 	void UnitySpaceApp::RecordHoldRewind(float dt)
 	{
 		if (holdRewind == nullptr) holdRewind = std::make_shared<HoldRewindState>();
@@ -1204,7 +1223,7 @@ namespace SpaceGod
 			return;
 		}
 		// Nothing lived: the clock stopped, or between the stars (a barrier, through the seat, once flying again).
-		if (Clock->Paused() || Travel->Active || InFtlCruise()) return;
+		if (Clock->Paused() || HrBetweenStars()) return;
 		HrSharedScope shared(coopShared, coop);
 
 		h.LivedS += dt;

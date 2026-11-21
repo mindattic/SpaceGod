@@ -654,6 +654,12 @@ the readout's centre line on every peer, and a co-op log line whenever who holds
   quicksave, keyframe) do not book the held-back fates in co-op (they wait out the window on every peer alike); a sync
   starts the recording afresh on every peer (a hold under way back to its press, the bookings made into the sync's
   save; `ResetHoldRewindForSync`). One machine's `-norewind` does not reach the party's rewind.
+- **Between the stars is the host's (US-T444).** Nothing lives for the rewind between the stars, so its lived seconds
+  stand still and the held-back bookings wait. A party trip is flown only in the host's view (a client's view arrives with
+  its `activate`; its own `Travel` is never active), so a client used to go on living through the trip and book the
+  fates the host still held (two more world events in the system left behind: a desync a few frames after the
+  arrival, only when a fight had a loss in the window as the trip began). The host now marks each frame it spent
+  between the stars (`hr-between` in the frame's Post, `HrBetweenStars`) and every client stands still on those frames.
 - **Proved** by the co-op smoke (`./tools/play.ps1 -Mode coop-smoke`): after its load the client starts a fight off
   Uranus in the frames (`x <seat> hrfight`, smoke only), holds Shift+R alone for 90 frames (no rewind), then the host
   holds too (`smokehold`, the headless host has no keyboard), both play it back from the same frame, let go, and play
