@@ -308,7 +308,7 @@ namespace SpaceGod::Core
 			bar.Add(e);
 		}
 		// US-T366: with a hostile hull locked that is open to boarding, it can call the side's boarders onto it.
-		auto prize = u->PlayerLockTarget;
+		auto prize = u != nullptr ? u->PlayerLockTarget : nullptr; // US-T425: no unit out of a fight
 		if (fight && prize != nullptr && prize->Present() && prize->Kind == UnitKind::Ship && b->Hostile(u, prize) && Battle::OpenPrize(prize))
 		{
 			int able = 0;
