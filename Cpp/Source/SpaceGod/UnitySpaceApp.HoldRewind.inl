@@ -49,6 +49,10 @@ public:
 		/// <summary>US-T424: true: a fight the hull flew clear of (or that went out of view) is still kept while it goes on, so
 		/// leaving it is no barrier: a hold to before puts the hull back in it. False: leaving it is a barrier.</summary>
 		static constexpr bool KeepFightLeft = true;
+		/// <summary>US-T443: true: a fight born in the window while another is watched (and still going on) is no barrier:
+		/// the other stays recorded, played back and put back with every resume point, and a hold back past the new one's
+		/// start takes it back and watches the other again. False: the new fight replacing the other is a barrier.</summary>
+		static constexpr bool KeepReplacedFight = true;
 		/// <summary>US-T410: true: while held, the whole system is drawn as it was (the world clock set back for the drawing
 		/// only: planets, ships in orbit and on the lanes, gates), and put back to now on letting go.</summary>
 		static constexpr bool ViewSystemBack = true;

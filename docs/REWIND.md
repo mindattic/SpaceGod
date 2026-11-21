@@ -774,10 +774,27 @@ left the start line behind. They now scan the whole log, at most 400 lines (US-T
 test timed out once in phase 18 and did not repeat; a phase's timeout now logs the refusal, the clock, the helm and
 the cooldown, so another such run will say why.
 
+### A fight born while another is watched (US-T443)
+
+When a fight born in the window (`BornS`) replaces one the rewind is watching that is still going on
+(`KeepReplacedFight`), the first fight is kept as `HoldRewindState::Prev`.
+
+- **What is kept:** its tracks and resume points stay, its units, missiles, rounds and decoys keep being recorded and
+  played back, and its held-back bookings stay held. The newborn fight's own bookings are made as they come.
+- **Resume points:** each one taken after the switch carries the first fight's state too (`HrAnchor::Also`), and so
+  does the press's. Every resume puts both back.
+- **A hold back past the new fight's start:** takes the new fight back (`War::Unstart`) and puts the first back from
+  its resume point. The rewind and the camera then watch the first fight again, as it was then.
+- **Proved** by the birth self-test's phases 110-113 (24/24 with the rest):
+  - A skirmish off Neptune is watched, a moment is marked, and a fight is born off Saturn in its place.
+  - Its start is no barrier, and the first stays recorded.
+  - A hold to the mark takes the newborn back and watches the first again. Its clock was put back from 10.22 s at the
+    press to 7.02 s, the resume point at or before the 7.50 s mark.
+
 ### Not yet (later stages)
 
-- A fight born while another is watched (one replacing the other) is a barrier: the resume points of the first fight
-  are cleared when the second takes its place.
+- A replaced fight is kept for one replacement: a third fight born while the second is kept replaces it outright (a
+  barrier, as before).
 
 ### Co-op too (US-T428)
 

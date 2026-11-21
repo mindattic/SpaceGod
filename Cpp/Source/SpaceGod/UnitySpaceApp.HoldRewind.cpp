@@ -59,6 +59,8 @@
 #include "Embodiment/MechWalker.h" // US-T416: a deployed mech's state, captured by value
 #include "Fleet.h" // US-T418: the fleet's comings and goings through the gates
 #include "BodyCatalog.h" // US-T424: the birth check's hull, off Uranus
+#include "SceneTour.h" // US-T443: the replaced-fight check's watched skirmish
+#include "ScaleModel.h"
 #include "BodyDefinition.h"
 #include "Misc/Paths.h" // US-T419: the self-test's screenshots
 #include "UnrealClient.h"
@@ -162,6 +164,9 @@ namespace SpaceGod
 			PilotState Pilot;
 			cs::Ref<Ship> PilotShip;
 			int PilotFrame = -1;
+			/// <summary>US-T443: the fight watched before a fight born in the window replaced it (still going on), as it was at
+			/// this moment, put back with this one.</summary>
+			std::shared_ptr<HrAnchor> Also;
 		};
 
 		/// <summary>What a resume cannot put back: who is in the fight and in what state, the seats. Any change between
@@ -636,6 +641,10 @@ namespace SpaceGod
 			double PhaseWasEnd = 0;
 			/// <summary>US-T431: the danger at the body before the birth check's fight began, and just after.</summary>
 			double DangerBefore = 0, DangerRaised = 0;
+			/// <summary>US-T443: the replaced-fight check: the fight watched first, the moment marked, its clock then and at the press.</summary>
+			cs::Ref<Battle> PrevFight;
+			double ReplaceMarkT = HrNone, PrevSecondsAtMark = 0, PrevSecondsAtPress = 0;
+			bool MovedClear = false;
 			cs::String BirthName;
 		};
 	}
@@ -653,6 +662,10 @@ namespace SpaceGod
 		cs::Ref<Battle> Entered;
 		double EnteredT = HrNone;
 		bool EnteredBorn = false;
+		/// <summary>US-T443: the fight watched when a fight born in the window took its place, while it goes on: still
+		/// recorded and played back, its held-back bookings still held, and put back with every resume point, so a hold
+		/// back past the new fight's start takes that one back and watches this one again.</summary>
+		cs::Ref<Battle> Prev;
 		/// <summary>US-T424: while a hold plays back a moment before the fight entered was born, its ships are let out of it
 		/// (their Battle cleared, so everything that reads it, the HUD's fight panels and status lines too, sees no fight);
 		/// these are put back in before anything else when the moment reached is after its start again, or the hold ends.</summary>
@@ -1219,28 +1232,40 @@ namespace SpaceGod
 		// US-T419: fought on since it would have ended (or put back to before): its end, if it comes again, starts afresh.
 		if (h.Hooked == nullptr || !h.Hooked->EndHeld) h.EndHeldSince = HrNone;
 		bool entering = false;
+		auto warHolds = [this](const cs::Ref<Battle>& b) { return b != nullptr && !b->Over && World()->War != nullptr && World()->War->Battles.Contains(b); };
+		// US-T443: the fight a born one replaced, once it is over or gone, is no longer kept.
+		if (h.Prev != nullptr && !warHolds(h.Prev)) h.Prev = nullptr;
 		if (fight != h.Fight)
 		{
-			// Another fight (or none): its tracks start now, and nothing before now can be played on from...
-			h.Units.clear();
-			h.Missiles.clear();
-			h.Rounds.clear();
-			h.Decoys.clear();
+			bool born = fight != nullptr && fight->Seconds <= HrTuning::BornS && warHolds(fight);
+			// US-T443: a fight born while another is watched, the other still going on: both are kept (the other's tracks,
+			// resume points and held-back bookings stay), so a hold back past the new one's start takes it back.
+			bool replacing = HrTuning::UndoFightStart && HrTuning::KeepReplacedFight && born && h.Prev == nullptr && warHolds(h.Fight);
+			if (!replacing)
+			{
+				// Another fight (or none): its tracks start now, and nothing before now can be played on from...
+				h.Units.clear();
+				h.Missiles.clear();
+				h.Rounds.clear();
+				h.Decoys.clear();
+			}
 			// ...US-T424: unless it is the first fight watched since none was: then the helm's resume points before it stay,
 			// and a resume to one of them takes the fight back if it was born now (or lets the hull go of it, or leaves a
 			// fight that only came into view going on from now).
 			// (In co-op too: every peer sees the same fight entered at the same frame, and takes it back at the same frame.)
-			entering = HrTuning::UndoFightStart && h.Fight == nullptr && fight != nullptr;
+			entering = HrTuning::UndoFightStart && fight != nullptr && (h.Fight == nullptr || replacing);
+			h.Prev = replacing ? h.Fight : nullptr;
 			h.Entered = entering ? fight : nullptr;
 			h.EnteredT = entering ? t : HrNone;
-			h.EnteredBorn = entering && fight->Seconds <= HrTuning::BornS && World()->War != nullptr && World()->War->Battles.Contains(fight);
+			h.EnteredBorn = entering && born;
 			if (!entering) h.Anchors.clear();
 			h.Fight = fight;
 			h.FightSince = t;
 			h.NextAnchorAt = 0;
 		}
-		// US-T410: the bookings of the fight in view wait out the window.
-		HookHoldRewindBookings(fight);
+		// US-T410: the bookings of the fight in view wait out the window. US-T443: while a born fight has replaced one still
+		// going on, the replaced one's stay held (it is the one with a past to undo; the newborn's are booked as they come).
+		HookHoldRewindBookings(h.Prev != nullptr ? h.Prev : fight);
 		HrCensus census = HrTakeCensus(fight, bodyShip, pilotFrameBody, piloting);
 		if (coop) census.Coop = CoopHoldRewindSeats();
 		// US-T424: the fight entered is no barrier (only what else changed this frame): the census before it counted none.
@@ -1278,9 +1303,12 @@ namespace SpaceGod
 		bool craftTick = t >= h.NextCraftAt;
 		if (craftTick) h.NextCraftAt = t + 1.0 / HrTuning::CraftHz;
 
-		if (fight != nullptr)
+		// US-T443: the fight watched and, while a born fight has replaced it, the replaced one too (keyed by object, so both
+		// share the track maps).
+		auto recordFight = [&](const cs::Ref<Battle>& f, double fs)
 		{
-			for (const auto& u : fight->Units)
+			if (f == nullptr) return;
+			for (const auto& u : f->Units)
 			{
 				if (u == nullptr) continue;
 				auto& tr = h.Units[u.get()];
@@ -1291,7 +1319,7 @@ namespace SpaceGod
 				if (!tr.Poses.empty() && !changed && (!due || !u->Present())) continue;
 				HrPose p;
 				p.T = t;
-				p.S = s;
+				p.S = fs;
 				p.Pos = u->Pos;
 				p.Vel = u->Vel;
 				p.Fwd = u->Forward;
@@ -1303,11 +1331,13 @@ namespace SpaceGod
 			}
 			if (craftTick && h.Samples < HrTuning::MaxSamples)
 			{
-				HrRecordProjectiles(h.Missiles, fight->Missiles, t, s, h.Samples);
-				HrRecordProjectiles(h.Rounds, fight->Rounds, t, s, h.Samples);
-				HrRecordProjectiles(h.Decoys, fight->Decoys, t, s, h.Samples);
+				HrRecordProjectiles(h.Missiles, f->Missiles, t, fs, h.Samples);
+				HrRecordProjectiles(h.Rounds, f->Rounds, t, fs, h.Samples);
+				HrRecordProjectiles(h.Decoys, f->Decoys, t, fs, h.Samples);
 			}
-		}
+		};
+		recordFight(fight, s);
+		if (h.Prev != nullptr && h.Prev != fight) recordFight(h.Prev, h.Prev->Seconds);
 		if (piloting) h.Pilot.push_back(HrPilotPose { t, pilot(), pilotFrameBody });
 
 		// US-T424: a resume point every AnchorS even with no fight or helm (an empty one: nothing of a fight to put back), so
@@ -1315,6 +1345,8 @@ namespace SpaceGod
 		if (t >= h.NextAnchorAt)
 		{
 			h.Anchors.push_back(HrCaptureAnchor(t, fight, piloting, pilot(), ship, pilotFrameBody, heldNonHelm));
+			// US-T443: the replaced fight as it is now, put back with this one.
+			if (h.Prev != nullptr && h.Prev != fight) h.Anchors.back()->Also = HrCaptureAnchor(t, h.Prev, false, PilotState(), nullptr, -1, nullptr);
 			h.NextAnchorAt = t + HrTuning::AnchorS;
 			// The self-test's mark: the state this resume point holds, hashed now (it is the live state this instant).
 			if (h.Test.On && h.Test.Phase == 1 && h.Test.M < 0 && fight != nullptr && fight == h.Test.Fight)
@@ -1493,6 +1525,7 @@ namespace SpaceGod
 			Coop::CoopPeer* peer = Coop::CoopPeer::Current();
 			// US-T423: in co-op no seat but the shared helm is put back (any player's seat changed is a barrier instead).
 			h.AtPress = HrCaptureAnchor(h.LivedS, h.Fight, piloting, pilot(), piloting ? h.PilotShip : nullptr, pilotFrameBody, peer != nullptr ? nullptr : HeldNonHelm());
+			if (h.Prev != nullptr && h.Prev != h.Fight) h.AtPress->Also = HrCaptureAnchor(h.LivedS, h.Prev, false, PilotState(), nullptr, -1, nullptr); // US-T443
 			h.Active = true;
 			h.Releasing = false;
 			h.PressT = h.LivedS;
@@ -1643,6 +1676,28 @@ namespace SpaceGod
 			HrPlayProjectiles(h.Fight->Rounds, h.Rounds, tau, interval);
 			HrPlayProjectiles(h.Fight->Decoys, h.Decoys, tau, interval);
 		}
+		// US-T443: the fight a born one replaced plays back too (every resume point puts it back with the fight watched).
+		if (h.Prev != nullptr && h.Prev != h.Fight)
+		{
+			for (const auto& u : h.Prev->Units)
+			{
+				if (u == nullptr) continue;
+				auto found = h.Units.find(u.get());
+				if (found == h.Units.end()) continue;
+				HrPose p;
+				if (!HrPoseAt(found->second.Poses, tau, p)) continue;
+				u->Pos = p.Pos;
+				u->Vel = p.Vel;
+				u->Forward = p.Fwd;
+				u->Dead = p.Dead;
+				u->Fled = p.Fled;
+				u->Docked = p.Docked;
+			}
+			double interval = 1.0 / HrTuning::CraftHz;
+			HrPlayProjectiles(h.Prev->Missiles, h.Missiles, tau, interval);
+			HrPlayProjectiles(h.Prev->Rounds, h.Rounds, tau, interval);
+			HrPlayProjectiles(h.Prev->Decoys, h.Decoys, tau, interval);
+		}
 		if (!h.Pilot.empty() && IsPiloting() && World()->PilotedShip == h.PilotShip)
 		{
 			auto it = std::lower_bound(h.Pilot.begin(), h.Pilot.end(), tau, [](const HrPilotPose& p, double t) { return p.T < t; });
@@ -1731,6 +1786,8 @@ namespace SpaceGod
 			// since by any player is a barrier, so the seats are already as they were).
 			if (peer == nullptr) RestoreHoldRewindSeat(a.Seat, a.HasPilot, a.PilotShip);
 			HrRestoreFight(a);
+			// US-T443: the fight a born one replaced, as it was then (while the war still holds it).
+			if (a.Also != nullptr && a.Also->Live != nullptr && World()->War != nullptr && World()->War->Battles.Contains(a.Also->Live)) HrRestoreFight(*a.Also);
 			if (a.HasPilot && IsPiloting() && World()->PilotedShip == a.PilotShip && a.PilotFrame >= 0)
 			{
 				// US-T422: in the frame it was taken in (a crossing into another body's space since is undone with it), as a
@@ -1792,13 +1849,15 @@ namespace SpaceGod
 		if (h.Entered != nullptr && h.Entered == h.Fight && best->T < h.EnteredT)
 		{
 			auto fight = h.Fight;
-			// What it held back never happened now; its hooks go back to the world's (nothing left to book).
+			auto replaced = h.Prev; // US-T443: the fight it replaced, still going on (or null)
+			// What it held back never happened now; its hooks go back to the world's (nothing left to book). US-T443: with a
+			// replaced fight the hooks are that one's, which stays watched: they stay on (its earlier bookings still wait).
 			while (!h.Bookings.empty() && h.Bookings.back().T > best->T) h.Bookings.pop_back();
-			HookHoldRewindBookings(nullptr);
+			if (replaced == nullptr) HookHoldRewindBookings(nullptr);
 			if (h.EnteredBorn && World()->War != nullptr && World()->War->Unstart(fight, Clock->Jd))
 			{
-				if (battleTimeFor == fight) battleTimeFor = nullptr;
-				beforeFight = cs::Cat(": before ", fight->Name, " began");
+				if (battleTimeFor == fight) battleTimeFor = replaced;
+				beforeFight = cs::Cat(": before ", fight->Name, " began", replaced != nullptr ? cs::Cat(" (", replaced->Name, " watched again)") : cs::String());
 			}
 			else
 			{
@@ -1815,11 +1874,22 @@ namespace SpaceGod
 				}
 				else beforeFight = cs::Cat(": before ", fight->Name, " came into view (it goes on from now)");
 			}
-			h.Units.clear();
-			h.Missiles.clear();
-			h.Rounds.clear();
-			h.Decoys.clear();
-			h.Fight = nullptr;
+			// US-T443: with a replaced fight, that one is the fight watched again, its tracks and resume points kept.
+			if (replaced == nullptr || !World()->War->Battles.Contains(replaced))
+			{
+				h.Units.clear();
+				h.Missiles.clear();
+				h.Rounds.clear();
+				h.Decoys.clear();
+				h.Fight = nullptr;
+			}
+			else
+			{
+				h.Fight = replaced;
+				// Its own time with it, as the resume point put it back (the marks held the newborn's clock since then).
+				h.FightSince = std::min(h.FightSince, best->T);
+			}
+			h.Prev = nullptr;
 			h.Entered = nullptr;
 			h.EnteredT = HrNone;
 			h.EnteredBorn = false;
@@ -2247,6 +2317,102 @@ namespace SpaceGod
 					if (again == nullptr) return finish("the fight did not begin again after it was taken back");
 					selfCheck(again->Id == t.BirthId && again->Name == t.BirthName, cs::Cat("begun again, it is the same fight by number and name (",
 						again->Name, " #", again->Id, ", was ", t.BirthName, " #", t.BirthId, ")"));
+					// US-T443: on to a fight born while another is watched. This one is taken off (the test's own doing) so the
+					// hull is free again.
+					World()->War->Unstart(again, Clock->Jd);
+					if (battleTimeFor == again) battleTimeFor = nullptr;
+					t.PhaseWall = wall;
+					t.Phase = 110;
+					return true;
+				}
+				// US-T443: a fight born while another is watched. A skirmish off Neptune is watched (the hull free off Uranus),
+				// a moment marked, then a fight begins on the hull (born, it takes the other's place); a hold back to the mark
+				// takes the new one back and watches the first again, put back as it was.
+				case 110:
+				{
+					if (!t.MovedClear)
+					{
+						// Out of the squadron's reach (the helm's own check would start a fight on the hull again), the one
+						// it is in taken off.
+						auto uranusBody = (*Catalog())["Uranus"];
+						pilotFrameBody = uranusBody->Index;
+						if (helmFlight != nullptr) helmFlight->FrameBody = uranusBody->Index;
+						SeedPilot(DVec3(0.3, 1, 0.2).Normalized() * (ScaleModel::NeighbourhoodKm(uranusBody) * 3), DVec3::Zero, DVec3::UnitX);
+						if (ship->Battle != nullptr) World()->War->Unstart(ship->Battle, Clock->Jd);
+						battleTimeFor = nullptr;
+						t.MovedClear = true;
+						t.PhaseWall = wall;
+						return true;
+					}
+					if (!HoldRewindRefusal().empty() || ship->Battle != nullptr) return true;
+					if (t.PrevFight == nullptr)
+					{
+						auto neptune = (*Catalog())["Neptune"];
+						if (neptune == nullptr) return finish("no Neptune for the replaced-fight check");
+						t.PrevFight = SceneTour::TriggerSkirmish(*this, neptune->Index, World()->Sol, World()->Reach,
+							cs::List<ShipClass>{ ShipClass::Cruiser, ShipClass::Destroyer, ShipClass::Frigate });
+						if (t.PrevFight == nullptr) return finish("the watched fight for the replaced-fight check did not start");
+						t.PrevFight->Advance(5, false);
+						WatchBattle(t.PrevFight);
+						t.PhaseWall = wall;
+						return true;
+					}
+					if (h.Fight != t.PrevFight || h.LivedS - h.FightSince < 2.5) return true;
+					if (t.ReplaceMarkT == HrNone)
+					{
+						t.ReplaceMarkT = h.LivedS;
+						t.PrevSecondsAtMark = t.PrevFight->Seconds;
+						t.PhaseWall = wall;
+						return true;
+					}
+					if (wall - t.PhaseWall < 0.7) return true;
+					// A fight born off Saturn, watched in the first one's place.
+					auto saturn = (*Catalog())["Saturn"];
+					auto fight = saturn != nullptr ? SceneTour::TriggerSkirmish(*this, saturn->Index, World()->Sol, World()->Reach,
+						cs::List<ShipClass>{ ShipClass::Cruiser, ShipClass::Destroyer, ShipClass::Frigate }) : nullptr;
+					if (fight == nullptr) return finish("the newborn fight for the replaced-fight check did not start");
+					WatchBattle(fight);
+					t.Fight = fight;
+					t.BirthName = fight->Name;
+					t.PhaseWall = wall;
+					t.Phase = 111;
+					return true;
+				}
+				case 111: // Born in the other's place: both kept; fight 2 s, then hold back to the mark.
+				{
+					if (h.Fight != t.Fight) return true;
+					if (h.LivedS - h.EnteredT < 2.0) return true;
+					selfCheck(h.EnteredBorn && h.Prev == t.PrevFight, "a fight born while another is watched keeps the other (still recorded)");
+					selfCheck(h.BarrierT < t.ReplaceMarkT, "and its start is no barrier");
+					t.PrevSecondsAtPress = t.PrevFight->Seconds;
+					t.Target = t.ReplaceMarkT;
+					t.ForceDown = true;
+					t.SettleFrames = 0;
+					t.PhaseWall = wall;
+					t.Phase = 112;
+					return true;
+				}
+				case 112:
+				{
+					if (!h.Active) return true;
+					if (h.Tau > std::max(t.ReplaceMarkT, h.Oldest) + 1e-6) return true;
+					if (++t.SettleFrames < 3) return true;
+					t.ForceDown = false;
+					t.HaveResume = false;
+					t.PhaseWall = wall;
+					t.Phase = 113;
+					return true;
+				}
+				case 113: // Played on from before it began: it is gone, the first fight is watched again, as it was.
+				{
+					if (!t.HaveResume) return true;
+					selfCheck(t.ResumedAnchorT <= t.ReplaceMarkT + HrTuning::AnchorS + 1e-6, "a fight born in another's place does not block a resume to before it");
+					selfCheck(!World()->War->Battles.Contains(t.Fight) && ship->Battle == nullptr, "the newborn fight is taken back, the hull free");
+					selfCheck(World()->War->Battles.Contains(t.PrevFight) && h.Fight == t.PrevFight && HoldRewindBattle() == t.PrevFight,
+						"and the first fight is watched again");
+					selfCheck(t.PrevFight->Seconds < t.PrevSecondsAtPress - 0.5 && t.PrevFight->Seconds <= t.PrevSecondsAtMark + HrTuning::AnchorS + 0.1,
+						cs::Cat("put back as it was at the resume point (its clock ", cs::Fmt(t.PrevFight->Seconds, "F2"), " s, was ", cs::Fmt(t.PrevSecondsAtPress, "F2"),
+							" s at the press, ", cs::Fmt(t.PrevSecondsAtMark, "F2"), " s at the mark)"));
 					return finish(cs::String());
 				}
 				default:
