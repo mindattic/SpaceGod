@@ -1151,7 +1151,7 @@ namespace SpaceGod::Core
 			*s = *d.Before;
 			for (int i = Events.Count() - 1; i >= 0; i--)
 			{
-				if (Events[i].Jd < b->StartJd - 1e-9) break;
+				if (Events[i].Jd < b->StartJd - 1e-9) continue; // (not break: a later line may carry an earlier date)
 				if (Events[i].Text == d.Line)
 				{
 					Events.RemoveAt(i);

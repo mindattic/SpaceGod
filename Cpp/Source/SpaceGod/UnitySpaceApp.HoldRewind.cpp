@@ -2029,7 +2029,10 @@ namespace SpaceGod
 		};
 		if (!rewindEnabled) return finish("rewind is off in this run (-capture, -demo or -norewind): run it without them");
 		if (Coop::CoopPeer::Current() != nullptr) return finish("rewind is single-player: run it outside co-op");
-		if (wall - t.PhaseWall > 60) return finish(cs::Cat("phase ", t.Phase, " timed out"));
+		if (wall - t.PhaseWall > 60)
+			return finish(cs::Cat("phase ", t.Phase, " timed out (refusal '", HoldRewindRefusal(), "', clock ", Clock != nullptr && Clock->Paused() ? "paused" : "running",
+				", piloting ", IsPiloting() ? "yes" : "no", ", lived ", cs::Fmt(h.LivedS, "F1"), " s, frame clock ", cs::Fmt(h.FrameClock, "F1"), " cooldown until ",
+				cs::Fmt(h.CooldownUntil, "F1"), ")"));
 		// US-T419: the screen as drawn (the game's views and the readout), saved for a look: Saved/Screenshots/holdrewind-*.png.
 		auto shot = [](const char* name)
 		{
@@ -2219,9 +2222,14 @@ namespace SpaceGod
 						if (u != nullptr && u->Ship != nullptr && u->Ship->Battle == t.Fight) shipsFree = false;
 					selfCheck(shipsFree, "and every ship that was in it is back on its own schedule");
 					int lines = 0;
+					cs::String left;
 					for (const auto& e : World()->Events)
-						if (e.Jd >= t.Fight->StartJd - 1e-9 && e.Text.find(t.BirthName) != cs::String::npos) lines++;
-					selfCheck(lines == 0, "and the world's log no longer tells of it");
+						if (e.Jd >= t.Fight->StartJd - 1e-9 && e.Text.find(t.BirthName) != cs::String::npos)
+						{
+							lines++;
+							left = cs::Cat(" (left: [", static_cast<int>(e.Kind), "] ", e.Text, ")");
+						}
+					selfCheck(lines == 0, cs::Cat("and the world's log no longer tells of it", left));
 					double dangerNow = World()->War->Danger(t.Fight->Body);
 					selfCheck(t.DangerRaised > t.DangerBefore && dangerNow <= t.DangerBefore + 1e-9,
 						cs::Cat("and the danger its start raised at the body is given back (", cs::Fmt(t.DangerBefore, "F2"), " -> ", cs::Fmt(t.DangerRaised, "F2"),

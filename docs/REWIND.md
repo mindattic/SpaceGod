@@ -763,6 +763,17 @@ held before the change it is drawn on the schedule it had (17/17).
 - **No deprecated input.** The self-test's controller key path uses the engine's current
   `InputKey(FInputKeyEventArgs::CreateSimulated(...))`, so the build has no deprecation warnings left.
 
+### In a real window
+
+Both self-tests also run in a real game window (`UnrealEditor.exe <project> /Engine/Maps/Entry -game -windowed
+-ResX=1280 -ResY=720 -nosound -ExecCmds="sg.HoldRewind selftest [birth] quit"`), with Shift+R pressed through Slate,
+the OS keyboard's path. The main test passed 56/56 and the birth test 18/18, each on its last two windowed runs.
+The window turned up one bug. `War::Unstart` and `World::UndoDivert` stopped scanning the log at the first line
+dated before the fight's start, but a later line may carry an earlier date (another system's coarser clock), which
+left the start line behind. They now scan the whole log, at most 400 lines (US-T436). One windowed run of the main
+test timed out once in phase 18 and did not repeat; a phase's timeout now logs the refusal, the clock, the helm and
+the cooldown, so another such run will say why.
+
 ### Not yet (later stages)
 
 - A fight born while another is watched (one replacing the other) is a barrier: the resume points of the first fight

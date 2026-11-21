@@ -1660,10 +1660,11 @@ namespace SpaceGod::Core
 		lastNamedId = lastGateId = -1;
 		lastGate = nullptr;
 		// The log's line of its start (the starters name it; a gate ambush's line names the gate instead, and stays).
+		// (The whole log, at most 400 lines: a line written after it may carry an earlier date, another system's coarser clock.)
 		for (int i = world->Events.Count() - 1; i >= 0; i--)
 		{
 			const auto& e = world->Events[i];
-			if (e.Jd < b->StartJd - 1e-9) break;
+			if (e.Jd < b->StartJd - 1e-9) continue;
 			if (e.Kind != WorldEventKind::Battle && e.Kind != WorldEventKind::Law) continue;
 			if (e.Text.find(b->Name) != cs::String::npos) world->Events.RemoveAt(i);
 		}
