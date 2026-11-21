@@ -239,7 +239,12 @@ namespace SpaceGod
 	void UnitySpaceApp::DrawTractorHud()
 	{
 		DrawMiningHud(); // US-T264: the mining beam's readout, drawn with the tractor beam's
-		if (tractorReadout.empty() || !ShowHud || ScreenCleared || !HudModeOn()) return; // US-T439: the full HUD's
+	}
+
+	// US-T440: the tractor drawer's content (the full HUD's, as US-T439 had it), on the bottom edge.
+	void UnitySpaceApp::DrawTractorReadout()
+	{
+		if (tractorReadout.empty() || !ShowHud || ScreenCleared) return;
 		if (tractorStyle == nullptr)
 		{
 			tractorBack = UI::Hud::Solid(Color(0.03f, 0.07f, 0.06f, 0.82f), Color(0.45f, 1.0f, 0.78f, 0.7f));
@@ -261,9 +266,7 @@ namespace SpaceGod
 		cs::String head = bar == cs::String::npos ? tractorReadout : tractorReadout.substr(0, bar);
 		cs::String tail = bar == cs::String::npos ? cs::String() : tractorReadout.substr(bar + 1);
 		float w = 760, h = tail.empty() ? 28.0f : 46.0f;
-		auto r = Rect((Screen::width - w) * 0.5f, Screen::height - 124 - h, w, h);
-		if (!UiRects.Contains(r)) UiRects.Add(r); // US-T212: world names skip it
-		GUI::Box(r, GUIContent::none(), tractorPanel);
+		auto r = hud->Place(w, h); // US-T440: the tractor drawer (framed by it)
 		GUI::Label(Rect(r.x, r.y + 4, w, 20), head, tractorStyle);
 		if (!tail.empty()) GUI::Label(Rect(r.x, r.y + 24, w, 18), tail, tractorSmall);
 		if (tractorPod != nullptr && tractorStartKm > 1e-9)

@@ -88,6 +88,9 @@ namespace SpaceGod
 
 		/// The smoke run (Smoke/SpaceGodSmoke.cpp) reads private members, as the C# track's smoke does by reflection.
 		friend struct SmokeAccess;
+		/// US-T440: the HUD's drawers draw the app's own panels (comms, the cruise and tractor readouts, Influence, the rewind's,
+		/// the tutorial's card) through their *Body / *Readout calls.
+		friend class UI::Hud;
 
 #include "UnitySpaceApp.Main.inl"
 #include "UnitySpaceApp.Main2.inl"

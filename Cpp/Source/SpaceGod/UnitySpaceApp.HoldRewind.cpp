@@ -2017,8 +2017,20 @@ namespace SpaceGod
 				h.Text->fontSize = 15;
 			}
 		}
+		// US-T440: the quiet line (500 wide, top right) is its drawer's, at the top of the right edge (an alert, always shown,
+		// drawn bare in the minimal HUD as it was); the loud ones stay centred on the screen.
+		bool loud = r.width > 500.0f;
+		if (holdRewindReadoutPass == loud) return;
+		if (!loud) r = hud->Place(h.Text->CalcSize(GUIContent(line)).x + 8, r.height); // as wide as its line (right-aligned)
 		h.Text->normal.textColor = tint;
 		GUI::Label(r, line, h.Text);
+	}
+
+	void UnitySpaceApp::DrawHoldRewindReadout()
+	{
+		holdRewindReadoutPass = true;
+		DrawHoldRewind();
+		holdRewindReadoutPass = false;
 	}
 
 	// ------------------------------------------------------------------------------------------- the self-test

@@ -492,11 +492,9 @@ namespace SpaceGod
 		auto c = CommsHere();
 		float w = std::min(static_cast<float>(Screen::width) - 32, 980.0f);
 		float h = std::min(static_cast<float>(Screen::height) - 140, 470.0f);
-		float x = (Screen::width - w) * 0.5f;
-		float y = Screen::height - h - 96;
-		auto box = Rect(x, y, w, h);
-		GUI::Box(box, GUIContent::none(), commsPanel);
-		if (!UiRects.Contains(box)) UiRects.Add(box);
+		// US-T440: the comms drawer's content rect (floating, centred, its foot 104 up; framed by the drawer).
+		auto box = hud->Place(w, h);
+		float x = box.x, y = box.y;
 
 		auto me = c.Speaker != nullptr ? Characters::Of(World())->Find(c.Speaker) : nullptr;
 		cs::String speaker = me != nullptr ? cs::Cat(me->Styled(), ", the ", c.Speaker->Name)

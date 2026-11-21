@@ -85,7 +85,7 @@ namespace SpaceGod::UI
 			auto m = GUIContent(line2);
 			auto d = GUIContent(line3);
 			float w = Mathf::Max(Mathf::Max(text->CalcSize(a).x, small->CalcSize(b).x), Mathf::Max(small->CalcSize(m).x, small->CalcSize(d).x)) + 28;
-			auto r = Panel(layout.Take(HudRegion::TopRight, w, 86)); // US-T211: TopRight, under the opportunities
+			auto r = Place(w, 86); // US-T211; US-T440: the harvest drawer, up the right edge under the opportunities
 			GUI::contentColor = amber;
 			GUI::Label(Rect(r.x + 14, r.y + 5, w, 20), a, text);
 			GUI::contentColor = Color::white();
@@ -115,7 +115,7 @@ namespace SpaceGod::UI
 		auto b = GUIContent(line1);
 		auto m = GUIContent(line2);
 		float w = Mathf::Max(text->CalcSize(a).x, Mathf::Max(small->CalcSize(b).x, small->CalcSize(m).x)) + 28;
-		auto r = Panel(layout.Take(HudRegion::TopRight, w, raidable ? 68.0f : 50.0f)); // US-T211
+		auto r = Place(w, raidable ? 68.0f : 50.0f); // US-T211; US-T440: the harvest drawer
 		GUI::contentColor = amber;
 		GUI::Label(Rect(r.x + 14, r.y + 5, w, 20), a, text);
 		GUI::contentColor = offer != nullptr ? Color::white() : Dim;

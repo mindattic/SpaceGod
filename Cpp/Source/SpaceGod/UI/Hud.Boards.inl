@@ -283,6 +283,8 @@ private:
 	/// pointing (the middle of the screen, which the view follows) and a line saying what is held and how to leave it.
 	/// </summary>
 	void DrawSeat();
+	/// US-T440: the seat's sight, the deck guide and the role panel, drawn with the seat line but no part of its drawer.
+	void DrawSeatOverlays();
 
 	/// <summary>
 	/// US-T135, the role panel of whatever seat is held (<see cref="Core::IEmbodiable.RolePanel"/>): the role, its state and

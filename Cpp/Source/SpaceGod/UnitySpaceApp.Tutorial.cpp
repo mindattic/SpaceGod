@@ -237,6 +237,19 @@ namespace SpaceGod
 
 	// ---------------------------------------------------------------- the cards
 
+	bool UnitySpaceApp::TutorialCardShown() const
+	{
+		bool running = tutorial != nullptr && tutorial->Running();
+		return (running || tutorialDoneAge >= 0 || tutorialHint >= 0) && !tutorialOffer && !ScreenCleared && !Tour::ShowcaseTour::Running();
+	}
+
+	void UnitySpaceApp::DrawTutorialCard()
+	{
+		tutorialCardPass = true;
+		DrawTutorial();
+		tutorialCardPass = false;
+	}
+
 	void UnitySpaceApp::DrawTutorial()
 	{
 		bool running = tutorial != nullptr && tutorial->Running();
@@ -272,9 +285,10 @@ namespace SpaceGod
 		};
 		const char* sep = UI::UiStyle::Glyph::Separator;
 
-		// The welcome card, a profile's first New Game.
+		// The welcome card, a profile's first New Game (a prompt, drawn over the HUD; US-T440: not the card's drawer).
 		if (tutorialOffer)
 		{
+			if (tutorialCardPass) return;
 			float w = 480, h = 178;
 			auto r = Rect((sw - w) * 0.5f, (sh - h) * 0.5f - 60, w, h);
 			UI::UiMotion::Scope motion("tutorial.offer");
@@ -291,8 +305,11 @@ namespace SpaceGod
 		}
 
 		float w = Mathf::Min(580.0f, sw - 32), h = 150;
-		// Bottom centre, over the status line and the drawer's handle.
+		// Bottom centre, over the status line and the drawer's handle. US-T440: the tutorial's drawer (an alert, always shown:
+		// floating, centred, its foot 104 up), which frames it; the outline round what a step points at is drawn over the HUD.
 		auto r = Rect((sw - w) * 0.5f, sh - 10 - 30 - 10 - h, w, h);
+		const bool card = tutorialCardPass;
+		if (card && (running || tutorialDoneAge >= 0)) r = hud->Place(w, h);
 
 		if (running)
 		{
@@ -301,18 +318,20 @@ namespace SpaceGod
 
 			// The HUD element the step is about, outlined and pulsing (where the HUD shows it).
 			auto spot = UI::Hud::TutorialHighlightRect(static_cast<int>(step.Highlight));
-			if (spot.width > 0 && ShowHud && !ClickPanelOpen())
+			if (!card)
 			{
-				float pulse = 0.55f + 0.45f * Mathf::Sin(Time::unscaledTime * 5.0f);
-				auto old = GUI::color;
-				GUI::color = Color(UI::UiStyle::Warning.r, UI::UiStyle::Warning.g, UI::UiStyle::Warning.b, pulse);
-				Outline(Rect(spot.x - 4, spot.y - 4, spot.width + 8, spot.height + 8), 2);
-				GUI::color = old;
+				if (spot.width > 0 && ShowHud && !ClickPanelOpen())
+				{
+					float pulse = 0.55f + 0.45f * Mathf::Sin(Time::unscaledTime * 5.0f);
+					auto old = GUI::color;
+					GUI::color = Color(UI::UiStyle::Warning.r, UI::UiStyle::Warning.g, UI::UiStyle::Warning.b, pulse);
+					Outline(Rect(spot.x - 4, spot.y - 4, spot.width + 8, spot.height + 8), 2);
+					GUI::color = old;
+				}
+				return;
 			}
 
 			UI::UiMotion::Scope motion(cs::Cat("tutorial.step.", step.Id).c_str());
-			take(r);
-			GUI::Box(r, GUIContent::none(), tutorialPanel);
 			bool flash = tutorial->Index() > 0 && tutorial->StepAge() < DoneFlashSeconds;
 			cs::String head = flash
 				? cs::Cat("TUTORIAL", sep, "STEP ", n, " OF ", total, sep, "DONE: ", Tutorial::Steps()[tutorial->Index() - 1].Title)
@@ -347,11 +366,10 @@ namespace SpaceGod
 			return;
 		}
 
+		if (!card) return; // US-T440: the rest is the card's drawer's
 		if (tutorialDoneAge >= 0)
 		{
 			UI::UiMotion::Scope motion("tutorial.done");
-			take(r);
-			GUI::Box(r, GUIContent::none(), tutorialPanel);
 			GUI::Label(Rect(r.x + 16, r.y + 10, w - 32, 16), "TUTORIAL", tutorialHeading);
 			GUI::Label(Rect(r.x + 16, r.y + 28, w - 32, 22), "That is the heart of it", tutorialTitle);
 			GUI::Label(Rect(r.x + 16, r.y + 54, w - 32, 60),
@@ -364,11 +382,9 @@ namespace SpaceGod
 		// A first-time hint: smaller, fading out at the end of its time.
 		const auto& hint = TutorialHints::Of(static_cast<TutorialHint>(tutorialHint));
 		float hh = 118;
-		auto hr = Rect(r.x, r.yMax() - hh, w, hh);
+		auto hr = hud->Place(w, hh); // US-T440: the card's drawer, its foot where the card's is
 		float fade = Mathf::Clamp01((HintSeconds - tutorialHintAge) / 1.5f);
 		UI::UiMotion::Scope motion(UI::UiMotion::Enter(tutorialHintAge) * fade, UI::UiMotion::ToastSlide);
-		take(hr);
-		GUI::Box(hr, GUIContent::none(), tutorialPanel);
 		GUI::Label(Rect(hr.x + 16, hr.y + 10, w - 32, 16), "HINT", tutorialHeading);
 		GUI::Label(Rect(hr.x + 16, hr.y + 26, w - 32, 22), hint.Title, tutorialTitle);
 		GUI::Label(Rect(hr.x + 16, hr.y + 50, w - 132, 62), hint.Text, tutorialText);

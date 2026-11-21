@@ -113,7 +113,7 @@ namespace SpaceGod::UI
 		else if (app->PortTabOpen == Tab::Crew) body = 5 * rowH;
 		else if (app->PortTabOpen == Tab::Locals) body = 11 * rowH; // US-T313
 		float h = 84 + body;
-		auto r = Panel(Rect((Screen::width - w) * 0.5f, Screen::height - h - 48, w, h));
+		auto r = Place(w, h); // US-T440: the port's drawer (floating, centred, its foot 104 up: clear of the status line and the bottom tabs)
 
 		auto law = app->World()->Law;
 		auto record = law != nullptr ? law->PlayerRecord() : nullptr;

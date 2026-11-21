@@ -73,6 +73,11 @@ public:
 
 	/// <summary>US-T409: the hold rewind's readout (OnGUI): REWIND ready, the cooldown, or how far back a hold has gone.</summary>
 	void DrawHoldRewind();
+	/// US-T440: the quiet line (REWIND ready, its cooldown), its drawer's content; DrawHoldRewind keeps the loud ones (a hold
+	/// under way, the hull's or the fight's end held back, co-op's wait) centred on the screen as the alerts they are.
+	void DrawHoldRewindReadout();
+	/// US-T440: DrawHoldRewind drawing the quiet line for its drawer (else only the loud ones).
+	bool holdRewindReadoutPass = false;
 
 	/// <summary>US-T409: true while a hold rewind is playing the past back (the simulation stands still meanwhile).</summary>
 	bool HoldRewindActive() const;

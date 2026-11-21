@@ -125,8 +125,9 @@ namespace SpaceGod::UI
 			app->UiRects.Clear();
 			app->ShipNameRects.Clear();
 		}
-		// US-T152..T155: every docked panel takes its place from the layout's regions (HudLayout.h), afresh each event.
-		layout.Begin(SafeLeft(), SafeRight(), static_cast<float>(Screen::width), static_cast<float>(Screen::height));
+		// US-T152..T155: every banner takes its place from the layout's region (HudLayout.h), afresh each event; US-T440: under
+		// the top edge's drawers (every panel is a drawer, placed by the drawers' manager).
+		layout.Begin(HudLayout::TopBarBottom - HudLayout::Gap, static_cast<float>(Screen::width));
 
 		// F11 (U.SPC-T496): a clear screen, nothing on it but the reticle in use.
 		if (app->ScreenCleared)
@@ -221,7 +222,15 @@ namespace SpaceGod::UI
 		systemMapOpen = false;
 		if (systemMap) systemMap->Closed(); // US-T310: the find field lets the keys go
 
-		LayoutNews(); // TopCentre's first slot, so every alert and banner stacks under the news
+		// US-T440: the drawers laid out first (as the last pass's panels asked), so the banners stack under the top edge's.
+		RegisterDrawers();
+		SyncPanelFlags();
+		auto frame = DrawerFrame();
+		frame.bare = !app->ShowHud; // U: the HUD's panels hidden; the alerts and what a key opened still show
+		{
+			auto top = drawers.EdgeExtent(HudDock::Edge::Top, frame);
+			if (!top.Empty()) layout.Begin(top.Bottom(), static_cast<float>(Screen::width));
+		}
 
 		if (app->Travel->Active) DrawTravel();
 		else if (app->InFtlCruise()) DrawFtlCruise();
@@ -244,54 +253,24 @@ namespace SpaceGod::UI
 		DrawSelfDestruct(); // US-T97: shown with the HUD off too
 		if (!app->ShowHud)
 		{
-			if (app->ShowSaves) DrawSaves();
+			drawers.Draw(frame); // US-T440: the alerts and what a key opened (the saves, the comms) only
+			PublishColumn();
 			return;
 		}
 		DrawFlightMarkers();
 		DrawOffscreenArrows(); // US-T128: targets off the screen, at its edge
 		DrawCombatHud();
-		ReserveDrawerEdges(); // US-T438: the right edge's drawers (the reactor, US-T94, and the sensors, US-T93) take BottomRight's first slot
-		// US-T439: the minimal HUD (the HUD mode off) keeps the reticle, the world's markers and the combat overlays above, the
-		// pinned drawers, urgent alerts and prompts, and whatever the player opens by its key; the always-on panels that are
-		// not drawers yet (US-T440) show in the HUD mode only.
-		bool full = app->HudModeOn();
-		if (full) DrawTopBar();
-		if (app->ShowNews) DrawNews();
-		else if (full) DrawTicker();
-		if (full) DrawNavigator();
-		// TopRight before the selection card, which takes what the right-hand column has left between its stacks.
-		if (!app->ShowMarket && full) DrawOpportunityBoard();
-		if (app->ShowMarket) DrawMarket();
-		if (full)
-		{
-			DrawHarvest(true); // US-T211: the gas works panel, TopRight after the board
-			DrawHunters();
-			DrawSelection();
-			DrawStatus();
-		}
+		DrawSeatOverlays(); // US-T440: the seat's sight, deck guide and role panel (the seat line itself is a drawer)
+		// US-T439/US-T440: every panel is a drawer now (UI/Hud.DrawerPanels.cpp registers them and their default edges); the
+		// minimal HUD (the HUD mode off) shows the pinned ones, the alerts and what a key opened, besides the reticle, the
+		// world's markers and the combat overlays above, the prompts and banners here.
 		DrawSalvage();
 		DrawBoarding();
 		DrawHail();
-		DrawLaneRide();
-		if (full)
-		{
-			DrawFtl();
-			DrawSeat();
-			DrawHelmAbilities(); // US-T106
-		}
 		DrawBattlePlot(); // US-T367
 		DrawCourseMarker();
-		DrawInterdiction();
-		if (app->ShowCargo) DrawCargo();
-		if (app->ShowOutfit) DrawOutfit();
-		if (app->ShowBounties) DrawBounties();
-		if (app->ShowContracts) DrawContracts();
-		if (app->ShowFleet) DrawFleet();
-		if (app->ShowTrade) DrawTradeDesk();
-		if (app->ShowPort) DrawPort(); // US-T266: the port screen, docked
-		if (app->ShowPicker) DrawPicker();
-		drawers.Draw(DrawerFrame()); // US-T438: the drawers and their edge tabs (US-T200's bottom drawer among them), over the docked panels
-		if (app->ShowSaves) DrawSaves();
+		drawers.Draw(frame); // US-T438: the drawers and their edge tabs, every HUD panel among them (US-T440)
+		PublishColumn();
 		DrawToast();
 	}
 
@@ -335,7 +314,7 @@ namespace SpaceGod::UI
 		savesCursorSlot = savesCursor >= 0 ? (*saveNames)[savesCursor] : cs::String(); // US-T398
 		bool loadKeyed = savesEnterKey;
 		savesEnterKey = false;
-		auto r = Panel(Rect((Screen::width - w) * 0.5f, Mathf::Min(170.0f, Screen::height - h - 20), w, h));
+		auto r = Place(w, h); // US-T440: the saves' drawer (floating, centred)
 		GUI::Label(Rect(r.x + 12, r.y + 6, w - 60, 22), cs::Cat("SAVE & LOAD  ·  ", cs::Strings::ToUpperInvariant(ActiveProfile::Current()->Name)), title);
 		if (GUI::Button(Rect(r.xMax() - 34, r.y + 6, 24, 22), "X", button)) app->ShowSaves = false;
 		auto old = GUI::contentColor;
@@ -593,7 +572,7 @@ namespace SpaceGod::UI
 		auto b = GUIContent(tail);
 		float w = Mathf::Max(text->CalcSize(a).x, Mathf::Max(small->CalcSize(m).x, small->CalcSize(b).x)) + 28;
 		float h = mid.empty() ? 50.0f : 68.0f;
-		auto r = Panel(Rect((Screen::width - w) * 0.5f, Screen::height - 222 - h, w, h));
+		auto r = Place(w, h); // US-T440: the FTL drive's drawer, on the bottom edge
 		GUI::contentColor = StreakColor;
 		GUI::Label(Rect(r.x + 14, r.y + 5, w, 20), a, text);
 		float y = r.y + 27;
@@ -658,21 +637,6 @@ namespace SpaceGod::UI
 					p + Vector2(10, -8), system ? Accent : Color(c.r, c.g, c.b, 0.75f), !system);
 			}
 		}
-	}
-
-	void Hud::LayoutNews()
-	{
-		// The same conditions and sizes DrawTicker and DrawNews draw by, so the slot is the panel's.
-		newsRect = Rect(0, 0, 0, 0);
-		if (!app->ShowHud) return;
-		if (!app->ShowNews && !app->HudModeOn()) return; // US-T439: the minimal HUD has no ticker
-		if (app->ShowNews)
-		{
-			newsRect = layout.Take(HudRegion::TopCentre, 760, Mathf::Min(Screen::height * 0.5f, 420.0f));
-			return;
-		}
-		int n = cs::Math::Min(4, app->World()->Events.Count());
-		if (n > 0) newsRect = layout.Take(HudRegion::TopCentre, 640, 10 + n * 17.0f);
 	}
 
 	cs::String Hud::FitText(const cs::String& s, const cs::Ref<GUIStyle>& style, float maxW)
@@ -1128,7 +1092,12 @@ namespace SpaceGod::UI
 			app->PilotFlightNote.empty() ? cs::String() : cs::Cat("   ", app->PilotFlightNote), "   (F)"); // US-T87: the brake plan
 		auto content = GUIContent(readout);
 		auto size = small->CalcSize(content);
-		auto p = Vector2((Screen::width - size.x) * 0.5f, static_cast<float>(Screen::height - 66));
+		// US-T440: over the bottom edge's drawers and their pull-out tabs (as the last pass laid them out), never under them.
+		float y = static_cast<float>(Screen::height - 66);
+		auto stack = drawers.LastEdgeExtent(HudDock::Edge::Bottom), tabs = drawers.LastTabExtent(HudDock::Edge::Bottom);
+		if (!stack.Empty()) y = Mathf::Min(y, stack.y - size.y - 4);
+		if (!tabs.Empty()) y = Mathf::Min(y, tabs.y - size.y - 4);
+		auto p = Vector2((Screen::width - size.x) * 0.5f, y);
 		DrawLabel(readout, p, assist ? Dim : RetrogradeColor, true);
 	}
 
@@ -1162,7 +1131,7 @@ namespace SpaceGod::UI
 		if (pursuit == nullptr || !pursuit->Active()) return;
 		// TopRight, under the opportunities or the market (US-T153): its own slot, taken on every event so the selection
 		// card under it is sized alike in the Layout pass and the Repaint.
-		auto slot = layout.Take(HudRegion::TopRight, 380, 22.0f + 18.0f * pursuit->Groups.Count());
+		auto slot = Place(380, 22.0f + 18.0f * pursuit->Groups.Count()); // US-T440: the hunters' drawer, up the right edge
 		if (Event::current().type != EventType::Repaint) return;
 		auto me = app->PilotOffsetKm();
 		auto myVel = app->PilotVelocityKmS();

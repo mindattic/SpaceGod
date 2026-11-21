@@ -40,6 +40,8 @@ public:
 	/// <summary>The HUD's cruise readout (from OnGUI): spool, speed, the target, how far, the drop-out's ETA; and the
 	/// drive's look (US-T197): the spool's charging glow, the flash as it engages and drops out, streaks while it cruises.</summary>
 	void DrawSystemCruise();
+	/// US-T440: the cruise drive's readout, its drawer's content (DrawSystemCruise keeps the drive's look on the screen).
+	void DrawSystemCruiseReadout();
 
 	/// <summary>The dev menu's Travel entries for the drive (US-T126's registry).</summary>
 	static void RegisterCruiseCheats();

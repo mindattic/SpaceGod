@@ -633,7 +633,12 @@ namespace SpaceGod
 				}
 			}
 		}
-		if (!SystemCruiseActive() || !HudModeOn()) return; // US-T439: the readout is the full HUD's (the drive's look above shows in either)
+	}
+
+	// US-T440: the readout is the cruise drawer's (the full HUD's, as US-T439 had it); the drive's look above shows in either.
+	void UnitySpaceApp::DrawSystemCruiseReadout()
+	{
+		if (ScreenCleared || !IsPiloting() || !SystemCruiseActive()) return;
 		if (cruiseStyle == nullptr)
 		{
 			cruiseBack = UI::Hud::Solid(Color(0.03f, 0.05f, 0.08f, 0.82f), Color(0.45f, 0.85f, 1.0f, 0.7f));
@@ -672,9 +677,7 @@ namespace SpaceGod
 				"   ·   Shift+J drops out   ·   true km and seconds at either scale (", ScaleGoal > 0.5 ? "game" : "realistic", " scale now)");
 		}
 		float w = 760, h = 48;
-		auto r = Rect((Screen::width - w) * 0.5f, 78, w, h);
-		if (!UiRects.Contains(r)) UiRects.Add(r); // US-T212: world names skip it
-		GUI::Box(r, GUIContent::none(), cruisePanel);
+		auto r = hud->Place(w, h); // US-T440: the cruise drawer, at the top edge under the top bar (framed by it)
 		GUI::Label(Rect(r.x, r.y + 4, w, 22), head, cruiseStyle);
 		GUI::Label(Rect(r.x, r.y + 26, w, 18), tail, cruiseSmall);
 		if (systemCruise.Spooling())

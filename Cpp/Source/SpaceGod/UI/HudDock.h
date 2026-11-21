@@ -5,9 +5,12 @@
 // drawer's window with it each GUI pass.
 //
 //   - Edges:      a window docked to an edge sits in that edge's band (the screen less what the HUD keeps for itself) and
-//                 stacks along it with the others docked there, in their order: down the left edge from the top, up the
-//                 right edge from the bottom (the right-hand column's habit), left to right along the bottom, centred along
-//                 the top. A slot is `length` along the edge (0: fill what is left) by `thickness` across it.
+//                 stacks with the others docked there, in their order, always one over another (US-T440): down the left
+//                 edge from the top, up the right edge from the bottom (the right-hand column's habit), up from the bottom
+//                 edge (each centred across it) and down from the top edge (centred). A left or right slot marked `far`
+//                 stacks from the other end instead (the right-hand column's top stack: down from the top), so an edge
+//                 holds two stacks with the free room between them. A slot is `length` tall (0: fill what is left) by
+//                 `thickness` wide (0 or more than the band: the band's width).
 //   - Splitting:  when what the slots want does not fit, each shrinks toward its least length in proportion to what it
 //                 has over it; fill slots share whatever is left equally (Split).
 //   - On screen:  a floating window is kept inside the screen at any resolution and UI scale (the GUI's screen is the
@@ -62,11 +65,21 @@ namespace SpaceGod::UI::HudDock
 		bool operator==(const Box& o) const { return x == o.x && y == o.y && w == o.w && h == o.h; }
 	};
 
-	/// One slot on an edge: `length` along it (0 or less: fill what is left), at least `least`, `thickness` across it.
+	/// One slot on an edge: `length` tall (0 or less: fill what is left), at least `least`, `thickness` wide (0 or less: the
+	/// band's width); `far`: on the left or right edge, stacked from the other end (US-T440).
 	struct Slot
 	{
 		float length = 0, least = 24, thickness = 200;
+		bool far = false;
 	};
+
+	/// Whether a slot on edge `e` stacks down from the band's top (else up from its bottom): the left and top edges do, the
+	/// right and bottom edges do not, and a far slot on the left or right edge does the other (US-T440).
+	inline bool FromTop(Edge e, bool far)
+	{
+		bool down = e == Edge::Left || e == Edge::Top;
+		return Vertical(e) && far ? !down : down;
+	}
 
 	/// The lengths a run of `available` gives slots that want `want` (0 or less: fill) and need at least `least`, `gap`
 	/// between them. Fixed slots take what they want and fill slots share the rest, each at least its least; when that
@@ -114,45 +127,38 @@ namespace SpaceGod::UI::HudDock
 		return len;
 	}
 
-	/// The boxes of the slots docked on edge `e`, in their order, inside `band` (the edge's usable area): down the left edge
-	/// from the band's top, up the right edge from its bottom, left to right along the bottom, centred along the top. A
-	/// slot's thickness is cut to the band.
+	/// The boxes of the slots docked on edge `e`, in their order, inside `band` (the edge's usable area), one over another:
+	/// down the left edge from the band's top, up the right edge from its bottom, down from the top edge and up from the
+	/// bottom edge (centred across the band), a far left or right slot from the other end (US-T440). The heights are split
+	/// along the band's height (Split); a slot's thickness is cut to the band.
 	inline std::vector<Box> StackEdge(Edge e, const Box& band, const std::vector<Slot>& slots, float gap)
 	{
 		std::vector<float> want, least;
 		for (const auto& s : slots) { want.push_back(s.length); least.push_back(s.least); }
-		bool vertical = Vertical(e);
-		auto len = Split(want, least, vertical ? band.h : band.w, gap);
+		auto len = Split(want, least, band.h, gap);
 		std::vector<Box> out;
-		float total = 0;
-		for (float l : len) total += l;
-		total += gap * static_cast<float>(len.empty() ? 0 : len.size() - 1);
-		float at = e == Edge::Left ? band.y : e == Edge::Right ? band.Bottom()
-			: e == Edge::Top ? band.x + std::max(0.0f, (band.w - total) * 0.5f) : band.x;
+		float top = band.y, bottom = band.Bottom();
 		for (size_t i = 0; i < slots.size(); i++)
 		{
-			float t = std::min(slots[i].thickness, vertical ? band.w : band.h);
-			switch (e)
-			{
-				case Edge::Left: out.emplace_back(band.x, at, t, len[i]); at += len[i] + gap; break;
-				case Edge::Right: at -= len[i]; out.emplace_back(band.Right() - t, at, t, len[i]); at -= gap; break;
-				case Edge::Top: out.emplace_back(at, band.y, len[i], t); at += len[i] + gap; break;
-				default: out.emplace_back(at, band.Bottom() - t, len[i], t); at += len[i] + gap; break;
-			}
+			float t = slots[i].thickness > 0 ? std::min(slots[i].thickness, band.w) : band.w;
+			float x = e == Edge::Left ? band.x : e == Edge::Right ? band.Right() - t : band.x + (band.w - t) * 0.5f;
+			if (FromTop(e, slots[i].far)) { out.emplace_back(x, top, t, len[i]); top += len[i] + gap; }
+			else { bottom -= len[i]; out.emplace_back(x, bottom, t, len[i]); bottom -= gap; }
 		}
 		return out;
 	}
 
-	/// The order a window dropped at (px, py) takes among the slots already on edge `e` (their boxes, in order): how many of
-	/// them lie before the pointer in the way the edge stacks.
-	inline int InsertOrder(Edge e, const std::vector<Box>& slots, float px, float py)
+	/// The order a window dropped at (px, py) takes among the slots already on edge `e` (their boxes, in order, all of one
+	/// stack: `far` or not): how many of them lie before the pointer in the way that stack grows.
+	inline int InsertOrder(Edge e, const std::vector<Box>& slots, float px, float py, bool far = false)
 	{
+		(void)px;
+		bool down = FromTop(e, far);
 		int n = 0;
 		for (const auto& b : slots)
 		{
-			float cx = b.x + b.w * 0.5f, cy = b.y + b.h * 0.5f;
-			bool before = e == Edge::Left ? cy < py : e == Edge::Right ? cy > py : cx < px;
-			if (before) n++;
+			float cy = b.y + b.h * 0.5f;
+			if (down ? cy < py : cy > py) n++;
 		}
 		return n;
 	}
@@ -187,18 +193,20 @@ namespace SpaceGod::UI::HudDock
 		enum class Kind { Float, Edge, Group };
 		Kind kind = Kind::Float;
 		Edge edge = Edge::Left;
-		/// Kind::Edge: its order among the slots on that edge.
+		/// Kind::Edge: its order among the slots of its stack on that edge, and which stack (US-T440: on the left or right edge,
+		/// the far one when let go in the third of the edge away from where it stacks).
 		int order = 0;
+		bool far = false;
 		/// Kind::Group: the index (in `strips`) of the window it joins.
 		int target = -1;
 	};
 
 	/// Over another window's title strip it joins that window (`strips`: each window's strip, an empty box for one that
 	/// cannot take it, the dragged window's own among them); within `reach` of a screen edge it docks there, at the order
-	/// the pointer falls at among `edgeSlots[edge]` (the boxes docked on each edge, the dragged window's left out); else it
-	/// floats.
+	/// the pointer falls at among `edgeSlots[edge]` (the boxes docked on each edge, the dragged window's left out; `edgeFar`
+	/// says which of them stack from the far end, none when it is empty); else it floats.
 	inline Snap FindSnap(float px, float py, float sw, float sh, float reach, const std::vector<Box>& strips,
-		const std::vector<std::vector<Box>>& edgeSlots)
+		const std::vector<std::vector<Box>>& edgeSlots, const std::vector<std::vector<bool>>& edgeFar = {})
 	{
 		Snap s;
 		for (size_t i = 0; i < strips.size(); i++)
@@ -214,7 +222,16 @@ namespace SpaceGod::UI::HudDock
 			s.kind = Snap::Kind::Edge;
 			s.edge = e;
 			int k = static_cast<int>(e);
-			s.order = k < static_cast<int>(edgeSlots.size()) ? InsertOrder(e, edgeSlots[k], px, py) : 0;
+			// On the left or right edge, the third away from where the edge stacks takes the far stack.
+			s.far = e == Edge::Right ? py < sh / 3.0f : e == Edge::Left ? py > sh * 2.0f / 3.0f : false;
+			std::vector<Box> mine;
+			if (k < static_cast<int>(edgeSlots.size()))
+				for (size_t i = 0; i < edgeSlots[k].size(); i++)
+				{
+					bool far = k < static_cast<int>(edgeFar.size()) && i < edgeFar[k].size() && edgeFar[k][i];
+					if (far == s.far) mine.push_back(edgeSlots[k][i]);
+				}
+			s.order = InsertOrder(e, mine, px, py, s.far);
 		}
 		return s;
 	}

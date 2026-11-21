@@ -104,6 +104,13 @@ namespace SpaceGod
 		return cs::Cat("YOUR SQUAD  \xC2\xB7  ", cs::Strings::ToUpperInvariant(state), can ? cs::Cat("  \xC2\xB7  ", key, " orders them to stand down") : cs::String());
 	}
 
+	void UnitySpaceApp::DrawInfluenceMeter()
+	{
+		influenceMeterPass = true;
+		DrawInfluence();
+		influenceMeterPass = false;
+	}
+
 	void UnitySpaceApp::DrawInfluence()
 	{
 		if (ScreenCleared || World() == nullptr) return;
@@ -144,16 +151,12 @@ namespace SpaceGod
 			influenceGainUntil = now + 5.0f;
 		}
 
-		// The meter: under the navigator, top left. The SpaceGod's own, whatever body it holds.
+		// The meter: under the navigator, top left. The SpaceGod's own, whatever body it holds. US-T440: its drawer's content, down
+		// the left edge under the navigator (the full HUD's, as US-T439 had it; the drawers keep off a full-screen screen).
+		if (influenceMeterPass)
 		{
 			float w = 268, h = 46;
-			auto r = Rect(10, 50, w, h);
-			// US-T208: a full-screen screen (spawn, manual, galaxy map) owns the top left: the badge would sit on its titles.
-			bool fullScreen = ShowSpawn || ShowHelp || ShowLogs /* US-T261 */ || ShowDiscoveries /* US-T259 */ || ShowEncyclopedia /* US-T271 */ || ShowSociety /* US-T293 */ || ((ShowGalaxyMap || ShowSystemMap /* US-T258 */) && !Travel->Active);
-			if (!fullScreen && HudModeOn()) // US-T439: the meter is the full HUD's (the refusal below is an alert: always)
-			{
-			if (!UiRects.Contains(r)) UiRects.Add(r); // US-T212: world names skip it
-			GUI::Box(r, GUIContent::none(), influencePanel);
+			auto r = hud->Place(w, h); // the drawer's frame stands for the badge's own
 			cs::String head = cs::Cat("INFLUENCE  ", level, "  \xC2\xB7  ", cs::Strings::ToUpperInvariant(SpaceGodInfluence::Title(level)),
 				inf != nullptr && inf->Waived ? cs::String("  \xC2\xB7  LIMITS OFF (dev)") : cs::String());
 			GUI::Label(Rect(r.x + 8, r.y + 3, w - 16, 18), head, influenceTitle);
@@ -165,7 +168,7 @@ namespace SpaceGod
 			if (now < influenceGainUntil && inf != nullptr)
 				foot = cs::Cat("+", cs::Fmt(inf->LastGainXp, "N0"), " XP  \xC2\xB7  ", inf->LastGain);
 			GUI::Label(Rect(r.x + 8, r.y + 29, w - 16, 15), foot, influenceSmall);
-			}
+			return;
 		}
 
 		// The refusal, while fresh: what was refused, and why.

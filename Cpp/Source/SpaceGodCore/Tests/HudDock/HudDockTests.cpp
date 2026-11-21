@@ -75,11 +75,18 @@ namespace
 		auto right = StackEdge(Edge::Right, band, slots, 6);
 		Check(right[0] == Box(1910 - 232, 1030 - 300, 232, 300), "stack: right, first slot at the bottom");
 		Check(right[1] == Box(1910 - 260, 1030 - 300 - 6 - 200, 260, 200), "stack: right, the next above it");
-		auto bottom = StackEdge(Edge::Bottom, band, { { 0, 200, 300 } }, 6);
-		Check(bottom[0] == Box(10, 1030 - 300, 1900, 300), "stack: a bottom fill spans the band");
-		auto top = StackEdge(Edge::Top, band, { { 400, 40, 100 }, { 300, 40, 100 } }, 6);
-		float run = 400 + 6 + 300;
-		Check(Near(top[0].x, 10 + (1900 - run) * 0.5f) && Near(top[1].x, top[0].Right() + 6) && top[0].y == 70, "stack: top, centred");
+		// US-T440: the bottom and top edges stack one over another, each slot centred across the band.
+		auto bottom = StackEdge(Edge::Bottom, band, { { 300, 30, 0 }, { 40, 30, 600 } }, 6);
+		Check(bottom[0] == Box(10, 1030 - 300, 1900, 300), "stack: a bottom slot of no thickness spans the band's width");
+		Check(bottom[1] == Box(10 + (1900 - 600) * 0.5f, 1030 - 300 - 6 - 40, 600, 40), "stack: bottom, the next over it, centred");
+		auto top = StackEdge(Edge::Top, band, { { 52, 40, 640 }, { 100, 40, 760 } }, 6);
+		Check(top[0] == Box(10 + (1900 - 640) * 0.5f, 70, 640, 52) && top[1] == Box(10 + (1900 - 760) * 0.5f, 70 + 52 + 6, 760, 100), "stack: top, down from the top, centred");
+		// US-T440: a far slot on the right edge stacks down from the band's top, the others still up from its bottom.
+		std::vector<Slot> two = { { 300, 30, 232 }, { 200, 30, 380, true } };
+		auto column = StackEdge(Edge::Right, band, two, 6);
+		Check(column[0] == Box(1910 - 232, 1030 - 300, 232, 300) && column[1] == Box(1910 - 380, 70, 380, 200), "stack: right, a far slot at the top");
+		auto leftFar = StackEdge(Edge::Left, band, two, 6);
+		Check(leftFar[1] == Box(10, 1030 - 200, 380, 200), "stack: left, a far slot at the bottom");
 		// Thickness is cut to the band.
 		auto thick = StackEdge(Edge::Left, Box(0, 0, 150, 500), { { 100, 30, 400 } }, 6);
 		Check(thick[0].w == 150, "stack: thickness cut to the band");
@@ -104,6 +111,12 @@ namespace
 		Check(InsertOrder(Edge::Right, right, 1900, 1020) == 0, "order: right, below the first (it stacks up)");
 		Check(InsertOrder(Edge::Right, right, 1900, 100) == 2, "order: right, at the top is last");
 		Check(InsertOrder(Edge::Bottom, {}, 500, 1000) == 0, "order: an empty edge");
+		// US-T440: the bottom edge stacks up, the top edge down; a far stack the other way.
+		auto bottom = StackEdge(Edge::Bottom, band, slots, 6);
+		Check(InsertOrder(Edge::Bottom, bottom, 500, 1020) == 0 && InsertOrder(Edge::Bottom, bottom, 500, 100) == 2, "order: bottom, it stacks up");
+		auto top = StackEdge(Edge::Top, band, slots, 6);
+		Check(InsertOrder(Edge::Top, top, 500, 80) == 0 && InsertOrder(Edge::Top, top, 500, 1000) == 2, "order: top, it stacks down");
+		Check(InsertOrder(Edge::Right, { Box(1500, 70, 400, 200) }, 1900, 400, true) == 1, "order: right's far stack, under its first");
 	}
 
 	void ScreenChecks()
@@ -145,6 +158,15 @@ namespace
 		Check(ed.kind == Snap::Kind::Edge && ed.edge == Edge::Left && ed.order == 1, "snap: the left edge, after the window there");
 		auto fl = FindSnap(900, 600, 1920, 1080, 24, strips, slots);
 		Check(fl.kind == Snap::Kind::Float, "snap: floats mid-screen");
+		// US-T440: the top third of the right edge takes its far stack (the right-hand column's top), counted on its own.
+		std::vector<std::vector<Box>> col(EdgeCount);
+		std::vector<std::vector<bool>> colFar(EdgeCount);
+		col[2] = { Box(1678, 730, 232, 300), Box(1530, 70, 380, 200) };
+		colFar[2] = { false, true };
+		auto hi = FindSnap(1916, 300, 1920, 1080, 24, { Box(), Box() }, col, colFar);
+		Check(hi.kind == Snap::Kind::Edge && hi.edge == Edge::Right && hi.far && hi.order == 1, "snap: the right edge's top third, the far stack, under its window");
+		auto lo = FindSnap(1916, 1000, 1920, 1080, 24, { Box(), Box() }, col, colFar);
+		Check(lo.kind == Snap::Kind::Edge && !lo.far && lo.order == 0, "snap: the right edge's foot, the near stack, first");
 		auto past = FindSnap(900, 2000, 1920, 1080, 24, { Box() }, slots);
 		Check(past.kind == Snap::Kind::Edge && past.edge == Edge::Bottom, "snap: dragged past the bottom of the screen docks there");
 	}

@@ -57,5 +57,7 @@ private:
 
 	/// <summary>The beam's readout over the bottom of the HUD.</summary>
 	void DrawTractorHud();
+	/// US-T440: the tractor beam's readout, its drawer's content (DrawTractorHud keeps the mining beam's readout).
+	void DrawTractorReadout();
 
 	Core::DVec3 TractorShipHelio();

@@ -95,7 +95,7 @@ namespace SpaceGod::UI
 		auto claims = ship != nullptr ? outlaws->Claims : cs::List<cs::Ref<KillClaim>>();
 		int extra = held.Count() + claims.Count();
 		float h = 54 + Mathf::Max(1, rows) * rowH + (extra > 0 ? 8 + extra * 22 : 0);
-		auto r = Panel(Rect((Screen::width - w) * 0.5f, 120, w, h));
+		auto r = Place(w, h); // US-T440: the bounty board's drawer (floating, centred)
 		GUI::Label(Rect(r.x + 12, r.y + 6, w - 24, 22),
 			cs::Cat("BOUNTY BOARD", board.Count() > 0 ? cs::Cat(" (", board.Count(), ")") : cs::String(), "  ·  ", // US-T392: the count
 				port != nullptr ? cs::Cat(port->Name, "  ·  ", port->Owner->Name) : cs::String("no port in view")), title);
@@ -171,7 +171,7 @@ namespace SpaceGod::UI
 		constexpr float w = 860, rowH = 20;
 		int rows = Mathf::Min(board.Count(), 12), ownRows = Mathf::Min(mine.Count(), 6); // US-T392: the rows shown at once; the rest scroll
 		float h = 54 + Mathf::Max(1, rows) * rowH + (ownRows > 0 ? 24 + ownRows * rowH : 0);
-		auto r = Panel(Rect((Screen::width - w) * 0.5f, 120, w, h));
+		auto r = Place(w, h); // US-T440: the contracts board's drawer (floating, centred)
 		GUI::Label(Rect(r.x + 12, r.y + 6, w - 24, 22),
 			cs::Cat("CONTRACTS", board.Count() > 0 ? cs::Cat(" (", board.Count(), ")") : cs::String(), "  ·  ", // US-T392: the count
 				port != nullptr ? cs::Cat(port->Name, "  ·  ", port->Owner->Name) : cs::String("no port in view")), title);
@@ -256,7 +256,7 @@ namespace SpaceGod::UI
 		for (const auto& p : h->Properties) if (!p->Lost) propRows += p->Kind == PropertyKind::Plant ? 2 : 1; // a plant: its state, then its goods (US-T265)
 		float listH = Mathf::Min((shipRows + propRows + 2) * rowH, 260.0f);
 		float h0 = 128 + 24 + listH + 6 * 16;
-		auto r = Panel(Rect((Screen::width - w) * 0.5f, 110, w, h0));
+		auto r = Place(w, h0); // US-T440: the fleet's drawer (floating, centred)
 		GUI::Label(Rect(r.x + 12, r.y + 6, w - 24, 22), cs::Cat("YOUR FLEET  ·  account ", Credits(h->Balance()), "  ·  earned ", Credits(h->TotalEarned),
 			"  ·  costs ", Credits(h->TotalCosts), "  ·  lost ", Credits(h->TotalLost)), title);
 		auto old = GUI::contentColor;
@@ -574,7 +574,7 @@ namespace SpaceGod::UI
 		float w = (canTrade ? 600.0f : 430.0f) + histW;
 		// US-T208: 78 = the 50 above the column header, its row, and 11 of padding under the last good (it was 62: Munitions sat on the border).
 		float h = marketOpen ? 78 + GoodInfo::Count * rowH + (canTrade ? 20 : 0) + extra + lawRow + surveyRow : 34;
-		auto r = Panel(layout.Take(HudRegion::TopRight, w, h)); // TopRight's first slot (US-T153)
+		auto r = Place(w, h); // US-T440: the market's drawer, at the top of the right edge (in the opportunities' place)
 		cs::String heading = market != nullptr ? cs::Cat("MARKET  ·  ", market->Name) : cs::String("MARKET  ·  system average");
 		if (GUI::Button(Rect(r.x + 8, r.y + 6, w - 16, 22), UiStyle::Fold(marketOpen, heading), title)) marketOpen = !marketOpen;
 		if (!marketOpen) return;
@@ -800,7 +800,7 @@ namespace SpaceGod::UI
 		constexpr float w = 600;
 		if (ship == nullptr || ship->Combat == nullptr)
 		{
-			auto r0 = Panel(Rect((Screen::width - w) * 0.5f, 190, w, 52));
+			auto r0 = Place(w, 52); // US-T440: the outfitting drawer (floating, centred)
 			GUI::Label(Rect(r0.x + 12, r0.y + 6, w - 24, 22), "OUTFITTING", title);
 			GUI::Label(Rect(r0.x + 12, r0.y + 28, w - 24, 18), cs::Cat("Pilot a ship (", BoundKeys(::SpaceGod::Input::KeyAction::Pilot), ") and bring it to a shipyard to refit it.   ",
 				CloseHint(::SpaceGod::Input::KeyAction::Outfit)), small); // US-T390
@@ -824,7 +824,7 @@ namespace SpaceGod::UI
 		else outfitSlot = -1;
 		float listH = Mathf::Min(rows * rowH, 230.0f);
 		float h = 112 + listH + (options > 0 ? 26 + options * rowH : 0);
-		auto r = Panel(Rect((Screen::width - w) * 0.5f, 190, w, h));
+		auto r = Place(w, h); // US-T440: the outfitting drawer (floating, centred)
 		GUI::Label(Rect(r.x + 12, r.y + 6, w - 24, 22), cs::Cat("OUTFITTING  ·  ", ship->Name, "  ·  ",
 			yard != nullptr ? yard->Name : port != nullptr ? cs::Cat(port->Name, " (no yard)") : cs::String("not alongside a port")), title);
 		// US-T89: the same hull as its components, with their utility sockets.
@@ -1106,7 +1106,7 @@ namespace SpaceGod::UI
 		constexpr float cell = 28.0f;
 		float w = cs::Math::Max(260, hold->Width * cell + 24);
 		float h = cargoOpen ? 74 + hold->Height * cell + (cargoSelected != nullptr ? 28 : 0) : 34;
-		auto r = Panel(Rect(SafeLeft() + 10, Screen::height - h - 56, w, h));
+		auto r = Place(w, h); // US-T440: the cargo hold's drawer, down the left edge under the navigator
 
 		if (GUI::Button(Rect(r.x + 8, r.y + 6, w - 16, 22), UiStyle::Fold(cargoOpen, cs::Cat("CARGO HOLD", UiStyle::Glyph::Separator, ship->Name)), title)) cargoOpen = !cargoOpen;
 		if (!cargoOpen) return;
@@ -1260,7 +1260,7 @@ namespace SpaceGod::UI
 			}
 		}
 		float w = 640, rowH = 17;
-		auto r = Panel(newsRect); // TopCentre's first slot, taken in LayoutNews (US-T154)
+		auto r = Place(w, 10 + n * rowH); // US-T440: the ticker's drawer, at the top edge under the top bar
 		auto old = GUI::contentColor;
 		for (int i = 0; i < n; i++)
 		{
@@ -1324,7 +1324,7 @@ namespace SpaceGod::UI
 		UiMotion::Scope motion("hud.news"); // US-T255
 		constexpr float w = 760;
 		float h = Mathf::Min(Screen::height * 0.5f, 420.0f);
-		auto r = Panel(newsRect); // TopCentre's first slot, taken in LayoutNews (US-T154)
+		auto r = Place(w, h); // US-T440: the news feed's drawer, at the top edge under the top bar
 		const auto& events = app->World()->Events;
 		if (GUI::Button(Rect(r.x + 8, r.y + 6, 120, 22), UiStyle::Fold(true, "NEWS"), title)) app->ShowNews = false;
 		auto old = GUI::contentColor;
@@ -1439,38 +1439,32 @@ namespace SpaceGod::UI
 			s = cs::Cat("FREE  ·  swim x", cs::Fmt(cam->SpeedMultiplier, "0.##"), "  ·  ", SpeedText(kmPerSec),
 				inside ? "  ·  inside " : "  ·  near ", (*app->Catalog())[frameBody]->Name);
 		}
-		// The band the bottom line has (HudLayout::BottomBand): beside the right-hand column, less the tanker call and the
-		// reorient toggle either side of it. Centred on the screen when it fits there, else in the band.
+		// The room the bottom line has (US-T440: its drawer's edge, the bottom one, beside the right-hand column), less the
+		// tanker call and the reorient toggle either side of it, in the one drawer with it.
 		cs::Ref<Ship> flown = app->IsPiloting() ? app->Piloted.Ship : nullptr;
 		bool tanker = flown != nullptr && flown->Battle == nullptr && (flown->PropellantFraction() < 0.15 || app->TankerDueS >= 0);
 		constexpr float tankerW = 170, levelW = 200, sideGap = 8;
-		float bx0 = 0, bx1 = 0;
-		layout.BottomBand(bx0, bx1);
 		float leftExtra = tanker ? tankerW + sideGap : 0, rightExtra = levelW + sideGap;
-		float maxText = Mathf::Max(80.0f, bx1 - bx0 - leftExtra - rightExtra - 28);
+		float maxText = Mathf::Max(80.0f, bottomBandW - 2 * HudDrawers::Pad - leftExtra - rightExtra - 28);
 		cs::String line = s + keys;
 		if (text->CalcSize(GUIContent(line)).x > maxText) line = s + shortKeys;
 		line = FitText(line, text, maxText);
 		auto content = GUIContent(line);
 		float w = text->CalcSize(content).x + 28;
-		float total = leftExtra + w + rightExtra;
-		float gx = (Screen::width - total) * 0.5f;
-		if (gx < bx0 || gx + total > bx1) gx = Mathf::Max(bx0, bx0 + (bx1 - bx0 - total) * 0.5f);
-		auto r = Panel(Rect(gx + leftExtra, Screen::height - 40, w, 30));
+		auto box = Place(leftExtra + w + rightExtra, 30); // US-T440: the status line's drawer, at the foot of the bottom edge
+		auto r = Rect(box.x + leftExtra, box.y, w, 30);
 		GUI::Label(Rect(r.x + 14, r.y + 6, w, 20), content, text);
 
 		// Tanks running low under the player's own hand: an emergency tanker can be called out.
 		if (tanker)
 		{
-			auto call = Panel(Rect(r.x - tankerW - sideGap, r.y, tankerW, 30));
 			cs::String callLabel = app->TankerDueS >= 0 ? cs::Cat("TANKER IN ", Mathf::CeilToInt(app->TankerDueS), " s") : cs::String("CALL A TANKER");
-			if (GUI::Button(Rect(call.x + 4, call.y + 4, call.width - 8, 22), callLabel, app->TankerDueS >= 0 ? buttonActive : button)) app->CallTanker();
+			if (GUI::Button(Rect(box.x + 4, box.y + 4, tankerW - 8, 22), callLabel, app->TankerDueS >= 0 ? buttonActive : button)) app->CallTanker();
 		}
 
 		// Auto-reorient: keep the active system's own plane level (a smooth swing, not a snap).
-		auto level = Panel(Rect(r.xMax() + sideGap, r.y, levelW, 30));
 		cs::String reorient = cam->Levelling() ? "REORIENTING…" : app->AutoReorient() ? "AUTO-REORIENT  ON  [R]" : "AUTO-REORIENT  OFF  [R]";
-		if (GUI::Button(Rect(level.x + 4, level.y + 4, level.width - 8, 22), reorient, app->AutoReorient() ? buttonActive : button))
+		if (GUI::Button(Rect(r.xMax() + sideGap + 4, r.y + 4, levelW - 8, 22), reorient, app->AutoReorient() ? buttonActive : button))
 			app->ToggleAutoReorient();
 	}
 
@@ -1639,15 +1633,19 @@ namespace SpaceGod::UI
 	{
 		cs::String line = app->SeatLine();
 		if (line.empty()) return; // C#: line == null
+		auto content = GUIContent(line);
+		float w = toast->CalcSize(content).x + 40;
+		auto r = Place(w, 34); // US-T440: the seat line's drawer, on the bottom edge (framed by it)
+		GUI::Label(Rect(r.x + 20, r.y + 7, w, 22), content, toast);
+	}
+
+	// US-T440: what goes with the seat line but is no panel: the seat's sight, the deck guide, the role panel.
+	void Hud::DrawSeatOverlays()
+	{
+		if (app->SeatLine().empty()) return;
 		DrawSeatSight();
 		DrawDeckGuide();
 		DrawRolePanel(); // US-T135
-		auto content = GUIContent(line);
-		float w = toast->CalcSize(content).x + 40;
-		auto r = Rect((Screen::width - w) * 0.5f, Screen::height - 96, w, 34);
-		RegisterUi(r); // US-T212
-		GUI::Box(r, GUIContent::none(), panel);
-		GUI::Label(Rect(r.x + 20, r.y + 7, w, 22), content, toast);
 	}
 
 	// ---------------------------------------------------------------- the helm's abilities (US-T106)
@@ -1776,9 +1774,7 @@ namespace SpaceGod::UI
 		}
 		widest = Mathf::Max(widest, small->CalcSize(GUIContent(heading)).x);
 		float w = widest + 2 * pad, h = pad * 2 + rowH * (rows + 1);
-		auto r = Rect((Screen::width - w) * 0.5f, Screen::height - 104 - h, w, h);
-		RegisterUi(r); // US-T212
-		GUI::Box(r, GUIContent::none(), panel);
+		auto r = Place(w, h); // US-T440: the helm abilities' drawer, on the bottom edge (framed by it)
 		auto old = GUI::contentColor;
 		GUI::contentColor = Dim;
 		GUI::Label(Rect(r.x + pad, r.y + pad - 2, w - 2 * pad, rowH), heading, small);
@@ -1938,7 +1934,7 @@ namespace SpaceGod::UI
 		pickerCursorSeat = pickerCursor >= 0 ? seats[pickerCursor] : nullptr; // US-T398
 		bool takeKeyed = pickerEnterKey;
 		pickerEnterKey = false;
-		auto r = Panel(Rect((Screen::width - w) * 0.5f, 110, w, 64 + listH + 24));
+		auto r = Place(w, 64 + listH + 24); // US-T440: the seat picker's drawer (floating, centred)
 		GUI::Label(Rect(r.x + 12, r.y + 6, w - 24, 22), cs::Cat("TAKE CHARGE  ·  ", seats.Count(), seats.Count() == 1 ? " seat" : " seats"), title);
 		auto old = GUI::contentColor;
 		GUI::contentColor = Dim;

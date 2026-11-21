@@ -41,6 +41,46 @@ public:
 	static constexpr const char* DrawerObjectivesId = "objectives";
 	static constexpr const char* DrawerReactorId = "reactor";
 	static constexpr const char* DrawerSensorsId = "sensors";
+	/// US-T440: every other HUD panel's drawer (UI/Hud.DrawerPanels.cpp registers them; docs/HUD.md lists them).
+	static constexpr const char* DrawerTopBarId = "topbar";
+	static constexpr const char* DrawerNewsId = "news";
+	static constexpr const char* DrawerTickerId = "ticker";
+	static constexpr const char* DrawerRewindBarId = "rewindbar";
+	static constexpr const char* DrawerCruiseId = "cruise";
+	static constexpr const char* DrawerNavigatorId = "navigator";
+	static constexpr const char* DrawerInfluenceId = "influence";
+	static constexpr const char* DrawerCargoId = "cargo";
+	static constexpr const char* DrawerHoldRewindId = "holdrewind";
+	static constexpr const char* DrawerOpportunitiesId = "opportunities";
+	static constexpr const char* DrawerMarketId = "market";
+	static constexpr const char* DrawerHarvestId = "harvest";
+	static constexpr const char* DrawerHuntersId = "hunters";
+	static constexpr const char* DrawerSelectionId = "selection";
+	static constexpr const char* DrawerTargetId = "target";
+	static constexpr const char* DrawerStatusId = "status";
+	static constexpr const char* DrawerSeatId = "seat";
+	static constexpr const char* DrawerHelmId = "helm";
+	static constexpr const char* DrawerTractorId = "tractor";
+	static constexpr const char* DrawerLaneRideId = "laneride";
+	static constexpr const char* DrawerInterdictionId = "interdiction";
+	static constexpr const char* DrawerFtlId = "ftl";
+	static constexpr const char* DrawerBountiesId = "bounties";
+	static constexpr const char* DrawerContractsId = "contracts";
+	static constexpr const char* DrawerFleetId = "fleet";
+	static constexpr const char* DrawerOutfitId = "outfit";
+	static constexpr const char* DrawerTradeId = "trade";
+	static constexpr const char* DrawerPortId = "port";
+	static constexpr const char* DrawerPickerId = "picker";
+	static constexpr const char* DrawerSavesId = "saves";
+	static constexpr const char* DrawerCommsId = "comms";
+	static constexpr const char* DrawerTutorialId = "tutorial";
+
+	/// <summary>US-T440: the rect a panel made a drawer draws in, from inside its drawer's draw callback: the content rect its
+	/// window was handed (it asks for w x h, which sizes its window from the next pass). The app's own panels (comms, the
+	/// cruise and tractor readouts, Influence, the rewind's, the tutorial's card) call it too.</summary>
+	Rect Place(float w, float h);
+	/// <summary>US-T440: the most content height the drawing drawer could have (what its edge leaves it).</summary>
+	float PlaceRoom() const;
 
 private:
 	enum class DrawerTab : int { Navigation, Ships, Notices /* US-T345 */, Objectives /* US-T405 */ };
@@ -102,9 +142,31 @@ private:
 	void RegisterDrawers();
 	/// US-T438: this pass's frame for the drawers: the mode, the screen, each edge's room, the HUD's Panel and styles.
 	HudDrawers::Frame DrawerFrame();
-	/// US-T438: before the right-hand column's panels: the right edge's docked drawers take their place in it (HudLayout's
-	/// BottomRight), so the selection card stacks over them as it did over the reactor and the sensors.
-	void ReserveDrawerEdges();
+
+	// ---- US-T440: every panel a drawer (UI/Hud.DrawerPanels.cpp)
+	/// The drawer drawing now (its content rect), for Place.
+	cs::String placeId;
+	Rect placeRect;
+	/// The width the bottom edge's band had in the last frame (the status line shortens its text to fit it).
+	float bottomBandW = 1200;
+	/// A panel's flag (app->ShowMarket...) and its drawer kept in step: the flag opens and closes it, its edge tab and its
+	/// close button set the flag.
+	struct FlagLink
+	{
+		cs::String id;
+		bool* flag = nullptr;
+		bool lastFlag = false, lastShown = false;
+	};
+	std::vector<FlagLink> flagLinks;
+	int flagsSyncedFrame = -1;
+	/// Registers a panel as a fit drawer whose draw callback runs `body` (which calls Place); `flag`: kept in step with it.
+	void AddPanel(DrawerSpec s, std::function<void()> body, bool* flag = nullptr);
+	/// Every panel's drawer and its default edge (called from RegisterDrawers).
+	void RegisterPanelDrawers();
+	/// Once a frame: the flags and their drawers in step.
+	void SyncPanelFlags();
+	/// After the drawers drew: the right edge's inner bound published (HudLayout::PublishedColumnLeft).
+	void PublishColumn();
 
 	static const char* DrawerTabId(DrawerTab tab);
 	static const char* DrawerTabTitle(DrawerTab tab);

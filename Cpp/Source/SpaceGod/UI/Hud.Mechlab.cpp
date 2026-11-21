@@ -169,7 +169,7 @@ namespace SpaceGod::UI
 		float optionsH = options > 0 ? 30 + options * rowH : 0;
 		float listH = Mathf::Max(80.0f, Mathf::Min(contentH, Mathf::Min(380.0f, Screen::height - 190 - 112 - optionsH - 20)));
 		float h = 112 + listH + optionsH;
-		auto r = Panel(Rect((Screen::width - w) * 0.5f, 190, w, h));
+		auto r = Place(w, h); // US-T440: the outfitting drawer's mechlab view (floating, centred)
 
 		GUI::Label(Rect(r.x + 12, r.y + 6, w - 24, 22), cs::Cat("MECHLAB  ·  ", ship->Name, "  ·  ",
 			yard != nullptr ? yard->Name : port != nullptr ? cs::Cat(port->Name, " (no yard)") : cs::String("not alongside a port")), title);

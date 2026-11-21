@@ -41,6 +41,13 @@ private:
 
 	/// <summary>The welcome card, the step card and its outline, the done card or a hint, over the HUD.</summary>
 	void DrawTutorial();
+	/// US-T440: the tutorial's card (a step, the end, a first-time hint), its drawer's content; DrawTutorial keeps the welcome
+	/// offer (a prompt) and the outline round what a step points at.
+	void DrawTutorialCard();
+	/// US-T440: whether the tutorial's card shows.
+	bool TutorialCardShown() const;
+	/// US-T440: DrawTutorial drawing the card for its drawer (else the offer and the outline).
+	bool tutorialCardPass = false;
 
 	/// <summary>The cards' textures go with the app (U.SPC-T366).</summary>
 	void DestroyTutorialTextures();

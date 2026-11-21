@@ -133,7 +133,7 @@ namespace SpaceGod::UI
 		auto a = GUIContent(head);
 		auto b = GUIContent(tail);
 		float w = Mathf::Max(text->CalcSize(a).x, small->CalcSize(b).x) + 28;
-		auto r = Panel(Rect((Screen::width - w) * 0.5f, Screen::height - 128, w, 50));
+		auto r = Place(w, 50); // US-T440: the lane ride's drawer (an alert: always shown), on the bottom edge
 		GUI::contentColor = StreakColor;
 		GUI::Label(Rect(r.x + 14, r.y + 5, w, 20), a, text);
 		GUI::contentColor = Dim;
@@ -171,7 +171,7 @@ namespace SpaceGod::UI
 		auto a = GUIContent(head);
 		auto b = GUIContent(tail);
 		float w = Mathf::Max(text->CalcSize(a).x, small->CalcSize(b).x) + 28;
-		auto r = Panel(Rect((Screen::width - w) * 0.5f, Screen::height - 184, w, 50));
+		auto r = Place(w, 50); // US-T440: the interdiction's drawer (an alert: always shown), on the bottom edge
 		GUI::contentColor = app->CanRejoinLane() && !app->RidingLane() && app->PilotStunSeconds() <= 0 ? StreakColor : InterdictColor;
 		GUI::Label(Rect(r.x + 14, r.y + 5, w, 20), a, text);
 		GUI::contentColor = Dim;
@@ -332,7 +332,7 @@ namespace SpaceGod::UI
 			hookH.Add(hooks[i].empty() ? 0.0f : opportunityHook->CalcHeight(GUIContent(hooks[i]), textW));
 			h += headH[i] + hookH[i] + 4;
 		}
-		auto r = Panel(layout.Take(HudRegion::TopRight, w, h)); // TopRight's first slot (HudLayout.h)
+		auto r = Place(w, h); // US-T440: the opportunities' drawer, at the top of the right edge
 		GUI::Label(Rect(r.x + 12, r.y + 6, textW, 18), cs::Cat("OPPORTUNITIES", app->IsPiloting() ? "" : "   (pilot a ship to answer)"), small);
 		float y = r.y + 26;
 		for (int i = 0; i < n; i++)
@@ -451,7 +451,7 @@ namespace SpaceGod::UI
 	void Hud::DrawTopBar()
 	{
 		float w = 640, h = 52;
-		auto r = Panel(Rect((Screen::width - w) * 0.5f, 10, w, h));
+		auto r = Place(w, h); // US-T440: the top bar's drawer, at the top edge
 		auto clock = app->Clock;
 
 		GUI::Label(Rect(r.x + 14, r.y + 7, 220, 20), cs::Cat(clock->Utc().ToString("yyyy-MM-dd  HH:mm"), " UTC"), title);
@@ -487,7 +487,9 @@ namespace SpaceGod::UI
 	{
 		float w = 268;
 		float h = navigatorOpen ? Mathf::Min(Screen::height - 24, 640) : 34;
-		auto r = Panel(Rect(SafeLeft() + 10, 10, w, h));
+		// US-T440: the navigator's drawer, at the top of the left edge: no taller than the edge leaves it.
+		if (navigatorOpen) h = Mathf::Max(120.0f, Mathf::Min(h, PlaceRoom()));
+		auto r = Place(w, h);
 		if (GUI::Button(Rect(r.x + 8, r.y + 6, w - 16, 22), UiStyle::Fold(navigatorOpen, "NAVIGATOR"), title)) navigatorOpen = !navigatorOpen;
 		if (!navigatorOpen) return;
 
@@ -741,9 +743,12 @@ namespace SpaceGod::UI
 	{
 		auto t = TextOnly(style);
 		float left = r.x + style->padding.left, right = r.xMax() - Mathf::Max(style->padding.right, 2);
-		float nameW = Mathf::Min(t->CalcSize(GUIContent(name)).x, right - left);
+		// US-T440: a name longer than its room is cut with an ellipsis (leaving the details a third of the row), not clipped.
+		float nameMax = details.empty() ? right - left : (right - left) * 0.68f;
+		cs::String shown = FitText(name, t, Mathf::Max(12.0f, nameMax));
+		float nameW = Mathf::Min(t->CalcSize(GUIContent(shown)).x, right - left);
 		GUI::BeginGroup(Rect(left, r.y, nameW, r.height));
-		GUI::Label(Rect(0, 0, nameW + 40, r.height), name, t);
+		GUI::Label(Rect(0, 0, nameW + 40, r.height), shown, t);
 		GUI::EndGroup();
 		if (details.empty()) return;
 		auto area = Rect(left + nameW + 8, r.y, right - left - nameW - 8, r.height);
@@ -1169,8 +1174,7 @@ namespace SpaceGod::UI
 
 	void Hud::DrawSelection()
 	{
-		// US-T256: the locked hull's card takes its BottomRight slot first, so the selection card fits what is left.
-		DrawTargetCard();
+		// US-T256: the locked hull's card is its own drawer (US-T440), under this one; this card takes what the edge leaves.
 		auto t = app->Selected;
 		if (t.IsNone()) return;
 		// US-T239: a new selection opens on its overview (unless sg.ScanView has just asked for a tab).
@@ -1237,7 +1241,7 @@ namespace SpaceGod::UI
 		// US-T272: the Encyclopedia's keywords, a wrapped row of links over the buttons.
 		cs::List<Rect> linkRects = ScanLinkRects(w - 28);
 		float linksH = linkRects.Count() == 0 ? 0.0f : linkRects[linkRects.Count() - 1].yMax() + 8;
-		float maxLinesH = Mathf::Max(19.0f * 2, layout.FreeRight() - (64 + 30 + tabsH + linksH));
+		float maxLinesH = Mathf::Max(19.0f * 2, PlaceRoom() - (64 + 30 + tabsH + linksH)); // US-T440: what its edge leaves it
 		bool scrolls = linesH > maxLinesH;
 		if (scrolls)
 		{
@@ -1246,7 +1250,7 @@ namespace SpaceGod::UI
 		}
 		float shownH = scrolls ? maxLinesH : linesH;
 		float h = 64 + tabsH + shownH + 30 + linksH;
-		auto r = Panel(layout.Take(HudRegion::BottomRight, w, h));
+		auto r = Place(w, h); // US-T440: the selection's drawer, up the right edge over the target card
 		auto old = GUI::contentColor;
 		GUI::contentColor = headingColor;
 		GUI::Label(Rect(r.x + 14, r.y + 8, w - 28, 24), heading, title);

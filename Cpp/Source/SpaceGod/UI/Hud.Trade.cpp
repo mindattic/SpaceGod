@@ -80,7 +80,7 @@ namespace SpaceGod::UI
 		constexpr float w = 860, rowH = 20, listH = 300;
 		bool backDoor = flown != nullptr && port != nullptr && app->NearPort(port) && Smuggling::HasBackDoor(port) && HasBackDoorCargo(desk, flown, port);
 		float h0 = 112 + listH + (backDoor ? 26 + 3 * rowH : 0);
-		auto r = Panel(Rect((Screen::width - w) * 0.5f, 100, w, h0));
+		auto r = Place(w, h0); // US-T440: the trade desk's drawer (floating, centred)
 		double worth = desk->NetWorth(purse != h->House ? purse : nullptr);
 		cs::String next = cs::Double::IsNaN(desk->NextRankWorth()) ? cs::String() : cs::Cat("  ·  next rank at ", Credits(desk->NextRankWorth()));
 		GUI::Label(Rect(r.x + 12, r.y + 6, w - 60, 22),

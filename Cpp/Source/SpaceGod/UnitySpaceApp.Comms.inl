@@ -78,6 +78,8 @@ private:
 	void TrackEmbodiedPilot();
 
 	void DrawComms();
+	/// US-T440: whether the comms panel shows (its drawer's, UI/Hud.DrawerPanels.cpp).
+	bool CommsShown() const { return commsOpen && !ScreenCleared; }
 	void EnsureCommsStyles();
 	void DestroyCommsTextures();
 

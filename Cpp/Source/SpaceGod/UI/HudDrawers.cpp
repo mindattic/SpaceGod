@@ -104,10 +104,87 @@ namespace SpaceGod::UI
 		return i < 0 ? nullptr : &specs[i];
 	}
 
-	bool HudDrawers::Available(const cs::String& id) const
+	bool HudDrawers::SpecAvailable(const cs::String& id) const
 	{
 		auto s = Spec(id);
 		return s != nullptr && (!s->available || s->available());
+	}
+
+	bool HudDrawers::Available(const cs::String& id) const
+	{
+		if (!SpecAvailable(id)) return false;
+		// US-T440: a fit drawer that asked for nothing the last time it drew has nothing to show.
+		auto e = empties.find(id);
+		return e == empties.end() || !e->second;
+	}
+
+	bool HudDrawers::HasAlways(const DrawerWindow& w) const
+	{
+		for (const auto& m : w.members)
+			if (auto s = Spec(m); s != nullptr && s->always) return true;
+		return false;
+	}
+
+	void HudDrawers::Want(const cs::String& id, Vector2 size)
+	{
+		wants[id] = size;
+		empties[id] = false;
+		if (id == drawing) asked = true;
+	}
+
+	void HudDrawers::DrawContent(const DrawerSpec& s, Rect r)
+	{
+		if (!s.draw) return;
+		if (!s.fit)
+		{
+			s.draw(r);
+			return;
+		}
+		cs::String was = drawing;
+		bool wasAsked = asked;
+		drawing = s.id;
+		asked = false;
+		s.draw(r);
+		// Asked for nothing: the panel had nothing to show (it is asked again, off the screen, on every Layout pass).
+		if (!asked) empties[s.id] = true;
+		drawing = was;
+		asked = wasAsked;
+	}
+
+	bool HudDrawers::FitSize(const DrawerWindow& w, bool bare, Vector2& size) const
+	{
+		if (!w.fitted || w.members.empty()) return false;
+		const auto& id = w.members[std::clamp(w.active, 0, static_cast<int>(w.members.size()) - 1)];
+		auto s = Spec(id);
+		if (s == nullptr || !s->fit) return false;
+		auto it = wants.find(id);
+		if (it == wants.end()) return false;
+		float side = bare ? 0.0f : Pad, top = bare ? 0.0f : TitleH, foot = bare ? 0.0f : Pad;
+		size = Vector2(it->second.x + 2 * side, it->second.y + top + foot);
+		return true;
+	}
+
+	float HudDrawers::Room(const cs::String& id) const
+	{
+		int i = WindowOf(id);
+		if (i < 0) return haveLast ? last.screenH : 1080.0f;
+		return windows[i].room;
+	}
+
+	HudDock::Box HudDrawers::LastEdgeExtent(HudDock::Edge edge) const
+	{
+		Box out;
+		bool any = false;
+		for (const auto& w : windows)
+		{
+			if (!w.drawn || !w.docked || w.edge != edge) continue;
+			Box b = ToBox(w.rect);
+			if (!any) { out = b; any = true; continue; }
+			float x0 = std::min(out.x, b.x), y0 = std::min(out.y, b.y);
+			float x1 = std::max(out.Right(), b.Right()), y1 = std::max(out.Bottom(), b.Bottom());
+			out = Box(x0, y0, x1 - x0, y1 - y0);
+		}
+		return out;
 	}
 
 	DrawerAlert HudDrawers::AlertOf(const cs::String& id) const
@@ -126,10 +203,18 @@ namespace SpaceGod::UI
 		w.docked = true;
 		w.edge = s.edge;
 		w.size = s.size;
+		w.far = s.far;
 		w.floating = Rect(240, 160, s.size.x > 0 ? s.size.x : 480, s.size.y > 0 ? s.size.y : 320);
+		// US-T440: a modal-like drawer starts floating, centred across the screen (kept so until it is moved).
+		if (s.floatY >= 0)
+		{
+			w.docked = false;
+			w.centred = true;
+			w.floating.y = s.floatY;
+		}
 		int n = 0;
 		for (const auto& o : windows)
-			if (o.docked && o.edge == s.edge) n++;
+			if (o.docked && o.edge == s.edge && o.far == s.far) n++;
 		w.order = n;
 		return w;
 	}
@@ -195,9 +280,20 @@ namespace SpaceGod::UI
 		return out;
 	}
 
-	bool HudDrawers::VisibleNow(const DrawerWindow& w, bool hudMode) const
+	bool HudDrawers::VisibleNow(const DrawerWindow& w, bool hudMode, bool bareFrame) const
 	{
-		return w.shown && (hudMode || w.pinned || w.peek) && !AvailableMembers(w).empty();
+		auto avail = AvailableMembers(w);
+		if (avail.empty()) return false;
+		bool keyed = false;
+		for (int k : avail)
+		{
+			auto s = Spec(w.members[k]);
+			if (s->always) return true; // US-T440: an alert shows whenever it can
+			keyed = keyed || s->keyed;
+		}
+		if (!w.shown) return false;
+		if (bareFrame) return keyed || w.peek; // the HUD's panels hidden (U): what a key opened still shows
+		return hudMode || w.pinned || w.peek || keyed;
 	}
 
 	void HudDrawers::Activate(DrawerWindow& w, const cs::String& id)
@@ -241,7 +337,7 @@ namespace SpaceGod::UI
 		int i = WindowOf(id);
 		if (i < 0) return false;
 		const auto& w = windows[i];
-		if (!VisibleNow(w, lastHudMode) || w.collapsed || !Available(id)) return false;
+		if (!VisibleNow(w, lastHudMode, haveLast && last.bare) || w.collapsed || !Available(id)) return false;
 		if (!w.tabbed) return true;
 		auto avail = AvailableMembers(w);
 		int active = w.active;
@@ -275,11 +371,15 @@ namespace SpaceGod::UI
 
 	void HudDrawers::Renumber(Edge edge)
 	{
-		std::vector<int> on;
-		for (size_t i = 0; i < windows.size(); i++)
-			if (windows[i].docked && windows[i].edge == edge) on.push_back(static_cast<int>(i));
-		std::stable_sort(on.begin(), on.end(), [&](int a, int b) { return windows[a].order < windows[b].order; });
-		for (size_t k = 0; k < on.size(); k++) windows[on[k]].order = static_cast<int>(k);
+		// Each of the edge's two stacks (US-T440) numbered on its own.
+		for (int far = 0; far < 2; far++)
+		{
+			std::vector<int> on;
+			for (size_t i = 0; i < windows.size(); i++)
+				if (windows[i].docked && windows[i].edge == edge && windows[i].far == (far == 1)) on.push_back(static_cast<int>(i));
+			std::stable_sort(on.begin(), on.end(), [&](int a, int b) { return windows[a].order < windows[b].order; });
+			for (size_t k = 0; k < on.size(); k++) windows[on[k]].order = static_cast<int>(k);
+		}
 	}
 
 	void HudDrawers::Float(const cs::String& id, Rect r)
@@ -290,28 +390,31 @@ namespace SpaceGod::UI
 		bool was = w.docked;
 		Edge old = w.edge;
 		w.docked = false;
+		w.centred = false; // US-T440: put somewhere, it stays there
 		w.floating = r;
 		if (was) Renumber(old);
 	}
 
-	void HudDrawers::Dock(const cs::String& id, Edge edge, int order)
+	void HudDrawers::Dock(const cs::String& id, Edge edge, int order, bool far)
 	{
 		int i = WindowOf(id);
 		if (i < 0) return;
 		auto& w = windows[i];
 		bool was = w.docked;
 		Edge old = w.edge;
-		// The others on that edge in their order, this one put in at `order`.
+		w.centred = false;
+		w.far = HudDock::Vertical(edge) && far;
+		// The others in that stack of that edge in their order, this one put in at `order`.
 		std::vector<int> on;
 		for (size_t k = 0; k < windows.size(); k++)
-			if (static_cast<int>(k) != i && windows[k].docked && windows[k].edge == edge) on.push_back(static_cast<int>(k));
+			if (static_cast<int>(k) != i && windows[k].docked && windows[k].edge == edge && windows[k].far == w.far) on.push_back(static_cast<int>(k));
 		std::stable_sort(on.begin(), on.end(), [&](int a, int b) { return windows[a].order < windows[b].order; });
 		int at = std::clamp(order, 0, static_cast<int>(on.size()));
 		on.insert(on.begin() + at, i);
 		w.docked = true;
 		w.edge = edge;
 		for (size_t k = 0; k < on.size(); k++) windows[on[k]].order = static_cast<int>(k);
-		if (was && old != edge) Renumber(old);
+		if (was) Renumber(old);
 	}
 
 	void HudDrawers::RemoveEmpty()
@@ -350,6 +453,7 @@ namespace SpaceGod::UI
 			bool was = from.docked;
 			Edge old = from.edge;
 			from.docked = false;
+			from.centred = false;
 			from.floating = r;
 			from.shown = true;
 			if (was) Renumber(old);
@@ -368,6 +472,8 @@ namespace SpaceGod::UI
 		w.floating = r;
 		w.slide = 1;
 		w.peek = from.peek;
+		w.far = false;
+		w.centred = false;
 		windows.push_back(w);
 		return static_cast<int>(windows.size()) - 1;
 	}
@@ -386,6 +492,7 @@ namespace SpaceGod::UI
 		if (i < 0) return false;
 		auto& w = windows[i];
 		constexpr float Step = 1.35f;
+		w.fitted = false; // US-T440: sized by hand, it no longer follows its content
 		if (!w.docked)
 		{
 			float sh = haveLast ? last.screenH : 1080.0f;
@@ -417,6 +524,19 @@ namespace SpaceGod::UI
 		return it == published.end() ? Rect() : it->second;
 	}
 
+	Rect HudDrawers::PublishedContent(const cs::String& id)
+	{
+		auto it = publishedContent.find(id);
+		return it == publishedContent.end() ? Rect() : it->second;
+	}
+
+	bool HudDrawers::BareNow(const DrawerWindow& w, const Frame& f) const
+	{
+		if (f.hudMode || w.members.size() != 1) return false;
+		auto s = Spec(w.members[0]);
+		return s != nullptr && s->bare;
+	}
+
 	HudDock::Edge HudDrawers::HomeEdge(const DrawerWindow& w, const Frame& f) const
 	{
 		return w.docked ? w.edge : HudDock::NearestEdge(ToBox(w.floating), f.screenW, f.screenH);
@@ -435,7 +555,7 @@ namespace SpaceGod::UI
 		bool motion = UiMotion::Enabled();
 		for (auto& w : windows)
 		{
-			float target = VisibleNow(w, hudMode) ? 1.0f : 0.0f;
+			float target = VisibleNow(w, hudMode, haveLast && last.bare) ? 1.0f : 0.0f;
 			w.slide = motion ? Mathf::MoveTowards(w.slide, target, dt / UiMotion::PanelSeconds) : target;
 		}
 	}
@@ -444,7 +564,26 @@ namespace SpaceGod::UI
 	{
 		if (!laidOut) ResetLayout();
 		bool moving = drag.kind == DragKind::Move || drag.kind == DragKind::Resize;
-		for (auto& w : windows) w.drawn = false;
+		for (auto& w : windows)
+		{
+			w.drawn = false;
+			w.bareNow = BareNow(w, f);
+			// US-T440: a fit window takes the size its content asked for; a centred one stays centred across the screen.
+			Vector2 fs;
+			bool dragged = moving && drag.window >= 0 && drag.window < static_cast<int>(windows.size()) && &windows[drag.window] == &w;
+			if (!dragged && FitSize(w, w.bareNow, fs))
+			{
+				if (w.docked) w.size = fs;
+				else { w.floating.width = fs.x; w.floating.height = fs.y; }
+			}
+			if (!w.docked && w.centred && !dragged && !w.members.empty())
+			{
+				auto s = Spec(w.members[0]);
+				float y = s != nullptr && s->floatY >= 0 ? s->floatY : w.floating.y;
+				w.floating.x = (f.screenW - w.floating.width) * 0.5f;
+				w.floating.y = s != nullptr && s->floatBottom ? f.screenH - y - w.floating.height : y;
+			}
+		}
 		for (int e = 0; e < HudDock::EdgeCount; e++)
 		{
 			auto edge = static_cast<Edge>(e);
@@ -453,38 +592,50 @@ namespace SpaceGod::UI
 			{
 				const auto& w = windows[i];
 				if (!w.docked || w.edge != edge) continue;
-				if (!(VisibleNow(w, f.hudMode) || w.slide > 0.001f) || AvailableMembers(w).empty()) continue;
+				if (!(VisibleNow(w, f.hudMode, f.bare) || w.slide > 0.001f) || AvailableMembers(w).empty()) continue;
 				on.push_back(static_cast<int>(i));
 			}
 			if (on.empty()) continue;
-			std::stable_sort(on.begin(), on.end(), [&](int a, int b) { return windows[a].order < windows[b].order; });
+			// The near stack in its order, then the far one (US-T440).
+			std::stable_sort(on.begin(), on.end(), [&](int a, int b)
+			{
+				if (windows[a].far != windows[b].far) return !windows[a].far;
+				return windows[a].order < windows[b].order;
+			});
 			bool vertical = HudDock::Vertical(edge);
 			std::vector<HudDock::Slot> slots;
 			for (int i : on)
 			{
 				const auto& w = windows[i];
+				float top = w.bareNow ? 0.0f : TitleH;
+				// US-T440: every edge stacks its windows one over another: a slot is the window's height by its width.
 				HudDock::Slot s;
-				if (vertical)
-				{
-					s.length = w.collapsed ? TitleH : w.size.y;
-					s.thickness = w.size.x > 0 ? w.size.x : 260;
-					s.least = w.collapsed ? TitleH : TitleH + 36;
-				}
-				else
-				{
-					s.length = w.size.x;
-					s.thickness = w.collapsed ? TitleH : (w.size.y > 0 ? w.size.y : 260);
-					s.least = 140;
-				}
+				s.length = w.collapsed ? top : w.size.y;
+				s.thickness = w.size.x > 0 ? w.size.x : (vertical ? 260.0f : 0.0f);
+				s.least = w.collapsed ? top : (s.length > 0 ? std::min(TitleH + 36, s.length) : TitleH + 36);
+				s.far = w.far;
 				slots.push_back(s);
 			}
-			auto boxes = HudDock::StackEdge(edge, f.bands[e], slots, UiStyle::Space::Gap);
+			const auto& band = f.bands[e];
+			auto boxes = HudDock::StackEdge(edge, band, slots, UiStyle::Space::Gap);
+			// What each could have: the band less what the others ask for (a yielding drawer's asking counts for no one).
+			float askedRoom = 0;
+			for (size_t k = 0; k < on.size(); k++)
+			{
+				auto s0 = windows[on[k]].members.empty() ? nullptr : Spec(windows[on[k]].members[0]);
+				if (s0 != nullptr && s0->yields) continue;
+				askedRoom += (slots[k].length > 0 ? slots[k].length : slots[k].least) + UiStyle::Space::Gap;
+			}
 			for (size_t k = 0; k < on.size(); k++)
 			{
 				auto& w = windows[on[k]];
 				float t = UiMotion::Enabled() ? Eased(w.slide) : (w.slide > 0 ? 1.0f : 0.0f);
 				w.rect = ToRect(HudDock::Slide(boxes[k], edge, t, f.screenW, f.screenH));
 				w.drawn = true;
+				auto s0 = w.members.empty() ? nullptr : Spec(w.members[0]);
+				float mine = s0 != nullptr && s0->yields ? 0.0f : (slots[k].length > 0 ? slots[k].length : slots[k].least) + UiStyle::Space::Gap;
+				float chrome = w.bareNow ? 0.0f : TitleH + Pad;
+				w.room = std::max(0.0f, band.h - (askedRoom - mine) - chrome);
 			}
 		}
 		for (size_t i = 0; i < windows.size(); i++)
@@ -492,12 +643,14 @@ namespace SpaceGod::UI
 			auto& w = windows[i];
 			if (w.docked || AvailableMembers(w).empty()) continue;
 			bool dragged = moving && drag.window == static_cast<int>(i);
-			if (!dragged && !(VisibleNow(w, f.hudMode) || w.slide > 0.001f)) continue;
-			auto r = HudDock::KeepOnScreen(ToBox(w.floating), f.screenW, f.screenH, 4, MinW, w.collapsed ? TitleH : MinH);
+			if (!dragged && !(VisibleNow(w, f.hudMode, f.bare) || w.slide > 0.001f)) continue;
+			float top = w.bareNow ? 0.0f : TitleH;
+			auto r = HudDock::KeepOnScreen(ToBox(w.floating), f.screenW, f.screenH, 4, MinW, w.collapsed ? top : MinH);
 			if (!dragged) w.floating = ToRect(r); // kept on screen at this resolution and UI scale
-			if (w.collapsed) r.h = TitleH;
+			if (w.collapsed) r.h = top;
 			w.rect = ToRect(r);
 			w.drawn = true;
+			w.room = std::max(0.0f, f.screenH - 8 - (w.bareNow ? 0.0f : TitleH + Pad));
 		}
 	}
 
@@ -524,7 +677,7 @@ namespace SpaceGod::UI
 		for (size_t i = 0; i < windows.size(); i++)
 		{
 			const auto& w = windows[i];
-			if (static_cast<int>(i) == except || !w.drawn) out.emplace_back();
+			if (static_cast<int>(i) == except || !w.drawn || w.bareNow) out.emplace_back();
 			else out.emplace_back(w.rect.x, w.rect.y, w.rect.width, TitleH);
 		}
 		return out;
@@ -535,12 +688,30 @@ namespace SpaceGod::UI
 		last = f;
 		haveLast = true;
 		auto& e = Event::current();
-		if (e.type == EventType::Repaint) published.clear();
+		if (e.type == EventType::Repaint)
+		{
+			published.clear();
+			publishedContent.clear();
+		}
 		if (drag.kind != DragKind::None && GUIUtility::hotControl != DragControl)
 		{
 			drag = Drag(); // something else took the pointer
 			previewing = false;
 		}
+		// US-T440: a fit drawer that had nothing to show is asked again on each Layout pass, drawn off the screen (nothing of it
+		// is seen and nothing takes a click there), so it comes back the moment it has something.
+		if (e.type == EventType::Layout)
+			for (const auto& s : specs)
+			{
+				if (!s.fit || !s.draw) continue;
+				auto it = empties.find(s.id);
+				if (it == empties.end() || !it->second || !SpecAvailable(s.id)) continue;
+				int wi = WindowOf(s.id);
+				if (wi < 0 || !(windows[wi].shown || s.always)) continue;
+				auto want = wants.find(s.id);
+				Vector2 size = want != wants.end() ? want->second : s.size;
+				DrawContent(s, Rect(-30000, -30000, std::max(1.0f, size.x), std::max(1.0f, size.y)));
+			}
 		Layout(f);
 
 		// Docked first, then floating, the one dragged last (on top).
@@ -556,8 +727,12 @@ namespace SpaceGod::UI
 		if (e.type == EventType::MouseDown)
 			for (int i : order)
 				if (windows[i].rect.Contains(e.mousePosition)) topHit = i;
-		for (int i : order) DrawWindow(i, f);
+		// The edge tabs over the docked windows and under the floating ones (US-T440: a centred board covers the top's tabs).
+		size_t docked = 0;
+		while (docked < order.size() && windows[order[docked]].docked) docked++;
+		for (size_t k = 0; k < docked; k++) DrawWindow(order[k], f);
 		DrawEdgeTabs(f);
+		for (size_t k = docked; k < order.size(); k++) DrawWindow(order[k], f);
 		HandleDrag(f);
 		if (drag.kind == DragKind::Move) DrawPreview(f);
 		// While dragging, the whole screen is the drag's: nothing under the pointer takes the release.
@@ -578,6 +753,22 @@ namespace SpaceGod::UI
 
 		float oldFade = GUI::fade;
 		if (!w.docked && UiMotion::Enabled()) GUI::fade = oldFade * Eased(w.slide);
+
+		// US-T440: a bare drawer in the minimal HUD: the overlay it was, no title bar (and a frameless one no panel either).
+		if (w.bareNow)
+		{
+			const auto& id = w.members[w.active];
+			auto s = Spec(id);
+			if (s != nullptr && !s->frameless) f.panel(r);
+			if (repaint)
+			{
+				published[id] = r;
+				publishedContent[id] = r;
+			}
+			if (s != nullptr && !w.collapsed) DrawContent(*s, r);
+			GUI::fade = oldFade;
+			return;
+		}
 		f.panel(r);
 
 		// The worst alert of what it holds tints its title bar.
@@ -585,23 +776,28 @@ namespace SpaceGod::UI
 		for (int k : avail) alertLevel = std::max(alertLevel, AlertOf(w.members[k]).level);
 		if (alertLevel > 0) Fill(Rect(r.x + 2, r.y + 2, r.width - 4, 2), AlertColor(alertLevel));
 
-		// The title bar's buttons, right to left: close, pin, tabs / stack.
+		// The title bar's buttons, right to left: close (none for an alert, US-T440), pin, tabs / stack; a narrow window's as
+		// one-letter buttons, so its title or tabs keep their room (US-T440).
+		bool narrow = r.width < 320;
 		float bx = r.xMax() - Pad;
 		float by = r.y + 3, bh = TitleH - 6;
-		bx -= 20;
-		if (GUI::Button(Rect(bx, by, 20, bh), "x", st.button))
+		if (!HasAlways(w))
 		{
-			w.shown = false;
-			w.peek = false;
+			bx -= 20;
+			if (GUI::Button(Rect(bx, by, 20, bh), "x", st.button))
+			{
+				w.shown = false;
+				w.peek = false;
+			}
 		}
-		float pw = 52;
+		float pw = narrow ? 20.0f : 52.0f;
 		bx -= pw + 3;
-		if (GUI::Button(Rect(bx, by, pw, bh), w.pinned ? "PINNED" : "PIN", w.pinned ? st.buttonActive : st.button)) w.pinned = !w.pinned;
+		if (GUI::Button(Rect(bx, by, pw, bh), narrow ? "P" : w.pinned ? "PINNED" : "PIN", w.pinned ? st.buttonActive : st.button)) w.pinned = !w.pinned;
 		if (w.members.size() > 1)
 		{
-			float mw = 50;
+			float mw = narrow ? 20.0f : 50.0f;
 			bx -= mw + 3;
-			if (GUI::Button(Rect(bx, by, mw, bh), w.tabbed ? "STACK" : "TABS", st.button)) w.tabbed = !w.tabbed;
+			if (GUI::Button(Rect(bx, by, mw, bh), narrow ? (w.tabbed ? "=" : "T") : w.tabbed ? "STACK" : "TABS", st.button)) w.tabbed = !w.tabbed;
 		}
 
 		// The handle: the rest of the title bar (fold mark, then the title or the tabs).
@@ -617,8 +813,11 @@ namespace SpaceGod::UI
 			std::vector<float> want, least;
 			for (int k : avail)
 			{
-				want.push_back(TextW(st.small, Spec(w.members[k])->title) + 16);
-				least.push_back(36);
+				auto sp = Spec(w.members[k]);
+				want.push_back(TextW(st.small, sp->title) + 16);
+				// US-T440: a tab never narrower than its short title (or the first letters of its title) needs.
+				cs::String brief = sp->shortTitle.empty() ? cs::String(sp->title.substr(0, std::min<size_t>(4, sp->title.size()))) : sp->shortTitle;
+				least.push_back(std::max(36.0f, TextW(st.small, brief) + 14));
 			}
 			auto len = HudDock::Split(want, least, handle.xMax() - tx - 2, 3);
 			float x = tx;
@@ -629,7 +828,10 @@ namespace SpaceGod::UI
 				bool on = avail[j] == w.active;
 				auto a = AlertOf(id);
 				if (a.level > 0) GUI::contentColor = AlertColor(a.level);
-				GUI::Box(tr, GUIContent(Fit(Spec(id)->title, st.small, len[j] - 8)), on ? st.buttonActive : st.button);
+				// US-T440: too narrow for its title, a tab shows its short title (whole, not cut to "RE...").
+				auto sp = Spec(id);
+				cs::String tabText = TextW(st.small, sp->title) + 8 > len[j] && !sp->shortTitle.empty() ? sp->shortTitle : sp->title;
+				GUI::Box(tr, GUIContent(Fit(tabText, st.small, len[j] - 8)), on ? st.buttonActive : st.button);
 				GUI::contentColor = old;
 				tabs.push_back({ tr, id });
 				x += len[j] + 3;
@@ -672,8 +874,12 @@ namespace SpaceGod::UI
 				if (w.tabbed || avail.size() == 1)
 				{
 					const auto& id = w.members[w.active];
-					if (repaint) published[id] = r;
-					if (auto s = Spec(id); s != nullptr && s->draw) s->draw(content);
+					if (repaint)
+					{
+						published[id] = r;
+						publishedContent[id] = content;
+					}
+					if (auto s = Spec(id); s != nullptr) DrawContent(*s, content);
 				}
 				else
 				{
@@ -693,9 +899,13 @@ namespace SpaceGod::UI
 						GUI::contentColor = old;
 						if (e.type == EventType::MouseDown && e.button == 0 && topHit == index && GUIUtility::hotControl == 0 && head.Contains(m))
 							press(DragFrom::Section, id);
-						if (repaint) published[id] = sec;
 						Rect body(sec.x, sec.y + SectionH + 2, sec.width, sec.height - SectionH - 2);
-						if (auto s = Spec(id); s != nullptr && s->draw && body.height > 4) s->draw(body);
+						if (repaint)
+						{
+							published[id] = sec;
+							publishedContent[id] = body;
+						}
+						if (auto s = Spec(id); s != nullptr && body.height > 4) DrawContent(*s, body);
 						y += len[j] + Pad;
 					}
 				}
@@ -721,11 +931,11 @@ namespace SpaceGod::UI
 		const auto& st = f.styles;
 		for (const auto& s : specs)
 		{
-			if (!Available(s.id)) continue;
+			if (f.bare || s.always || !Available(s.id)) continue; // US-T440: no tabs with the HUD's panels hidden; an alert has none
 			int wi = WindowOf(s.id);
 			if (wi < 0) continue;
 			const auto& w = windows[wi];
-			if (VisibleNow(w, f.hudMode) && w.drawn) continue; // in its window (a group's tab strip shows the rest)
+			if (VisibleNow(w, f.hudMode, f.bare) && w.drawn) continue; // in its window (a group's tab strip shows the rest)
 			auto a = AlertOf(s.id);
 			if (!f.hudMode && a.level < 2) continue; // the minimal HUD shows only the tabs that raise something urgent (US-T439)
 			cs::String label = !f.hudMode && !a.text.empty() ? cs::Cat(s.title, UiStyle::Glyph::Separator, a.text) : s.title;
@@ -744,7 +954,7 @@ namespace SpaceGod::UI
 		int e = static_cast<int>(edge);
 		Box out;
 		bool any = false;
-		for (const auto& b : HudDock::EdgeTabs(edge, f.bands[e], lens[e], TabH, 4))
+		for (const auto& b : HudDock::EdgeTabs(edge, TabBand(edge, f), lens[e], TabH, 4))
 		{
 			if (!any) { out = b; any = true; continue; }
 			float x0 = std::min(out.x, b.x), y0 = std::min(out.y, b.y);
@@ -752,6 +962,22 @@ namespace SpaceGod::UI
 			out = Box(x0, y0, x1 - x0, y1 - y0);
 		}
 		return out;
+	}
+
+	HudDock::Box HudDrawers::TabBand(Edge edge, const Frame& f) const
+	{
+		// US-T440: the tabs keep out of the windows docked there: in the room between the edge's two stacks (past the top or
+		// bottom edge's windows), as the band was when that room is too small.
+		Box band = f.bands[static_cast<int>(edge)];
+		float top = band.y, bottom = band.Bottom();
+		for (const auto& w : windows)
+		{
+			if (!w.drawn || !w.docked || w.edge != edge) continue;
+			if (HudDock::FromTop(edge, w.far)) top = std::max(top, w.rect.yMax() + UiStyle::Space::Gap);
+			else bottom = std::min(bottom, w.rect.y - UiStyle::Space::Gap);
+		}
+		if (bottom - top < TabH) return band;
+		return Box(band.x, top, band.w, bottom - top);
 	}
 
 	void HudDrawers::DrawEdgeTabs(const Frame& f)
@@ -764,9 +990,17 @@ namespace SpaceGod::UI
 		auto old = GUI::contentColor;
 		for (int e = 0; e < HudDock::EdgeCount; e++)
 		{
+			tabExtents[e] = Box();
 			if (on[e].empty()) continue;
 			auto edge = static_cast<Edge>(e);
-			auto boxes = HudDock::EdgeTabs(edge, f.bands[e], lens[e], TabH, 4);
+			auto boxes = HudDock::EdgeTabs(edge, TabBand(edge, f), lens[e], TabH, 4);
+			for (const auto& b : boxes)
+			{
+				auto& x = tabExtents[e];
+				if (x.Empty()) { x = b; continue; }
+				float x0 = std::min(x.x, b.x), y0 = std::min(x.y, b.y);
+				x = Box(x0, y0, std::max(x.Right(), b.Right()) - x0, std::max(x.Bottom(), b.Bottom()) - y0);
+			}
 			for (size_t k = 0; k < boxes.size(); k++)
 			{
 				Rect r = ToRect(boxes[k]);
@@ -785,7 +1019,10 @@ namespace SpaceGod::UI
 				Rect mark = edge == Edge::Left ? Rect(r.x, r.y, 2, r.height) : edge == Edge::Right ? Rect(r.xMax() - 2, r.y, 2, r.height)
 					: edge == Edge::Top ? Rect(r.x, r.y, r.width, 2) : Rect(r.x, r.yMax() - 2, r.width, 2);
 				Fill(mark, t.level > 0 ? AlertColor(t.level) : UiStyle::Accent);
-				if (ev.type == EventType::MouseDown && ev.button == 0 && GUIUtility::hotControl == 0 && r.Contains(ev.mousePosition))
+				bool covered = false; // US-T440: under a floating window the press is the window's
+				for (const auto& w : windows)
+					if (w.drawn && !w.docked && w.rect.Contains(ev.mousePosition)) covered = true;
+				if (ev.type == EventType::MouseDown && ev.button == 0 && GUIUtility::hotControl == 0 && !covered && r.Contains(ev.mousePosition))
 				{
 					drag = Drag();
 					drag.kind = DragKind::Pending;
@@ -847,6 +1084,7 @@ namespace SpaceGod::UI
 							Renumber(old);
 						}
 						else w.floating = w.rect;
+						w.centred = false; // US-T440: moved by hand, it stays where it is put
 					}
 					drag.kind = DragKind::Move;
 				}
@@ -861,6 +1099,8 @@ namespace SpaceGod::UI
 			else if (drag.kind == DragKind::Resize && drag.window >= 0)
 			{
 				auto& w = windows[drag.window];
+				w.fitted = false; // US-T440: sized by hand, it no longer follows its content
+				w.centred = false;
 				w.floating.width = std::max(MinW, drag.start.width + (m.x - drag.down.x));
 				w.floating.height = std::max(MinH, drag.start.height + (m.y - drag.down.y));
 			}
@@ -900,14 +1140,16 @@ namespace SpaceGod::UI
 		if (wi < 0 || wi >= static_cast<int>(windows.size())) return;
 		Vector2 m = Event::current().mousePosition;
 		std::vector<std::vector<Box>> slots(HudDock::EdgeCount);
+		std::vector<std::vector<bool>> far(HudDock::EdgeCount);
 		for (size_t i = 0; i < windows.size(); i++)
 		{
 			const auto& o = windows[i];
 			if (static_cast<int>(i) == wi || !o.drawn || !o.docked) continue;
 			slots[static_cast<int>(o.edge)].push_back(ToBox(o.rect));
+			far[static_cast<int>(o.edge)].push_back(o.far);
 		}
 		// The slots in their order on each edge (InsertOrder counts them by where they lie, so order is all it needs).
-		auto snap = HudDock::FindSnap(m.x, m.y, f.screenW, f.screenH, EdgeReach, TitleStrips(wi), slots);
+		auto snap = HudDock::FindSnap(m.x, m.y, f.screenW, f.screenH, EdgeReach, TitleStrips(wi), slots, far);
 		auto& w = windows[wi];
 		switch (snap.kind)
 		{
@@ -925,7 +1167,7 @@ namespace SpaceGod::UI
 				const auto& band = f.bands[static_cast<int>(snap.edge)];
 				w.size = Vector2(!vertical && w.floating.width >= band.w * 0.8f ? 0.0f : w.floating.width,
 					vertical && w.floating.height >= band.h * 0.8f ? 0.0f : w.floating.height);
-				Dock(w.members.front(), snap.edge, snap.order);
+				Dock(w.members.front(), snap.edge, snap.order, snap.far);
 				return;
 			}
 			default:
@@ -939,13 +1181,15 @@ namespace SpaceGod::UI
 		if (Event::current().type != EventType::Repaint || drag.window < 0) return;
 		Vector2 m = Event::current().mousePosition;
 		std::vector<std::vector<Box>> slots(HudDock::EdgeCount);
+		std::vector<std::vector<bool>> far(HudDock::EdgeCount);
 		for (size_t i = 0; i < windows.size(); i++)
 		{
 			const auto& o = windows[i];
 			if (static_cast<int>(i) == drag.window || !o.drawn || !o.docked) continue;
 			slots[static_cast<int>(o.edge)].push_back(ToBox(o.rect));
+			far[static_cast<int>(o.edge)].push_back(o.far);
 		}
-		preview = HudDock::FindSnap(m.x, m.y, f.screenW, f.screenH, EdgeReach, TitleStrips(drag.window), slots);
+		preview = HudDock::FindSnap(m.x, m.y, f.screenW, f.screenH, EdgeReach, TitleStrips(drag.window), slots, far);
 		previewing = true;
 		Color c(UiStyle::Accent.r, UiStyle::Accent.g, UiStyle::Accent.b, 0.85f);
 		if (preview.kind == HudDock::Snap::Kind::Group && preview.target >= 0)
@@ -991,6 +1235,9 @@ namespace SpaceGod::UI
 			j->Set("y", w.floating.y);
 			j->Set("fw", w.floating.width);
 			j->Set("fh", w.floating.height);
+			j->Set("far", w.far); // US-T440
+			j->Set("fit", w.fitted);
+			j->Set("centred", w.centred);
 			list->Add(JsonValue(j));
 		}
 		o->Set("windows", list);
@@ -1027,6 +1274,9 @@ namespace SpaceGod::UI
 			w.order = j->GetInt("order");
 			w.size = Vector2(j->GetFloat("w", 260), j->GetFloat("h", 200));
 			w.floating = Rect(j->GetFloat("x", 200), j->GetFloat("y", 200), j->GetFloat("fw", 320), j->GetFloat("fh", 240));
+			w.far = j->GetBool("far"); // US-T440
+			w.fitted = j->GetBool("fit", true);
+			w.centred = j->GetBool("centred");
 			loaded.push_back(w);
 		}
 		windows = std::move(loaded);

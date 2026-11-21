@@ -27,6 +27,19 @@
 // drew inside its own rect (no Panel() call, no HudLayout::Take: the manager has placed and framed it), `available` when it
 // only shows sometimes (at the controls, in a fight), `alert` for anything urgent; Register it in Hud::RegisterDrawers. Open,
 // Close, Toggle and Visible drive it from keys; RectOf / PublishedRect say where it is drawn (the tutorial's outline).
+//
+// US-T440 made every HUD panel a drawer, and a drawer can now be:
+//   - fit: its window takes the size its content asks for each pass (Want; the HUD's Place), until the player resizes it.
+//     A fit drawer whose content asked for nothing the last time it drew (the panel had nothing to show) is not drawn; it
+//     is asked again on every Layout pass, drawn off the screen, so it comes back the moment it has something to show;
+//   - keyed: opened by a key or a flag (the market, the cargo hold, the boards): shown in either mode while pulled out;
+//   - always: an alert ("alert, always shown": the rewind bar, the hold rewind's readout, a lane ride's off-ramps): shown in
+//     either mode whenever it can show, with no close button;
+//   - bare: in the minimal HUD drawn as the overlay it was, with no title bar (frameless: no panel either); in HUD mode it
+//     has its title bar and moves like any window;
+//   - floating to begin with (floatY), centred across the screen and kept centred until moved (the modal-like boards);
+//   - far: on the left or right edge, stacked from the other end (the right-hand column's top stack);
+//   - yields: it takes what its edge has left (Room counts it in no other drawer's room: the selection card).
 
 #include "Cs/Cs.h"
 #include "UnityCompat/UnityTypes.h"
@@ -72,6 +85,16 @@ namespace SpaceGod::UI
 		std::function<DrawerAlert()> alert;
 		/// Draws the content into the rect handed (GUI units, screen space). Called once per GUI pass while it shows.
 		std::function<void(Rect)> draw;
+
+		// ---- US-T440 (the header's list)
+		/// A shorter title, for a tab in a group's strip too narrow for the whole one.
+		cs::String shortTitle;
+		/// Left or right edge: stacked from the other end (the right edge from the top).
+		bool far = false;
+		bool fit = false, keyed = false, always = false, bare = false, frameless = false, yields = false;
+		/// 0 or more: starts floating, centred across the screen, its top this far down (floatBottom: its bottom this far up).
+		float floatY = -1;
+		bool floatBottom = false;
 	};
 
 	/// A window: one drawer, or a group of them docked to each other.
@@ -89,6 +112,9 @@ namespace SpaceGod::UI
 		Vector2 size = Vector2(260, 200);
 		/// Floating: where.
 		Rect floating = Rect(200, 200, 320, 240);
+		/// US-T440: the far stack of its edge; its size follows its content (a fit drawer's, until resized); floating, kept
+		/// centred across the screen where its drawer starts (until moved).
+		bool far = false, fitted = true, centred = false;
 
 		// ---- not saved
 		/// Opened from the minimal HUD by a key or its tab: shown there until closed, or the HUD mode changes.
@@ -99,6 +125,10 @@ namespace SpaceGod::UI
 		Rect rect;
 		/// Drawn this pass (laid out and visible).
 		bool drawn = false;
+		/// US-T440: drawn with no title bar this pass (a bare drawer in the minimal HUD).
+		bool bareNow = false;
+		/// US-T440: the most content height it could have this pass (what its edge leaves it).
+		float room = 0;
 	};
 
 	class HudDrawers final
@@ -115,6 +145,8 @@ namespace SpaceGod::UI
 		struct Frame
 		{
 			bool hudMode = true;
+			/// US-T440: only the drawers that show with the HUD's panels hidden (U): the alerts and those opened by a key.
+			bool bare = false;
 			float screenW = 1920, screenH = 1080;
 			HudDock::Box bands[HudDock::EdgeCount];
 			std::function<Rect(Rect)> panel;
@@ -156,7 +188,7 @@ namespace SpaceGod::UI
 		/// Its window floating at <paramref name="r"/> (kept on screen when drawn).
 		void Float(const cs::String& id, Rect r);
 		/// Its window docked on <paramref name="edge"/> at <paramref name="order"/> among the windows there.
-		void Dock(const cs::String& id, HudDock::Edge edge, int order = 1000);
+		void Dock(const cs::String& id, HudDock::Edge edge, int order = 1000, bool far = false);
 		/// <paramref name="id"/>'s window joins <paramref name="into"/>'s (as its last tab, shown).
 		void Join(const cs::String& id, const cs::String& into);
 		/// Tears the drawer off its group into a window of its own, floating at <paramref name="r"/>.
@@ -176,6 +208,19 @@ namespace SpaceGod::UI
 		Rect RectOf(const cs::String& id) const;
 		/// The same, for code with no Hud at hand (the tutorial's outline): as the last Repaint drew it.
 		static Rect PublishedRect(const cs::String& id);
+		/// US-T440: the content rect the drawer was handed in the last Repaint (empty when it was not drawn).
+		static Rect PublishedContent(const cs::String& id);
+
+		/// US-T440: a fit drawer's content asks for w x h (from its draw callback: the HUD's Place); its window takes that size
+		/// from the next pass.
+		void Want(const cs::String& id, Vector2 size);
+		/// US-T440: the most content height the drawer's window could have (what its edge leaves it, the screen when it
+		/// floats), as the last pass laid out.
+		float Room(const cs::String& id) const;
+		/// US-T440: the box the windows docked on <paramref name="edge"/> took in the last pass laid out (empty: none).
+		HudDock::Box LastEdgeExtent(HudDock::Edge edge) const;
+		/// US-T440: the box the pull-out tabs on <paramref name="edge"/> took in the last pass drawn (empty: none).
+		HudDock::Box LastTabExtent(HudDock::Edge edge) const { return tabExtents[static_cast<int>(edge)]; }
 
 		/// A window is being dragged (or a press on a title or tab may become a drag).
 		bool Dragging() const { return drag.kind != DragKind::None; }
@@ -234,14 +279,34 @@ namespace SpaceGod::UI
 		bool haveLast = false;
 
 		static inline std::unordered_map<cs::String, Rect> published;
+		static inline std::unordered_map<cs::String, Rect> publishedContent;
+		/// US-T440: each edge's pull-out tabs as the last pass drew them.
+		HudDock::Box tabExtents[HudDock::EdgeCount];
+		/// US-T440: what each fit drawer's content asked for; those that asked for nothing the last time they drew.
+		std::unordered_map<cs::String, Vector2> wants;
+		std::unordered_map<cs::String, bool> empties;
+		/// US-T440: the fit drawer drawing now, and whether it asked (Want) while drawing.
+		cs::String drawing;
+		bool asked = false;
 
 		int SpecIndex(const cs::String& id) const;
 		bool Available(const cs::String& id) const;
+		/// US-T440: its own `available` (what Available adds to it: a fit drawer that asked for nothing is not).
+		bool SpecAvailable(const cs::String& id) const;
+		/// US-T440: draws the drawer's content into r, noting whether a fit drawer asked for anything.
+		void DrawContent(const DrawerSpec& s, Rect r);
+		/// US-T440: whether the window is drawn with no title bar in this frame (bare in the minimal HUD).
+		bool BareNow(const DrawerWindow& w, const Frame& f) const;
+		/// US-T440: whether one of its drawers is an alert (always shown).
+		bool HasAlways(const DrawerWindow& w) const;
+		/// US-T440: a fit window's size from what its content asked for (false: not fit, or nothing asked yet).
+		bool FitSize(const DrawerWindow& w, bool bare, Vector2& size) const;
 		DrawerAlert AlertOf(const cs::String& id) const;
 		/// The window's members that can show now.
 		std::vector<int> AvailableMembers(const DrawerWindow& w) const;
-		/// Shown, and in this mode (pinned, peeked or the HUD mode on), and one of its drawers can show.
-		bool VisibleNow(const DrawerWindow& w, bool hudMode) const;
+		/// Shown, and in this mode (pinned, peeked, keyed or the HUD mode on), and one of its drawers can show; or one of its
+		/// drawers is an alert that can show (US-T440). bareFrame: the HUD's panels hidden (U), only alerts and keyed ones.
+		bool VisibleNow(const DrawerWindow& w, bool hudMode, bool bareFrame = false) const;
 		HudDock::Edge HomeEdge(const DrawerWindow& w, const Frame& f) const;
 		DrawerWindow DefaultWindow(const DrawerSpec& s) const;
 		void Renumber(HudDock::Edge edge);
@@ -256,6 +321,8 @@ namespace SpaceGod::UI
 		/// The tabs each edge shows this frame (after Layout) and their lengths along it.
 		void CollectEdgeTabs(const Frame& f, std::vector<EdgeTab> (&on)[HudDock::EdgeCount], std::vector<float> (&lens)[HudDock::EdgeCount]) const;
 		void DrawEdgeTabs(const Frame& f);
+		/// US-T440: the part of the edge's band its tabs lie in (clear of the windows docked there).
+		HudDock::Box TabBand(HudDock::Edge edge, const Frame& f) const;
 		void HandleDrag(const Frame& f);
 		void Drop(const Frame& f);
 		void DrawPreview(const Frame& f);

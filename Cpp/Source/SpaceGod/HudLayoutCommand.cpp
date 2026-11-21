@@ -3,6 +3,10 @@
 // ping), HUD mode with every edge's tabs, a drawer floated off its edge, two drawers docked into a tabbed group (and the
 // bottom drawers' group pulled out), a collapsed and a pinned window in HUD mode, then the minimal HUD again with only the
 // pinned window left. Checks the layout saves and loads back the same, and puts the layout and the mode back as they were.
+// US-T440 (every panel a drawer): then, the layout reset and Earth selected, HUD mode with every default drawer (the top bar,
+// the navigator, the selection card, the status line...), and each modal-like drawer opened by its flag as its key does:
+// the market, the cargo hold, the fleet and the port (docked at Earth's port), and the market again in the minimal HUD (a
+// drawer opened by its key shows there too); checks each shows, where it should, and closes with its flag.
 //   sg.HudLayout [shot <dir>] [quit]   (screenshots: <dir>/hudlayout-*.png; without a dir, Saved/Screenshots)
 
 #include "UnitySpaceApp.h"
@@ -15,7 +19,11 @@
 #include "UnityCompat/UnityRuntime.h"
 #include "UnityCompat/UnityTypes.h"
 
+#include "BodyCatalog.h"
+#include "BodyDefinition.h"
 #include "Combat/CombatState.h"
+#include "Economy/Economy.h"
+#include "Economy/Settlement.h"
 #include "Ships.h"
 #include "Shared/Json/JsonObject.h"
 
@@ -303,8 +311,133 @@ namespace
 			return true;
 		});
 		shot(TEXT("minimal-pinned"));
+		// ---- US-T440: every panel a drawer
+		auto earth = [](UnitySpaceApp& app) -> int
+		{
+			auto body = (*app.Catalog())["Earth"];
+			return body != nullptr ? body->Index : 0;
+		};
+		push(TEXT("US-T440: the layout reset, Earth selected, HUD mode with every default drawer"), [run, lit, earth](UnitySpaceApp& app, double t)
+		{
+			auto* d = Drawers(app);
+			if (run->First())
+			{
+				d->ResetLayout();
+				app.HudMode = true;
+				app.Select(SpaceGod::Target::OfBody(earth(app)));
+			}
+			lit(app);
+			return t >= 2.0;
+		});
+		push(TEXT("every default drawer checked"), [run, log](UnitySpaceApp& app, double)
+		{
+			auto* d = Drawers(app);
+			log(app, TEXT("all drawers"));
+			auto docked = [d](const char* id, HudDock::Edge edge)
+			{
+				int w = d->WindowOf(id);
+				return w >= 0 && d->Windows()[w].docked && d->Windows()[w].edge == edge && d->Visible(id);
+			};
+			run->Expect(docked(Hud::DrawerTopBarId, HudDock::Edge::Top), TEXT("all: the top bar at the top edge"));
+			run->Expect(docked(Hud::DrawerNavigatorId, HudDock::Edge::Left), TEXT("all: the navigator at the left edge"));
+			run->Expect(docked(Hud::DrawerStatusId, HudDock::Edge::Bottom), TEXT("all: the status line at the bottom edge"));
+			run->Expect(docked(Hud::DrawerSelectionId, HudDock::Edge::Right), TEXT("all: the selection card at the right edge"));
+			run->Expect(docked(Hud::DrawerReactorId, HudDock::Edge::Right) && docked(Hud::DrawerSensorsId, HudDock::Edge::Right), TEXT("all: the reactor and the sensors at the right edge"));
+			auto top = d->RectOf(Hud::DrawerTopBarId), nav = d->RectOf(Hud::DrawerNavigatorId), status = d->RectOf(Hud::DrawerStatusId);
+			float sw = static_cast<float>(SpaceGod::Screen::width), sh = static_cast<float>(SpaceGod::Screen::height);
+			run->Expect(top.y < 20 && SpaceGod::Mathf::Abs(top.x + top.width * 0.5f - sw * 0.5f) < 2, TEXT("all: the top bar centred at the top, as it was"));
+			run->Expect(nav.x < 40 && nav.y < 20, TEXT("all: the navigator in the top left corner, as it was"));
+			run->Expect(status.yMax() > sh - 20, TEXT("all: the status line on the screen's foot, as it was"));
+			auto sel = d->RectOf(Hud::DrawerSelectionId), react = d->RectOf(Hud::DrawerReactorId);
+			run->Expect(sel.yMax() <= react.y + 0.5f, TEXT("all: the selection card stands over the reactor, as it did"));
+			run->Expect(!d->Visible(Hud::DrawerMarketId) && !d->Visible(Hud::DrawerCargoId), TEXT("all: the market and the cargo hold closed until their keys"));
+			return true;
+		});
+		shot(TEXT("all-drawers"));
+		struct Modal { const TCHAR* tag; const char* id; bool UnitySpaceApp::* flag; };
+		const Modal modals[] = {
+			{ TEXT("market"), Hud::DrawerMarketId, &UnitySpaceApp::ShowMarket },
+			{ TEXT("cargo"), Hud::DrawerCargoId, &UnitySpaceApp::ShowCargo },
+			{ TEXT("fleet"), Hud::DrawerFleetId, &UnitySpaceApp::ShowFleet },
+		};
+		for (const auto& m : modals)
+		{
+			push(FString::Printf(TEXT("US-T440: the %s opened by its flag"), m.tag), [run, lit, m](UnitySpaceApp& app, double t)
+			{
+				if (run->First()) app.*(m.flag) = true;
+				lit(app);
+				return t >= 1.5;
+			});
+			push(FString::Printf(TEXT("%s checked"), m.tag), [run, log, m](UnitySpaceApp& app, double)
+			{
+				auto* d = Drawers(app);
+				log(app, m.tag);
+				run->Expect(d->Visible(m.id), *FString::Printf(TEXT("%s: its drawer shows, opened by its flag"), m.tag));
+				if (FCString::Strcmp(m.tag, TEXT("market")) == 0)
+					run->Expect(!d->Visible(Hud::DrawerOpportunitiesId), TEXT("market: it takes the opportunities' place"));
+				if (FCString::Strcmp(m.tag, TEXT("fleet")) == 0)
+				{
+					auto r = d->RectOf(m.id);
+					int w = d->WindowOf(m.id);
+					run->Expect(w >= 0 && !d->Windows()[w].docked && SpaceGod::Mathf::Abs(r.x + r.width * 0.5f - SpaceGod::Screen::width * 0.5f) < 2,
+						TEXT("fleet: floating, centred across the screen, as it was"));
+				}
+				return true;
+			});
+			shot(m.tag);
+			push(FString::Printf(TEXT("the %s closed by its flag"), m.tag), [run, m](UnitySpaceApp& app, double t)
+			{
+				if (run->First()) app.*(m.flag) = false;
+				return t >= 0.5;
+			});
+			push(FString::Printf(TEXT("%s closed checked"), m.tag), [run, m](UnitySpaceApp& app, double)
+			{
+				run->Expect(!Drawers(app)->Visible(m.id), *FString::Printf(TEXT("%s: closed with its flag"), m.tag));
+				return true;
+			});
+		}
+		push(TEXT("US-T440: docked at Earth's port (the port screen opens)"), [run, lit, earth](UnitySpaceApp& app, double t)
+		{
+			if (run->First())
+				for (const auto& s : app.Economy()->At(earth(app)))
+					if (s->Discovered() && app.Dock(s)) break;
+			lit(app);
+			return t >= 2.0;
+		});
+		push(TEXT("port checked"), [run, log](UnitySpaceApp& app, double)
+		{
+			auto* d = Drawers(app);
+			log(app, TEXT("port"));
+			run->Expect(app.DockedAt != nullptr && app.ShowPort, TEXT("port: docked, the port screen's flag up"));
+			run->Expect(d->Visible(Hud::DrawerPortId), TEXT("port: its drawer shows"));
+			return true;
+		});
+		shot(TEXT("port"));
+		push(TEXT("undocked, the market opened and the minimal HUD"), [run, lit](UnitySpaceApp& app, double t)
+		{
+			if (run->First())
+			{
+				app.Undock(cs::String());
+				app.ShowMarket = true;
+				app.HudMode = false;
+			}
+			lit(app);
+			return t >= 1.5;
+		});
+		push(TEXT("minimal with the market checked"), [run, log](UnitySpaceApp& app, double)
+		{
+			auto* d = Drawers(app);
+			log(app, TEXT("minimal market"));
+			run->Expect(!app.ShowPort && !d->Visible(Hud::DrawerPortId), TEXT("undocked: the port's drawer gone with its flag"));
+			run->Expect(d->Visible(Hud::DrawerMarketId), TEXT("minimal: the market, opened by its key, shows"));
+			run->Expect(!d->Visible(Hud::DrawerTopBarId) && !d->Visible(Hud::DrawerNavigatorId) && !d->Visible(Hud::DrawerStatusId),
+				TEXT("minimal: the top bar, the navigator and the status line hidden"));
+			return true;
+		});
+		shot(TEXT("minimal-market"));
 		push(TEXT("the layout and the mode put back"), [run](UnitySpaceApp& app, double)
 		{
+			app.ShowMarket = false;
 			if (app.Piloted.Ship != nullptr && app.Piloted.Ship->Combat != nullptr) app.Piloted.Ship->Combat->PingLitS = 0;
 			run->Restore();
 			return true;
@@ -318,8 +451,9 @@ namespace
 
 	FAutoConsoleCommand GHudLayoutCommand(
 		TEXT("sg.HudLayout"),
-		TEXT("US-T438/US-T439: sg.HudLayout [shot <dir>] [quit] takes a practice fighter's helm and screenshots the HUD's drawers: the minimal HUD, "
+		TEXT("US-T438/US-T439/US-T440: sg.HudLayout [shot <dir>] [quit] takes a practice fighter's helm and screenshots the HUD's drawers: the minimal HUD, "
 			"HUD mode with its edge tabs, a drawer floated, two drawers docked into a tabbed group, a collapsed and a pinned window (and the minimal "
-			"HUD with only the pinned one); checks the layout saves and loads back the same; puts the layout and the mode back after."),
+			"HUD with only the pinned one), HUD mode with every default drawer, the market, the cargo hold, the fleet and the port opened (and the "
+			"market in the minimal HUD); checks the layout saves and loads back the same; puts the layout and the mode back after."),
 		FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& args) { Start(args); }));
 }

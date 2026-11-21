@@ -683,15 +683,16 @@ namespace SpaceGod
 		if (menu) GUI::enabled = false;
 		// US-T252: Settings > Accessibility > HUD opacity, over the view's overlays only (a screen or menu open stays solid).
 		if (!menu && OpenScreens() == 0 && !ShowSystemMap && !ShowLogs && !ShowDiscoveries && !ShowEncyclopedia /* US-T271 */ && !ShowSociety /* US-T293 */) GUI::fade = PlayerOptions::HudAlpha();
+		// US-T440: the comms panel (US-T137), the cruise drive's (US-T127) and the tractor beam's (US-T95) readouts, the
+		// Influence meter (US-T140), the tutorial's card (US-T254), the rewind bar (US-T99) and the hold rewind's quiet line
+		// (US-T409) are the HUD's drawers now, drawn in hud->Draw; what is left here is drawn over the HUD.
 		hud->Draw();
-		DrawComms(); // US-T137: the comms panel, over the HUD
-		DrawSystemCruise(); // US-T127: the cruise drive's readout
-		DrawTractorHud(); // US-T95: the tractor beam's readout
-		DrawInfluence(); // US-T140: the Influence meter, the embody gate's refusals, the squad's line
+		DrawSystemCruise(); // US-T127/US-T197: the cruise drive's look (the edge glow, the flash, the streaks)
+		DrawTractorHud(); // US-T264: the mining beam's readout
+		DrawInfluence(); // US-T140: the embody gate's refusals (an alert)
 		Tour::ShowcaseTour::Draw(*this); // US-T147: the showcase tour's strip
-		DrawTutorial(); // US-T254: the tutorial's card, or a first-time hint
-		DrawRewindBar(); // US-T99: the timeline bar (after Shift+F8, while a seek replays)
-		DrawHoldRewind(); // US-T409: REWIND ready / its cooldown / how far back a hold has gone
+		DrawTutorial(); // US-T254: the welcome offer, and the outline round what a step points at
+		DrawHoldRewind(); // US-T409: a hold under way, the hull's or the fight's end held back, co-op's wait (alerts, centred)
 		cheatMenu->Draw(*this); // US-T126: the dev menu, or the HUD's hint for its key
 		GUI::enabled = true;
 		if (menu) pauseMenu->Draw();

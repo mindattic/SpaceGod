@@ -13,6 +13,10 @@ public:
 
 	/// <summary>The Influence meter and, while one is fresh, the refusal banner and the squad's line (US-T140).</summary>
 	void DrawInfluence();
+	/// US-T440: the Influence meter, its drawer's content (DrawInfluence keeps the embody gate's refusal, an alert).
+	void DrawInfluenceMeter();
+	/// US-T440: DrawInfluence drawing the meter (for its drawer) rather than the refusal.
+	bool influenceMeterPass = false;
 
 	/// <summary>US-T215: the squad banner's text (empty when none), drawn by the Hud in its TopCentre stack.</summary>
 	cs::String SquadLine();

@@ -428,10 +428,9 @@ namespace SpaceGod
 		if (!rewindFrames.empty()) endS = std::max(endS, rewindFrames.back().SessionS);
 		if (endS <= 0) endS = 1;
 		float w = std::min(900.0f, Screen::width - 80.0f), h = 54;
-		auto panel = Rect((Screen::width - w) * 0.5f, 70, w, h);
+		// US-T440: the rewind bar's drawer (an alert, always shown: at the top edge under the top bar, framed by it).
+		auto panel = hud->Place(w, h);
 		auto strip = Rect(panel.x + 12, panel.y + 8, w - 24, 14);
-		if (!UiRects.Contains(panel)) UiRects.Add(panel);
-		GUI::Box(panel, GUIContent::none(), rewindBarPanel);
 		auto xOf = [&](double s) { return strip.x + static_cast<float>(cs::Math::Clamp(s / endS, 0.0, 1.0)) * strip.width; };
 
 		// The replayable stretch (the frame log), the keyframes, and where the session is now.

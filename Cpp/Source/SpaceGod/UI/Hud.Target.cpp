@@ -245,15 +245,13 @@ namespace SpaceGod::UI
 		// US-T404: whether recon of your side paints it for your torpedoes (ElectronicWarfare::Painted, read only).
 		bool paintLine = focusLine && ElectronicWarfare::Painted(battle, t, me->Side);
 		if (paintLine) fixedH += RowH;
-		float room = layout.FreeRight() - HudLayout::Gap;
+		float room = PlaceRoom(); // US-T440: what its edge leaves it
 		int kindRows = static_cast<int>(kinds.size());
 		if (fixedH + kindRows * RowH > room) kindRows = std::max(0, static_cast<int>((room - fixedH) / RowH));
 		float h = fixedH + kindRows * RowH;
-		auto r = layout.Take(HudRegion::BottomRight, CardW, h);
-		RegisterUi(r);
+		auto r = Place(CardW, h); // US-T440: the target card's drawer (framed by it), up the right edge
 		if (Event::current().type != EventType::Repaint) return;
 
-		GUI::Box(r, GUIContent::none(), panel);
 		float x = r.x + Pad, w = CardW - 2 * Pad, y = r.y + 6;
 		bool made = me->LockProgress >= 1;
 		Color lockTint = made ? LockColor : HostileColor;

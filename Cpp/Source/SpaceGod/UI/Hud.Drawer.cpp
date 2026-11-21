@@ -77,39 +77,12 @@ namespace SpaceGod::UI
 		if (drawersRegistered) return;
 		drawersRegistered = true;
 		using HudDock::Edge;
-		// The bottom drawer's four, one window of tabs along the bottom edge (filling it), closed to begin with as it was.
-		for (int t = 0; t < DrawerTabCount; t++)
-		{
-			auto tab = static_cast<DrawerTab>(t);
-			DrawerSpec s;
-			s.id = DrawerTabId(tab);
-			s.title = DrawerTabTitle(tab);
-			s.edge = Edge::Bottom;
-			s.size = Vector2(0, 420);
-			s.shown = false;
-			s.group = "bottom";
-			s.available = [this] { return DrawerAvailable(); };
-			s.draw = [this, tab](Rect r) { DrawDrawerTab(tab, r); };
-			if (tab == DrawerTab::Ships) s.title = "SHIPS";
-			if (tab == DrawerTab::Objectives) // US-T405: the offers waiting on the SpaceGod
-				s.alert = [this]
-				{
-					DrawerAlert a;
-					auto lc = app->Galaxy != nullptr ? LastingConsequences::Find(*app->Galaxy) : nullptr;
-					if (lc == nullptr) return a;
-					int offered = 0;
-					for (const auto& o : lc->Objectives)
-						if (o != nullptr && o->Status == GodObjectiveStatus::Offered) offered++;
-					if (offered > 0) a = DrawerAlert{ 1, cs::Cat(offered, offered == 1 ? " offer" : " offers") };
-					return a;
-				};
-			drawers.Register(std::move(s));
-		}
 		// The reactor (US-T94) and the sensors (US-T93): up the right edge from the bottom, the reactor first, at the controls.
 		{
 			DrawerSpec s;
 			s.id = DrawerReactorId;
 			s.title = "REACTOR";
+			s.shortTitle = "PWR"; // US-T440: a tab's room in a narrow group
 			s.edge = Edge::Right;
 			s.size = Vector2(240, 158);
 			s.available = [this] { return ReactorAvailable(); };
@@ -125,6 +98,7 @@ namespace SpaceGod::UI
 			DrawerSpec s;
 			s.id = DrawerSensorsId;
 			s.title = "SENSORS";
+			s.shortTitle = "SNS"; // US-T440
 			s.edge = Edge::Right;
 			s.size = Vector2(240, 82);
 			s.available = [this] { return SensorsAvailable(); };
@@ -140,6 +114,38 @@ namespace SpaceGod::UI
 			};
 			drawers.Register(std::move(s));
 		}
+		// US-T440: every other panel's drawer, at its default edge (the reactor and the sensors stay first up the right edge).
+		RegisterPanelDrawers();
+		// The bottom drawer's four, one window of tabs along the bottom edge (filling it), closed to begin with as it was; last on
+		// that edge, so pulled out it stands over the status line and the helm's lines (US-T440).
+		for (int t = 0; t < DrawerTabCount; t++)
+		{
+			auto tab = static_cast<DrawerTab>(t);
+			DrawerSpec s;
+			s.id = DrawerTabId(tab);
+			s.title = DrawerTabTitle(tab);
+			s.edge = Edge::Bottom;
+			s.size = Vector2(0, 420);
+			s.shown = false;
+			s.group = "bottom";
+			s.available = [this] { return DrawerAvailable(); };
+			s.draw = [this, tab](Rect r) { DrawDrawerTab(tab, r); };
+			if (tab == DrawerTab::Ships) s.title = "SHIPS";
+			s.shortTitle = tab == DrawerTab::Navigation ? "NAV" : tab == DrawerTab::Ships ? "SHIPS" : tab == DrawerTab::Notices ? "NOTES" : "OBJ"; // US-T440
+			if (tab == DrawerTab::Objectives) // US-T405: the offers waiting on the SpaceGod
+				s.alert = [this]
+				{
+					DrawerAlert a;
+					auto lc = app->Galaxy != nullptr ? LastingConsequences::Find(*app->Galaxy) : nullptr;
+					if (lc == nullptr) return a;
+					int offered = 0;
+					for (const auto& o : lc->Objectives)
+						if (o != nullptr && o->Status == GodObjectiveStatus::Offered) offered++;
+					if (offered > 0) a = DrawerAlert{ 1, cs::Cat(offered, offered == 1 ? " offer" : " offers") };
+					return a;
+				};
+			drawers.Register(std::move(s));
+		}
 		drawers.ResetLayout();
 	}
 
@@ -150,37 +156,32 @@ namespace SpaceGod::UI
 		f.screenW = static_cast<float>(Screen::width);
 		f.screenH = static_cast<float>(Screen::height);
 		float left = SafeLeft() + HudLayout::Margin, right = SafeRight() - HudLayout::Margin;
-		float top = HudLayout::TopBarBottom + HudLayout::Margin;
-		// The status line's band at the foot (40 high with its gap, as the bottom drawer always sat on it).
-		float foot = f.screenH - 40 - HudLayout::Gap;
+		float top = HudLayout::Margin, foot = f.screenH - HudLayout::Margin;
 		using HudDock::Box;
 		using HudDock::Edge;
-		// The left edge: under the navigator's title bar (it stays a fixed panel until US-T440), down to the foot.
-		f.bands[static_cast<int>(Edge::Left)] = Box(left, 10 + 34 + HudLayout::Gap, Mathf::Max(0.0f, right - left), Mathf::Max(0.0f, foot - 50));
+		// US-T440: every panel is a drawer, so the edges' bands are the screen less its margins: the top bar and the navigator
+		// are drawers at the top of the top and left edges, the status line at the foot of the bottom edge.
+		// The left edge stops over the status line's window (its foot stack, the cargo hold, opened over it as it always did).
+		float leftFoot = foot - 64;
+		f.bands[static_cast<int>(Edge::Left)] = Box(left, top, Mathf::Max(0.0f, right - left), Mathf::Max(0.0f, leftFoot - top));
 		f.bands[static_cast<int>(Edge::Top)] = Box(left, top, Mathf::Max(0.0f, right - left), Mathf::Max(0.0f, foot - top));
-		// The right edge: the right-hand column's bottom stack, from over the dev menu's hint up to under the top bar.
-		float rightBottom = f.screenH - HudLayout::Margin - HudLayout::DevHintStrip;
-		f.bands[static_cast<int>(Edge::Right)] = Box(left, top, Mathf::Max(0.0f, right - left), Mathf::Max(0.0f, rightBottom - top));
-		// The bottom edge: from the left edge to the right-hand column (as the bottom drawer was), on the status line.
-		float x1 = Mathf::Min(layout.BottomColumnLeft(), SafeRight()) - HudLayout::Margin;
+		// The right edge: the right-hand column, from over the dev menu's hint up to the hold rewind's line (the readout itself
+		// is the first drawer down from its top, where the line always was).
+		float rightTop = 44, rightBottom = f.screenH - HudLayout::Margin - HudLayout::DevHintStrip;
+		f.bands[static_cast<int>(Edge::Right)] = Box(left, rightTop, Mathf::Max(0.0f, right - left), Mathf::Max(0.0f, rightBottom - rightTop));
+		// The bottom edge: from the left edge to the right-hand column's foot stack (the reactor, the sensors, the cards over
+		// them) as the last pass laid it out, on the screen's foot.
+		float x1 = right;
+		for (const auto& w : drawers.Windows())
+			if (w.drawn && w.docked && w.edge == Edge::Right && !w.far) x1 = Mathf::Min(x1, w.rect.x - HudLayout::Margin);
+		x1 = Mathf::Min(x1, f.screenW - HudLayout::DevHintWidth - HudLayout::Margin);
 		if (x1 - left < 520) x1 = Mathf::Min(left + 520, right);
 		f.bands[static_cast<int>(Edge::Bottom)] = Box(left, top, Mathf::Max(0.0f, x1 - left), Mathf::Max(0.0f, foot - top));
+		bottomBandW = Mathf::Max(0.0f, x1 - left);
 		f.panel = [this](Rect r) { return Panel(r); };
 		f.registerUi = [this](Rect r) { RegisterUi(r); };
 		f.styles = HudDrawers::Styles{ panel, title, small, button, buttonActive };
 		return f;
-	}
-
-	void Hud::ReserveDrawerEdges()
-	{
-		RegisterDrawers();
-		auto f = DrawerFrame();
-		auto r = drawers.EdgeExtent(HudDock::Edge::Right, f);
-		// US-T439: with no window on it (the minimal HUD), its urgent tabs still keep the bottom drawers clear of them.
-		if (r.Empty()) r = drawers.EdgeTabExtent(HudDock::Edge::Right, f);
-		if (r.Empty()) return;
-		// Its windows stand from the column's foot as the reactor and the sensors did: the column's next panel goes over them.
-		layout.Take(HudRegion::BottomRight, r.w, (f.bands[static_cast<int>(HudDock::Edge::Right)].Bottom() - r.y));
 	}
 
 	bool Hud::DrawerOpen() const

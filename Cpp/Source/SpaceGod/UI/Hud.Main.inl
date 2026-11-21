@@ -92,14 +92,9 @@ private:
 	/// US-T261: the logs screen (Shift+L), made the first time it is opened.
 	cs::Ref<LogsScreen> logsScreen;
 
-	/// US-T152..T155: where every docked panel goes this draw (HudLayout.h has the rule), reset at the top of Draw.
+	/// US-T152..T155: where every banner goes this draw (HudLayout.h has the rule), reset at the top of Draw; US-T440: the
+	/// panels are drawers (HudDrawers), the banners stack under the top edge's.
 	HudLayout layout;
-	/// The news ticker's or the open news panel's rect, taken from TopCentre first thing in Draw so every alert and
-	/// banner stacks under it (empty when neither is drawn).
-	Rect newsRect;
-
-	/// Takes TopCentre's first slot for the news (the ticker or the open feed) before anything else is drawn.
-	void LayoutNews();
 
 	/// The Bio Mass contact warning (US-T125) in the TopCentre stack, under the news (US-T154).
 	void DrawBioMassWarning();
