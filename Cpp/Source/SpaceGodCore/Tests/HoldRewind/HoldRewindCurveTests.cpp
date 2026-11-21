@@ -13,7 +13,10 @@
 #include <cstdio>
 #include <limits>
 
+#include <vector>
+
 #include "Persistence/HoldRewindCurve.h"
+#include "Persistence/HoldRewindEcho.h"
 
 using namespace SpaceGod::Core;
 
@@ -94,6 +97,29 @@ int main()
 		tau = 100;
 		for (int i = 0; i < 1000; i++) tau = HoldRewindCurve::Step(tau, 1.0 / 60, TopRate, oldest, 98.5);
 		Check(Near(tau, 98.5), "a stop is never passed");
+	}
+
+	// US-T427: the sounds heard, played back reversed as a hold passes them.
+	{
+		HoldRewindEcho<int> echo;
+		for (int i = 0; i <= 30; i++) echo.Record(100.0 + i * 0.5, i, WindowS + 1); // heard every 0.5 s from 100 to 115
+		Check(echo.Count() == 23, "only the last window and a second of sounds are kept");
+		std::vector<int> played;
+		auto play = [&played](int i) { played.push_back(i); };
+		int n = echo.Crossed(115.0, 113.9, play, 64);
+		Check(n == 3 && played.size() == 3 && played[0] == 30 && played[1] == 29 && played[2] == 28, "a hold passing three sounds plays them, newest first");
+		played.clear();
+		Check(echo.Crossed(113.9, 113.6, play, 64) == 0, "between sounds, none");
+		Check(echo.Crossed(113.6, 113.6, play, 64) == 0 && echo.Crossed(113.0, 114.0, play, 64) == 0, "standing still or going forward, none");
+		Check(echo.Crossed(115.0, 100.0, play, 4) == 4, "at most the cap in one frame");
+		played.clear();
+		echo.Crossed(115.0, 113.5, play, 64);
+		Check(played.size() == 3 && played.back() == 28, "a sound heard exactly at the moment reached is not passed yet");
+		echo.Resumed(112.0, 20.0);
+		Check(echo.Count() == 17 && Near(echo.All().back().At, 132.0), "after a resume: later sounds never were, the rest move on with the clock");
+		played.clear();
+		echo.Crossed(132.0, 131.4, play, 64);
+		Check(played.size() == 2 && played[0] == 24 && played[1] == 23, "and a later hold passes them at their new moments");
 	}
 
 	std::printf("HoldRewindCurveTests: %d checks, %d failures\n", checks, failures);

@@ -13,6 +13,8 @@
 #include "Embodiment/StationSeat.h"
 #include "Ships.h"
 #include "World.h"
+#include "Persistence/HoldRewindEcho.h" // US-T427: the fight's sounds played back reversed under a hold rewind
+#include "UnityCompat/UnityRuntime.h"
 
 #include "HAL/PlatformTime.h"
 
@@ -348,6 +350,58 @@ namespace SpaceGod::Audio::CombatSounds
 			return muffled ? far[i] : clean[i];
 		}
 
+		// ================================================================ US-T427: the hold rewind, heard
+
+		/// The clip played backward: an explosion sucked back into its flash, a shot drawn back into the gun.
+		const SoundClip& Reversed(Snd s, bool muffled)
+		{
+			static std::array<std::array<SoundClip, 2>, SndCount> rev;
+			static std::array<std::array<bool, 2>, SndCount> built{};
+			const int i = static_cast<int>(s), j = muffled ? 1 : 0;
+			if (!built[i][j])
+			{
+				const SoundClip& fwd = Clip(s, muffled);
+				SoundClip r = fwd;
+				if (fwd.IsValid())
+				{
+					auto samples = std::make_shared<std::vector<std::int16_t>>(fwd.Samples->rbegin(), fwd.Samples->rend());
+					r.Samples = samples;
+				}
+				r.Name = "Combat.Reversed";
+				rev[i][j] = r;
+				built[i][j] = true;
+			}
+			return rev[i][j];
+		}
+
+		/// The bed under a hold: a tape running backward, a breathy whirr with a warble that falls and rises, looped.
+		const SoundClip& RewindBed()
+		{
+			static SoundClip clip;
+			if (!clip.IsValid())
+			{
+				auto b = Buffer(1.2f);
+				Noise(b, 0, 1.2f, 0.5f, 0.35f, 0.0f, 181);
+				for (int k = 0; k < 4; k++)
+				{
+					Tone(b, k * 0.3f, 0.3f, 720, 380, 0.22f, Wave::Triangle, 0.01f);
+					Tone(b, k * 0.3f, 0.3f, 1440, 760, 0.08f, Wave::Sine, 0.01f);
+				}
+				Tone(b, 0, 1.2f, 55, 55, 0.25f, Wave::Sine, 0.0f);
+				clip = FinishLoop(std::move(b), "Rewind.Bed", 0.55f);
+			}
+			return clip;
+		}
+
+		/// A sound heard, as it was played: kept for the window so a hold can play it again, reversed.
+		struct Echoed
+		{
+			Snd snd = Snd::Gun;
+			bool muffled = false;
+			Vector3 dir;
+			float volume = 1, pitch = 1;
+		};
+
 		// ================================================================ the cues the fight raises
 
 		struct Pending
@@ -371,6 +425,12 @@ namespace SpaceGod::Audio::CombatSounds
 			const World* world = nullptr;
 			std::array<std::array<double, 8>, PoolCount> busyUntil{};
 			std::uint32_t jitter = 0x9E3779B9u;
+			// US-T427: what was heard (the effects' clock), the hold under way, its bed and the last clock it reached.
+			HoldRewindEcho<Echoed> echo;
+			bool holding = false;
+			double lastClock = 0, lastWall = 0;
+			LoopId bed = 0;
+			int fxSeen = 0, reversed = 0;
 		};
 
 		State& S()
@@ -556,6 +616,11 @@ namespace SpaceGod::Audio::CombatSounds
 		s.ownUnit = nullptr;
 		s.world = nullptr;
 		Clear();
+		// US-T427
+		if (s.bed != 0) GameAudio::StopLoop(s.bed, 0.1f);
+		s.bed = 0;
+		s.holding = false;
+		s.echo.Clear();
 	}
 
 	void Poll(UnitySpaceApp* app)
@@ -572,6 +637,47 @@ namespace SpaceGod::Audio::CombatSounds
 		{
 			s.world = app->World().get();
 			Clear();
+			s.echo.Clear();
+		}
+
+		// US-T427: under a hold rewind the fight is heard backward. A bed (a tape running back) whose pitch and loudness follow
+		// the playback's speed, and every sound heard in the window played again reversed as the hold passes the moment it
+		// was heard (on the effects' clock, which runs back with the hold). On letting go the undone sounds never were.
+		{
+			const double wall = FPlatformTime::Seconds();
+			const double clock = app->HoldRewindFxClock(UnityCompat::Time::unscaledTime);
+			if (app->HoldRewindActive())
+			{
+				if (!s.holding)
+				{
+					s.holding = true;
+					s.lastClock = clock;
+					s.lastWall = wall;
+					s.bed = GameAudio::StartLoop(RewindBed(), AudioBus::Effects, 0.2f);
+				}
+				const double dt = std::max(1e-3, wall - s.lastWall);
+				const float rate = static_cast<float>(std::clamp((s.lastClock - clock) / dt, 0.0, 4.0)); // seconds of the past a second
+				GameAudio::SetLoopVolume(s.bed, std::clamp(0.2f + 0.12f * rate, 0.2f, 0.6f));
+				GameAudio::SetLoopPitch(s.bed, std::clamp(0.7f + 0.2f * rate, 0.6f, 1.4f));
+				const float played = std::clamp(0.85f + 0.15f * rate, 0.85f, 1.4f);
+				s.reversed += s.echo.Crossed(s.lastClock, clock, [&](const Echoed& e)
+				{
+					GameAudio::Play3D(Reversed(e.snd, e.muffled), AudioBus::Effects, e.dir * PlaceUnits, e.volume * 0.8f, e.pitch * played, PlaceUnits, 1e6f);
+				}, 12);
+				s.lastClock = clock;
+				s.lastWall = wall;
+			}
+			else if (s.holding)
+			{
+				s.holding = false;
+				GameAudio::StopLoop(s.bed, 0.25f);
+				UE_LOG(LogTemp, Display, TEXT("CombatSounds: hold rewind heard backward: bed %s, %d sounds played reversed (%d kept)"),
+					s.bed != 0 ? TEXT("played") : TEXT("none"), s.reversed, static_cast<int>(s.echo.Count()));
+				s.bed = 0;
+				s.reversed = 0;
+			}
+			float resumeFx = 0;
+			if (app->HoldRewindFxEnded(s.fxSeen, resumeFx)) s.echo.Resumed(resumeFx, UnityCompat::Time::unscaledTime - resumeFx);
 		}
 
 		cs::Ref<Battle> heldBattle;
@@ -645,6 +751,8 @@ namespace SpaceGod::Audio::CombatSounds
 				const SoundClip& clip = Clip(q.p.snd, muffled);
 				GameAudio::Play3D(clip, AudioBus::Effects, q.dir * PlaceUnits, volume, pitch, PlaceUnits, 1e6f);
 				busy[slot] = now + clip.Seconds() / std::max(0.2f, pitch);
+				// US-T427: kept for the window, for a hold to play back reversed.
+				s.echo.Record(UnityCompat::Time::unscaledTime, Echoed { q.p.snd, muffled, q.dir, volume, pitch }, UnitySpaceApp::HoldRewindTuning::WindowS + 1);
 			}
 		}
 	}

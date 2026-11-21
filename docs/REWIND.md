@@ -714,12 +714,28 @@ unit; their schedules run on underneath), and the war lists it, numbers it, coun
   and phases 26-29: the helm is put well past the fight's edge, the hull is out of it with the fight still kept, and a
   hold to before puts it back in the fight at its helm (56/56).
 
+### Heard backward (US-T427)
+
+- **The bed.** Under a hold plays a synthesized loop: a tape running back, a breathy whirr with a falling warble
+  (`CombatSounds`, `RewindBed`). Its pitch and loudness follow the playback's speed (the slow start, the top rate),
+  and it fades out on letting go.
+- **The fight, reversed.** Every fight sound heard is kept for the window with the moment it was heard on the
+  effects' clock, the clock US-T421's reversed effects age by (`Persistence/HoldRewindEcho.h`). While a hold runs
+  that clock back, each sound it passes plays again reversed, where it was heard: an explosion is sucked back into
+  its flash, and a shot is drawn back into the gun. At most 12 play per frame, sped up a little with the playback.
+  On letting go the sounds after the moment played on from never were, and the rest move on with the clock, as the
+  effects do. Local to each machine, like all of the game's sound.
+- **Proved.** `HoldRewindEcho` is unit-checked in `Tests/HoldRewind` (27/27 with the curve's checks): which sounds a
+  hold passes and in what order, the cap, a resume dropping the undone and shifting the rest. A self-test run with a
+  real audio device (`-GameAudio`, no `-nosound`) logs each hold. Every hold played the bed, and 5 to 64 sounds were
+  played reversed per hold (`CombatSounds: hold rewind heard backward: bed played, 64 sounds played reversed`). The
+  self-test passed 56/56 in that run.
+
 ### Not yet (later stages)
 
 - A ship that changed phase (left an orbit, joined a lane) in the window is still drawn where its *current* phase
   puts it at the past `jd`, as a ship's analytic state is a snapshot of now, overwritten at every phase change.
-- The reversed audio bed. In co-op, a fight's start and a fight left are still barriers (US-T424 and US-T426 are
-  single-player).
+- In co-op, a fight's start and a fight left are still barriers (US-T424 and US-T426 are single-player).
 
 ## Parked: checkpoint loops with ghost replays (US-T169)
 
